@@ -1,27 +1,52 @@
-export const GoalTypes = {
-  FAT_LOSS: "fat_loss",
-  MUSCLE_GAIN: "muscle_gain",
-  BODY_FAT: "body_fat",
-  WEIGHT: "weight",
-  PERFORMANCE: "performance",
+export const GoalType = {
+  QUANTIFIABLE: "quantifiable",
+  HABIT: "habit",
+  STREAK: "streak",
+  MILESTONE: "milestone",
 };
 
-export function createGoal() {
+export const GoalStatus = {
+  ON_TRACK: "On Track",
+  AHEAD: "Ahead",
+  PLATEAU: "Plateau",
+  OFF_TRACK: "Off Track",
+  COMPLETED: "Completed",
+};
+
+export function createGoal(data = {}) {
   return {
-    id: "",
+    id: Date.now().toString(),
 
     title: "",
 
-    type: GoalTypes.BODY_FAT,
+    primary: false,
 
-    targetValue: null,
+    type: GoalType.QUANTIFIABLE,
 
-    currentValue: null,
+    measurable: true,
 
-    targetDate: null,
+    startValue: 0,
 
-    createdAt: new Date(),
+    currentValue: 0,
 
-    status: "active",
+    targetValue: 0,
+
+    unit: "",
+
+    projectedCompletion: "",
+
+    confidence: 0,
+
+    trend: "Improving",
+
+    velocity: null,
+
+    status: GoalStatus.ON_TRACK,
+
+    nextAction: "",
+
+    supportingMetrics: [],
+
+    ...data,
   };
 }

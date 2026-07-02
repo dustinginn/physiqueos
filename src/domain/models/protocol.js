@@ -1,0 +1,53 @@
+import { createFieldProvenance, createSource } from "./recordMetadata";
+
+export const ProtocolCategory = {
+  MEDICATION: "medication",
+  PEPTIDE: "peptide",
+  SUPPLEMENT: "supplement",
+  NUTRITION: "nutrition",
+  TRAINING: "training",
+  RECOVERY: "recovery",
+  LIFESTYLE: "lifestyle",
+  OTHER: "other",
+};
+
+export const ProtocolStatus = {
+  PLANNED: "planned",
+  ACTIVE: "active",
+  PAUSED: "paused",
+  COMPLETED: "completed",
+};
+
+export function createProtocol(data = {}) {
+  return {
+    id: "",
+    userId: "",
+    name: "",
+    category: ProtocolCategory.LIFESTYLE,
+    relatedGoalIds: [],
+    startDate: "",
+    endDate: null,
+    status: ProtocolStatus.ACTIVE,
+    dose: {
+      value: null,
+      unit: "",
+    },
+    doseUnit: "",
+    doseHistory: [],
+    frequency: {
+      interval: null,
+      unit: "",
+      daysOfWeek: [],
+    },
+    schedule: {
+      type: "",
+      nextScheduledAt: null,
+    },
+    notes: "",
+    source: createSource({ type: "manual" }),
+    fieldProvenance: createFieldProvenance(),
+    createdAt: "",
+    updatedAt: "",
+    ...data,
+  };
+}

@@ -1,0 +1,108 @@
+[browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerLayoutRouter url="/lab" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+      <SegmentViewNode type="page" pagePath="lab/page.js">
+        <SegmentTrieNode>
+        <FounderAlphaLabPage>
+          <FounderAlphaLabScreen personas={[...]}>
+            <main className="app-surfac...">
+              <div className="mx-auto ma...">
+                <LabHeader journeys={[...]} onLoad={function loadJourney} onReplay={function replayJourney} ...>
+                  <Card className="sticky top...">
+                    <div className={"\n      ..."}>
+                      <div className="flex flex-...">
+                        <div>
+                        <div className="grid gap-2...">
+                          <LabButton>
+                          <label className="inline-fle...">
+                            <Archive>
+                            <select aria-label="Load Previ..." className="max-w-[150..." defaultValue="" ...>
+                              <option>
++                             <option value="lab_1783000067430_lfbl5g">
+                              ...
+                          ...
+                ...
+      ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at option (<anonymous>)
+    at <unknown> (src/screens/FounderAlphaLabScreen.jsx:348:17)
+    at Array.map (<anonymous>)
+    at LabHeader (src/screens/FounderAlphaLabScreen.jsx:347:25)
+    at FounderAlphaLabScreen (src/screens/FounderAlphaLabScreen.jsx:258:9)
+    at FounderAlphaLabPage (src\app\lab\page.js:17:10)
+  346 |               <option value="">Load Previous</option>
+  347 |               {journeys.map((journey) => (
+> 348 |                 <option key={journey.id} value={journey.id}>
+      |                 ^
+  349 |                   {journey.persona?.title ?? "Journey"} / {formatTime(journey.timestamp)}
+  350 |                 </option>
+  351 |               ))}
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.js">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="en" className="plus_jakar..." suppressHydrationWarning={true}>
+                          <body>
+                            <script>
+                            <OuterLayoutRouter>
+                            <FloatingBottomNavigation>
+                            <ThemeSwitch>
+                              <div className="theme-swit...">
+                                <button
+                                  aria-label="Use System theme"
+                                  className="grid h-8 w-8 place-items-center rounded-full transition"
++                                 data-active={false}
+-                                 data-active="true"
+                                  onClick={function onClick}
+                                  type="button"
+                                >
+                                <button
+                                  aria-label="Use Light theme"
+                                  className="grid h-8 w-8 place-items-center rounded-full transition"
++                                 data-active={true}
+-                                 data-active="false"
+                                  onClick={function onClick}
+                                  type="button"
+                                >
+                                ...
+                  ...
+ 

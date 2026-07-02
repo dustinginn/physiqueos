@@ -1,10 +1,7 @@
-import AppShell from "../components/layout/AppShell";
-import Dashboard from "../features/dashboard/Dashboard";
+import HomeScreen from "../screens/HomeScreen";
+
+export const dynamic = "force-dynamic";
 
 export default function Home() {
-  return (
-    <AppShell>
-      <Dashboard />
-    </AppShell>
-  );
+  return <HomeScreen />;
 }
