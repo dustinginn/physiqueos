@@ -85,6 +85,137 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
   return [...canonicalById.values(), ...supersededById.values()];
 }
 
+export function reconcileConfirmedEvidencePackage({
+  evidencePackage,
+  existingCanonicalObjects = [],
+  userId,
+  mutationReason = "evidence_review_confirmation",
+} = {}) {
+  const scope = buildCanonicalReconciliationScope({
+    evidencePackage,
+    existingCanonicalObjects,
+    mutationReason,
+  });
+  const scopedIds = new Set([
+    ...scope.incomingCanonicalIdentities,
+    ...scope.directlyRelatedCanonicalIdentities,
+    ...scope.supersededCanonicalIdentities,
+  ]);
+  const scopedExistingObjects = existingCanonicalObjects.filter((object) =>
+    scopedIds.has(object.canonicalId)
+  );
+  const scopedEvidencePackage = {
+    ...evidencePackage,
+    evidence_objects: (evidencePackage?.evidence_objects ?? []).filter(
+      (object) => object.removed !== true
+    ),
+  };
+  const reconciledById = new Map(reconcileEvidencePackageIntoCanonicalHistory({
+    evidencePackage: scopedEvidencePackage,
+    existingCanonicalObjects: scopedExistingObjects,
+    userId,
+  }).map((candidate) => [candidate.canonicalId,
+    preserveUnchangedCanonicalObject(
+      scopedExistingObjects.find((object) => object.canonicalId === candidate.canonicalId),
+      candidate
+    )]
+  ));
+  scopedEvidencePackage.evidence_objects.forEach((object) => {
+    const incomingId = getCanonicalEvidenceIdentity(object);
+    uniqueStrings([
+      object.reconciliation?.supersedes_canonical_id,
+      object.supersedes_canonical_id,
+    ]).forEach((supersededId) => {
+      const prior = reconciledById.get(supersededId);
+      if (!prior || supersededId === incomingId) return;
+      reconciledById.set(supersededId, createSupersededCanonicalObject({
+        object: prior,
+        reason: "Explicitly superseded by confirmed evidence.",
+        supersededBy: incomingId,
+      }));
+    });
+  });
+  const reconciledObjects = [...reconciledById.values()];
+  const existingById = new Map(
+    existingCanonicalObjects.map((object) => [object.canonicalId, object])
+  );
+  const changedObjects = reconciledObjects.filter(
+    (object) => !canonicalRecordsEqual(existingById.get(object.canonicalId), object)
+  );
+
+  return {
+    changedObjects,
+    scope,
+    report: {
+      addedCanonicalIds: changedObjects
+        .filter((object) => !existingById.has(object.canonicalId))
+        .map((object) => object.canonicalId),
+      changedCanonicalIds: changedObjects.map((object) => object.canonicalId),
+      sourceEvidencePackageIds: scope.sourceEvidencePackageIds,
+      supersededCanonicalIds: changedObjects
+        .filter((object) => object.quality?.status === "superseded")
+        .map((object) => object.canonicalId),
+      updatedCanonicalIds: changedObjects
+        .filter((object) => existingById.has(object.canonicalId))
+        .map((object) => object.canonicalId),
+    },
+  };
+}
+
+export function buildCanonicalReconciliationScope({
+  evidencePackage,
+  existingCanonicalObjects = [],
+  mutationReason = "evidence_review_confirmation",
+} = {}) {
+  const incomingObjects = (evidencePackage?.evidence_objects ?? []).filter(
+    (object) => object.removed !== true
+  );
+  const incomingCanonicalIdentities = uniqueStrings(
+    incomingObjects.map(getCanonicalEvidenceIdentity)
+  );
+  const directlyRelated = new Set();
+  const superseded = new Set();
+  const canonicalById = new Map(
+    existingCanonicalObjects.map((object) => [object.canonicalId, object])
+  );
+
+  incomingObjects.forEach((object) => {
+    const incomingId = getCanonicalEvidenceIdentity(object);
+    if (canonicalById.has(incomingId)) directlyRelated.add(incomingId);
+
+    const explicitIds = getExplicitCanonicalRelationshipIds(object, evidencePackage);
+    explicitIds.forEach((id) => {
+      if (canonicalById.has(id)) directlyRelated.add(id);
+    });
+    uniqueStrings([
+      object.reconciliation?.supersedes_canonical_id,
+      object.supersedes_canonical_id,
+    ]).forEach((id) => {
+      if (canonicalById.has(id)) superseded.add(id);
+    });
+
+    findCompatibleCanonicalObjects(canonicalById, object).forEach((candidate) =>
+      directlyRelated.add(candidate.canonicalId)
+    );
+  });
+
+  existingCanonicalObjects.forEach((object) => {
+    if (incomingCanonicalIdentities.includes(object.quality?.supersededBy)) {
+      superseded.add(object.canonicalId);
+    }
+  });
+
+  return {
+    directlyRelatedCanonicalIdentities: [...directlyRelated].sort(),
+    incomingCanonicalIdentities: [...incomingCanonicalIdentities].sort(),
+    mutationReason,
+    sourceEvidencePackageIds: uniqueStrings([
+      evidencePackage?.package_id ?? evidencePackage?.id,
+    ]).sort(),
+    supersededCanonicalIdentities: [...superseded].sort(),
+  };
+}
+
 export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
   if (isActivityDay(evidenceObject)) {
     return ["activity_day", getDateKey(evidenceObject.observed_at)].join("|");
@@ -157,6 +288,35 @@ function createCanonicalEvidenceObject({
     updatedAt: now,
     userId,
   };
+}
+
+function preserveUnchangedCanonicalObject(existingObject, candidate) {
+  if (!existingObject) return candidate;
+
+  return canonicalRecordsEqual(existingObject, candidate, { ignoreUpdatedAt: true })
+    ? existingObject
+    : candidate;
+}
+
+function canonicalRecordsEqual(left, right, { ignoreUpdatedAt = false } = {}) {
+  if (!left || !right) return left === right;
+  if (!ignoreUpdatedAt) return JSON.stringify(left) === JSON.stringify(right);
+  const withoutUpdatedAt = ({ updatedAt: _updatedAt, ...record }) => record;
+
+  return JSON.stringify(withoutUpdatedAt(left)) === JSON.stringify(withoutUpdatedAt(right));
+}
+
+function getExplicitCanonicalRelationshipIds(evidenceObject = {}, evidencePackage = {}) {
+  return uniqueStrings([
+    evidenceObject.reconciliation?.target_canonical_id,
+    evidenceObject.reconciliation?.supersedes_canonical_id,
+    ...(evidenceObject.reconciliation?.merge_canonical_ids ?? []),
+    evidenceObject.correction?.target_canonical_id,
+    evidenceObject.supersedes_canonical_id,
+    ...(evidenceObject.merge_canonical_ids ?? []),
+    evidencePackage.correction?.target_canonical_id,
+    ...(evidencePackage.reconciliation?.merge_canonical_ids ?? []),
+  ]);
 }
 
 function normalizeCanonicalPayload(evidenceObject) {

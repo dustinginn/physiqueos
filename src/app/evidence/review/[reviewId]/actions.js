@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
 import { createEvidenceReviewService } from "../../../../domain/services/EvidenceReviewService";
-import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../../domain/services/CanonicalEvidenceService";
 import { createWeightEntry } from "../../../../domain/models/weightEntry";
 import { createDEXAScan } from "../../../../domain/models/dexaScan";
 import { createProgressPhoto } from "../../../../domain/models/progressPhoto";
@@ -71,10 +70,13 @@ function createHandlers({ evidencePackage, user }) {
   const committedPackage = { ...evidencePackage, evidence_objects: (evidencePackage.evidence_objects ?? []).filter((item) => item.removed !== true) };
   return {
     canonical_commit: async () => {
-      const existing = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      canonical = expandCanonicalPhotoSessions(reconcileEvidencePackageIntoCanonicalHistory({ evidencePackage: committedPackage, existingCanonicalObjects: existing, userId: user.id }), committedPackage, user.id);
-      await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(canonical);
-      return { status: "completed", canonicalEvidenceIds: canonical.filter((item) => item.quality?.status !== "superseded").map((item) => item.canonicalId) };
+      const scopedResult = await FounderRepositories.canonicalEvidence.reconcileConfirmedEvidencePackage(committedPackage, user.id);
+      canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      if (committedPackage.evidence_objects.some((item) => item.evidence_type === "photo_session")) {
+        canonical = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
+        await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(canonical);
+      }
+      return { status: "completed", canonicalEvidenceIds: canonical.filter((item) => item.quality?.status !== "superseded").map((item) => item.canonicalId), reconciliationScope: scopedResult.scope, ...scopedResult.report };
     },
     compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ evidencePackage, user }) }),
     scheduled_completion: async () => {
@@ -186,10 +188,21 @@ function expandCanonicalPhotoSessions(canonicalObjects, evidencePackage, userId)
     const photos = (object.photos ?? []).map((photo) => ({ ...photo, canonicalPhotoId: `canonical_photo_${userId}_${date}_${photo.view}_${photo.pose}`, captureDate: date, occurrenceTimestamp: date, sourceIds: [photo.id], sourceHashes: [photo.source_hash].filter(Boolean), status: photo.active === false ? "inactive" : "active" }));
     const session = createCanonicalPhotoSession({ ...object, provisional: false, captureDate: date, sessionId: `photo_session_${userId}_${date}`, userId, photos });
     const sessionObject = { canonicalId: session.sessionId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "photo_session", firstObservedAt: date, lastObservedAt: date, payload: { ...session, evidence_type: "photo_session", observed_at: date }, provenance: object.provenance ?? {}, quality: { status: "active" }, userId };
-    byId.set(sessionObject.canonicalId, sessionObject);
-    photos.forEach((photo) => byId.set(photo.canonicalPhotoId, { canonicalId: photo.canonicalPhotoId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "progress_photo", firstObservedAt: date, lastObservedAt: date, payload: { ...photo, evidence_type: "progress_photo", observed_at: date }, provenance: { source_artifact_refs: photo.sourceIds, source_hashes: photo.sourceHashes }, quality: { status: photo.status }, userId }));
+    byId.set(sessionObject.canonicalId, preserveCanonicalTimestamps(byId.get(sessionObject.canonicalId), sessionObject));
+    photos.forEach((photo) => {
+      const candidate = { canonicalId: photo.canonicalPhotoId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "progress_photo", firstObservedAt: date, lastObservedAt: date, payload: { ...photo, evidence_type: "progress_photo", observed_at: date }, provenance: { source_artifact_refs: photo.sourceIds, source_hashes: photo.sourceHashes }, quality: { status: photo.status }, userId };
+      byId.set(photo.canonicalPhotoId, preserveCanonicalTimestamps(byId.get(photo.canonicalPhotoId), candidate));
+    });
   }
   return [...byId.values()];
+}
+
+function preserveCanonicalTimestamps(existing, candidate) {
+  if (!existing) return candidate;
+  const semantic = ({ createdAt: _createdAt, updatedAt: _updatedAt, ...record }) => record;
+  if (JSON.stringify(semantic(existing)) === JSON.stringify(semantic(candidate))) return existing;
+
+  return { ...candidate, createdAt: existing.createdAt ?? candidate.createdAt };
 }
 
 async function runDomainAnalysis({ canonical, evidencePackage, user }) {
