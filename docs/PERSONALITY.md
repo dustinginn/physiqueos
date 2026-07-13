@@ -4,6 +4,8 @@
 
 This document defines how PhysiqueOS communicates.
 
+Personality governs how an approved narrative decision is expressed. It does not choose the story, reinterpret evidence, or change coaching priority. See `docs/NARRATIVE_INTELLIGENCE.md` for the system that determines what should be communicated.
+
 The goal is consistency.
 
 Whether a user is reading the Home screen, an insight, a recommendation, a notification, or interacting with an AI coach, the experience should feel like it comes from the same product.

@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import ProfileAvatar from "./ProfileAvatar";
 
 export default function PageHeader({
@@ -11,13 +8,11 @@ export default function PageHeader({
   actions,
   className = "",
 }) {
-  const [resolvedGreeting] = useState(() => getTimeAwareGreeting(new Date()) || greeting);
-
   return (
     <header className={`flex items-start justify-between gap-4 ${className}`}>
       <div className="min-w-0 flex-1">
         <p className="text-[17px] font-medium leading-tight text-[#64748B]">
-          {resolvedGreeting}
+          {greeting}
         </p>
 
         <h1 className="mt-0.5 truncate text-[34px] font-bold leading-none text-[#0B1020]">
@@ -46,12 +41,4 @@ export default function PageHeader({
       </div>
     </header>
   );
-}
-
-function getTimeAwareGreeting(now) {
-  const hour = now.getHours();
-
-  if (hour >= 5 && hour < 12) return "Good morning,";
-  if (hour >= 12 && hour < 17) return "Good afternoon,";
-  return "Good evening,";
 }

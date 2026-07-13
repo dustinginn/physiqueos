@@ -2,6 +2,10 @@ import {
   createVisualEvidence,
   VisualEvidenceSourceType,
 } from "./VisualEvidence";
+import {
+  getProgressPhotoCategoryLabel,
+  normalizeProgressPhotoCategory,
+} from "../models/progressPhotoPoseVocabulary";
 
 export function interpretProgressPhotos({ photos = [], weights = [] } = {}) {
   const sortedPhotos = [...photos].sort((a, b) =>
@@ -9,7 +13,8 @@ export function interpretProgressPhotos({ photos = [], weights = [] } = {}) {
   );
 
   return sortedPhotos.map((photo) => {
-    const previousPhoto = getPreviousMatchingPhoto(photo, sortedPhotos);
+    const normalizedPhoto = normalizeProgressPhoto(photo);
+    const previousPhoto = getPreviousMatchingPhoto(normalizedPhoto, sortedPhotos);
     const dateKey = getDateKey(getPhotoDate(photo));
     const sameDayWeight = weights.find((entry) => getDateKey(entry.measuredAt) === dateKey);
 
@@ -20,13 +25,13 @@ export function interpretProgressPhotos({ photos = [], weights = [] } = {}) {
       imageRef: photo.imagePath ?? "",
       evidenceDate: getPhotoDate(photo),
       uploadDate: photo.uploadedAt ?? null,
-      viewType: photo.view ?? "unknown",
+      viewType: normalizedPhoto.view,
       capturedAt: getPhotoDate(photo),
       uploadedAt: photo.uploadedAt ?? null,
       imagePath: photo.imagePath ?? "",
-      view: photo.view ?? "unknown",
-      pose: photo.pose ?? "unknown",
-      tags: getKnownPhotoTags(photo),
+      view: normalizedPhoto.view,
+      pose: normalizedPhoto.pose,
+      tags: getKnownPhotoTags(normalizedPhoto),
       relatedGoals: photo.relatedGoalIds ?? [],
       relatedGoalIds: photo.relatedGoalIds ?? [],
       comparisonTarget: previousPhoto
@@ -37,19 +42,19 @@ export function interpretProgressPhotos({ photos = [], weights = [] } = {}) {
             label: getPhotoLabel(previousPhoto),
           }
         : null,
-      observations: getPhotoObservations(photo, previousPhoto),
-      biggestImprovements: getPhotoStrengths(photo, previousPhoto),
-      remainingFocus: getPhotoRemainingFocus(photo),
-      confidenceImpact: getPhotoConfidenceImpact(photo),
-      limitations: getPhotoLimitations(photo, previousPhoto),
+      observations: getPhotoObservations(normalizedPhoto, previousPhoto),
+      biggestImprovements: getPhotoStrengths(normalizedPhoto, previousPhoto),
+      remainingFocus: getPhotoRemainingFocus(normalizedPhoto),
+      confidenceImpact: getPhotoConfidenceImpact(normalizedPhoto),
+      limitations: getPhotoLimitations(normalizedPhoto, previousPhoto),
       extractionConfidence: "medium",
       originalUserNotes: photo.conditions?.notes ?? null,
       timelinePlacement: sameDayWeight?.weight
         ? `${formatDate(getPhotoDate(photo))} with same-day ${formatWeight(sameDayWeight.weight)} weigh-in.`
         : `${formatDate(getPhotoDate(photo))} with no same-day weight entry.`,
       metadata: {
-        label: getPhotoLabel(photo),
-        detail: getPhotoDetail(photo),
+        label: getPhotoLabel(normalizedPhoto),
+        detail: getPhotoDetail(normalizedPhoto),
         dateKey,
         sameDayWeightId: sameDayWeight?.id ?? null,
         weightLabel: sameDayWeight?.weight ? formatWeight(sameDayWeight.weight) : null,
@@ -63,6 +68,7 @@ function getPreviousMatchingPhoto(photo, photos) {
 
   return (
     photos
+      .map(normalizeProgressPhoto)
       .filter(
         (candidate) =>
           getDateKey(getPhotoDate(candidate)) < currentDate &&
@@ -71,6 +77,10 @@ function getPreviousMatchingPhoto(photo, photos) {
       )
       .at(-1) ?? null
   );
+}
+
+function normalizeProgressPhoto(photo = {}) {
+  return normalizeProgressPhotoCategory(photo);
 }
 
 function getPhotoObservations(photo, previousPhoto) {
@@ -90,32 +100,15 @@ function getPhotoObservations(photo, previousPhoto) {
     ];
   }
 
-  if (photo.view === "back" && photo.pose === "double_biceps") {
-    return [
-      createObservation({
-        category: "muscle_retention",
-        description:
-          "Back and shoulder definition can be compared against the prior matching pose.",
-        comparisonBasis: "previous matching pose",
-        goalRelevance: ["goal_preserve_lean_mass", "goal_visible_abs_at_rest"],
-      }),
-      createObservation({
-        category: "visual_quality",
-        description:
-          "Muscle-retention appearance remains the primary signal in this view.",
-        comparisonBasis: "same-view visual evidence",
-        goalRelevance: ["goal_preserve_lean_mass"],
-      }),
-    ];
-  }
-
   if (photo.view === "back") {
+    const categoryLabel = getProgressPhotoCategoryLabel(photo).toLowerCase();
+
     return [
       createObservation({
         category: "definition",
         description:
-          "Rear taper and back definition can be compared against the prior relaxed rear check-in.",
-        comparisonBasis: "previous rear relaxed photo",
+          `Rear taper and back definition can be compared against the prior ${categoryLabel} check-in.`,
+        comparisonBasis: `previous ${categoryLabel} photo`,
         goalRelevance: ["goal_preserve_lean_mass"],
       }),
       createObservation({
@@ -172,20 +165,13 @@ function createObservation({
 }
 
 function getPhotoStrengths(photo, previousPhoto) {
-  if (photo.view === "back" && photo.pose === "double_biceps") {
-    return [
-      previousPhoto
-        ? "Back width, shoulder shape, and arm retention can be reviewed against the prior check-in."
-        : "Rear double-biceps view establishes a useful muscle-retention baseline.",
-      "This pose is valuable for judging whether the cut is preserving visual muscularity.",
-    ];
-  }
-
   if (photo.view === "back") {
+    const categoryLabel = getProgressPhotoCategoryLabel(photo);
+
     return [
       previousPhoto
-        ? "Shoulder-to-waist taper and back definition are comparable against the prior rear relaxed photo."
-        : "Rear relaxed view establishes a useful taper and symmetry baseline.",
+        ? `Shoulder-to-waist taper and back definition are comparable against the prior ${categoryLabel.toLowerCase()} photo.`
+        : `${categoryLabel} view establishes a useful taper and symmetry baseline.`,
       "Rear photos support Preserve Lean Mass alongside the primary visible-abs goal.",
     ];
   }
@@ -280,7 +266,7 @@ function getPhotoDetail(photo) {
 }
 
 function getPhotoLabel(photo) {
-  return `${formatLabel(photo.view)} ${formatLabel(photo.pose)}`;
+  return getProgressPhotoCategoryLabel(photo);
 }
 
 function getPhotoDate(photo) {

@@ -28,6 +28,23 @@ This document describes the system that the code is intended to represent.
 
 # High-Level Architecture
 
+The target architecture is one canonical intelligence pipeline:
+
+```text
+Raw Evidence
+-> Canonical Evidence Objects
+-> Canonical Interpreter Layer
+-> Canonical Structured Observations
+-> Canonical Physiological Model
+-> Canonical Narrative / Reasoning Engine
+-> Canonical Coaching Engine
+-> Presentation Layer
+```
+
+The simulator exposes and debugs this pipeline. Production executes the same pipeline and renders its outputs. Daily Briefing, Evidence Pages, Timeline, Chat, Voice, Weekly Review, Monthly Review, notifications, and future experiences should all consume the same canonical outputs rather than reimplementing interpretation, reasoning, or coaching.
+
+Legacy shorthand for the feedback loop:
+
 ```
 Evidence Sources
 
@@ -124,6 +141,63 @@ It only:
 
 This separation allows every future interface to share the exact same intelligence.
 
+## Presentation Communication Boundary
+
+The Presentation Layer renders understanding, not implementation mechanics.
+
+Internal concepts such as EvidencePackages, canonical objects, interpreters, parsing, structured observations, reconciliation, confidence calculations, repositories, provider paths, and fallback logic belong inside the intelligence and diagnostic layers. They should not appear in user-facing copy.
+
+User-facing surfaces should speak in terms of current understanding, evidence confidence, available evidence, uncertainty, physiology, goal impact, and recommended next evidence.
+
+The engine reasons. The coach explains. The UI communicates.
+
+## Canonical Intelligence and Simulator
+
+The simulator is not a separate implementation of PhysiqueOS intelligence.
+
+The simulator is the debugger, inspector, and visualization layer for the canonical intelligence pipeline. Production must execute the same canonical modules rather than independently rewriting coaching, prompt behavior, narrative prioritization, physiological modeling, or evidence reconciliation.
+
+The boundary is:
+
+* canonical engine modules own interpreters, canonical evidence objects, structured observations, physiological modeling, Narrative Engine behavior, coaching language, evidence reconciliation, and editorial judgment
+* simulator owns inspection, debugging, pipeline visualization, golden scenario validation, and Founder QA of engine behavior
+* production owns evidence collection, persistence, routing, navigation, UI rendering, session flow, and execution of the canonical pipeline
+
+Every major AI feature should move through:
+
+```text
+Design -> Simulator iteration -> Founder approval -> Freeze -> Synchronization pass -> Production QA -> Ship
+```
+
+Approved simulator outputs are golden reference cases. Production differences should be treated as canonical pipeline integration regressions unless the simulator has approved a new behavior.
+
+See `docs/INTELLIGENCE_SYNCHRONIZATION.md` for the synchronization contract.
+
+## Engine Contracts
+
+Every engine boundary must have a clear input and output contract:
+
+* Raw Evidence -> Canonical Evidence Objects
+* Canonical Evidence Objects -> Canonical Structured Observations
+* Canonical Structured Observations -> Canonical Physiological Model
+* Canonical Physiological Model -> Canonical Narrative
+* Canonical Narrative -> Canonical Coaching Narrative
+* Canonical Coaching Narrative -> Presentation
+
+The Narrative Engine should never know where evidence originated. It should never care whether evidence came from an API, screenshot, PDF, manual entry, voice, typed text, or a future integration. Every source must normalize into the same canonical evidence model before reasoning begins.
+
+Production QA should validate contracts in order:
+
+1. Was evidence extracted correctly?
+2. Were canonical evidence objects built correctly?
+3. Were structured observations generated correctly?
+4. Was the physiological model updated correctly?
+5. Did the Narrative Engine reason correctly?
+6. Did the Coaching Engine produce the correct coaching narrative?
+7. Did the Presentation Layer render that narrative correctly?
+
+If the canonical outputs are correct and production still looks wrong, the defect is a presentation bug. If the canonical outputs differ from the approved simulator reference, the defect is an engine or integration bug.
+
 ---
 
 # Evidence Engine
@@ -165,6 +239,36 @@ Its responsibility is establishing facts.
 
 ---
 
+# Voice Intelligence
+
+Voice Intelligence is a first-class evidence intake subsystem.
+
+Voice is not an AI chatbot. It is a low-friction way for users to tell PhysiqueOS what happened.
+
+The Voice Intelligence boundary is:
+
+```text
+Natural Speech
+-> Transcription
+-> Entity Resolution
+-> Intent Routing
+-> Parallel Evidence Interpreters
+-> Evidence Merge
+-> Clarification Ranking
+-> Conversation State
+-> Canonical Evidence
+```
+
+Voice Intelligence ends at Canonical Evidence.
+
+Goal Impact Analysis, Narrative Intelligence, Predictions, Priorities, Recommendations, Coaching, and Daily Briefing belong to the broader Intelligence Engine.
+
+Voice must not create voice-only schemas, repositories, or downstream reasoning paths. It should produce the same canonical evidence objects as screenshots, PDFs, typed evidence, manual entry, APIs, and future integrations. Transcript remains provenance. Canonical evidence remains the source of truth.
+
+See `docs/VOICE_INTELLIGENCE.md` for the authoritative Voice Intelligence specification.
+
+---
+
 # Goal Engine
 
 ## Responsibility
@@ -190,6 +294,8 @@ Examples:
 Every prediction is evaluated relative to the active goal.
 
 Only one primary goal is active at a time.
+
+Narrative Intelligence sits downstream of goal-relative truth and persistent physiological assessment. It selects what should be communicated without reinterpreting evidence or changing the Goal Engine's conclusions. See `docs/NARRATIVE_INTELLIGENCE.md` for the canonical system boundary, Conversation State, story selection, cadence, and transition-conversation contract.
 
 ---
 

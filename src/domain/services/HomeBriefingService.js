@@ -2,9 +2,11 @@ import { bottomNavigation } from "../../fixtures/bottomNavigation";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { ActionEngineService } from "./ActionEngineService";
 import { DailyFocusService } from "./DailyFocusService";
+import { getDailyBriefingFreshness } from "./DailyBriefingFreshnessService";
 import { getDailyEvent } from "./DailyEventService";
 import { GoalEvaluationService } from "./GoalEvaluationService";
 import { GoalIntelligenceService } from "./GoalIntelligenceService";
+import { formatLocalShortDate } from "../utils/localDate";
 
 const placeholderHeader = {
   greeting: "Good morning,",
@@ -41,6 +43,9 @@ export function createHomeBriefingService({
         nutritionContext,
         progressPhotos,
         latestAnalysis,
+        analyses,
+        latestDailyBriefing,
+        latestEventBriefing,
       ] = resolvedUserId
           ? await Promise.all([
             repositories.goals.listGoals(resolvedUserId),
@@ -54,10 +59,14 @@ export function createHomeBriefingService({
             repositories.nutritionContext?.getNutritionContext(resolvedUserId) ?? null,
             repositories.progressPhotos?.listPhotos(resolvedUserId) ?? [],
             repositories.analyses.getLatestAnalysis(),
+            repositories.analyses.listAnalyses?.() ?? [],
+            repositories.dailyBriefings?.getLatestBriefingArtifact?.(resolvedUserId) ?? repositories.dailyBriefings?.getLatestDailyBriefing?.(resolvedUserId) ?? null,
+            repositories.dailyBriefings?.getLatestActiveEventBriefing?.(resolvedUserId) ?? null,
           ])
         : [
             [],
             null,
+            null,
             [],
             [],
             [],
@@ -65,8 +74,10 @@ export function createHomeBriefingService({
             [],
             [],
             null,
-            [],
             await repositories.analyses.getLatestAnalysis(),
+            await repositories.analyses.listAnalyses?.() ?? [],
+            null,
+            null,
           ];
       const goalEvaluations = GoalEvaluationService.getGoalEvaluations({
         goals,
@@ -99,6 +110,15 @@ export function createHomeBriefingService({
         protocols: activeProtocols,
         weights: weightEntries,
       });
+      const briefingFreshness = getDailyBriefingFreshness({
+        analyses,
+        checkIns,
+        dailyBriefing: latestDailyBriefing,
+        dexaScans,
+        nutritionContext,
+        progressPhotos,
+        weightEntries,
+      });
 
       return {
         header: mapHeader(user),
@@ -110,6 +130,9 @@ export function createHomeBriefingService({
         bottomNavigation: navigation,
         latestAnalysis: mapDailyBriefingCard({
           dailyEvent,
+          freshness: briefingFreshness,
+          latestDailyBriefing,
+          latestEventBriefing,
           latestAnalysis,
           dexaScans,
           progressPhotos,
@@ -125,6 +148,9 @@ export const HomeBriefingService = createHomeBriefingService();
 
 function mapDailyBriefingCard({
   dailyEvent,
+  freshness,
+  latestDailyBriefing,
+  latestEventBriefing,
   latestAnalysis,
   dexaScans,
   progressPhotos,
@@ -135,16 +161,71 @@ function mapDailyBriefingCard({
 
   if (!hasBriefingEvidence) return null;
 
+  if (latestEventBriefing) {
+    const isPhoto = latestEventBriefing.trigger?.evidenceType === "progress_photo";
+    return {
+      id: latestEventBriefing.id,
+      sectionLabel: "Event Briefing",
+      title: isPhoto ? "Progress Photo Analysis Ready" : "DEXA Analysis Ready",
+      summary: latestEventBriefing.briefing?.hero?.summary ?? null,
+      createdAt: latestEventBriefing.generatedAt,
+      tone: "insight",
+      prompt: "Open the latest coaching conversation.",
+      href: "/briefing/daily",
+      freshnessState: "event",
+    };
+  }
+
+  if (freshness?.status === "stale") {
+    return {
+      id: latestDailyBriefing?.id ?? "daily-briefing-stale",
+      sectionLabel: "Daily Briefing",
+      title: "Generate Today's Briefing",
+      summary: null,
+      createdAt: freshness.latestEvidence?.occurredAt ?? null,
+      tone: null,
+      prompt: getStaleBriefingPrompt(freshness),
+      href: "/briefing/daily",
+      freshnessState: "stale",
+    };
+  }
+
+  if (freshness?.status === "missing") {
+    return {
+      id: "daily-briefing-missing",
+      sectionLabel: "Daily Briefing",
+      title: "Generate Today's Briefing",
+      summary: null,
+      createdAt: freshness.latestEvidence?.occurredAt ?? null,
+      tone: null,
+      prompt: "New evidence is ready to synthesize.",
+      href: "/briefing/daily",
+      freshnessState: "missing",
+    };
+  }
+
   return {
-    id: latestAnalysis?.id ?? "daily-briefing",
+    id: latestDailyBriefing?.id ?? latestAnalysis?.id ?? "daily-briefing",
     sectionLabel: "Daily Briefing",
     title: "Daily Briefing Ready",
     summary: latestAnalysis?.summary ?? null,
-    createdAt: latestAnalysis?.createdAt ?? null,
+    createdAt: latestDailyBriefing?.generatedAt ?? latestAnalysis?.createdAt ?? null,
     tone: latestAnalysis?.tone ?? null,
-    prompt: dailyEvent?.homeSubtitle ?? "See what changed.",
+    prompt: freshness?.briefingDate
+      ? `${dailyEvent?.homeSubtitle ?? "See what changed."} ${formatLocalShortDate(freshness.briefingDate)}`
+      : dailyEvent?.homeSubtitle ?? "See what changed.",
     href: "/briefing/daily",
+    freshnessState: "current",
   };
+}
+
+function getStaleBriefingPrompt(freshness) {
+  const evidenceLabel = freshness?.latestEvidence?.label ?? "New evidence";
+  const staleDate = freshness?.briefingDate
+    ? formatLocalShortDate(freshness.briefingDate)
+    : "the previous briefing";
+
+  return `${evidenceLabel} arrived after ${staleDate}. Generate the latest coaching.`;
 }
 
 function mapHeader(user) {
@@ -187,6 +268,12 @@ function getActionTitle(priority) {
   const actionTitles = {
     "Front Progress Photos": "Upload Front Photos",
     "Rear Progress Photos": "Upload Rear Photos",
+    "Front Progress Photo": "Upload Front Photo",
+    "Rear Progress Photo": "Upload Rear Photo",
+    "Weekly Progress Photo Set": "Upload Progress Photo Set",
+    "Morning Check-in": "Complete Morning Check-in",
+    "Afternoon Check-in": "Complete Afternoon Check-in",
+    "Evening Check-in": "Complete Evening Check-in",
     Retatrutide: "Retatrutide Tonight",
     Tesamorelin: "Tesamorelin Tonight",
     "Foam Roll": "Foam Roll",

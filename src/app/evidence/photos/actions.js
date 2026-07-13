@@ -6,9 +6,23 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAnalysis, AnalysisTone } from "../../../domain/models/analysis";
 import { createProgressPhoto } from "../../../domain/models/progressPhoto";
+import {
+  normalizeProgressPhotoPose,
+  normalizeProgressPhotoView as normalizeProgressPhotoViewModel,
+} from "../../../domain/models/progressPhotoPoseVocabulary";
 import { interpretPhotoSetWithVision } from "../../../domain/interpreters/PhotoInterpreterService";
+import { normalizePhotoInterpretationToStructuredObservations } from "../../../domain/interpreters/PhotoObservationModel";
 import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
+import {
+  createAuthoritativePhotoConditions,
+  createPhotoIntakeIdentity,
+  createPhotoSourceHash,
+  reconcilePhotoIntoSession,
+  synthesizePhotoSessionObservations,
+} from "../../../domain/services/PhotoSessionService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
+import { createProvisionalPhotoSession } from "../../../domain/services/ProvisionalPhotoSessionService";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -17,22 +31,54 @@ export async function saveProgressPhotoEvidence(formData) {
 
   if (!user) throw new Error("Founder user is not available.");
 
-  const file = formData.get("photo");
-  const view = String(formData.get("view") || "front");
-  const pose = String(formData.get("pose") || "relaxed");
+  const files = formData.getAll("photos").filter((file) => file && typeof file.arrayBuffer === "function" && file.size > 0);
+  if (files.length === 0) {
+    const legacyFile = formData.get("photo");
+    if (legacyFile && typeof legacyFile.arrayBuffer === "function" && legacyFile.size > 0) files.push(legacyFile);
+  }
   const capturedAt = String(formData.get("capturedAt") || getTodayKey());
   const notes = normalizeOptionalText(formData.get("notes"));
+  const returnTo = normalizeReturnTo(formData.get("returnTo"));
 
-  if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
-    throw new Error("Progress photo is required.");
-  }
+  if (files.length === 0) throw new Error("Select at least one progress photo.");
+  const conditions = createAuthoritativePhotoConditions({
+    fasted: parseTriState(formData.get("fasted")),
+    lighting: normalizeOptionalText(formData.get("lighting")),
+    location: normalizeOptionalText(formData.get("location")),
+    morning: parseTriState(formData.get("morning")),
+    postWorkout: parseTriState(formData.get("postWorkout")),
+    pump: parseTriState(formData.get("pump")),
+  });
 
   const uploadedAt = new Date().toISOString();
-  const storedPath = await storePrivateUpload({
-    directory: path.join("private", "founder", "photos", "uploads"),
-    file,
-    prefix: `${capturedAt}-${view}-${pose}`,
+  const requestedPoses = formData.getAll("pose");
+  const defaults = ["front-relaxed", "back-relaxed", "back-flexed"];
+  const provisionalPhotos = [];
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+    await assertValidProgressPhotoFile(file);
+    const category = normalizeCategoryValue(requestedPoses[index] ?? defaults[index] ?? "front-relaxed");
+    const sourceHash = createPhotoSourceHash(Buffer.from(await file.arrayBuffer()));
+    const storedPath = await storePrivateUpload({ directory: path.join("private", "founder", "photos", "uploads"), file, prefix: `${capturedAt}-${category.view}-${category.pose}` });
+    provisionalPhotos.push({ id: `provisional_photo_${uploadedAt.replace(/\D/g, "")}_${index}`, storage_path: storedPath, source_hash: sourceHash, view: category.view, pose: category.pose, active: true, order: index });
+  }
+  const packageId = `photo_review_${uploadedAt.replace(/\D/g, "")}`;
+  const provisionalSession = createProvisionalPhotoSession({ captureDate: capturedAt, photos: provisionalPhotos, conditions });
+  const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
+    userId: user.id,
+    source: "dedicated_progress_photo",
+    evidencePackage: {
+      package_id: packageId,
+      review_metadata: {
+        requiredPoses: ["front-relaxed", "back-relaxed", "back-flexed"],
+        provisionalPhotoSessionId: provisionalSession.id,
+      },
+      evidence_objects: [{ ...provisionalSession, provenance: { source_artifact_refs: provisionalPhotos.map((photo) => photo.storage_path) } }],
+    },
   });
+  redirect(`/evidence/review/${review.id}`);
+
+  /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
   const [sameDayWeights, dexaScans] = await Promise.all([
     FounderRepositories.weights.listWeightEntries(user.id, {
       start: capturedAt,
@@ -41,6 +87,13 @@ export async function saveProgressPhotoEvidence(formData) {
     FounderRepositories.dexaScans.listDEXAScans(user.id),
   ]);
   const existingPhotos = await FounderRepositories.progressPhotos.listPhotos(user.id);
+  const poseId = `${view}-${pose}`;
+  const intakeIdentity = createPhotoIntakeIdentity({
+    captureDate: capturedAt,
+    poseId,
+    sourceHash,
+    userId: user.id,
+  });
   const photo = createProgressPhoto({
     id: `progress_photo_${capturedAt.replaceAll("-", "_")}_${view}_${pose}_${Date.now()}`,
     userId: user.id,
@@ -51,15 +104,7 @@ export async function saveProgressPhotoEvidence(formData) {
     relatedGoalIds: [VISIBLE_ABS_GOAL_ID],
     view,
     pose,
-    conditions: {
-      morning: true,
-      fasted: true,
-      sameLighting: true,
-      sameMirror: true,
-      postWorkout: false,
-      pump: false,
-      notes,
-    },
+    conditions: { ...conditions, notes },
     linkedWeightEntryId: sameDayWeights[0]?.id ?? null,
     nearestDexaScanId: getNearestDexaScanId(dexaScans, capturedAt),
     source: {
@@ -68,7 +113,7 @@ export async function saveProgressPhotoEvidence(formData) {
       externalId: null,
       importedAt: uploadedAt,
       confidence: "high",
-      notes: "Founder-uploaded progress photo using default Founder Alpha photo context.",
+      notes: "Founder-uploaded progress photo with explicit tri-state condition metadata.",
     },
     fieldProvenance: {
       imported: [
@@ -104,6 +149,7 @@ export async function saveProgressPhotoEvidence(formData) {
       },
     ],
     previousPhotoSet: await getPreviousPhotoSet({
+      captureDate: capturedAt,
       existingPhotos,
       pose,
       userId: user.id,
@@ -117,27 +163,101 @@ export async function saveProgressPhotoEvidence(formData) {
   });
 
   await FounderRepositories.analyses.createAnalysis(analysis);
-  await createDailyBriefingService({
-    repositories: FounderRepositories,
-  }).generateDailyBriefing({
+  const canonicalObjects = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+  const existingSessionObject = canonicalObjects.find(
+    (object) => object.evidence_type === "photo_session" && object.payload?.captureDate === capturedAt && object.quality?.status !== "superseded"
+  );
+  const canonicalPhoto = {
+    canonicalPhotoId: `canonical_${photo.id}`,
+    captureDate: capturedAt,
+    conditions,
+    ingestionTimestamp: uploadedAt,
+    intakeIdentity,
+    occurrenceTimestamp: capturedAt,
+    orientation: view,
+    pose,
+    priorComparisonReference: interpretationResult.comparison?.previous_photo_set_id ?? null,
+    rawPoseLabel: String(formData.get("category") ?? poseId),
+    sourceHashes: [sourceHash],
+    sourceIds: [photo.id],
+    view,
+  };
+  const session = reconcilePhotoIntoSession({
+    existingSession: existingSessionObject?.payload,
+    photo: canonicalPhoto,
     userId: user.id,
-    trigger: {
-      evidenceId: photo.id,
-      evidenceType: "progress_photo",
-      analysisId: analysis.id,
-    },
   });
+  const sessionAnalyses = await FounderRepositories.analyses.listAnalyses(user.id);
+  session.synthesis = synthesizePhotoSessionObservations(
+    sessionAnalyses
+      .filter((item) => session.photos.some((itemPhoto) => item.evidenceIds?.includes(itemPhoto.sourceIds?.[0])))
+      .map((item) => ({
+        evidenceIds: item.evidenceIds,
+        structuredObservations: item.metadata?.structuredObservations,
+      }))
+  );
+  session.synthesisStatus = session.completionState === "complete" ? "complete" : "partial";
+  await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects([
+    {
+      canonicalId: canonicalPhoto.canonicalPhotoId,
+      createdAt: uploadedAt,
+      evidence_type: "progress_photo",
+      firstObservedAt: capturedAt,
+      lastObservedAt: capturedAt,
+      payload: canonicalPhoto,
+      provenance: { source_artifact_refs: [photo.id], source_hashes: [sourceHash] },
+      quality: { status: session.photos.find((item) => item.canonicalPhotoId === canonicalPhoto.canonicalPhotoId)?.status ?? "duplicate" },
+      updatedAt: uploadedAt,
+      userId: user.id,
+    },
+    {
+      canonicalId: session.sessionId,
+      createdAt: existingSessionObject?.createdAt ?? uploadedAt,
+      evidence_type: "photo_session",
+      firstObservedAt: existingSessionObject?.firstObservedAt ?? capturedAt,
+      lastObservedAt: capturedAt,
+      payload: { ...session, evidence_type: "photo_session" },
+      provenance: { source_artifact_refs: session.photos.flatMap((item) => item.sourceIds ?? []) },
+      quality: { status: "active" },
+      updatedAt: uploadedAt,
+      userId: user.id,
+    },
+  ]);
+  if (session.completionState === "complete") {
+    await createDailyBriefingService({ repositories: FounderRepositories }).generateEventBriefing({
+      userId: user.id,
+      trigger: { evidenceId: session.sessionId, evidenceType: "photo_session", analysisId: analysis.id },
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/briefing/daily");
   revalidatePath("/progress");
   revalidatePath("/progress/photos");
   revalidatePath("/timeline");
+  if (returnTo) redirect(returnTo);
   redirect("/briefing/daily");
+}
+
+function normalizeCategoryValue(value) {
+  const normalized = String(value).replace("rear-", "back-");
+  if (normalized === "back-flexed" || normalized === "rear-double-biceps") return { view: "back", pose: "flexed" };
+  const [view = "front", pose = "relaxed"] = normalized.split("-");
+  return { view: normalizeProgressPhotoView(view), pose: normalizeProgressPhotoPoseValue(pose, view) };
+}
+
+function parseTriState(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "yes", "1"].includes(normalized)) return true;
+  if (["false", "no", "0"].includes(normalized)) return false;
+  return "unknown";
 }
 
 function createPhotoInterpretationAnalysis({ createdAt, interpretationResult, photo }) {
   const interpretation = interpretationResult.interpretation;
+  const structuredObservations =
+    interpretation.structured_observations ??
+    normalizePhotoInterpretationToStructuredObservations(interpretation);
 
   return createAnalysis({
     id: `analysis_progress_photo_${createdAt.replace(/\D/g, "")}`,
@@ -147,12 +267,12 @@ function createPhotoInterpretationAnalysis({ createdAt, interpretationResult, ph
     evidenceIds: [photo.id],
     evidenceTypes: ["progress_photo"],
     findings: [
-      ...interpretation.body_composition_observations.slice(0, 3).map((detail) => ({
-        title: "Visual observation",
-        detail,
+      ...structuredObservations.slice(0, 4).map((observation) => ({
+        title: observation.region,
+        detail: observation.change,
       })),
-      ...interpretation.visual_changes_observed.slice(0, 2).map((detail) => ({
-        title: "Visual change",
+      ...interpretation.body_composition_observations.slice(0, 2).map((detail) => ({
+        title: "Body-composition read",
         detail,
       })),
     ],
@@ -199,13 +319,24 @@ function createPhotoInterpretationAnalysis({ createdAt, interpretationResult, ph
     },
     metadata: {
       photoInterpretation: interpretation,
+      structuredObservations,
     },
   });
 }
 
-async function getPreviousPhotoSet({ existingPhotos, pose, userId, view }) {
+async function getPreviousPhotoSet({ captureDate, existingPhotos, pose, userId, view }) {
   const previous = [...existingPhotos]
-    .filter((photo) => photo.userId === userId && photo.view === view && photo.pose === pose)
+    .filter((photo) => {
+      const photoDate = String(photo.capturedAt ?? photo.date ?? "");
+
+      return (
+        photo.userId === userId &&
+        photo.view === view &&
+        photo.pose === pose &&
+        photoDate &&
+        (!captureDate || photoDate < captureDate)
+      );
+    })
     .sort((a, b) => String(b.capturedAt ?? b.date).localeCompare(String(a.capturedAt ?? a.date)))[0];
 
   if (!previous) return null;
@@ -253,6 +384,32 @@ async function fileToDataUrl(file) {
   return `data:${file.type || "image/jpeg"};base64,${buffer.toString("base64")}`;
 }
 
+async function assertValidProgressPhotoFile(file) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (buffer.length < 128 || !hasSupportedImageSignature(buffer)) {
+    throw new Error("Please upload a valid progress photo image.");
+  }
+}
+
+function hasSupportedImageSignature(buffer) {
+  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const isPng =
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a;
+  const isWebp =
+    buffer.slice(0, 4).toString("ascii") === "RIFF" &&
+    buffer.slice(8, 12).toString("ascii") === "WEBP";
+
+  return isJpeg || isPng || isWebp;
+}
+
 function getMimeType(filePath = "") {
   const extension = path.extname(filePath).toLowerCase();
 
@@ -295,6 +452,50 @@ function normalizeOptionalText(value) {
   const text = String(value ?? "").trim();
 
   return text.length > 0 ? text : null;
+}
+
+function normalizeProgressPhotoView(value) {
+  const view = normalizeProgressPhotoViewModel(value);
+
+  return view === "unknown" ? "front" : view;
+}
+
+function normalizeProgressPhotoPoseValue(value, view) {
+  return normalizeProgressPhotoPose(value, view);
+}
+
+function normalizeProgressPhotoCategory(formData) {
+  const category = String(formData.get("category") ?? "").trim().toLowerCase();
+
+  if (category === "back-flexed") {
+    return { pose: "flexed", view: "back" };
+  }
+  if (category === "back-relaxed") {
+    return { pose: "relaxed", view: "back" };
+  }
+  if (category === "side-relaxed") {
+    return { pose: "relaxed", view: "side" };
+  }
+  if (category === "front-relaxed") {
+    return { pose: "relaxed", view: "front" };
+  }
+
+  const view = normalizeProgressPhotoView(formData.get("view"));
+
+  return {
+    pose: normalizeProgressPhotoPoseValue(formData.get("pose"), view),
+    view,
+  };
+}
+
+function normalizeReturnTo(value) {
+  const text = normalizeOptionalText(value);
+  if (!text) return null;
+  if (["/log?session=morning", "/log?session=afternoon", "/log?session=evening"].includes(text)) {
+    return text;
+  }
+
+  return null;
 }
 
 function sanitizeFileName(value) {

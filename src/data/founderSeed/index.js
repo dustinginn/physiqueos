@@ -13,6 +13,7 @@ import { founderProtocols } from "./protocols";
 import { founderReminders } from "./reminders";
 import { founderUser } from "./user";
 import { founderWeightEntries } from "./weights";
+import { founderExecutionItems } from "./executionItems";
 
 export const founderSeedPack = {
   version: "founder-seed-v2",
@@ -22,6 +23,9 @@ export const founderSeedPack = {
   weightEntries: founderWeightEntries,
   dexaScans: founderDEXAScans,
   protocols: founderProtocols,
+  protocolVersions: [],
+  energyStrategyLinks: [],
+  executionItems: founderExecutionItems,
   reminders: founderReminders,
   nutritionContext: founderNutritionContext,
   operatingPlan: founderOperatingPlan,

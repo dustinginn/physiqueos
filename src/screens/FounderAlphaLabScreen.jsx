@@ -17,6 +17,7 @@ import {
   UserRound,
   Wand2,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { createCustomPersona, createLabSimulation } from "../domain/lab/labSimulation";
 import Card from "../components/ui/Card";
@@ -333,6 +334,13 @@ function LabHeader({ journeys, onLoad, onReplay, onReset }) {
           </h1>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
+          <Link
+            className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--divider)] bg-[var(--surface-muted)] px-3 py-3 text-sm font-extrabold text-[var(--text-primary)] hover:border-[var(--border-strong)]"
+            href="/lab/narrative-engine"
+          >
+            <Brain size={16} />
+            Narrative Lab
+          </Link>
           <LabButton icon={RotateCcw} label="Start New Journey" onClick={onReset} tone="primary" />
           <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[14px] border border-[var(--divider)] bg-[var(--surface-muted)] px-3 py-3 text-sm font-extrabold text-[var(--text-primary)]">
             <Archive size={16} />
@@ -936,7 +944,7 @@ function inferView(fileName) {
 function inferPose(fileName) {
   const lower = String(fileName ?? "").toLowerCase();
 
-  if (lower.includes("double")) return "double_biceps";
+  if (lower.includes("double") || lower.includes("flex")) return "flexed";
   if (lower.includes("relaxed")) return "relaxed";
 
   return "unknown";

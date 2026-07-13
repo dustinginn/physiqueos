@@ -13,5 +13,9 @@ export default async function DailyBriefingPage() {
 
   if (!briefing) notFound();
 
+  if (briefing.artifactType === "event" && briefing.artifactId) {
+    await service.consumeBriefing(briefing.artifactId);
+  }
+
   return <DailyBriefingScreen briefing={briefing} />;
 }

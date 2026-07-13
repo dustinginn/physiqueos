@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function EvidenceImage({ alt, className = "", src }) {
+export default function EvidenceImage({ alt, className = "", diagnostic = null, src }) {
   const [failed, setFailed] = useState(false);
 
   if (!src || failed) {
@@ -10,9 +10,7 @@ export default function EvidenceImage({ alt, className = "", src }) {
       <div
         className={`grid place-items-center bg-[var(--surface-soft)] text-center text-xs font-bold leading-5 text-[var(--text-muted)] ${className}`}
       >
-        Original source stored.
-        <br />
-        Preview unavailable.
+        <span>Photo preview unavailable.{diagnostic && <span className="mt-1 block max-w-full break-words font-medium">{diagnostic.stage}: {diagnostic.unresolvedSourceIds?.join(", ") || diagnostic.canonicalViewId} · {diagnostic.repository}</span>}</span>
       </div>
     );
   }

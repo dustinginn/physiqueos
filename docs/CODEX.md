@@ -216,6 +216,32 @@ Assume specialist apps remain the preferred place for data entry.
 
 PhysiqueOS should become the place where users understand what all of their evidence collectively means.
 
+## Canonical Intelligence Workflow
+
+The simulator is the single source of truth for PhysiqueOS intelligence.
+
+Do not independently improve coaching quality inside production screens or services.
+
+For AI features, follow:
+
+1. Design
+2. Simulator iteration
+3. Founder approval
+4. Freeze
+5. Synchronization pass
+6. Production QA
+7. Ship
+
+Production work should focus on fidelity:
+
+* collect evidence correctly
+* persist state correctly
+* call canonical intelligence correctly
+* render the resulting coaching clearly
+* compare production output against approved simulator golden scenarios
+
+If production output is worse than the simulator, assume synchronization drift before assuming the coaching needs to be retuned.
+
 When designing new features, always ask:
 
 1. Does this help users collect evidence?

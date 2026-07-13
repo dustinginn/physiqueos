@@ -14,6 +14,7 @@ export default function ConfidenceRing({
       size={size}
       strokeWidth={6}
       value={value}
+      animate
     />
   );
 }

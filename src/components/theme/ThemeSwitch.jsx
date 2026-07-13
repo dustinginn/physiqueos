@@ -10,14 +10,14 @@ const options = [
 ];
 
 export default function ThemeSwitch() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "system";
-
-    return window.localStorage.getItem("physiqueos-theme") ?? "system";
-  });
+  const [theme, setTheme] = useState("system");
 
   useEffect(() => {
-    applyTheme(theme);
+    const storedTheme = window.localStorage.getItem("physiqueos-theme") ?? "system";
+    applyTheme(storedTheme);
+    const stateSyncTimer = window.setTimeout(() => {
+      setTheme(storedTheme);
+    }, 0);
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
@@ -28,7 +28,14 @@ export default function ThemeSwitch() {
 
     media.addEventListener("change", onChange);
 
-    return () => media.removeEventListener("change", onChange);
+    return () => {
+      window.clearTimeout(stateSyncTimer);
+      media.removeEventListener("change", onChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    applyTheme(theme);
   }, [theme]);
 
   function selectTheme(nextTheme) {

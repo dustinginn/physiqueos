@@ -35,10 +35,6 @@ export function createDEXAScan(data = {}) {
       value: null,
       unit: "lb",
     },
-    boneMass: {
-      value: null,
-      unit: "lb",
-    },
     boneMineralContent: createDEXAMass(),
     restingMetabolicRate: {
       value: null,

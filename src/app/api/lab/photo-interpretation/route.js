@@ -70,7 +70,7 @@ function inferView(fileName, fallback) {
 function inferPose(fileName, fallback) {
   const lower = String(fileName ?? "").toLowerCase();
 
-  if (lower.includes("double")) return "double_biceps";
+  if (lower.includes("double") || lower.includes("flex")) return "flexed";
   if (lower.includes("relaxed")) return "relaxed";
 
   return fallback;

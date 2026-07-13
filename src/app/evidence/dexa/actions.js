@@ -8,6 +8,7 @@ import { createDEXAScan } from "../../../domain/models/dexaScan";
 import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
 import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -37,6 +38,35 @@ export async function saveDEXAEvidence(formData) {
     file,
     prefix: `dexa-${measuredAt}`,
   });
+  const existingScans = await FounderRepositories.dexaScans.listDEXAScans(user.id);
+  const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
+    userId: user.id,
+    source: "dedicated_dexa",
+    evidencePackage: {
+      package_id: `dexa_review_${createdAt.replace(/\D/g, "")}`,
+      review_metadata: { duplicateCandidate: existingScans.some((item) => item.measuredAt === measuredAt) },
+      evidence_objects: [{
+        id: `dexa_${measuredAt}`,
+        evidence_type: "dexa_scan",
+        observed_at: measuredAt,
+        source_file: rawReportPath,
+        parser_confidence: "user_entered",
+        metadata: {
+          totalMass: normalizeOptionalNumber(formData.get("totalMass")),
+          bodyFatPercentage: normalizeOptionalNumber(formData.get("bodyFatPercentage")),
+          fatMass: normalizeOptionalNumber(formData.get("fatMass")),
+          leanMass: normalizeOptionalNumber(formData.get("leanMass")),
+          boneMineralContent: normalizeOptionalNumber(formData.get("boneMineralContent")),
+          restingMetabolicRate: normalizeOptionalNumber(formData.get("restingMetabolicRate")),
+          vatMass: normalizeOptionalNumber(formData.get("vatMass")),
+          vatVolume: normalizeOptionalNumber(formData.get("vatVolume")),
+        },
+      }],
+    },
+  });
+  redirect(`/evidence/review/${review.id}`);
+
+  /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
   const scan = createDEXAScan({
     id: `dexa_${measuredAt.replaceAll("-", "_")}_${Date.now()}`,
     userId: user.id,
@@ -115,7 +145,7 @@ export async function saveDEXAEvidence(formData) {
   await FounderRepositories.analyses.createAnalysis(analysis);
   await createDailyBriefingService({
     repositories: FounderRepositories,
-  }).generateDailyBriefing({
+  }).generateEventBriefing({
     userId: user.id,
     trigger: {
       evidenceId: scan.id,

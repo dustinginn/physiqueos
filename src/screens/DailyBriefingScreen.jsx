@@ -1,15 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import {
   ArrowLeft,
   Brain,
-  Camera,
   ChartNoAxesCombined,
   CheckCircle2,
   Dna,
-  Layers,
-  ListChecks,
   Scale,
   Sparkles,
+  Telescope,
 } from "lucide-react";
 import ActionButton from "../components/ui/ActionButton";
 import ProgressLineChart from "../components/progress/ProgressLineChart";
@@ -17,23 +17,28 @@ import Card from "../components/ui/Card";
 import ConfidenceRing from "../components/ui/ConfidenceRing";
 import IconBadge from "../components/ui/IconBadge";
 
-export default function DailyBriefingScreen({ briefing }) {
+export default function DailyBriefingScreen({
+  backHref = "/",
+  backLabel = "Home",
+  briefing,
+  eyebrow = null,
+}) {
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-10">
         <Link
           className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500"
-          href="/"
+          href={backHref}
         >
           <ArrowLeft size={18} />
-          Home
+          {backLabel}
         </Link>
 
         <section className="mb-5 space-y-3">
           <div className="flex items-center gap-3">
             <IconBadge icon={Sparkles} color="warning" size="md" />
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-indigo-600">
-              Daily Briefing
+              {eyebrow ?? (briefing.artifactType === "event" ? "Event Briefing" : "Daily Briefing")}
             </p>
           </div>
         </section>
@@ -43,90 +48,138 @@ export default function DailyBriefingScreen({ briefing }) {
             hero={briefing.hero}
             reasons={briefing.confidenceReasons ?? []}
           />
-          <ProgressEvidenceSection evidence={briefing.progressEvidence} />
-          <SupportingContextSection items={briefing.evidenceUsed} />
-          <ListSection
-            eyebrow="Execution"
-            icon={ListChecks}
-            title="Today's Plan"
-            items={briefing.todayPlan ?? []}
+          <CurrentSnapshotSection items={briefing.currentSnapshot ?? []} />
+          <ProgressStorySection
+            dexaProgress={briefing.dexaProgress}
+            weightProgress={briefing.weightProgress}
           />
-          <CalloutSection
-            icon={Brain}
-            title="Coach's Insight"
-            heading="What matters most"
-            detail={briefing.coachInsight}
-            tone="primary"
-          />
-          {briefing.watchItems?.length > 0 && (
-            <ListSection title="Watch Items" items={briefing.watchItems} />
-          )}
-          {briefing.lookingAhead?.length > 0 && (
-            <ListSection title="What should you expect next?" items={briefing.lookingAhead} />
-          )}
+          <InterpretationSection items={briefing.interpretation ?? []} />
+          <CoachInsightSection view={briefing.coachInsightView} fallback={briefing.coachInsight} />
 
-          <ActionButton href="/">Back to Home</ActionButton>
+          <ActionButton href={backHref}>Back to {backLabel}</ActionButton>
         </div>
       </div>
     </main>
   );
 }
 
-function ProgressEvidenceSection({ evidence }) {
-  if (!evidence) return null;
+function CurrentSnapshotSection({ items }) {
+  if (items.length === 0) return null;
 
   return (
-    <Card className="space-y-4">
-      <SectionHeading icon={ChartNoAxesCombined} title="Journey Evidence" />
-      <WeightEvidenceCard evidence={evidence.weights} />
-      <DEXAEvidenceCard evidence={evidence.dexa} />
-      <PhotoEvidenceCard evidence={evidence.photos} />
+    <Card className="space-y-3">
+      <SectionHeading icon={Scale} title="Current Snapshot" />
+      <div className="grid grid-cols-2 gap-2">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-[14px] bg-[var(--surface-muted)] p-3"
+          >
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
+              {item.label}
+            </p>
+            <p className="mt-1 text-base font-extrabold leading-tight text-slate-950">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
 
-function WeightEvidenceCard({ evidence }) {
+function ProgressStorySection({ dexaProgress, weightProgress }) {
+  const hasWeight = weightProgress?.points?.length > 0;
+  const hasDexa = dexaProgress?.rows?.length > 0;
+
+  if (!hasWeight && !hasDexa) return null;
+
   return (
-    <div className="rounded-[14px] border border-[#DCFCE7] bg-[#F7FEFA] p-3">
-      <EvidenceHeader
-        badge={evidence.badge}
-        icon={Scale}
-        title={evidence.title}
-        tone="success"
-      />
+    <Card className="space-y-4">
+      <SectionHeading icon={ChartNoAxesCombined} title="Progress" />
+      {hasWeight && <WeightProgressBlock progress={weightProgress} />}
+      {hasDexa && <DexaProgressBlock progress={dexaProgress} />}
+    </Card>
+  );
+}
+
+function WeightProgressBlock({ progress }) {
+  return (
+    <div className="rounded-[14px] border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
+      <div className="flex items-center gap-2">
+        <IconBadge icon={Scale} color="success" size="xs" className="rounded-full" />
+        <h3 className="text-base font-extrabold leading-tight text-slate-950">
+          Weight Trend
+        </h3>
+      </div>
       <p className="mt-2 text-sm font-medium leading-5 text-slate-600">
-        {evidence.summary}
+        {progress.summary}
       </p>
-      <WeightMiniTrend points={evidence.points} />
-      <WeeklyMomentumTable rows={evidence.weeklyMomentum} />
+      <div className="mt-3">
+        <ProgressLineChart
+          ariaLabel="Weight trend"
+          metricLabel="Weight"
+          points={progress.points}
+          suffix={` ${progress.points.at(-1)?.unit ?? "lb"}`}
+        />
+      </div>
+      {progress.weeklyMomentum?.length > 0 && (
+        <details className="mt-3 rounded-[12px] bg-[var(--surface-elevated)] p-3">
+          <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+            Weekly averages
+          </summary>
+          <div className="mt-3 space-y-2">
+            {progress.weeklyMomentum.map((row) => (
+              <div
+                key={`${row.label}-${row.period}`}
+                className="grid grid-cols-[1fr_0.8fr_0.8fr] gap-2 text-xs"
+              >
+                <div>
+                  <p className="font-extrabold text-slate-900">{row.label}</p>
+                  <p className="text-[10px] font-semibold text-slate-400">{row.period}</p>
+                </div>
+                <p className="text-right font-bold text-slate-700">
+                  {row.average.toFixed(1)} {row.unit}
+                </p>
+                <p className={`text-right font-extrabold ${row.change < 0 ? "text-[#15803D]" : "text-slate-500"}`}>
+                  {row.change === null ? "Base" : `${row.change > 0 ? "+" : ""}${row.change.toFixed(1)} ${row.unit}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
 
-function DEXAEvidenceCard({ evidence }) {
+function DexaProgressBlock({ progress }) {
   return (
-    <div className="rounded-[14px] border border-[#DBEAFE] bg-[#F8FBFF] p-3">
-      <EvidenceHeader
-        badge={evidence.badge}
-        icon={Dna}
-        title={evidence.title}
-        tone="evidence"
-      />
-      <p className="mt-2 text-sm font-medium leading-5 text-slate-600">
-        {evidence.summary}
-      </p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        {evidence.scans.map((scan) => (
-          <div key={scan.date} className="rounded-[12px] bg-[var(--surface-elevated)] p-2 text-center shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-              {scan.label}
-            </p>
-            <p className="mt-1 text-lg font-extrabold leading-none text-slate-950">
-              {scan.bodyFat.toFixed(1)}%
-            </p>
-            <p className="mt-1 text-[10px] font-bold text-slate-500">
-              {scan.fatMass?.toFixed(1) ?? "Pending"} {scan.unit} fat
-            </p>
+    <div className="rounded-[14px] border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
+      <div className="flex items-center gap-2">
+        <IconBadge icon={Dna} color="evidence" size="xs" className="rounded-full" />
+        <h3 className="text-base font-extrabold leading-tight text-slate-950">
+          DEXA Progress
+        </h3>
+      </div>
+      <div className="mt-3 overflow-hidden rounded-[12px] bg-[var(--surface-elevated)]">
+        <div className="grid grid-cols-[0.9fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-1 border-b border-[var(--divider)] px-2 py-2 text-[9px] font-extrabold uppercase tracking-[0.05em] text-slate-400">
+          <span>Date</span>
+          <span className="text-right">Weight</span>
+          <span className="text-right">Lean</span>
+          <span className="text-right">Fat</span>
+          <span className="text-right">BF%</span>
+        </div>
+        {progress.rows.map((row) => (
+          <div
+            key={row.date}
+            className="grid grid-cols-[0.9fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-1 border-b border-[var(--divider)] px-2 py-2 text-[11px] font-bold last:border-b-0"
+          >
+            <span className="text-slate-900">{row.label}</span>
+            <span className="text-right text-slate-600">{formatTableValue(row.weight)}</span>
+            <span className="text-right text-slate-600">{formatTableValue(row.lean)}</span>
+            <span className="text-right text-slate-600">{formatTableValue(row.fat)}</span>
+            <span className="text-right text-slate-900">{formatPercentValue(row.bodyFat)}</span>
           </div>
         ))}
       </div>
@@ -134,111 +187,51 @@ function DEXAEvidenceCard({ evidence }) {
   );
 }
 
-function PhotoEvidenceCard({ evidence }) {
-  return (
-    <div className="rounded-[14px] border border-[#FED7AA] bg-[#FFFBF5] p-3">
-      <EvidenceHeader
-        badge={evidence.badge}
-        icon={Camera}
-        title={evidence.title}
-        tone="effort"
-      />
-      <p className="mt-2 text-sm font-medium leading-5 text-slate-600">
-        {evidence.summary}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <EvidencePill title="Strengths" items={evidence.strengths} />
-        <EvidencePill title="Focus" items={evidence.focus} />
-      </div>
-    </div>
-  );
-}
+function InterpretationSection({ items }) {
+  if (items.length === 0) return null;
 
-function EvidencePill({ title, items }) {
   return (
-    <div className="rounded-[12px] bg-[color-mix(in_srgb,var(--surface-elevated)_84%,transparent)] p-2">
-      <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-        {title}
-      </p>
-      <div className="mt-1 space-y-1">
+    <Card className="space-y-3">
+      <SectionHeading icon={Brain} title="Interpretation" />
+      <div className="space-y-3 rounded-[14px] bg-[color-mix(in_srgb,var(--primary)_6%,var(--surface-muted))] p-3">
         {items.map((item) => (
-          <p key={item} className="text-xs font-bold leading-4 text-slate-700">
+          <p
+            key={item}
+            className="text-sm font-semibold leading-6 text-slate-700"
+          >
             {item}
           </p>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
-function EvidenceHeader({ badge, icon, title, tone }) {
-  const Icon = icon;
+function ProjectionSection({ items }) {
+  if (items.length === 0) return null;
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <IconBadge icon={Icon} color={tone === "effort" ? "warning" : tone} size="xs" className="rounded-full" />
-        <h3 className="text-base font-extrabold leading-tight text-slate-950">
-          {title}
-        </h3>
-      </div>
-      <Badge tone={tone}>{badge}</Badge>
-    </div>
-  );
-}
-
-function WeightMiniTrend({ points }) {
-  if (!points?.length) return null;
-
-  return (
-    <div className="mt-3">
-      <ProgressLineChart
-        ariaLabel="Weight journey since start of cut"
-        metricLabel="Weight"
-        points={points.map((point) => ({
-          ...point,
-          id: point.id ?? point.date,
-        }))}
-        suffix={` ${points.at(-1).unit}`}
-      />
-      <div className="mt-1 flex justify-between text-[11px] font-bold text-slate-500">
-        <span>{points[0].value.toFixed(1)} {points[0].unit}</span>
-        <span className="text-[#15803D]">
-          {points.at(-1).value.toFixed(1)} {points.at(-1).unit}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function WeeklyMomentumTable({ rows }) {
-  if (!rows?.length) return null;
-
-  return (
-    <div className="mt-3 overflow-hidden rounded-[12px] bg-[var(--surface-elevated)]">
-      <div className="grid grid-cols-[1.2fr_0.9fr_0.9fr] gap-2 border-b border-[#E2E8F0] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-        <span>Period</span>
-        <span className="text-right">Average</span>
-        <span className="text-right">Change</span>
-      </div>
-      {rows.map((row) => (
-        <div
-          key={`${row.label}-${row.period}`}
-          className="grid grid-cols-[1.2fr_0.9fr_0.9fr] gap-2 border-b border-[#F1F5F9] px-3 py-2 last:border-b-0"
-        >
-          <div>
-            <p className="text-xs font-extrabold text-slate-900">{row.label}</p>
-            <p className="text-[10px] font-semibold text-slate-400">{row.period}</p>
+    <Card className="space-y-3">
+      <SectionHeading icon={Telescope} title="Projection" />
+      <div className="grid grid-cols-1 gap-2">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-[14px] bg-[var(--surface-muted)] p-3"
+          >
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
+              {item.label}
+            </p>
+            <p className="mt-1 text-lg font-extrabold leading-tight text-slate-950">
+              {item.value}
+            </p>
+            <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+              {item.detail}
+            </p>
           </div>
-          <p className="self-center text-right text-xs font-bold text-slate-700">
-            {row.average.toFixed(1)} {row.unit}
-          </p>
-          <p className={`self-center text-right text-xs font-extrabold ${row.change < 0 ? "text-[#15803D]" : "text-slate-500"}`}>
-            {row.change === null ? "Base" : `${row.change > 0 ? "+" : ""}${row.change.toFixed(1)} ${row.unit}`}
-          </p>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -248,6 +241,11 @@ function HeroConfidenceSection({ hero, reasons }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <Badge tone="primary">{hero.primaryGoal}</Badge>
+          {hero.currentChapter && (
+            <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
+              {hero.currentChapter.replaceAll("_", " ")}
+            </p>
+          )}
           <h2 className="mt-3 text-2xl font-extrabold leading-tight text-slate-950">
             {hero.title}
           </h2>
@@ -263,7 +261,7 @@ function HeroConfidenceSection({ hero, reasons }) {
       </div>
 
       <div className="mt-4 grid gap-2">
-        {reasons.map((reason, index) => (
+        {reasons.slice(0, 3).map((reason, index) => (
           <div
             key={reason.label}
             className="flex items-center gap-2 rounded-[12px] bg-[color-mix(in_srgb,var(--surface-elevated)_84%,transparent)] px-3 py-2 text-sm font-bold text-slate-800 motion-safe:animate-[briefing-card-enter_360ms_ease-out_both] transition duration-500 ease-out"
@@ -273,42 +271,6 @@ function HeroConfidenceSection({ hero, reasons }) {
               <CheckCircle2 size={13} />
             </span>
             {reason.label}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function SupportingContextSection({ items }) {
-  const supportingItems = items.filter((item) =>
-    ["Journal", "Nutrition trend", "Protocol context", "Recovery"].includes(item.label)
-  );
-
-  if (supportingItems.length === 0) return null;
-
-  return (
-    <Card className="space-y-3">
-      <SectionHeading icon={Layers} title="Context Used" />
-      <div className="space-y-2">
-        {supportingItems.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-[12px] border border-[var(--divider)] bg-[var(--surface-muted)] p-3"
-          >
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
-                <CheckCircle2 size={14} />
-              </span>
-              <div>
-                <p className="text-sm font-bold leading-tight text-slate-950">
-                  {item.label}
-                </p>
-                <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-                  {item.detail}
-                </p>
-              </div>
-            </div>
           </div>
         ))}
       </div>
@@ -331,6 +293,25 @@ function CalloutSection({ icon, title, heading, detail, tone = "effort" }) {
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
       </div>
+    </Card>
+  );
+}
+
+function CoachInsightSection({ view, fallback }) {
+  if (!view) {
+    return <CalloutSection icon={Brain} title="Coach's Insight" heading="What to understand today" detail={fallback} tone="primary" />;
+  }
+
+  return (
+    <Card className="space-y-4 border-[#C7D2FE] bg-[#F8FAFF]">
+      <SectionHeading icon={Brain} title="Coach's Insight" />
+      {view.intro && <p className="text-sm leading-6 text-slate-600">{view.intro}</p>}
+      {view.currentFocusBody && (
+        <div className="space-y-2">
+          <p className="text-sm font-extrabold text-slate-950">{view.currentFocusLabel ?? "Current Focus"}</p>
+          <p className="text-sm leading-6 text-slate-600">{view.currentFocusBody}</p>
+        </div>
+      )}
     </Card>
   );
 }
@@ -394,6 +375,18 @@ function getReasonClass(tone) {
   if (tone === "effort") return "bg-[#FFF7ED] text-[#C2410C]";
 
   return "bg-[#ECFDF3] text-[#15803D]";
+}
+
+function formatTableValue(value) {
+  if (typeof value !== "number") return "—";
+
+  return value.toFixed(1);
+}
+
+function formatPercentValue(value) {
+  if (typeof value !== "number") return "—";
+
+  return `${value.toFixed(1)}%`;
 }
 
 function SectionHeading({ icon, title }) {

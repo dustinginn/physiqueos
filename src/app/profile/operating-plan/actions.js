@@ -15,8 +15,7 @@ const PROTOCOL_IDS = [
 
 const REMINDER_IDS = [
   "reminder_morning_weight",
-  "reminder_front_progress_photos",
-  "reminder_rear_progress_photos",
+  "reminder_weekly_progress_photo_set",
   "reminder_retatrutide",
   "reminder_tesamorelin",
   "reminder_foam_roll_daily",

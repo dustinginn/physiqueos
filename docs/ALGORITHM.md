@@ -94,6 +94,12 @@ PhysiqueOS should always know whether a new observation confirmed the current mo
 
 7. Additional evidence is valuable only if it meaningfully reduces uncertainty.
 
+8. AI coaching behavior is canonical in the simulator first. Production must call or synchronize the approved simulator intelligence rather than independently tuning coaching, prompts, or editorial judgment.
+
+9. Golden simulator scenarios are regression contracts. If production loses an approved idea, adds an unapproved idea, or exposes implementation terminology, synchronization has failed.
+
+10. Evidence corrections replace evidence. They never create parallel truths. For scheduled authoritative evidence such as morning weight, DEXA, and scheduled progress photos, the corrected record becomes the single source of truth for charts, calculations, narratives, goals, confidence, and projections. Previous values may remain only as internal audit history.
+
 ---
 
 # Step 1 — Evidence Evaluation
@@ -271,6 +277,8 @@ It should not merely report metrics.
 
 It should explain the updated belief PhysiqueOS holds after reviewing the latest evidence, predictions, validation results, and remaining uncertainty.
 
+Narrative selection is downstream of authoritative goal evaluation and persistent physiological assessment. It chooses one dominant story, maintains conversation continuity, and defers lower-priority truths without recalculating them. See `docs/NARRATIVE_INTELLIGENCE.md` for the canonical Narrative Intelligence algorithm boundary.
+
 ---
 
 # Evidence Sources
@@ -393,6 +401,83 @@ Examples:
 * A DEXA PDF may produce parsed measurements.
 * A voice note may produce structured context.
 * A nutrition note may produce estimated intake context.
+
+## Voice Intelligence Intake
+
+Voice evidence enters the algorithm before canonical evidence reaches the broader Intelligence Engine.
+
+The voice-specific pipeline is:
+
+```text
+Narrative
+-> Transcription
+-> Entity Resolution
+-> Intent Routing
+-> Parallel Evidence Interpreters
+-> Evidence Merge
+-> Clarification Ranking
+-> Conversation State
+-> Canonical Evidence
+```
+
+After Canonical Evidence is created, the standard PhysiqueOS algorithm resumes:
+
+```text
+Canonical Evidence
+-> Evidence Evaluation
+-> Prediction
+-> Validation
+-> Confidence Update
+-> Recommendation
+-> Insight
+```
+
+Voice Intelligence should determine what evidence the user provided, resolve entities, route to specialized interpreters, merge evidence, and ask only high-value clarifications.
+
+It should not decide goal progress, forecast outcomes, author the Daily Briefing, or create voice-only models.
+
+See `docs/VOICE_INTELLIGENCE.md`.
+
+## Canonical Training Session Evidence
+
+Resistance training has one canonical evidence target: `TrainingSession`.
+
+Every training input modality must converge on the same structure:
+
+* screenshot interpreters
+* manual entry interpreters
+* voice interpreters
+* API integrations such as Hevy, Strong, Apple Health, Garmin, and future imports
+
+The input method may change provenance, confidence, and completeness, but it must not change the downstream object shape. A workout is represented as one `TrainingSession` evidence object. Exercises are children of that session. Sets are children of each exercise.
+
+Downstream systems should never need to know whether a workout came from a screenshot, typed entry, voice transcript, wearable, or API. They consume `TrainingSession` objects only.
+
+Exercises are first-class historical child entities inside `TrainingSession`. Each exercise should include a stable `id`, `name`, `equipment`, `body_region`, `primary_muscle_groups`, `secondary_muscle_groups`, `movement_pattern`, `sets`, and provenance. This enables exercise history, PR tracking, volume trends, frequency, muscle group analytics, and future coaching without re-inferring basic exercise identity on every read.
+
+The canonical exercise hierarchy lives in `exercises` and `sets`, not in serialized `values[]` JSON. `values[]` may preserve raw supplemental evidence or non-hierarchical fields, but it must not duplicate the exercise tree as a string.
+
+## Canonical Nutrition Day Evidence
+
+Nutrition has one canonical evidence target: `NutritionDay`.
+
+Screenshots, typed entries, voice logs, and future API integrations are evidence artifacts. They should enrich a `NutritionDay`; they should not become separate nutrition models unless they represent a different calendar day.
+
+A `NutritionDay` may contain:
+
+* daily totals such as calories, protein, carbohydrates, fat, fiber, sugar, sodium, cholesterol, and other visible nutrients
+* targets/goals such as calorie, protein, carbohydrate, and fat targets
+* macro percentages such as grams, percent of calories, and goal percent for protein, carbohydrates, and fat
+* goal status such as actual, goal, and difference for calories, protein, carbohydrates, fat, fiber, sugar, sodium, cholesterol, and additional visible nutrients
+* meals such as breakfast, lunch, dinner, and snacks
+* foods inside meals, including canonical name, brand, serving size, servings, calories, macros, micronutrients, visible nutrient rows, and provenance
+* completeness, confidence, and provenance metadata
+
+Multiple screenshots from the same date should reconcile into the same `NutritionDay` when dates agree. Daily summaries, macro reports, nutrient reports, meal detail screens, individual food screens, typed notes, voice logs, and future API records are all enrichment sources for the same canonical day.
+
+Meal totals are stored independently from food totals. Food detail screenshots enrich the meal and make foods historically trackable, but they must not overwrite meal totals merely because every food has not been individually opened. Foods are first-class child entities inside `NutritionDay` so future systems can answer questions such as how often a food appeared, which foods contributed most to protein intake, and which foods consistently pushed a nutrient over target.
+
+Nutrition evidence may appear in the Daily Briefing when it changes what the user needs to understand, but it must not claim physique progress by itself. Coaching should be generated only when the nutrition evidence creates a real decision, such as a material calorie miss, low protein, missing data needed for the current goal, a protocol conflict, or a repeated pattern over time.
 
 This interpretation step is not the same as goal evaluation.
 

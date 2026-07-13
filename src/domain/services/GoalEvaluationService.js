@@ -4,6 +4,9 @@ const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PROJECTION_BUCKET_DAYS = 7;
+const PROJECTION_WINDOW_RADIUS_DAYS = 3;
+const ROLLING_TREND_WINDOW_DAYS = 7;
 
 export function createGoalEvaluationService() {
   return {
@@ -195,6 +198,13 @@ function evaluateVisibleAbs(goal, evidence) {
     }),
     metadata: {
       currentBodyFatEstimate,
+      currentBodyFatEstimateRange:
+        currentBodyFatEstimate === null
+          ? null
+          : formatBodyFatEstimateRange(currentBodyFatEstimate, {
+              latestDEXA,
+              weightEntries: evidence.weightEntries,
+            }),
       postDexaLoss,
       bodyFatTrend,
     },
@@ -497,39 +507,47 @@ function getProjection({ dexaScans = [], latestDEXA, weightEntries, now }) {
   }
 
   const latestWeight = postDexaWeights.at(-1);
-  const first = postDexaWeights[0];
-  const elapsedDays = Math.max(1, daysBetween(first.measuredAt, latestWeight.measuredAt));
-  const rawLossRatePerDay = (first.weight.value - latestWeight.weight.value) / elapsedDays;
+  const rollingTrend = getRollingWeightTrend(postDexaWeights);
   const lossRatePerDay =
-    rawLossRatePerDay > 0
-      ? rawLossRatePerDay
-      : getRecentPositiveLossRate(postDexaWeights) ??
-        getRecentPositiveLossRate(weightEntries);
+    rollingTrend?.lossRatePerDay ??
+    getRecentPositiveLossRate(postDexaWeights) ??
+    getRecentPositiveLossRate(weightEntries);
   const estimatedBodyFat = estimateCurrentBodyFatFromWeight(latestDEXA, weightEntries);
 
   if (!lossRatePerDay || lossRatePerDay <= 0) {
     return getDexaTrendProjection({ dexaScans, latestDEXA, now });
   }
 
-  if (estimatedBodyFat !== null && estimatedBodyFat <= 9.2) {
-    return {
-      projectedFinish: formatDateRange(addDays(now, 14), addDays(now, 20)),
-      daysRemaining: "~2 weeks",
-    };
-  }
+  const projectionAnchorDate = rollingTrend?.anchorDate ?? latestWeight.measuredAt;
 
-  const nonFatMass = latestDEXA.totalMass.value - latestDEXA.fatMass.value;
-  const targetHighWeight = nonFatMass / 0.91;
-  const remaining = Math.max(0, latestWeight.weight.value - targetHighWeight);
-  const estimatedDays = remaining / lossRatePerDay;
+  const estimatedFatMass =
+    estimatedBodyFat !== null
+      ? latestWeight.weight.value * (estimatedBodyFat / 100)
+      : latestDEXA.fatMass.value;
+  const estimatedNonFatMass = latestWeight.weight.value - estimatedFatMass;
+  const targetHighWeight = estimatedNonFatMass / 0.91;
+  const trendWeight = rollingTrend?.trendWeight ?? latestWeight.weight.value;
+  const remaining = Math.max(0, trendWeight - targetHighWeight);
+  const estimatedDays =
+    estimatedBodyFat !== null && estimatedBodyFat <= 9.9
+      ? Math.min(20, Math.max(7, remaining / lossRatePerDay))
+      : remaining / lossRatePerDay;
 
   if (!Number.isFinite(estimatedDays) || estimatedDays > 90) return null;
 
   return {
-    projectedFinish: formatDateRange(
-      addDays(now, Math.max(0, Math.floor(estimatedDays * 0.75))),
-      addDays(now, Math.ceil(estimatedDays * 1.15))
-    ),
+    currentBodyFatEstimate: estimatedBodyFat,
+    currentBodyFatRange:
+      estimatedBodyFat === null
+        ? null
+        : formatBodyFatEstimateRange(estimatedBodyFat, {
+            latestDEXA,
+            weightEntries: postDexaWeights,
+          }),
+    projectedFinish: formatStabilizedProjectionWindow({
+      anchorDate: projectionAnchorDate,
+      estimatedDays,
+    }),
     daysRemaining: formatApproxWeekRange(estimatedDays),
   };
 }
@@ -562,6 +580,67 @@ function getDexaTrendProjection({ dexaScans, latestDEXA, now }) {
     ),
     daysRemaining: formatApproxWeekRange(estimatedDays),
   };
+}
+
+function getRollingWeightTrend(weightEntries) {
+  const sortedWeights = sortByDate(weightEntries, "measuredAt");
+
+  if (sortedWeights.length < ROLLING_TREND_WINDOW_DAYS + 1) return null;
+
+  const rollingPoints = [];
+
+  for (
+    let index = ROLLING_TREND_WINDOW_DAYS - 1;
+    index < sortedWeights.length;
+    index += 1
+  ) {
+    const window = sortedWeights.slice(index - ROLLING_TREND_WINDOW_DAYS + 1, index + 1);
+    const windowDays = daysBetween(window[0].measuredAt, window.at(-1).measuredAt);
+
+    if (window.length < ROLLING_TREND_WINDOW_DAYS || windowDays < ROLLING_TREND_WINDOW_DAYS - 1) {
+      continue;
+    }
+
+    rollingPoints.push({
+      date: window.at(-1).measuredAt,
+      value:
+        window.reduce((total, entry) => total + entry.weight.value, 0) /
+        window.length,
+    });
+  }
+
+  if (rollingPoints.length < 2) return null;
+
+  const first = rollingPoints[0];
+  const latest = rollingPoints.at(-1);
+  const elapsedDays = Math.max(1, daysBetween(first.date, latest.date));
+  const lossRatePerDay = (first.value - latest.value) / elapsedDays;
+
+  if (!Number.isFinite(lossRatePerDay) || lossRatePerDay <= 0) return null;
+
+  return {
+    anchorDate: latest.date,
+    lossRatePerDay,
+    trendWeight: latest.value,
+  };
+}
+
+function formatStabilizedProjectionWindow({ anchorDate, estimatedDays }) {
+  const projectedCenter = addDays(anchorDate, Math.max(0, Math.round(estimatedDays)));
+  const stableCenter = snapDateToDayBucket(projectedCenter, PROJECTION_BUCKET_DAYS);
+
+  return formatDateRange(
+    addDays(stableCenter, -PROJECTION_WINDOW_RADIUS_DAYS),
+    addDays(stableCenter, PROJECTION_WINDOW_RADIUS_DAYS)
+  );
+}
+
+function snapDateToDayBucket(value, bucketDays) {
+  const date = value instanceof Date ? new Date(value) : parseDate(value);
+  const epochDay = Math.round(date.getTime() / DAY_MS);
+  const snappedDay = Math.round(epochDay / bucketDays) * bucketDays;
+
+  return new Date(snappedDay * DAY_MS + DAY_MS / 2);
 }
 
 function getRecentPositiveLossRate(weightEntries) {
@@ -606,10 +685,49 @@ function estimateCurrentBodyFatFromWeight(latestDEXA, weightEntries) {
     return null;
   }
 
-  const nonFatMass = latestDEXA.totalMass.value - latestDEXA.fatMass.value;
-  const estimatedFatMass = Math.max(0, latestWeight.weight.value - nonFatMass);
+  const postDexaLoss = Math.max(
+    0,
+    latestDEXA.totalMass.value - latestWeight.weight.value
+  );
+  const rollingTrend = getRollingWeightTrend(
+    weightEntries.filter((entry) => entry.measuredAt >= latestDEXA.measuredAt)
+  );
+  const fatLossRatio = rollingTrend?.lossRatePerDay && rollingTrend.lossRatePerDay > 0
+    ? 0.72
+    : 0.62;
+  const estimatedFatMass = Math.max(
+    latestDEXA.fatMass.value * 0.72,
+    latestDEXA.fatMass.value - postDexaLoss * fatLossRatio
+  );
 
   return (estimatedFatMass / latestWeight.weight.value) * 100;
+}
+
+function formatBodyFatEstimateRange(value, { latestDEXA, weightEntries = [] } = {}) {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+
+  const latestWeight = weightEntries.at(-1);
+  const latestWeightValue = latestWeight?.weight?.value;
+  const dexaWeightValue = latestDEXA?.totalMass?.value;
+  const dexaFatMass = latestDEXA?.fatMass?.value;
+  if (latestWeightValue && dexaWeightValue && dexaFatMass && latestWeightValue < dexaWeightValue) {
+    const postDexaLoss = dexaWeightValue - latestWeightValue;
+    const lowerFatMass = Math.max(dexaFatMass * 0.72, dexaFatMass - postDexaLoss * 0.78);
+    const upperFatMass = Math.max(dexaFatMass * 0.72, dexaFatMass - postDexaLoss * 0.7);
+    return `~${((lowerFatMass / latestWeightValue) * 100).toFixed(1)}-${((upperFatMass / latestWeightValue) * 100).toFixed(1)}%`;
+  }
+
+  const daysSinceDexa =
+    latestDEXA?.measuredAt && latestWeight?.measuredAt
+      ? Math.max(0, daysBetween(latestDEXA.measuredAt, latestWeight.measuredAt))
+      : 0;
+  const scaleOnlyInference = weightEntries.length > 1 && daysSinceDexa >= 7;
+  const lowerSpread = scaleOnlyInference ? 0.45 : 0.2;
+  const upperSpread = scaleOnlyInference ? 0.75 : 0.3;
+  const lower = Math.max(0, value - lowerSpread);
+  const upper = value + upperSpread;
+
+  return `~${lower.toFixed(1)}-${upper.toFixed(1)}%`;
 }
 
 function getLeanMassPreservationScore(latestDEXA) {

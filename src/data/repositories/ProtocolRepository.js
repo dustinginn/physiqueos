@@ -19,6 +19,15 @@ export function createProtocolRepository(protocols = [], options = {}) {
       return protocols.find((protocol) => protocol.id === protocolId) ?? null;
     },
 
+    async getActiveProtocolByType(userId, protocolType) {
+      return protocols.find(
+        (protocol) =>
+          protocol.userId === userId &&
+          protocol.protocolType === protocolType &&
+          protocol.status === ProtocolStatus.ACTIVE
+      ) ?? null;
+    },
+
     async saveProtocol(protocol) {
       const existingIndex = protocols.findIndex((item) => item.id === protocol.id);
 

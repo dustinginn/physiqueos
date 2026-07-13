@@ -208,6 +208,8 @@ The Home screen should always surface the single highest-impact next action.
 
 The Daily Briefing is the richer intelligence experience. It is not a dashboard, report, checklist, or task manager. It presents the Intelligence Engine's updated belief after reviewing the latest evidence, predictions, calibration status, uncertainty, and goal context.
 
+The Daily Briefing is the highest-bandwidth expression of the shared Narrative Intelligence decision; it does not own a separate narrative truth. See `docs/NARRATIVE_INTELLIGENCE.md` for the cross-surface communication contract.
+
 ---
 
 # Plans

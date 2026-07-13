@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createDailyCheckIn } from "../../../domain/models/dailyCheckIn";
+import { createCanonicalMorningWeightEvidenceObject } from "../../../domain/models/morningWeightEvidence";
 import { createWeightEntry } from "../../../domain/models/weightEntry";
 import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
 import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import { extractManualNoteEvidence } from "../../../domain/services/DailyEventService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -43,6 +45,33 @@ export async function saveMorningCheckIn(formData) {
     formData,
     user.preferences?.defaultWeighInContext
   );
+  const existingSameDayWeight = (await FounderRepositories.weights.listWeightEntries(user.id, { start: today, end: today }))[0] ?? null;
+  const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
+    userId: user.id,
+    source: "morning_check_in",
+    evidencePackage: {
+      package_id: `morning_check_in_${createdAt.replace(/\D/g, "")}`,
+      review_metadata: {
+        correctionStatus: existingSameDayWeight
+          ? existingSameDayWeight.weight?.value === weightValue ? "duplicate_candidate" : "same_day_correction"
+          : "new_entry",
+        existingEvidenceId: existingSameDayWeight?.id ?? null,
+      },
+      evidence_objects: [{
+        id: `morning_weight_${today}`,
+        evidence_type: "morning_weight",
+        observed_at: today,
+        value: weightValue,
+        unit: user.preferences?.weightUnit ?? "lb",
+        context: weighInContext,
+        notes,
+        metadata: { estimatedCalories, estimatedCaloriesBurned, proteinTarget, proteinAchieved, protocolChangeNote },
+      }],
+    },
+  });
+  redirect(`/evidence/review/${review.id}`);
+
+  /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
   const contextAdjusted = !weighInContext.isDefault;
   const evidenceConfidence = contextAdjusted ? "medium" : "high";
   const confidenceAfter = getConfidenceAfter({
@@ -93,7 +122,7 @@ export async function saveMorningCheckIn(formData) {
   const existingTodayCheckIn =
     await FounderRepositories.dailyCheckIns.getCheckInForDate(user.id, today);
 
-  await FounderRepositories.dailyCheckIns.saveCheckIn(
+  const dailyCheckIn = await FounderRepositories.dailyCheckIns.saveCheckIn(
     createDailyCheckIn({
       ...existingTodayCheckIn,
       id: `daily_check_in_${today.replaceAll("-", "_")}`,
@@ -162,6 +191,12 @@ export async function saveMorningCheckIn(formData) {
       updatedAt: createdAt,
     })
   );
+  await saveCanonicalMorningWeightEvidence({
+    createdAt,
+    dailyCheckIn,
+    userId: user.id,
+    weightEntry,
+  });
 
   const analysis = createAnalysisFromEvidence({
     id: weightEntry.id,
@@ -196,13 +231,45 @@ export async function saveMorningCheckIn(formData) {
   revalidatePath("/progress");
   revalidatePath("/progress/weight");
   revalidatePath(`/analysis/${analysis.id}`);
+  const returnTo = normalizeReturnTo(formData.get("returnTo"));
+  if (returnTo) redirect(returnTo);
   redirect("/briefing/daily");
+}
+
+async function saveCanonicalMorningWeightEvidence({
+  createdAt,
+  dailyCheckIn,
+  userId,
+  weightEntry,
+}) {
+  if (!FounderRepositories.canonicalEvidence) return;
+
+  const canonicalObject = createCanonicalMorningWeightEvidenceObject({
+    createdAt,
+    dailyCheckIn,
+    userId,
+    weightEntry,
+  });
+
+  if (!canonicalObject) return;
+
+  await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects([
+    canonicalObject,
+  ]);
 }
 
 function normalizeOptionalText(value) {
   const text = String(value ?? "").trim();
 
   return text.length > 0 ? text : null;
+}
+
+function normalizeReturnTo(value) {
+  const text = normalizeOptionalText(value);
+  if (!text) return null;
+  if (text === "/log?session=morning") return text;
+
+  return null;
 }
 
 function normalizeOptionalNumber(value) {

@@ -58,6 +58,17 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+.input-shell {
+  min-height: 2.75rem;
+  border: 1px solid var(--divider);
+  border-radius: 0.75rem;
+  background: var(--surface-elevated);
+  padding: 0.625rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
 :root {
   --background: #f7f8fa;
   --foreground: #0b1020;
@@ -278,6 +289,34 @@
     background: var(--primary);
     color: var(--primary-foreground);
   }
+
+  .voice-lab-panel {
+    pointer-events: auto;
+    touch-action: pan-y;
+  }
+
+  .voice-lab-panel button,
+  .voice-lab-panel summary,
+  .voice-lab-panel textarea,
+  .voice-lab-panel input {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .safe-lab-mode .theme-switch,
+  .safe-lab-mode .floating-bottom-navigation {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
+  .safe-lab-mode .voice-lab-panel,
+  .safe-lab-mode main.app-surface {
+    pointer-events: auto !important;
+  }
+
+  .safe-lab-mode .voice-lab-panel {
+    z-index: 2147483600 !important;
+  }
 }
 
 @layer utilities {
@@ -402,6 +441,19 @@
     border-color: var(--divider) !important;
     color: var(--text-primary);
   }
+
+  .dark .deep-pressable-card {
+    background-color: color-mix(in srgb, var(--surface-elevated) 78%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
+  }
+
+  .dark .deep-pressable-card:hover {
+    background-color: color-mix(in srgb, var(--surface-elevated) 90%, var(--surface-hover));
+  }
+
+  .dark .deep-pressable-card:active {
+    background-color: color-mix(in srgb, var(--surface-active) 36%, var(--surface-elevated));
+  }
 }
 
 @keyframes briefing-card-enter {
@@ -412,4 +464,8 @@
   to {
     transform: translateY(0) scale(1);
   }
+}
+@keyframes confidence-ring-fill {
+  from { stroke-dashoffset: var(--ring-start); }
+  to { stroke-dashoffset: var(--ring-end); }
 }

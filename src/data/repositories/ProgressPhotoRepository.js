@@ -26,6 +26,14 @@ export function createProgressPhotoRepository(progressPhotos = [], options = {})
       return photo;
     },
 
+    async upsertPhoto(photo) {
+      const index = progressPhotos.findIndex((item) => item.id === photo.id);
+      if (index >= 0) progressPhotos[index] = photo;
+      else progressPhotos.push(photo);
+      options.onChange?.();
+      return photo;
+    },
+
     async importPhotos(photos, source) {
       const importedPhotos = photos.map((photo) => ({
         ...photo,

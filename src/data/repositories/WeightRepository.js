@@ -12,14 +12,39 @@ export function createWeightRepository(weightEntries = [], options = {}) {
     },
 
     async addWeightEntry(entry) {
-      const existingIndex = weightEntries.findIndex(
+      const matchingEntries = weightEntries.filter(
         (item) =>
           item.userId === entry.userId &&
           getDateKey(item.measuredAt) === getDateKey(entry.measuredAt)
       );
 
-      if (existingIndex >= 0) {
-        weightEntries[existingIndex] = entry;
+      if (matchingEntries.length > 0) {
+        for (let index = weightEntries.length - 1; index >= 0; index -= 1) {
+          const item = weightEntries[index];
+
+          if (
+            item.userId === entry.userId &&
+            getDateKey(item.measuredAt) === getDateKey(entry.measuredAt)
+          ) {
+            weightEntries.splice(index, 1);
+          }
+        }
+
+        weightEntries.push({
+          ...entry,
+          correctionHistory: [
+            ...matchingEntries.flatMap((item) => item.correctionHistory ?? []),
+            ...matchingEntries
+              .filter(
+                (item) => JSON.stringify(item.weight) !== JSON.stringify(entry.weight)
+              )
+              .map((item) => ({
+                correctedAt: entry.updatedAt ?? new Date().toISOString(),
+                previousEntry: item,
+                reason: "Same-day authoritative weight correction.",
+              })),
+          ],
+        });
       } else {
         weightEntries.push(entry);
       }

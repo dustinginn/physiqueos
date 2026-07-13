@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import Card from "../ui/Card";
 import EvidenceImage from "./EvidenceImage";
 import ReportDrawer from "./ReportDrawer";
@@ -18,6 +19,10 @@ export default function ProgressPhotoGallery({
   const [selectedRecordId, setSelectedRecordId] = useState(null);
   const selectedIndex = records.findIndex((entry) => entry.id === selectedRecordId);
   const selectedRecord = selectedIndex >= 0 ? records[selectedIndex] : null;
+  const selectedSessionRecords = selectedRecord?.photoSessionId
+    ? records.filter((entry) => entry.photoSessionId === selectedRecord.photoSessionId)
+    : records;
+  const selectedSessionIndex = selectedSessionRecords.findIndex((entry) => entry.id === selectedRecordId);
 
   const openPhotoSet = useCallback((photoSetId) => {
     const photoSet = visibleSets.find((set) => set.id === photoSetId);
@@ -57,11 +62,8 @@ export default function ProgressPhotoGallery({
   return (
     <div ref={galleryRef}>
       {latestPhotoSet && (
-        <PhotoSetCard
-          label="Latest Photo Set"
-          photoSet={latestPhotoSet}
-          size="large"
-        />
+        <><PhotoSetCard label="Latest Photo Set" photoSet={latestPhotoSet} size="large" />
+        {latestPhotoSet.sourceMode === "canonical" && <Link className="mt-2 flex w-full items-center justify-center rounded-[14px] bg-[var(--primary)] px-4 py-3 text-sm font-extrabold text-white" href={`/briefings/photo/${latestPhotoSet.photoSessionId ?? latestPhotoSet.id}`}>Read Photo Briefing</Link>}</>
       )}
 
       <div className="mt-4">
@@ -84,11 +86,11 @@ export default function ProgressPhotoGallery({
       {selectedRecord && (
         <PhotoModal
           entry={selectedRecord}
-          next={records[(selectedIndex + 1) % records.length]}
+          next={selectedSessionRecords[(selectedSessionIndex + 1) % selectedSessionRecords.length]}
           onClose={closeGallery}
           onShowRecord={showRecord}
-          previous={records[(selectedIndex - 1 + records.length) % records.length]}
-          showNavigation={records.length > 1}
+          previous={selectedSessionRecords[(selectedSessionIndex - 1 + selectedSessionRecords.length) % selectedSessionRecords.length]}
+          showNavigation={selectedSessionRecords.length > 1}
         />
       )}
     </div>
@@ -137,11 +139,13 @@ function PhotoSetCard({ label, photoSet, size = "compact" }) {
           <p className="mt-2 text-xs font-extrabold text-[var(--primary)]">
             Open gallery &rarr;
           </p>
+          {photoSet.completionLabel && <p className="mt-1 text-[11px] font-bold text-emerald-600">{photoSet.completionLabel}</p>}
         </div>
         <p className="self-start rounded-full bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">
           {photoSet.views.length} views
         </p>
       </div>
+      {photoSet.sourceMode === "canonical" && photoSet.duplicateRetryCount > 0 && <details className="mt-3 rounded-[12px] bg-[var(--surface-muted)] p-3 text-xs"><summary className="cursor-pointer font-extrabold text-slate-600">Source history</summary><p className="mt-2 text-slate-500">{photoSet.activeViewCount} visible views · {photoSet.provenanceSourceCount} source images · {photoSet.duplicateRetryCount} additional source retained in history</p></details>}
     </Card>
   );
 }
@@ -179,7 +183,7 @@ function PhotoSetRow({ set, variant }) {
 
 function PhotoThumbnail({ className, photoSet }) {
   if (photoSet.thumbnailHref) {
-    return <EvidenceImage alt="" className={className} src={photoSet.thumbnailHref} />;
+    return <EvidenceImage alt="" className={className} diagnostic={photoSet.thumbnailHydrationDiagnostic} src={photoSet.thumbnailHref} />;
   }
 
   return (
@@ -224,29 +228,17 @@ function PhotoModal({
           </button>
         </div>
 
-        <div className="grid gap-3">
-          <div className="overflow-hidden rounded-[18px] bg-[var(--surface-muted)]">
-            <EvidenceImage
-              alt={entry.label}
-              className="max-h-[54vh] w-full object-contain"
-              src={entry.imageHref}
-            />
-          </div>
-
-          <TagList tags={entry.tags} />
-
+        <div className="grid gap-2">
           {entry.previousImageHref && (
             <div className="grid grid-cols-2 gap-2">
-              <ComparisonImage label="Previous" record={entry} src={entry.previousImageHref} />
-              <ComparisonImage label="Current" record={entry} src={entry.imageHref} />
+              <ComparisonImage date={entry.comparison?.previousDate} label="Previous" record={entry} src={entry.previousImageHref} />
+              <ComparisonImage date={entry.captureDate} label="Current" record={entry} src={entry.imageHref} />
             </div>
           )}
-
-          <GallerySection accent="accent" title="Compared to Previous Check-in" values={entry.observedChanges} />
-          <GallerySection accent="success" title="Biggest Improvements" values={entry.strengths} />
-          <GallerySection accent="focus" title="Remaining Focus" values={entry.remainingFocus} />
-          <GallerySection accent="warning" title="Confidence Impact" values={[entry.confidenceContribution]} />
-          <GallerySection title="Timeline Placement" values={[entry.timelinePlacement]} />
+          {!entry.previousImageHref && <div className="overflow-hidden rounded-[18px] bg-[var(--surface-muted)]"><EvidenceImage alt={entry.label} className="max-h-[54vh] w-full object-contain" diagnostic={entry.hydrationDiagnostic} src={entry.imageHref}/></div>}
+          <section className="rounded-[14px] bg-[var(--surface-muted)] p-3"><h3 className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">Interpretation</h3><p className="mt-1.5 text-xs font-semibold leading-5 text-slate-600">{entry.galleryInterpretation?.summary}</p><ul className="mt-1.5 space-y-1">{(entry.galleryInterpretation?.comparisonBullets??[]).map((value)=><li className="text-xs font-semibold leading-5 text-slate-600" key={value}>• {value}</li>)}</ul></section>
+          <section className="rounded-[14px] bg-[var(--surface-muted)] p-3"><h3 className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-500">Capture Conditions</h3><p className="mt-2 text-xs font-semibold leading-5 text-slate-600">{entry.galleryInterpretation?.conditionSummary}</p></section>
+          <details className="rounded-[14px] bg-[var(--surface-muted)] p-3"><summary className="cursor-pointer text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-500">Source History</summary><p className="mt-2 text-xs font-semibold leading-5 text-slate-600">{entry.sourceHistory}</p></details>
         </div>
 
         {showNavigation && (
@@ -284,64 +276,21 @@ function createSetFromRecord(record) {
   };
 }
 
-function ComparisonImage({ label, record, src }) {
+function ComparisonImage({ date, label, record, src }) {
   return (
     <div className="overflow-hidden rounded-[14px] bg-[var(--surface-muted)]">
       <EvidenceImage
         alt={`${label} ${record.label}`}
         className="aspect-[3/4] w-full object-cover"
+        diagnostic={label === "Previous" ? record.previousHydrationDiagnostic : record.hydrationDiagnostic}
         src={src}
       />
-      <p className="px-2 py-2 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
-        {label}
+      <p className="px-2 py-1.5 text-slate-500">
+        <span className="block text-xs font-extrabold text-slate-700">{formatGalleryDate(date)}</span>
+        <span className="block text-[9px] font-bold uppercase tracking-[0.08em]">{label}</span>
       </p>
     </div>
   );
 }
 
-function GallerySection({ accent = "neutral", title, values = [] }) {
-  const visibleValues = values.filter(Boolean);
-  const accentClasses = {
-    accent: "text-[var(--primary)]",
-    focus: "text-sky-600",
-    neutral: "text-slate-400",
-    success: "text-emerald-600",
-    warning: "text-amber-600",
-  };
-
-  if (visibleValues.length === 0) return null;
-
-  return (
-    <section className="rounded-[14px] bg-[var(--surface-muted)] p-3">
-      <h3 className={`text-[10px] font-extrabold uppercase tracking-[0.08em] ${accentClasses[accent] ?? accentClasses.neutral}`}>
-        {title}
-      </h3>
-      <div className="mt-2 space-y-1">
-        {visibleValues.map((value) => (
-          <p className="text-xs font-semibold leading-5 text-slate-600" key={value}>
-            {value}
-          </p>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function TagList({ tags = [] }) {
-  const visibleTags = tags.filter(Boolean);
-
-  if (visibleTags.length === 0) return null;
-
-  return (
-    <span className="mt-2 flex flex-wrap gap-1.5">
-      {visibleTags.map((tag) => (
-        <span
-          className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-extrabold capitalize text-slate-500 ring-1 ring-[var(--divider)]"
-          key={tag}
-        >
-          {tag}
-        </span>
-      ))}
-    </span>
-  );
-}
+function formatGalleryDate(value) { if(!value)return "Date unavailable";const [year,month,day]=String(value).slice(0,10).split("-").map(Number);return new Date(year,month-1,day).toLocaleDateString("en-US",{month:"short",day:"numeric"}); }

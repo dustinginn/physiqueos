@@ -70,7 +70,6 @@ function createBodySpecDEXAScan({
     bodyFatPercentage: summary.bodyFatPercentage,
     fatMass: summary.fatMass,
     leanMass: summary.leanMass,
-    boneMass: summary.boneMineralContent,
     boneMineralContent: summary.boneMineralContent,
     restingMetabolicRate: {
       value: rmr,

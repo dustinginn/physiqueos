@@ -11,10 +11,12 @@ export function getDailyEvent({
   const sortedCheckIns = sortByDate(checkIns, "date");
   const latestWeight = sortedWeights.at(-1) ?? null;
   const previousWeight = sortedWeights.at(-2) ?? null;
+  const weightBeforePrevious = sortedWeights.at(-3) ?? null;
   const latestCheckIn = sortedCheckIns.at(-1) ?? null;
   const recoveryNote = getRecoveryNote(latestCheckIn);
   const latestWeightEvent = getWeightEvent({
     latestWeight,
+    previousPreviousWeight: weightBeforePrevious,
     previousWeight,
     weights: sortedWeights,
   });
@@ -109,7 +111,7 @@ export function extractManualNoteEvidence(note) {
   };
 }
 
-function getWeightEvent({ latestWeight, previousWeight, weights }) {
+function getWeightEvent({ latestWeight, previousPreviousWeight, previousWeight, weights }) {
   if (!latestWeight) return null;
 
   const previousLow = Math.min(
@@ -120,6 +122,7 @@ function getWeightEvent({ latestWeight, previousWeight, weights }) {
   );
   const latestValue = latestWeight.weight?.value;
   const previousValue = previousWeight?.weight?.value;
+  const previousPreviousValue = previousPreviousWeight?.weight?.value;
 
   if (Number.isFinite(latestValue) && latestValue < previousLow) {
     return {
@@ -148,6 +151,28 @@ function getWeightEvent({ latestWeight, previousWeight, weights }) {
       coachLead:
         "Holding a new low is consistent with normal stabilization rather than loss of momentum.",
       journeyLead: `Today's weigh-in held the recent low at ${latestValue.toFixed(1)} ${latestWeight.weight.unit ?? "lb"}.`,
+    };
+  }
+
+  if (
+    Number.isFinite(latestValue) &&
+    Number.isFinite(previousValue) &&
+    Number.isFinite(previousPreviousValue) &&
+    previousValue - previousPreviousValue >= 0.3 &&
+    previousValue - latestValue >= 0.3 &&
+    latestValue <= previousPreviousValue + 0.2
+  ) {
+    return {
+      type: "weight_fluctuation_resolved",
+      significance: 80,
+      homeSubtitle: "Scale fluctuation resolved",
+      heroTitle: "Yesterday's bump already resolved.",
+      heroSummary:
+        "Today's weigh-in reinforces that yesterday's increase was normal day-to-day fluctuation, not a new trend.",
+      coachLead:
+        "This is exactly why we do not overreact to one morning's weigh-in. Yesterday's increase disappeared as quickly as it arrived, while the broader trend stayed intact.",
+      journeyLead:
+        "Yesterday's scale bump resolved on the next weigh-in, which is useful evidence that the trend remained intact.",
     };
   }
 
@@ -198,14 +223,19 @@ function getNoMeaningfulChangeEvent({ latestWeight, previousWeight }) {
   }
 
   return {
-    type: "briefing_ready",
+    type: "evidence_reviewed",
     significance: 10,
-    homeSubtitle: "See what changed",
-    heroTitle: "Briefing ready.",
-    heroSummary: "The latest evidence has been organized for review.",
-    coachLead:
-      "The latest evidence has been reviewed and organized into today's plan.",
-    journeyLead: "Evidence has been updated since the last review.",
+    homeSubtitle: "Evidence reviewed",
+    heroTitle: latestWeight ? "Trend context updated." : "Evidence reviewed.",
+    heroSummary: latestWeight
+      ? `The latest ${latestWeight.weight?.value?.toFixed?.(1) ?? "weight"} ${latestWeight.weight?.unit ?? "lb"} weigh-in did not materially change the current plan.`
+      : "No new evidence materially changed the current plan.",
+    coachLead: latestWeight
+      ? "Today's evidence reinforces the current read rather than changing the decision."
+      : "There was no material signal that calls for a plan change.",
+    journeyLead: latestWeight
+      ? "The newest evidence updated the record without changing the broader trajectory."
+      : "The record is current, with no meaningful change to highlight.",
   };
 }
 

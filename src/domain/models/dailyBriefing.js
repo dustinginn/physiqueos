@@ -5,6 +5,10 @@ export function createDailyBriefing(data = {}) {
     id: "",
     userId: "",
     generatedAt: "",
+    artifactType: "scheduled",
+    cadence: "daily",
+    evidenceWindow: null,
+    lifecycle: { generatedAt: "", surfacedAt: null, openedAt: null, consumedAt: null, supersededAt: null, resolvedAt: null, eligibleForHigherCadenceSummary: true },
     trigger: {
       evidenceId: null,
       evidenceType: null,

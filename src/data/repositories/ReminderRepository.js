@@ -43,6 +43,18 @@ export function createReminderRepository(reminders = [], options = {}) {
 
       return reminders[reminderIndex];
     },
+
+    async completeReminderFromEvidence(reminderId, completion = {}) {
+      const reminderIndex = reminders.findIndex((item) => item.id === reminderId);
+      if (reminderIndex < 0) return null;
+      const completionId = completion.id ?? `${reminderId}:${String(completion.completedAt ?? "").slice(0, 10)}`;
+      const history = reminders[reminderIndex].completionHistory ?? [];
+      if (history.some((item) => item.id === completionId)) return history.find((item) => item.id === completionId);
+      const record = { ...completion, id: completionId };
+      reminders[reminderIndex] = { ...reminders[reminderIndex], completedAt: completion.completedAt, completedByEvidenceId: completion.canonicalEvidenceId, completionHistory: [...history, record] };
+      options.onChange?.();
+      return record;
+    },
   };
 }
 

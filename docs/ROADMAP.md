@@ -255,6 +255,11 @@ Future milestones include:
 * Conversational onboarding
 * Conversational logging
 * Speech-to-Evidence engine
+* Richer entity resolution
+* Additional specialized voice interpreters
+* User correction learning
+* Voice-driven historical backfill
+* Voice-driven protocol updates
 
 Long-term, voice should become the lowest-friction way to teach PhysiqueOS about the user and continuously submit new evidence.
 
@@ -264,7 +269,9 @@ The objective is speech-to-structured-evidence.
 
 Users should rarely feel like they are filling out forms.
 
-**Status:** Vision
+Foundational Voice Intelligence architecture is defined in `docs/VOICE_INTELLIGENCE.md`.
+
+**Status:** Foundation complete; product maturity planned
 
 ---
 

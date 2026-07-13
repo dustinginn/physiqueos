@@ -114,6 +114,38 @@ Evidence can have multiple sources.
 
 It should not have multiple truths.
 
+## Every Intake Path Must Produce The Same Canonical Objects
+
+The downstream engines should never know whether evidence came from:
+
+* screenshot
+* PDF
+* typed text
+* voice
+* manual entry
+* API integration
+* wearable import
+* future ingestion tools
+
+Every intake path must normalize into the same canonical evidence objects before reasoning begins.
+
+Examples:
+
+* Apple Fitness screenshot -> `ActivityDay` and/or `TrainingSession`
+* Apple Health API workout -> `TrainingSession`
+* Cronometer screenshot -> `NutritionDay`
+* Cronometer API day -> `NutritionDay`
+* BodySpec PDF -> `DEXAScan`
+* BodySpec API import -> `DEXAScan`
+* typed workout notes -> `TrainingSession`
+* voice workout log -> `TrainingSession`
+
+The interpreter changes by modality.
+
+The canonical object does not.
+
+If an API provides richer or cleaner data than a screenshot, that should improve completeness, confidence, and provenance. It should not create a parallel data shape.
+
 ## Evidence Should Improve Understanding Over Time
 
 The value of evidence compounds.
@@ -238,6 +270,198 @@ User
 
 New Evidence
 ```
+
+---
+
+# Canonical Evidence Storage Contract
+
+After interpretation and reconciliation, Evidence Storage is the single source of truth for downstream engines.
+
+Persist every canonical evidence object with:
+
+* canonical fields
+* object id
+* evidence type
+* observed timestamp/date
+* captured/imported timestamp when available
+* source metadata
+* raw artifact references
+* provenance
+* confidence
+* quality metadata
+* reconciliation metadata
+* child entities such as exercises, sets, meals, foods, nutrients, regional DEXA measurements, and activity references
+
+Do not persist duplicate derived information that can always be recomputed from canonical evidence.
+
+Examples of values that should usually be recomputed:
+
+* chart series
+* rolling averages
+* projected finish windows
+* current dashboard summaries
+* Daily Briefing copy
+* presentation-specific labels
+
+Evidence Storage should preserve facts and traceability.
+
+Engines should compute interpretation from those facts.
+
+Presentation should render engine outputs.
+
+---
+
+# Diagnostics Modes
+
+Diagnostics should explain the pipeline without changing intelligence.
+
+The same evidence and engines must produce the same canonical outputs regardless of diagnostic mode.
+
+## Developer Mode
+
+Developer diagnostics may include:
+
+* full pipeline stages
+* raw extraction details
+* canonical object inspection
+* reconciliation decisions
+* confidence transitions
+* provenance inspection
+* fallback reasons
+* unresolved ambiguity
+
+Developer Mode exists for simulator inspection, production debugging, and regression analysis.
+
+## Production Mode
+
+Production diagnostics should be concise and operational.
+
+They should include:
+
+* evidence entered
+* canonical object counts
+* reconciliation summary
+* confidence summary
+* unresolved ambiguity or limitations
+
+They should not expose unnecessary implementation noise to product surfaces. User-facing coaching should never mention provider paths, parser internals, fallback labels, metadata mechanics, or diagnostic mode.
+
+---
+
+# Communication Principles
+
+PhysiqueOS communicates what it understands, not how it arrived there.
+
+The Intelligence Engine may internally reason about:
+
+* EvidencePackages
+* canonical objects
+* interpreters
+* parsing
+* structured observations
+* reconciliation
+* confidence calculations
+* repositories
+* fallback logic
+
+Those concepts should never appear in user-facing copy.
+
+Instead, user-facing surfaces should communicate:
+
+* current understanding
+* evidence confidence
+* available evidence
+* uncertainty
+* physiological interpretation
+* recommended next evidence
+* goal impact
+
+Example:
+
+Do not say:
+
+> 2 foods detected but not fully parsed.
+
+Prefer:
+
+> PhysiqueOS confidently identified one food. Additional foods may be present and will be included as more complete evidence becomes available.
+
+Likewise, avoid labels such as:
+
+* Completeness: Partial
+* structured entries
+* evidence packages
+* canonical objects
+* fallback mode
+* parser failed
+* repository state
+* reconciliation result
+
+Prefer user-centered labels such as:
+
+* Current understanding
+* Evidence confidence
+* Available evidence
+* What changed
+* What remains uncertain
+* What to add next
+
+The engine reasons.
+
+The coach explains.
+
+The UI communicates.
+
+Implementation remains invisible.
+
+Speak physiology, goals, progress, and understanding, not software.
+
+---
+
+# Failure Handling
+
+When interpretation cannot fully complete, PhysiqueOS should prefer incomplete but trustworthy evidence over fabricated certainty.
+
+Examples:
+
+* unsupported screenshot
+* corrupt PDF
+* partial upload
+* missing pages
+* OCR ambiguity
+* interpreter timeout
+* unavailable provider
+
+Required behavior:
+
+1. Preserve the raw artifact.
+2. Preserve provenance.
+3. Record uncertainty honestly.
+4. Avoid producing unsupported canonical values.
+5. Allow future reprocessing.
+6. Keep user-facing language implementation-agnostic.
+
+If a canonical object cannot be trusted, store a limited evidence package or artifact reference rather than inventing structured data.
+
+---
+
+# Golden Regression Fixtures
+
+The following fixture families are permanent regression targets for Evidence Intake:
+
+* mixed upload: screenshots + PDF + typed evidence
+* multiple DEXA upload
+* duplicate DEXA reconciliation
+* nutrition-only upload
+* activity-only upload
+* training-only upload
+* typed evidence reconciliation
+* duplicate workout reconciliation
+* unsupported or partial evidence fallback
+
+Future development should treat these as product contracts.
+
+Improvements may expand the expected outputs, but they must not silently break canonical object counts, source attribution, provenance, confidence, quality metadata, or reconciliation behavior.
 
 This loop never ends.
 

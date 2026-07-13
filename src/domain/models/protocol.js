@@ -12,22 +12,26 @@ export const ProtocolCategory = {
 };
 
 export const ProtocolStatus = {
+  DRAFT: "draft",
   PLANNED: "planned",
   ACTIVE: "active",
   PAUSED: "paused",
   COMPLETED: "completed",
+  ARCHIVED: "archived",
 };
 
 export function createProtocol(data = {}) {
   return {
     id: "",
     userId: "",
+    protocolType: null,
     name: "",
     category: ProtocolCategory.LIFESTYLE,
     relatedGoalIds: [],
     startDate: "",
     endDate: null,
     status: ProtocolStatus.ACTIVE,
+    currentVersionId: null,
     dose: {
       value: null,
       unit: "",

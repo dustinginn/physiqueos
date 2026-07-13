@@ -5,12 +5,15 @@ import IconBadge from "../components/ui/IconBadge";
 
 const typeIcons = {
   Analysis: FileText,
+  "Daily Activity": Activity,
   "Daily Check-In": Activity,
   "Daily Briefing": FileText,
   DEXA: ScanLine,
+  "Evidence Upload": FileText,
   "Progress Photo": Camera,
   Protocol: Activity,
   Weight: Scale,
+  Workout: Activity,
 };
 
 export default function EvidenceTimelineScreen({ items }) {
@@ -33,8 +36,8 @@ export default function EvidenceTimelineScreen({ items }) {
             Founder history.
           </h1>
           <p className="text-base leading-7 text-slate-500">
-            Weight, photos, DEXA, protocols, check-ins, and analyses all stay
-            visible as append-only operating history.
+            Weight, photos, DEXA, workouts, activity, protocols, check-ins, and
+            analyses all stay visible as operating history.
           </p>
         </header>
 
@@ -58,10 +61,10 @@ export default function EvidenceTimelineScreen({ items }) {
                     </p>
                   </div>
                   <h2 className="mt-1 text-base font-bold leading-tight text-slate-950">
-                    {item.title}
+                    {renderTimelineValue(item.title, "Timeline entry")}
                   </h2>
                   <p className="mt-1 text-sm leading-5 text-slate-500">
-                    {item.detail}
+                    {renderTimelineValue(item.detail, "Details available")}
                   </p>
                 </div>
               </div>
@@ -71,6 +74,14 @@ export default function EvidenceTimelineScreen({ items }) {
       </div>
     </main>
   );
+}
+
+export function renderTimelineValue(value, fallback) {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map((item)=>renderTimelineValue(item, "")).filter(Boolean).join(", ") || fallback;
+  if (value == null) return fallback;
+  if (process.env.NODE_ENV !== "production") console.warn("[EvidenceTimeline] Prevented object from rendering as a React child.");
+  return fallback;
 }
 
 function formatDate(value) {

@@ -85,7 +85,7 @@ function getFindings(evidenceType, evidence, weightChange, contextAdjusted) {
   const findings = [
     {
       title: "Manual morning weight saved",
-      detail: `${formatWeight(evidence.value, evidence.unit)} is now the authoritative weight evidence for ${evidence.measuredAt}.`,
+      detail: `${formatWeight(evidence.value, evidence.unit)} is saved as today's morning weight for ${evidence.measuredAt}.`,
     },
   ];
 

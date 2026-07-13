@@ -122,7 +122,7 @@ export const founderProgressPhotos = [
   createFounderProgressPhoto({
     date: "2026-06-13",
     view: "back",
-    pose: "double_biceps",
+    pose: "flexed",
     filename: "2026-06-13-back-double-biceps.jpg.JPEG",
     nearestDexaScanId: "dexa_2026_06_20",
   }),
@@ -144,7 +144,7 @@ export const founderProgressPhotos = [
   createFounderProgressPhoto({
     date: "2026-06-20",
     view: "back",
-    pose: "double_biceps",
+    pose: "flexed",
     filename: "2026-06-20-back-double-biceps.jpg.JPEG",
     nearestDexaScanId: "dexa_2026_06_20",
   }),
@@ -166,7 +166,7 @@ export const founderProgressPhotos = [
   createFounderProgressPhoto({
     date: "2026-06-27",
     view: "back",
-    pose: "double_biceps",
+    pose: "flexed",
     filename: "2026-06-27-back-double-biceps.jpg.JPEG",
     nearestDexaScanId: "dexa_2026_06_20",
   }),

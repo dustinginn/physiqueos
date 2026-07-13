@@ -2,17 +2,21 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Camera,
+  CheckCircle2,
   ClipboardList,
   Dumbbell,
+  FileText,
   FileUp,
   NotebookPen,
   Pill,
   Scale,
   Syringe,
+  Upload,
 } from "lucide-react";
 import ActionButton from "../components/ui/ActionButton";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
+import UploadAnythingForm from "../components/evidence/UploadAnythingForm";
 
 const DAY_NAMES = [
   "sunday",
@@ -25,12 +29,21 @@ const DAY_NAMES = [
 ];
 
 export default function LogHubScreen({
+  activeSessionId = null,
   completeReminderAction,
   completeSupplementAction,
+  contextualizedUpload = false,
+  error = null,
+  evidenceView = null,
   noteAction,
+  objects = null,
   protocols = [],
   reminders = [],
   saved = null,
+  historicalUpload = false,
+  sessions = [],
+  uploadAnythingAction,
+  pendingEvidenceReviews = [],
 }) {
   const now = new Date();
   const dayName = DAY_NAMES[now.getDay()];
@@ -46,6 +59,10 @@ export default function LogHubScreen({
   const supplements = protocols.filter(
     (protocol) => protocol.category === "supplement"
   );
+  const activeSession =
+    sessions.find((session) => session.timeBlock === activeSessionId) ??
+    sessions.find((session) => session.id === activeSessionId) ??
+    null;
 
   return (
     <main className="min-h-screen bg-[#F7F8FA]">
@@ -71,32 +88,73 @@ export default function LogHubScreen({
           </p>
           {saved && (
             <p className="rounded-full bg-[#ECFDF3] px-3 py-2 text-sm font-bold text-[#15803D]">
-              Saved.
+              {saved === "intake"
+                ? historicalUpload || contextualizedUpload
+                  ? `Evidence contextualized${objects ? `: ${objects}` : "."}`
+                  : `Evidence processed${objects ? `: ${objects}` : "."}`
+                : "Saved."}
+            </p>
+          )}
+          {error && (
+            <p className="rounded-[16px] bg-[#FEF2F2] px-3 py-2 text-sm font-bold leading-6 text-[#B91C1C]">
+              {formatLogError(error)}
             </p>
           )}
         </header>
 
         <div className="space-y-4">
+          {saved === "intake" && (historicalUpload || contextualizedUpload) && (
+            <EvidenceContextualizedComplete
+              evidenceView={evidenceView}
+              historicalUpload={historicalUpload}
+              objects={objects}
+            />
+          )}
+
+          {activeSession && (
+            <SessionChecklist session={activeSession} />
+          )}
+
+          {!activeSession && sessions.some((session) => session.pendingCount > 0) && (
+            <Card className="space-y-3">
+              <SectionHeader icon={ClipboardList} title="Today's Sessions" />
+              {sessions
+                .filter((session) => session.pendingCount > 0)
+                .map((session) => (
+                  <LogLink
+                    href={`/log?session=${session.timeBlock}`}
+                    icon={ClipboardList}
+                    key={session.id}
+                    label={session.label}
+                    subtitle={`${session.completedCount}/${session.totalCount} complete`}
+                  />
+                ))}
+            </Card>
+          )}
+
+          {pendingEvidenceReviews.length > 0 && <PendingEvidenceReviews reviews={pendingEvidenceReviews}/>}
+          <UploadAnythingCard action={uploadAnythingAction} />
+
           <Card className="space-y-3">
-            <SectionHeader icon={Scale} title="Evidence" />
+            <SectionHeader icon={Scale} title="Quick Actions" />
             <div className="grid grid-cols-1 gap-2">
               <LogLink
                 href="/check-in/morning"
                 icon={Scale}
                 label="Morning Weight"
-                subtitle="Fastest daily check-in"
+                subtitle="Fast check-in shortcut"
               />
               <LogLink
                 href="/evidence/photos"
                 icon={Camera}
                 label="Progress Photo"
-                subtitle="Front, rear, or side visual evidence"
+                subtitle="Photo evidence through the shared intake model"
               />
               <LogLink
                 href="/evidence/dexa"
                 icon={FileUp}
                 label="DEXA Upload"
-                subtitle="Parse and confirm a BodySpec PDF"
+                subtitle="Convenience shortcut; Upload Anything also accepts PDFs"
               />
             </div>
           </Card>
@@ -146,6 +204,204 @@ export default function LogHubScreen({
         </div>
       </div>
     </main>
+  );
+}
+
+function EvidenceContextualizedComplete({ evidenceView, historicalUpload, objects }) {
+  const evidenceHref = getEvidenceViewHref(evidenceView);
+
+  return (
+    <Card className="space-y-4 border-[#D1FAE5] bg-[#F0FDF4]">
+      <div className="flex items-start gap-3">
+        <IconBadge icon={CheckCircle2} color="success" size="md" />
+        <div className="min-w-0">
+          <h2 className="text-xl font-black leading-tight text-slate-950">
+            {historicalUpload ? "Historical evidence uploaded" : "Evidence added to your history"}
+          </h2>
+          <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
+            PhysiqueOS contextualized this against your existing history and updated
+            your records{objects ? `: ${objects}` : "."}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <ActionButton href={evidenceHref}>View Evidence</ActionButton>
+        <ActionButton href="/">Go Home</ActionButton>
+      </div>
+    </Card>
+  );
+}
+
+function getEvidenceViewHref(evidenceView) {
+  if (evidenceView === "nutrition") return "/progress/nutrition";
+  if (evidenceView === "training") return "/progress/training";
+  if (evidenceView === "dexa") return "/progress/dexa";
+  if (evidenceView === "photos") return "/progress/photos";
+
+  return "/timeline";
+}
+
+function UploadAnythingCard({ action }) {
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-start gap-3">
+        <IconBadge icon={Upload} color="primary" size="md" />
+        <div>
+          <h2 className="text-xl font-black leading-tight text-slate-950">
+            Upload Anything
+          </h2>
+          <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
+            Screenshots, PDFs, photos, notes, workouts, nutrition, activity, labs,
+            or body composition.
+          </p>
+        </div>
+      </div>
+
+      <UploadAnythingForm action={action}>
+        <label className="block rounded-[16px] border border-dashed border-[#C7D2FE] bg-[#F8FAFC] p-4">
+          <span className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+            <FileUp size={18} />
+            Upload files
+          </span>
+          <span className="mt-1 block text-xs font-medium leading-5 text-slate-500">
+            Add screenshots, PDFs, or photos. Multiple files can be interpreted
+            together.
+          </span>
+          <input
+            accept="image/*,application/pdf,.pdf"
+            className="mt-3 block w-full text-xs font-semibold text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white"
+            multiple
+            name="evidenceFiles"
+            type="file"
+          />
+        </label>
+
+        <label className="block space-y-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
+          <span className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+            <FileText size={18} />
+            Add note
+          </span>
+          <span className="block text-xs font-medium leading-5 text-slate-500">
+            Add anything that helps PhysiqueOS understand this evidence.
+          </span>
+          <textarea
+            className="min-h-24 w-full resize-none rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm leading-6 text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            name="evidenceNote"
+            placeholder="Example: Did spider curls 4 x 13 @ 30 lb and EZ bar curls 2 x 12 @ 65 lb..."
+          />
+        </label>
+
+        <label className="block space-y-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
+          <span className="text-sm font-extrabold text-slate-950">
+            Evidence date
+          </span>
+          <span className="block text-xs font-medium leading-5 text-slate-500">
+            Use the date the workout, meal, scan, or activity happened.
+          </span>
+          <input
+            className="w-full rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+            defaultValue={getTodayKey()}
+            name="evidenceDate"
+            type="date"
+          />
+        </label>
+
+        <label className="block rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
+          <span className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+            <Camera size={18} />
+            Take photo / upload photo
+          </span>
+          <span className="mt-1 block text-xs font-medium leading-5 text-slate-500">
+            Use your camera for quick visual evidence when supported.
+          </span>
+          <input
+            accept="image/*"
+            capture="environment"
+            className="mt-3 block w-full text-xs font-semibold text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-bold file:text-indigo-600"
+            name="evidenceFiles"
+            type="file"
+          />
+        </label>
+
+      </UploadAnythingForm>
+    </Card>
+  );
+}
+
+function PendingEvidenceReviews({ reviews }) {
+  return <Card className="space-y-3"><SectionHeader icon={ClipboardList} title="Pending evidence reviews"/><p className="text-sm text-slate-500">Uploads are safely saved. Resume a review before it is added to your history.</p>{reviews.map((review)=><Link className="block rounded-[14px] border border-[#E5E7EB] bg-[#F8FAFC] p-3" href={`/evidence/review/${review.id}`} key={review.id}><span className="block text-sm font-extrabold text-slate-950">{review.date} · {review.itemCount} item{review.itemCount===1?"":"s"}</span><span className="mt-1 block text-xs font-medium text-slate-500">{review.evidenceTypes.join(", ")}{review.likelyDuplicate?" · Likely duplicate upload":""}</span></Link>)}</Card>;
+}
+
+function SessionChecklist({ session }) {
+  const allComplete = session.pendingCount === 0;
+  const sessionTime = formatSessionTimeBlock(session.timeBlock);
+
+  return (
+    <Card className="space-y-4">
+      <SectionHeader icon={ClipboardList} title={session.label} />
+      <div>
+        <p className="text-sm font-medium leading-6 text-slate-500">
+          Complete today&apos;s scheduled {sessionTime} evidence.
+        </p>
+        <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em] text-indigo-600">
+          {session.completedCount}/{session.totalCount} complete
+        </p>
+      </div>
+      <div className="space-y-2">
+        {session.items.map((item) => (
+          <SessionChecklistItem item={item} key={item.id} />
+        ))}
+      </div>
+      {allComplete ? (
+        <ActionButton href="/">Finish Session</ActionButton>
+      ) : (
+        <p className="text-xs font-medium leading-5 text-slate-500">
+          After saving an item, you will return here with the next incomplete item ready.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function formatSessionTimeBlock(timeBlock) {
+  if (!timeBlock) return "check-in";
+  return timeBlock.charAt(0).toLowerCase() + timeBlock.slice(1);
+}
+
+function SessionChecklistItem({ item }) {
+  const Icon = item.icon === "camera" ? Camera : item.icon === "scale" ? Scale : ClipboardList;
+  const content = (
+    <>
+      <IconBadge icon={item.completed ? CheckCircle2 : Icon} color={item.completed ? "success" : item.color} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-extrabold text-slate-950">
+          {item.label}
+        </span>
+        <span className="block text-xs font-medium leading-5 text-slate-500">
+          {item.completed ? "Complete" : [item.subtitle, item.metadata].filter(Boolean).join(" - ")}
+        </span>
+      </span>
+      <span className="text-xs font-bold uppercase tracking-[0.08em] text-indigo-600">
+        {item.completed ? "Done" : "Open"}
+      </span>
+    </>
+  );
+
+  if (item.completed) {
+    return (
+      <div className="flex items-center gap-3 rounded-[14px] border border-[#D1FAE5] bg-[#ECFDF3] px-3 py-3">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      className="flex items-center gap-3 rounded-[14px] border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-3 transition hover:border-[#C7D2FE]"
+      href={item.href}
+    >
+      {content}
+    </Link>
   );
 }
 
@@ -258,6 +514,18 @@ function formatReminderSubtitle(reminder) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   return [time, mode].filter(Boolean).join(" · ");
+}
+
+function formatLogError(error) {
+  if (error === "empty-intake") {
+    return "Add a file or note before submitting evidence.";
+  }
+
+  if (error === "intake-failed") {
+    return "PhysiqueOS saved the attempt, but interpretation needs to be retried.";
+  }
+
+  return "Something went wrong while saving evidence.";
 }
 
 function formatTimeOfDay(value) {

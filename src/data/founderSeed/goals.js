@@ -8,7 +8,7 @@ export const founderGoals = [
     type: GoalType.BODY_COMPOSITION,
     primary: true,
     status: "active",
-    startDate: null,
+    startDate: "2026-05-24",
     targetDate: null,
     startValue: null,
     currentValue: null,

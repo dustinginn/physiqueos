@@ -64,18 +64,11 @@ export const founderOperatingPlan = createOperatingPlan({
     },
     progressPhotos: [
       {
-        title: "Front Progress Photos",
-        cadence: "weekly",
-        dayOfWeek: "friday",
-        timeOfDay: "morning",
-        expectedViews: ["front-relaxed"],
-      },
-      {
-        title: "Rear Progress Photos",
+        title: "Weekly Progress Photo Set",
         cadence: "weekly",
         dayOfWeek: "saturday",
-        timeOfDay: "morning",
-        expectedViews: ["back-relaxed", "back-double-biceps"],
+        timeOfDay: "afternoon",
+        expectedViews: ["front-relaxed", "back-relaxed", "back-flexed"],
       },
     ],
     dexa: {

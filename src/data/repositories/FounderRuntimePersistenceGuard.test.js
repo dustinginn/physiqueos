@@ -1,0 +1,15 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach,describe,expect,it } from "vitest";
+import { createFounderRuntimeStore,persistFounderRuntimeStore } from "./founderRuntimeStore";
+import { founderSeedPack } from "../founderSeed";
+
+const dirs=[];
+afterEach(()=>{for(const dir of dirs.splice(0))fs.rmSync(dir,{recursive:true,force:true});});
+function fixture(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),"physiqueos-guard-"));dirs.push(dir);const file=path.join(dir,"runtime-store.json");const prior={id:"old",userId:"u",artifactType:"scheduled",cadence:"daily",generatedAt:"2026-01-01",evidenceWindow:{id:"d",cadence:"daily"},briefing:{v:1}};const root={...prior,id:"new",briefing:{v:2},replacedBriefingHistory:[{briefing:{...prior,replacedBriefingHistory:[{previousEntry:{...prior,id:"oldest"}}]}}]};const data={version:founderSeedPack.version,updatedAt:"2026-01-01",user:{id:"u"},goals:[],weightEntries:[],dexaScans:[],protocols:[],protocolVersions:[],energyStrategyLinks:[],executionItems:[],reminders:[],dailyCheckIns:[],dailyBriefings:[root],analyses:[],evidencePackages:[],canonicalEvidenceObjects:[],evidenceReviews:[],progressPhotos:[]};fs.writeFileSync(file,JSON.stringify(data));return{file,data};}
+describe("Founder runtime persistence guard",()=>{
+ it("loading and repeated hydration do not write legacy bytes",()=>{const {file,data}=fixture(),before=fs.readFileSync(file),mtime=fs.statSync(file).mtimeMs;createFounderRuntimeStore(data);createFounderRuntimeStore(data);expect(fs.readFileSync(file)).toEqual(before);expect(fs.statSync(file).mtimeMs).toBe(mtime);});
+ it("an unrelated mutation preserves persisted legacy briefing bytes",()=>{const {file,data}=fixture(),store=createFounderRuntimeStore(data),legacy=JSON.parse(fs.readFileSync(file)).dailyBriefings;store.weightEntries.push({id:"w",userId:"u",weight:{value:1}});persistFounderRuntimeStore(store,{filePath:file,mutatedCollection:"weightEntries"});const saved=JSON.parse(fs.readFileSync(file));expect(saved.dailyBriefings).toEqual(legacy);expect(saved.weightEntries.some(x=>x.id==="w")).toBe(true);});
+ it("an explicit briefing mutation persists flat history without promoting canonical hydration",()=>{const {file,data}=fixture(),store=createFounderRuntimeStore(data);store.dailyBriefings[0].briefing={v:3};persistFounderRuntimeStore(store,{filePath:file,mutatedCollection:"dailyBriefings"});const saved=JSON.parse(fs.readFileSync(file));expect(saved.dailyBriefings[0].replacedBriefingHistory.every(entry=>entry.artifact&&!entry.briefing&&!entry.previousEntry)).toBe(true);expect(saved.canonicalEvidenceObjects).toEqual(data.canonicalEvidenceObjects);});
+});

@@ -24,6 +24,10 @@ The goal is to establish domain models, repository interfaces, seed data, and da
 
 6. The Intelligence Engine remains platform-independent.
 
+7. There is one canonical intelligence pipeline. The simulator inspects and validates it; production executes the same canonical modules and renders their outputs.
+
+8. Approved simulator scenarios become golden reference cases. Production QA verifies fidelity to those scenarios and fixes canonical engine integration or presentation issues instead of rewriting coaching inside production.
+
 ---
 
 # Initial Domain Model
@@ -195,6 +199,42 @@ PhysiqueOS should behave like a high-performing coach who reviews every availabl
 - unfinished priorities
 
 The briefing should synthesize evidence into guidance rather than repeat raw data.
+
+### Narrative Engine Ownership
+
+The Daily Briefing is rendered, not authored. The Narrative Engine owns the coaching story and answers one question first:
+
+> What is the story of the user's physiology today?
+
+Every briefing should be the next chapter in the same ongoing story. The engine should begin with what changed since the previous chapter, resolve uncertainty when new evidence clarifies it, coach from physiology rather than evidence mechanics, and choose only the observations that best explain today's understanding.
+
+Permanent rules:
+
+- The engine thinks in stories, not reports.
+- The engine evaluates recent sequence, current evidence, physiological meaning, and recommended response.
+- The engine recognizes resolved uncertainty, such as a one-day scale bump returning to trend.
+- The engine teaches the user how to interpret future evidence.
+- The engine manages expectations before normal volatility becomes concern.
+- The engine never exposes implementation details such as interpreters, metadata, corrections, confidence calculations, or synchronization.
+- The active goal determines which evidence matters most.
+
+Hero, Interpretation, Projection, Coach's Insight, and other Daily Briefing sections should render the Narrative Engine's story. Future coaching refinements should improve the Narrative Engine rather than rewriting individual briefing cards.
+
+### Screenshot Interpreter Production Port
+
+The Screenshot Interpreter simulator is the canonical proving ground for Upload Anything. Production should port the pipeline without lab UI assumptions:
+
+1. Evidence artifact intake: accept uploads, typed context, and future voice/API artifacts as one evidence submission.
+2. Interpreter service: run the screenshot/document/manual interpreters and return canonical objects, not page-specific view models.
+3. Canonical object creation: emit domain-specific objects such as ActivityDay, TrainingSession, NutritionDay, DEXAScan, LabPanel, RecoveryDay, and PhotoSession.
+4. Reconciliation: merge multiple artifacts into the correct real-world event while preserving field-level provenance and object-level source applications.
+5. Storage: persist canonical objects and artifacts separately so evidence pages can trace every value back to its source.
+6. Evidence pages: render stored canonical objects, not interpreter debug output.
+7. Goal engine integration: consume canonical objects only; never branch on whether evidence came from upload, typed entry, voice, or API.
+8. Narrative engine integration: decide whether new canonical evidence changes today's physiology story.
+9. Coaching integration: coach from the Narrative Engine story, not from raw extraction details.
+
+Lab-only diagnostics, pipeline counters, and debug panels should remain in the simulator. Production may keep internal trace metadata, but user-facing surfaces should render the evidence and coaching, not the mechanics.
 
 Daily Briefing answers six questions in order:
 

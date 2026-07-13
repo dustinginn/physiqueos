@@ -6,6 +6,7 @@ export default function ProgressRing({
   color = "var(--confidence)",
   trackColor = "var(--confidence-track)",
   className = "",
+  animate = false,
 }) {
   const normalized = Math.min(Math.max(value, 0), 100);
   const center = size / 2;
@@ -49,6 +50,8 @@ export default function ProgressRing({
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
+          className={animate ? "motion-safe:animate-[confidence-ring-fill_700ms_ease-out_both]" : undefined}
+          style={animate ? { "--ring-start": circumference, "--ring-end": offset } : undefined}
         />
       </svg>
 

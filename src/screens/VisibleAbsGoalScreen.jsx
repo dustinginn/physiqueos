@@ -18,6 +18,7 @@ import IconBadge from "../components/ui/IconBadge";
 import { FounderRepositories } from "../data/repositories/founderRepositories";
 import { GoalEvaluationService } from "../domain/services/GoalEvaluationService";
 import { GoalIntelligenceService } from "../domain/services/GoalIntelligenceService";
+import { orderWeeklyAveragesNewestFirst } from "../domain/utils/weeklyAverageOrdering";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -698,6 +699,7 @@ function getWeeklyMomentum(weights) {
       weeks.push({
         label: `Week ${weekNumber}`,
         period: `${formatShortDate(toDateKey(cursor))}-${formatShortDate(toDateKey(end))}`,
+        sortDate: toDateKey(cursor),
         average,
         change:
           previousAverage === null
@@ -729,6 +731,7 @@ function getWeeklyMomentum(weights) {
     weeks.push({
       label: "Current Rolling 7 Days",
       period: `${formatShortDate(toDateKey(rollingStart))}-${formatShortDate(toDateKey(rollingEnd))}`,
+      sortDate: toDateKey(rollingStart),
       average: rollingAverage,
       change:
         previousRollingAverage === null
@@ -738,7 +741,7 @@ function getWeeklyMomentum(weights) {
     });
   }
 
-  return weeks.slice(-6);
+  return orderWeeklyAveragesNewestFirst(weeks.slice(-6));
 }
 
 function averageWeight(weights) {

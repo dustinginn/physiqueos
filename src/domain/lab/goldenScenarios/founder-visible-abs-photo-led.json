@@ -1,0 +1,92 @@
+{
+  "id": "founder-visible-abs-photo-led",
+  "feature": "daily_briefing",
+  "canonicalSource": "simulator",
+  "status": "frozen",
+  "approvedBy": "Founder Alpha",
+  "approvedAt": "2026-07-04",
+  "purpose": "Golden reference for a photo-led Visible Abs at Rest Daily Briefing after comparable progress photo evidence arrives.",
+  "inputs": {
+    "primaryGoalId": "goal-visible-abs",
+    "newEvidenceType": "progress_photo_analysis",
+    "scenario": "Comparable progress photo evidence with a small scale fluctuation and existing DEXA context.",
+    "requiredEvidenceIdeas": [
+      "photo interpretation",
+      "weight trend",
+      "DEXA context",
+      "visible abs milestone",
+      "upper-body preservation"
+    ]
+  },
+  "structuredObservationExpectations": [
+    "waist and taper changes",
+    "cleaner silhouette",
+    "conditioning read",
+    "lower-ab milestone status",
+    "upper-body preservation",
+    "emerging versus confirmed visual changes",
+    "confidence and caveats",
+    "relationship to scale trend and DEXA context"
+  ],
+  "expected": {
+    "hero": {
+      "title": "The photos are today's strongest signal.",
+      "summary": "The photos point in the right direction even with normal scale noise."
+    },
+    "interpretation": [
+      "Your latest photos suggest the cut is still moving in the right direction.",
+      "The strongest read is around your waist and taper. The waist looks a little tighter, the rib-to-waist transition looks cleaner, and your torso has a sharper overall shape.",
+      "Upper-body shape appears maintained, which matters because the goal is not just to get lighter. The goal is to reveal more definition while keeping the muscle and proportions you have built.",
+      "Lower-ab definition remains the next visible milestone. The photos can support progress toward visible abs at rest, but they do not replace DEXA or longer-term weight trend evidence.",
+      "A small scale increase does not outweigh the stronger visual signal. At this stage, a 0.2 lb move is normal noise unless it becomes a pattern."
+    ],
+    "currentAssessment": [
+      {
+        "label": "Fat Loss Trajectory",
+        "value": "Supported",
+        "detail": "The weight trend and latest photos still point toward continued fat loss. Today's scale noise does not change the direction."
+      },
+      {
+        "label": "Muscle Preservation",
+        "value": "Protected",
+        "detail": "Upper-body shape appears maintained while the waist and torso look cleaner, which is the right physiological read for this stage of the cut."
+      },
+      {
+        "label": "Protocol Response",
+        "value": "No change needed",
+        "detail": "The current plan is still producing the kind of evidence we want, so protocols should remain context rather than a reason to adjust."
+      },
+      {
+        "label": "Visual Confirmation",
+        "value": "Improving",
+        "detail": "The photos support a cleaner silhouette, tighter waist, and maintained upper-body shape."
+      },
+      {
+        "label": "Goal Forecast",
+        "value": "On track",
+        "detail": "The next meaningful checkpoint is continued lower-ab definition while the preserved shape and weight trend hold."
+      }
+    ],
+    "projection": {
+      "direction": "On track",
+      "detail": "Continue using the current plan while watching whether lower-ab definition becomes more consistent."
+    },
+    "coachInsight": "Stay the course. The photos are giving the right kind of signal: tighter waist, cleaner shape, and maintained upper body. Nothing here suggests changing nutrition or training today. The next thing to watch is whether lower-ab definition continues to emerge while weight noise stays within the expected range."
+  },
+  "forbiddenUserFacingTerms": [
+    "fallback mode",
+    "OpenAI",
+    "PhotoInterpreter path",
+    "PhotoInterpreter evidence",
+    "PI evidence",
+    "metadata captured",
+    "provider",
+    "parser",
+    "structured observations",
+    "visual evidence",
+    "conditioning read",
+    "preservation read",
+    "confidence note",
+    "model unavailable"
+  ]
+}

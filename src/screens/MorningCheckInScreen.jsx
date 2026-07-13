@@ -4,7 +4,11 @@ import Card from "../components/ui/Card";
 import ActionButton from "../components/ui/ActionButton";
 import IconBadge from "../components/ui/IconBadge";
 
-export default function MorningCheckInScreen({ action, reconciliationItems = [] }) {
+export default function MorningCheckInScreen({
+  action,
+  reconciliationItems = [],
+  returnTo = null,
+}) {
   return (
     <main className="min-h-screen bg-[#F7F8FA]">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-10">
@@ -25,11 +29,12 @@ export default function MorningCheckInScreen({ action, reconciliationItems = [] 
           </h1>
           <p className="text-base leading-7 text-slate-500">
             Start with your manual morning weight. PhysiqueOS will treat it as
-            today&apos;s authoritative weight evidence.
+            today&apos;s morning weight evidence.
           </p>
         </div>
 
         <form action={action} className="space-y-4">
+          {returnTo && <input name="returnTo" type="hidden" value={returnTo} />}
           {reconciliationItems.length > 0 && (
             <Card className="space-y-4">
               <FieldLabel icon={ClipboardList} label="Yesterday" />

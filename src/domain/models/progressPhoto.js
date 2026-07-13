@@ -10,7 +10,6 @@ export const ProgressPhotoView = {
 export const ProgressPhotoPose = {
   RELAXED: "relaxed",
   FLEXED: "flexed",
-  DOUBLE_BICEPS: "double_biceps",
   UNKNOWN: "unknown",
 };
 

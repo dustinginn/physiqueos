@@ -16,6 +16,7 @@ import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 
 const streamIcons = {
+  activity: Activity,
   dexa: ScanLine,
   "health-metrics": HeartPulse,
   nutrition: Salad,
@@ -77,39 +78,21 @@ function EvidenceStreamCard({ from, stream }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-                  {stream.status === "available" ? "Reporting" : "Preview"}
-                </p>
-                <h2 className="mt-1 text-lg font-extrabold leading-tight text-slate-950">
+                <h2 className="text-lg font-extrabold leading-tight text-slate-950">
                   {stream.title}
                 </h2>
               </div>
               <ChevronRight className="mt-1 shrink-0 text-slate-300" size={18} />
             </div>
 
-            <div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-3">
-              <div>
-                <p className="text-2xl font-extrabold tracking-tight text-slate-950">
-                  {stream.metric}
-                </p>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  {stream.trend}{" "}
-                  <span className="font-semibold text-slate-400">
-                    {stream.trendLabel}
-                  </span>
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-                  History
-                </p>
-                <p className="mt-1 text-xs font-extrabold text-slate-700">
-                  {stream.history}
-                </p>
-              </div>
-            </div>
+            <p className="mt-4 text-2xl font-extrabold tracking-tight text-slate-950">
+              {stream.metric}
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+              {stream.trend}
+            </p>
 
-            <p className="mt-3 text-[11px] font-semibold text-slate-400">
+            <p className="mt-3 text-[11px] font-bold text-slate-400">
               Latest: {formatDate(stream.lastUpdated)}
             </p>
           </div>
