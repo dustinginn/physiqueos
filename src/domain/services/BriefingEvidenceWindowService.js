@@ -42,6 +42,28 @@ export function createScheduledEvidenceWindow(options = {}) {
     : createPreviousDayEvidenceWindow(options);
 }
 
+export function resolveScheduledBriefingExpectation({
+  now = new Date(),
+  timeZone = "America/Los_Angeles",
+  monthlyEnabled = false,
+} = {}) {
+  const localDate = getDateKeyInTimeZone(now, timeZone);
+  const cadence = selectScheduledBriefingCadence({ now, timeZone, monthlyEnabled });
+  const evidenceWindow = createScheduledEvidenceWindow({ now, timeZone, monthlyEnabled });
+
+  return {
+    localDate,
+    briefingDate: evidenceWindow.briefingDate,
+    evidenceThroughDate: evidenceWindow.date,
+    evidenceWindow,
+    windowId: evidenceWindow.id,
+    cadence,
+    artifactId: `${cadence}_briefing_${evidenceWindow.date.replaceAll("-", "")}`,
+    closed: evidenceWindow.closed === true,
+    dailyEligible: cadence === "daily" && evidenceWindow.closed === true,
+  };
+}
+
 export function isRecordAvailableByWindow(record, window, fields = []) {
   if (!window?.date) return true;
   const value = fields

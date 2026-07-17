@@ -1,3 +1,5 @@
+import { auditUserFacingNarrative, filterEditorialNarration, inspectUserFacingLanguage, isUserFacingNarrationAllowed } from "./NarrativeEditorialPolicy";
+
 export function composeNarrativeSurface({
   artifactType = "scheduled",
   currentChapter = null,
@@ -13,9 +15,10 @@ export function composeNarrativeSurface({
   weight = null,
   storyTheme = null,
   evidenceCoverage = null,
+  continuity = null,
 } = {}) {
   if (artifactType !== "event") {
-    return composeScheduledNarrative({ confidence, evidenceCoverage, projection, recommendation, storyTheme, temporalContext, trainingPerformance, weight });
+    return composeScheduledNarrative({ coachInsight, confidence, continuity, evidenceCoverage, hero, interpretation, projection, recommendation, storyTheme, temporalContext, trainingPerformance, weight });
   }
 
   const analyticalInterpretation = interpretation.filter(isAnalyticalInterpretation);
@@ -45,44 +48,58 @@ export function composeNarrativeSurface({
   };
 }
 
-function composeScheduledNarrative({ confidence, evidenceCoverage, projection, recommendation, storyTheme, temporalContext, trainingPerformance, weight }) {
+function composeScheduledNarrative({ coachInsight, confidence, continuity, evidenceCoverage, hero, interpretation, projection, recommendation, storyTheme, temporalContext, trainingPerformance, weight }) {
   const relative = temporalContext?.relativeLabel === "yesterday" ? "Yesterday" : "The completed evidence window";
   const dayLabel = formatWeekday(temporalContext?.date);
   const weeklyDirection = weight?.weekOverWeek != null && weight.weekOverWeek < 0 ? "downward" : "established";
   const trainingNarrative = getTrainingNarrative(trainingPerformance, weeklyDirection);
-  const observations = [
-    `${dayLabel}'s weigh-in stayed aligned with the trend.`,
+  const observations = filterEditorialNarration([
+    weight ? `${dayLabel}'s weigh-in stayed aligned with the weekly trend.` : null,
     trainingNarrative.support,
-    projection?.projectedFinish
-      ? "We're still moving toward the next scheduled measurement."
-      : "We're still moving in the right direction.",
-  ];
+  ]).slice(0, 3);
   const changeContext = weight?.dayChange == null
     ? "The completed weigh-in fits the bigger picture without changing it."
     : `The ${formatMagnitude(weight.dayChange, weight.unit)} is normal day-to-day movement. The rolling trend is still ${weeklyDirection === "downward" ? "moving down" : "intact"}.`;
   const recommendationText = recommendation?.narrativePriority === "material"
     ? recommendation.summary ?? recommendation.title
-    : "Keep execution steady. Preserve training quality and let the trend continue doing its job.";
+    : weight?.dayChange != null
+      ? "Today's weight is normal day-to-day noise, so do not adjust calories or the protocol from this single weigh-in."
+      : trainingNarrative.support
+        ? "Training quality is the priority for the next few days; keep load and effort stable while the cut continues."
+        : "Nothing in the completed evidence justifies changing the protocol today.";
 
-  const narrative = {
+  const fallback = {
     hero: {
       currentChapter: "final_stretch",
       confidence,
       confidenceLabel: getConfidenceLabel(confidence),
       primaryGoal: "Visible Abs at Rest",
-      title: "Another day of confirmation.",
-      summary: `${relative}'s weigh-in fit right into the trend we've been building. Everything still points in the same direction as the cut approaches its finish line.`,
+      title: getHumanConclusion({ evidenceCoverage, trainingNarrative, weight }),
+      summary: getHumanSummary({ relative, trainingNarrative, weight }),
     },
     supportingObservations: observations.slice(0, 3),
     interpretation: [
       changeContext,
       trainingNarrative.interpretation,
-    ],
-    coachInsight: `${dayLabel} gave us another steady day. There's nothing here to chase this close to the finish line.`,
+    ].filter(Boolean),
+    coachInsight: recommendationText,
     coachInsightView: {
-      intro: `${dayLabel} gave us another steady day. There's nothing here to chase this close to the finish line.`,
+      intro: recommendationText,
       currentFocusLabel: "Current Focus",
       currentFocusBody: recommendationText,
+    },
+  };
+  const canonicalHero = isValidHero(hero) && isUserFacingNarrationAllowed(hero.title) && isUserFacingNarrationAllowed(hero.summary) ? { ...hero, currentChapter: hero.currentChapter ?? fallback.hero.currentChapter, confidence: hero.confidence ?? confidence, confidenceLabel: hero.confidenceLabel ?? getConfidenceLabel(confidence) } : fallback.hero;
+  const canonicalInterpretation = filterEditorialNarration(normalizeNarration(interpretation)).filter(isAnalyticalInterpretation);
+  const canonicalCoachInsight = isUserFacingNarrationAllowed(coachInsight) && !inspectUserFacingLanguage(coachInsight).genericAction ? normalizeText(coachInsight) : null;
+  const narrative = {
+    ...fallback,
+    hero: canonicalHero,
+    interpretation: canonicalInterpretation.length ? canonicalInterpretation : fallback.interpretation,
+    coachInsight: canonicalCoachInsight ?? fallback.coachInsight,
+    coachInsightView: {
+      ...fallback.coachInsightView,
+      intro: canonicalCoachInsight ?? fallback.coachInsightView.intro,
     },
   };
   const energyNarrative = getEnergyBalanceNarrative(evidenceCoverage?.energyBalanceExecutionContext);
@@ -107,9 +124,35 @@ function composeScheduledNarrative({ confidence, evidenceCoverage, projection, r
 
   narrative.narrationAudit = {
     ...auditNarrative(narrative),
+    editorial: auditUserFacingNarrative(narrative, { claimLifecycles: continuity?.claimLifecycles }),
     evidenceCoverage: evidenceCoverage?.domains ?? {},
+    continuity: auditContinuity(continuity),
   };
   return narrative;
+}
+
+function isValidHero(hero) {
+  return Boolean(normalizeText(hero?.title) && normalizeText(hero?.summary));
+}
+
+function normalizeNarration(items) {
+  return (Array.isArray(items) ? items : []).map(normalizeText).filter(Boolean);
+}
+
+function normalizeText(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || null;
+}
+
+function auditContinuity(continuity = {}) {
+  const previous = new Set(continuity?.previousClaimIds ?? []);
+  const current = [...new Set(continuity?.currentClaimIds ?? [])];
+  return {
+    currentClaimIds: current,
+    priorSameCadenceClaimIds: [...previous],
+    repeatedClaimIds: current.filter((id) => previous.has(id)),
+    novelClaimIds: current.filter((id) => !previous.has(id)),
+  };
 }
 
 function getEnergyBalanceNarrative(context) {
@@ -134,8 +177,8 @@ function getEnergyBalanceNarrative(context) {
 function getTrainingNarrative(signal, weeklyDirection) {
   if (!signal?.shouldMention) {
     return {
-      support: "Training is holding up well.",
-      interpretation: "Training continues to hold up well during the cut. That is encouraging this late in the process, even though training alone cannot tell us exactly what is happening with lean mass.",
+      support: null,
+      interpretation: null,
     };
   }
   const exercise = signal.recentPrs?.[0] ?? signal.improvingExercises?.[0] ?? "a recent lift";
@@ -161,6 +204,20 @@ function getTrainingNarrative(signal, weeklyDirection) {
     support: "Training performance remains steady.",
     interpretation: "Training remains steady. At this stage of the cut, holding performance is a positive result because strength has not broadly fallen off.",
   };
+}
+
+function getHumanConclusion({ evidenceCoverage, trainingNarrative, weight }) {
+  if (trainingNarrative?.support && /decline|slipped/i.test(trainingNarrative.support)) return "Training needs attention today.";
+  if (weight?.lowestWeight) return "The scale stayed on plan.";
+  if (weight) return "Still on track.";
+  if (evidenceCoverage?.energyBalanceExecutionContext?.selectedForInterpretation) return "The plan still fits.";
+  return "Nothing to fix today.";
+}
+
+function getHumanSummary({ relative, trainingNarrative, weight }) {
+  if (weight?.dayChange != null) return `${relative}'s weigh-in fits the weekly pattern and does not justify changing the plan.`;
+  if (trainingNarrative?.support) return `${trainingNarrative.support} That is the most useful signal from the completed day.`;
+  return "The available evidence does not show a new risk or a reason to change course.";
 }
 
 function auditNarrative(narrative) {

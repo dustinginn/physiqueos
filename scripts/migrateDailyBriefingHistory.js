@@ -7,7 +7,9 @@ import { stableSerialize } from "../src/data/repositories/DailyBriefingHistory.j
 
 const args=parseArgs(process.argv.slice(2));
 if(!args.source||!args.outputDir){console.error('Usage: node scripts/migrateDailyBriefingHistory.js --source "<runtime-store-copy.json>" --output-dir "<migration-output>"');process.exit(2);}
-if(await portOpen(3000)){console.error("Preflight failed: port 3000 is active. Stop the Next.js writer manually before migration.");process.exit(3);}
+const writerPort = args.writerPort === undefined ? 3000 : Number(args.writerPort);
+if(!Number.isInteger(writerPort)||writerPort<0||writerPort>65535){console.error("Preflight failed: --writer-port must be an integer from 0 to 65535.");process.exit(2);}
+if(writerPort!==0&&await portOpen(writerPort)){console.error(`Preflight failed: port ${writerPort} is active. Stop the writer manually before migration.`);process.exit(3);}
 const source=path.resolve(args.source),out=path.resolve(args.outputDir);
 if(!fs.existsSync(source)||!fs.statSync(source).isFile())throw new Error("Source must be an existing regular file.");
 fs.mkdirSync(out,{recursive:true});const stamp=new Date().toISOString().replace(/[:.]/g,"-");const lock=path.join(out,"daily-briefing-migration.lock");

@@ -54,3 +54,23 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Founder operational output (runtime data and incident snapshots are managed separately)
+/private/founder/logs/
+/private/founder/tmp/
+/private/founder/operations/
+
+# Transitional protection for legacy root-level operational logs
+/controlled-restart*.log
+/daily-briefing-lifecycle-*.log
+/final-controlled-restart*.log
+/final-restoration*.log
+/founder-alpha-resume*.log
+/log-evidence-cleanup*.log
+/pending-review-reprocess*.log
+/tmp-*.log
+/debug.log
+/storybook.log
+/.clean-dev*.log
+/.dev-server*.log
+/.ngrok*.log

@@ -213,7 +213,7 @@ function createSteadyPhysiologyStory({
     theme: "steady_execution",
     text:
       primaryEvaluation?.projection?.daysRemaining
-        ? `You are moving from proving the plan toward finishing it well. With about ${primaryEvaluation.projection.daysRemaining} left, the smarter move is patience: ${
+        ? `You are moving from proving the plan toward finishing it well. With ${primaryEvaluation.projection.daysRemaining} left, the smarter move is patience: ${
             narrativeNovelty?.noChangeRationale ??
             "keep the conditions steady and let the next strong check-in tell us whether anything needs to change."
           }`

@@ -4,16 +4,22 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "playwright:server": "node scripts/playwrightServer.mjs",
     "dev:tunnel": "npx ngrok http 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "fonts:check": "node scripts/checkFontBuild.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "snap": "playwright test tests/home.spec.ts --project=chromium",
-    "diff": "node scripts/diff.js"
+    "diff": "node scripts/diff.js",
+    "ops:root:check": "node scripts/checkRootOperations.mjs",
+    "ops:logs:check": "node scripts/cleanupOperationsLogs.mjs",
+    "ops:logs:clean": "node scripts/cleanupOperationsLogs.mjs --apply"
   },
   "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@fontsource/inter": "^5.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

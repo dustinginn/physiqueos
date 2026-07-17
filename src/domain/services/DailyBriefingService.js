@@ -9,15 +9,16 @@ import { normalizePhotoInterpretationToStructuredObservations } from "../interpr
 import { orderWeeklyAveragesNewestFirst } from "../utils/weeklyAverageOrdering";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import founderVisibleAbsPhotoLedScenario from "../lab/goldenScenarios/founder-visible-abs-photo-led.json";
-import { createScheduledEvidenceWindow, isRecordAvailableByWindow } from "./BriefingEvidenceWindowService";
+import { createPreviousDayEvidenceWindow, createScheduledEvidenceWindow, isRecordAvailableByWindow, resolveScheduledBriefingExpectation } from "./BriefingEvidenceWindowService";
 import { composeNarrativeSurface } from "./NarrativeComposerService";
 import { createDailyNarrativeEvidenceCoverage } from "./NarrativeEvidenceCoverageService";
+import { getClaimLifecycle } from "./NarrativeEditorialPolicy";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 const DAILY_BRIEFING_VERSION = "daily-briefing-v29-voice-calibration";
 const FOUNDER_PHOTO_LED_GOLDEN = founderVisibleAbsPhotoLedScenario.expected;
 
-export function createDailyBriefingService({ repositories, now = () => new Date() }) {
+export function createDailyBriefingService({ repositories, now = () => new Date(), scheduledComposer = null }) {
   async function composeDailyBriefing(userId, trigger = {}, options = {}) {
     const user = userId
       ? await repositories.users.getUserById(userId)
@@ -79,6 +80,10 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       protocols,
       weights: sortedWeights,
     });
+    const trainingPerformanceReport = createTrainingPerformanceIntelligenceReport({
+      canonicalObjects: windowCanonicalEvidence,
+      now: new Date(`${latestWeight?.measuredAt ?? new Date().toISOString().slice(0, 10)}T12:00:00`),
+    });
     const evaluations = GoalEvaluationService.getGoalEvaluations({
       goals,
       dexaScans: sortedDEXA,
@@ -86,6 +91,11 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       progressPhotos: sortedPhotos,
       protocols,
       nutritionContext: windowNutritionContext,
+      photoAnalyses: windowAnalyses,
+      trainingPerformance: trainingPerformanceReport,
+      now: evidenceWindow?.date
+        ? new Date(`${evidenceWindow.date}T12:00:00`)
+        : now(),
     });
     const intelligence = GoalIntelligenceService.getGoalIntelligence({
       evaluations,
@@ -136,11 +146,10 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       progressPhotos: sortedPhotos,
       reminders,
     });
-    const trainingPerformanceReport = createTrainingPerformanceIntelligenceReport({
-      canonicalObjects: windowCanonicalEvidence,
-      now: new Date(`${latestWeight?.measuredAt ?? weightStats.latestDate ?? new Date().toISOString().slice(0, 10)}T12:00:00`),
-    });
+    const briefingMemory = getDailyBriefingMemory(latestStoredBriefing);
     const trainingPerformanceSignal = getTrainingPerformanceBriefingSignal({
+      briefingMemory,
+      evidenceDate: evidenceWindow?.date,
       primaryEvaluation,
       report: trainingPerformanceReport,
       weightStats,
@@ -152,7 +161,6 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       latestWeight,
       nutritionRange: windowNutritionContext?.estimatedDailyCaloricIntake,
     });
-    const briefingMemory = getDailyBriefingMemory(latestStoredBriefing);
     const narrativeNovelty = getNarrativeNovelty({
       briefingMemory,
       dailyEvidence,
@@ -262,6 +270,7 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
         ? "fluctuation_resolution"
         : narrativeNovelty?.primaryChange?.theme ?? narrativeStory?.theme,
       evidenceCoverage: narrativeEvidenceCoverage,
+      continuity: getNarrativeClaimContinuity({ briefingMemory, primaryEvaluation, trainingPerformanceSignal }),
     });
 
     return {
@@ -354,13 +363,14 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
         narrativeNovelty,
         primaryEvaluation,
         recommendation,
+        trainingPerformanceSignal,
       }),
       narrativeContinuity: { mode: briefingMemoryMode, sourceArtifactId: latestStoredBriefing?.id ?? null, sourceCadence: latestStoredBriefing?.cadence ?? null },
     };
   }
 
   return {
-    async getDailyBriefing(userId) {
+    async getPersistedDailyBriefing(userId) {
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -368,46 +378,124 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
 
       if (!resolvedUserId) return null;
 
-      const activeEvent = await repositories.dailyBriefings?.getLatestActiveEventBriefing?.(resolvedUserId);
-      if (activeEvent) return { ...activeEvent.briefing, artifactId: activeEvent.id, artifactType: "event" };
-
-      const evidenceWindow = createScheduledEvidenceWindow({ now: now(), timeZone: user?.timeZone ?? "America/Los_Angeles" });
+      const evidenceWindow = createPreviousDayEvidenceWindow({ now: now(), timeZone: user?.timeZone ?? "America/Los_Angeles" });
       const scheduled = await repositories.dailyBriefings?.getBriefingByEvidenceWindow?.(resolvedUserId, evidenceWindow.id);
       if (scheduled?.briefing?.version === DAILY_BRIEFING_VERSION) {
         return { ...normalizeDailyBriefingForPresentation(scheduled.briefing), artifactId: scheduled.id };
       }
 
-      const [
-        latestStoredBriefing,
-        weights,
-        dexaScans,
-        progressPhotos,
-        checkIns,
-        nutritionContext,
-        analyses,
-      ] = await Promise.all([
-        repositories.dailyBriefings?.getLatestScheduledDailyBriefing(resolvedUserId) ?? null,
-        repositories.weights.listWeightEntries(resolvedUserId),
-        repositories.dexaScans.listDEXAScans(resolvedUserId),
-        repositories.progressPhotos?.listPhotos(resolvedUserId) ?? [],
-        repositories.dailyCheckIns.listCheckIns(resolvedUserId),
-        repositories.nutritionContext?.getNutritionContext(resolvedUserId) ?? null,
-        repositories.analyses.listAnalyses?.() ?? [],
-      ]);
-      const freshness = getDailyBriefingFreshness({
-        analyses,
-        checkIns,
-        dailyBriefing: latestStoredBriefing,
-        dexaScans,
-        nutritionContext,
-        progressPhotos,
-        weightEntries: weights,
-      });
+      return null;
+    },
 
+    async getLatestPersistedDailyBriefing(userId) {
+      const user = userId
+        ? await repositories.users.getUserById(userId)
+        : await repositories.users.getCurrentUser();
+      const resolvedUserId = user?.id ?? userId;
+      if (!resolvedUserId) return null;
+      const artifact = await repositories.dailyBriefings?.getLatestScheduledDailyBriefing(resolvedUserId);
+      return artifact?.briefing
+        ? { ...normalizeDailyBriefingForPresentation(artifact.briefing), artifactId: artifact.id, artifactType: "scheduled" }
+        : null;
+    },
+
+    async getDailyBriefing(userId) {
+      const persisted = await this.getPersistedDailyBriefing(userId);
+      if (persisted) return persisted;
+      const user = userId
+        ? await repositories.users.getUserById(userId)
+        : await repositories.users.getCurrentUser();
+      const resolvedUserId = user?.id ?? userId;
+      if (!resolvedUserId) return null;
       return this.generateDailyBriefing({
         userId: resolvedUserId,
-        evidenceWindow,
+        evidenceWindow: createPreviousDayEvidenceWindow({ now: now(), timeZone: user?.timeZone ?? "America/Los_Angeles" }),
       });
+    },
+
+    async generateScheduledDailyBriefingForClosedWindow({ userId, asOf = now() } = {}) {
+      const user = userId
+        ? await repositories.users.getUserById(userId)
+        : await repositories.users.getCurrentUser();
+      const resolvedUserId = user?.id ?? userId;
+      if (!resolvedUserId) return { state: "not_eligible", reason: "user_not_found" };
+
+      const expectation = resolveScheduledBriefingExpectation({
+        now: asOf,
+        timeZone: user?.timeZone ?? "America/Los_Angeles",
+      });
+      if (expectation.cadence !== "daily") {
+        return { state: "blocked_by_precedence", expectation };
+      }
+      if (!expectation.closed) {
+        return { state: "not_eligible", expectation, reason: "evidence_window_open" };
+      }
+
+      const existing = await repositories.dailyBriefings.getBriefingByEvidenceWindow(
+        resolvedUserId,
+        expectation.windowId
+      );
+      if (existing?.briefing && existing.lifecycle?.generationStatus !== "failed") {
+        return { state: "already_exists", artifact: existing, expectation };
+      }
+
+      const claimedAt = now().toISOString();
+      const claim = await repositories.dailyBriefings.claimScheduledBriefing({
+        artifactId: expectation.artifactId,
+        evidenceWindow: expectation.evidenceWindow,
+        claimedAt,
+        userId: resolvedUserId,
+      });
+      if (!claim.acquired) {
+        return {
+          state: claim.state === "complete" ? "already_exists" : claim.state,
+          artifact: claim.artifact,
+          expectation,
+        };
+      }
+
+      try {
+        const briefing = await (scheduledComposer ?? composeDailyBriefing)(resolvedUserId, {}, {
+          artifactType: "scheduled",
+          evidenceWindow: expectation.evidenceWindow,
+        });
+        if (!briefing) throw new Error("Daily briefing composition returned no artifact.");
+
+        const generatedAt = now().toISOString();
+        const artifact = createDailyBriefing({
+          id: expectation.artifactId,
+          userId: resolvedUserId,
+          generatedAt,
+          artifactType: "scheduled",
+          cadence: "daily",
+          evidenceWindow: expectation.evidenceWindow,
+          lifecycle: {
+            ...claim.artifact.lifecycle,
+            generationStatus: "complete",
+            generatedAt,
+            completedAt: generatedAt,
+            failedAt: null,
+            failureReason: null,
+          },
+          trigger: {},
+          briefing: { ...briefing, generatedAt },
+          createdAt: claim.artifact.createdAt ?? claimedAt,
+          updatedAt: generatedAt,
+        });
+        await repositories.dailyBriefings.completeScheduledBriefing(artifact);
+        return { state: "created", artifact, expectation };
+      } catch (error) {
+        const failedAt = now().toISOString();
+        await repositories.dailyBriefings.failScheduledBriefing(expectation.artifactId, {
+          failedAt,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        return {
+          state: "failed",
+          expectation,
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
     },
 
     async generateDailyBriefing({ userId, trigger = {}, evidenceWindow = null, artifactType = "scheduled" } = {}) {
@@ -671,6 +759,7 @@ function getGoalStatus({ evaluations, intelligence }) {
       progress: evaluations.find((item) => item.goalId === PRIMARY_GOAL_ID)?.progress ?? 0,
       confidence: intelligence.trajectory.confidence,
       goalConfidence: intelligence.trajectory.goalConfidence,
+      projectionId: intelligence.trajectory.projectionId,
       projectedFinish: intelligence.trajectory.projectedFinish,
       daysRemaining: intelligence.trajectory.daysRemaining,
       summary: intelligence.trajectory.description,
@@ -785,10 +874,11 @@ function getCurrentSnapshot({
         "Pending",
     },
     {
-      label: "Confidence",
+      label: "Goal confidence",
       value:
-        primaryEvaluation?.goalConfidence?.label ??
-        getConfidenceLabel(primaryEvaluation?.confidence ?? 0),
+        primaryEvaluation?.goalConfidence
+          ? `${primaryEvaluation.goalConfidence.value}% · ${primaryEvaluation.goalConfidence.label}`
+          : getConfidenceLabel(primaryEvaluation?.confidence ?? 0),
     },
   ];
 }
@@ -920,8 +1010,8 @@ function getInterpretation({
       : null;
 
   const forecastText = primaryEvaluation?.projection?.daysRemaining
-    ? `The forecast should follow that signal rather than stay frozen; right now it reads ${primaryEvaluation.projection.daysRemaining}.`
-    : "That is why I would keep the forecast conservative until the next clear check-in.";
+    ? `You're currently on pace to reach the goal in ${primaryEvaluation.projection.daysRemaining}.`
+    : "The timeline should stay conservative until the next clear check-in.";
   const noChangeText =
     narrativeNovelty?.noChangeRationale ??
     "A protocol change today would be reacting to noise before the signal asks for it.";
@@ -1207,19 +1297,22 @@ function getProjectionSection({
     weights,
     weightStats,
   });
+  const projectionId = primaryEvaluation?.projection?.id ?? null;
 
   return [
     {
+      projectionId,
       label: "Estimated body fat today",
       value:
         primaryEvaluation?.projection?.currentBodyFatRange ??
         conservativeProjection?.currentEstimateRange ??
         "Pending",
       detail: latestDEXA
-        ? "Based on your last DEXA and the weight trend since then."
+        ? "Based on your last DEXA and the weight trend since then. Goal confidence describes the overall trajectory, not exact body-fat precision."
         : "Waiting for a stronger body-composition check.",
     },
     {
+      projectionId,
       label: "Projected time to goal",
       value: primaryEvaluation?.projection?.daysRemaining ?? "Pending",
       detail: primaryEvaluation?.projection?.projectedFinish
@@ -1227,6 +1320,7 @@ function getProjectionSection({
         : "More trend evidence is needed before narrowing timing.",
     },
     {
+      projectionId,
       label: "Next milestone",
       value: "Visible lower abs at rest",
       detail:
@@ -1237,6 +1331,7 @@ function getProjectionSection({
           : "Next comparable photo set will improve confidence.",
     },
     {
+      projectionId,
       label: "Expected protocol response",
       value:
         weightStats.weekOverWeek !== null && weightStats.weekOverWeek <= 0
@@ -1785,6 +1880,10 @@ export function getDailyBriefingMemory(latestStoredBriefing) {
           `${briefing?.coachInsight ?? ""} ${(briefing?.interpretation ?? []).join(" ")}`
         )
     ),
+    communicatedClaimIds: [...new Set(previousMemory.communicatedClaimIds ?? [])].slice(-24),
+    claimHistory: (previousMemory.claimHistory ?? []).slice(-48),
+    previousProjectionState: previousMemory.currentProjectionState ?? null,
+    previousMilestoneState: previousMemory.currentMilestoneState ?? null,
   };
 }
 
@@ -2052,6 +2151,7 @@ function getUpdatedDailyBriefingMemory({
   narrativeNovelty,
   primaryEvaluation,
   recommendation,
+  trainingPerformanceSignal,
 }) {
   const currentThemes = [
     coachInsight.theme,
@@ -2072,6 +2172,18 @@ function getUpdatedDailyBriefingMemory({
     currentRecommendation:
       recommendation?.title ?? recommendation?.summary ?? null,
     currentProjectionWindow: primaryEvaluation?.projection?.projectedFinish ?? null,
+    currentProjectionState: getProjectionClaimId(primaryEvaluation),
+    currentMilestoneState: getMilestoneClaimId(primaryEvaluation),
+    communicatedClaimIds: [
+      ...(briefingMemory.communicatedClaimIds ?? []),
+      ...(trainingPerformanceSignal?.communicatedClaimIds ?? []),
+      getProjectionClaimId(primaryEvaluation),
+      getMilestoneClaimId(primaryEvaluation),
+    ].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).slice(-24),
+    claimHistory: [
+      ...(briefingMemory.claimHistory ?? []),
+      ...(trainingPerformanceSignal?.claimIds ?? []).map((claimId) => ({ claimId, evidenceDate: trainingPerformanceSignal.evidenceDate ?? null })),
+    ].slice(-48),
     recentNarrativeThemes: [
       ...(briefingMemory.recentNarrativeThemes ?? []),
       ...currentThemes,
@@ -2080,7 +2192,9 @@ function getUpdatedDailyBriefingMemory({
   };
 }
 
-function getTrainingPerformanceBriefingSignal({
+export function getTrainingPerformanceBriefingSignal({
+  briefingMemory = {},
+  evidenceDate = null,
   primaryEvaluation,
   report,
   weightStats = {},
@@ -2089,9 +2203,23 @@ function getTrainingPerformanceBriefingSignal({
   const recentPrs = report?.exerciseObservations?.filter(
     (observation) => observation.explanation_data?.pr_detection?.detected
   ) ?? [];
+  const prClaims = recentPrs.map(createTrainingClaim).filter(Boolean);
+  const recordedClaimIds = new Set((briefingMemory.claimHistory ?? []).map((entry) => entry.claimId));
+  const claimHistory = [
+    ...(briefingMemory.claimHistory ?? []),
+    ...(briefingMemory.communicatedClaimIds ?? []).filter((claimId) => !recordedClaimIds.has(claimId)).map((claimId) => ({ claimId })),
+  ];
+  const claimLifecycles = Object.fromEntries(prClaims.map((claim) => [claim.id, getClaimLifecycle({ claimId: claim.id, evidenceDate: claim.evidenceDate, currentEvidenceDate: evidenceDate, history: claimHistory })]));
+  const eligiblePrClaims = prClaims.filter((claim) => ["new", "relevant"].includes(claimLifecycles[claim.id]));
   const improving = report?.exerciseObservations?.filter(
     (observation) => observation.status === "improving"
   ) ?? [];
+  const repeatedPrObservationIds = new Set(
+    recentPrs
+      .filter((observation) => !eligiblePrClaims.some((claim) => claim.observationId === observation.id))
+      .map((observation) => observation.id)
+  );
+  const eligibleImproving = improving.filter((observation) => !repeatedPrObservationIds.has(observation.id));
   const regressing = report?.exerciseObservations?.filter(
     (observation) => observation.status === "regressing"
   ) ?? [];
@@ -2100,8 +2228,8 @@ function getTrainingPerformanceBriefingSignal({
     (primaryEvaluation?.progress ?? 0) >= 80 &&
     Boolean(primaryEvaluation?.projection?.daysRemaining);
   const hasMeaningfulSignal =
-    recentPrs.length > 0 ||
-    improving.length > 0 ||
+    eligiblePrClaims.length > 0 ||
+    eligibleImproving.length > 0 ||
     regressing.length > 0 ||
     (stageIsLateCut && (summary.resistance_sessions_last_7_days ?? 0) > 0);
 
@@ -2110,16 +2238,19 @@ function getTrainingPerformanceBriefingSignal({
       shouldMention: false,
       status: "insufficient_signal",
       summary,
+      claimIds: prClaims.map((claim) => claim.id),
+      claimLifecycles,
+      evidenceDate,
     };
   }
 
   const leadExercise =
-    recentPrs[0]?.exercise?.name ??
-    improving[0]?.exercise?.name ??
+    eligiblePrClaims[0]?.exerciseName ??
+    eligibleImproving[0]?.exercise?.name ??
     summary.most_improved_exercise ??
     null;
-  const recentPrCount = recentPrs.length || summary.recent_pr_count || 0;
-  const improvingCount = improving.length || summary.exercises_improving || 0;
+  const recentPrCount = eligiblePrClaims.length;
+  const improvingCount = eligibleImproving.length;
   const performancePhrase =
     regressing.length > 0
       ? `${regressing[0].exercise.name} is showing a material performance drop`
@@ -2139,9 +2270,13 @@ function getTrainingPerformanceBriefingSignal({
         ? `${sentenceCase(performancePhrase)}. That does not prove lean mass is being lost, but it makes training quality a watch item.`
         : `${sentenceCase(performancePhrase)} ${supportPhrase}. This supports the lean-mass-preservation read, but it does not prove it by itself.`,
     coachLine: `${sentenceCase(performancePhrase)} ${supportPhrase}.`,
-    improvingExercises: improving.map((observation) => observation.exercise.name),
+    improvingExercises: eligibleImproving.map((observation) => observation.exercise.name),
     interpretationLine: `${sentenceCase(performancePhrase)} ${supportPhrase}; that is the training-quality signal that matters most for preserving lean mass near the end of the cut.`,
-    recentPrs: recentPrs.map((observation) => observation.exercise.name),
+    claimIds: prClaims.map((claim) => claim.id),
+    claimLifecycles,
+    communicatedClaimIds: eligiblePrClaims.map((claim) => claim.id),
+    evidenceDate,
+    recentPrs: eligiblePrClaims.map((claim) => claim.exerciseName),
     shouldMention: true,
     stageIsLateCut,
     status:
@@ -2153,6 +2288,43 @@ function getTrainingPerformanceBriefingSignal({
             ? "improving"
             : "late_cut_training_present",
     summary,
+  };
+}
+
+function createTrainingClaim(observation) {
+  const evidenceDate = observation?.evidence_date_range?.end ?? null;
+  const pr = observation?.explanation_data?.pr_detection?.prs?.[0];
+  if (!observation?.id || !evidenceDate) return null;
+  const detail = [pr?.type, pr?.value, pr?.unit, pr?.load].filter((value) => value !== undefined && value !== null).join(":");
+  return {
+    id: `training:${observation.id}:${evidenceDate}:${detail || "pr"}`,
+    observationId: observation.id,
+    evidenceDate,
+    exerciseName: observation.exercise?.name ?? "a recent lift",
+  };
+}
+
+function getProjectionClaimId(primaryEvaluation) {
+  const projection = primaryEvaluation?.projection;
+  const state = projection?.projectedFinish ?? projection?.daysRemaining;
+  return state == null ? null : `projection:${state}`;
+}
+
+function getMilestoneClaimId(primaryEvaluation) {
+  const milestone = primaryEvaluation?.nextMilestone ?? primaryEvaluation?.milestone;
+  const state = milestone?.id ?? milestone?.title ?? milestone?.label ?? null;
+  return state == null ? null : `milestone:${state}`;
+}
+
+function getNarrativeClaimContinuity({ briefingMemory, primaryEvaluation, trainingPerformanceSignal }) {
+  return {
+    previousClaimIds: briefingMemory?.communicatedClaimIds ?? [],
+    currentClaimIds: [
+      ...(trainingPerformanceSignal?.communicatedClaimIds ?? []),
+      getProjectionClaimId(primaryEvaluation),
+      getMilestoneClaimId(primaryEvaluation),
+    ].filter(Boolean),
+    claimLifecycles: trainingPerformanceSignal?.claimLifecycles ?? {},
   };
 }
 

@@ -2,6 +2,10 @@ import { latestByDate } from "./repositoryUtils";
 
 export function createEvidencePackageRepository(evidencePackages = [], options = {}) {
   return {
+    async getEvidencePackageById(packageId) {
+      return evidencePackages.find((item) => item.package_id === packageId) ?? null;
+    },
+
     async listEvidencePackages(userId) {
       return evidencePackages.filter(
         (evidencePackage) => !userId || evidencePackage.userId === userId

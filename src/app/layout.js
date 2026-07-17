@@ -1,22 +1,15 @@
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import FloatingBottomNavigation from "../components/navigation/FloatingBottomNavigation";
 import ThemeScript from "../components/theme/ThemeScript";
 import ThemeSwitch from "../components/theme/ThemeSwitch";
 import "./globals.css";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+const plusJakarta = localFont({
+  src: "../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2",
   display: "swap",
   variable: "--font-sans",
-  weight: [
-    "200",
-    "300",
-    "400",
-    "500",
-    "600",
-    "700",
-    "800",
-  ],
+  weight: "200 800",
+  style: "normal",
 });
 
 export const metadata = {

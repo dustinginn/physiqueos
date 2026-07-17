@@ -139,7 +139,7 @@ export function createTrainingSessionEvidenceFromText({
 }
 
 export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidence_0" } = {}) {
-  const normalizedText = normalizeNumberWords(normalizeTrainingTextInput(text));
+  const normalizedText = normalizeNumberWords(normalizeSetLineMetadata(normalizeTrainingTextInput(text)));
   if (
     !/strength|curl|press|row|squat|deadlift|bench|extension|raise|pull|pulldown|push\s*downs?|pushdowns?|leg|abduction|thrust|fly|flies|crunch|plank/i.test(normalizedText) &&
     !hasAnySetLine(normalizedText)
@@ -807,7 +807,7 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
 }
 
 export function getStrengthTrainingBlockParseDiagnostics(text) {
-  const normalizedText = normalizeNumberWords(normalizeTrainingTextInput(text));
+  const normalizedText = normalizeNumberWords(normalizeSetLineMetadata(normalizeTrainingTextInput(text)));
   const parsed = parseNaturalStrengthTrainingBlocks(normalizedText);
 
   return {
@@ -832,7 +832,7 @@ export function getStrengthTrainingBlockParseDiagnostics(text) {
 }
 
 export function splitStrengthTrainingExerciseClauses(text) {
-  const normalizedText = normalizeNumberWords(normalizeTrainingTextInput(text));
+  const normalizedText = normalizeNumberWords(normalizeSetLineMetadata(normalizeTrainingTextInput(text)));
   const preparedText = prepareTrainingTextForSegments(normalizedText)
     .replace(
       /\b(?:i\s+also\s+did|also\s+did|and\s+i\s+did|and\s+then\s+i\s+did|then\s+i\s+did|then\s+did|followed\s+by)\b/gi,
@@ -1486,6 +1486,7 @@ function getNaturalExercisePatterns() {
     { canonical: "Leg Press, high and narrow feet", pattern: /\bleg\s+press\b[^.!?]{0,45}\b(?:feet\s+)?high\b[^.!?]{0,45}\bnarrow\b/gi },
     { canonical: "Straight Bar Cable Pushdown", pattern: /\b(?:straight\s+bar\s+cable|cable\s+straight\s+bar)\s+push\s*downs?\b/gi },
     { canonical: "Incline Dumbbell Press", pattern: /\b(?:incline\s+dumbbell|dumbbell\s+incline)\s+press(?:es)?\b/gi },
+    { canonical: "Incline Bench Press", pattern: /\b(?:(?:barbell\s+)?incline\s+(?:barbell\s+)?bench\s+press|incline\s+barbell\s+press)\b/gi },
     { canonical: "Shoulder Press Machine", pattern: /\b(?:shoulder\s+press\s+machine|machine\s+shoulder\s+press|shoulder\s+press\s+on\s+the\s+machine|shoulder\s+press\s+machine)\b/gi },
     { canonical: "Chest Fly Machine", pattern: /\bchest\s+(?:fly|flies)\s+machine\b/gi },
     { canonical: "Hanging Leg Raise", pattern: /\bhanging\s+leg\s+raises?\b/gi },
@@ -2381,6 +2382,12 @@ function normalizeTrainingTextInput(text) {
     .replace(/\u00a0/g, " ");
 }
 
+function normalizeSetLineMetadata(text) {
+  return String(text ?? "")
+    .replace(/^\s*set\s+\d+\s*:\s*/gim, "")
+    .replace(/\s*(?:Â·|·)\s*/g, " ");
+}
+
 function cleanExerciseName(value) {
   const text = cleanText(value)
     ?.replace(/\b(for strength training|strength training|workout|today)\b/gi, "")
@@ -2500,6 +2507,8 @@ function extractSpecificExerciseName(value) {
   if (/\blateral\s+raises\s+machines?\b/i.test(text)) return "Lateral Raises Machine";
   if (/\blateral\s+raise\s+machines?\b/i.test(text)) return "Lateral Raise Machine";
   if (/\blateral\s+raises?\b/i.test(text)) return "Lateral Raise";
+  if (/\bcable\s+machines?\s+front\s+raises?\b/i.test(text)) return "Cable Machine Front Raise";
+  if (/\bdumbbell\s+front\s+raises?\b|\bdb\s+front\s+raises?\b/i.test(text)) return "Dumbbell Front Raise";
   if (/\bbarbell\s+front\s+raises?\b/i.test(text)) return "Barbell Front Raises";
   if (/\bfront\s+raises?\b/i.test(text)) return "Front Raises";
   if (/\bfront\s+rows?\b/i.test(text)) return "Front Rows";
@@ -2521,6 +2530,9 @@ function extractSpecificExerciseName(value) {
   }
   if (/\bincline\s+dumbbell\s+press(?:es)?\b/i.test(text)) {
     return "Incline Dumbbell Press";
+  }
+  if (/\b(?:(?:barbell\s+)?incline\s+(?:barbell\s+)?bench\s+press|incline\s+barbell\s+press)\b/i.test(text)) {
+    return "Incline Bench Press";
   }
   if (/\bpull-?ups?\b/i.test(text)) return "Pull-Ups";
   if (/\blat\s+pulldowns?\b/i.test(text)) return "Lat Pulldown";

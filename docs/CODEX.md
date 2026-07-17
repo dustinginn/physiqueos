@@ -164,6 +164,14 @@ Use the screenshot comparison workflow whenever making significant UI updates.
 
 Aim for close visual parity while preserving maintainability.
 
+## Mandatory Mobile-First Development
+
+Founder Alpha is designed mobile-first, and the iPhone composition is canonical. Desktop is primarily a development and secondary-viewing canvas; preserve the centered mobile composition unless a task explicitly requests a desktop-specific layout. Do not introduce fixed-width desktop expansion merely because more viewport space is available.
+
+A user-facing UI task is incomplete until it has been validated at 360px, 393px, a tablet viewport, and a normal desktop viewport. Responsive validation must confirm the mobile composition has no clipping, horizontal overflow, detached content, oversized empty space, or content hidden behind fixed navigation at every width.
+
+Every UI completion report must list the responsive viewports validated and any related shared surfaces inspected.
+
 ---
 
 # Founder Daily Driver Development Rules

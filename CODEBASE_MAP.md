@@ -14,12 +14,13 @@ Founder Alpha uses the Next.js App Router under `src/app`.
 | --- | --- | --- |
 | `/` | Home decision surface | `HomeScreen`, `HomeBriefingService` |
 | `/briefing/daily` | Daily Briefing | `DailyBriefingScreen`, `DailyBriefingService` |
+| `/briefings/monthly/preview/2026-07-01` | Isolated June 2026 Monthly Briefing architecture preview | `MonthlyBriefingScreen`, `MonthlyBriefingPreviewService` |
 | `/check-in/morning` | Morning Check-In | `MorningCheckInScreen`, check-in actions |
 | `/analysis/[analysisId]` | Saved Analysis detail | `AnalysisScreen`, `AnalysisRepository` |
 | `/goals` | Goals Hub | `GoalsHubScreen` |
-| `/goals/visible-abs` | Primary Goal detail | `VisibleAbsGoalScreen` |
-| `/goals/maintenance` | Supporting Goal detail | `SupportingGoalScreen` |
-| `/goals/lean-mass` | Supporting Goal detail | `SupportingGoalScreen` |
+| `/goals/visible-abs` | Primary Narrative Goal journey | `NarrativeGoalPreviewScreen`, `NarrativeGoalPresentationLoader`, `NarrativeGoalPreviewService` |
+| `/goals/maintenance` | Body-fat maintenance Narrative Goal journey | `NarrativeGoalPreviewScreen`, `NarrativeGoalPresentationLoader`, `SupportingNarrativeGoalPreviewService` |
+| `/goals/lean-mass` | Lean-mass preservation Narrative Goal journey | `NarrativeGoalPreviewScreen`, `NarrativeGoalPresentationLoader`, `SupportingNarrativeGoalPreviewService` |
 | `/log` | Universal evidence capture hub | `LogHubScreen`, log actions |
 | `/evidence/photos` | Progress Photo upload | `ProgressPhotoUploadScreen`, photo actions |
 | `/evidence/dexa` | DEXA PDF upload/confirm | `DEXAUploadScreen`, DEXA actions |
@@ -63,11 +64,24 @@ Primary daily-use screens:
 * `LogHubScreen`
 * `PriorityDetailScreen`
 
+Narrative briefing screens:
+
+* `WeeklyBriefingScreen`
+* `DEXAEventBriefingScreen`
+* `PhotoEventBriefingScreen`
+* `MonthlyBriefingScreen` (preview-only architecture)
+
 Goal screens:
 
 * `GoalsHubScreen`
-* `VisibleAbsGoalScreen`
-* `SupportingGoalScreen`
+* `NarrativeGoalPreviewScreen` (shared production journey renderer for all three canonical Goal routes)
+
+Goal presentation loaders/adapters:
+
+* `NarrativeGoalPresentationLoader`
+* `NarrativeGoalPreviewService`
+* `SupportingNarrativeGoalPreviewService`
+* `VisibleAbsGoalScreen` and `SupportingGoalScreen` now retain dossier-loading orchestration only; their superseded JSX compositions were removed.
 
 Evidence screens:
 
@@ -98,6 +112,8 @@ Do not build new Founder Alpha work on placeholder screens unless the product ex
 
 # Domain and Services
 
+The canonical Narrative cadence and Home precedence definition lives in `docs/NARRATIVE_SCHEDULE.md`.
+
 Domain models live in `src/domain/models`.
 
 Application/domain services live in `src/domain/services`.
@@ -115,6 +131,7 @@ Key services:
 * `DailyFocusService`: daily priorities/focus support.
 * `PriorityDetailService`: operational priority detail view model.
 * `AnalysisService`: deterministic Analysis generation.
+* `MonthlyBriefingPreviewService`: read-only composition of the fixed June 1–30 Monthly Narrative preview delivered July 1, 2026.
 
 Repository implementations live in `src/data/repositories`.
 

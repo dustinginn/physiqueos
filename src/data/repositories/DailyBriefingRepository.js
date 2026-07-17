@@ -25,6 +25,77 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
       return dailyBriefings.find((item) => item.userId === userId && item.artifactType !== "event" && item.evidenceWindow?.id === windowId) ?? null;
     },
 
+    async claimScheduledBriefing({ artifactId, evidenceWindow, claimedAt, userId }) {
+      const existing = dailyBriefings.find((item) => item.id === artifactId);
+      if (existing) {
+        if (existing.lifecycle?.generationStatus === "failed") {
+          existing.lifecycle = {
+            ...existing.lifecycle,
+            generationStatus: "in_progress",
+            claimedAt,
+            failedAt: null,
+            failureReason: null,
+          };
+          existing.updatedAt = claimedAt;
+          options.onChange?.();
+          return { acquired: true, artifact: structuredClone(existing), state: "in_progress" };
+        }
+        return {
+          acquired: false,
+          artifact: structuredClone(existing),
+          state: existing.lifecycle?.generationStatus ?? (existing.briefing ? "complete" : "in_progress"),
+        };
+      }
+
+      const claim = {
+        id: artifactId,
+        userId,
+        artifactType: "scheduled",
+        cadence: evidenceWindow.cadence,
+        generatedAt: null,
+        evidenceWindow: structuredClone(evidenceWindow),
+        lifecycle: {
+          generationStatus: "in_progress",
+          claimedAt,
+          generatedAt: null,
+          failedAt: null,
+          failureReason: null,
+          openedAt: null,
+          consumedAt: null,
+        },
+        trigger: {},
+        briefing: null,
+        createdAt: claimedAt,
+        updatedAt: claimedAt,
+      };
+      dailyBriefings.push(claim);
+      options.onChange?.();
+      return { acquired: true, artifact: structuredClone(claim), state: "in_progress" };
+    },
+
+    async completeScheduledBriefing(artifact) {
+      const index = dailyBriefings.findIndex((item) => item.id === artifact.id);
+      if (index < 0) throw new Error(`Scheduled briefing claim ${artifact.id} was not found.`);
+      dailyBriefings[index] = structuredClone(artifact);
+      assertFlatBriefingHistory(dailyBriefings);
+      options.onChange?.();
+      return structuredClone(artifact);
+    },
+
+    async failScheduledBriefing(id, { failedAt, reason }) {
+      const artifact = dailyBriefings.find((item) => item.id === id);
+      if (!artifact) return null;
+      artifact.lifecycle = {
+        ...(artifact.lifecycle ?? {}),
+        generationStatus: "failed",
+        failedAt,
+        failureReason: reason,
+      };
+      artifact.updatedAt = failedAt;
+      options.onChange?.();
+      return structuredClone(artifact);
+    },
+
     async getLatestActiveEventBriefing(userId) {
       return latestByDate(
         dailyBriefings.filter((item) => item.userId === userId && item.artifactType === "event" && !item.lifecycle?.consumedAt),
@@ -81,7 +152,7 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
   }
 
   function selectLatest(userId, cadence, { excludeArtifactId = null } = {}) {
-    return dailyBriefings.filter((item) => item.userId === userId && item.id !== excludeArtifactId && item.preview !== true && item.lifecycle?.preview !== true && (!cadence || classifyBriefingCadence(item) === cadence)).sort(compareBriefingRecency)[0] ?? null;
+    return dailyBriefings.filter((item) => item.userId === userId && item.id !== excludeArtifactId && item.preview !== true && item.lifecycle?.preview !== true && item.lifecycle?.generationStatus !== "in_progress" && item.lifecycle?.generationStatus !== "failed" && Boolean(item.briefing) && (!cadence || classifyBriefingCadence(item) === cadence)).sort(compareBriefingRecency)[0] ?? null;
   }
 }
 

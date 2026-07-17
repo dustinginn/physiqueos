@@ -3,6 +3,7 @@ import { ArrowRight, Brain } from "lucide-react";
 import Card from "../ui/Card";
 import IconBadge from "../ui/IconBadge";
 import SectionTitle from "../ui/SectionTitle";
+import BriefingGenerationButton from "./BriefingGenerationButton";
 
 export default function LatestAnalysisCard({
   sectionLabel = "Latest Analysis",
@@ -10,6 +11,9 @@ export default function LatestAnalysisCard({
   createdAt,
   prompt = "See what's changed.",
   href,
+  action,
+  actionLabel,
+  historicalFallback,
 }) {
   const content = (
     <Card as="section" padding="sm">
@@ -45,6 +49,19 @@ export default function LatestAnalysisCard({
           <p className="mt-1.5 text-[13px] font-medium leading-5 text-[#64748B]">
             {prompt}
           </p>
+          {action && (
+            <form action={action}>
+              <BriefingGenerationButton label={actionLabel} />
+            </form>
+          )}
+          {historicalFallback && (
+            <Link
+              className="mt-3 inline-flex min-h-11 items-center text-xs font-bold text-[var(--text-secondary)]"
+              href={historicalFallback.href}
+            >
+              {historicalFallback.label}
+            </Link>
+          )}
         </div>
       </div>
     </Card>

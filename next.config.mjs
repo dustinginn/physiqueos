@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.69"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.69", "float-departed-symphony.ngrok-free.dev"],
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",

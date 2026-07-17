@@ -15,7 +15,7 @@ export default function PhotoEventBriefingScreen({ narrative }) {
   function openViewer(index){scrollPosition.current=window.scrollY;setViewerIndex(index);}
   function closeViewer(){setViewerIndex(null);}
   useEffect(()=>{if(!viewerOpen)return undefined;const body=document.body;const previous={position:body.style.position,top:body.style.top,width:body.style.width,overflow:body.style.overflow};body.style.position="fixed";body.style.top=`-${scrollPosition.current}px`;body.style.width="100%";body.style.overflow="hidden";return()=>{body.style.position=previous.position;body.style.top=previous.top;body.style.width=previous.width;body.style.overflow=previous.overflow;window.scrollTo({top:scrollPosition.current,behavior:"instant"});};},[viewerOpen]);
-  return <main className="app-surface min-h-screen"><div className="mx-auto max-w-[560px] px-4 pb-10 pt-7 sm:pt-10">
+  return <main className="app-surface mx-auto min-h-screen max-w-[393px] overflow-x-hidden"><div className="px-4 pb-32 pt-7 sm:pt-10">
     <Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href="/progress/photos"><ArrowLeft size={18}/>Progress Photos</Link>
     <section className="mb-5 space-y-3" data-testid="photo-event-hero"><div className="flex items-center gap-3"><IconBadge color="warning" icon={Sparkles} size="md"/><p className="text-sm font-semibold uppercase tracking-[0.12em] text-indigo-600">Photo Event</p></div><h1 className="text-[30px] font-extrabold leading-[1.12] text-slate-950">{cards.hero.title}</h1><p className="text-sm font-semibold leading-6 text-slate-500">{cards.hero.body}</p></section>
     <div className="space-y-3">
@@ -32,4 +32,3 @@ function PhotoViewer({activeIndex,eventDate,onClose,onIndexChange,views}){const 
 function ViewerImage({date,label,src}){return <figure className="flex min-w-0 flex-col justify-center">{src?<EvidenceImage alt={`${label} photo`} className="max-h-[78vh] w-full object-contain" src={src}/>:<div className="flex aspect-[3/4] items-center justify-center bg-white/5 text-xs text-slate-500">No prior photo</div>}<figcaption className="p-2 text-center"><span className="block text-sm font-extrabold">{formatDate(date)}</span><span className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">{label}</span></figcaption></figure>}
 function Eyebrow({children}){return <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">{children}</p>}
 function formatDate(value){if(!value)return "—";const [y,m,d]=String(value).slice(0,10).split("-").map(Number);return new Date(y,m-1,d).toLocaleDateString("en-US",{month:"short",day:"numeric"});}
-

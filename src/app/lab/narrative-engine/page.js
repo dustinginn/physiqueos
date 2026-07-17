@@ -12,7 +12,7 @@ export default async function NarrativeEngineLabPage() {
   const service = createDailyBriefingService({
     repositories: FounderRepositories,
   });
-  const briefing = await service.getDailyBriefing();
+  const briefing = await service.getLatestPersistedDailyBriefing();
 
   return <NarrativeEngineLabScreen baseBriefing={briefing} />;
 }

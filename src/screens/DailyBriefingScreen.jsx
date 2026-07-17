@@ -9,7 +9,6 @@ import {
   Dna,
   Scale,
   Sparkles,
-  Telescope,
 } from "lucide-react";
 import ActionButton from "../components/ui/ActionButton";
 import ProgressLineChart from "../components/progress/ProgressLineChart";
@@ -41,6 +40,11 @@ export default function DailyBriefingScreen({
               {eyebrow ?? (briefing.artifactType === "event" ? "Event Briefing" : "Daily Briefing")}
             </p>
           </div>
+          {briefing.evidenceWindow?.date && (
+            <p className="text-xs font-semibold text-slate-500">
+              Evidence through {formatBriefingDate(briefing.evidenceWindow.date)}
+            </p>
+          )}
         </section>
 
         <div className="space-y-4">
@@ -207,32 +211,11 @@ function InterpretationSection({ items }) {
   );
 }
 
-function ProjectionSection({ items }) {
-  if (items.length === 0) return null;
-
-  return (
-    <Card className="space-y-3">
-      <SectionHeading icon={Telescope} title="Projection" />
-      <div className="grid grid-cols-1 gap-2">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-[14px] bg-[var(--surface-muted)] p-3"
-          >
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-              {item.label}
-            </p>
-            <p className="mt-1 text-lg font-extrabold leading-tight text-slate-950">
-              {item.value}
-            </p>
-            <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-              {item.detail}
-            </p>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
+function formatBriefingDate(value) {
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function HeroConfidenceSection({ hero, reasons }) {
@@ -260,7 +243,7 @@ function HeroConfidenceSection({ hero, reasons }) {
         />
       </div>
 
-      <div className="mt-4 grid gap-2">
+      {reasons.length > 0 && <div className="mt-4 grid gap-2">
         {reasons.slice(0, 3).map((reason, index) => (
           <div
             key={reason.label}
@@ -273,7 +256,7 @@ function HeroConfidenceSection({ hero, reasons }) {
             {reason.label}
           </div>
         ))}
-      </div>
+      </div>}
     </Card>
   );
 }

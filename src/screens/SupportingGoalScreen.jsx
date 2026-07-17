@@ -1,19 +1,13 @@
-import Link from "next/link";
 import {
-  ArrowLeft,
   Activity,
   Camera,
   Dumbbell,
   ShieldCheck,
-  Sparkles,
-  Syringe,
-  Target,
   TrendingDown,
 } from "lucide-react";
-import Card from "../components/ui/Card";
-import IconBadge from "../components/ui/IconBadge";
 import { FounderRepositories } from "../data/repositories/founderRepositories";
 import { GoalEvaluationService } from "../domain/services/GoalEvaluationService";
+import { createTrainingPerformanceIntelligenceReport } from "../domain/services/TrainingPerformanceIntelligenceService";
 
 const GOAL_IDS = {
   maintenance: "goal_maintain_8_9_body_fat",
@@ -57,33 +51,11 @@ const configs = {
   },
 };
 
-export default async function SupportingGoalScreen({ from, goalKey }) {
-  const config = configs[goalKey] ?? configs.maintenance;
-  const data = await getSupportingGoalData(config, goalKey);
-  const fromYou = from === "you";
-
-  return (
-    <main className="app-surface min-h-screen">
-      <div className="mx-auto max-w-[393px] px-4 pt-10 pb-12">
-        <Link
-          className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500"
-          href={fromYou ? "/goals?from=you" : "/goals"}
-        >
-          <ArrowLeft size={18} />
-          Goals
-        </Link>
-
-        <div className="space-y-4">
-          <Hero config={config} data={data} />
-          <GoalExplanation config={config} />
-          <Objectives objectives={config.objectives} />
-          <EvidenceSection evidence={data.evidence} />
-          <SupportingProtocols protocols={data.protocols} />
-          <CoachPerspective coach={config.coach} />
-        </div>
-      </div>
-    </main>
-  );
+export async function getSupportingGoalDossier(goalKey) {
+  const resolvedGoalKey = configs[goalKey] ? goalKey : "maintenance";
+  const config = configs[resolvedGoalKey];
+  const data = await getSupportingGoalData(config, resolvedGoalKey);
+  return { config, data, goalKey: resolvedGoalKey };
 }
 
 async function getSupportingGoalData(config, goalKey) {
@@ -96,6 +68,8 @@ async function getSupportingGoalData(config, goalKey) {
     progressPhotos,
     protocols,
     nutritionContext,
+    analyses,
+    canonicalEvidence,
   ] = await Promise.all([
     FounderRepositories.goals.listGoals(userId),
     FounderRepositories.dexaScans.listDEXAScans(userId),
@@ -103,9 +77,12 @@ async function getSupportingGoalData(config, goalKey) {
     FounderRepositories.progressPhotos.listPhotos(userId),
     FounderRepositories.protocols.listActiveProtocols(userId),
     FounderRepositories.nutritionContext.getNutritionContext(userId),
+    FounderRepositories.analyses.listAnalyses(),
+    FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
   ]);
   const sortedDEXA = sortByDate(dexaScans, "measuredAt");
   const sortedWeights = sortByDate(weightEntries, "measuredAt");
+  const trainingPerformance = createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence });
   const evaluations = GoalEvaluationService.getGoalEvaluations({
     goals,
     dexaScans: sortedDEXA,
@@ -113,6 +90,8 @@ async function getSupportingGoalData(config, goalKey) {
     progressPhotos,
     protocols,
     nutritionContext,
+    photoAnalyses: analyses,
+    trainingPerformance,
   });
   const evaluation = evaluations.find((item) => item.goalId === config.id);
 
@@ -128,119 +107,13 @@ async function getSupportingGoalData(config, goalKey) {
       goalKey === "leanMass"
         ? getLeanMassProtocols({ protocols, nutritionContext })
         : getMaintenanceProtocols({ protocols, nutritionContext }),
+    sourceFacts: {
+      dexaScans: sortedDEXA.map((scan) => ({ date: scan.measuredAt, bodyFat: scan.bodyFatPercentage, leanMass: scan.leanMass?.value ?? null, unit: scan.leanMass?.unit ?? "lb" })),
+      weights: sortedWeights.map((entry) => ({ date: entry.measuredAt, value: entry.weight?.value ?? null, unit: entry.weight?.unit ?? "lb" })),
+      photoDates: progressPhotos.map((photo) => photo.capturedAt ?? photo.date).filter(Boolean).sort(),
+      trainingGeneratedAt: trainingPerformance.generated_at ?? null,
+    },
   };
-}
-
-function Hero({ config, data }) {
-  return (
-    <Card className="border-[var(--divider)] bg-gradient-to-br from-[color-mix(in_srgb,var(--primary)_10%,var(--surface-elevated))] via-[var(--surface-elevated)] to-[var(--surface-muted)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <span className="inline-flex rounded-full bg-[#EEF2FF] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#4F46E5]">
-            Supporting Goal
-          </span>
-          <h1 className="mt-3 text-3xl font-extrabold leading-tight text-slate-950">
-            {config.title}
-          </h1>
-          <p className="mt-2 text-sm font-semibold leading-5 text-slate-600">
-            {data.status}
-          </p>
-        </div>
-        <div className="w-[92px] shrink-0 text-right">
-          <IconBadge icon={config.icon} color={config.color} size="lg" className="ml-auto rounded-full" />
-          <p className="mt-3 text-2xl font-extrabold leading-none text-slate-950">
-            {data.confidence}%
-          </p>
-          <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-            {data.confidenceLabel}
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function GoalExplanation({ config }) {
-  return (
-    <Card className="space-y-2">
-      <SectionHeading icon={Target} title="Goal" />
-      <p className="text-sm font-medium leading-6 text-slate-600">
-        {config.explanation}
-      </p>
-    </Card>
-  );
-}
-
-function Objectives({ objectives }) {
-  return (
-    <Card className="space-y-3">
-      <SectionHeading icon={ShieldCheck} title="Objectives" />
-      <div className="space-y-2">
-        {objectives.map((objective) => (
-          <div key={objective} className="rounded-[12px] bg-[var(--surface-muted)] p-3 text-sm font-bold text-slate-800">
-            {objective}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function EvidenceSection({ evidence }) {
-  return (
-    <Card className="space-y-3">
-      <SectionHeading icon={TrendingDown} title="Evidence" />
-      <div className="space-y-2">
-        {evidence.map((item) => (
-          <div key={item.title} className="rounded-[14px] border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
-            <div className="flex items-center gap-2">
-              <IconBadge icon={item.icon} color={item.color} size="xs" className="rounded-full" />
-              <h2 className="text-base font-extrabold text-slate-950">{item.title}</h2>
-            </div>
-            <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-              {item.detail}
-            </p>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function SupportingProtocols({ protocols }) {
-  return (
-    <Card className="space-y-3">
-      <SectionHeading icon={Syringe} title="Supporting Protocols" />
-      <div className="space-y-2">
-        {protocols.map((protocol) => (
-          <div key={protocol.title} className="rounded-[12px] bg-[var(--surface-muted)] p-3">
-            <p className="text-sm font-extrabold text-slate-950">{protocol.title}</p>
-            <p className="mt-1 text-sm font-medium leading-5 text-slate-600">
-              {protocol.detail}
-            </p>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function CoachPerspective({ coach }) {
-  return (
-    <Card className="space-y-3 border-[#C7D2FE] bg-[#F8FAFF]">
-      <SectionHeading icon={Sparkles} title="Coach's Perspective" />
-      <p className="text-sm font-medium leading-6 text-slate-600">{coach}</p>
-    </Card>
-  );
-}
-
-function SectionHeading({ icon, title }) {
-  return (
-    <div className="flex items-center gap-2">
-      <IconBadge icon={icon} color="primary" size="xs" className="rounded-full" />
-      <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-    </div>
-  );
 }
 
 function getMaintenanceEvidence({ sortedDEXA, sortedWeights, progressPhotos }) {

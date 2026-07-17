@@ -1,0 +1,10 @@
+import { describe, expect, it } from "vitest";
+import { interpretTextEvidence } from "./TextInterpreter";
+import { createEvidenceReviewPresentation } from "../services/EvidenceReviewPresentationService";
+
+const examples = ["today’s weight 165.2", "today's weight 165.2", "weight 165.2", "165.2 lb", "weighed 165.2 pounds", "morning weight: 165.2"];
+describe("universal typed-weight fallback", () => {
+  it.each(examples)("parses %s as a high-confidence Weight candidate", (text) => { const result = interpretTextEvidence({ expectedEvidenceType: "auto", id: "submission", observedAt: "2026-07-14", provenanceRef: "typed_evidence_0", text }); const weight = result.evidenceObjects.find((item) => item.evidence_type === "morning_weight"); expect(weight).toMatchObject({ id: "submission_morning_weight", observed_at: "2026-07-14", value: 165.2, unit: "lb", confidence: { extraction: "high", interpretation: "high" } }); });
+  it("does not guess exercise load or unsafe values", () => { for (const text of ["3 sets of rows at 165.2 lb", "weight 12", "weight 1200"]) expect(interpretTextEvidence({ expectedEvidenceType: "auto", text }).evidenceObjects.find((item) => item.evidence_type === "morning_weight")).toBeUndefined(); });
+  it("presents clear typed Weight as included by default", () => { const object = interpretTextEvidence({ expectedEvidenceType: "auto", id: "submission", observedAt: "2026-07-14", text: "today’s weight 165.2" }).evidenceObjects[0]; const evidencePackage = { evidence_objects: [object], provenance: { source_artifacts: [{ id: "typed_evidence_0", kind: "typed_evidence", text: "today’s weight 165.2" }] } }; const presentation = createEvidenceReviewPresentation({ evidencePackage }); expect(presentation.summary.text).toBe("1 weight entry"); expect(presentation.items[0]).toMatchObject({ title: "Weight", date: "Jul 14, 2026", included: true, sourceLabel: "Typed evidence" }); expect(presentation.items[0].metrics).toEqual(expect.arrayContaining([{ label: "Weight", value: "165.2 lb" }])); });
+});

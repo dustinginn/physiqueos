@@ -37,12 +37,15 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
     const supersededObjects = compatibleObjects.filter(
       (object) => object.canonicalId !== targetCanonicalId
     );
+    const additionalSupersededObjects = supersededObjects.filter(
+      (object) => object.canonicalId !== compatibleObject?.canonicalId
+    );
     const mergedExistingObject =
-      supersededObjects.length > 0 && exactObject
-        ? mergeCompatibleCanonicalObjects(exactObject, supersededObjects)
-        : supersededObjects.length > 0
-          ? mergeCompatibleCanonicalObjects(compatibleObject, supersededObjects)
-          : exactObject;
+      additionalSupersededObjects.length > 0 && exactObject
+        ? mergeCompatibleCanonicalObjects(exactObject, additionalSupersededObjects)
+        : additionalSupersededObjects.length > 0
+          ? mergeCompatibleCanonicalObjects(compatibleObject, additionalSupersededObjects)
+          : exactObject ?? compatibleObject;
 
     supersededObjects.forEach((object) => {
       canonicalById.delete(object.canonicalId);
@@ -217,6 +220,11 @@ export function buildCanonicalReconciliationScope({
 }
 
 export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
+  const explicitCanonicalId = String(
+    evidenceObject.reconciliation?.canonical_id ?? ""
+  ).trim();
+  if (explicitCanonicalId) return explicitCanonicalId;
+
   if (isActivityDay(evidenceObject)) {
     return ["activity_day", getDateKey(evidenceObject.observed_at)].join("|");
   }
@@ -886,6 +894,18 @@ function compatibleOptionalIdentityPart(left, right) {
 }
 
 function mergeTrainingPayload(existingPayload, candidate, { evidencePackage = null } = {}) {
+  if (evidencePackage?.correction?.type === "canonical_exercise_identity_correction") {
+    return {
+      ...existingPayload,
+      ...candidate,
+      id: existingPayload.id,
+      metadata: mergeDefinedFields(existingPayload.metadata, candidate.metadata),
+      exercises: candidate.exercises,
+      provenance: mergeObjectProvenance(existingPayload.provenance, candidate.provenance),
+      source: mergeSource(existingPayload.source, candidate.source),
+    };
+  }
+
   const preferredBase =
     getEvidenceRichnessScore(candidate) >= getEvidenceRichnessScore(existingPayload)
       ? candidate

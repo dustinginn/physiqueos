@@ -128,7 +128,7 @@ export default function ProgressLineChart({
             />
           );
         })}
-        {markers.map((marker) => {
+        {markers.map((marker, index) => {
           const markerTime = getTime(marker.date);
           const x =
             padding + ((markerTime - firstDate) / timeRange) * (width - padding * 2);
@@ -136,7 +136,7 @@ export default function ProgressLineChart({
           if (x < padding || x > width - padding) return null;
 
           return (
-            <g key={`${marker.id}-${marker.date}`}>
+            <g key={getChartPointKey(marker, index, "marker")}>
               <line
                 stroke="var(--chart-marker)"
                 strokeDasharray="3 4"
@@ -158,12 +158,12 @@ export default function ProgressLineChart({
           strokeLinejoin="round"
           strokeWidth="3"
         />
-        {coordinates.map((point) => (
+        {coordinates.map((point, index) => (
           <circle
             cx={point.x}
             cy={point.y}
             fill="var(--surface-elevated)"
-            key={point.id}
+            key={getChartPointKey(point, index)}
             r="3"
             stroke={color}
             strokeWidth="2"
@@ -212,6 +212,11 @@ export default function ProgressLineChart({
       </div>
     </figure>
   );
+}
+
+export function getChartPointKey(point = {}, index = 0, prefix = "point") {
+  const identity = point.id ?? point.evidenceId ?? point.date ?? point.timestamp ?? prefix;
+  return `${prefix}-${identity}-${index}`;
 }
 
 function getTime(value) {

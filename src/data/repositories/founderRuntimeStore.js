@@ -747,8 +747,20 @@ function normalizeFounderPhotoReminder(reminder, { expectedViews, linkedEntityTy
   };
 }
 
+export function resolveFounderRuntimeStorePath({ cwd = process.cwd(), env = process.env } = {}) {
+  const livePath = path.resolve(cwd, "private", "founder", "runtime-store.json");
+  const configuredPath = env.PHYSIQUEOS_RUNTIME_STORE_PATH;
+  const resolvedPath = configuredPath ? path.resolve(cwd, configuredPath) : livePath;
+
+  if (env.PHYSIQUEOS_PLAYWRIGHT === "1" && resolvedPath === livePath) {
+    throw new Error("Playwright cannot use the live Founder runtime store. Configure PHYSIQUEOS_RUNTIME_STORE_PATH to an isolated copy.");
+  }
+
+  return resolvedPath;
+}
+
 function getRuntimeStorePath() {
-  return path.join(process.cwd(), "private", "founder", "runtime-store.json");
+  return resolveFounderRuntimeStorePath();
 }
 
 function createRuntimeStoreTempPath(filePath) {

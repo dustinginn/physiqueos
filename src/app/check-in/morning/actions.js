@@ -6,10 +6,9 @@ import { createDailyCheckIn } from "../../../domain/models/dailyCheckIn";
 import { createCanonicalMorningWeightEvidenceObject } from "../../../domain/models/morningWeightEvidence";
 import { createWeightEntry } from "../../../domain/models/weightEntry";
 import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
-import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import { extractManualNoteEvidence } from "../../../domain/services/DailyEventService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
+import { getLocalDateKey } from "../../../domain/utils/localDate";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -22,14 +21,17 @@ export async function saveMorningCheckIn(formData) {
     throw new Error("Founder user is not available.");
   }
 
-  const weightValue = Number(formData.get("weight"));
+  const rawWeight = String(formData.get("weight") ?? "").trim();
+  const parsedWeight = Number(rawWeight);
 
-  if (!Number.isFinite(weightValue) || weightValue <= 0) {
-    throw new Error("Morning weight is required.");
+  if (!rawWeight || !Number.isFinite(parsedWeight)) {
+    throw new Error("Enter a valid morning weight.");
   }
+  const weightValue = Math.round(parsedWeight * 10) / 10;
+  if (weightValue < 50 || weightValue > 1000) throw new Error("Morning weight must be between 50 and 1,000 lb.");
 
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = getLocalDateKey(now, user.timeZone);
   const createdAt = now.toISOString();
   const notes = normalizeOptionalText(formData.get("notes"));
   const noteEvidence = extractManualNoteEvidence(notes);
@@ -40,38 +42,15 @@ export async function saveMorningCheckIn(formData) {
   );
   const proteinTarget = normalizeOptionalNumber(formData.get("proteinTarget"));
   const proteinAchieved = normalizeOptionalNumber(formData.get("proteinAchieved"));
-  const previousWeight = await FounderRepositories.weights.getLatestWeightEntry(user.id);
+  const weights = await FounderRepositories.weights.listWeightEntries(user.id);
+  const previousWeight = [...weights].filter((item)=>String(item.measuredAt).slice(0,10)<today).sort((a,b)=>String(b.measuredAt).localeCompare(String(a.measuredAt)))[0]??null;
   const weighInContext = resolveWeighInContext(
     formData,
     user.preferences?.defaultWeighInContext
   );
-  const existingSameDayWeight = (await FounderRepositories.weights.listWeightEntries(user.id, { start: today, end: today }))[0] ?? null;
-  const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
-    userId: user.id,
-    source: "morning_check_in",
-    evidencePackage: {
-      package_id: `morning_check_in_${createdAt.replace(/\D/g, "")}`,
-      review_metadata: {
-        correctionStatus: existingSameDayWeight
-          ? existingSameDayWeight.weight?.value === weightValue ? "duplicate_candidate" : "same_day_correction"
-          : "new_entry",
-        existingEvidenceId: existingSameDayWeight?.id ?? null,
-      },
-      evidence_objects: [{
-        id: `morning_weight_${today}`,
-        evidence_type: "morning_weight",
-        observed_at: today,
-        value: weightValue,
-        unit: user.preferences?.weightUnit ?? "lb",
-        context: weighInContext,
-        notes,
-        metadata: { estimatedCalories, estimatedCaloriesBurned, proteinTarget, proteinAchieved, protocolChangeNote },
-      }],
-    },
-  });
-  redirect(`/evidence/review/${review.id}`);
+  const existingSameDayWeight = weights.find((item)=>String(item.measuredAt).slice(0,10)===today)??null;
+  if (existingSameDayWeight?.weight?.value === weightValue) redirect("/?weight=unchanged");
 
-  /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
   const contextAdjusted = !weighInContext.isDefault;
   const evidenceConfidence = contextAdjusted ? "medium" : "high";
   const confidenceAfter = getConfidenceAfter({
@@ -215,25 +194,11 @@ export async function saveMorningCheckIn(formData) {
   });
 
   await FounderRepositories.analyses.createAnalysis(analysis);
-  await createDailyBriefingService({
-    repositories: FounderRepositories,
-  }).generateDailyBriefing({
-    userId: user.id,
-    trigger: {
-      evidenceId: weightEntry.id,
-      evidenceType: "weight",
-      analysisId: analysis.id,
-    },
-  });
-
   revalidatePath("/");
-  revalidatePath("/briefing/daily");
   revalidatePath("/progress");
   revalidatePath("/progress/weight");
   revalidatePath(`/analysis/${analysis.id}`);
-  const returnTo = normalizeReturnTo(formData.get("returnTo"));
-  if (returnTo) redirect(returnTo);
-  redirect("/briefing/daily");
+  redirect("/?weight=saved");
 }
 
 async function saveCanonicalMorningWeightEvidence({
@@ -262,14 +227,6 @@ function normalizeOptionalText(value) {
   const text = String(value ?? "").trim();
 
   return text.length > 0 ? text : null;
-}
-
-function normalizeReturnTo(value) {
-  const text = normalizeOptionalText(value);
-  if (!text) return null;
-  if (text === "/log?session=morning") return text;
-
-  return null;
 }
 
 function normalizeOptionalNumber(value) {

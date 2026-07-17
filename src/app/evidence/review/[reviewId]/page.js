@@ -1,13 +1,19 @@
 import { notFound } from "next/navigation";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
 import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
-import { confirmEvidenceReview, discardEvidenceReview, updateEvidenceReviewItemDecision } from "./actions";
+import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
+import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
+import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EvidenceReviewPage({ params }) {
+export default async function EvidenceReviewPage({ params, searchParams }) {
   const { reviewId } = await params;
-  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  const query = await searchParams;
+  const review = process.env.NODE_ENV !== "production" && reviewId === "fixture-mobile-review"
+    ? createMobileEvidenceReviewFixture({ noneIncluded: query?.state === "none" })
+    : await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!review) notFound();
-  return <EvidenceReviewScreen confirmAction={confirmEvidenceReview} decisionAction={updateEvidenceReviewItemDecision} discardAction={discardEvidenceReview} review={review} />;
+  const presentedReview = { ...review, interpretedEvidence: repairPendingReviewExerciseIdentities(review.interpretedEvidence) };
+  return <EvidenceReviewScreen confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
 }

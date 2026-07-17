@@ -20,6 +20,19 @@ import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/Pho
 import { normalizePhotoInterpretationToStructuredObservations } from "../../../../domain/interpreters/PhotoObservationModel";
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
+import { createDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
+import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
+
+export async function reprocessEvidenceReview(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  const user = await FounderRepositories.users.getCurrentUser();
+  if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  await createPendingEvidenceReviewReprocessingService({ repositories: FounderRepositories })
+    .reprocessPendingReviewInPlace(reviewId);
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(`/evidence/review/${reviewId}?reprocessed=1`);
+}
 
 export async function confirmEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
@@ -29,7 +42,10 @@ export async function confirmEvidenceReview(formData) {
   let evidencePackage;
   try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
   catch { throw new Error("The reviewed evidence contains invalid JSON."); }
-  evidencePackage = applyPersistedItemDecisions(evidencePackage, review.itemDecisions);
+  let submittedItemDecisions;
+  try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
+  catch { throw new Error("The evidence selection is invalid."); }
+  evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
 
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
   await service.beginCommit(reviewId);
@@ -117,8 +133,10 @@ function createHandlers({ evidencePackage, user }) {
       for (const type of eligible) {
         const object = (evidencePackage.evidence_objects ?? []).find((item) => item.evidence_type === type || (type === "dexa" && ["dexa_scan", "body_composition"].includes(item.evidence_type)));
         const canonicalId = getStableCanonicalId(object, user.id);
-        const artifact = await createDailyBriefingService({ repositories: FounderRepositories }).generateEventBriefing({ userId: user.id, trigger: { evidenceId: canonicalId, evidenceType: type === "photo_session" ? "photo_session" : "dexa", analysisId: analyses[0]?.id ?? results.analysis?.analysisIds?.[0] } });
-        artifacts.push(artifact.artifactId);
+        const artifact = type === "photo_session"
+          ? await createDailyBriefingService({ repositories: FounderRepositories }).generateEventBriefing({ userId: user.id, trigger: { evidenceId: canonicalId, evidenceType: "photo_session", analysisId: analyses[0]?.id ?? results.analysis?.analysisIds?.[0] } })
+          : await createDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
+        artifacts.push(artifact.artifactId ?? artifact.id);
       }
       return { status: "completed", artifactIds: artifacts, freshness: eligible.length ? "event_generated" : "scheduled_preserved" };
     },
@@ -159,6 +177,14 @@ async function commitCompatibilityRepositories({ evidencePackage, user }) {
           leanMass: { value: metadata.leanMass ?? null, unit: "lb" },
           boneMineralContent: { value: metadata.boneMineralContent ?? null, unit: "lb" },
           restingMetabolicRate: { value: metadata.restingMetabolicRate ?? null, unit: "kcal/day" },
+          visceralAdiposeTissue: metadata.visceralAdiposeTissue ?? { mass: { value: metadata.vatMass ?? null, unit: "lb" }, volume: { value: metadata.vatVolume ?? null, unit: "in3" } },
+          androidFatPercentage: metadata.androidFatPercentage ?? null,
+          gynoidFatPercentage: metadata.gynoidFatPercentage ?? null,
+          androidGynoidRatio: metadata.androidGynoidRatio ?? null,
+          ...(metadata.regionalAssessment ? { regionalAssessment: metadata.regionalAssessment } : {}),
+          ...(metadata.muscleBalance ? { muscleBalance: metadata.muscleBalance } : {}),
+          ...(metadata.boneDensity ? { boneDensity: metadata.boneDensity } : {}),
+          provider: metadata.provider ?? object.provider ?? "BodySpec",
           sourceFileId: object.source_file, rawReportPath: object.source_file,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         });

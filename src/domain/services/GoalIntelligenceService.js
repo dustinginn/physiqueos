@@ -18,8 +18,11 @@ export function createGoalIntelligenceService() {
           title: getTrajectoryTitle(activeSummary),
           description: getTrajectoryDescription(activeSummary),
           confidence: activeEvaluation?.goalConfidence?.value ?? activeEvaluation?.confidence ?? 0,
-          confidenceLabel: activeEvaluation?.goalConfidence?.label ?? "Confidence",
+          confidenceLabel: "Goal confidence",
+          confidenceLevel: activeEvaluation?.goalConfidence?.label ?? "Building",
           goalConfidence: activeEvaluation?.goalConfidence ?? null,
+          projectionId: projection?.id ?? null,
+          projection,
           projectedFinish: projection?.projectedFinish ?? "Pending",
           daysRemaining: projection?.daysRemaining ?? "Pending",
         },
@@ -48,6 +51,7 @@ function mapEvaluationToGoalSummary(evaluation) {
     confidence: evaluation.goalConfidence?.value ?? evaluation.confidence,
     goalProgress: evaluation.goalProgress,
     goalConfidence: evaluation.goalConfidence,
+    projection: evaluation.projection,
     presentation: evaluation.primary
       ? {
           mode: "primary_goal",
@@ -108,5 +112,5 @@ function getTrajectoryTitle(activeSummary) {
 function getTrajectoryDescription(activeSummary) {
   if (!activeSummary) return "Import evidence to generate trajectory.";
 
-  return activeSummary.summary ?? "Evidence supports the current direction.";
+  return activeSummary.projection?.supportingExplanation ?? activeSummary.summary ?? "Evidence supports the current direction.";
 }

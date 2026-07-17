@@ -7,6 +7,9 @@ import { getDailyEvent } from "./DailyEventService";
 import { GoalEvaluationService } from "./GoalEvaluationService";
 import { GoalIntelligenceService } from "./GoalIntelligenceService";
 import { formatLocalShortDate } from "../utils/localDate";
+import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
+import { resolveHomeBriefingSelection } from "./HomeBriefingRoutingService";
+import { resolveScheduledBriefingExpectation } from "./BriefingEvidenceWindowService";
 
 const placeholderHeader = {
   greeting: "Good morning,",
@@ -23,6 +26,7 @@ export function createHomeBriefingService({
   repositories = FounderRepositories,
   navigation = bottomNavigation,
   viewData = {},
+  now = () => new Date(),
 } = {}) {
   return {
     async getHomeBriefing(userId) {
@@ -45,7 +49,9 @@ export function createHomeBriefingService({
         latestAnalysis,
         analyses,
         latestDailyBriefing,
+        latestWeeklyBriefing,
         latestEventBriefing,
+        canonicalEvidence,
       ] = resolvedUserId
           ? await Promise.all([
             repositories.goals.listGoals(resolvedUserId),
@@ -60,8 +66,10 @@ export function createHomeBriefingService({
             repositories.progressPhotos?.listPhotos(resolvedUserId) ?? [],
             repositories.analyses.getLatestAnalysis(),
             repositories.analyses.listAnalyses?.() ?? [],
-            repositories.dailyBriefings?.getLatestBriefingArtifact?.(resolvedUserId) ?? repositories.dailyBriefings?.getLatestDailyBriefing?.(resolvedUserId) ?? null,
+            repositories.dailyBriefings?.getLatestScheduledDailyBriefing?.(resolvedUserId) ?? repositories.dailyBriefings?.getLatestDailyBriefing?.(resolvedUserId) ?? null,
+            repositories.dailyBriefings?.getLatestWeeklyBriefing?.(resolvedUserId) ?? null,
             repositories.dailyBriefings?.getLatestActiveEventBriefing?.(resolvedUserId) ?? null,
+            repositories.canonicalEvidence?.listCanonicalEvidenceObjects(resolvedUserId) ?? [],
           ])
         : [
             [],
@@ -78,7 +86,18 @@ export function createHomeBriefingService({
             await repositories.analyses.listAnalyses?.() ?? [],
             null,
             null,
+            null,
+            [],
           ];
+      const trainingPerformance = createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence });
+      const expectation = resolveScheduledBriefingExpectation({
+        now: now(),
+        timeZone: user?.timeZone ?? "America/Los_Angeles",
+      });
+      const expectedDailyRecord = expectation.cadence === "daily" && resolvedUserId
+        ? await repositories.dailyBriefings?.getBriefingByEvidenceWindow?.(resolvedUserId, expectation.windowId)
+        : null;
+      const currentDailyBriefing = expectedDailyRecord?.briefing ? expectedDailyRecord : null;
       const goalEvaluations = GoalEvaluationService.getGoalEvaluations({
         goals,
         dexaScans,
@@ -86,11 +105,14 @@ export function createHomeBriefingService({
         progressPhotos,
         protocols: activeProtocols,
         nutritionContext,
+        photoAnalyses: analyses,
+        trainingPerformance,
       });
       const goalIntelligence = GoalIntelligenceService.getGoalIntelligence({
         evaluations: goalEvaluations,
         activeGoal,
       });
+      const primaryEvaluation = goalEvaluations.find((evaluation) => evaluation.goalId === activeGoal?.id) ?? goalEvaluations.find((evaluation) => evaluation.primary) ?? null;
       const todaysFocus = DailyFocusService.getDailyFocus({
         checkIns,
         latestWeight,
@@ -113,66 +135,178 @@ export function createHomeBriefingService({
       const briefingFreshness = getDailyBriefingFreshness({
         analyses,
         checkIns,
-        dailyBriefing: latestDailyBriefing,
+        dailyBriefing: currentDailyBriefing,
         dexaScans,
         nutritionContext,
         progressPhotos,
         weightEntries,
+        expectedWindow: expectation.evidenceWindow,
+      });
+      const briefingSelection = resolveHomeBriefingSelection({
+        dailyArtifact: currentDailyBriefing,
+        eventArtifact: latestEventBriefing,
+        now: now(),
+        timeZone: user?.timeZone ?? "America/Los_Angeles",
+        weeklyArtifact: latestWeeklyBriefing,
+      });
+      const briefingCard = mapBriefingCard({
+        dailyEvent,
+        freshness: briefingFreshness,
+        latestAnalysis,
+        selection: briefingSelection,
+        dexaScans,
+        progressPhotos,
+        weightEntries,
+        expectation,
+        generationArtifact: expectedDailyRecord,
+        historicalDailyBriefing: latestDailyBriefing,
       });
 
       return {
         header: mapHeader(user),
+        hero: mapHomeHero({ activeGoal, evaluation: primaryEvaluation, weightEntries }),
         trajectory: goalIntelligence.trajectory,
-        nextBestAction: mapNextBestAction({ actionPlan, user }),
+        nextBestAction: mapNextBestAction({ actionPlan, briefingCard, user }),
         actionPlan,
         goals: goalIntelligence.goals.map(mapGoal),
         todaysFocus,
         bottomNavigation: navigation,
-        latestAnalysis: mapDailyBriefingCard({
-          dailyEvent,
-          freshness: briefingFreshness,
-          latestDailyBriefing,
-          latestEventBriefing,
-          latestAnalysis,
-          dexaScans,
-          progressPhotos,
-          weightEntries,
-        }),
+        latestAnalysis: briefingCard,
         ...viewData,
       };
     },
   };
 }
 
+export function mapHomeHero({ activeGoal, evaluation } = {}) {
+  const stage = evaluation?.projection?.currentCompletionStage;
+  const projection = evaluation?.projection ?? null;
+  const isVisibleAbs = activeGoal?.id === "goal_visible_abs_at_rest" || evaluation?.metricKey === "visualDefinition";
+  const headline = stage === "goal_visually_confirmed"
+    ? "Goal achieved."
+    : stage === "visual_confirmation_developing"
+      ? "Final stretch."
+      : stage === "progressing_toward_numerical_target"
+        ? "On track."
+        : "Progress update.";
+
+  return {
+    confidence: evaluation?.goalConfidence?.value ?? null,
+    daysRemaining: projection?.daysRemaining ?? "Unavailable",
+    goalLabel: isVisibleAbs ? "Visible Abs at Rest" : activeGoal?.title ?? evaluation?.title ?? "Current Goal",
+    headline,
+    projectedFinish: projection?.projectedFinish ?? "Unavailable",
+    projectionId: projection?.id ?? null,
+    supportLine: stage === "goal_visually_confirmed"
+      ? "Your progress is confirmed."
+      : stage === "visual_confirmation_developing"
+        ? "You're close—keep executing the plan."
+        : evaluation
+          ? "Keep executing the plan."
+          : "More evidence is needed to update the outlook.",
+  };
+}
+
 export const HomeBriefingService = createHomeBriefingService();
 
-function mapDailyBriefingCard({
+export function mapBriefingCard({
   dailyEvent,
   freshness,
-  latestDailyBriefing,
-  latestEventBriefing,
   latestAnalysis,
+  selection,
   dexaScans,
   progressPhotos,
   weightEntries,
+  expectation,
+  generationArtifact,
+  historicalDailyBriefing,
 }) {
   const hasBriefingEvidence =
     weightEntries.length > 0 || dexaScans.length > 0 || progressPhotos.length > 0;
 
   if (!hasBriefingEvidence) return null;
 
-  if (latestEventBriefing) {
-    const isPhoto = latestEventBriefing.trigger?.evidenceType === "progress_photo";
+  if (selection.briefingType === "event") {
+    const artifact = selection.artifact;
+    const isPhoto = ["progress_photo", "photo_session"].includes(artifact.trigger?.evidenceType);
     return {
-      id: latestEventBriefing.id,
+      id: artifact.id,
       sectionLabel: "Event Briefing",
       title: isPhoto ? "Progress Photo Analysis Ready" : "DEXA Analysis Ready",
-      summary: latestEventBriefing.briefing?.hero?.summary ?? null,
-      createdAt: latestEventBriefing.generatedAt,
+      summary: artifact.briefing?.dexaEventNarrative?.hero?.body ?? artifact.briefing?.hero?.summary ?? artifact.briefing?.photoEventNarrative?.hero?.body ?? null,
+      createdAt: artifact.generatedAt,
       tone: "insight",
       prompt: "Open the latest coaching conversation.",
-      href: "/briefing/daily",
+      href: selection.href,
       freshnessState: "event",
+    };
+  }
+
+  if (selection.briefingType === "weekly") {
+    const artifact = selection.artifact;
+    return {
+      id: artifact?.id ?? "weekly-briefing-unavailable",
+      sectionLabel: "Weekly Briefing",
+      title: artifact ? "Weekly Briefing Ready" : "Weekly Briefing Unavailable",
+      summary: artifact?.briefing?.weeklyNarrative?.cards?.hero?.body ?? artifact?.briefing?.hero?.summary ?? null,
+      createdAt: artifact?.generatedAt ?? null,
+      tone: "insight",
+      prompt: artifact ? "Review the completed week." : "No persisted Weekly Briefing is available yet.",
+      href: selection.href,
+      freshnessState: artifact ? "current" : "missing",
+    };
+  }
+
+  const latestDailyBriefing = selection.artifact;
+
+  if (!latestDailyBriefing && generationArtifact?.lifecycle?.generationStatus === "in_progress") {
+    return {
+      id: generationArtifact.id,
+      sectionLabel: "Daily Briefing",
+      title: "Preparing Daily Briefing",
+      summary: null,
+      createdAt: null,
+      tone: null,
+      prompt: `Synthesizing the completed ${formatLocalShortDate(expectation.evidenceThroughDate)} evidence window.`,
+      href: null,
+      freshnessState: "in_progress",
+      actionKind: null,
+    };
+  }
+
+  if (!latestDailyBriefing && generationArtifact?.lifecycle?.generationStatus === "failed") {
+    return {
+      id: generationArtifact.id,
+      sectionLabel: "Daily Briefing",
+      title: "Daily Briefing Needs a Retry",
+      summary: null,
+      createdAt: null,
+      tone: null,
+      prompt: generationArtifact.lifecycle.failureReason ?? "The briefing could not be prepared.",
+      href: null,
+      freshnessState: "failed",
+      actionKind: "generate_daily",
+      actionLabel: "Retry",
+    };
+  }
+
+  if (!latestDailyBriefing && expectation?.dailyEligible) {
+    return {
+      id: expectation.artifactId,
+      sectionLabel: "Daily Briefing",
+      title: "Daily Briefing Ready to Prepare",
+      summary: null,
+      createdAt: null,
+      tone: null,
+      prompt: `Prepare today's coaching from the completed ${formatLocalShortDate(expectation.evidenceThroughDate)} evidence window.`,
+      href: null,
+      freshnessState: "eligible_missing",
+      actionKind: "generate_daily",
+      actionLabel: "Prepare Briefing",
+      historicalFallback: historicalDailyBriefing ? {
+        href: `/briefings/review/${historicalDailyBriefing.id}`,
+        label: "View previous briefing",
+      } : null,
     };
   }
 
@@ -180,13 +314,15 @@ function mapDailyBriefingCard({
     return {
       id: latestDailyBriefing?.id ?? "daily-briefing-stale",
       sectionLabel: "Daily Briefing",
-      title: "Generate Today's Briefing",
+      title: "Daily Briefing Needs an Update",
       summary: null,
-      createdAt: freshness.latestEvidence?.occurredAt ?? null,
+      createdAt: latestDailyBriefing?.generatedAt ?? null,
       tone: null,
       prompt: getStaleBriefingPrompt(freshness),
-      href: "/briefing/daily",
+      href: null,
       freshnessState: "stale",
+      actionKind: "generate_daily",
+      actionLabel: "Update Briefing",
     };
   }
 
@@ -194,12 +330,12 @@ function mapDailyBriefingCard({
     return {
       id: "daily-briefing-missing",
       sectionLabel: "Daily Briefing",
-      title: "Generate Today's Briefing",
+      title: "Daily Briefing Unavailable",
       summary: null,
-      createdAt: freshness.latestEvidence?.occurredAt ?? null,
+      createdAt: null,
       tone: null,
-      prompt: "New evidence is ready to synthesize.",
-      href: "/briefing/daily",
+      prompt: "No current Daily Briefing is available yet.",
+      href: null,
       freshnessState: "missing",
     };
   }
@@ -207,8 +343,8 @@ function mapDailyBriefingCard({
   return {
     id: latestDailyBriefing?.id ?? latestAnalysis?.id ?? "daily-briefing",
     sectionLabel: "Daily Briefing",
-    title: "Daily Briefing Ready",
-    summary: latestAnalysis?.summary ?? null,
+    title: latestDailyBriefing?.briefing?.hero?.title ?? "Daily Briefing Ready",
+    summary: latestDailyBriefing?.briefing?.hero?.summary ?? latestAnalysis?.summary ?? null,
     createdAt: latestDailyBriefing?.generatedAt ?? latestAnalysis?.createdAt ?? null,
     tone: latestAnalysis?.tone ?? null,
     prompt: freshness?.briefingDate
@@ -245,7 +381,7 @@ function mapHeader(user) {
   };
 }
 
-function mapNextBestAction({ actionPlan, user }) {
+function mapNextBestAction({ actionPlan, briefingCard, user }) {
   if (!user) return placeholderNextBestAction;
   const nextPriority = actionPlan?.currentAction;
 
@@ -258,8 +394,8 @@ function mapNextBestAction({ actionPlan, user }) {
   }
 
   return {
-    title: "Open Daily Briefing",
-    href: "/briefing/daily",
+    title: briefingCard ? `Open ${briefingCard.sectionLabel}` : "Open Daily Briefing",
+    href: briefingCard?.href ?? "/briefing/daily",
     icon: "analysis",
   };
 }

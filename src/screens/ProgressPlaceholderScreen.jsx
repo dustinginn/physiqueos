@@ -68,10 +68,12 @@ export default function ProgressPlaceholderScreen({ from, report }) {
           </div>
         </header>
 
-        <EvidenceReportContext
-          mode="related-goals"
-          relatedGoals={report.relatedGoals}
-        />
+        {report.id !== "training" && (
+          <EvidenceReportContext
+            mode="related-goals"
+            relatedGoals={report.relatedGoals}
+          />
+        )}
 
         {report.id === "training" && <TrainingEvidenceReport report={report} />}
         {report.id === "nutrition" && <NutritionEvidenceReport report={report} />}
@@ -164,6 +166,7 @@ export default function ProgressPlaceholderScreen({ from, report }) {
             mode="data-sources"
           />
         )}
+
       </div>
     </main>
   );
@@ -231,6 +234,11 @@ function TrainingEvidenceReport({ report }) {
       <EvidenceSection title="Current Protocol">
         <CurrentProtocolCard protocol={report.currentProtocol} />
       </EvidenceSection>
+
+      <EvidenceReportContext
+        mode="related-goals"
+        relatedGoals={report.relatedGoals}
+      />
 
       <TrainingSourceMetadataFooter items={report.sourceEvidence ?? []} />
     </div>
@@ -584,35 +592,54 @@ function LatestTrainingDayCard({ trainingDay }) {
     );
   }
 
+  const activities = summarizeTrainingActivities(trainingDay.sessions);
+
   return (
     <details className={`rounded-[12px] bg-[var(--surface-muted)] p-3 ${nativePressClassName}`}>
       <summary className="cursor-pointer list-none">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-base font-extrabold text-slate-950">
-              {trainingDay.label}
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-700">
-              {trainingDay.summary}
-            </p>
-            <div className="mt-2 space-y-1">
-              {trainingDay.sessions.slice(0, 5).map((session) => (
-                <p className="text-xs font-semibold text-slate-500" key={session.id}>
-                  {session.label}
-                </p>
-              ))}
-            </div>
-          </div>
-          <span className="shrink-0 text-sm font-extrabold text-indigo-600">
-            View training day
-          </span>
-        </div>
+        <p className="text-base font-extrabold text-slate-950">
+          {trainingDay.label}
+        </p>
+        <p className="mt-1 text-sm font-bold text-slate-700">
+          {trainingDay.summary}
+        </p>
+        {activities.length > 0 && (
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+            {activities.join(" • ")}
+          </p>
+        )}
+        <span className="mt-2 inline-flex text-sm font-extrabold leading-5 text-indigo-600">
+          View Training Day →
+        </span>
       </summary>
       <div className="mt-3 border-t border-[var(--divider)] pt-3">
         <RecordPreview entries={trainingDay.sessions} showSources />
       </div>
     </details>
   );
+}
+
+export function summarizeTrainingActivities(sessions = []) {
+  const labels = [];
+  const seen = new Set();
+
+  sessions.forEach((session) => {
+    const source = String(session.label ?? "").trim();
+    if (!source) return;
+    const label = /^(traditional |functional )?strength training$/i.test(source)
+      ? "Strength Training"
+      : source;
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    labels.push(label);
+  });
+
+  return labels.sort((left, right) => {
+    if (left === "Strength Training") return -1;
+    if (right === "Strength Training") return 1;
+    return 0;
+  });
 }
 
 function CurrentProtocolCard({ protocol }) {

@@ -7,9 +7,11 @@ import EvidenceImage from "./EvidenceImage";
 import ReportDrawer from "./ReportDrawer";
 
 export default function ProgressPhotoGallery({
+  children = null,
   latestPhotoSet = null,
   records = [],
   sets = [],
+  triggerOnly = false,
 }) {
   const galleryRef = useRef(null);
   const visibleSets = useMemo(
@@ -61,6 +63,8 @@ export default function ProgressPhotoGallery({
 
   return (
     <div ref={galleryRef}>
+      {children}
+      {!triggerOnly && <>
       {latestPhotoSet && (
         <><PhotoSetCard label="Latest Photo Set" photoSet={latestPhotoSet} size="large" />
         {latestPhotoSet.sourceMode === "canonical" && <Link className="mt-2 flex w-full items-center justify-center rounded-[14px] bg-[var(--primary)] px-4 py-3 text-sm font-extrabold text-white" href={`/briefings/photo/${latestPhotoSet.photoSessionId ?? latestPhotoSet.id}`}>Read Photo Briefing</Link>}</>
@@ -82,6 +86,7 @@ export default function ProgressPhotoGallery({
           </div>
         </ReportDrawer>
       </div>
+      </>}
 
       {selectedRecord && (
         <PhotoModal

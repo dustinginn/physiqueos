@@ -41,10 +41,29 @@ export function classifyBriefingCadence(artifact = {}) {
   return "unknown";
 }
 
+const RECURSIVE_HISTORY_KEYS = new Set([
+  "replacedBriefingHistory",
+  "replacementHistory",
+  "priorVersions",
+  "versionHistory",
+  "previousEntry",
+  "previousEntries",
+]);
+
 export function sanitizeHistoricalBriefingArtifact(artifact) {
   if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) return null;
-  const { replacedBriefingHistory: _history, previousEntry: _previous, artifact: _artifact, ...sanitized } = artifact;
-  return { ...sanitized };
+  return cloneWithoutRecursiveHistory(artifact, { root: true });
+}
+
+export function createFlatBriefingHistorySnapshot(artifact, { replacedAt, reason, replacedByArtifactId } = {}) {
+  const sanitized = sanitizeHistoricalBriefingArtifact(artifact);
+  if (!sanitized) throw new Error("Cannot archive an invalid briefing artifact.");
+  return {
+    artifact: sanitized,
+    replacedAt: replacedAt ?? sanitized.updatedAt ?? sanitized.generatedAt ?? null,
+    reason: reason ?? "Briefing artifact replaced.",
+    replacedByArtifactId: replacedByArtifactId ?? null,
+  };
 }
 
 export function flattenBriefingHistory(root, { replacedByArtifactId = root?.id ?? null } = {}) {
@@ -53,9 +72,9 @@ export function flattenBriefingHistory(root, { replacedByArtifactId = root?.id ?
 
   function visitEntry(entry, inherited = {}) {
     if (!entry || typeof entry !== "object") return;
-    const artifact = entry.artifact ?? entry.briefing ?? entry.previousEntry ?? null;
+    const artifact = unwrapHistoryArtifact(entry);
     if (!artifact || typeof artifact !== "object") return;
-    for (const nested of artifact.replacedBriefingHistory ?? []) visitEntry(nested, entry);
+    for (const nested of getNestedHistoryEntries(artifact)) visitEntry(nested, entry);
     const sanitized = sanitizeHistoricalBriefingArtifact(artifact);
     if (!sanitized) return;
     const key = `${clean(sanitized.id)}|${stableSerialize(sanitized)}`;
@@ -69,14 +88,12 @@ export function flattenBriefingHistory(root, { replacedByArtifactId = root?.id ?
     });
   }
 
-  for (const entry of root?.replacedBriefingHistory ?? []) visitEntry(entry);
+  for (const entry of getNestedHistoryEntries(root)) visitEntry(entry);
   return output;
 }
 
 export function createBriefingHistoryEntry(artifact, { replacedAt, reason, replacedByArtifactId } = {}) {
-  const sanitized = sanitizeHistoricalBriefingArtifact(artifact);
-  if (!sanitized) throw new Error("Cannot archive an invalid briefing artifact.");
-  return { artifact: sanitized, replacedAt: replacedAt ?? sanitized.updatedAt ?? sanitized.generatedAt ?? null, reason: reason ?? "Briefing artifact replaced.", replacedByArtifactId: replacedByArtifactId ?? null };
+  return createFlatBriefingHistorySnapshot(artifact, { replacedAt, reason, replacedByArtifactId });
 }
 
 export function normalizeDailyBriefingRecords(records = []) {
@@ -84,7 +101,7 @@ export function normalizeDailyBriefingRecords(records = []) {
   const exactRoots = new Set();
   for (const record of Array.isArray(records) ? records : []) {
     if (!record || typeof record !== "object") continue;
-    const next = { ...record, replacedBriefingHistory: flattenBriefingHistory(record) };
+    const next = { ...cloneWithoutRecursiveHistory(record), replacedBriefingHistory: flattenBriefingHistory(record) };
     if (next.replacedBriefingHistory.length === 0) delete next.replacedBriefingHistory;
     const key = `${getBriefingOccurrenceIdentity(next) ?? "unidentified"}|${stableSerialize(next)}`;
     if (exactRoots.has(key)) continue;
@@ -97,7 +114,7 @@ export function normalizeDailyBriefingRecords(records = []) {
 export function assertFlatBriefingHistory(records = []) {
   for (const root of records) for (const entry of root?.replacedBriefingHistory ?? []) {
     if (!entry?.artifact || entry.briefing || entry.previousEntry) throw new Error("Briefing history entry is not canonical.");
-    if (entry.artifact.replacedBriefingHistory || entry.artifact.previousEntry) throw new Error("Nested briefing history is not allowed.");
+    if (containsRecursiveHistory(entry.artifact)) throw new Error("Nested briefing history is not allowed.");
   }
   return true;
 }
@@ -109,3 +126,36 @@ export function stableSerialize(value) {
 }
 
 function clean(value) { return String(value ?? "").trim(); }
+
+function cloneWithoutRecursiveHistory(value, { root = false } = {}) {
+  if (Array.isArray(value)) return value.map((item) => cloneWithoutRecursiveHistory(item));
+  if (!value || typeof value !== "object") return value;
+  const output = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (RECURSIVE_HISTORY_KEYS.has(key) || root && key === "artifact") continue;
+    output[key] = cloneWithoutRecursiveHistory(child);
+  }
+  return output;
+}
+
+function getNestedHistoryEntries(artifact) {
+  const entries = [];
+  for (const key of RECURSIVE_HISTORY_KEYS) {
+    const value = artifact?.[key];
+    if (Array.isArray(value)) entries.push(...value);
+    else if (value && typeof value === "object") entries.push({ previousEntry: value });
+  }
+  return entries;
+}
+
+function unwrapHistoryArtifact(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  if (entry.id && entry.briefing) return entry;
+  return entry.artifact ?? entry.briefing ?? entry.previousEntry ?? entry.snapshot ?? null;
+}
+
+function containsRecursiveHistory(value) {
+  if (Array.isArray(value)) return value.some(containsRecursiveHistory);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) => RECURSIVE_HISTORY_KEYS.has(key) || containsRecursiveHistory(child));
+}

@@ -14,7 +14,9 @@ import {
   SessionBadge,
   SummaryCard,
 } from "../components/deep-page/DeepPagePrimitives";
+import Link from "next/link";
 import MobilePageHeader from "../components/navigation/MobilePageHeader";
+import TrainingAnalysisDrawerGroup from "../components/training/TrainingAnalysisDrawerGroup";
 import Card from "../components/ui/Card";
 import {
   getCanonicalTrainingExerciseLabel,
@@ -57,18 +59,121 @@ export default function TrainingKnowledgeScreen({
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-4 pb-24">
-        <MobilePageHeader
-          breadcrumbs={navigation?.breadcrumbs}
-          description={content.summary}
-          parentHref={navigation?.parentRoute ?? backHref ?? "/progress/training"}
-          parentLabel={getParentLabel(navigation)}
-          sectionLabel={content.eyebrow}
-          title={content.title}
-        />
+        {content.navigationMode === "training-library" ? (
+          <TrainingLibraryHeader
+            description={content.summary}
+            navigation={navigation}
+            title={content.title}
+          />
+        ) : content.navigationMode === "training-reporting" ? (
+          <TrainingReportingHeader
+            description={content.summary}
+            title={content.title}
+          />
+        ) : (
+          <MobilePageHeader
+            breadcrumbs={navigation?.breadcrumbs}
+            description={content.summary}
+            parentHref={navigation?.parentRoute ?? backHref ?? "/progress/training"}
+            parentLabel={getParentLabel(navigation)}
+            sectionLabel={content.eyebrow}
+            title={content.title}
+          />
+        )}
 
         <div className="space-y-4">{content.sections}</div>
       </div>
     </main>
+  );
+}
+
+function TrainingReportingHeader({ description, title }) {
+  const hierarchy = [
+    { href: "/progress/training", label: "Training" },
+    { href: "/progress/training/library", label: "Training Library" },
+    { href: "/progress/training#reporting", label: "Reporting" },
+  ];
+
+  return (
+    <header className="mb-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-indigo-600">
+        Reporting
+      </p>
+      <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-950">
+        {title}
+      </h1>
+      <nav
+        aria-label="Training reporting hierarchy"
+        className="mt-3 flex flex-wrap gap-2"
+      >
+        {hierarchy.map((item) => (
+          <Link
+            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] px-3.5 text-sm font-extrabold text-slate-700 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 active:bg-[var(--surface-active)]"
+            href={item.href}
+            key={item.label}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      {description && (
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
+          {description}
+        </p>
+      )}
+    </header>
+  );
+}
+
+function TrainingLibraryHeader({ description, navigation, title }) {
+  const breadcrumbs = navigation?.breadcrumbs ?? [];
+  const currentRoute = navigation?.route;
+  const hierarchy = [
+    { href: "/progress/training", label: "Training" },
+    currentRoute !== "/progress/training/library"
+      ? { href: "/progress/training/library", label: "Training Library" }
+      : null,
+    ...breadcrumbs.filter(
+      (item) =>
+        item.href !== "/progress/training" &&
+        item.href !== "/progress/training/library" &&
+        item.href !== currentRoute
+    ),
+  ]
+    .filter(Boolean)
+    .filter(
+      (item, index, items) =>
+        items.findIndex((candidate) => candidate.href === item.href) === index
+    );
+
+  return (
+    <header className="mb-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-indigo-600">
+        Training Library
+      </p>
+      <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-950">
+        {title}
+      </h1>
+      <nav
+        aria-label="Training Library hierarchy"
+        className="mt-3 flex flex-wrap gap-2"
+      >
+        {hierarchy.map((item) => (
+          <Link
+            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] px-3.5 text-sm font-extrabold text-slate-700 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 active:bg-[var(--surface-active)]"
+            href={item.href}
+            key={item.href}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      {description && (
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
+          {description}
+        </p>
+      )}
+    </header>
   );
 }
 
@@ -137,51 +242,51 @@ function getResistanceReportingContent({ report }) {
   const performance = report.resistancePerformance;
   const summary = performance?.summary ?? {};
   const statusCounts = getExerciseStatusCounts(performance?.exerciseObservations ?? []);
+  const statusGroups = getExerciseStatusGroups(
+    performance?.exerciseObservations ?? []
+  );
   const highlights = getResistanceHighlights(performance);
   const needsAttention = getResistanceNeedsAttention(performance);
   const recentPrs = getRecentPrs(performance);
 
   return {
     eyebrow: "Reporting",
+    navigationMode: "training-reporting",
     title: "Resistance Training",
     summary: "Strength progression, PRs, and category momentum from training history.",
     sections: [
-      <SummaryCard key="summary" title="Resistance Summary">
-        <MetricGroup
-          items={[
-            {
-              label: "7 days",
-              value: summary.resistance_sessions_last_7_days ?? 0,
-            },
-            {
-              label: "30 days",
-              value: summary.exercises_trained_last_30_days ?? summary.exercises_tracked ?? 0,
-            },
-            {
-              label: "Improving",
-              value: summary.exercises_improving ?? 0,
-            },
-            {
-              label: "Recent PRs",
-              value: summary.recent_pr_count ?? 0,
-            },
-          ]}
-        />
-      </SummaryCard>,
-      <DeepPageCard className="space-y-2.5" key="status">
-        <SectionHeader title="Performance Status" />
-        <MetricGroup
-          items={[
-            { label: "Improving", value: statusCounts.improving ?? 0 },
-            { label: "Stable", value: statusCounts.stable ?? 0 },
-            { label: "Plateauing", value: statusCounts.plateauing ?? 0 },
-            { label: "Regressing", value: statusCounts.regressing ?? 0 },
-            {
-              label: "Needs data",
-              value: statusCounts.insufficient_data ?? 0,
-            },
-          ]}
-        />
+      <DeepPageCard className="space-y-3" key="summary">
+        <SectionHeader title="Resistance Summary" />
+        <div className="grid grid-cols-3 gap-2">
+          <PerformanceMetric
+            label="7 Days"
+            value={summary.resistance_sessions_last_7_days ?? 0}
+          />
+          <PerformanceMetric
+            label="30 Days"
+            value={
+              summary.exercises_trained_last_30_days ??
+              summary.exercises_tracked ??
+              0
+            }
+          />
+          <div className="rounded-xl border border-violet-200/70 px-2 py-2.5 text-violet-800 dark:border-violet-300/15 dark:text-violet-200">
+            <p className="text-[9px] font-extrabold uppercase leading-4 tracking-[0.05em]">
+              Recent PRs
+            </p>
+            <p className="mt-1 text-lg font-black leading-none">
+              {summary.recent_pr_count ?? 0}
+            </p>
+          </div>
+        </div>
+        <StatusDrawers groups={statusGroups} statusCounts={statusCounts} />
+      </DeepPageCard>,
+      <DeepPageCard
+        className="space-y-2.5 border-violet-200/70 bg-violet-50/35 dark:border-violet-300/15 dark:bg-violet-300/[.035]"
+        key="prs"
+      >
+        <SectionHeader title="Recent PRs" />
+        <ObservationList emptyText="No recent PRs yet." items={recentPrs} />
       </DeepPageCard>,
       <DeepPageCard className="space-y-2.5" key="highlights">
         <SectionHeader title="Highlights" />
@@ -199,11 +304,10 @@ function getResistanceReportingContent({ report }) {
       </DeepPageCard>,
       <DeepPageCard className="space-y-2.5" key="categories">
         <SectionHeader title="Category Rollups" />
-        <CategoryRollups observations={performance?.categoryObservations ?? []} />
-      </DeepPageCard>,
-      <DeepPageCard className="space-y-2.5" key="prs">
-        <SectionHeader title="Recent PRs" />
-        <ObservationList emptyText="No recent PRs yet." items={recentPrs} />
+        <CategoryRollups
+          exerciseObservations={performance?.exerciseObservations ?? []}
+          observations={performance?.categoryObservations ?? []}
+        />
       </DeepPageCard>,
       <MetadataFooter
         items={[
@@ -233,6 +337,7 @@ function ObservationList({ emptyText, items = [] }) {
       {items.map((item) => (
         <InformationListItem
           detail={item.detail}
+          href={item.href}
           key={`${item.label}-${item.detail}`}
           label={item.label}
         />
@@ -241,7 +346,29 @@ function ObservationList({ emptyText, items = [] }) {
   );
 }
 
-function CategoryRollups({ observations = [] }) {
+function StatusDrawers({ groups, statusCounts }) {
+  const statuses = [
+    { key: "improving", label: "Improving", tone: "success" },
+    { key: "stable", label: "Stable", tone: "stable" },
+    { key: "plateauing", label: "Plateauing", tone: "warning" },
+    { key: "regressing", label: "Regressing", tone: "danger" },
+    { key: "insufficient_data", label: "Needs Data", tone: "neutral" },
+  ];
+
+  return (
+    <TrainingAnalysisDrawerGroup
+      groups={statuses.map((status) => ({
+        ...status,
+        count: statusCounts[status.key] ?? 0,
+        drawerDescription: `${status.label} exercises from current resistance-training analysis.`,
+        items: groups[status.key] ?? [],
+      }))}
+      mode="status"
+    />
+  );
+}
+
+function CategoryRollups({ exerciseObservations = [], observations = [] }) {
   const ordered = FLAT_TRAINING_NAV_GROUPS.map((label) => {
     const category = slugify(label);
 
@@ -256,9 +383,7 @@ function CategoryRollups({ observations = [] }) {
     );
   }
 
-  return (
-    <div className="space-y-2">
-      {ordered.map((observation) => {
+  const groups = ordered.map((observation) => {
         const categoryLabel = toTitle(observation.category);
         const data = observation.explanation_data ?? {};
         const statusCounts = data.status_counts ?? {};
@@ -270,33 +395,27 @@ function CategoryRollups({ observations = [] }) {
             : null,
           data.latest_known_volume ? `${formatNumber(data.latest_known_volume)} lb` : null,
         ].filter(Boolean);
+        const exercises = exerciseObservations
+          .filter(
+            (exerciseObservation) =>
+              exerciseObservation.exercise.primaryNavigationCategory ===
+              observation.category
+          )
+          .map(toExerciseNavigationItem);
 
-        return (
-          <PressableCard
-            className="block px-3 py-2.5"
-            href={`/progress/training/library/${observation.category}`}
-            key={observation.category}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-extrabold text-slate-950">
-                  {categoryLabel}
-                </p>
-                <p className="mt-0.5 text-xs font-semibold leading-5 text-slate-500">
-                  {parts.join(" · ")}
-                </p>
-                <p className="mt-1 text-[11px] font-bold text-slate-400">
-                  {formatStatusCounts(statusCounts)}
-                </p>
-              </div>
-              <span className="shrink-0 text-sm font-extrabold text-indigo-600">
-                &gt;
-              </span>
-            </div>
-          </PressableCard>
-        );
-      })}
-    </div>
+        return {
+          count: data.exercise_count ?? 0,
+          description: `${parts.join(" · ")} · ${formatStatusCounts(statusCounts)}`,
+          drawerDescription: `${categoryLabel} exercises from current resistance-training analysis.`,
+          items: exercises,
+          key: observation.category,
+          label: categoryLabel,
+          tone: "neutral",
+        };
+      });
+
+  return (
+    <TrainingAnalysisDrawerGroup groups={groups} mode="list" />
   );
 }
 
@@ -308,6 +427,42 @@ function getExerciseStatusCounts(exerciseObservations = []) {
   }, {});
 }
 
+export function getExerciseStatusGroups(exerciseObservations = []) {
+  return exerciseObservations.reduce((groups, observation) => {
+    const status = observation.status ?? "insufficient_data";
+    groups[status] = [
+      ...(groups[status] ?? []),
+      toExerciseNavigationItem(observation),
+    ];
+    return groups;
+  }, {});
+}
+
+function toExerciseNavigationItem(observation) {
+  return {
+    detail: [
+      toTitle(String(observation.status ?? "needs data").replaceAll("_", " ")),
+      observation.evidence_date_range?.end
+        ? `Latest ${formatDate(observation.evidence_date_range.end)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    href: getExerciseObservationHref(observation),
+    label: observation.exercise.name,
+  };
+}
+
+function getExerciseObservationHref(observation) {
+  const category =
+    observation.exercise.primaryNavigationCategory ??
+    slugify(observation.exercise.name);
+  const exercise = slugify(
+    getCanonicalTrainingExerciseLabel(observation.exercise.name)
+  );
+  return `/progress/training/library/${category}/${exercise}`;
+}
+
 function getResistanceHighlights(performance) {
   const exerciseHighlights = (performance?.exerciseObservations ?? [])
     .filter((observation) => observation.status === "improving")
@@ -315,6 +470,7 @@ function getResistanceHighlights(performance) {
     .map((observation) => ({
       label: observation.exercise.name,
       detail: formatExerciseHighlight(observation),
+      href: getExerciseObservationHref(observation),
     }));
   const categoryHighlight = (performance?.categoryObservations ?? [])
     .filter(
@@ -325,6 +481,7 @@ function getResistanceHighlights(performance) {
     .map((observation) => ({
       label: toTitle(observation.category),
       detail: `${observation.explanation_data.status_counts.improving} improving exercises`,
+      href: `/progress/training/library/${observation.category}`,
     }));
 
   return [...exerciseHighlights, ...categoryHighlight].slice(0, 4);
@@ -340,6 +497,7 @@ function getResistanceNeedsAttention(performance) {
         observation.status === "regressing"
           ? "Recent performance moved down."
           : "Multiple comparable sessions without clear overload.",
+      href: getExerciseObservationHref(observation),
     }));
 }
 
@@ -350,6 +508,7 @@ function getRecentPrs(performance) {
     .map((observation) => ({
       label: observation.exercise.name,
       detail: formatPrDetail(observation.explanation_data.pr_detection.prs?.[0]),
+      href: getExerciseObservationHref(observation),
     }));
 }
 
@@ -445,9 +604,10 @@ function getLibraryContent({ report, slug = [] }) {
 
   return {
     eyebrow: "Training Library",
+    navigationMode: "training-library",
     title,
     summary: path.length
-      ? "Choose an exercise to review your last performance."
+      ? null
       : "Browse by muscle group and jump straight to exercises.",
     sections: [
       <BrowseCard items={children} key="library" />,
@@ -801,19 +961,18 @@ function getExerciseDetailContent({ exerciseSlug, report }) {
   const occurrences = getExerciseOccurrences({ exerciseSlug, report });
   const latest = occurrences[0];
   const title = latest?.exercise.name ?? toTitle(exerciseSlug);
-  const lifetimeSessions = getExerciseSessionCount(occurrences);
-  const summary = latest?.session
-    ? `Last trained ${formatDate(latest.session.date)} - ${formatLifetimeSessions(
-        lifetimeSessions
-      )}`
-    : `No matching history yet - ${formatLifetimeSessions(lifetimeSessions)}`;
 
   return {
     eyebrow: "Training Library",
+    navigationMode: "training-library",
     title,
-    summary,
+    summary: null,
     sections: [
-      <MostRecentExerciseCard key="most-recent" occurrence={latest} />,
+      <CurrentExerciseBenchmarkCard
+        key="benchmark"
+        occurrences={occurrences}
+      />,
+      <LastExerciseSessionCard key="last-session" occurrence={latest} />,
       <ExerciseHistoryCard key="history" occurrences={occurrences} />,
       <ExerciseMetadataFooter
         key="metadata"
@@ -841,13 +1000,108 @@ function MostRecentTrainingCard({ record, value }) {
   );
 }
 
-function MostRecentExerciseCard({ occurrence }) {
+function CurrentExerciseBenchmarkCard({ occurrences }) {
+  const benchmark = getCurrentExerciseBenchmark(occurrences);
+  const comparisonTone = getBenchmarkComparisonTone(benchmark?.comparison);
+
+  return (
+    <Card
+      className="space-y-3 border-blue-200/70 bg-blue-50/35 shadow-[0_12px_30px_-24px_rgba(37,99,235,.45)] dark:border-blue-300/15 dark:bg-blue-300/[.035]"
+      padding="sm"
+    >
+      <div>
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-blue-700 dark:text-blue-300">
+          Today&apos;s Target
+        </p>
+        <h2 className="mt-0.5 text-lg font-extrabold text-slate-950">
+          Current Benchmark
+        </h2>
+      </div>
+      {benchmark ? (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <BenchmarkMetric
+              label="Best Set"
+              tone="success"
+              value={benchmark.bestSet}
+            />
+            <BenchmarkMetric
+              label="Last Session"
+              tone="neutral"
+              value={benchmark.lastSession}
+            />
+            <BenchmarkMetric
+              label="Current Working Weight"
+              tone="current"
+              value={benchmark.workingWeight}
+            />
+          </div>
+          {benchmark.comparison && (
+            <p
+              className={`rounded-xl border px-3 py-2.5 text-xs font-bold leading-5 ${comparisonTone}`}
+            >
+              {benchmark.comparison}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-sm font-semibold leading-6 text-slate-500">
+          No matching history yet.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function BenchmarkMetric({ label, tone, value }) {
+  const tones = {
+    current:
+      "border-blue-200/70 bg-blue-50/70 dark:border-blue-300/15 dark:bg-blue-300/[.06]",
+    neutral:
+      "border-[var(--divider)] bg-[var(--surface-elevated)]",
+    success:
+      "border-emerald-200/80 bg-emerald-50/80 dark:border-emerald-300/15 dark:bg-emerald-300/[.06]",
+  };
+  const labelTones = {
+    current: "text-blue-700 dark:text-blue-300",
+    neutral: "text-slate-500",
+    success: "text-emerald-700 dark:text-emerald-300",
+  };
+
+  return (
+    <div
+      className={`min-w-0 rounded-[12px] border px-2 py-2.5 ${tones[tone] ?? tones.neutral}`}
+    >
+      <p
+        className={`text-[9px] font-extrabold uppercase leading-4 tracking-[0.05em] ${labelTones[tone] ?? labelTones.neutral}`}
+      >
+        {label}
+      </p>
+      <p className="mt-1 whitespace-nowrap text-sm font-extrabold text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function getBenchmarkComparisonTone(comparison) {
+  if (comparison?.includes("established a new best")) {
+    return "border-violet-200/70 bg-violet-50/70 text-violet-800 dark:border-violet-300/15 dark:bg-violet-300/[.06] dark:text-violet-200";
+  }
+  if (comparison?.includes("matched")) {
+    return "border-emerald-200/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-300/15 dark:bg-emerald-300/[.06] dark:text-emerald-200";
+  }
+
+  return "border-amber-200/80 bg-amber-50/75 text-amber-900 dark:border-amber-300/15 dark:bg-amber-300/[.06] dark:text-amber-200";
+}
+
+function LastExerciseSessionCard({ occurrence }) {
   const sets = occurrence?.exercise?.sets ?? [];
 
   return (
     <SummaryCard
       meta={occurrence?.session ? <SessionBadge date={occurrence.session.date} /> : null}
-      title="Last Performance"
+      title="Last Session"
     >
       {occurrence?.session ? (
         <div className="space-y-2">
@@ -1066,19 +1320,61 @@ function getExerciseSetStats(sets = []) {
       weight: Number(set.weight),
     }))
     .filter(({ reps }) => Number.isFinite(reps))
-    .sort((a, b) => {
-      const aWeight = Number.isFinite(a.weight) ? a.weight : -1;
-      const bWeight = Number.isFinite(b.weight) ? b.weight : -1;
-
-      if (bWeight !== aWeight) return bWeight - aWeight;
-      return b.reps - a.reps;
-    })[0]?.set;
+    .sort((a, b) => compareExerciseSets(a.set, b.set))[0]?.set;
 
   return {
     bestSet,
     totalSets: validSets.length,
     volume: volume > 0 ? volume : null,
   };
+}
+
+export function getCurrentExerciseBenchmark(occurrences = []) {
+  const latest = occurrences[0];
+  if (!latest?.session) return null;
+  const latestStats = getExerciseSetStats(latest.exercise?.sets ?? []);
+  const lifetimeStats = getExerciseSetStats(
+    occurrences.flatMap((occurrence) => occurrence.exercise?.sets ?? [])
+  );
+  const priorStats = getExerciseSetStats(
+    occurrences
+      .slice(1)
+      .flatMap((occurrence) => occurrence.exercise?.sets ?? [])
+  );
+  if (!lifetimeStats.bestSet) return null;
+
+  const comparison = latestStats.bestSet
+    ? priorStats.bestSet &&
+      compareExerciseSets(latestStats.bestSet, priorStats.bestSet) < 0
+      ? "Last session established a new best."
+      : compareExerciseSets(latestStats.bestSet, lifetimeStats.bestSet) === 0
+        ? "Last session matched your current best."
+        : "Last session finished below your current best."
+    : null;
+
+  return {
+    bestSet: formatSetGlance(lifetimeStats.bestSet),
+    comparison,
+    lastSession: formatDate(latest.session.date),
+    workingWeight: latestStats.bestSet
+      ? formatSetWeight(latestStats.bestSet)
+      : "Pending",
+  };
+}
+
+function compareExerciseSets(left = {}, right = {}) {
+  const leftWeight = Number(left.weight);
+  const rightWeight = Number(right.weight);
+  const comparableLeftWeight = Number.isFinite(leftWeight) ? leftWeight : -1;
+  const comparableRightWeight = Number.isFinite(rightWeight) ? rightWeight : -1;
+  if (comparableRightWeight !== comparableLeftWeight) {
+    return comparableRightWeight - comparableLeftWeight;
+  }
+
+  const leftReps = Number(left.reps);
+  const rightReps = Number(right.reps);
+  return (Number.isFinite(rightReps) ? rightReps : -1) -
+    (Number.isFinite(leftReps) ? leftReps : -1);
 }
 
 function getExerciseMetricItems(sets = []) {

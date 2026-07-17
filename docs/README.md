@@ -34,3 +34,19 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Founder operations output
+
+Generated Founder Alpha output must not be written to the repository root. Use `private/founder/logs/` for server, recovery, migration, test, and debug logs; use `private/founder/tmp/` for disposable operational files. Production incident snapshots remain in the established `private/founder/incident-recovery/` directory and are never included in routine cleanup.
+
+Use lowercase descriptive names and Windows-safe timestamps such as `controlled-restart-2026-07-15T03-46-51-703Z.out.log`. The helper in `scripts/operationsPaths.mjs` creates category directories and stdout/stderr paths.
+
+- `npm run ops:root:check` rejects known generated logs in the repository root.
+- `npm run ops:logs:check` previews retention cleanup without deleting anything.
+- `npm run ops:logs:clean -- --retain 20 --older-than-days 30` explicitly deletes eligible logs. Runtime stores, backups, uploads, evidence, and incident-recovery snapshots are always excluded.
+
+## Visual language follow-up
+
+During a future app-wide Visual Language Pass, use the approved DEXA Hero metric-card treatment to inform Weekly Hero highlights. Do not redesign Weekly as part of DEXA work.
+
+Semantic colors communicate outcomes; neutral colors communicate evidence. The DEXA Event is the current reference implementation for this rule, but it should not be propagated to other surfaces before that app-wide pass.

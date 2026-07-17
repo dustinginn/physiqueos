@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const isolatedRuntimeStore = "private/founder/tmp/playwright/runtime-store.json";
+
 export default defineConfig({
   testDir: "./tests",
 
@@ -8,6 +10,18 @@ export default defineConfig({
   workers: 1,
 
   reporter: "list",
+
+  webServer: {
+    command: "node scripts/playwrightServer.mjs",
+    url: "http://127.0.0.1:3000",
+    reuseExistingServer: false,
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      PHYSIQUEOS_PLAYWRIGHT: "1",
+      PHYSIQUEOS_RUNTIME_STORE_PATH: isolatedRuntimeStore,
+    },
+  },
 
   use: {
     baseURL: "http://127.0.0.1:3000",
@@ -29,6 +43,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      grepInvert: /@legacy-diagnostic/,
+      use: {},
+    },
+    {
+      name: "legacy-diagnostics",
+      grep: /@legacy-diagnostic/,
       use: {},
     },
   ],

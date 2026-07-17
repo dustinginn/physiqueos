@@ -1,9 +1,9 @@
-import SupportingGoalScreen from "../../../screens/SupportingGoalScreen";
+import NarrativeGoalPreviewScreen from "../../../screens/NarrativeGoalPreviewScreen";
+import { getNarrativeGoalPresentation } from "../../../domain/services/NarrativeGoalPresentationLoader";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeanMassGoalPage({ searchParams }) {
-  const params = await searchParams;
-
-  return <SupportingGoalScreen from={params?.from} goalKey="leanMass" />;
+export default async function LeanMassGoalPage() {
+  const narrative = await getNarrativeGoalPresentation("leanMass");
+  return <NarrativeGoalPreviewScreen narrative={narrative} />;
 }

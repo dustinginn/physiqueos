@@ -1,4 +1,6 @@
 import { GoalConfidenceService } from "./GoalConfidenceService";
+import { getLocalDateKey } from "../utils/localDate";
+import { createBodyCompositionEstimate, formatBodyCompositionRange } from "./BodyCompositionEstimateService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -17,6 +19,8 @@ export function createGoalEvaluationService() {
       progressPhotos = [],
       protocols = [],
       nutritionContext = null,
+      photoAnalyses = [],
+      trainingPerformance = null,
       now = new Date(),
     } = {}) {
       const evidence = {
@@ -25,6 +29,8 @@ export function createGoalEvaluationService() {
         progressPhotos: sortByDate(progressPhotos, "date"),
         protocols,
         nutritionContext,
+        photoAnalyses,
+        trainingPerformance,
         now,
       };
 
@@ -75,10 +81,8 @@ function evaluateVisibleAbs(goal, evidence) {
     });
   }
 
-  const currentBodyFatEstimate = estimateCurrentBodyFatFromWeight(
-    latestDEXA,
-    evidence.weightEntries
-  );
+  const bodyCompositionEstimate = getBodyCompositionEstimate(latestDEXA, evidence);
+  const currentBodyFatEstimate = bodyCompositionEstimate?.pointEstimateBodyFatPercent ?? null;
   const bodyFatTrend = getBodyFatTrend(evidence.dexaScans);
   const postDexaLoss = getWeightLossAfterDate(
     evidence.weightEntries,
@@ -158,6 +162,28 @@ function evaluateVisibleAbs(goal, evidence) {
     92
   );
 
+  const goalConfidence = getGoalConfidence({
+    confidenceFactors,
+    evidence,
+    findings,
+    missingEvidence:
+      currentBodyFatEstimate === null
+        ? ["current_body_fat_calibration"]
+        : ["visual_confirmation_at_rest"],
+  });
+  const projection = attachProjectionConfidence(
+    getProjection({
+      goal,
+      dexaScans: evidence.dexaScans,
+      latestDEXA,
+      weightEntries: evidence.weightEntries,
+      bodyCompositionEstimate,
+      progressPhotos: evidence.progressPhotos,
+      now: evidence.now,
+    }),
+    goalConfidence
+  );
+
   return createEvaluation({
     goal,
     title: "Visible Abs",
@@ -165,15 +191,7 @@ function evaluateVisibleAbs(goal, evidence) {
     target: "Visible at rest",
     summary: "Keep executing the plan.",
     progress,
-    confidence: getGoalConfidence({
-      confidenceFactors,
-      evidence,
-      findings,
-      missingEvidence:
-        currentBodyFatEstimate === null
-          ? ["current_body_fat_calibration"]
-          : ["visual_confirmation_at_rest"],
-    }),
+    confidence: goalConfidence,
     findings,
     recommendations: [
       createRecommendation(
@@ -190,21 +208,12 @@ function evaluateVisibleAbs(goal, evidence) {
       currentBodyFatEstimate === null
         ? ["current_body_fat_calibration"]
         : ["visual_confirmation_at_rest"],
-    projection: getProjection({
-      dexaScans: evidence.dexaScans,
-      latestDEXA,
-      weightEntries: evidence.weightEntries,
-      now: evidence.now,
-    }),
+    projection,
     metadata: {
       currentBodyFatEstimate,
       currentBodyFatEstimateRange:
-        currentBodyFatEstimate === null
-          ? null
-          : formatBodyFatEstimateRange(currentBodyFatEstimate, {
-              latestDEXA,
-              weightEntries: evidence.weightEntries,
-            }),
+        formatBodyCompositionRange(bodyCompositionEstimate),
+      bodyCompositionEstimate,
       postDexaLoss,
       bodyFatTrend,
     },
@@ -229,10 +238,8 @@ function evaluateBodyFat(goal, evidence) {
 
   const targetMin = goal.targetRange?.min ?? 8;
   const targetMax = goal.targetRange?.max ?? 9;
-  const currentBodyFatEstimate = estimateCurrentBodyFatFromWeight(
-    latestDEXA,
-    evidence.weightEntries
-  );
+  const bodyCompositionEstimate = getBodyCompositionEstimate(latestDEXA, evidence);
+  const currentBodyFatEstimate = bodyCompositionEstimate?.pointEstimateBodyFatPercent ?? null;
   const progressValue = currentBodyFatEstimate ?? latestDEXA.bodyFatPercentage;
   const bodyFatTrend = getBodyFatTrend(evidence.dexaScans);
   const postDexaLoss = getWeightLossAfterDate(
@@ -241,9 +248,12 @@ function evaluateBodyFat(goal, evidence) {
   );
   const trendImproved = progressValue < latestDEXA.bodyFatPercentage;
   const projection = getProjection({
+    goal,
     dexaScans: evidence.dexaScans,
     latestDEXA,
     weightEntries: evidence.weightEntries,
+    bodyCompositionEstimate,
+    progressPhotos: evidence.progressPhotos,
     now: evidence.now,
   });
   const protocolContextExists = evidence.protocols.some((protocol) =>
@@ -325,6 +335,13 @@ function evaluateBodyFat(goal, evidence) {
     evidenceIsConsistent,
     hasCurrentEstimate: currentBodyFatEstimate !== null,
   });
+  const goalConfidence = getGoalConfidence({
+    confidenceFactors,
+    evidence,
+    findings,
+    missingEvidence: ["next_dexa_confirmation"],
+  });
+  const projectionWithConfidence = attachProjectionConfidence(projection, goalConfidence);
 
   return createEvaluation({
     goal,
@@ -333,21 +350,18 @@ function evaluateBodyFat(goal, evidence) {
     target: `${targetMin}-${targetMax}%`,
     summary: "Body-fat trend is moving toward the target range.",
     progress,
-    confidence: getGoalConfidence({
-      confidenceFactors,
-      evidence,
-      findings,
-      missingEvidence: ["next_dexa_confirmation"],
-    }),
+    confidence: goalConfidence,
     findings,
     recommendations: [
       createRecommendation("confirm_next_dexa", "Use the next DEXA to confirm the current estimate."),
     ],
     confidenceFactors,
     missingEvidence: ["next_dexa_confirmation"],
-    projection,
+    projection: projectionWithConfidence,
     metadata: {
       currentBodyFatEstimate,
+      currentBodyFatEstimateRange: formatBodyCompositionRange(bodyCompositionEstimate),
+      bodyCompositionEstimate,
       postDexaLoss,
       bodyFatTrend,
     },
@@ -493,7 +507,18 @@ function createConfidenceFactor(id, text, impact) {
   };
 }
 
-function getProjection({ dexaScans = [], latestDEXA, weightEntries, now }) {
+function getBodyCompositionEstimate(latestDEXA, evidence) {
+  return createBodyCompositionEstimate({
+    latestDEXA,
+    weightEntries: evidence.weightEntries,
+    progressPhotos: evidence.progressPhotos,
+    photoAnalyses: evidence.photoAnalyses,
+    trainingPerformance: evidence.trainingPerformance,
+    now: evidence.now,
+  });
+}
+
+function getProjection({ goal, dexaScans = [], latestDEXA, weightEntries, bodyCompositionEstimate = null, progressPhotos = [], now }) {
   if (!latestDEXA?.totalMass?.value || !latestDEXA?.fatMass?.value) {
     return null;
   }
@@ -503,7 +528,7 @@ function getProjection({ dexaScans = [], latestDEXA, weightEntries, now }) {
   );
 
   if (postDexaWeights.length < 2) {
-    return getDexaTrendProjection({ dexaScans, latestDEXA, now });
+    return getDexaTrendProjection({ goal, dexaScans, latestDEXA, now });
   }
 
   const latestWeight = postDexaWeights.at(-1);
@@ -512,10 +537,10 @@ function getProjection({ dexaScans = [], latestDEXA, weightEntries, now }) {
     rollingTrend?.lossRatePerDay ??
     getRecentPositiveLossRate(postDexaWeights) ??
     getRecentPositiveLossRate(weightEntries);
-  const estimatedBodyFat = estimateCurrentBodyFatFromWeight(latestDEXA, weightEntries);
+  const estimatedBodyFat = bodyCompositionEstimate?.pointEstimateBodyFatPercent ?? estimateCurrentBodyFatFromWeight(latestDEXA, weightEntries);
 
   if (!lossRatePerDay || lossRatePerDay <= 0) {
-    return getDexaTrendProjection({ dexaScans, latestDEXA, now });
+    return getDexaTrendProjection({ goal, dexaScans, latestDEXA, now });
   }
 
   const projectionAnchorDate = rollingTrend?.anchorDate ?? latestWeight.measuredAt;
@@ -535,24 +560,36 @@ function getProjection({ dexaScans = [], latestDEXA, weightEntries, now }) {
 
   if (!Number.isFinite(estimatedDays) || estimatedDays > 90) return null;
 
-  return {
+  const projectionWindow = getStabilizedProjectionWindow({
+    anchorDate: projectionAnchorDate,
+    estimatedDays,
+  });
+  const timelineSemantics = getTimelineSemantics({
+    bodyCompositionEstimate,
+    goal,
+    now,
+    progressPhotos,
+  });
+
+  return createGoalProjection({
+    goal,
+    now,
+    evidenceThroughDate: latestWeight.measuredAt,
+    projectionAnchorDate,
+    projectionWindow,
+    estimatedDays,
+    expectedProgressRate: lossRatePerDay,
+    estimatedRemainingChange: remaining,
     currentBodyFatEstimate: estimatedBodyFat,
-    currentBodyFatRange:
-      estimatedBodyFat === null
-        ? null
-        : formatBodyFatEstimateRange(estimatedBodyFat, {
-            latestDEXA,
-            weightEntries: postDexaWeights,
-          }),
-    projectedFinish: formatStabilizedProjectionWindow({
-      anchorDate: projectionAnchorDate,
-      estimatedDays,
-    }),
-    daysRemaining: formatApproxWeekRange(estimatedDays),
-  };
+    currentBodyFatRange: bodyCompositionEstimate
+      ? formatBodyCompositionRange(bodyCompositionEstimate)
+      : formatBodyFatEstimateRange(estimatedBodyFat, { latestDEXA, weightEntries: postDexaWeights }),
+    bodyCompositionEstimate,
+    timelineSemantics,
+  });
 }
 
-function getDexaTrendProjection({ dexaScans, latestDEXA, now }) {
+function getDexaTrendProjection({ goal, dexaScans, latestDEXA, now }) {
   const previousDEXA = dexaScans.at(-2) ?? null;
 
   if (!previousDEXA?.bodyFatPercentage || !latestDEXA?.bodyFatPercentage) {
@@ -573,13 +610,28 @@ function getDexaTrendProjection({ dexaScans, latestDEXA, now }) {
 
   if (!Number.isFinite(estimatedDays) || estimatedDays > 45) return null;
 
-  return {
-    projectedFinish: formatDateRange(
-      addDays(now, Math.max(0, Math.floor(estimatedDays * 0.8))),
-      addDays(now, Math.ceil(estimatedDays * 1.2) + 2)
-    ),
-    daysRemaining: formatApproxWeekRange(estimatedDays),
-  };
+  const asOfDate = getLocalDateKey(now);
+  const earliestDate = toDateKey(addDays(asOfDate, Math.max(0, Math.floor(estimatedDays * 0.8))));
+  const latestDate = toDateKey(addDays(asOfDate, Math.ceil(estimatedDays * 1.2) + 2));
+  const expectedDate = toDateKey(addDays(asOfDate, Math.round(estimatedDays)));
+
+  return createGoalProjection({
+    goal,
+    now,
+    evidenceThroughDate: latestDEXA.measuredAt,
+    projectionAnchorDate: latestDEXA.measuredAt,
+    projectionWindow: {
+      earliestDate,
+      expectedDate,
+      latestDate,
+      label: formatDateRange(parseDate(earliestDate), parseDate(latestDate)),
+    },
+    estimatedDays,
+    expectedProgressRate: bodyFatLossRate,
+    estimatedRemainingChange: remainingBodyFat,
+    currentBodyFatEstimate: latestDEXA.bodyFatPercentage,
+    currentBodyFatRange: null,
+  });
 }
 
 function getRollingWeightTrend(weightEntries) {
@@ -625,14 +677,161 @@ function getRollingWeightTrend(weightEntries) {
   };
 }
 
-function formatStabilizedProjectionWindow({ anchorDate, estimatedDays }) {
+function getStabilizedProjectionWindow({ anchorDate, estimatedDays }) {
   const projectedCenter = addDays(anchorDate, Math.max(0, Math.round(estimatedDays)));
   const stableCenter = snapDateToDayBucket(projectedCenter, PROJECTION_BUCKET_DAYS);
+  const earliestDate = toDateKey(addDays(stableCenter, -PROJECTION_WINDOW_RADIUS_DAYS));
+  const expectedDate = toDateKey(stableCenter);
+  const latestDate = toDateKey(addDays(stableCenter, PROJECTION_WINDOW_RADIUS_DAYS));
 
-  return formatDateRange(
-    addDays(stableCenter, -PROJECTION_WINDOW_RADIUS_DAYS),
-    addDays(stableCenter, PROJECTION_WINDOW_RADIUS_DAYS)
-  );
+  return {
+    earliestDate,
+    expectedDate,
+    latestDate,
+    label: formatDateRange(parseDate(earliestDate), parseDate(latestDate)),
+  };
+}
+
+function createGoalProjection({
+  goal,
+  now,
+  evidenceThroughDate,
+  projectionAnchorDate,
+  projectionWindow,
+  estimatedDays,
+  expectedProgressRate,
+  estimatedRemainingChange,
+  currentBodyFatEstimate,
+  currentBodyFatRange,
+  bodyCompositionEstimate = null,
+  timelineSemantics = null,
+}) {
+  const asOfDate = getLocalDateKey(now);
+  const minimumDaysRemaining = Math.max(0, daysBetween(asOfDate, projectionWindow.earliestDate));
+  const expectedDaysRemaining = Math.max(0, daysBetween(asOfDate, projectionWindow.expectedDate));
+  const maximumDaysRemaining = Math.max(0, daysBetween(asOfDate, projectionWindow.latestDate));
+
+  return {
+    id: `goal_projection_${goal?.id ?? "unknown"}_${asOfDate}_${evidenceThroughDate}`,
+    asOfDate,
+    evidenceThroughDate,
+    goal: {
+      id: goal?.id ?? null,
+      title: goal?.title ?? null,
+    },
+    currentEstimate: {
+      value: currentBodyFatEstimate,
+      range: currentBodyFatRange,
+      unit: "%",
+      method: bodyCompositionEstimate?.method ?? "DEXA-calibrated weight trend",
+      estimateId: bodyCompositionEstimate?.id ?? null,
+    },
+    target: goal?.targetRange ?? goal?.targetValue ?? "Visible at rest",
+    confidence: null,
+    confidenceMeaning:
+      "Confidence in the overall goal trajectory assessment, not certainty in the numerical body-fat estimate.",
+    earliestCompletionDate: projectionWindow.earliestDate,
+    expectedCompletionDate: projectionWindow.expectedDate,
+    latestCompletionDate: projectionWindow.latestDate,
+    minimumDaysRemaining,
+    expectedDaysRemaining,
+    maximumDaysRemaining,
+    status: "on_track",
+    currentCompletionStage: timelineSemantics?.currentCompletionStage ?? "progressing_toward_numerical_target",
+    completionStageLabel: timelineSemantics?.completionStageLabel ?? "Progressing toward numerical target",
+    remainingCriterion: timelineSemantics?.remainingCriterion ?? "Reach the numerical body-composition target.",
+    nextEvidenceCheckpoint: timelineSemantics?.nextEvidenceCheckpoint ?? null,
+    assumedCheckpointCount: timelineSemantics?.assumedCheckpointCount ?? 0,
+    projectionBasis: timelineSemantics?.projectionBasis ?? "DEXA-calibrated body-composition progress",
+    uncertaintyReason: timelineSemantics?.uncertaintyReason ?? "The rate of body-composition change may vary.",
+    supportingExplanation: timelineSemantics?.supportingExplanation ?? "Body-composition progress still determines the timeline.",
+    numericalThresholdStatus: timelineSemantics?.numericalThresholdStatus ?? "not_reached",
+    visualConfirmationStatus: timelineSemantics?.visualConfirmationStatus ?? "not_applicable",
+    assumptions: {
+      projectionAnchorDate,
+      rawEstimatedDays: Number(estimatedDays.toFixed(2)),
+      expectedProgressRate: Number(expectedProgressRate.toFixed(4)),
+      estimatedRemainingChange: Number(estimatedRemainingChange.toFixed(2)),
+      stabilityBucketDays: PROJECTION_BUCKET_DAYS,
+      windowRadiusDays: PROJECTION_WINDOW_RADIUS_DAYS,
+    },
+    currentBodyFatEstimate,
+    currentBodyFatRange,
+    bodyCompositionEstimate,
+    projectedFinish: projectionWindow.label,
+    daysRemaining: formatProjectionDuration({
+      minimumDaysRemaining,
+      expectedDaysRemaining,
+      maximumDaysRemaining,
+    }),
+  };
+}
+
+export function getTimelineSemantics({ bodyCompositionEstimate, goal, now = new Date(), progressPhotos = [], visualConfirmed = false, visualProgressSupported = true } = {}) {
+  const isVisualGoal = goal?.id === VISIBLE_ABS_GOAL_ID || goal?.metricKey === "visualDefinition";
+  const targetUpper = goal?.supportingBodyFatRange?.max ?? goal?.targetRange?.max ?? 9;
+  const estimateInRange = Boolean(bodyCompositionEstimate && bodyCompositionEstimate.pointEstimateBodyFatPercent <= targetUpper && bodyCompositionEstimate.lowerBodyFatPercent <= targetUpper);
+  if (!isVisualGoal || !estimateInRange) {
+    return {
+      currentCompletionStage: "progressing_toward_numerical_target",
+      completionStageLabel: "Progressing toward numerical target",
+      remainingCriterion: "Reach the numerical body-composition target before visual confirmation becomes decisive.",
+      nextEvidenceCheckpoint: null,
+      assumedCheckpointCount: 0,
+      projectionBasis: "DEXA-calibrated body-composition progress",
+      uncertaintyReason: "The numerical threshold has not yet been reached.",
+      supportingExplanation: "Body-composition progress still determines the timeline.",
+      numericalThresholdStatus: "not_reached",
+      visualConfirmationStatus: "not_applicable",
+    };
+  }
+
+  const nextEvidenceCheckpoint = getNextWeeklyPhotoCheckpoint({ now, progressPhotos });
+  if (visualConfirmed) {
+    return {
+      currentCompletionStage: "goal_visually_confirmed", completionStageLabel: "Goal visually confirmed",
+      remainingCriterion: null, nextEvidenceCheckpoint, assumedCheckpointCount: 0,
+      projectionBasis: "Comparable progress photos confirm the visual goal.", uncertaintyReason: null,
+      supportingExplanation: "Comparable progress photos now confirm visible abs at rest.",
+      numericalThresholdStatus: "reached", visualConfirmationStatus: "confirmed",
+    };
+  }
+
+  return {
+    currentCompletionStage: visualProgressSupported ? "visual_confirmation_developing" : "awaiting_visual_confirmation",
+    completionStageLabel: visualProgressSupported ? "Visual confirmation developing" : "Awaiting visual confirmation",
+    remainingCriterion: "Consistent visible lower-ab definition at rest in comparable progress photos.",
+    nextEvidenceCheckpoint,
+    assumedCheckpointCount: 2,
+    projectionBasis: "Upcoming weekly comparable progress-photo check-ins",
+    uncertaintyReason: visualProgressSupported
+      ? "The first check-in may confirm the goal, while a second may be needed to establish consistency."
+      : "Comparable photo evidence is still needed; a missed check-in does not imply physiological regression.",
+    supportingExplanation: "Your estimated body composition is already in the target range. Comparable progress photos are now the deciding evidence, and the next one or two check-ins should clarify completion.",
+    numericalThresholdStatus: "reached",
+    visualConfirmationStatus: visualProgressSupported ? "developing" : "awaiting_comparable_evidence",
+  };
+}
+
+function getNextWeeklyPhotoCheckpoint({ now, progressPhotos }) {
+  const asOfDate = getLocalDateKey(now);
+  const latestDate = [...new Set(progressPhotos.map((photo) => String(photo.date ?? photo.capturedAt ?? "").slice(0, 10)).filter(Boolean))].sort().at(-1);
+  let checkpoint = latestDate ? addDays(latestDate, 7) : addDays(asOfDate, 7);
+  while (toDateKey(checkpoint) < asOfDate) checkpoint = addDays(checkpoint, 7);
+  return toDateKey(checkpoint);
+}
+
+function attachProjectionConfidence(projection, goalConfidence) {
+  if (!projection) return null;
+
+  return {
+    ...projection,
+    confidence: {
+      value: goalConfidence?.value ?? 0,
+      label: goalConfidence?.label ?? "Building",
+      meaning: projection.confidenceMeaning,
+    },
+  };
 }
 
 function snapDateToDayBucket(value, bucketDays) {
@@ -707,16 +906,6 @@ function formatBodyFatEstimateRange(value, { latestDEXA, weightEntries = [] } = 
   if (typeof value !== "number" || Number.isNaN(value)) return null;
 
   const latestWeight = weightEntries.at(-1);
-  const latestWeightValue = latestWeight?.weight?.value;
-  const dexaWeightValue = latestDEXA?.totalMass?.value;
-  const dexaFatMass = latestDEXA?.fatMass?.value;
-  if (latestWeightValue && dexaWeightValue && dexaFatMass && latestWeightValue < dexaWeightValue) {
-    const postDexaLoss = dexaWeightValue - latestWeightValue;
-    const lowerFatMass = Math.max(dexaFatMass * 0.72, dexaFatMass - postDexaLoss * 0.78);
-    const upperFatMass = Math.max(dexaFatMass * 0.72, dexaFatMass - postDexaLoss * 0.7);
-    return `~${((lowerFatMass / latestWeightValue) * 100).toFixed(1)}-${((upperFatMass / latestWeightValue) * 100).toFixed(1)}%`;
-  }
-
   const daysSinceDexa =
     latestDEXA?.measuredAt && latestWeight?.measuredAt
       ? Math.max(0, daysBetween(latestDEXA.measuredAt, latestWeight.measuredAt))
@@ -855,21 +1044,34 @@ function formatShortDate(date) {
   }).format(date);
 }
 
-function formatWeekRange(days) {
-  if (days <= 7) return "0-1 week";
-
-  const low = Math.max(1, Math.floor(days / 7));
-  const high = Math.max(low + 1, Math.ceil((days + 7) / 7));
-
+export function formatProjectionDuration({
+  minimumDaysRemaining,
+  expectedDaysRemaining,
+  maximumDaysRemaining,
+}) {
+  if (maximumDaysRemaining <= 0) return "Today";
+  if (minimumDaysRemaining === 1 && maximumDaysRemaining === 1) return "Tomorrow";
+  if (maximumDaysRemaining <= 6) {
+    return minimumDaysRemaining === maximumDaysRemaining
+      ? `About ${expectedDaysRemaining} days`
+      : `${minimumDaysRemaining}-${maximumDaysRemaining} days`;
+  }
+  if (maximumDaysRemaining === 7) return "0-1 week";
+  if (minimumDaysRemaining >= 7 && maximumDaysRemaining <= 10) return "About 1 week";
+  if (minimumDaysRemaining >= 8 && maximumDaysRemaining <= 14) return "1-2 weeks";
+  if (minimumDaysRemaining >= 11 && maximumDaysRemaining <= 17) return "About 2 weeks";
+  const low = Math.max(1, Math.floor(minimumDaysRemaining / 7));
+  const high = Math.max(low + 1, Math.ceil(maximumDaysRemaining / 7));
   return `${low}-${high} weeks`;
 }
 
-function formatApproxWeekRange(days) {
-  if (days <= 10) return "~1 week";
-  if (days <= 20) return "~2 weeks";
-  if (days <= 27) return "~3 weeks";
-
-  return formatWeekRange(days);
+function toDateKey(value) {
+  const date = value instanceof Date ? value : parseDate(value);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function clamp(value, min, max) {

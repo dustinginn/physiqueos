@@ -25,7 +25,7 @@ export async function POST(request) {
   const user = await FounderRepositories.users.getCurrentUser();
   const baseBriefing = await createDailyBriefingService({
     repositories: FounderRepositories,
-  }).getDailyBriefing(user?.id);
+  }).getLatestPersistedDailyBriefing(user?.id);
 
   try {
     const packet = await createEvidencePacket({

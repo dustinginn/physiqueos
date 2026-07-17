@@ -185,7 +185,7 @@ function getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }) {
     label: "Morning Weight",
     subtitle: state.label,
     metadata: "Fasted",
-    href: "/check-in/morning?session=morning",
+    href: "/check-in/morning",
     icon: "scale",
     color: "evidence",
     completed,
@@ -275,13 +275,15 @@ function getDailySessionsFromItems(items) {
   return Object.entries(groups).map(([timeBlock, sessionItems]) => {
     const completedCount = sessionItems.filter((item) => item.completed).length;
     const pendingCount = sessionItems.length - completedCount;
+    const pendingItems = sessionItems.filter((item) => !item.completed);
+    const dedicatedWeight = pendingItems.length === 1 && pendingItems[0].id === "verified-weight" ? pendingItems[0] : null;
 
     return {
       id: `${timeBlock}-check-in`,
       label: `${formatSessionLabel(timeBlock)} Check-in`,
       subtitle: `Complete today's scheduled ${formatSessionLabel(timeBlock).toLowerCase()} evidence.`,
       metadata: `${completedCount}/${sessionItems.length} complete`,
-      href: `/log?session=${timeBlock}`,
+      href: dedicatedWeight?.href ?? `/log?session=${timeBlock}`,
       icon: "target",
       color: "primary",
       completed: pendingCount === 0,

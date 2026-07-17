@@ -27,8 +27,10 @@ export function getDailyBriefingFreshness({
   nutritionContext = null,
   progressPhotos = [],
   today = getLocalDateKey(new Date()),
+  expectedWindow = null,
   weightEntries = [],
 } = {}) {
+  const expectedEvidenceDate = expectedWindow?.date ?? today;
   const latestEvidence = getLatestBriefingRelevantEvidence({
     analyses,
     checkIns,
@@ -36,7 +38,7 @@ export function getDailyBriefingFreshness({
     nutritionContext,
     progressPhotos,
     weightEntries,
-    today,
+    today: expectedEvidenceDate,
   });
   const briefingGeneratedAt =
     dailyBriefing?.generatedAt ??
@@ -46,8 +48,12 @@ export function getDailyBriefingFreshness({
   const briefingDate = getBriefingDate(dailyBriefing, briefingGeneratedAt);
   const evidenceDate = latestEvidence?.evidenceDate ?? getDateKey(latestEvidence?.occurredAt);
 
+  const matchesExpectedWindow = expectedWindow
+    ? dailyBriefing?.evidenceWindow?.id === expectedWindow.id
+    : briefingDate === today;
+
   if (!latestEvidence) {
-    const isTodayBriefing = briefingDate === today;
+    const isTodayBriefing = matchesExpectedWindow;
 
     return {
       status: isTodayBriefing ? "current" : dailyBriefing ? "ready" : "missing",
@@ -59,7 +65,7 @@ export function getDailyBriefingFreshness({
     };
   }
 
-  const isTodayBriefing = briefingDate === today;
+  const isTodayBriefing = matchesExpectedWindow;
   const generatedAfterEvidence =
     Boolean(briefingGeneratedAt) &&
     String(briefingGeneratedAt).localeCompare(String(latestEvidence.changedAt)) >= 0;

@@ -4,7 +4,9 @@ import {
   normalizeTrainingSets,
   parseStrengthTrainingText,
   replaceTrainingHierarchyValue,
+  getStrengthTrainingBlockParseDiagnostics,
 } from "../models/trainingSessionEvidence";
+import { getCanonicalTrainingExerciseSlug } from "../models/trainingExerciseIdentity";
 import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
 import { createNutritionDayEvidenceObject } from "../models/nutritionDayEvidence";
 
@@ -865,6 +867,10 @@ function createEvidencePipelineWarnings({
     warnings.push("Reconciliation/canonicalization reduced the number of training sessions.");
   }
 
+  (finalEvidenceObjects ?? [])
+    .filter((object) => object.reconciliation?.typed_parse?.status === "incomplete_preserved_existing")
+    .forEach((object) => warnings.push(`Typed exercise reconciliation retained the complete interpreter result for ${object.metadata?.activity_type ?? "the strength workout"}.`));
+
   const finalSessionKeys = new Set(
     (finalEvidenceObjects ?? [])
       .filter(isTrainingEvidenceObject)
@@ -1341,7 +1347,7 @@ function getObservedAtFromValues(values) {
   return [date, startTime].filter(Boolean).join(" ") || null;
 }
 
-function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEvidence }) {
+export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEvidence }) {
   if (!typedEvidence) return evidenceObjects;
 
   const strengthExercises = parseStrengthTrainingEvidence(typedEvidence);
@@ -1361,10 +1367,22 @@ function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEvidence 
       return evidenceObject;
     }
 
-    const mergedExercises = mergeStrengthExercises(
-      stripTypedEvidenceExercises(evidenceObject.exercises ?? []),
-      strengthExercises
-    );
+    const completeness = assessTypedStrengthParseCompleteness({
+      existingExercises: evidenceObject.exercises ?? [],
+      parsedExercises: strengthExercises,
+      typedEvidence,
+    });
+    if (!completeness.complete) {
+      return {
+        ...evidenceObject,
+        reconciliation: {
+          ...(evidenceObject.reconciliation ?? {}),
+          typed_parse: completeness,
+        },
+      };
+    }
+
+    const mergedExercises = mergeStrengthExercises(stripTypedEvidenceExercises(evidenceObject.exercises ?? []), strengthExercises);
     const mergedProvenanceRefs = [
       ...new Set([
         ...(evidenceObject.provenance?.source_artifact_refs ?? []),
@@ -1404,6 +1422,34 @@ function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEvidence 
       },
     };
   });
+}
+
+export function assessTypedStrengthParseCompleteness({ existingExercises = [], parsedExercises = [], typedEvidence = "" } = {}) {
+  const diagnostics = getStrengthTrainingBlockParseDiagnostics(typedEvidence);
+  const recognizedIdentities = [...new Set((diagnostics.recognizedExerciseMentions ?? []).map(stableExerciseIdentity).filter(Boolean))];
+  const parsedIdentities = new Set(parsedExercises.filter((exercise) => (exercise.sets ?? []).length > 0).map((exercise) => stableExerciseIdentity(exercise.name)).filter(Boolean));
+  const existingTypedIdentities = [...new Set(existingExercises.filter(hasTypedExerciseEvidence).map((exercise) => stableExerciseIdentity(exercise.name)).filter(Boolean))];
+  const missingIdentities = recognizedIdentities.filter((identity) => !parsedIdentities.has(identity));
+  const lowerCardinality = existingTypedIdentities.length > 0 && parsedIdentities.size < existingTypedIdentities.length;
+  const missingWouldDiscardExisting = existingTypedIdentities.length > 0 && missingIdentities.length > 0;
+  const complete = parsedIdentities.size > 0 && !missingWouldDiscardExisting && !lowerCardinality;
+  return {
+    status: complete ? "complete" : "incomplete_preserved_existing",
+    complete,
+    recognizedIdentities,
+    parsedIdentities: [...parsedIdentities],
+    existingTypedIdentities,
+    missingIdentities,
+    reason: complete ? "Every recognized typed exercise survived deterministic parsing with set coverage." : "Deterministic typed parsing did not preserve every recognized exercise; the existing interpreter result was retained.",
+  };
+}
+
+function stableExerciseIdentity(name) {
+  return getCanonicalTrainingExerciseSlug(name);
+}
+
+function hasTypedExerciseEvidence(exercise) {
+  return exercise?.provenance_ref === "typed_evidence_0" || (exercise?.sets ?? []).some((set) => set.provenance_ref === "typed_evidence_0");
 }
 
 function stripTypedEvidenceExercises(exercises = []) {
