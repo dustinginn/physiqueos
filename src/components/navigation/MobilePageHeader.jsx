@@ -5,6 +5,7 @@ import BreadcrumbTrail from "./BreadcrumbTrail";
 export default function MobilePageHeader({
   breadcrumbs = [],
   description,
+  navigationSlot,
   parentHref,
   parentLabel,
   rightAction,
@@ -41,6 +42,8 @@ export default function MobilePageHeader({
           {rightAction}
         </div>
       </div>
+
+      {navigationSlot}
 
       <BreadcrumbTrail items={breadcrumbs} />
 

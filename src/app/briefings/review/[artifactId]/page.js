@@ -5,6 +5,7 @@ import BriefingReviewScreen from "../../../../screens/BriefingReviewScreen";
 import PhotoEventBriefingScreen from "../../../../screens/PhotoEventBriefingScreen";
 import WeeklyBriefingScreen from "../../../../screens/WeeklyBriefingScreen";
 import DEXAEventBriefingScreen from "../../../../screens/DEXAEventBriefingScreen";
+import MidweekBriefingScreen from "../../../../screens/MidweekBriefingScreen";
 import { resolveBriefingReviewArtifact } from "../../../../domain/services/BriefingReviewArtifactResolver";
 
 export const dynamic = "force-dynamic";
@@ -22,5 +23,6 @@ export default async function BriefingReviewPage({ params, searchParams }) {
   if (artifact.briefing?.photoEventNarrative) return <PhotoEventBriefingScreen narrative={artifact.briefing.photoEventNarrative}/>;
   if (artifact.briefing?.dexaEventNarrative) return <DEXAEventBriefingScreen narrative={artifact.briefing.dexaEventNarrative}/>;
   if (artifact.briefing?.weeklyNarrative) return <WeeklyBriefingScreen narrative={artifact.briefing.weeklyNarrative}/>;
+  if (artifact.cadence === "midweek" && artifact.briefing) return <MidweekBriefingScreen briefing={artifact.briefing}/>;
   return <BriefingReviewScreen artifact={artifact} preview={preview}/>;
 }

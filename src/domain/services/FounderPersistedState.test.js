@@ -9,7 +9,7 @@ describe("Founder persisted-state regressions", () => {
   it("keeps July 11 as three active poses and one provenance-only retry", () => {
     const session = canonical.find((item) => item.evidence_type === "photo_session" && item.canonicalId === "photo_session_user_founder_001_2026-07-11");
     const active = session.payload.photos.filter((photo) => photo.status === "active");
-    expect(active.map((photo) => `${photo.view}-${photo.pose}`).sort()).toEqual(["back-flexed", "back-relaxed", "front-relaxed"]);
+    expect(active.map((photo) => `${photo.view}-${photo.pose}`).sort()).toEqual(["front-relaxed", "rear-flexed", "rear-relaxed"]);
     expect(session.payload.photos.filter((photo) => photo.status === "duplicate")).toHaveLength(1);
     expect(session.payload.completionState).toBe("complete");
     expect(Object.fromEntries(["morning", "fasted", "postWorkout", "pump"].map((key) => [key, session.payload.sessionConditions[key]?.value]))).toEqual({ morning: false, fasted: false, postWorkout: true, pump: "unknown" });

@@ -1,8 +1,13 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { summarizeTrainingActivities } from "./ProgressPlaceholderScreen";
+import { getTrainingDaySummary } from "../presentation/trainingPresentation";
 
 const source = fs.readFileSync(new URL("./ProgressPlaceholderScreen.jsx", import.meta.url), "utf8");
+const historySheetSource = fs.readFileSync(
+  new URL("../components/training/TrainingHistorySheet.jsx", import.meta.url),
+  "utf8"
+);
 
 describe("Training Evidence workflow presentation", () => {
   it("keeps Latest Training Day as the first Training content section", () => {
@@ -40,10 +45,31 @@ describe("Training Evidence workflow presentation", () => {
     expect(source).toContain("<RecordPreview entries={trainingDay.sessions} showSources />");
   });
 
-  it("uses one compact summary line and preserves the existing training-day action", () => {
-    expect(source).toContain('activities.join(" • ")');
+  it("uses the shared muscle-group summary and preserves the existing training-day action", () => {
+    expect(source).toContain("getTrainingDaySummary(");
     expect(source).toContain("View Training Day →");
     expect(source).not.toContain("trainingDay.sessions.slice(0, 5)");
+    expect(source).not.toContain("{trainingDay.summary}");
+    expect(source).not.toContain("{day.summary}");
+    expect(
+      getTrainingDaySummary([
+        {
+          label: "Traditional Strength Training",
+          exercises: [{ name: "Hanging Leg Raise" }, { name: "Lying Leg Curl" }],
+        },
+        { label: "Outdoor Walk" },
+      ])
+    ).toBe("Core · Hamstrings · Walking");
+  });
+
+  it("opens complete recent history in the shared FloatingSheet", () => {
+    expect(source).toContain("<TrainingHistorySheet");
+    expect(source).toContain("days={trainingDays}");
+    expect(source).not.toContain(
+      'action={{ href: "/progress/training/reporting/history", label: "Show All" }}'
+    );
+    expect(historySheetSource).toContain("getTrainingDaySummary(day.sessions)");
+    expect(historySheetSource).not.toContain("day.summary");
   });
 
   it("keeps the mobile page centered without horizontal overflow primitives", () => {

@@ -164,13 +164,21 @@ Use the screenshot comparison workflow whenever making significant UI updates.
 
 Aim for close visual parity while preserving maintainability.
 
-## Mandatory Mobile-First Development
+## Mandatory Mobile-First Product Rule
 
-Founder Alpha is designed mobile-first, and the iPhone composition is canonical. Desktop is primarily a development and secondary-viewing canvas; preserve the centered mobile composition unless a task explicitly requests a desktop-specific layout. Do not introduce fixed-width desktop expansion merely because more viewport space is available.
+PhysiqueOS is a mobile-first application. For every new screen, preview, route, card system, or major UI change:
 
-A user-facing UI task is incomplete until it has been validated at 360px, 393px, a tablet viewport, and a normal desktop viewport. Responsive validation must confirm the mobile composition has no clipping, horizontal overflow, detached content, oversized empty space, or content hidden behind fixed navigation at every width.
+1. Begin with the canonical PhysiqueOS mobile application shell and design for 393 px first.
+2. Verify graceful behavior at 360 px.
+3. Desktop must center and preserve the mobile shell unless a desktop-specific layout has been explicitly approved. Never make an unrestricted full-width desktop page the default presentation.
+4. Reuse shared shell, navigation, spacing, safe-area, and responsive contracts.
+5. Verify bottom-navigation clearance and horizontal-overflow protection.
+6. Static responsive assertions are insufficient for visual approval. Report honestly when live 393/360 light/dark inspection is unavailable, and never claim mobile verification without actual inspection or an explicit limitation disclosure.
+7. A feature is not visually complete until its mobile presentation has been reviewed.
 
-Every UI completion report must list the responsive viewports validated and any related shared surfaces inspected.
+Preview routes must use the same canonical mobile shell and shared presentation architecture as production unless the preview is explicitly a developer diagnostic tool.
+
+When a task requires broader responsive validation, also inspect the requested tablet and desktop viewports. Every UI completion report must list the responsive viewports actually inspected and any related shared surfaces reviewed.
 
 ---
 

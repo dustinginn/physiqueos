@@ -8,6 +8,8 @@ import { createEvidencePackageRepository } from "./EvidencePackageRepository";
 import { createEnergyStrategyLinkRepository } from "./EnergyStrategyLinkRepository";
 import { createExecutionItemRepository } from "./ExecutionItemRepository";
 import { createGoalRepository } from "./GoalRepository";
+import { createGoalTransitionRepository } from "./GoalTransitionRepository";
+import { createGoalProtocolTransitionRepository } from "./GoalProtocolTransitionRepository";
 import { createMilestoneRepository } from "./MilestoneRepository";
 import { createNutritionContextRepository } from "./NutritionContextRepository";
 import { createOperatingPlanRepository } from "./OperatingPlanRepository";
@@ -26,6 +28,14 @@ export function createSeedRepositories(seedPack, options = {}) {
   return {
     users: createUserRepository(seedPack.user, options),
     goals: createGoalRepository(seedPack.goals, options),
+    goalTransitionDrafts: createGoalTransitionRepository(
+      seedPack.goalTransitionDrafts ?? [],
+      { ...options, onChange: () => options.onChange?.("goalTransitionDrafts") }
+    ),
+    goalProtocolTransitionDrafts: createGoalProtocolTransitionRepository(
+      seedPack.goalProtocolTransitionDrafts ?? [],
+      { ...options, onChange: () => options.onChange?.("goalProtocolTransitionDrafts") }
+    ),
     weights: createWeightRepository(seedPack.weightEntries, options),
     dexaScans: createDEXARepository(seedPack.dexaScans, options),
     protocols: createProtocolRepository(seedPack.protocols, options),

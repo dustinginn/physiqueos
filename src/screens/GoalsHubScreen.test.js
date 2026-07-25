@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const source = fs.readFileSync(new URL("./GoalsHubScreen.jsx", import.meta.url), "utf8");
 
-describe("GoalsHubScreen active-goal index", () => {
+describe("GoalsHubScreen finalized goal index", () => {
   it("renders the approved landing-page hierarchy in order", () => {
-    const headings = ["Your Goals", "Primary Goal", "Supporting Goals", "Goal Relationships", "Add Goal"];
+    const headings = ["Your Goals", "Primary Goal", "Completed Goals", "Add Goal"];
     let cursor = -1;
     for (const heading of headings) {
       const next = source.indexOf(heading);
@@ -14,25 +14,40 @@ describe("GoalsHubScreen active-goal index", () => {
     }
   });
 
-  it("removes completed, future, edit, progress, projection, and explanatory card UI", () => {
-    expect(source).not.toMatch(/CompletedGoals|Completed Goals|FutureGoals|Future Goals/);
+  it("retires supporting-goal and relationship presentation without deleting records", () => {
+    expect(source).not.toMatch(/Supporting Goals|Goal Relationships|GoalRelationships|getRelationships/);
+    expect(source).toContain("CompletedGoals");
+    expect(source).toContain('title: completedJourney.hero.title');
+    expect(source).toContain('href: "/goals/visible-abs"');
+  });
+
+  it("keeps future, edit, progress, projection, and explanatory card UI out of the index", () => {
+    expect(source).not.toMatch(/FutureGoals|Future Goals/);
     expect(source).not.toMatch(/EditGoalButton|ProgressBar|estimatedCompletion|supportingExplanation/);
     expect(source).not.toMatch(/goal\.description|goal\.presentation\.detail/);
   });
 
   it("links each full active-goal card to its canonical production route", () => {
-    expect(source).toContain('return "/goals/visible-abs"');
-    expect(source).toContain('return "/goals/maintenance"');
-    expect(source).toContain('return "/goals/lean-mass"');
-    expect(source).toContain("href={withReturnContext(goal.href, from)}");
+    expect(source).toContain("resolveGoalNavigationHref");
+    expect(source).toContain("href={withReturnContext(goal.navigation.href, from)}");
+    expect(source).toContain("if (!goal.navigation.available)");
     expect(source).not.toContain("narrative-preview");
+  });
+
+  it("renders the completed achievement card as a full accessible link", () => {
+    expect(source).toContain('aria-label={`Open completed goal ${goal.title}`}');
+    expect(source).toContain("{goal.dates}");
+    expect(source).toContain("{goal.achievement}");
+    expect(source).toContain("Completed Goal");
   });
 
   it("keeps objective-specific live states and compact confidence values", () => {
     expect(source).toContain("evaluation?.projection?.completionStageLabel");
     expect(source).toContain("summary.presentation?.status ?? summary.current");
-    expect(source).toContain("summary.confidence ?? evaluation?.confidence ?? 0");
-    expect(source).toContain("{goal.confidence}% confidence");
+    expect(source).toContain("resolveOverallGoalConfidenceReadModel");
+    expect(source).toContain("formatConfidence(goal.confidence)");
+    expect(source).toContain('"Confidence unavailable"');
+    expect(source).not.toContain("summary.confidence ?? evaluation?.confidence ?? 0");
     expect(source).toContain('"Visual confirmation developing": "Visual Confirmation Developing"');
     expect(source).toContain('"Entering target range": "Entering Target Range"');
     expect(source).toContain('Stable: "Stable"');

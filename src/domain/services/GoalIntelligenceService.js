@@ -36,12 +36,17 @@ export const GoalIntelligenceService = createGoalIntelligenceService();
 
 function mapEvaluationToGoalSummary(evaluation) {
   const visualIdentity = getGoalVisualIdentity(evaluation);
+  const leanAchievement = evaluation.metricKey === "leanMass" && evaluation.lifecycleState === "achieved"
+    ? evaluation.achievementEvidence
+    : null;
+  const isTerminal = ["awaiting_confirmation", "transition_ready", "achieved"].includes(evaluation.lifecycleState);
+  const maintenanceTransition = evaluation.metricKey === "bodyFatPercentage" && evaluation.lifecycleState === "transition_ready";
 
   return {
     id: evaluation.goalId,
     title: evaluation.title,
-    current: evaluation.current,
-    target: evaluation.target,
+    current: leanAchievement ? `${leanAchievement.baselineLeanMass.toFixed(1)} lb baseline` : maintenanceTransition ? `${evaluation.current} current` : evaluation.current,
+    target: maintenanceTransition ? `${evaluation.target.replace("-", "–")} range` : evaluation.target,
     progress: evaluation.progress,
     primary: evaluation.primary,
     icon: visualIdentity.icon,
@@ -52,16 +57,30 @@ function mapEvaluationToGoalSummary(evaluation) {
     goalProgress: evaluation.goalProgress,
     goalConfidence: evaluation.goalConfidence,
     projection: evaluation.projection,
-    presentation: evaluation.primary
+    presentation: isTerminal
       ? {
-          mode: "primary_goal",
+          mode: "terminal_goal",
+          status: evaluation.lifecycleState === "awaiting_confirmation"
+            ? "Awaiting visual confirmation"
+            : evaluation.presentation?.status ?? (evaluation.lifecycleState === "achieved" ? "Achieved" : "Ready for next phase"),
+          detail: evaluation.lifecycleState === "awaiting_confirmation"
+            ? "DEXA threshold reached"
+            : evaluation.presentation?.detail ?? evaluation.summary,
         }
+      : evaluation.primary
+        ? { mode: "primary_goal" }
       : evaluation.presentation ?? {
           mode: "supporting_objective",
           status: evaluation.current,
           detail: evaluation.summary,
           label: "Status",
         },
+    lifecycleState: evaluation.lifecycleState,
+    thresholdStatus: evaluation.thresholdStatus,
+    requiredAction: evaluation.requiredAction,
+    actionLabel: evaluation.actionLabel,
+    actionHref: evaluation.actionHref,
+    transitionReady: evaluation.transitionReady,
   };
 }
 

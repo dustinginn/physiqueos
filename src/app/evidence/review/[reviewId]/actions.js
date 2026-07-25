@@ -15,13 +15,17 @@ import { createPostConfirmationOrchestrator } from "../../../../domain/services/
 import { evaluateScheduledCompletion } from "../../../../domain/services/ScheduledCompletionService";
 import { synthesizePhotoSessionObservations } from "../../../../domain/services/PhotoSessionService";
 import { createTrainingPerformanceIntelligenceReport } from "../../../../domain/services/TrainingPerformanceIntelligenceService";
-import { createDailyBriefingService } from "../../../../domain/services/DailyBriefingService";
 import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/PhotoInterpreterService";
 import { normalizePhotoInterpretationToStructuredObservations } from "../../../../domain/interpreters/PhotoObservationModel";
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
 import { createDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
+import { createPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
+import { assertValidDexaScan } from "../../../../domain/services/DEXAContract";
+import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/services/DEXAReadModelAdapter";
+import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
+import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
 
 export async function reprocessEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
@@ -46,19 +50,23 @@ export async function confirmEvidenceReview(formData) {
   try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
   catch { throw new Error("The evidence selection is invalid."); }
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
+  validateDexaObjectsBeforeCommit(evidencePackage);
 
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
   await service.beginCommit(reviewId);
+  let orchestrationResult;
   try {
     const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
     const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, user }) });
-    await orchestrator.run({ reviewId, evidencePackage, userId: user.id, commitProgress: currentReview.commitProgress ?? {} });
+    orchestrationResult = await orchestrator.run({ reviewId, evidencePackage, userId: user.id, commitProgress: currentReview.commitProgress ?? {} });
     await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id });
   } catch (error) {
     await service.failCommit(reviewId, error);
     throw error;
   }
   ["/", "/briefing/daily", "/progress", "/progress/photos", "/progress/dexa", "/progress/training", "/timeline"].forEach(revalidatePath);
+  const photoSessionId = orchestrationResult?.briefingResult?.photoSessionIds?.[0];
+  if (photoSessionId) redirect(`/briefings/photo/${photoSessionId}`);
   redirect(`/evidence/review/${reviewId}?confirmed=1`);
 }
 
@@ -100,6 +108,15 @@ function createHandlers({ evidencePackage, user }) {
       const results = evaluateScheduledCompletion({ canonicalObjects: canonical, evidencePackage });
       const completionRecords = [];
       for (const result of results.filter((item) => item.satisfied)) {
+        if (result.evidenceType === "photo_session") {
+          const session = canonical.find((item) => item.canonicalId === result.canonicalEvidenceId);
+          const satisfaction = await satisfyPhotoPriorityFromCanonicalSession({
+            repositories: FounderRepositories, userId: user.id, canonicalSession: session,
+            evidenceDate: result.observedDate,
+          });
+          if (satisfaction.record) completionRecords.push(satisfaction.record.id);
+          continue;
+        }
         const reminderId = { weight: "reminder_morning_weight", photo_session: "reminder_weekly_progress_photo_set", dexa: "reminder_dexa" }[result.evidenceType];
         if (!reminderId) continue;
         const completion = { id: `${reminderId}:${result.observedDate}:${result.canonicalEvidenceId}`, completedAt: `${result.observedDate}T12:00:00.000Z`, canonicalEvidenceId: result.canonicalEvidenceId, evidenceType: result.evidenceType, source: "PostConfirmationOrchestrator" };
@@ -130,15 +147,24 @@ function createHandlers({ evidencePackage, user }) {
     briefing: async ({ results }) => {
       const eligible = results.event_eligibility?.eligible ?? [];
       const artifacts = [];
+      const photoSessionIds = [];
       for (const type of eligible) {
         const object = (evidencePackage.evidence_objects ?? []).find((item) => item.evidence_type === type || (type === "dexa" && ["dexa_scan", "body_composition"].includes(item.evidence_type)));
         const canonicalId = getStableCanonicalId(object, user.id);
-        const artifact = type === "photo_session"
-          ? await createDailyBriefingService({ repositories: FounderRepositories }).generateEventBriefing({ userId: user.id, trigger: { evidenceId: canonicalId, evidenceType: "photo_session", analysisId: analyses[0]?.id ?? results.analysis?.analysisIds?.[0] } })
-          : await createDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
+        if (type === "photo_session") {
+          const result = await createPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+          if (result.status !== "completed" || !result.artifactId) {
+            throw new Error(`${result.code ?? "photo_event_briefing_failed"}: ${result.message ?? "Photo Event briefing was not created."}`);
+          }
+          artifacts.push(result.artifactId);
+          photoSessionIds.push(result.sessionId);
+          continue;
+        }
+        const artifact = await createDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
+        if (!artifact?.artifactId && !artifact?.id) throw new Error("dexa_event_briefing_failed: DEXA Event briefing was not created.");
         artifacts.push(artifact.artifactId ?? artifact.id);
       }
-      return { status: "completed", artifactIds: artifacts, freshness: eligible.length ? "event_generated" : "scheduled_preserved" };
+      return { status: "completed", artifactIds: artifacts, photoSessionIds, freshness: eligible.length ? "event_generated" : "scheduled_preserved" };
     },
     home_refresh: async ({ results }) => {
       revalidatePath("/");
@@ -165,32 +191,10 @@ async function commitCompatibilityRepositories({ evidencePackage, user }) {
       records.push(entry.id);
     }
     if (["dexa_scan", "dexa", "body_composition"].includes(object.evidence_type)) {
-      const metadata = object.metadata ?? {};
-      const date = String(object.observed_at).slice(0, 10);
-      const existing = await FounderRepositories.dexaScans.listDEXAScans(user.id);
-      if (!existing.some((item) => item.id === object.id || (item.measuredAt === date && item.sourceFileId === object.source_file))) {
-        const scan = createDEXAScan({
-          id: object.id, userId: user.id, measuredAt: date,
-          totalMass: { value: metadata.totalMass ?? null, unit: "lb" },
-          bodyFatPercentage: metadata.bodyFatPercentage ?? null,
-          fatMass: { value: metadata.fatMass ?? null, unit: "lb" },
-          leanMass: { value: metadata.leanMass ?? null, unit: "lb" },
-          boneMineralContent: { value: metadata.boneMineralContent ?? null, unit: "lb" },
-          restingMetabolicRate: { value: metadata.restingMetabolicRate ?? null, unit: "kcal/day" },
-          visceralAdiposeTissue: metadata.visceralAdiposeTissue ?? { mass: { value: metadata.vatMass ?? null, unit: "lb" }, volume: { value: metadata.vatVolume ?? null, unit: "in3" } },
-          androidFatPercentage: metadata.androidFatPercentage ?? null,
-          gynoidFatPercentage: metadata.gynoidFatPercentage ?? null,
-          androidGynoidRatio: metadata.androidGynoidRatio ?? null,
-          ...(metadata.regionalAssessment ? { regionalAssessment: metadata.regionalAssessment } : {}),
-          ...(metadata.muscleBalance ? { muscleBalance: metadata.muscleBalance } : {}),
-          ...(metadata.boneDensity ? { boneDensity: metadata.boneDensity } : {}),
-          provider: metadata.provider ?? object.provider ?? "BodySpec",
-          sourceFileId: object.source_file, rawReportPath: object.source_file,
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        });
-        await FounderRepositories.dexaScans.addDEXAScan(scan);
-        records.push(scan.id);
-      }
+      const canonicalId = getStableCanonicalId(object, user.id);
+      const scan = toDexaReadModel(object, { canonicalId, userId: user.id });
+      await (FounderRepositories.dexaScans.upsertDEXAScan?.(scan) ?? FounderRepositories.dexaScans.addDEXAScan(scan));
+      records.push(scan.id);
     }
     if (object.evidence_type === "photo_session") {
       const date = String(object.observed_at).slice(0, 10);
@@ -211,8 +215,13 @@ function expandCanonicalPhotoSessions(canonicalObjects, evidencePackage, userId)
   const byId = new Map(canonicalObjects.map((item) => [item.canonicalId, item]));
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => item.evidence_type === "photo_session" && !item.removed)) {
     const date = String(object.observed_at).slice(0, 10);
-    const photos = (object.photos ?? []).map((photo) => ({ ...photo, canonicalPhotoId: `canonical_photo_${userId}_${date}_${photo.view}_${photo.pose}`, captureDate: date, occurrenceTimestamp: date, sourceIds: [photo.id], sourceHashes: [photo.source_hash].filter(Boolean), status: photo.active === false ? "inactive" : "active" }));
-    const session = createCanonicalPhotoSession({ ...object, provisional: false, captureDate: date, sessionId: `photo_session_${userId}_${date}`, userId, photos });
+    const photos = (object.photos ?? []).map((photo, index) => ({ ...photo,
+      canonicalPhotoId: photo.canonicalPhotoId ?? `canonical_photo_${userId}_${date}_${stablePhotoIdentity(photo.id ?? photo.source_hash ?? index)}`,
+      stableViewId: photo.stableViewId ?? photo.id, captureDate: date, occurrenceTimestamp: date,
+      sourceIds: [photo.id], sourceHashes: [photo.source_hash].filter(Boolean),
+      status: photo.active === false ? "inactive" : "active", sourceOrder: photo.sourceOrder ?? photo.order ?? index,
+    }));
+    const session = createCanonicalPhotoSession({ ...object, confirmationIntent: evidencePackage.review_metadata?.confirmationIntent ?? null, provisional: false, captureDate: date, sessionId: `photo_session_${userId}_${date}`, userId, photos });
     const sessionObject = { canonicalId: session.sessionId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "photo_session", firstObservedAt: date, lastObservedAt: date, payload: { ...session, evidence_type: "photo_session", observed_at: date }, provenance: object.provenance ?? {}, quality: { status: "active" }, userId };
     byId.set(sessionObject.canonicalId, preserveCanonicalTimestamps(byId.get(sessionObject.canonicalId), sessionObject));
     photos.forEach((photo) => {
@@ -233,16 +242,20 @@ function preserveCanonicalTimestamps(existing, candidate) {
 
 async function runDomainAnalysis({ canonical, evidencePackage, user }) {
   const created = [];
+  const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
+  const photoGoalContext = completionIntent?.confirmationPurpose === "visible_abs_completion"
+    ? "Visible Abs completion evaluation. For Front Relaxed, directly state whether lower abs are visibly present at rest, and identify any pose, abdominal visibility, lighting, framing, editing, or confidence limitation. Rear views cannot confirm completion."
+    : "Visible Abs at Rest";
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
     if (object.evidence_type === "photo_session") {
       const sessionId = `photo_session_${user.id}_${String(object.observed_at).slice(0, 10)}`;
       const perView = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
-        const canonicalPhotoId = `canonical_photo_${user.id}_${String(object.observed_at).slice(0, 10)}_${photo.view}_${photo.pose}`;
+        const canonicalPhotoId = photo.canonicalPhotoId ?? `canonical_photo_${user.id}_${String(object.observed_at).slice(0, 10)}_${stablePhotoIdentity(photo.id ?? photo.source_hash)}`;
         const prior = findPriorCanonicalPhoto(canonical, photo, object.observed_at);
         const currentInput = await photoInterpreterInput(photo, object);
         const priorInput = prior ? await canonicalPhotoInterpreterInput(prior) : null;
-        const interpretationResult = await interpretPhotoSetWithVision({ captureDate: object.observed_at, goalContext: "Visible Abs at Rest", photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
+        const interpretationResult = await interpretPhotoSetWithVision({ captureDate: object.observed_at, goalContext: photoGoalContext, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
         if (interpretationResult.provider !== "openai") throw new Error(`Photo Interpreter provider did not complete canonical analysis for ${canonicalPhotoId}: ${interpretationResult.warning ?? "provider unavailable"}`);
         const interpretation = interpretationResult.interpretation;
         const structuredObservations = interpretation.structured_observations ?? normalizePhotoInterpretationToStructuredObservations(interpretation);
@@ -250,15 +263,19 @@ async function runDomainAnalysis({ canonical, evidencePackage, user }) {
         const analysis = createAnalysis({ id: stableAnalysisId([canonicalPhotoId, "v1", prior?.canonicalId ?? "baseline", interpreterVersion]), createdAt: new Date().toISOString(), title: `${photo.view} ${photo.pose} interpreted`, summary: interpretation.user_facing_summary, evidenceIds: [canonicalPhotoId], evidenceTypes: ["progress_photo"], findings: structuredObservations.map((item) => ({ title: item.region, detail: item.change })), metadata: { canonicalPhotoId, canonicalVersion: "v1", interpreterVersion, priorComparisonId: prior?.canonicalId ?? null, provider: interpretationResult.provider, warning: interpretationResult.warning, photoInterpretation: interpretation, structuredObservations } });
         await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis); perView.push({ evidenceIds: analysis.evidenceIds, structuredObservations, analysisId: analysis.id });
       }
-      if (perView.length !== 3) throw new Error(`PhotoSession synthesis requires three successful per-view analyses; received ${perView.length}.`);
+      if (perView.length === 0) throw new Error("PhotoSession synthesis requires at least one successful per-view analysis.");
       const synthesis = synthesizePhotoSessionObservations(perView);
       const synthesisId = stableAnalysisId([sessionId, "v1", ...perView.map((item) => item.analysisId).sort(), "synthesis-v1"]);
-      const analysis = createAnalysis({ id: synthesisId, createdAt: new Date().toISOString(), title: "Photo Session Synthesis", summary: "Canonical multi-view synthesis completed from three production Photo Interpreter analyses.", evidenceIds: [sessionId], evidenceTypes: ["photo_session"], metadata: { photoSessionSynthesis: synthesis, sourceAnalysisIds: perView.map((item) => item.analysisId), synthesisVersion: "synthesis-v1" } });
+      const analysis = createAnalysis({ id: synthesisId, createdAt: new Date().toISOString(), title: "Photo Session Synthesis", summary: `Canonical multi-view synthesis completed from ${perView.length} production Photo Interpreter ${perView.length===1?"analysis":"analyses"}.`, evidenceIds: [sessionId], evidenceTypes: ["photo_session"], metadata: { photoSessionSynthesis: synthesis, sourceAnalysisIds: perView.map((item) => item.analysisId), synthesisVersion: "synthesis-v2" } });
       await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
     } else if (["dexa", "dexa_scan", "body_composition"].includes(object.evidence_type)) {
       const canonicalScan = canonical.find((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && String(item.lastObservedAt).slice(0, 10) === String(object.observed_at).slice(0, 10));
       if (!canonicalScan) throw new Error("Confirmed canonical DEXA was not available for interpretation.");
-      const priorScan = canonical.filter((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && item.quality?.status !== "superseded" && String(item.lastObservedAt) < String(canonicalScan.lastObservedAt)).sort((a, b) => String(b.lastObservedAt).localeCompare(String(a.lastObservedAt)))[0] ?? null;
+      const canonicalPrior = canonical.filter((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && item.quality?.status !== "superseded" && String(item.lastObservedAt) < String(canonicalScan.lastObservedAt)).sort((a, b) => String(b.lastObservedAt).localeCompare(String(a.lastObservedAt)))[0] ?? null;
+      const legacyPrior = selectValidDexaScans(await FounderRepositories.dexaScans.listDEXAScans(user.id))
+        .filter((item) => String(item.measuredAt) < String(canonicalScan.lastObservedAt))
+        .at(-1) ?? null;
+      const priorScan = canonicalPrior ?? (legacyPrior ? { canonicalId: legacyPrior.canonicalId ?? legacyPrior.id, payload: legacyPrior } : null);
       const analysis = createDEXAInterpretation({ canonicalScan, priorScan });
       await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
     }
@@ -271,9 +288,18 @@ async function runDomainAnalysis({ canonical, evidencePackage, user }) {
   return created;
 }
 
+function validateDexaObjectsBeforeCommit(evidencePackage) {
+  for (const object of (evidencePackage.evidence_objects ?? []).filter((item) =>
+    !item.removed && ["dexa_scan", "dexa", "body_composition"].includes(item.evidence_type)
+  )) {
+    assertValidDexaScan(object, { production: true });
+  }
+}
+
 function isCompletePhotoSession(object) {
-  const poses = new Set((object.photos ?? []).filter((photo) => photo.active !== false).map((photo) => `${photo.view}-${photo.pose}`));
-  return ["front-relaxed", "back-relaxed", "back-flexed"].every((pose) => poses.has(pose));
+  return (object.photos ?? []).some((photo) =>
+    photo.active !== false && photo.identityStatus === "confirmed" && photo.userConfirmedIdentity === true
+  );
 }
 
 function getStableCanonicalId(object, userId) {
@@ -293,7 +319,9 @@ async function refreshGoalEvaluations({ evidencePackage, user }) {
 }
 
 function findPriorCanonicalPhoto(canonical, photo, observedAt) {
-  return canonical.filter((item) => item.evidence_type === "progress_photo" && item.quality?.status === "active" && item.payload?.view === photo.view && item.payload?.pose === photo.pose && String(item.lastObservedAt) < String(observedAt)).sort((left, right) => String(right.lastObservedAt).localeCompare(String(left.lastObservedAt)))[0] ?? null;
+  return canonical.filter((item) => item.evidence_type === "progress_photo" && item.quality?.status === "active" &&
+    arePhotoPoseIdentitiesCompatible(item.payload, photo) && String(item.lastObservedAt) < String(observedAt))
+    .sort((left, right) => String(right.lastObservedAt).localeCompare(String(left.lastObservedAt)))[0] ?? null;
 }
 
 async function photoInterpreterInput(photo, session) {
@@ -326,6 +354,10 @@ function mimeType(filePath) {
 
 function stableAnalysisId(parts) {
   return `analysis_${parts.join("|").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "")}`;
+}
+
+function stablePhotoIdentity(value) {
+  return String(value ?? "view").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
 }
 
 export async function discardEvidenceReview(formData) {

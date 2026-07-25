@@ -15,6 +15,7 @@ Founder Alpha uses the Next.js App Router under `src/app`.
 | `/` | Home decision surface | `HomeScreen`, `HomeBriefingService` |
 | `/briefing/daily` | Daily Briefing | `DailyBriefingScreen`, `DailyBriefingService` |
 | `/briefings/monthly/preview/2026-07-01` | Isolated June 2026 Monthly Briefing architecture preview | `MonthlyBriefingScreen`, `MonthlyBriefingPreviewService` |
+| `/briefings/midweek/preview` | Read-only Wednesday Midweek Briefing preview | `MidweekBriefingScreen`, `MidweekBriefingPreviewService` |
 | `/check-in/morning` | Morning Check-In | `MorningCheckInScreen`, check-in actions |
 | `/analysis/[analysisId]` | Saved Analysis detail | `AnalysisScreen`, `AnalysisRepository` |
 | `/goals` | Goals Hub | `GoalsHubScreen` |

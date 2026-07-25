@@ -8,15 +8,29 @@ function canonicalSession(date = "2026-07-11") {
 }
 
 describe("CanonicalPhotoSessionReadService", () => {
+  it("prefers the stable canonical session identity when duplicate records share the same assets", () => {
+    const stable = canonicalSession("2026-07-18");
+    stable.canonicalId = "photo_session_user_founder_001_2026-07-18";
+    stable.payload.sessionId = stable.canonicalId;
+    const ingestionAlias = {
+      ...structuredClone(stable),
+      canonicalId: "photo_session|2026-07-18|front|rear|flex|side|front-flex",
+      payload: { ...structuredClone(stable.payload), sessionId: null },
+    };
+    const sessions = createPhotoSessionReadModels({ canonicalObjects: [ingestionAlias, stable] });
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].id).toBe(stable.canonicalId);
+    expect(sessions[0].hiddenProvenanceAliases).toContain(ingestionAlias.canonicalId);
+  });
   it("renders canonical July 11 as exactly three ordered views with provenance-only retry", () => {
     const sessions = createPhotoSessionReadModels({ canonicalObjects: [canonicalSession()], legacyPhotos: [{ id: "legacy-retry", date: "2026-07-11", view: "back", pose: "flexed", imagePath: "flex.jpg" }], weights: [{ measuredAt: "2026-07-11", weight: { value: 180, unit: "lb" } }] });
     expect(sessions).toHaveLength(1);
     expect(sessions[0].sourceMode).toBe("canonical");
     expect(sessions[0].activeViewCount).toBe(3);
-    expect(sessions[0].views.map((view) => view.label)).toEqual(["Front Relaxed", "Rear Relaxed", "Rear Flexed"]);
+    expect(sessions[0].views.map((view) => view.label)).toEqual(["Front Relaxed", "Rear Relaxed", "Rear Flexed — Double Biceps"]);
     expect(sessions[0].duplicateRetryCount).toBe(1);
     expect(sessions[0].weight).toBe("180.0 lb");
-    expect(sessions[0].completionLabel).toBe("3/3 complete");
+    expect(sessions[0].completionLabel).toBe("3 confirmed views");
     expect(sessions[0].views[0].tags).toEqual(expect.arrayContaining(["Post-workout", "Not morning", "Not fasted", "Pump unknown"]));
   });
 

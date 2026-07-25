@@ -150,12 +150,14 @@ function getEvaluations(now = new Date("2026-07-12T12:00:00-07:00")) {
 }
 
 function createDexa(measuredAt, totalMass, fatMass, bodyFatPercentage) {
+  const boneMineralContent = 7;
   return {
     id: `dexa_${measuredAt}`,
     measuredAt,
     totalMass: { value: totalMass, unit: "lb" },
     fatMass: { value: fatMass, unit: "lb" },
-    leanMass: { value: totalMass - fatMass, unit: "lb" },
+    leanMass: { value: totalMass - fatMass - boneMineralContent, unit: "lb" },
+    boneMineralContent: { value: boneMineralContent, unit: "lb" },
     bodyFatPercentage,
   };
 }

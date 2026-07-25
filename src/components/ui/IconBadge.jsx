@@ -3,6 +3,7 @@ export default function IconBadge({
   color = "primary",
   size = "md",
   className = "",
+  appearanceClassName = "",
 }) {
   const colors = {
     primary: "bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] text-[var(--primary)]",
@@ -29,7 +30,7 @@ export default function IconBadge({
     md: 18,
     lg: 22,
   };
-  const colorClass = colors[color] ?? colors.primary;
+  const colorClass = appearanceClassName || colors[color] || colors.primary;
   const sizeClass = sizes[size] ?? sizes.md;
   const iconSize = iconSizes[size] ?? iconSizes.md;
 

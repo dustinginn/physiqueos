@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Activity, AlertTriangle, Camera, Dumbbell, FileText, HeartPulse, Scale, Utensils } from "lucide-react";
+import { Activity, AlertTriangle, Camera, Check, Dumbbell, FileText, HeartPulse, Scale, Utensils } from "lucide-react";
 import Card from "../components/ui/Card";
 import EvidenceImage from "../components/progress/EvidenceImage";
 import {
   createEvidenceReviewPresentation,
   toggleEvidenceReviewItemDecision,
 } from "../domain/services/EvidenceReviewPresentationService";
+import { createEvidenceExperiencePresentation } from "../domain/services/EvidenceExperiencePresentationService";
+import { createEvidenceSuccessNavigation } from "../domain/services/EvidenceSuccessNavigationService";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
@@ -17,8 +19,10 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
+  const experience = createEvidenceExperiencePresentation(review);
   const status = review.status;
-  const canEdit = ["pending", "commit_failed", "partially_committed"].includes(status);
+  const canEdit = ["pending", "commit_failed"].includes(status);
+  const canContinue = status === "partially_committed";
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
   const toggleItem = (item) => {
     setItemDecisions((current) =>
@@ -26,14 +30,17 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
     );
   };
 
+  if (status === "confirmed") return <EvidenceSavedScreen experience={experience} />;
+
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pb-32 pt-8 sm:py-10">
         <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--primary)]" href="/log">← Back to Log</Link>
-        <header className="mt-3">
-          <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--primary)]">Evidence Review</p>
-          <h1 className="mt-2 text-3xl font-extrabold text-[var(--text-primary)]">Is this what you meant to log?</h1>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Check what PhysiqueOS detected. You can exclude anything that should not become part of your history.</p>
+        <header aria-label={experience.reviewingTitle} aria-live="polite" className="mt-3">
+          <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--primary)]">{experience.eyebrow}</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-[var(--text-primary)]">Does this look right?</h1>
+          {experience.friendlyDate && <p className="mt-3 text-sm font-bold text-[var(--text-secondary)]">{experience.friendlyDate}</p>}
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{experience.reviewingBody} Review what PhysiqueOS understood before saving it. You can exclude anything that should not become part of your history.</p>
         </header>
 
         <div className="mt-6 space-y-4">
@@ -44,7 +51,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
 
         {hasCommitFailure(review) && (
           <Card className="mt-6" variant="warning">
-            <div className="flex gap-3"><AlertTriangle aria-hidden="true" size={20} /><div><h2 className="font-extrabold">Processing paused safely</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">Retry to continue. Steps that already completed will not run again.</p></div></div>
+            <div className="flex gap-3"><AlertTriangle aria-hidden="true" size={20} /><div><h2 className="font-extrabold">Your photos are saved</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">{canContinue ? "The photo review finished, but its follow-up did not. Finish saving without re-uploading or repeating completed work." : "Saving paused safely. Try again to continue; completed steps will not run again."}</p></div></div>
           </Card>
         )}
 
@@ -68,8 +75,8 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
           <input name="reviewId" type="hidden" value={review.id} />
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(evidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
-          {canEdit ? (
-            <ConfirmButton disabled={!presentation.summary.included || blockingPhotoIssue} retry={status === "partially_committed"} />
+          {canEdit || canContinue ? (
+            <ConfirmButton disabled={!canContinue && (!presentation.summary.included || blockingPhotoIssue)} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><ReprocessButton /></form>}
@@ -98,8 +105,52 @@ function EvidenceCard({ canEdit, item, onToggle }) {
 
       {item.exercises?.length > 0 && <section><h3 className="text-sm font-extrabold text-[var(--text-primary)]">Exercises</h3><div className="mt-3 space-y-4">{item.exercises.map((exercise, index) => <div key={`${exercise.name}-${index}`}><p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>{exercise.sets.length ? <ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{exercise.sets.map((set, setIndex) => <li key={`${set}-${setIndex}`}>• {set}</li>)}</ul> : <p className="mt-1 text-sm text-[var(--text-muted)]">Set details unavailable</p>}</div>)}</div></section>}
 
+      {item.meals?.length > 0 && (
+        <section>
+          <div className="flex items-end justify-between gap-3">
+            <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Meals</h3>
+            <p className="text-xs font-semibold text-[var(--text-muted)]">
+              {item.meals.reduce((count, meal) => count + meal.foodCount, 0)} foods
+            </p>
+          </div>
+          <div className="mt-3 space-y-2">
+            {item.meals.map((meal) => (
+              <details className="rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)]" key={meal.id ?? meal.name}>
+                <summary className="cursor-pointer list-none px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold text-[var(--text-primary)]">{meal.name}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{meal.summary}</p>
+                    </div>
+                    <span className="shrink-0 text-xs font-bold text-[var(--text-muted)]">
+                      {meal.foodCount} {meal.foodCount === 1 ? "food" : "foods"}
+                    </span>
+                  </div>
+                </summary>
+                <ul className="space-y-3 border-t border-[var(--divider)] px-3 py-3">
+                  {meal.foods.map((food, index) => (
+                    <li className="flex items-start justify-between gap-3 text-sm" key={food.id ?? `${food.name}-${index}`}>
+                      <div>
+                        <p className="font-bold text-[var(--text-primary)]">{food.name}</p>
+                        {(food.brand || food.serving) && (
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                            {[food.brand, food.serving].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                      {food.calories && <span className="shrink-0 font-bold text-[var(--text-secondary)]">{food.calories}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+          {item.reconciliation && <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{item.reconciliation}</p>}
+        </section>
+      )}
+
       {item.type === "photos" && <PhotoPreviews object={item.object} />}
-      {(item.sourceFiles.length > 0 || item.typedEvidence) && <details className="rounded-xl bg-[var(--surface-muted)]"><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-extrabold text-[var(--text-secondary)]">Original details</summary><div className="space-y-3 border-t border-[var(--divider)] p-3">{item.sourceFiles.length > 0 && <div><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-muted)]">Source files</p><ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{item.sourceFiles.map((file) => <li className="break-all" key={file}>{file}</li>)}</ul></div>}{item.typedEvidence && <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{item.typedEvidence}</p>}</div></details>}
+      {item.type !== "nutrition" && (item.sourceFiles.length > 0 || item.typedEvidence) && <details className="rounded-xl bg-[var(--surface-muted)]"><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-extrabold text-[var(--text-secondary)]">Original details</summary><div className="space-y-3 border-t border-[var(--divider)] p-3">{item.sourceFiles.length > 0 && <div><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-muted)]">Source files</p><ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{item.sourceFiles.map((file) => <li className="break-all" key={file}>{file}</li>)}</ul></div>}{item.typedEvidence && <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{item.typedEvidence}</p>}</div></details>}
 
       <button
         aria-label={`${item.included ? "Exclude" : "Include"} ${item.title} ${item.date ?? ""}`.trim()}
@@ -114,14 +165,14 @@ function EvidenceCard({ canEdit, item, onToggle }) {
   );
 }
 
-function ConfirmButton({ disabled, retry }) {
+function ConfirmButton({ disabled, retry, savingLabel }) {
   const { pending } = useFormStatus();
-  return <button className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? "Logging evidence..." : retry ? "Retry logging evidence" : "Log included evidence"}</button>;
+  return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Finishing your upload\u2026" : savingLabel) : retry ? "Finish saving" : "Save included evidence"}</button>;
 }
 
 function ReprocessButton() {
   const { pending } = useFormStatus();
-  return <button className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pending} type="submit">{pending ? "Refreshing review..." : "Reprocess review"}</button>;
+  return <button className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pending} type="submit">{pending ? "Reading upload again\u2026" : "Read upload again"}</button>;
 }
 
 function DiscardReviewControl({ action, reviewId }) {
@@ -154,6 +205,26 @@ function DiscardReviewControl({ action, reviewId }) {
 function DiscardSubmitButton() {
   const { pending } = useFormStatus();
   return <button className="min-h-12 w-full cursor-pointer rounded-2xl bg-red-600 px-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={pending} type="submit">{pending ? "Discarding..." : "Discard review"}</button>;
+}
+
+function EvidenceSavedScreen({ experience }) {
+  const [continueNavigation] = useState(() =>
+    createEvidenceSuccessNavigation((destination) => {
+      window.location.assign(destination);
+    })
+  );
+
+  return (
+    <main className="app-surface min-h-screen">
+      <section aria-live="polite" className="mx-auto flex min-h-screen max-w-[393px] flex-col items-center justify-center px-6 pb-24 text-center" role="status">
+        {experience.friendlyDate && <p className="mb-7 text-sm font-bold text-[var(--text-secondary)]">{experience.friendlyDate}</p>}
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-success)] text-[var(--chart-1)]"><Check aria-hidden="true" size={30} strokeWidth={3} /></span>
+        <h1 className="mt-7 text-3xl font-extrabold text-[var(--text-primary)]">{experience.savedTitle}</h1>
+        <p className="mt-3 max-w-xs text-base leading-7 text-[var(--text-secondary)]">{experience.savedBody}</p>
+        <button className="mt-9 min-h-14 w-full rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" onClick={continueNavigation} type="button">Continue</button>
+      </section>
+    </main>
+  );
 }
 
 function PhotoPreviews({ object }) { const photos = (object.photos ?? []).filter((photo) => photo.active !== false); return <div className="grid grid-cols-3 gap-2">{photos.map((photo, index) => <EvidenceImage alt={`${photo.view ?? "Photo"} ${photo.pose ?? ""}`} className="aspect-[3/4] w-full rounded-xl object-cover" key={photo.id ?? index} src={privateEvidenceUrl(photo.storage_path ?? photo.imagePath)} />)}</div>; }

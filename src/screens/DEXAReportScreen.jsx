@@ -3,10 +3,11 @@ import { ArrowLeft, ScanLine } from "lucide-react";
 import EvidenceReportContext from "../components/progress/EvidenceReportContext";
 import ProgressLineChart from "../components/progress/ProgressLineChart";
 import ReportDrawer from "../components/progress/ReportDrawer";
+import TrainingTimelineSelector from "../components/training/TrainingTimelineSelector";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 
-export default function DEXAReportScreen({ from, report }) {
+export default function DEXAReportScreen({ evidenceContext, from, report }) {
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-24">
@@ -33,10 +34,16 @@ export default function DEXAReportScreen({ from, report }) {
           </div>
         </header>
 
-        <EvidenceReportContext
-          mode="related-goals"
-          relatedGoals={report.relatedGoals}
-        />
+        {evidenceContext && (
+          <div data-testid="dexa-evidence-context">
+            <TrainingTimelineSelector
+              ariaLabel="DEXA evidence context"
+              currentPath="/progress/dexa"
+              preservedParams={{ from }}
+              timeline={evidenceContext}
+            />
+          </div>
+        )}
 
         {report.latestScan && (
           <Card className="mb-4 grid grid-cols-[1fr_auto] gap-3" padding="sm">
@@ -249,10 +256,13 @@ export default function DEXAReportScreen({ from, report }) {
           </ReportDrawer>
         </div>
 
-        <EvidenceReportContext
-          dataSources={report.dataSources}
-          mode="data-sources"
-        />
+        <div className="mt-4 space-y-4">
+          <EvidenceReportContext
+            dataSources={report.dataSources}
+            flush
+            mode="data-sources"
+          />
+        </div>
       </div>
     </main>
   );
@@ -313,14 +323,14 @@ function Delta({ label, value }) {
 function MetricRows({ rows }) {
   return (
     <div className="space-y-2">
-      {rows.map(([label, value, unit]) => (
+      {rows.map(([label, value, unit, precision = 1]) => (
         <div
           className="flex items-center justify-between rounded-[12px] bg-[var(--surface-muted)] px-3 py-2"
           key={label}
         >
           <p className="text-sm font-bold text-slate-600">{label}</p>
           <p className="text-sm font-extrabold text-slate-950">
-            {Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "Pending"}
+            {Number.isFinite(value) ? `${value.toFixed(precision)}${unit}` : "Unavailable"}
           </p>
         </div>
       ))}

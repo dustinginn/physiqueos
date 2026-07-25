@@ -1546,7 +1546,7 @@ async function createDexaEvidencePacket({ formData, user }) {
     .getAll("dexaPdf")
     .filter((file) => typeof file.arrayBuffer === "function" && file.size > 0);
   const now = new Date().toISOString();
-  const pdfInterpretation = interpretPdfEvidence({
+  const pdfInterpretation = await interpretPdfEvidence({
     capturedAt: now,
     files:
       files.length > 0
@@ -1555,7 +1555,7 @@ async function createDexaEvidencePacket({ formData, user }) {
               capturedAt: now,
               fileName: file.name,
               id: `lab_dexa_pdf_${Date.now()}_${index + 1}`,
-              text: await getUploadText(file),
+              buffer: Buffer.from(await file.arrayBuffer()),
             }))
           )
         : [

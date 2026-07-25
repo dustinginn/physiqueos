@@ -1,6 +1,5 @@
 import localFont from "next/font/local";
 import FloatingBottomNavigation from "../components/navigation/FloatingBottomNavigation";
-import ThemeScript from "../components/theme/ThemeScript";
 import ThemeSwitch from "../components/theme/ThemeSwitch";
 import "./globals.css";
 
@@ -25,7 +24,6 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <body>
-        <ThemeScript />
         {children}
         <FloatingBottomNavigation />
         <ThemeSwitch />

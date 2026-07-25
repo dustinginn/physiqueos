@@ -3,30 +3,31 @@ import Card from "../ui/Card";
 
 export default function EvidenceReportContext({
   dataSources = [],
+  flush = false,
   mode = "all",
   relatedGoals = [],
 }) {
   if (mode === "related-goals") {
-    return <RelatedGoalsCard relatedGoals={relatedGoals} />;
+    return <RelatedGoalsCard flush={flush} relatedGoals={relatedGoals} />;
   }
 
   if (mode === "data-sources") {
-    return <DataSourcesCard dataSources={dataSources} />;
+    return <DataSourcesCard dataSources={dataSources} flush={flush} />;
   }
 
   return (
     <>
-      <RelatedGoalsCard relatedGoals={relatedGoals} />
-      <DataSourcesCard dataSources={dataSources} />
+      <RelatedGoalsCard flush={flush} relatedGoals={relatedGoals} />
+      <DataSourcesCard dataSources={dataSources} flush={flush} />
     </>
   );
 }
 
-function RelatedGoalsCard({ relatedGoals = [] }) {
+function RelatedGoalsCard({ flush = false, relatedGoals = [] }) {
   if (relatedGoals.length === 0) return null;
 
   return (
-    <div className="mb-4">
+    <div className={flush ? "" : "mb-4"}>
       <Card className="space-y-2" padding="sm">
         <h2 className="text-sm font-extrabold text-slate-950">Related Goals</h2>
         <div className="flex flex-wrap gap-2">
@@ -45,11 +46,11 @@ function RelatedGoalsCard({ relatedGoals = [] }) {
   );
 }
 
-function DataSourcesCard({ dataSources = [] }) {
+function DataSourcesCard({ dataSources = [], flush = false }) {
   if (dataSources.length === 0) return null;
 
   return (
-    <Card className="mt-4 space-y-2" padding="sm">
+    <Card className={`${flush ? "" : "mt-4"} space-y-2`} padding="sm">
       <h2 className="text-sm font-extrabold text-slate-950">Data Sources</h2>
       <div className="grid gap-2">
         {dataSources.map((source) => (

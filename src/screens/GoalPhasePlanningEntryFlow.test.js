@@ -1,0 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { resolvePhasePlanningEntry } from "../domain/services/GoalEditPhaseDraftService";
+const source=fs.readFileSync(path.resolve(process.cwd(),"src/screens/GoalEditWizardScreen.jsx"),"utf8");
+describe("Goal phase-planning entry reconciliation",()=>{
+ it("routes phase entry through the phase-planning contract",()=>{const draft={phaseEditing:{capability:{available:true},workingAuthoredPhases:[{id:"phase_1"}],intentPlanning:{mode:"idle"}}};const resolved=resolvePhasePlanningEntry(draft);expect(resolved.phaseEditing).toMatchObject({recommendationDecision:"existing_review",intentPlanning:{mode:"accepted"}});expect(source).toContain("resolvePhasePlanningEntry(selectedDraft)");expect(source).toContain('moved.currentStep==="phases"?resolvePhasePlanningEntry(moved)');expect(source).toContain("case GoalEditSection.PHASES");expect(source).toContain('data-editor-type="phase_editor"');});
+ it("uses broad intent-first copy and removes unavailable mic commentary from the active entry",()=>{const entry=source.slice(source.indexOf("function PlanIntentEntry"),source.indexOf("function CanonicalSuggestionReview"));expect(entry).toContain("Tell us how you envision the phases");expect(entry).toContain("Describe how you expect this goal to unfold");expect(entry).toContain("Interpret my plan");expect(entry).toContain("Keep this goal continuous");expect(entry).not.toContain("Voice transcription is not connected here yet")});
+ it("hides generic Continue until the phase section is resolved",()=>{expect(source).toContain('step==="phases"&&!isPhaseSectionResolved(draft)');expect(source).toContain('if(step==="phases"&&!isPhaseSectionResolved(draft))return draft')});
+ it("uses valid-suggestion language only inside the gated review",()=>{const review=source.slice(source.indexOf("function CanonicalSuggestionReview"),source.indexOf("function TextList"));expect(review).toContain("Use this structure");expect(review).toContain("Customize phases");expect(review).toContain("Describe different phases");expect(review).not.toContain(">Customize suggested phases<")});
+ it("keeps shared shell safe-area clearance across every section",()=>{expect(source).toContain("max-w-[393px]");expect(source).toContain("pb-[calc(8rem+env(safe-area-inset-bottom))]");expect(source).not.toMatch(/fixed.*(?:Continue|Prepare final review)/)});
+});

@@ -1,3 +1,117 @@
+export const PHOTO_INTERPRETATION_SCHEMA_VERSION = "photo_interpretation_v2";
+
+export const PHOTO_INTERPRETATION_METRICS = Object.freeze([
+  "leanness",
+  "abdominal_definition",
+  "whole_body_softness",
+  "muscularity",
+  "visual_stability",
+  "unknown",
+]);
+
+export const PHOTO_INTERPRETATION_DIRECTIONS = Object.freeze([
+  "increased",
+  "decreased",
+  "stable",
+  "mixed",
+  "insufficient",
+  "unknown",
+]);
+
+export const PHOTO_INTERPRETATION_MAGNITUDES = Object.freeze([
+  "subtle",
+  "moderate",
+  "pronounced",
+  "unknown",
+]);
+
+export function normalizeStructuredPhotoSemantics(
+  values = [],
+  {
+    comparisonSessionId = null,
+    contractionState = "unknown",
+    pose = "unknown",
+    bodyView = "unknown",
+    sourceEvidenceIds = [],
+    provenance = {},
+  } = {}
+) {
+  return (Array.isArray(values) ? values : []).map((value) => {
+    const metric = String(value?.metric ?? "unknown");
+    const direction = String(value?.direction ?? "unknown");
+    const magnitude = String(value?.magnitude ?? "unknown");
+    const limitations = normalizeStringList(value?.limitations);
+    const confidence = normalizeConfidence(value?.confidence);
+
+    validateStructuredPhotoSemantic({
+      ...value,
+      confidence,
+      direction,
+      limitations,
+      magnitude,
+      metric,
+    });
+
+    return {
+      schemaVersion: PHOTO_INTERPRETATION_SCHEMA_VERSION,
+      region: String(value?.region ?? "Photo evidence"),
+      metric,
+      direction,
+      magnitude,
+      change: String(value?.change ?? ""),
+      confidence,
+      limitations,
+      pose: String(value?.pose ?? pose),
+      bodyView: String(value?.bodyView ?? bodyView),
+      contractionState: String(value?.contractionState ?? contractionState),
+      comparisonSessionId: value?.comparisonSessionId ?? comparisonSessionId,
+      sourceEvidenceIds: normalizeStringList(
+        value?.sourceEvidenceIds?.length ? value.sourceEvidenceIds : sourceEvidenceIds
+      ),
+      provenance: {
+        ...provenance,
+        ...(value?.provenance ?? {}),
+        schemaVersion: PHOTO_INTERPRETATION_SCHEMA_VERSION,
+      },
+    };
+  });
+}
+
+export function validateStructuredPhotoSemantic(value = {}) {
+  if (!PHOTO_INTERPRETATION_METRICS.includes(value.metric)) {
+    throw new Error(`Unsupported Photo interpretation metric: ${value.metric}`);
+  }
+  if (!PHOTO_INTERPRETATION_DIRECTIONS.includes(value.direction)) {
+    throw new Error(`Unsupported Photo interpretation direction: ${value.direction}`);
+  }
+  if (!PHOTO_INTERPRETATION_MAGNITUDES.includes(value.magnitude)) {
+    throw new Error(`Unsupported Photo interpretation magnitude: ${value.magnitude}`);
+  }
+  if (value.direction === "insufficient" && !value.limitations?.length) {
+    throw new Error("Insufficient Photo interpretation requires a limitation.");
+  }
+  if (
+    value.metric === "unknown" &&
+    !["unknown", "insufficient"].includes(value.direction)
+  ) {
+    throw new Error("Unknown Photo metric cannot carry a directional conclusion.");
+  }
+  if (
+    value.metric === "visual_stability" &&
+    !["stable", "mixed", "insufficient", "unknown"].includes(value.direction)
+  ) {
+    throw new Error("Visual stability cannot use an increasing or decreasing direction.");
+  }
+  if (
+    value.bodyFatPercentage != null ||
+    value.leanMass != null ||
+    value.fatMass != null ||
+    value.numericBodyCompositionValue != null
+  ) {
+    throw new Error("Photo interpretation cannot contain numeric body-composition measurements.");
+  }
+}
+
 export function normalizePhotoInterpretationToStructuredObservations(interpretation = {}) {
   const observations = [];
 
@@ -79,6 +193,17 @@ export function normalizePhotoInterpretationToStructuredObservations(interpretat
   }
 
   return uniqueObservationObjects(observations).slice(0, 24);
+}
+
+function normalizeConfidence(value) {
+  const confidence = String(value ?? "low").toLowerCase();
+  return ["high", "moderate", "low", "unknown"].includes(confidence)
+    ? confidence
+    : "unknown";
+}
+
+function normalizeStringList(values) {
+  return [...new Set((Array.isArray(values) ? values : []).map(String).filter(Boolean))].sort();
 }
 
 export function inferPhotoObservationRegion(value = "") {

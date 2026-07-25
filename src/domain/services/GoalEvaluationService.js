@@ -1,6 +1,7 @@
 import { GoalConfidenceService } from "./GoalConfidenceService";
 import { getLocalDateKey } from "../utils/localDate";
 import { createBodyCompositionEstimate, formatBodyCompositionRange } from "./BodyCompositionEstimateService";
+import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -9,6 +10,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PROJECTION_BUCKET_DAYS = 7;
 const PROJECTION_WINDOW_RADIUS_DAYS = 3;
 const ROLLING_TREND_WINDOW_DAYS = 7;
+const LEAN_MASS_PRESERVATION_RATIO = 0.95;
 
 export function createGoalEvaluationService() {
   return {
@@ -24,7 +26,8 @@ export function createGoalEvaluationService() {
       now = new Date(),
     } = {}) {
       const evidence = {
-        dexaScans: sortByDate(dexaScans, "measuredAt"),
+        dexaScans: selectValidDexaScans(dexaScans),
+        invalidDexaCount: dexaScans.length - selectValidDexaScans(dexaScans).length,
         weightEntries: sortByDate(weightEntries, "measuredAt"),
         progressPhotos: sortByDate(progressPhotos, "date"),
         protocols,
@@ -67,6 +70,7 @@ function evaluateGoal(goal, evidence) {
 
 function evaluateVisibleAbs(goal, evidence) {
   const latestDEXA = evidence.dexaScans.at(-1) ?? null;
+  const explicitlyCompleted = goal?.status === "completed" && goal?.completion?.userConfirmed === true;
 
   if (!latestDEXA) {
     return createEvaluation({
@@ -74,7 +78,7 @@ function evaluateVisibleAbs(goal, evidence) {
       title: "Visible Abs",
       current: "Pending",
       target: "Visible",
-      summary: "Add DEXA evidence to calibrate progress toward visible abs.",
+      summary: missingDexaSummary(evidence, "calibrate progress toward visible abs"),
       progress: 0,
       confidence: 0,
       missingEvidence: ["dexa_scan", "progress_photos"],
@@ -82,6 +86,7 @@ function evaluateVisibleAbs(goal, evidence) {
   }
 
   const bodyCompositionEstimate = getBodyCompositionEstimate(latestDEXA, evidence);
+  const numericalThresholdReached = latestDEXA.bodyFatPercentage <= (goal.supportingBodyFatRange?.max ?? 9);
   const currentBodyFatEstimate = bodyCompositionEstimate?.pointEstimateBodyFatPercent ?? null;
   const bodyFatTrend = getBodyFatTrend(evidence.dexaScans);
   const postDexaLoss = getWeightLossAfterDate(
@@ -167,7 +172,9 @@ function evaluateVisibleAbs(goal, evidence) {
     evidence,
     findings,
     missingEvidence:
-      currentBodyFatEstimate === null
+      explicitlyCompleted
+        ? []
+        : currentBodyFatEstimate === null
         ? ["current_body_fat_calibration"]
         : ["visual_confirmation_at_rest"],
   });
@@ -189,8 +196,12 @@ function evaluateVisibleAbs(goal, evidence) {
     title: "Visible Abs",
     current: "Lower abs",
     target: "Visible at rest",
-    summary: "Keep executing the plan.",
-    progress,
+    summary: explicitlyCompleted
+      ? "Visible Abs at Rest is complete. You finished the cut at 7.7% body fat while preserving lean mass."
+      : numericalThresholdReached
+      ? "DEXA threshold reached. A relaxed photo set is the final visual check."
+      : "Keep executing the plan.",
+    progress: numericalThresholdReached ? null : progress,
     confidence: goalConfidence,
     findings,
     recommendations: [
@@ -208,7 +219,16 @@ function evaluateVisibleAbs(goal, evidence) {
       currentBodyFatEstimate === null
         ? ["current_body_fat_calibration"]
         : ["visual_confirmation_at_rest"],
-    projection,
+    projection: numericalThresholdReached ? null : projection,
+    lifecycleState: explicitlyCompleted ? "achieved" : numericalThresholdReached ? "awaiting_confirmation" : "active",
+    thresholdStatus: numericalThresholdReached ? "complete" : "in_progress",
+    confirmationType: numericalThresholdReached ? "relaxed_progress_photos" : null,
+    confirmationStatus: explicitlyCompleted ? "confirmed" : numericalThresholdReached ? "pending" : null,
+    terminalReason: explicitlyCompleted ? "User confirmed the final qualified Photo Event." : numericalThresholdReached ? "DEXA body-composition threshold reached." : null,
+    requiredAction: explicitlyCompleted ? "Choose the next goal." : numericalThresholdReached ? "Review a qualified relaxed progress-photo set." : null,
+    actionLabel: explicitlyCompleted ? "View completion" : numericalThresholdReached ? "Review Visible Abs goal" : null,
+    actionHref: explicitlyCompleted && goal.completion?.evidence?.finalPhotoSessionId ? `/briefings/photo/${goal.completion.evidence.finalPhotoSessionId}` : numericalThresholdReached ? "/goals/visible-abs" : null,
+    transitionReady: explicitlyCompleted,
     metadata: {
       currentBodyFatEstimate,
       currentBodyFatEstimateRange:
@@ -216,6 +236,11 @@ function evaluateVisibleAbs(goal, evidence) {
       bodyCompositionEstimate,
       postDexaLoss,
       bodyFatTrend,
+      projectionUnavailableReason: projection && !numericalThresholdReached
+        ? null
+        : numericalThresholdReached
+          ? "The numerical body-composition threshold is reached; completion now depends on visual confirmation at rest."
+          : "Validated evidence does not currently support a finish-date estimate.",
     },
   });
 }
@@ -229,7 +254,7 @@ function evaluateBodyFat(goal, evidence) {
       title: "Maintenance",
       current: "Pending",
       target: formatGoalTarget(goal),
-      summary: "Add DEXA evidence to calibrate body-fat progress.",
+      summary: missingDexaSummary(evidence, "calibrate body-fat progress"),
       progress: 0,
       confidence: 0,
       missingEvidence: ["dexa_scan"],
@@ -238,6 +263,7 @@ function evaluateBodyFat(goal, evidence) {
 
   const targetMin = goal.targetRange?.min ?? 8;
   const targetMax = goal.targetRange?.max ?? 9;
+  const belowTargetRange = latestDEXA.bodyFatPercentage < targetMin;
   const bodyCompositionEstimate = getBodyCompositionEstimate(latestDEXA, evidence);
   const currentBodyFatEstimate = bodyCompositionEstimate?.pointEstimateBodyFatPercent ?? null;
   const progressValue = currentBodyFatEstimate ?? latestDEXA.bodyFatPercentage;
@@ -348,7 +374,9 @@ function evaluateBodyFat(goal, evidence) {
     title: "Maintenance",
     current: `${latestDEXA.bodyFatPercentage.toFixed(1)}%`,
     target: `${targetMin}-${targetMax}%`,
-    summary: "Body-fat trend is moving toward the target range.",
+    summary: belowTargetRange
+      ? `Current DEXA is ${latestDEXA.bodyFatPercentage.toFixed(1)}%, below the ${targetMin}-${targetMax}% maintenance range. Establishing maintenance is the next decision.`
+      : "Body-fat trend is moving toward the target range.",
     progress,
     confidence: goalConfidence,
     findings,
@@ -358,6 +386,11 @@ function evaluateBodyFat(goal, evidence) {
     confidenceFactors,
     missingEvidence: ["next_dexa_confirmation"],
     projection: projectionWithConfidence,
+    lifecycleState: belowTargetRange ? "transition_ready" : "active",
+    thresholdStatus: belowTargetRange ? "exceeded" : "in_progress",
+    terminalReason: belowTargetRange ? "The cut threshold has been reached and the current result is below the intended maintenance range." : null,
+    requiredAction: belowTargetRange ? "Decide how to establish the maintenance phase." : null,
+    transitionReady: belowTargetRange,
     metadata: {
       currentBodyFatEstimate,
       currentBodyFatEstimateRange: formatBodyCompositionRange(bodyCompositionEstimate),
@@ -367,8 +400,8 @@ function evaluateBodyFat(goal, evidence) {
     },
     presentation: {
       mode: "supporting_objective",
-      status: projection ? "Entering Target Range" : "On Track",
-      detail: "High Confidence",
+      status: belowTargetRange ? "Ready for next phase" : projection ? "Entering Target Range" : "On Track",
+      detail: belowTargetRange ? "Currently below target range" : "High Confidence",
       label: "Forecast",
     },
   });
@@ -384,15 +417,17 @@ function evaluateLeanMass(goal, evidence) {
       title: "Lean Mass",
       current: "Pending",
       target: "Preserve",
-      summary: "Add DEXA evidence to calibrate lean-mass status.",
+      summary: missingDexaSummary(evidence, "calibrate lean-mass status"),
       progress: 0,
       confidence: 0,
       missingEvidence: ["dexa_scan"],
     });
   }
 
-  const referenceLeanMass = 149.1;
+  const baseline = evidence.dexaScans.find((scan) => scan.measuredAt === "2026-05-24") ?? null;
+  const referenceLeanMass = baseline?.leanMass?.value ?? 149.1;
   const preservedRatio = leanMass / referenceLeanMass;
+  const achieved = preservedRatio >= LEAN_MASS_PRESERVATION_RATIO;
   const progress = clamp(Math.round(preservedRatio * 86), 0, 86);
   const findings = [
     createFinding({
@@ -418,8 +453,10 @@ function evaluateLeanMass(goal, evidence) {
     title: "Lean Mass",
     current: `${leanMass.toFixed(1)} ${latestDEXA.leanMass.unit}`,
     target: "Preserve",
-    summary: "Lean mass remains provisionally preserved between scans.",
-    progress,
+    summary: achieved
+      ? `Lean tissue was preserved at ${leanMass.toFixed(1)} ${latestDEXA.leanMass.unit}, ${formatSigned(leanMass - referenceLeanMass)} ${latestDEXA.leanMass.unit} from the May 24 baseline.`
+      : "Lean-mass preservation needs review.",
+    progress: achieved ? null : progress,
     confidence: getGoalConfidence({
       confidenceFactors,
       evidence,
@@ -431,14 +468,40 @@ function evaluateLeanMass(goal, evidence) {
       createRecommendation("preserve_protein", "Keep protein and training consistency high."),
     ],
     confidenceFactors,
-    missingEvidence: ["next_dexa_confirmation"],
+    missingEvidence: achieved ? [] : ["next_dexa_confirmation"],
+    lifecycleState: achieved ? "achieved" : "active",
+    thresholdStatus: achieved ? "complete" : "in_progress",
+    terminalReason: achieved ? "Jul 18 DEXA confirms lean-tissue preservation through the cut." : null,
+    requiredAction: achieved ? "Review the next-goal decision." : null,
+    transitionReady: achieved,
+    achievementEvidence: achieved ? {
+      baselineDate: baseline?.measuredAt ?? "2026-05-24",
+      baselineLeanMass: referenceLeanMass,
+      currentDate: latestDEXA.measuredAt,
+      currentLeanMass: leanMass,
+      delta: Number((leanMass - referenceLeanMass).toFixed(1)),
+      unit: latestDEXA.leanMass.unit,
+      preservationRatio: Number(preservedRatio.toFixed(4)),
+      preservationToleranceRatio: LEAN_MASS_PRESERVATION_RATIO,
+      decisionBasis: "latest_lean_mass_at_or_above_preservation_tolerance",
+    } : null,
     presentation: {
       mode: "supporting_objective",
-      status: "Stable",
-      detail: "Last DEXA",
+      status: achieved ? "Achieved" : "Under review",
+      detail: achieved ? `${leanMass.toFixed(1)} lb latest · ${formatPresentationDelta(leanMass - referenceLeanMass)} lb` : "Last DEXA",
       label: "Trend",
     },
   });
+}
+
+function formatPresentationDelta(value) {
+  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(1)}`;
+}
+
+function missingDexaSummary(evidence, purpose) {
+  return evidence.invalidDexaCount > 0
+    ? `The latest DEXA is incomplete and cannot ${purpose}. Review or reprocess that scan.`
+    : `Add DEXA evidence to ${purpose}.`;
 }
 
 function createEvaluation({
@@ -456,6 +519,16 @@ function createEvaluation({
   projection = null,
   metadata = {},
   presentation = null,
+  lifecycleState = "active",
+  thresholdStatus = "in_progress",
+  confirmationType = null,
+  confirmationStatus = null,
+  terminalReason = null,
+  requiredAction = null,
+  actionLabel = null,
+  actionHref = null,
+  achievementEvidence = null,
+  transitionReady = false,
 }) {
   return {
     id: `goal_evaluation_${goal.id}`,
@@ -468,10 +541,7 @@ function createEvaluation({
     summary,
     progress,
     confidence: getConfidenceValue(confidence),
-    goalProgress: {
-      value: progress,
-      label: `${progress}% complete`,
-    },
+    goalProgress: progress == null ? null : { value: progress, label: `${progress}% complete` },
     goalConfidence: normalizeConfidence(confidence),
     findings,
     recommendations,
@@ -480,6 +550,16 @@ function createEvaluation({
     projection,
     metadata,
     presentation,
+    lifecycleState,
+    thresholdStatus,
+    confirmationType,
+    confirmationStatus,
+    terminalReason,
+    requiredAction,
+    actionLabel,
+    actionHref,
+    achievementEvidence,
+    transitionReady,
   };
 }
 
@@ -1076,6 +1156,10 @@ function toDateKey(value) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function formatSigned(value) {
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
 function getGoalConfidence({ confidenceFactors, evidence, findings, missingEvidence }) {

@@ -8,6 +8,7 @@ import { createAnalysis, AnalysisTone } from "../../../domain/models/analysis";
 import { createProgressPhoto } from "../../../domain/models/progressPhoto";
 import {
   normalizeProgressPhotoPose,
+  normalizePhotoViewIdentity,
   normalizeProgressPhotoView as normalizeProgressPhotoViewModel,
 } from "../../../domain/models/progressPhotoPoseVocabulary";
 import { interpretPhotoSetWithVision } from "../../../domain/interpreters/PhotoInterpreterService";
@@ -39,6 +40,19 @@ export async function saveProgressPhotoEvidence(formData) {
   const capturedAt = String(formData.get("capturedAt") || getTodayKey());
   const notes = normalizeOptionalText(formData.get("notes"));
   const returnTo = normalizeReturnTo(formData.get("returnTo"));
+  const confirmationPurpose = normalizeOptionalText(formData.get("confirmationPurpose"));
+  const confirmationIntent = confirmationPurpose === "visible_abs_completion" ? {
+    goalId: "goal_visible_abs_at_rest",
+    confirmationPurpose,
+    numericalThresholdComplete: String(formData.get("numericalThresholdComplete")) === "true",
+    visualCriterionComplete: String(formData.get("visualCriterionComplete")) === "true" ? true : String(formData.get("visualCriterionComplete")) === "false" ? false : "uncertain",
+    criterion: "lower_abs_visible_at_rest",
+    requiredPose: "front-relaxed",
+    userConfirmationRequired: String(formData.get("userConfirmationRequired")) !== "false",
+    requestedEvidence: normalizeOptionalText(formData.get("requestedEvidence")) ?? "relaxed_front_photo",
+    sourceContext: normalizeOptionalText(formData.get("sourceContext")) ?? "dexa_event",
+    sourceId: normalizeOptionalText(formData.get("sourceId")),
+  } : null;
 
   if (files.length === 0) throw new Error("Select at least one progress photo.");
   const conditions = createAuthoritativePhotoConditions({
@@ -51,16 +65,36 @@ export async function saveProgressPhotoEvidence(formData) {
   });
 
   const uploadedAt = new Date().toISOString();
-  const requestedPoses = formData.getAll("pose");
-  const defaults = ["front-relaxed", "back-relaxed", "back-flexed"];
+  let requestedIdentities;
+  try { requestedIdentities = JSON.parse(String(formData.get("photoIdentitiesJson") ?? "[]")); }
+  catch { throw new Error("Photo identities are invalid."); }
+  if (!Array.isArray(requestedIdentities) || requestedIdentities.length !== files.length) {
+    throw new Error("Review and confirm an identity for every selected photo.");
+  }
+  if (String(formData.get("originalUnedited")) !== "true") {
+    throw new Error("Confirm that the selected photos are original and unedited.");
+  }
   const provisionalPhotos = [];
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
     await assertValidProgressPhotoFile(file);
-    const category = normalizeCategoryValue(requestedPoses[index] ?? defaults[index] ?? "front-relaxed");
+    const draftIdentity = requestedIdentities[index] ?? {};
+    if (draftIdentity.identityStatus !== "confirmed" || draftIdentity.userConfirmedIdentity !== true) {
+      throw new Error(`Confirm the identity for photo ${index + 1}.`);
+    }
+    const identity = normalizePhotoViewIdentity(draftIdentity);
+    if (identity.poseId === "unknown" || (identity.poseVariant === "other" && !identity.customLabel)) {
+      throw new Error(`Photo ${index + 1} needs a valid pose identity.`);
+    }
     const sourceHash = createPhotoSourceHash(Buffer.from(await file.arrayBuffer()));
-    const storedPath = await storePrivateUpload({ directory: path.join("private", "founder", "photos", "uploads"), file, prefix: `${capturedAt}-${category.view}-${category.pose}` });
-    provisionalPhotos.push({ id: `provisional_photo_${uploadedAt.replace(/\D/g, "")}_${index}`, storage_path: storedPath, source_hash: sourceHash, view: category.view, pose: category.pose, active: true, order: index });
+    const storedPath = await storePrivateUpload({ directory: path.join("private", "founder", "photos", "uploads"), file, prefix: `${capturedAt}-${identity.poseId}` });
+    provisionalPhotos.push({
+      id: `provisional_photo_${uploadedAt.replace(/\D/g, "")}_${index}`,
+      storage_path: storedPath, source_hash: sourceHash, active: true,
+      ...identity, tags: Array.isArray(draftIdentity.tags) ? draftIdentity.tags : [],
+      goalValidationRole: draftIdentity.goalValidationRole ?? "supporting",
+      identityStatus: "confirmed", userConfirmedIdentity: true, sourceOrder: index, order: index,
+    });
   }
   const packageId = `photo_review_${uploadedAt.replace(/\D/g, "")}`;
   const provisionalSession = createProvisionalPhotoSession({ captureDate: capturedAt, photos: provisionalPhotos, conditions });
@@ -70,8 +104,10 @@ export async function saveProgressPhotoEvidence(formData) {
     evidencePackage: {
       package_id: packageId,
       review_metadata: {
-        requiredPoses: ["front-relaxed", "back-relaxed", "back-flexed"],
+        identityReviewComplete: true,
+        photoCount: provisionalPhotos.length,
         provisionalPhotoSessionId: provisionalSession.id,
+        confirmationIntent,
       },
       evidence_objects: [{ ...provisionalSession, provenance: { source_artifact_refs: provisionalPhotos.map((photo) => photo.storage_path) } }],
     },

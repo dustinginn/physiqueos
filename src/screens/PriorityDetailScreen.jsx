@@ -39,6 +39,9 @@ export default function PriorityDetailScreen({ completeAction, priority }) {
           {priority.completable && completeAction ? (
             <form action={completeAction}>
               <input name="priorityId" type="hidden" value={priority.id} />
+              <input name="occurrenceDate" type="hidden" value={priority.completionContext?.occurrenceDate ?? ""} />
+              <input name="dose" type="hidden" value={priority.completionContext?.dose ?? ""} />
+              <input name="protocolId" type="hidden" value={priority.completionContext?.protocolId ?? ""} />
               <ActionButton type="submit">Mark Complete</ActionButton>
             </form>
           ) : (

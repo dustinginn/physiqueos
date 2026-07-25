@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { ArrowLeft, ScanLine } from "lucide-react";
+import { ArrowLeft, Camera, ScanLine } from "lucide-react";
+import ActionButton from "../components/ui/ActionButton";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 
 export default function DEXAEventBriefingScreen({ narrative, preview = false }) {
-  const { hero, snapshot, progress, interpretation, coachInsight, milestones = [] } = narrative;
+  if (!hasCompleteDexaNarrative(narrative)) {
+    return <main className="app-surface mx-auto min-h-screen max-w-[393px] overflow-x-hidden"><div className="px-4 pb-32 pt-10"><Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href={preview ? "/progress/dexa" : "/briefings/review"}><ArrowLeft size={18}/>Back</Link><Card><Eyebrow>DEXA Event Briefing</Eyebrow><h1 className="mt-2 text-xl font-extrabold text-slate-950">This historical briefing is unavailable.</h1><p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Its saved DEXA snapshot is incomplete. Reprocess the source scan before using this briefing for decisions.</p></Card></div></main>;
+  }
+  const { hero, snapshot, progress, interpretation, coachInsight, goalCompletionHandoff, milestones = [] } = narrative;
   return <main className="app-surface mx-auto min-h-screen max-w-[393px] overflow-x-hidden"><div className="px-4 pb-32 pt-10">
     <Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href={preview ? "/progress/dexa" : "/briefings/review"}><ArrowLeft size={18}/>{preview ? "DEXA History" : "Briefing History"}</Link>
     <section className="mb-6 space-y-4 rounded-[28px] border border-indigo-100/80 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/70 p-4 shadow-[0_18px_50px_-30px_rgba(79,70,229,.55)] dark:border-indigo-300/10 dark:from-white/[.07] dark:via-indigo-400/[.05] dark:to-violet-400/[.04]">
@@ -27,8 +31,21 @@ export default function DEXAEventBriefingScreen({ narrative, preview = false }) 
       </Card>
       <Card><Eyebrow>Interpretation</Eyebrow><h2 className="mt-1 text-lg font-extrabold">What this scan means</h2><p className="mt-2 text-sm font-bold leading-6 text-slate-800">{interpretation.opening}</p><Interpret label="Fat loss" value={interpretation.fatLoss}/><Interpret label="Lean tissue" value={interpretation.leanMass}/><Interpret label="Where change occurred" value={interpretation.regional}/>{interpretation.stoodOut&&<Interpret label="What stood out" value={interpretation.stoodOut}/>}<Interpret label="Supporting context" value={interpretation.supportingEvidence}/><Interpret label="Uncertainty" value={interpretation.uncertainty}/></Card>
       <Card className="border-violet-200/70 bg-violet-50/45 dark:border-violet-300/15 dark:bg-violet-300/[.04]"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-violet-700 dark:text-violet-300">Coach’s Insight</p><div className="mt-3 space-y-3"><Coach label="🎉 Biggest Win" value={coachInsight.biggestWin}/><Coach label="💪 What to Protect" value={coachInsight.protect}/><Coach label="👀 What to Watch" value={coachInsight.watch}/><Coach label="🎯 What Comes Next" value={coachInsight.next}/></div></Card>
+      {goalCompletionHandoff?.actionHref&&<Card className="border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-300/15 dark:bg-emerald-300/[.04]"><Eyebrow>Visual confirmation</Eyebrow><h2 className="mt-1 text-lg font-extrabold">One qualified check remains</h2><p className="mb-4 mt-2 text-sm font-semibold leading-6 text-slate-700">{goalCompletionHandoff.question}</p><ActionButton href={goalCompletionHandoff.actionHref} icon={Camera}>{goalCompletionHandoff.actionLabel}</ActionButton></Card>}
     </div>
   </div></main>;
+}
+
+function hasCompleteDexaNarrative(narrative) {
+  const snapshot = narrative?.snapshot;
+  return Boolean(
+    narrative?.hero &&
+    narrative?.progress &&
+    narrative?.interpretation &&
+    narrative?.coachInsight &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(snapshot?.scanDate ?? "")) &&
+    ["weight", "bodyFat", "fatMass", "leanMass"].every((field) => Number.isFinite(snapshot?.[field]))
+  );
 }
 
 function HeroResult({result}){const lean=result.label==="Lean Tissue";const fat=["Fat Mass","Body Fat","Trunk Fat"].includes(result.label);const tone=lean?"border-blue-200/70 bg-blue-100/65 dark:border-blue-300/20 dark:bg-blue-400/[.12]":fat?"border-orange-200/70 bg-orange-100/65 dark:border-orange-300/20 dark:bg-orange-400/[.12]":"border-white/90 bg-white/85 dark:border-white/10 dark:bg-white/[.07]";const semantic=lean?"text-blue-700 dark:text-blue-300":fat?"text-orange-700 dark:text-orange-300":"text-slate-500";const icon=lean?"bg-blue-200/60 dark:bg-blue-300/15":fat?"bg-orange-200/60 dark:bg-orange-300/15":"bg-slate-100 dark:bg-white/10";return <div className={`flex min-h-32 flex-col rounded-2xl border p-3.5 shadow-[0_10px_24px_-18px_rgba(15,23,42,.5)] ${tone}`}><div className="flex items-center gap-1.5"><span aria-hidden className={`rounded-lg p-1 ${icon}`}>{result.emoji}</span><p className={`text-[9px] font-extrabold uppercase tracking-[.09em] ${semantic}`}>{result.label}</p></div><p className="mt-3 text-[25px] font-black leading-none tracking-[-.04em] text-slate-950">{result.value}</p>{result.context&&<p className="mt-auto pt-3 text-[11px] font-bold leading-4 text-slate-500">{result.context}</p>}</div>}

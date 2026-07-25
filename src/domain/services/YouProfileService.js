@@ -45,7 +45,7 @@ export function createYouProfileService({ repositories }) {
           title: "PhysiqueOS understands your operating system.",
           summary:
             "Your goals, evidence, protocols, integrations, and preferences are connected into one daily operating model.",
-          goals: goals.filter((goal) => goal.status === "active").length,
+          goals: goals.filter((goal) => goal.primary && goal.status === "active").length,
           evidenceSources: connectedSources.length,
           activeProtocols: activeProtocols.length,
           connectedIntegrations: getConnectedIntegrationCount({ dexaScans }),
@@ -66,7 +66,7 @@ export function createYouProfileService({ repositories }) {
         protocols: {
           active: activeProtocols,
           groups: getProtocolGroups(protocols),
-          href: "/profile/protocols",
+          href: "/profile/operating-plan",
         },
         integrations: getIntegrations({ dexaScans }),
         preferences: getPreferences({ user }),
@@ -76,6 +76,10 @@ export function createYouProfileService({ repositories }) {
       };
     },
   };
+}
+
+export function formatActiveGoalCount(count) {
+  return `${Number.isFinite(Number(count)) ? Number(count) : 0} active`;
 }
 
 function emptyProfile() {
@@ -94,7 +98,7 @@ function emptyProfile() {
     goals: { primary: null, supporting: [], href: "/goals" },
     operatingPlan: { href: "/profile/operating-plan", items: [], summary: "Not configured" },
     evidenceSources: [],
-    protocols: { active: [], groups: [], href: "/profile/protocols" },
+    protocols: { active: [], groups: [], href: "/profile/operating-plan" },
     integrations: [],
     preferences: [],
     about: [],

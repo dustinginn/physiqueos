@@ -30,7 +30,7 @@ const configs = {
       "Preserve performance and recovery",
     ],
     coach:
-      "Maintenance is about transitioning from fat loss to stability once the primary goal is achieved. The evidence supports continued progress toward the range, but this should not become a second aggressive cut. The next phase is about arriving lean, then proving the result can be held.",
+      "The current 7.7% result is below the intended 8–9% range. The next decision is a deliberate transition toward stability, not additional aggressive cutting.",
   },
   leanMass: {
     id: GOAL_IDS.leanMass,
@@ -47,7 +47,7 @@ const configs = {
       "Watch recovery and excessive fatigue",
     ],
     coach:
-      "DEXA remains the highest-confidence lean-mass evidence. Progress photos can support confidence when muscularity and fullness appear preserved, but they do not replace scan evidence. The current picture supports preservation, while the next DEXA remains the cleanest confirmation point.",
+      "The May 24 to Jul 18 DEXA comparison confirms that lean mass remained within the established preservation tolerance. This objective is achieved; the next goal remains a separate decision.",
   },
 };
 
@@ -97,6 +97,10 @@ async function getSupportingGoalData(config, goalKey) {
 
   return {
     status: evaluation?.presentation?.status ?? evaluation?.current ?? config.statusFallback,
+    lifecycleState: evaluation?.lifecycleState ?? "active",
+    thresholdStatus: evaluation?.thresholdStatus ?? "in_progress",
+    achievementEvidence: evaluation?.achievementEvidence ?? null,
+    transitionReady: evaluation?.transitionReady ?? false,
     confidence: evaluation?.confidence ?? 0,
     confidenceLabel: getConfidenceLabel(evaluation?.confidence ?? 0),
     evidence:

@@ -9,7 +9,7 @@ export function getBriefingOccurrenceIdentity(artifact = {}) {
   if (type === "event" || cadence === "event") {
     return userId && id ? `${userId}|event|${id}` : null;
   }
-  if (type === "scheduled" && ["daily", "weekly", "monthly"].includes(cadence)) {
+  if (type === "scheduled" && ["daily", "midweek", "weekly", "monthly"].includes(cadence)) {
     if (userId && windowId) return `${userId}|scheduled|${cadence}|${windowId}`;
     if (cadence === "daily" && userId) {
       const date = clean(artifact.generatedAt ?? artifact.createdAt).slice(0, 10);
@@ -28,16 +28,19 @@ export function classifyBriefingCadence(artifact = {}) {
   const type = clean(artifact.artifactType).toLowerCase();
   const windowId = clean(artifact.evidenceWindow?.id).toLowerCase();
   const id = clean(artifact.id).toLowerCase();
-  if (type === "event" || cadence === "event" || artifact.trigger?.evidenceType && !["scheduled", "daily", "weekly", "monthly"].includes(type)) return "event";
-  if (["daily", "weekly", "monthly"].includes(cadence)) return cadence;
+  if (type === "event" || cadence === "event") return "event";
+  if (["daily", "midweek", "weekly", "monthly"].includes(cadence)) return cadence;
   if (windowId.startsWith("daily:")) return "daily";
   if (windowId.startsWith("weekly:")) return "weekly";
+  if (windowId.startsWith("midweek:")) return "midweek";
   if (windowId.startsWith("monthly:")) return "monthly";
-  if (type && type !== "scheduled") return "unknown";
   if (/^daily_briefing_/.test(id)) return "daily";
   if (/^weekly_briefing_/.test(id)) return "weekly";
+  if (/^midweek_briefing_/.test(id)) return "midweek";
   if (/^monthly_briefing_/.test(id)) return "monthly";
   if (/^event_briefing_/.test(id)) return "event";
+  if (artifact.trigger?.evidenceType && !["scheduled", "daily", "weekly", "monthly"].includes(type)) return "event";
+  if (type && type !== "scheduled") return "unknown";
   return "unknown";
 }
 

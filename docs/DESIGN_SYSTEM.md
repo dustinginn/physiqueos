@@ -477,6 +477,20 @@ Evidence Report pages should follow this default structure:
 
 Do not duplicate full analysis on evidence pages. Evidence pages explain what happened and what evidence exists; Daily Briefing and Goal Detail explain what it means.
 
+### Long day-based evidence history
+
+When one calendar day contains multiple evidence records and rendering every child
+record would materially lengthen a reporting page:
+
+* keep the inline page as a compact summary and navigation surface with one entry per day
+* open the day's child records in the shared production drawer
+* provide a complete history drawer when broader browsing is useful
+* preserve canonical date scope, child ordering, and links to any first-class detail page
+
+Use a route instead of a drawer when the destination is already a first-class
+canonical page with meaningful deeper navigation or editing. Do not replace those
+detail pages with drawers.
+
 ---
 
 # Iconography Governance

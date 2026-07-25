@@ -120,7 +120,184 @@ describe("reprocessPendingReviewInPlace", () => {
     active.review.reprocessing = { status: "in_progress" };
     await expect(createPendingEvidenceReviewReprocessingService({ repositories: active.repositories }).reprocessPendingReviewInPlace(REVIEW_ID)).rejects.toMatchObject({ code: "REPROCESS_IN_PROGRESS" });
   });
+
+  it("restores bodyweight semantics when a bodyweight-only exercise is reinterpreted as zero-load external weight", async () => {
+    const state = semanticFixture({
+      priorExercise: exerciseFixture("Hanging Leg Raise", [bodyweightSet(16)]),
+      freshExercise: exerciseFixture("Hanging Leg Raise", [zeroLoadSet(16)]),
+      sourceText: "Hanging Leg Raise\n16r bodyweight",
+    });
+    await reprocessSemanticFixture(state);
+    expect(await currentSets(state)).toEqual([expect.objectContaining({
+      reps: 16,
+      load_type: "bodyweight",
+      weight: null,
+      weight_unit: null,
+      measurement_type: "bodyweight_reps",
+      set_type: "bodyweight_reps",
+    })]);
+  });
+
+  it("preserves the stable exercise ID for the same canonical exercise and source order", async () => {
+    const priorExercise = {
+      ...exerciseFixture("Hanging Leg Raise", [bodyweightSet(16)]),
+      id: "exercise_hanging_leg_raise_20260717",
+    };
+    const freshExercise = {
+      ...exerciseFixture("Hanging Leg Raise", [zeroLoadSet(16)]),
+      id: "ex_hanging_leg_raise_5",
+    };
+    const state = semanticFixture({
+      priorExercise,
+      freshExercise,
+      sourceText: "Hanging Leg Raise\n16r bodyweight",
+    });
+    await reprocessSemanticFixture(state);
+    const review = await state.repositories.evidenceReviews.getReviewById(REVIEW_ID);
+    expect(review.interpretedEvidence.evidence_objects[0].exercises[0].id).toBe(
+      "exercise_hanging_leg_raise_20260717"
+    );
+  });
+
+  it.each([
+    ["added Hanging Leg Raise load", "Hanging Leg Raise\n16 reps with added 10 lb", exerciseFixture("Hanging Leg Raise", [weightedSet(16, 10)])],
+    ["weighted Pull-Up", "Pull-Up\n8 reps with added 10 lb", exerciseFixture("Pull-Up", [weightedSet(8, 10)])],
+  ])("keeps %s distinct from plain bodyweight", async (_label, sourceText, freshExercise) => {
+    const state = semanticFixture({
+      priorExercise: exerciseFixture(freshExercise.name, [bodyweightSet(freshExercise.sets[0].reps)]),
+      freshExercise,
+      sourceText,
+    });
+    await reprocessSemanticFixture(state);
+    expect(await currentSets(state)).toEqual([expect.objectContaining({
+      load_type: "external_load",
+      weight: 10,
+      weight_unit: "lb",
+    })]);
+  });
+
+  it("does not rewrite an explicitly assisted bodyweight-capable exercise", async () => {
+    const state = semanticFixture({
+      priorExercise: exerciseFixture("Hanging Leg Raise", [bodyweightSet(16)]),
+      freshExercise: exerciseFixture("Hanging Leg Raise", [zeroLoadSet(16)]),
+      sourceText: "Hanging Leg Raise\n16 reps assisted",
+    });
+    await reprocessSemanticFixture(state);
+    expect(await currentSets(state)).toEqual([expect.objectContaining({
+      load_type: "external_load",
+      weight: 0,
+      weight_unit: "lb",
+    })]);
+  });
+
+  it("normalizes explicit zero additional load for a bodyweight-only exercise", async () => {
+    const state = semanticFixture({
+      priorExercise: exerciseFixture("Pull-Up", [bodyweightSet(8)]),
+      freshExercise: exerciseFixture("Pull-Up", [zeroLoadSet(8)]),
+      sourceText: "Pull-Up\n8 reps with 0 lb additional load",
+    });
+    await reprocessSemanticFixture(state);
+    expect(await currentSets(state)).toEqual([expect.objectContaining({
+      load_type: "bodyweight",
+      weight: null,
+      weight_unit: null,
+    })]);
+  });
+
+  it("keeps a legitimate zero-pound machine set external-load", async () => {
+    const state = semanticFixture({
+      priorExercise: exerciseFixture("Leg Press", [zeroLoadSet(10)]),
+      freshExercise: exerciseFixture("Leg Press", [zeroLoadSet(10)]),
+      sourceText: "Leg Press\n10 reps at 0 lb",
+    });
+    await reprocessSemanticFixture(state);
+    expect(await currentSets(state)).toEqual([expect.objectContaining({
+      load_type: "external_load",
+      weight: 0,
+      weight_unit: "lb",
+    })]);
+  });
+
+  it.each([
+    ["changed reps", exerciseFixture("Front Raise", [bodyweightSet(10)]), exerciseFixture("Front Raise", [zeroLoadSet(12)])],
+    ["changed set count", exerciseFixture("Front Raise", [bodyweightSet(10)]), exerciseFixture("Front Raise", [zeroLoadSet(10), zeroLoadSet(10, 2)])],
+    ["exercise identity mismatch", exerciseFixture("Front Raise", [bodyweightSet(10)]), exerciseFixture("Dumbbell Front Raise", [zeroLoadSet(10)])],
+  ])("does not blindly reuse prior semantics after %s", async (_label, priorExercise, freshExercise) => {
+    const state = semanticFixture({ priorExercise, freshExercise, sourceText: `${freshExercise.name}\n10 reps` });
+    await reprocessSemanticFixture(state);
+    expect((await currentSets(state)).every((set) => set.load_type === "external_load")).toBe(true);
+  });
 });
+
+function semanticFixture({ priorExercise, freshExercise, sourceText }) {
+  const state = fixture();
+  const sourceArtifact = state.evidencePackage.provenance.source_artifacts.find((artifact) => artifact.kind === "typed_evidence");
+  sourceArtifact.text = sourceText;
+  state.review.interpretedEvidence.provenance = structuredClone(state.evidencePackage.provenance);
+  state.review.interpretedEvidence.evidence_objects = [trainingObject([priorExercise])];
+  state.freshExercise = freshExercise;
+  return state;
+}
+
+async function reprocessSemanticFixture(state) {
+  const reinterpret = vi.fn(async () => ({
+    ...correctedPackage(state.evidencePackage),
+    evidence_objects: [trainingObject([state.freshExercise])],
+  }));
+  return createPendingEvidenceReviewReprocessingService({
+    repositories: state.repositories,
+    reinterpret,
+    now: clock(),
+  }).reprocessPendingReviewInPlace(REVIEW_ID);
+}
+
+async function currentSets(state) {
+  const review = await state.repositories.evidenceReviews.getReviewById(REVIEW_ID);
+  return review.interpretedEvidence.evidence_objects[0].exercises[0].sets;
+}
+
+function exerciseFixture(name, sets) {
+  return {
+    id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    name,
+    sets,
+    provenance_ref: "typed_evidence_0",
+  };
+}
+
+function bodyweightSet(reps, setNumber = 1) {
+  return {
+    set_number: setNumber,
+    reps,
+    weight: null,
+    weight_unit: "bodyweight",
+    load_type: "bodyweight",
+    measurement_type: "bodyweight_reps",
+    set_type: "bodyweight_reps",
+    volume: null,
+    duration_seconds: null,
+    provenance_ref: "typed_evidence_0",
+  };
+}
+
+function zeroLoadSet(reps, setNumber = 1) {
+  return weightedSet(reps, 0, setNumber);
+}
+
+function weightedSet(reps, weight, setNumber = 1) {
+  return {
+    set_number: setNumber,
+    reps,
+    weight,
+    weight_unit: "lb",
+    load_type: "external_load",
+    measurement_type: "weighted_reps",
+    set_type: "weighted_reps",
+    volume: reps * weight,
+    duration_seconds: null,
+    provenance_ref: "typed_evidence_0",
+  };
+}
 
 function clock() {
   let tick = 0;

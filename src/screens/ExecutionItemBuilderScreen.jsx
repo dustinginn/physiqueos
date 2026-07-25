@@ -16,6 +16,11 @@ const CADENCES = [["daily","Every day"],["specific_weekdays","Specific days"],["
 
 export default function ExecutionItemBuilderScreen({ action, item }) {
   const config = COPY[item.id];
+  if (!config) return <ExecutionUnavailable/>;
+  return <ConfiguredExecutionItemBuilder action={action} config={config} item={item}/>;
+}
+
+function ConfiguredExecutionItemBuilder({ action, config, item }) {
   const title = item.id === "execution_dexa" ? "DEXA Scan" : item.title;
   const [cadence, setCadence] = useState(config.cadenceLocked ?? item.cadence.type);
   const [days, setDays] = useState(item.preferredSchedule.daysOfWeek ?? []);
@@ -43,6 +48,7 @@ export default function ExecutionItemBuilderScreen({ action, item }) {
     <button className="min-h-12 w-full rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white" type="submit">Save changes</button>
   </form></main>;
 }
+function ExecutionUnavailable(){return <main className="app-surface min-h-screen"><section aria-live="polite" className="mx-auto max-w-[393px] px-4 pb-28 pt-10"><Link className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--text-secondary)]" href="/profile/operating-plan">â† Operating Plan</Link><h1 className="mt-6 text-3xl font-extrabold text-[var(--text-primary)]">This execution item is not available here.</h1><p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">Return to the Operating Plan to review the actions currently available.</p></section></main>}
 function Section({children,title}){return <section className="space-y-3 rounded-2xl bg-[var(--surface-elevated)] p-4"><h2 className="text-base font-extrabold">{title}</h2>{children}</section>}
 function Label({children}){return <span className="mb-2 block text-xs font-extrabold text-[var(--text-muted)]">{children}</span>}
 function ChoiceGroup({label,name,onChange,options,value}){return <div><Label>{label}</Label>{name&&<input name={name} type="hidden" value={value}/>}<div className="grid grid-cols-2 gap-2" role="radiogroup">{options.map(([id,text])=><button aria-checked={value===id} className={`flex min-h-12 items-center rounded-xl border px-3 text-left text-sm font-extrabold ${value===id?"border-[var(--primary)] bg-[var(--surface-accent)] text-[var(--primary)]":"border-[var(--divider)] bg-[var(--surface-muted)]"}`} key={id} onClick={()=>onChange?.(id)} role="radio" type="button">{text}</button>)}</div></div>}

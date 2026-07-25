@@ -4,12 +4,18 @@ import {
   ArrowLeft,
   ChevronRight,
   Dumbbell,
+  MessageCircle,
   Salad,
   Scale,
+  Syringe,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 import OperatingPlanDrawer from "../components/operating-plan/OperatingPlanDrawer";
+import { getOperatingPlanStrategyHref } from "../domain/services/OperatingPlanStrategyDetailService";
+import { formatSupplementExecutionSummary } from "../domain/services/SupplementExecutionManagementService";
+import { formatPeptideExecutionSummary } from "../domain/services/PeptideExecutionManagementService";
+import { DEXA_APPOINTMENT_ID, formatDexaAppointmentSummary } from "../domain/services/DexaAppointmentManagementService";
 
 export default function OperatingPlanScreen({
   activityActivated = false,
@@ -79,6 +85,7 @@ export default function OperatingPlanScreen({
 }
 
 function PlanSection({ section }) {
+  if (section.supplements) return <Card className="space-y-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><Link className="inline-flex min-h-11 items-center text-xs font-extrabold text-[var(--primary)]" href="/profile/operating-plan/supplements/new">Add Supplement</Link></div><div className="space-y-2">{section.items.map((item)=><PlanRow item={item} key={item.id}/>)}</div></Card>;
   if (section.drawer) return <Card className="space-y-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><OperatingPlanDrawer description={section.subtitle} preview={section.preview} title={section.title}>{section.items.map((item)=><PlanRow hideStatus item={item} key={item.id}/>)}</OperatingPlanDrawer></Card>;
   return (
     <Card className="space-y-3">
@@ -133,7 +140,38 @@ function PlanRow({ hideStatus = false, item }) {
 }
 
 export function buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, trainingProtocol }) {
-  const supplements = protocols.filter((protocol) => protocol.category === "supplement");
+  const activeProtocols = protocols.filter((protocol) => protocol.status === "active");
+  const supplements = activeProtocols.filter((protocol) => protocol.category === "supplement");
+  const recoveryProtocols = activeProtocols.filter((protocol) => protocol.category === "recovery");
+  const coachingProtocol = activeProtocols.find((protocol) => protocol.category === "briefings");
+  const peptides = activeProtocols.filter((protocol) => protocol.category === "peptide");
+  const recurringExecutionItems = deriveAuthoritativeRecurringExecutionItems({
+    executionItems,
+    protocols: activeProtocols,
+  });
+  const visibleExecutionItems = recurringExecutionItems.filter((item) => !["supplement","peptide","protocol"].includes(item.type));
+  const supplementExecutionItems = supplements.flatMap((protocol) => {
+    const configured = recurringExecutionItems.find((item) => item.type === "supplement" && item.protocolRootId === protocol.id);
+    if (!configured) return [];
+    return {
+      id: configured.id,
+      title: protocol.name,
+      detail: formatSupplementExecutionSummary(configured),
+      href: `/profile/operating-plan/execution/supplements/${protocol.id}`,
+      status: "Execution",
+    };
+  });
+  const allExecutionItems = [...visibleExecutionItems.map(buildExecutionPlanItem), ...supplementExecutionItems];
+  const peptideExecutionItems = peptides.flatMap((protocol) => {
+    const configured=recurringExecutionItems.find((item)=>
+      ["peptide","protocol"].includes(item.type) &&
+      [item.protocolRootId,item.linkedProtocolId].includes(protocol.id)
+    );
+    if (!configured) return [];
+    return {id:configured.id,title:protocol.name,detail:formatPeptideExecutionSummary(configured,new Intl.DateTimeFormat("en-CA",{timeZone:"America/Los_Angeles"}).format(new Date())),href:`/profile/operating-plan/execution/peptides/${protocol.id}`,status:"Execution"};
+  });
+  allExecutionItems.push(...peptideExecutionItems);
+  allExecutionItems.sort((left, right) => String(left.id).localeCompare(String(right.id)));
 
   return [
     {
@@ -150,18 +188,17 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
       tone: "effort",
       items: [buildTrainingPlanItem(trainingProtocol)],
     },
-    { icon: Scale, title: "Execution", subtitle: `${executionItems.filter((item) => item.active).length} recurring commitments`, tone: "evidence", drawer: true, preview: executionItems.filter((item)=>item.active).slice(0,3).map((item)=>item.id==="execution_dexa"?"DEXA Scan":item.title).join("\n")+`\n+${Math.max(0,executionItems.filter((item)=>item.active).length-3)} more`, items: executionItems.filter((item) => item.active).map(buildExecutionPlanItem) },
+    { icon: Scale, title: "Execution", subtitle: `${allExecutionItems.length} recurring commitments`, tone: "evidence", drawer: true, preview: allExecutionItems.slice(0,3).map((item)=>item.title).join("\n")+`\n+${Math.max(0,allExecutionItems.length-3)} more`, items: allExecutionItems },
     {
       icon: Dumbbell,
       title: "Supplements",
       subtitle: `${supplements.length} active protocols`,
       tone: "success",
-      drawer: true,
-      preview: supplements.slice(0,3).map((item)=>item.name).join("\n")+`\n+${Math.max(0,supplements.length-3)} more`,
+      supplements: true,
       items: supplements.map((protocol) => ({
         id: protocol.id,
         title: protocol.name,
-        detail: formatProtocolSchedule(protocol),
+        detail: formatSupplementExecutionSummary(executionItems.find((item) => item.type === "supplement" && item.protocolRootId === protocol.id)),
         href: `/profile/protocols/${protocol.id}?from=operating-plan`,
         status: formatPersistence(protocol.status),
       })),
@@ -174,33 +211,103 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
       items: [
         {
           id: "nutrition-calorie-range",
-          title: "Calorie Range",
+          title: nutritionContext?.calibrationStrategy ? "Maintenance Calibration" : "Calorie Range",
           detail: formatCalorieRange(nutritionContext),
-          href: "/progress/nutrition",
-          status: "Context",
-        },
-        {
-          id: "nutrition-hydration",
-          title: "Hydration",
-          detail: "Future expectation",
-          href: null,
-          status: "Future",
+          href: getOperatingPlanStrategyHref("nutrition", nutritionContext?.activeProtocolId),
+          status: "Active",
         },
       ],
     },
-    { icon: Activity, title: "Recovery", subtitle: "Strategy coming soon", tone: "success", items: [{ id:"recovery-coming-soon", title:"Recovery", detail:"A dedicated recovery strategy will complete this layer", href:null, status:"Coming Soon" }] },
-  ].filter((section) => section.items.length > 0).sort((a,b)=>["Energy Strategy","Nutrition","Training","Recovery","Execution","Supplements"].indexOf(a.title)-["Energy Strategy","Nutrition","Training","Recovery","Execution","Supplements"].indexOf(b.title));
+    {
+      icon: Syringe,
+      title: "Peptides",
+      subtitle: `${peptides.length} active protocols`,
+      tone: "effort",
+      items: peptides.map((protocol)=>({
+        id:protocol.id,
+        title:protocol.name,
+        detail:"Active peptide strategy",
+        href:`/profile/protocols/${protocol.id}?from=operating-plan`,
+        status:"Active",
+      })),
+    },
+    {
+      icon: Activity,
+      title: "Recovery",
+      subtitle: recoveryProtocols.length ? `${recoveryProtocols.length} active protocol` : "Strategy coming soon",
+      tone: "success",
+      items: recoveryProtocols.length
+        ? recoveryProtocols.map((protocol) => ({
+            id: protocol.id,
+            title: protocol.name,
+            detail: formatProtocolSchedule(protocol),
+            href: `/profile/protocols/${protocol.id}?from=operating-plan`,
+            status: "Active",
+          }))
+        : [{ id:"recovery-coming-soon", title:"Recovery", detail:"A dedicated recovery strategy will complete this layer", href:null, status:"Coming Soon" }],
+    },
+    ...(coachingProtocol ? [{
+      icon: MessageCircle,
+      title: "Coaching Updates",
+      subtitle: "Wednesday and Sunday",
+      tone: "primary",
+      items: [{
+        id: coachingProtocol.id,
+        title: "Coaching Updates",
+        detail: "Midweek calibration and weekly synthesis",
+        href: getOperatingPlanStrategyHref("briefings", coachingProtocol.id),
+        status: "Active",
+      }],
+    }] : []),
+  ].filter((section) => section.items.length > 0).sort((a,b)=>["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"].indexOf(a.title)-["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"].indexOf(b.title));
 }
 
-function buildExecutionPlanItem(item) { return { id: item.id, title: item.id === "execution_dexa" ? "DEXA Scan" : item.title, detail: `${formatExecutionSchedule(item)} · ${formatExecutionSupport(item)}`, href: `/profile/operating-plan/execution/${item.id}`, status: "Execution" }; }
-function formatExecutionSchedule(item) { const schedule=item.preferredSchedule??{}; const time=formatExecutionTime(schedule.timeOfDay); if(item.cadence?.type==="daily")return schedule.timeOfDay==="morning"?"Every morning":`Daily${time?` at ${time}`:""}`;if(item.cadence?.type==="scheduled_date")return schedule.date?`${new Date(`${schedule.date}T12:00:00`).toLocaleDateString("en-US",{month:"long",day:"numeric"})}${time?` at ${time}`:""}`:"Date pending";if(schedule.daysOfWeek?.length)return `${formatDayRange(schedule.daysOfWeek)}${time?(/^\d/.test(schedule.timeOfDay)?` at ${time}`:` ${time.toLowerCase()}`):""}`;return formatPersistence(item.cadence?.type); }
+export function isConcreteExecutionItem(item) {
+  const id = String(item?.id ?? "");
+  return ![
+    "_commitment_nutrition_daily_",
+    "_commitment_training_weekly_",
+    "_commitment_activity_weekly_",
+    "_commitment_energy_weekly_",
+    "_commitment_briefings_weekly_",
+  ].some((marker) => id.includes(marker));
+}
+
+export function deriveAuthoritativeRecurringExecutionItems({
+  executionItems = [],
+  protocols = [],
+} = {}) {
+  const activeProtocolIds = new Set(
+    protocols
+      .filter((protocol) => protocol.status === "active")
+      .map((protocol) => protocol.id)
+  );
+
+  return executionItems.filter((item) => {
+    if (item.active !== true || item.status && item.status !== "active") return false;
+    if (!isConcreteExecutionItem(item)) return false;
+    if (item.cadence?.type === "scheduled_date" || item.completedAt) return false;
+    const protocolId = item.protocolRootId ?? item.linkedProtocolId;
+    if (["supplement", "peptide", "protocol"].includes(item.type)) {
+      return Boolean(protocolId) && activeProtocolIds.has(protocolId);
+    }
+    return !protocolId || activeProtocolIds.has(protocolId);
+  }).sort((left, right) => String(left.id).localeCompare(String(right.id)));
+}
+
+function buildExecutionPlanItem(item) { return { id: item.id, title: item.id === "execution_dexa" ? "DEXA Scan" : item.title, detail: formatExecutionSchedule(item), href: `/profile/operating-plan/execution/${item.id}`, status: "Execution" }; }
+export function formatExecutionSchedule(item) { const schedule=item.preferredSchedule??{}; const time=formatExecutionTime(schedule.timeOfDay); if(item.cadence?.type==="daily")return schedule.timeOfDay==="morning"?"Every morning":joinSummary("Daily",time);if(item.cadence?.type==="scheduled_date")return schedule.date?joinSummary(new Date(`${schedule.date}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"}),time):"Not scheduled";if(schedule.daysOfWeek?.length)return joinSummary(formatDayRange(schedule.daysOfWeek),time || daypart(schedule.timeOfDay));return formatPersistence(item.cadence?.type)||"Not scheduled"; }
 function formatExecutionTime(value){if(!value)return"";if(/^\d{2}:\d{2}$/.test(value)){const [hour,minute]=value.split(":").map(Number);return new Date(2000,0,1,hour,minute).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});}return formatPersistence(value);}
-function formatDayRange(days){const names=days.map(formatPersistence);if(names.join(",").toLowerCase()==="sunday,monday,tuesday,wednesday,thursday")return"Sunday–Thursday";return names.length===1?names[0]:names.join(", ");}
-function formatExecutionSupport(item) { const strategy=item.linkedStrategyIds?.[0]; if(strategy?.includes("energy"))return "Supports Energy Strategy";if(strategy?.includes("training"))return "Supports Training Strategy";if(strategy==="recovery")return "Supports Recovery";return "Supports Goal Progress"; }
+function formatDayRange(days){const names=days.map(formatPersistence);if(names.join(",").toLowerCase()==="sunday,monday,tuesday,wednesday,thursday")return"Sun–Thu";return names.length===1?names[0]:names.join(", ");}
+function joinSummary(cadence,time){return [cadence,time].filter(Boolean).join(" · ");}
+function daypart(value){return ["morning","afternoon","evening","night"].includes(value) ? value.toLowerCase() : "";}
 
 export function buildEnergyStrategyPlanItem(link) {
-  if (!link) return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the cut", href: "/profile/operating-plan/energy/new", status: "Build Strategy" };
-  return { id: "energy-strategy-active", title: `${formatPersistence(link.selectedPace)} cut`, detail: "Activity and Nutrition linked", href: null, status: "Active" };
+  if (!link) return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the cut", href: null, status: "Build Strategy" };
+  if (link.selectedPace === "maintenance_calibration") {
+    return { id: link.protocolId, title: "Maintenance Calibration", detail: "Activity and Nutrition linked for weekly calibration", href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" };
+  }
+  return { id: link.protocolId, title: `${formatPersistence(link.selectedPace)} cut`, detail: "Activity and Nutrition linked", href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" };
 }
 
 export function buildActivityPlanItem(version) {
@@ -240,27 +347,30 @@ export function buildTrainingPlanItem(version) {
 
   const weeklySessions = Object.values(strategy.weeklyFrequencies ?? {}).reduce((sum, value) => sum + Number(value), 0);
   return {
-    id: "training-protocol-active",
+    id: version.protocolId,
     title: "Maintenance Training Strategy",
     detail: `${weeklySessions} weekly area sessions · ${formatPersistence(strategy.progression?.pace)} progression`,
-    href: null,
+    href: getOperatingPlanStrategyHref("training", version.protocolId),
     status: "Active",
   };
 }
 
 function formatProtocolSchedule(protocol) {
   const schedule = protocol.schedule ?? {};
-  const time = schedule.timeOfDay ? formatPersistence(schedule.timeOfDay) : "Timing pending";
-  const dose = protocol.dose?.value
-    ? `${protocol.dose.value} ${protocol.dose.unit ?? protocol.doseUnit ?? ""}`.trim()
-    : "Dose pending";
-
-  return `${dose} / ${time}`;
+  const cadence = formatPersistence(schedule.frequency ?? schedule.type ?? protocol.frequency?.unit);
+  const time = formatExecutionTime(schedule.timeOfDay);
+  return joinSummary(cadence, time) || "Schedule not specified";
 }
 
 function formatCalorieRange(nutritionContext) {
   const range = nutritionContext?.estimatedDailyCaloricIntake;
 
+  if (nutritionContext?.calibrationStrategy) {
+    const strategy = nutritionContext.calibrationStrategy;
+    return strategy.proteinBasis === "body_weight" && Number(strategy.proteinRatio) === 1
+      ? "1 g per lb of body weight · intake adjusted gradually"
+      : "Intake adjusted gradually from weekly signals";
+  }
   if (!range?.min || !range?.max) return "Range pending";
 
   return `${range.min}-${range.max} ${range.unit}`;

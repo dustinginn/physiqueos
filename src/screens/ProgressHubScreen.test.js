@@ -47,6 +47,7 @@ describe("Evidence Hub V2", () => {
     expect(index).toContain("Review ${title}. ${accessibleSummary}");
     expect(index).toContain("focus-visible:ring-4");
     expect(index).not.toMatch(/narrative-preview|\/log/);
+    expect(index).toContain("getEvidenceIconPresentation(stream.id)");
   });
 
   it("keeps the centered mobile column overflow-safe above the bottom navigation", () => {

@@ -21,7 +21,12 @@ import {
 } from "../components/deep-page/DeepPagePrimitives";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
+import ActivityHistorySheet from "../components/activity/ActivityHistorySheet";
+import NutritionHistorySheet from "../components/nutrition/NutritionHistorySheet";
+import TrainingHistorySheet from "../components/training/TrainingHistorySheet";
+import TrainingTimelineSelector from "../components/training/TrainingTimelineSelector";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
+import { getTrainingDaySummary } from "../presentation/trainingPresentation";
 
 const TRAINING_AREA_NAV_GROUPS = [
   "Chest",
@@ -35,8 +40,10 @@ const TRAINING_AREA_NAV_GROUPS = [
   "Glutes",
   "Calves",
 ];
+export const NUTRITION_HISTORY_PREVIEW_LIMIT = 3;
+export const ACTIVITY_HISTORY_PREVIEW_LIMIT = 3;
 
-export default function ProgressPlaceholderScreen({ from, report }) {
+export default function ProgressPlaceholderScreen({ evidenceContext, from, report }) {
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-24">
@@ -68,14 +75,25 @@ export default function ProgressPlaceholderScreen({ from, report }) {
           </div>
         </header>
 
-        {report.id !== "training" && (
-          <EvidenceReportContext
-            mode="related-goals"
-            relatedGoals={report.relatedGoals}
-          />
+        {report.id === "training" && evidenceContext && (
+          <TrainingEvidenceContext context={evidenceContext} />
+        )}
+        {report.id === "nutrition" && evidenceContext && (
+          <NutritionEvidenceContext context={evidenceContext} from={from} />
+        )}
+        {report.id === "activity" && evidenceContext && (
+          <ActivityEvidenceContext context={evidenceContext} from={from} />
+        )}
+        {report.id === "photos" && evidenceContext && (
+          <PhotosEvidenceContext context={evidenceContext} from={from} />
         )}
 
-        {report.id === "training" && <TrainingEvidenceReport report={report} />}
+        {report.id === "training" && (
+          <TrainingEvidenceReport
+            evidenceContext={evidenceContext}
+            report={report}
+          />
+        )}
         {report.id === "nutrition" && <NutritionEvidenceReport report={report} />}
         {report.id === "activity" && <ActivityEvidenceReport report={report} />}
 
@@ -161,10 +179,24 @@ export default function ProgressPlaceholderScreen({ from, report }) {
         )}
 
         {report.id !== "training" && (
-          <EvidenceReportContext
-            dataSources={report.dataSources}
-            mode="data-sources"
-          />
+          <div className="mt-4 space-y-4">
+            {report.id !== "photos" &&
+              report.id !== "nutrition" &&
+              report.id !== "activity" && (
+              <EvidenceReportContext
+                flush
+                mode="related-goals"
+                relatedGoals={report.relatedGoals}
+              />
+            )}
+            {report.id !== "photos" && (
+              <EvidenceReportContext
+                dataSources={report.dataSources}
+                flush
+                mode="data-sources"
+              />
+            )}
+          </div>
         )}
 
       </div>
@@ -172,15 +204,67 @@ export default function ProgressPlaceholderScreen({ from, report }) {
   );
 }
 
+function TrainingEvidenceContext({ context }) {
+  return (
+    <div data-testid="training-evidence-context">
+      <TrainingTimelineSelector
+        currentPath={context.currentPath}
+        timeline={context}
+      />
+    </div>
+  );
+}
+
+function NutritionEvidenceContext({ context, from }) {
+  return (
+    <div data-testid="nutrition-evidence-context">
+      <TrainingTimelineSelector
+        ariaLabel="Nutrition evidence context"
+        currentPath="/progress/nutrition"
+        preservedParams={{ from }}
+        timeline={context}
+      />
+    </div>
+  );
+}
+
+function ActivityEvidenceContext({ context, from }) {
+  return (
+    <div data-testid="activity-evidence-context">
+      <TrainingTimelineSelector
+        ariaLabel="Activity evidence context"
+        currentPath="/progress/activity"
+        preservedParams={{ from }}
+        timeline={context}
+      />
+    </div>
+  );
+}
+
+function PhotosEvidenceContext({ context, from }) {
+  return (
+    <div data-testid="photos-evidence-context">
+      <TrainingTimelineSelector
+        ariaLabel="Photos evidence context"
+        currentPath="/progress/photos"
+        preservedParams={{ from }}
+        timeline={context}
+      />
+    </div>
+  );
+}
+
 function NutritionEvidenceReport({ report }) {
+  const {
+    fullHistory,
+    previewHistory,
+    showAll,
+  } = getNutritionHistoryPresentation(report.nutritionDays);
+
   return (
     <div className="space-y-4">
       <EvidenceSection title="Latest Nutrition Day">
         <LatestNutritionDayCard nutritionDay={report.latestNutrition} />
-      </EvidenceSection>
-
-      <EvidenceSection title="Current Nutrition Protocol">
-        <CurrentNutritionProtocolCard protocol={report.currentNutritionProtocol} />
       </EvidenceSection>
 
       <EvidenceSection title="Reporting">
@@ -191,44 +275,82 @@ function NutritionEvidenceReport({ report }) {
         <TrainingLibraryLinks items={report.nutritionLibrary ?? []} />
       </EvidenceSection>
 
-      <EvidenceSection title="Recent Nutrition History">
-        <NutritionDayHistory days={(report.nutritionDays ?? []).slice(0, 10)} />
-        {(report.nutritionDays ?? []).length > 10 && (
-          <button className="mt-3 w-full rounded-[12px] border border-[var(--divider)] bg-white px-3 py-2 text-sm font-extrabold text-slate-700">
-            Load older days
-          </button>
-        )}
+      <EvidenceSection
+        action={
+          showAll ? (
+            <NutritionHistorySheet days={fullHistory} />
+          ) : null
+        }
+        title="Recent Nutrition History"
+      >
+        <NutritionDayHistory days={previewHistory} />
       </EvidenceSection>
     </div>
   );
 }
 
-function TrainingEvidenceReport({ report }) {
+export function getNutritionHistoryPresentation(scopedHistory = []) {
+  const fullHistory = Array.isArray(scopedHistory) ? scopedHistory : [];
+
+  return {
+    fullHistory,
+    previewHistory: fullHistory.slice(0, NUTRITION_HISTORY_PREVIEW_LIMIT),
+    showAll: fullHistory.length > NUTRITION_HISTORY_PREVIEW_LIMIT,
+  };
+}
+
+function TrainingEvidenceReport({ evidenceContext, report }) {
+  const adaptHref = evidenceContext?.adaptHref ?? ((href) => href);
+  const trainingDays = (report.trainingDays ?? []).map((day) => ({
+    ...day,
+    sessions: (day.sessions ?? []).map((session) => ({
+      ...session,
+      href: adaptHref(session.href),
+    })),
+  }));
+  const latestTrainingDay = report.latestTrainingDay
+    ? {
+        ...report.latestTrainingDay,
+        sessions: (report.latestTrainingDay.sessions ?? []).map((session) => ({
+          ...session,
+          href: adaptHref(session.href),
+        })),
+      }
+    : null;
+
   return (
     <div className="space-y-4">
       <EvidenceSection title="Latest Training Day">
-        <LatestTrainingDayCard trainingDay={report.latestTrainingDay} />
+        <LatestTrainingDayCard trainingDay={latestTrainingDay} />
       </EvidenceSection>
 
       <EvidenceSection
-        action={{ href: "/progress/training/library", label: "Browse" }}
+        action={{ href: adaptHref("/progress/training/library"), label: "Browse" }}
         title="Training Areas"
       >
         <TrainingAreas
+          adaptHref={adaptHref}
           breakdowns={report.trainingBreakdowns ?? {}}
           library={report.trainingLibrary ?? []}
         />
       </EvidenceSection>
 
       <EvidenceSection title="Reporting">
-        <ReportingLinks items={report.reportingLinks ?? []} compact />
+        <ReportingLinks
+          adaptHref={adaptHref}
+          items={report.reportingLinks ?? []}
+          compact
+        />
       </EvidenceSection>
 
       <EvidenceSection
-        action={{ href: "/progress/training/reporting/history", label: "Show All" }}
+        action={<TrainingHistorySheet days={trainingDays} />}
         title="Recent Training History"
       >
-        <TrainingDayHistoryPreview day={(report.trainingDays ?? [])[0]} />
+        <TrainingDayHistoryPreview
+          day={trainingDays[0]}
+          href={adaptHref("/progress/training/reporting/history")}
+        />
       </EvidenceSection>
 
       <EvidenceSection title="Current Protocol">
@@ -246,6 +368,12 @@ function TrainingEvidenceReport({ report }) {
 }
 
 function ActivityEvidenceReport({ report }) {
+  const {
+    fullHistory,
+    previewHistory,
+    showAll,
+  } = getActivityHistoryPresentation(report.activityHistory);
+
   return (
     <div className="space-y-4">
       <EvidenceSection title={report.latestActivitySectionTitle ?? "Latest Activity Day"}>
@@ -255,30 +383,38 @@ function ActivityEvidenceReport({ report }) {
         />
       </EvidenceSection>
 
-      <EvidenceSection title="Current Activity Protocol">
-        <CurrentActivityProtocolCard protocol={report.currentActivityProtocol} />
-      </EvidenceSection>
-
       <EvidenceSection title="Activity Areas">
         <ActivityAreaLinks items={report.activityAreas ?? []} />
       </EvidenceSection>
 
-      {report.linkedTrainingContext?.length > 0 && (
-        <EvidenceSection title="Linked Training Context">
+      <EvidenceSection title="Linked Training Context">
+        {report.linkedTrainingContext?.length > 0 ? (
           <RecordPreview entries={report.linkedTrainingContext} />
-        </EvidenceSection>
-      )}
-
-      <EvidenceSection title="Recent Activity History">
-        <ActivityDayHistory days={(report.activityHistory ?? []).slice(0, 10)} />
-        {(report.activityHistory ?? []).length > 10 && (
-          <button className="mt-3 w-full rounded-[12px] border border-[var(--divider)] bg-white px-3 py-2 text-sm font-extrabold text-slate-700">
-            Load older days
-          </button>
+        ) : (
+          <p className="text-sm font-semibold leading-6 text-slate-500">
+            No linked workouts are available for this activity day.
+          </p>
         )}
+      </EvidenceSection>
+
+      <EvidenceSection
+        action={showAll ? <ActivityHistorySheet days={fullHistory} /> : null}
+        title="Recent Activity History"
+      >
+        <ActivityDayHistory days={previewHistory} />
       </EvidenceSection>
     </div>
   );
+}
+
+export function getActivityHistoryPresentation(scopedHistory = []) {
+  const fullHistory = Array.isArray(scopedHistory) ? scopedHistory : [];
+
+  return {
+    fullHistory,
+    previewHistory: fullHistory.slice(0, ACTIVITY_HISTORY_PREVIEW_LIMIT),
+    showAll: fullHistory.length > ACTIVITY_HISTORY_PREVIEW_LIMIT,
+  };
 }
 
 function LatestActivityDayCard({ activityDay, label }) {
@@ -592,7 +728,10 @@ function LatestTrainingDayCard({ trainingDay }) {
     );
   }
 
-  const activities = summarizeTrainingActivities(trainingDay.sessions);
+  const daySummary = getTrainingDaySummary(
+    trainingDay.sessions,
+    summarizeTrainingActivities(trainingDay.sessions).join(" · ")
+  );
 
   return (
     <details className={`rounded-[12px] bg-[var(--surface-muted)] p-3 ${nativePressClassName}`}>
@@ -600,12 +739,9 @@ function LatestTrainingDayCard({ trainingDay }) {
         <p className="text-base font-extrabold text-slate-950">
           {trainingDay.label}
         </p>
-        <p className="mt-1 text-sm font-bold text-slate-700">
-          {trainingDay.summary}
-        </p>
-        {activities.length > 0 && (
+        {daySummary && (
           <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-            {activities.join(" • ")}
+            {daySummary}
           </p>
         )}
         <span className="mt-2 inline-flex text-sm font-extrabold leading-5 text-indigo-600">
@@ -716,7 +852,7 @@ function ProtocolRow({ label, value }) {
   );
 }
 
-function ReportingLinks({ compact = false, items }) {
+function ReportingLinks({ adaptHref = (href) => href, compact = false, items }) {
   if (compact) {
     return (
       <details className={`rounded-[12px] bg-[var(--surface-muted)] p-3 ${nativePressClassName}`}>
@@ -736,7 +872,7 @@ function ReportingLinks({ compact = false, items }) {
           </div>
         </summary>
         <div className="mt-3 space-y-2 border-t border-[var(--divider)] pt-3">
-          <ReportingLinks items={items} />
+          <ReportingLinks adaptHref={adaptHref} items={items} />
         </div>
       </details>
     );
@@ -747,7 +883,7 @@ function ReportingLinks({ compact = false, items }) {
       {items.map((item) => (
         <PressableCard
           className="flex items-start justify-between gap-3 p-3"
-          href={item.href}
+          href={adaptHref(item.href)}
           key={item.label}
         >
           <div>
@@ -791,7 +927,7 @@ function TrainingLibraryLinks({ items }) {
   );
 }
 
-function TrainingAreas({ breakdowns = {}, library = [] }) {
+function TrainingAreas({ adaptHref = (href) => href, breakdowns = {}, library = [] }) {
   const groups = getTrainingAreaNavigationGroups(breakdowns);
 
   if (!groups.length) {
@@ -805,7 +941,7 @@ function TrainingAreas({ breakdowns = {}, library = [] }) {
       {groups.map((group) => (
         <TrainingAreaGroup
           detail={group.detail}
-          href={group.href}
+          href={adaptHref(group.href)}
           icon={group.icon}
           key={group.label}
           title={group.label}
@@ -1018,9 +1154,11 @@ function TrainingDayHistory({ days }) {
                 <p className="text-sm font-extrabold text-slate-950">
                   {day.label}
                 </p>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  {day.summary}
-                </p>
+                {getTrainingDaySummary(day.sessions) && (
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    {getTrainingDaySummary(day.sessions)}
+                  </p>
+                )}
               </div>
               <span className="text-sm font-extrabold text-indigo-600">&gt;</span>
             </div>
@@ -1034,7 +1172,10 @@ function TrainingDayHistory({ days }) {
   );
 }
 
-function TrainingDayHistoryPreview({ day }) {
+function TrainingDayHistoryPreview({
+  day,
+  href = "/progress/training/reporting/history",
+}) {
   if (!day) {
     return (
       <p className="text-sm font-semibold leading-6 text-slate-500">
@@ -1044,13 +1185,13 @@ function TrainingDayHistoryPreview({ day }) {
   }
 
   return (
-    <DrawerPreview href="/progress/training/reporting/history">
+    <DrawerPreview href={href}>
       <div className="min-w-0">
         <p className="truncate text-sm font-extrabold text-slate-950">
           {day.label}
         </p>
         <p className="mt-0.5 text-xs font-bold text-slate-500">
-          {day.summary}
+          {getTrainingDaySummary(day.sessions)}
         </p>
       </div>
       <span className="shrink-0 text-sm font-extrabold text-[var(--primary)]">

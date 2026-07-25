@@ -1,4 +1,8 @@
-import { normalizePhotoInterpretationToStructuredObservations } from "./PhotoObservationModel";
+import {
+  normalizePhotoInterpretationToStructuredObservations,
+  normalizeStructuredPhotoSemantics,
+  PHOTO_INTERPRETATION_SCHEMA_VERSION,
+} from "./PhotoObservationModel";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
 
@@ -160,6 +164,10 @@ function getSystemPrompt() {
   return [
     "You are PhysiqueOS PhotoInterpreter.",
     "Return structured JSON only.",
+    "For every machine-readable structured_observations entry, assign metric and direction directly from your visual evaluation. Never derive them from the change sentence.",
+    "Allowed metrics are leanness, abdominal_definition, whole_body_softness, muscularity, visual_stability, and unknown.",
+    "Allowed directions are increased, decreased, stable, mixed, insufficient, and unknown. Direction is relative to the named metric.",
+    "Photos must never emit body-fat percentage, lean-mass amount, fat-mass amount, or any numeric body-composition measurement.",
     "Interpret progress photos as visual evidence.",
     "Optimize for being the best possible interpreter of progress photos, not for Daily Briefing brevity. The Daily Briefing is a separate consumer and can summarize later.",
     "Produce the complete coach's notebook for the photo comparison: the rich, careful observations an experienced physique coach would write after studying the photos for 30-60 seconds.",
@@ -660,9 +668,27 @@ function normalizeInterpreterOutput(output, fallback) {
 }
 
 function withStructuredObservations(interpretation) {
+  const explicitSemantics = interpretation.structured_observations?.some(
+    (item) => item?.metric != null || item?.direction != null
+  )
+    ? normalizeStructuredPhotoSemantics(interpretation.structured_observations, {
+        comparisonSessionId:
+          interpretation.comparison_metadata?.previous_photo_set_id ?? null,
+        sourceEvidenceIds: [interpretation.photo_set_id].filter(Boolean),
+        provenance: {
+          interpreter: "PhotoInterpreter",
+          interpreterVersion: PHOTO_INTERPRETATION_SCHEMA_VERSION,
+        },
+      })
+    : null;
+
   return {
     ...interpretation,
+    interpretation_schema_version: explicitSemantics
+      ? PHOTO_INTERPRETATION_SCHEMA_VERSION
+      : interpretation.interpretation_schema_version ?? null,
     structured_observations:
+      explicitSemantics ??
       interpretation.structured_observations ??
       normalizePhotoInterpretationToStructuredObservations(interpretation),
   };
@@ -2105,6 +2131,7 @@ export const photoInterpretationJsonSchema = {
     "suggested_priorities",
     "user_facing_summary",
     "coach_briefing_insert",
+    "structured_observations",
   ],
   properties: {
     photo_set_id: { type: "string" },
@@ -2211,5 +2238,76 @@ export const photoInterpretationJsonSchema = {
     suggested_priorities: stringArray,
     user_facing_summary: { type: "string" },
     coach_briefing_insert: { type: "string" },
+    structured_observations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "region",
+          "metric",
+          "direction",
+          "magnitude",
+          "change",
+          "confidence",
+          "limitations",
+          "pose",
+          "bodyView",
+          "contractionState",
+          "comparisonSessionId",
+          "sourceEvidenceIds",
+          "provenance",
+        ],
+        properties: {
+          region: { type: "string" },
+          metric: {
+            type: "string",
+            enum: [
+              "leanness",
+              "abdominal_definition",
+              "whole_body_softness",
+              "muscularity",
+              "visual_stability",
+              "unknown",
+            ],
+          },
+          direction: {
+            type: "string",
+            enum: [
+              "increased",
+              "decreased",
+              "stable",
+              "mixed",
+              "insufficient",
+              "unknown",
+            ],
+          },
+          magnitude: {
+            type: "string",
+            enum: ["subtle", "moderate", "pronounced", "unknown"],
+          },
+          change: { type: "string" },
+          confidence: {
+            type: "string",
+            enum: ["high", "moderate", "low", "unknown"],
+          },
+          limitations: stringArray,
+          pose: { type: "string" },
+          bodyView: { type: "string" },
+          contractionState: { type: "string" },
+          comparisonSessionId: { type: ["string", "null"] },
+          sourceEvidenceIds: stringArray,
+          provenance: {
+            type: "object",
+            additionalProperties: false,
+            required: ["interpreter", "interpreterVersion"],
+            properties: {
+              interpreter: { type: "string" },
+              interpreterVersion: { type: "string" },
+            },
+          },
+        },
+      },
+    },
   },
 };

@@ -1,0 +1,10 @@
+import { describe, expect, it } from "vitest";
+import { composePhaseAwareActiveGoalPreview } from "./PhaseAwareActiveGoalPreviewService";
+
+const goal={id:"goal-build",userId:"u",title:"Build Lean Mass",type:"build_lean_mass",status:"active",primary:true,target:{type:"numeric_change",metric:"lean_mass",amount:10,unit:"lb",description:"Build 10 lb of lean mass",targetDate:"2026-10-31"},timeline:{startDate:"2026-07-20",targetDate:"2026-10-31"},guardrails:[{text:"Maintain approximately 8–9% body fat.",accepted:true}],phases:[{id:"p1",name:"Establish Maintenance",purpose:"Establish a reliable maintenance baseline.",status:"active",order:0,timingMode:"fixed_duration",startDate:"2026-07-20",duration:{value:4,unit:"weeks"}},{id:"p2",name:"Lean Mass Build",status:"upcoming",order:1,timingMode:"target_date",targetDate:"2026-10-31"}]};
+const dexa=[{measuredAt:"2026-07-18",bodyFatPercentage:7.7,leanMass:{value:147.5,unit:"lb"},fatMass:{value:12.8,unit:"lb"},totalMass:{value:167.4,unit:"lb"}}];
+
+describe("phase-aware active goal preview",()=>{
+  it("projects the canonical goal, phases, and baseline without raw lifecycle language",()=>{const result=composePhaseAwareActiveGoalPreview({user:{timeZone:"America/Los_Angeles"},goal,dexaScans:dexa,currentDate:new Date("2026-07-22T12:00:00Z")});expect(result.hero).toMatchObject({title:"Build Lean Mass",status:"Active Goal",destination:"Build 10 lb of lean mass by October 31, 2026"});expect(result.journey.map(x=>[x.name,x.status,x.color])).toEqual([["Establish Maintenance","Active","orange"],["Lean Mass Build","Upcoming","green"]]);expect(result.journey[0].progress).toBe("Week 1 of 4");expect(result.journey[1]).toMatchObject({progress:"0 of 10 lb measured",support:"Awaiting next DEXA"});expect(result.evidence.dexa).toMatchObject({bodyFat:"7.7%",leanMass:"147.5 lb"});expect(JSON.stringify(result.readiness)).not.toMatch(/transitionPolicy|timingMode|lifecycle/);});
+  it("rejects a non-active or different goal",()=>{expect(()=>composePhaseAwareActiveGoalPreview({user:{},goal:{...goal,status:"completed"},dexaScans:dexa})).toThrow(/unavailable/);});
+});

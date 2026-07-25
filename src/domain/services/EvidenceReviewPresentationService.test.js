@@ -50,7 +50,7 @@ describe("Evidence Review presentation", () => {
       { label: "Source", value: "Screenshot + Typed evidence" },
     ]));
     expect(card.exercises.map((exercise) => exercise.name)).toEqual([
-      "Pull-Up", "Hanging Leg Raise", "Iso-Lateral High Row", "Cable Crunch", "Seated Cable Row", "Plank",
+      "Pull-Ups", "Hanging Leg Raises", "Iso-Lateral High Rows", "Cable Crunches", "Seated Cable Rows", "Planks",
     ]);
     expect(card.exercises[0].sets).toEqual(["12 reps · Bodyweight"]);
     expect(card.exercises[4].sets).toEqual(["15 reps @ 120 lb"]);
@@ -99,6 +99,33 @@ describe("Evidence Review presentation", () => {
     });
   });
 
+  it("presents ordered nutrition meals with expandable food details", () => {
+    const card = presentEvidenceObject({
+      id: "nutritionday-2026-07-17",
+      evidence_type: "nutrition",
+      observed_at: "2026-07-17",
+      daily_totals: { calories: 1930, protein_g: 171, carbs_g: 161, fat_g: 79 },
+      meals: [
+        { id: "snacks", name: "Snacks", totals: { calories: 210, protein_g: 3, carbs_g: 36, fat_g: 7 }, foods: [] },
+        { id: "dinner", name: "Dinner", totals: { calories: 813, protein_g: 60, carbs_g: 74, fat_g: 39 }, foods: [{ id: "dinner-1", name: "Chicken", brand: "Example", serving_size: "1 piece", nutrients: { calories: 813 } }] },
+        { id: "breakfast", name: "Breakfast", totals: { calories: 440, protein_g: 62, carbs_g: 37, fat_g: 6 }, foods: [] },
+        { id: "lunch", name: "Lunch", totals: { calories: 467, protein_g: 47, carbs_g: 14, fat_g: 26 }, foods: [] },
+      ],
+    }, evidencePackage([]));
+
+    expect(card.metrics).toEqual(expect.arrayContaining([
+      { label: "Calories", value: "1,930 cal" },
+    ]));
+    expect(card.meals.map((meal) => meal.name)).toEqual([
+      "Breakfast", "Lunch", "Dinner", "Snacks",
+    ]);
+    expect(card.meals[2].foods[0]).toEqual(expect.objectContaining({
+      brand: "Example",
+      serving: "1 piece",
+    }));
+    expect(card.reconciliation).toBe("Meal totals match the daily total.");
+  });
+
   it("never renders missing or zero duration as 0s", () => {
     expect(formatExerciseSet({ reps: 8 })).toBe("8 reps");
     expect(formatExerciseSet({ duration_seconds: null })).toBeNull();
@@ -123,7 +150,7 @@ describe("Evidence Review presentation", () => {
 
 describe("Cable Machine Front Raise canonical identity", () => {
   it.each(["Cable Machine Front Raise", "Cable Machine Front Raises", "cable machine front raises"])("resolves %s distinctly", (name) => {
-    expect(resolveTrainingExerciseIdentity(name)).toEqual(expect.objectContaining({ canonicalExerciseId: "cable_machine_front_raise", canonicalExerciseName: "Cable Machine Front Raise" }));
+    expect(resolveTrainingExerciseIdentity(name)).toEqual(expect.objectContaining({ canonicalExerciseId: "cable_machine_front_raise", canonicalExerciseName: "Cable Machine Front Raises" }));
   });
 
   it("keeps generic, dumbbell, lateral, and press identities separate", () => {
@@ -138,14 +165,14 @@ describe("Cable Machine Front Raise canonical identity", () => {
     source.provenance.source_artifacts[1].text = "Cable Machine Front Raises\n13r 110p\n12r 120p\n10r 130p\n10r 130p";
     const once = repairPendingReviewExerciseIdentities(source);
     const twice = repairPendingReviewExerciseIdentities(once);
-    expect(twice.evidence_objects[0].exercises).toEqual([{ name: "Cable Machine Front Raise", equipment: "cable", sets: [{ reps: 13, weight: 110 }, { reps: 12, weight: 120 }, { reps: 10, weight: 130 }, { reps: 10, weight: 130 }] }]);
-    expect(createEvidenceReviewPresentation({ evidencePackage: twice }).items[0].exercises[0]).toEqual({ name: "Cable Machine Front Raise", sets: ["13 reps @ 110 lb", "12 reps @ 120 lb", "10 reps @ 130 lb", "10 reps @ 130 lb"] });
+    expect(twice.evidence_objects[0].exercises).toEqual([{ name: "Cable Machine Front Raises", equipment: "cable", sets: [{ reps: 13, weight: 110 }, { reps: 12, weight: 120 }, { reps: 10, weight: 130 }, { reps: 10, weight: 130 }] }]);
+    expect(createEvidenceReviewPresentation({ evidencePackage: twice }).items[0].exercises[0]).toEqual({ name: "Cable Machine Front Raises", sets: ["13 reps @ 110 lb", "12 reps @ 120 lb", "10 reps @ 130 lb", "10 reps @ 130 lb"] });
   });
 });
 
 describe("Seated Cable Row canonical identity", () => {
   it.each(["Seater cable row", "Seater Cable Rows", "Seated Cable Row", "Seated Cable Rows", "seated cable row"])("resolves %s", (name) => {
-    expect(resolveTrainingExerciseIdentity(name)).toEqual(expect.objectContaining({ canonicalExerciseId: "seated_cable_row", canonicalExerciseName: "Seated Cable Row" }));
+    expect(resolveTrainingExerciseIdentity(name)).toEqual(expect.objectContaining({ canonicalExerciseId: "seated_cable_row", canonicalExerciseName: "Seated Cable Rows" }));
   });
 
   it("does not merge unrelated row exercises", () => {
@@ -156,10 +183,10 @@ describe("Seated Cable Row canonical identity", () => {
   it("consolidates historical spellings into one performance node without duplicate sessions", () => {
     const session = (id, name, date) => ({ id, evidence_type: "training", observed_at: date, metadata: { activity_type: "Strength" }, exercises: [{ name, sets: [{ reps: 12, weight: 110 }] }] });
     const report = createTrainingPerformanceIntelligenceReport({ trainingSessions: [session("one", "Seated Cable Row", "2026-07-01"), session("two", "Seater cable row", "2026-07-12"), session("two", "Seater cable row", "2026-07-12")] });
-    const rows = report.exerciseObservations.filter((item) => item.exercise.name === "Seated Cable Row");
+    const rows = report.exerciseObservations.filter((item) => item.exercise.name === "Seated Cable Rows");
 
     expect(rows).toHaveLength(1);
     expect(rows[0].supporting_session_ids).toEqual(["one", "two"]);
-    expect(getCanonicalTrainingExerciseLabel("Seater cable row")).toBe("Seated Cable Row");
+    expect(getCanonicalTrainingExerciseLabel("Seater cable row")).toBe("Seated Cable Rows");
   });
 });

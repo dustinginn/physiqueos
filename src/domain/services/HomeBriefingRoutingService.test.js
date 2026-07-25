@@ -1,65 +1,197 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveHomeBriefingSelection } from "./HomeBriefingRoutingService";
+import {
+  isCadenceArtifactReady,
+  resolveHomeBriefingSelection,
+} from "./HomeBriefingRoutingService";
 import { createDailyBriefingService } from "./DailyBriefingService";
-import { mapBriefingCard } from "./HomeBriefingService";
 
-const daily = { id: "daily", cadence: "daily", briefing: { version: "daily-briefing-v29-voice-calibration" } };
-const weekly = { id: "weekly", cadence: "weekly", evidenceWindow: { startDate: "2026-07-05", endDate: "2026-07-11" } };
-const photoEvent = { id: "event", artifactType: "event", generatedAt: "2026-07-12T18:00:00Z", trigger: { evidenceType: "photo_session", evidenceId: "session" }, lifecycle: {}, briefing: { photoEventNarrative: { eventDate: "2026-07-12" } } };
-const dexaEvent = { id: "dexa-event", artifactType: "event", generatedAt: "2026-07-12T19:00:00Z", trigger: { evidenceType: "dexa", evidenceId: "dexa_2026_06_20" }, lifecycle: {}, briefing: { dexaEventNarrative: { scanDate: "2026-06-20" } } };
-function select(now, overrides = {}) { return resolveHomeBriefingSelection({ dailyArtifact: daily, weeklyArtifact: weekly, now, timeZone: "America/Los_Angeles", ...overrides }); }
+const midweek = artifact("midweek", {
+  generatedAt: "2026-07-22T17:04:26.525Z",
+  window: {
+    id: "midweek:2026-07-19:2026-07-21:America/Los_Angeles",
+    briefingDate: "2026-07-22",
+    startDate: "2026-07-19",
+    endDate: "2026-07-21",
+  },
+});
+const weekly = artifact("weekly", {
+  generatedAt: "2026-07-26T16:00:00Z",
+  window: {
+    id: "weekly:2026-07-19:2026-07-25:America/Los_Angeles",
+    briefingDate: "2026-07-26",
+    startDate: "2026-07-19",
+    endDate: "2026-07-25",
+  },
+});
+const previousWeekly = artifact("weekly", {
+  id: "weekly-previous",
+  generatedAt: "2026-07-19T16:00:00Z",
+  window: {
+    id: "weekly:2026-07-12:2026-07-18:America/Los_Angeles",
+    briefingDate: "2026-07-19",
+    startDate: "2026-07-12",
+    endDate: "2026-07-18",
+  },
+});
+const photoEvent = {
+  id: "event",
+  artifactType: "event",
+  cadence: "event",
+  generatedAt: "2026-07-22T18:00:00Z",
+  trigger: { evidenceType: "photo_session", evidenceId: "session" },
+  lifecycle: {},
+  briefing: { photoEventNarrative: { eventDate: "2026-07-22" } },
+};
 
-describe("Home briefing routing", () => {
-  it("selects Weekly on Sunday", () => expect(select(new Date("2026-07-12T18:00:00Z")).briefingType).toBe("weekly"));
-  it("links Sunday to the direct Weekly route", () => expect(select(new Date("2026-07-12T18:00:00Z")).href).toBe("/briefings/weekly"));
-  it("selects Daily Monday through Saturday", () => expect(select(new Date("2026-07-13T18:00:00Z")).briefingType).toBe("daily"));
-  it("links weekdays to the direct Daily route", () => expect(select(new Date("2026-07-13T18:00:00Z")).href).toBe("/briefing/daily"));
-  it("uses Founder local time across the UTC Sunday boundary", () => expect(select(new Date("2026-07-12T06:30:00Z")).briefingType).toBe("daily"));
-  it("switches after local midnight without a UTC off-by-one", () => expect(select(new Date("2026-07-12T07:30:00Z")).briefingType).toBe("weekly"));
-  it("gives an active same-day Photo Event precedence", () => expect(select(new Date("2026-07-12T18:00:00Z"), { eventArtifact: photoEvent }).href).toBe("/briefings/photo/session"));
-  it("routes an active DEXA Event through its stable direct route", () => expect(select(new Date("2026-07-12T18:00:00Z"), { eventArtifact: dexaEvent }).href).toBe("/briefings/dexa/dexa_2026_06_20"));
-  it("resumes scheduled cadence after an event is consumed", () => expect(select(new Date("2026-07-12T18:00:00Z"), { eventArtifact: { ...photoEvent, lifecycle: { consumedAt: "x" } } }).briefingType).toBe("weekly"));
-  it("does not promote an old unconsumed photo event", () => expect(select(new Date("2026-07-13T18:00:00Z"), { eventArtifact: photoEvent }).briefingType).toBe("daily"));
-  it("keeps a missing Sunday Weekly clearly unavailable without relabeling Daily", () => { const result = select(new Date("2026-07-12T18:00:00Z"), { weeklyArtifact: null }); expect(result.reason).toBe("scheduled_sunday_weekly_unavailable"); expect(result.artifact).toBeNull(); });
-  it("builds the Sunday Home card from the selected Weekly artifact", () => {
-    const selection = select(new Date("2026-07-12T18:00:00Z"));
-    const card = mapBriefingCard({ selection, dexaScans: [{}], progressPhotos: [], weightEntries: [], freshness: null, latestAnalysis: null, dailyEvent: null });
-    expect(card.sectionLabel).toBe("Weekly Briefing"); expect(card.href).toBe("/briefings/weekly"); expect(card.id).toBe("weekly");
-  });
-  it("presents a missing eligible Daily as a real action with an explicit historical fallback", () => {
-    const expectation = {
-      artifactId: "daily_briefing_20260713",
-      dailyEligible: true,
-      evidenceThroughDate: "2026-07-13",
-    };
-    const card = mapBriefingCard({
-      selection: { artifact: null, briefingType: "daily" },
-      dexaScans: [{}],
-      progressPhotos: [],
-      weightEntries: [],
-      freshness: { status: "missing" },
-      latestAnalysis: null,
-      dailyEvent: null,
-      expectation,
-      generationArtifact: null,
-      historicalDailyBriefing: { id: "daily_briefing_20260712" },
+const select = (date, extra = {}) => resolveHomeBriefingSelection({
+  now: new Date(`${date}T18:00:00Z`),
+  timeZone: "America/Los_Angeles",
+  ...extra,
+});
+
+describe("artifact-backed Home briefing routing", () => {
+  it("shows a valid Midweek artifact on Wednesday with an exact artifact route", () => {
+    expect(select("2026-07-22", { midweekArtifact: midweek })).toMatchObject({
+      briefingType: "midweek",
+      artifact: midweek,
+      href: "/briefings/review/midweek",
+      reason: "scheduled_wednesday_midweek",
     });
-    expect(card).toMatchObject({
-      id: "daily_briefing_20260713",
-      freshnessState: "eligible_missing",
-      actionKind: "generate_daily",
+  });
+
+  it("suppresses Wednesday readiness when only the planned date exists", () => {
+    expect(select("2026-07-22")).toMatchObject({
+      briefingType: "none",
+      artifact: null,
       href: null,
-      historicalFallback: {
-        href: "/briefings/review/daily_briefing_20260712",
-        label: "View previous briefing",
-      },
+      reason: "scheduled_wednesday_midweek_unavailable",
     });
-    expect(`${card.title} ${card.prompt}`).not.toContain("Jul 12");
   });
-  it("keeps direct Daily reads cadence-specific and non-mutating", async () => {
-    const create = vi.fn(); const consume = vi.fn();
-    const repositories = { users: { getCurrentUser: async () => ({ id: "u", timeZone: "America/Los_Angeles" }) }, dailyBriefings: { getBriefingByEvidenceWindow: vi.fn(async () => null), getLatestScheduledDailyBriefing: vi.fn(async () => daily), createDailyBriefing: create, markBriefingConsumed: consume } };
-    const result = await createDailyBriefingService({ repositories, now: () => new Date("2026-07-12T18:00:00Z") }).getPersistedDailyBriefing();
-    expect(result).toBeNull(); expect(create).not.toHaveBeenCalled(); expect(consume).not.toHaveBeenCalled();
+
+  it("shows a valid Weekly artifact on Sunday with an exact artifact route", () => {
+    expect(select("2026-07-26", { weeklyArtifact: weekly })).toMatchObject({
+      briefingType: "weekly",
+      artifact: weekly,
+      href: "/briefings/review/weekly",
+      reason: "scheduled_sunday_weekly",
+    });
+  });
+
+  it("does not synthesize Weekly readiness on Sunday without an artifact", () => {
+    expect(select("2026-07-26")).toMatchObject({
+      briefingType: "none",
+      artifact: null,
+      href: null,
+    });
+  });
+
+  it("keeps the valid Wednesday Midweek artifact until Sunday Weekly exists", () => {
+    expect(select("2026-07-26", { midweekArtifact: midweek })).toMatchObject({
+      briefingType: "midweek",
+      artifact: midweek,
+      reason: "sunday_weekly_pending_keep_midweek",
+    });
+  });
+
+  it("lets the same-cycle Weekly artifact supersede Midweek on Sunday", () => {
+    expect(select("2026-07-26", {
+      midweekArtifact: midweek,
+      weeklyArtifact: weekly,
+    })).toMatchObject({
+      briefingType: "weekly",
+      artifact: weekly,
+    });
+  });
+
+  it("keeps the current Midweek on later weekdays and retires prior-cycle Midweek", () => {
+    expect(select("2026-07-24", { midweekArtifact: midweek })).toMatchObject({
+      briefingType: "midweek",
+      artifact: midweek,
+    });
+    expect(select("2026-07-30", { midweekArtifact: midweek })).toMatchObject({
+      briefingType: "none",
+      artifact: null,
+    });
+  });
+
+  it("keeps the most recently completed Weekly artifact before current Midweek exists", () => {
+    expect(select("2026-07-20", { weeklyArtifact: previousWeekly })).toMatchObject({
+      briefingType: "weekly",
+      artifact: previousWeekly,
+    });
+  });
+
+  it("rejects missing content, type mismatches, and invalid lifecycle states", () => {
+    expect(isCadenceArtifactReady({ ...midweek, briefing: null }, "midweek")).toBe(false);
+    expect(isCadenceArtifactReady(midweek, "weekly")).toBe(false);
+    for (const generationStatus of ["failed", "in_progress", "invalid", "retired", "superseded"]) {
+      expect(isCadenceArtifactReady({
+        ...midweek,
+        lifecycle: { generationStatus },
+      }, "midweek")).toBe(false);
+    }
+    expect(isCadenceArtifactReady({ ...midweek, status: "retired" }, "midweek")).toBe(false);
+    expect(isCadenceArtifactReady({
+      ...midweek,
+      lifecycle: { status: "superseded" },
+    }, "midweek")).toBe(false);
+  });
+
+  it("preserves same-day Event precedence and rejects superseded Events", () => {
+    expect(select("2026-07-22", {
+      eventArtifact: photoEvent,
+      midweekArtifact: midweek,
+    })).toMatchObject({
+      briefingType: "event",
+      href: "/briefings/photo/session",
+    });
+    expect(select("2026-07-22", {
+      eventArtifact: {
+        ...photoEvent,
+        lifecycle: { generationStatus: "superseded" },
+      },
+      midweekArtifact: midweek,
+    })).toMatchObject({
+      briefingType: "midweek",
+      artifact: midweek,
+    });
+  });
+
+  it("keeps direct Daily reads non-mutating", async () => {
+    const create = vi.fn();
+    const consume = vi.fn();
+    const repositories = {
+      users: { getCurrentUser: async () => ({ id: "u", timeZone: "America/Los_Angeles" }) },
+      dailyBriefings: {
+        getBriefingByEvidenceWindow: vi.fn(async () => null),
+        getLatestScheduledDailyBriefing: vi.fn(async () => null),
+        createDailyBriefing: create,
+        markBriefingConsumed: consume,
+      },
+    };
+    expect(await createDailyBriefingService({
+      repositories,
+      now: () => new Date("2026-07-24T18:00:00Z"),
+    }).getPersistedDailyBriefing()).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
   });
 });
+
+function artifact(cadence, { generatedAt, id = cadence, window }) {
+  return {
+    id,
+    artifactType: "scheduled",
+    cadence,
+    generatedAt,
+    evidenceWindow: {
+      ...window,
+      cadence,
+      closed: true,
+    },
+    lifecycle: { generationStatus: "completed" },
+    briefing: cadence === "midweek"
+      ? { hero: { summary: "Week so far" } }
+      : { weeklyNarrative: { cards: { hero: { body: "Completed week" } } } },
+  };
+}

@@ -1,111 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDailyBriefingRepository } from "../../data/repositories/DailyBriefingRepository";
 import { createDailyBriefingService } from "./DailyBriefingService";
-import { resolveScheduledBriefingExpectation } from "./BriefingEvidenceWindowService";
-import { getDailyBriefingFreshness } from "./DailyBriefingFreshnessService";
+import { resolveScheduledBriefingExpectation, retireLegacyDailyBriefingWork, selectScheduledBriefingCadence } from "./BriefingEvidenceWindowService";
 
-const JUL_14 = new Date("2026-07-14T14:00:00.000Z");
-const user = { id: "founder", timeZone: "America/Los_Angeles" };
+const zone="America/Los_Angeles";
+const at=(date)=>new Date(`${date}T18:00:00Z`);
 
-function harness({ composer = vi.fn(async () => ({ version: "test", hero: { title: "Current belief" } })) } = {}) {
-  const records = [];
-  const onChange = vi.fn();
-  const dailyBriefings = createDailyBriefingRepository(records, { onChange });
-  const repositories = {
-    users: { getCurrentUser: vi.fn(async () => user), getUserById: vi.fn(async () => user) },
-    dailyBriefings,
-  };
-  const timestamps = ["2026-07-14T14:00:00.000Z", "2026-07-14T14:00:01.000Z"];
-  let index = 0;
-  const service = createDailyBriefingService({
-    repositories,
-    now: () => new Date(timestamps[Math.min(index++, timestamps.length - 1)]),
-    scheduledComposer: composer,
-  });
-  return { composer, dailyBriefings, onChange, records, service };
-}
+describe("twice-weekly routine cadence",()=>{
+  it.each([
+    ["2026-07-20","none"],["2026-07-21","none"],["2026-07-22","midweek"],
+    ["2026-07-23","none"],["2026-07-24","none"],["2026-07-25","none"],["2026-07-26","weekly"],
+  ])("maps %s to %s",(date,cadence)=>expect(selectScheduledBriefingCadence({now:at(date),timeZone:zone})).toBe(cadence));
 
-describe("scheduled Daily lifecycle", () => {
-  it("resolves Jul 14 PDT to the closed Jul 13 Daily identity", () => {
-    expect(resolveScheduledBriefingExpectation({ now: JUL_14, timeZone: user.timeZone })).toMatchObject({
-      localDate: "2026-07-14",
-      briefingDate: "2026-07-14",
-      evidenceThroughDate: "2026-07-13",
-      windowId: "daily:2026-07-13:America/Los_Angeles",
-      artifactId: "daily_briefing_20260713",
-      cadence: "daily",
-      closed: true,
-    });
-  });
+  it.each([
+    ["2026-01-01T07:30:00Z","2025-12-31","midweek"],
+    ["2026-03-08T09:30:00Z","2026-03-08","weekly"],
+    ["2026-11-01T08:30:00Z","2026-11-01","weekly"],
+  ])("uses local boundaries for %s",(instant,localDate,cadence)=>expect(resolveScheduledBriefingExpectation({now:new Date(instant),timeZone:zone})).toMatchObject({localDate,cadence}));
 
-  it("creates the stable artifact once and returns it unchanged on retry", async () => {
-    const { composer, records, service } = harness();
-    const first = await service.generateScheduledDailyBriefingForClosedWindow({ asOf: JUL_14 });
-    const generatedAt = first.artifact.generatedAt;
-    const second = await service.generateScheduledDailyBriefingForClosedWindow({ asOf: JUL_14 });
-    expect(first.state).toBe("created");
-    expect(second.state).toBe("already_exists");
-    expect(records).toHaveLength(1);
-    expect(records[0]).toMatchObject({
-      id: "daily_briefing_20260713",
-      cadence: "daily",
-      evidenceWindow: { id: "daily:2026-07-13:America/Los_Angeles", date: "2026-07-13" },
-      lifecycle: { generationStatus: "complete" },
-    });
-    expect(records[0].generatedAt).toBe(generatedAt);
-    expect(records[0].replacedBriefingHistory).toBeUndefined();
-    expect(composer).toHaveBeenCalledTimes(1);
-  });
-
-  it("admits one persisted claim when two requests arrive together", async () => {
-    let release;
-    const blocked = new Promise((resolve) => { release = resolve; });
-    const composer = vi.fn(async () => { await blocked; return { version: "test", hero: { title: "One" } }; });
-    const { records, service } = harness({ composer });
-    const firstPromise = service.generateScheduledDailyBriefingForClosedWindow({ asOf: JUL_14 });
-    await Promise.resolve();
-    await Promise.resolve();
-    const second = await service.generateScheduledDailyBriefingForClosedWindow({ asOf: JUL_14 });
-    release();
-    const first = await firstPromise;
-    expect([first.state, second.state].sort()).toEqual(["created", "in_progress"]);
-    expect(records).toHaveLength(1);
-    expect(composer).toHaveBeenCalledTimes(1);
-  });
-
-  it("blocks Daily generation when Sunday Weekly owns cadence", async () => {
-    const { composer, records, service } = harness();
-    const result = await service.generateScheduledDailyBriefingForClosedWindow({ asOf: new Date("2026-07-12T18:00:00Z") });
-    expect(result.state).toBe("blocked_by_precedence");
-    expect(records).toHaveLength(0);
-    expect(composer).not.toHaveBeenCalled();
-  });
+  it("keeps Wednesday Sunday-through-Tuesday and excludes Wednesday",()=>expect(resolveScheduledBriefingExpectation({now:at("2026-07-22"),timeZone:zone})).toMatchObject({cadence:"midweek",evidenceWindow:{cadence:"midweek",startDate:"2026-07-19",endDate:"2026-07-21",sameDayEvidenceExcluded:true},productionRoutingStatus:"active"}));
+  it("keeps Sunday as the full prior Sunday-through-Saturday week",()=>expect(resolveScheduledBriefingExpectation({now:at("2026-07-26"),timeZone:zone})).toMatchObject({cadence:"weekly",evidenceWindow:{startDate:"2026-07-19",endDate:"2026-07-25"}}));
+  it("treats no-briefing days as a valid closed result without an artifact identity",()=>expect(resolveScheduledBriefingExpectation({now:at("2026-07-20"),timeZone:zone})).toMatchObject({cadence:"none",artifactId:null,windowId:null,dailyEligible:false,routineBriefingExpected:false,productionRoutingStatus:"not_scheduled"}));
 });
 
-describe("cadence-aware Daily freshness", () => {
-  const expectedWindow = resolveScheduledBriefingExpectation({ now: JUL_14, timeZone: user.timeZone }).evidenceWindow;
-  const artifact = {
-    id: "daily_briefing_20260713",
-    generatedAt: "2026-07-14T13:00:00Z",
-    evidenceWindow: expectedWindow,
-    briefing: { evidenceReconciliation: { date: "2026-07-13" } },
-  };
-
-  it("does not stale the Jul 13 window with a routine Jul 14 weigh-in", () => {
-    const result = getDailyBriefingFreshness({
-      dailyBriefing: artifact,
-      expectedWindow,
-      weightEntries: [{ id: "w14", measuredAt: "2026-07-14", updatedAt: "2026-07-14T13:58:42Z" }],
-    });
-    expect(result.status).toBe("current");
-  });
-
-  it("stales the briefing for a later correction inside the Jul 13 window", () => {
-    const result = getDailyBriefingFreshness({
-      dailyBriefing: artifact,
-      expectedWindow,
-      weightEntries: [{ id: "w13", measuredAt: "2026-07-13", updatedAt: "2026-07-14T13:58:42Z" }],
-    });
-    expect(result.status).toBe("stale");
-  });
+describe("Daily retirement",()=>{
+  it("fails closed before claims, composition, or persistence",async()=>{const create=vi.fn(),claim=vi.fn(),composer=vi.fn();const repositories={users:{getCurrentUser:vi.fn()},dailyBriefings:{createDailyBriefing:create,claimScheduledBriefing:claim}};const result=await createDailyBriefingService({repositories,scheduledComposer:composer}).generateScheduledDailyBriefingForClosedWindow({asOf:at("2026-07-20")});expect(result).toMatchObject({state:"retired",reason:"routine_daily_cadence_retired"});expect(create).not.toHaveBeenCalled();expect(claim).not.toHaveBeenCalled();expect(composer).not.toHaveBeenCalled();expect(repositories.users.getCurrentUser).not.toHaveBeenCalled();});
+  it("retires direct scheduled generation while preserving Event generation",async()=>{const records=[];const repository=createDailyBriefingRepository(records);const user={id:"u",timeZone:zone};const service=createDailyBriefingService({repositories:{users:{getCurrentUser:async()=>user,getUserById:async()=>user},dailyBriefings:repository},scheduledComposer:async()=>({})});expect(await service.generateDailyBriefing({userId:"u"})).toMatchObject({state:"retired"});expect(records).toHaveLength(0);});
+  it("retires stale Daily work idempotently and preserves unrelated jobs",()=>{const records=[{id:"daily",cadence:"daily",status:"pending"},{id:"weekly",cadence:"weekly",status:"pending"}];const once=retireLegacyDailyBriefingWork(records),twice=retireLegacyDailyBriefingWork(once);expect(twice).toEqual(once);expect(once[0]).toMatchObject({status:"retired",retirementReason:"routine_daily_cadence_retired"});expect(once[1]).toEqual(records[1]);});
+  it("keeps historical Daily reads intact",async()=>{const records=[{id:"daily_briefing_old",userId:"u",artifactType:"scheduled",cadence:"daily",generatedAt:"2026-07-20T12:00:00Z",briefing:{hero:{title:"Historical"}}}];const repo=createDailyBriefingRepository(records);expect((await repo.getLatestScheduledDailyBriefing("u")).id).toBe("daily_briefing_old");expect(await repo.listDailyBriefings("u")).toEqual(records);});
 });

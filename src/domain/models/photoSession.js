@@ -2,6 +2,7 @@ import {
   FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT,
   getFounderAlphaPhotoSessionCompletion,
   getProgressPhotoCategoryId,
+  normalizeProgressPhotoCategory,
 } from "./progressPhotoPoseVocabulary";
 
 export const PhotoConditionValue = Object.freeze({
@@ -21,11 +22,15 @@ export function normalizePhotoCondition(value, provenance = {}) {
 }
 
 export function createCanonicalPhotoSession({ photos = [], ...data } = {}) {
-  const completion = getFounderAlphaPhotoSessionCompletion(photos);
+  const normalizedPhotos = photos.map((photo) => ({
+    ...photo,
+    ...normalizeProgressPhotoCategory(photo),
+  }));
+  const completion = getFounderAlphaPhotoSessionCompletion(normalizedPhotos);
   const activePhotoIdsByPose = {};
   const duplicateRetrySourceReferences = [];
 
-  photos.forEach((photo) => {
+  normalizedPhotos.forEach((photo) => {
     const poseId = getProgressPhotoCategoryId(photo);
     if (["duplicate", "superseded", "inactive"].includes(photo.status)) {
       duplicateRetrySourceReferences.push(...(photo.sourceIds ?? []));
@@ -43,8 +48,8 @@ export function createCanonicalPhotoSession({ photos = [], ...data } = {}) {
     duplicateRetrySourceReferences: [...new Set(duplicateRetrySourceReferences)],
     expectedPoseContract: FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT,
     missingPoses: completion.missingPoseIds,
-    photos,
+    photos: normalizedPhotos,
     synthesisOutputReference: null,
-    synthesisStatus: completion.complete ? "ready" : "awaiting_required_views",
+    synthesisStatus: completion.complete ? "ready" : "awaiting_confirmed_view",
   };
 }

@@ -23,6 +23,18 @@ describe("Evidence Hub local usage ranking", () => {
     expect(rankRecentlyUsedEvidence(null, NOW)).toEqual([]);
   });
 
+  it("archives Protocols from Evidence usage without rewriting stored history", () => {
+    const protocolUsage = usage({
+      protocols: category("2026-07-17T11:59:00.000Z"),
+      training: category("2026-07-17T11:00:00.000Z"),
+    });
+
+    expect(rankRecentlyUsedEvidence(protocolUsage, NOW)).toEqual(["training"]);
+    expect(recordEvidenceHubVisit(protocolUsage, "protocols", NOW)).toEqual(
+      parseEvidenceHubUsage(protocolUsage)
+    );
+  });
+
   it("records stable evidence identifiers without mutating its input", () => {
     const initial = usage({});
     const next = recordEvidenceHubVisit(initial, "training", NOW);
@@ -92,7 +104,33 @@ describe("Evidence Hub local usage ranking", () => {
   });
 
   it("keeps All Evidence in canonical order and complete", () => {
-    const reversed = [...EVIDENCE_HUB_CANONICAL_ORDER].reverse().map((id) => ({ id }));
+    expect(EVIDENCE_HUB_CANONICAL_ORDER).toEqual([
+      "training",
+      "nutrition",
+      "weight",
+      "photos",
+      "dexa",
+      "activity",
+      "energy",
+      "recovery",
+      "health-metrics",
+    ]);
+    const reversed = [
+      ...EVIDENCE_HUB_CANONICAL_ORDER,
+      "protocols",
+      "unknown",
+    ].reverse().map((id) => ({ id }));
     expect(orderEvidenceStreams(reversed).map((item) => item.id)).toEqual(EVIDENCE_HUB_CANONICAL_ORDER);
+  });
+
+  it("ranks Energy independently without inheriting source usage", () => {
+    const initial = usage({
+      nutrition: category("2026-07-17T11:00:00.000Z"),
+      activity: category("2026-07-17T10:00:00.000Z"),
+    });
+    const next = recordEvidenceHubVisit(initial, "energy", NOW);
+    expect(next.categories.energy.recentOpens).toEqual([NOW.toISOString()]);
+    expect(next.categories.dexa).toBeUndefined();
+    expect(rankRecentlyUsedEvidence(next, NOW)[0]).toBe("energy");
   });
 });

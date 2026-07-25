@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, FileText, FileUp, Upload } from "lucide-react";
+import { Activity, ArrowLeft, ClipboardList, Dumbbell, FileText, FileUp, Utensils, Upload } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 import UploadAnythingForm from "../components/evidence/UploadAnythingForm";
 
 export default function LogHubScreen({
   error = null,
+  loggedToday = { rows: [] },
   pendingEvidenceReviews = [],
   saved = null,
   uploadAnythingAction,
@@ -29,11 +30,66 @@ export default function LogHubScreen({
         </header>
 
         <div className="space-y-4">
+          <LoggedTodayCard summary={loggedToday} />
           {pendingEvidenceReviews.length > 0 && <PendingEvidenceReviews reviews={pendingEvidenceReviews} />}
           <UploadAnythingCard action={uploadAnythingAction} />
         </div>
       </div>
     </main>
+  );
+}
+
+const LOGGED_TODAY_ICONS = {
+  activity: Activity,
+  nutrition: Utensils,
+  training: Dumbbell,
+};
+
+function LoggedTodayCard({ summary }) {
+  return (
+    <Card className="space-y-1">
+      <h2 className="px-1 pb-2 text-base font-extrabold text-slate-950">
+        Logged Today
+      </h2>
+      {summary.rows.map((row) => (
+        <LoggedTodayRow key={row.id} row={row} />
+      ))}
+    </Card>
+  );
+}
+
+function LoggedTodayRow({ row }) {
+  const Icon = LOGGED_TODAY_ICONS[row.id];
+  const content = (
+    <>
+      <Icon aria-hidden="true" className="shrink-0 text-indigo-600" size={18} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+          {row.label}
+        </span>
+        <span className="mt-0.5 block text-sm font-semibold leading-5 text-slate-950">
+          {row.summary}
+        </span>
+        {row.context && (
+          <span className="block text-xs font-medium leading-5 text-slate-500">
+            {row.context}
+          </span>
+        )}
+      </span>
+    </>
+  );
+  const className =
+    "flex min-h-16 items-center gap-3 rounded-[14px] px-3 py-2.5";
+
+  return row.href ? (
+    <Link
+      className={`${className} transition hover:bg-[#F8FAFC] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100`}
+      href={row.href}
+    >
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 

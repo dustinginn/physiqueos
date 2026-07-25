@@ -1,4 +1,10 @@
 export const NUTRITION_DAY_SCHEMA_VERSION = "nutrition-day-v1";
+export const NUTRITION_RECONCILIATION_TOLERANCE = {
+  calories: 25,
+  protein_g: 2,
+  carbs_g: 2,
+  fat_g: 2,
+};
 
 const DEFAULT_TOTALS = {
   calories: null,
@@ -159,6 +165,89 @@ export function parseDailyNutritionTotals(text) {
   return totals;
 }
 
+export function reconcileNutritionDayEvidence({
+  dailyTotals = {},
+  meals = [],
+  tolerance = NUTRITION_RECONCILIATION_TOLERANCE,
+} = {}) {
+  const normalizedMeals = normalizeMeals(meals);
+  const mealSums = sumNutritionTotals(normalizedMeals.map((meal) => meal.totals));
+  const differences = Object.fromEntries(
+    Object.keys(NUTRITION_RECONCILIATION_TOLERANCE).map((key) => [
+      key,
+      finiteDifference(dailyTotals[key], mealSums[key]),
+    ])
+  );
+  const comparableKeys = Object.keys(differences).filter(
+    (key) => differences[key] !== null
+  );
+  const withinTolerance =
+    comparableKeys.length > 0 &&
+    comparableKeys.every(
+      (key) => Math.abs(differences[key]) <= (tolerance[key] ?? 0)
+    );
+
+  return {
+    authoritative_source: hasMeaningfulTotals(dailyTotals)
+      ? "daily_totals"
+      : "meal_sums",
+    status:
+      comparableKeys.length === 0
+        ? "not_comparable"
+        : withinTolerance
+          ? "reconciled"
+          : "needs_review",
+    tolerance: { ...tolerance },
+    meal_sums: mealSums,
+    differences,
+  };
+}
+
+// Older pending reviews may contain a gap left by former name-based food
+// deduplication. Recover only when item sequence and meal calories independently
+// identify one exact duplicate.
+export function restoreCollapsedNutritionFoodDuplicates(meal = {}) {
+  const foods = Array.isArray(meal.foods) ? meal.foods : [];
+  const numericIds = foods
+    .map((food) => String(food.id ?? "").match(/^(.*?)(\d+)$/))
+    .filter(Boolean);
+  if (numericIds.length !== foods.length || foods.length < 2) return foods;
+  if (new Set(numericIds.map((match) => match[1])).size !== 1) return foods;
+
+  const numbers = numericIds.map((match) => Number(match[2])).sort((a, b) => a - b);
+  const missing = [];
+  for (let value = numbers[0]; value <= numbers[numbers.length - 1]; value += 1) {
+    if (!numbers.includes(value)) missing.push(value);
+  }
+  if (missing.length !== 1) return foods;
+
+  const mealCalories = finiteNumber(meal.totals?.calories);
+  const foodCalories = foods.reduce(
+    (sum, food) => sum + (finiteNumber(food.nutrients?.calories) ?? 0),
+    0
+  );
+  if (mealCalories === null) return foods;
+  const gap = mealCalories - foodCalories;
+  const duplicate = foods.find(
+    (food) => Math.abs((finiteNumber(food.nutrients?.calories) ?? -1) - gap) <= 1
+  );
+  if (!duplicate || gap <= 0) return foods;
+
+  const recovered = {
+    ...duplicate,
+    id: `${numericIds[0][1]}${missing[0]}`,
+    provenance: {
+      ...duplicate.provenance,
+      reconciliation: "recovered_collapsed_duplicate",
+    },
+  };
+  return [...foods, recovered].sort(
+    (first, second) =>
+      Number(String(first.id).match(/(\d+)$/)?.[1] ?? 0) -
+      Number(String(second.id).match(/(\d+)$/)?.[1] ?? 0)
+  );
+}
+
 function parseMealNutritionText(text, { provenanceRef }) {
   const value = String(text ?? "");
   const mealMatch = value.match(/\b(breakfast|lunch|dinner|snack|snacks)\b/i);
@@ -201,8 +290,10 @@ function parseMealNutritionText(text, { provenanceRef }) {
 }
 
 function normalizeMeals(meals) {
-  return (Array.isArray(meals) ? meals : []).map((meal) => ({
-    id: meal.id ?? slugify(meal.name ?? "meal"),
+  return (Array.isArray(meals) ? meals : []).map((meal, mealIndex) => {
+    const mealId = meal.id ?? `${slugify(meal.name ?? "meal")}_${mealIndex + 1}`;
+    return {
+    id: mealId,
     name: meal.name ?? "Meal",
     completeness: meal.completeness ?? getMealCompleteness(meal),
     known_foods:
@@ -220,22 +311,23 @@ function normalizeMeals(meals) {
       ...DEFAULT_TOTALS,
       ...withoutEmptyValues(meal.totals ?? {}),
     },
-    foods: normalizeFoods(meal.foods ?? []),
+    foods: normalizeFoods(meal.foods ?? [], mealId),
     provenance_ref: meal.provenance_ref ?? "unknown",
     provenance: {
       source_artifact_refs:
         meal.provenance?.source_artifact_refs ??
         [meal.provenance_ref ?? "unknown"],
     },
-  }));
+  };
+  });
 }
 
-function normalizeFoods(foods) {
+function normalizeFoods(foods, mealId = "meal") {
   return (Array.isArray(foods) ? foods : []).map((food, index) => {
     const canonicalName = food.canonical_name ?? food.name ?? `Food ${index + 1}`;
 
     return {
-      id: food.id ?? slugify(canonicalName),
+      id: food.id ?? `${mealId}_food_${index + 1}`,
       canonical_name: canonicalName,
       name: food.name ?? canonicalName,
       brand: food.brand ?? null,
@@ -258,6 +350,33 @@ function normalizeFoods(foods) {
       },
     };
   });
+}
+
+function sumNutritionTotals(totals = []) {
+  return Object.fromEntries(
+    Object.keys(DEFAULT_TOTALS).map((key) => {
+      const values = totals
+        .map((entry) => finiteNumber(entry?.[key]))
+        .filter((value) => value !== null);
+      return [key, values.length ? values.reduce((sum, value) => sum + value, 0) : null];
+    })
+  );
+}
+
+function finiteDifference(authoritative, compared) {
+  const first = finiteNumber(authoritative);
+  const second = finiteNumber(compared);
+  return first === null || second === null ? null : first - second;
+}
+
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function hasMeaningfulTotals(totals = {}) {
+  return Object.values(totals).some((value) => finiteNumber(value) !== null);
 }
 
 function normalizeFoodPercentOfDailyGoals(percentages = {}) {

@@ -3,10 +3,11 @@ import { ArrowLeft, Scale } from "lucide-react";
 import EvidenceReportContext from "../components/progress/EvidenceReportContext";
 import ProgressLineChart from "../components/progress/ProgressLineChart";
 import ReportDrawer from "../components/progress/ReportDrawer";
+import TrainingTimelineSelector from "../components/training/TrainingTimelineSelector";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 
-export default function WeightReportScreen({ from, report }) {
+export default function WeightReportScreen({ evidenceContext, from, report }) {
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-24">
@@ -33,9 +34,11 @@ export default function WeightReportScreen({ from, report }) {
           </div>
         </header>
 
-        <EvidenceReportContext
-          mode="related-goals"
-          relatedGoals={report.relatedGoals}
+        <TrainingTimelineSelector
+          ariaLabel="Weight evidence time filter"
+          currentPath={evidenceContext.currentPath}
+          preservedParams={evidenceContext.preservedParams}
+          timeline={evidenceContext}
         />
 
         <section className="grid grid-cols-2 gap-3">
@@ -89,10 +92,14 @@ export default function WeightReportScreen({ from, report }) {
           </ReportDrawer>
         </div>
 
-        <EvidenceReportContext
-          dataSources={report.dataSources}
-          mode="data-sources"
-        />
+        {/* Evidence Context replaces redundant Related Goals presentation here. */}
+        <div className="mt-4 space-y-4">
+          <EvidenceReportContext
+            dataSources={report.dataSources}
+            flush
+            mode="data-sources"
+          />
+        </div>
       </div>
     </main>
   );

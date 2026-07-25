@@ -1,6 +1,7 @@
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export function composeNarrativeGoalPreview({ goalId = VISIBLE_ABS_GOAL_ID, dossier = {} } = {}) {
+  const awaitingConfirmation = dossier.lifecycleState === "awaiting_confirmation";
   const progress = number(dossier.progress);
   const confidence = number(dossier.confidence);
   const journeyState = getJourneyState(progress);
@@ -25,8 +26,8 @@ export function composeNarrativeGoalPreview({ goalId = VISIBLE_ABS_GOAL_ID, doss
     goalId,
     hero: {
       title: "Visible Abs at Rest",
-      state: journeyState,
-      conclusion: remainingVisual.length ? `Most of the journey is behind you. The remaining work is concentrated in ${joinBodyList(remainingVisual,true)} and confirming the result under consistent conditions.` : "The finish line is close and the current direction remains intact.",
+      state: awaitingConfirmation ? "Awaiting Visual Confirmation" : journeyState,
+      conclusion: awaitingConfirmation ? "DEXA confirms the body-composition threshold is reached. A qualified relaxed photo set is the final visual check." : remainingVisual.length ? `Most of the journey is behind you. The remaining work is concentrated in ${joinBodyList(remainingVisual,true)} and confirming the result under consistent conditions.` : "The finish line is close and the current direction remains intact.",
       confidence,
       confidenceLabel: dossier.confidenceLevel ?? "Building",
       estimate: dossier.daysRemaining && dossier.daysRemaining !== "Unknown" ? dossier.daysRemaining : null,
@@ -36,7 +37,7 @@ export function composeNarrativeGoalPreview({ goalId = VISIBLE_ABS_GOAL_ID, doss
       stops: [
         { state: "complete", label: "Start", detail: firstWeight ? `${formatDate(firstWeight.date)} · ${firstWeight.value.toFixed(1)} ${firstWeight.unit}` : "Starting point established" },
         { state: "complete", label: "Ground Covered", detail: latestDexa ? `${latestDexa.bodyFat.toFixed(1)}% Body Fat Confirmed` : "Durable Weight Trend" },
-        { state: "current", label: "Today", detail: journeyState },
+        { state: "current", label: "Today", detail: awaitingConfirmation ? "Awaiting Visual Confirmation" : journeyState },
         { state: "next", label: "Next Milestone", detail: remainingVisual[0] ? `${titleCase(remainingVisual[0])} Definition` : "Visual Result Confirmation" },
         { state: "destination", label: "Goal", detail: "Visible Abs at Rest" },
       ],
@@ -46,16 +47,18 @@ export function composeNarrativeGoalPreview({ goalId = VISIBLE_ABS_GOAL_ID, doss
       latestDexa && { title: "Body Fat Confirmed", body: `DEXA showed the cut was changing body composition—not merely the scale.` },
       visual.strengths?.length && { title: "Visual Progress Confirmed", body: `${joinBodyList(visual.strengths.slice(0,3))}. The remaining work is now narrower and clearer.` },
     ].filter(Boolean),
-    roadAhead: [
-      ...completionCriteria.filter((item)=>item.status!=="Achieved").map((item)=>({ type:"physical", label:item.label, detail:"Continue revealing this outcome without forcing the pace." })),
-      { type:"execution", label:"Productive Abdominal Training", detail:"Maintain training quality while the cut finishes." },
-      { type:"confirmation", label:"Comparable Finish Confirmation", detail:"Use consistent photos and the next planned checkpoint before transitioning." },
-    ],
+    roadAhead: awaitingConfirmation
+      ? [{ type:"confirmation", label:"Relaxed Photo Confirmation", detail:"Use a qualified relaxed photo set and your own visual assessment to confirm lower-ab visibility at rest." }]
+      : [
+          ...completionCriteria.filter((item)=>item.status!=="Achieved").map((item)=>({ type:"physical", label:item.label, detail:"Continue revealing this outcome without forcing the pace." })),
+          { type:"execution", label:"Productive Abdominal Training", detail:"Maintain training quality while the cut finishes." },
+          { type:"confirmation", label:"Comparable Finish Confirmation", detail:"Use consistent photos and the next planned checkpoint before transitioning." },
+        ],
     completionCriteria,
     strategy: {
-      conclusion: "Continue a controlled deficit while keeping training quality and direct abdominal work productive. Recent progress does not call for a more aggressive approach.",
+      conclusion: awaitingConfirmation ? "Hold training quality, recovery, and nutrition steady while the final relaxed-photo confirmation is completed." : "Continue a controlled deficit while keeping training quality and direct abdominal work productive. Recent progress does not call for a more aggressive approach.",
       pillars: (dossier.protocols ?? []).filter((item)=>/nutrition|training|activity|recovery/i.test(item.name)).slice(0,4).map((item)=>({ label:item.name, detail:cleanCoachCopy(item.reason) })),
-      constraint: "Protect training quality while finishing the remaining visual work.",
+      constraint: awaitingConfirmation ? "Do not add unnecessary deficit after reaching the numerical threshold." : "Protect training quality while finishing the remaining visual work.",
     },
     turningPoints,
     confidence: {
@@ -65,8 +68,8 @@ export function composeNarrativeGoalPreview({ goalId = VISIBLE_ABS_GOAL_ID, doss
       reasons: (dossier.confidenceReasons ?? []).slice(0,3).map(cleanCoachCopy),
       watching: "Lower-ab definition under consistent photo conditions.",
     },
-    protocols: (dossier.protocols ?? []).map((item)=>({ name:item.name, purpose:cleanCoachCopy(item.reason), href:"/profile/protocols" })),
-    transition: progress >= 80 ? { title:"What comes next", state:progress >= 100?"Transition Ready":"Approaching Completion", body:"Once lower-ab visibility is confirmed, the focus shifts from losing more weight to stabilizing the result. Maintenance should begin deliberately, not as an abrupt stop." } : null,
+    protocols: (dossier.protocols ?? []).map((item)=>({ name:item.name, purpose:cleanCoachCopy(item.reason), href:"/profile/operating-plan" })),
+    transition: awaitingConfirmation ? { title:"What comes next", state:"Awaiting Visual Confirmation", body:"Once lower-ab visibility is confirmed, the focus shifts from losing more weight to stabilizing the result. Maintenance remains a separate deliberate decision." } : progress >= 80 ? { title:"What comes next", state:progress >= 100?"Transition Ready":"Approaching Completion", body:"Once lower-ab visibility is confirmed, the focus shifts from losing more weight to stabilizing the result. Maintenance should begin deliberately, not as an abrupt stop." } : null,
     provenance: { presentationOnly:true, persisted:false, source:"visible_abs_goal_dossier" },
   };
 }

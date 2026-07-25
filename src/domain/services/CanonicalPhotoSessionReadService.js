@@ -1,7 +1,7 @@
 import { getProgressPhotoCategoryId, getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabulary";
 import { composeGalleryInterpretation } from "./GalleryInterpretationService";
 
-const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed"];
+const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed", "side-relaxed", "left-side-relaxed", "right-side-relaxed", "front-flexed"];
 const INACTIVE = new Set(["duplicate", "superseded", "inactive"]);
 
 export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhotos = [], weights = [], analyses = [] } = {}) {
@@ -9,12 +9,56 @@ export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhot
     .filter((item) => item.evidence_type === "photo_session" && item.quality?.status !== "superseded")
     .map((item) => buildCanonicalSession(item, { canonicalObjects, legacyPhotos, weights, analyses }));
   const canonicalByFingerprint = new Map();
-  canonicalCandidates.forEach((session) => { const key=session.sessionFingerprint;const existing=canonicalByFingerprint.get(key);if(!existing){canonicalByFingerprint.set(key,session);return;}const owner=session.activeViewCount>existing.activeViewCount?session:existing;const alias=owner===session?existing:session;canonicalByFingerprint.set(key,{...owner,hiddenProvenanceAliases:unique([...(owner.hiddenProvenanceAliases??[]),alias.id,...(alias.hiddenProvenanceAliases??[])])}); });
+  canonicalCandidates.forEach((session) => {
+    const key = session.sessionFingerprint;
+    const existing = canonicalByFingerprint.get(key);
+    if (!existing) {
+      canonicalByFingerprint.set(key, session);
+      return;
+    }
+    const owner = selectCanonicalSessionOwner(existing, session);
+    const alias = owner === session ? existing : session;
+    canonicalByFingerprint.set(key, {
+      ...owner,
+      hiddenProvenanceAliases: unique([
+        ...(owner.hiddenProvenanceAliases ?? []),
+        alias.id,
+        ...(alias.hiddenProvenanceAliases ?? []),
+      ]),
+    });
+  });
   const canonicalSessions = [...canonicalByFingerprint.values()];
   const ownedSourceIds = new Set(canonicalSessions.flatMap((session)=>[...(session.inactiveSourceReferences??[]),...session.views.flatMap((view)=>view.provenance?.sourceIds??[])]));
   const canonicalAssetKeys = new Set([...canonicalSessions.flatMap((session)=>session.views.map((view)=>stableAssetKey(view.imageReference,[]))),...legacyPhotos.filter((photo)=>ownedSourceIds.has(photo.id)).map((photo)=>stableAssetKey(photo.imagePath,[]))]);
-  const legacySessions = buildLegacySessions(legacyPhotos.filter((photo) => !canonicalAssetKeys.has(stableAssetKey(photo.imagePath,[]))), weights, analyses);
+  const legacySessions = buildLegacySessions(legacyPhotos.filter((photo) => !canonicalAssetKeys.has(stableAssetKey(photo.imagePath,[])) && isUsableLegacyPhoto(photo)), weights, analyses);
   return finalizeComparisons([...canonicalSessions, ...legacySessions].sort((left, right) => right.captureDate.localeCompare(left.captureDate)));
+}
+
+export function reconcilePhotoSessionComparisons(sessions = []) {
+  return finalizeComparisons(
+    sessions.map((session) => ({
+      ...session,
+      views: (session.views ?? []).map(clearPresentationComparison),
+    }))
+  );
+}
+
+function isUsableLegacyPhoto(photo) {
+  return photo.active !== false
+    && !INACTIVE.has(photo.status)
+    && photo.edited !== true
+    && photo.source?.edited !== true
+    && Boolean(photo.imagePath);
+}
+
+function selectCanonicalSessionOwner(left, right) {
+  if (left.activeViewCount !== right.activeViewCount) {
+    return left.activeViewCount > right.activeViewCount ? left : right;
+  }
+  const leftStable = left.hasStableSessionIdentity ? 1 : 0;
+  const rightStable = right.hasStableSessionIdentity ? 1 : 0;
+  if (leftStable !== rightStable) return leftStable > rightStable ? left : right;
+  return String(left.id).localeCompare(String(right.id)) <= 0 ? left : right;
 }
 
 function buildCanonicalSession(object, context) {
@@ -45,9 +89,11 @@ function buildCanonicalSession(object, context) {
   return {
     id: object.canonicalId,
     photoSessionId: object.canonicalId,
+    hasStableSessionIdentity: payload.sessionId === object.canonicalId,
     captureDate,
     date: formatDate(captureDate),
     sourceMode: "canonical",
+    confirmationIntent: payload.confirmationIntent ?? null,
     dateDerivationSource: payload.captureDate ? "canonical_capture_date" : captureDate !== dateKey(payload.observed_at ?? object.lastObservedAt) ? "matched_source_capture_date" : "canonical_observed_date",
     sessionFingerprint: createSessionFingerprint(activePhotos.map((photo)=>resolveCanonicalAsset(photo,context.legacyPhotos))),
     hiddenProvenanceAliases: [],
@@ -62,7 +108,7 @@ function buildCanonicalSession(object, context) {
     comparedAgainst: nearestComparisonDate(views),
     sessionConditions: normalizeConditions(payload.sessionConditions ?? payload.conditions),
     completionStatus: payload.completionState ?? (views.length === 3 ? "complete" : "incomplete"),
-    completionLabel: `${views.filter((view) => POSE_ORDER.includes(view.poseId)).length}/3 complete`,
+    completionLabel: `${views.length} confirmed ${views.length === 1 ? "view" : "views"}`,
     synthesisStatus: payload.synthesisStatus ?? (synthesis ? "complete" : "pending"),
     synthesisSummaryReference: synthesis?.id ?? payload.synthesisOutputReference ?? null,
     synthesis,
@@ -84,6 +130,7 @@ function buildCanonicalView(photo, context) {
     canonicalViewId: photo.canonicalPhotoId ?? photo.id,
     canonicalPhotoId: photo.canonicalPhotoId ?? photo.id,
     pose: { id: poseId, label: getProgressPhotoCategoryLabel(photo), view: photo.view, pose: photo.pose },
+    poseIdentity: { orientation: photo.orientation, contractionState: photo.contractionState, poseVariant: photo.poseVariant, customLabel: photo.customLabel, poseId, label: getProgressPhotoCategoryLabel(photo) },
     poseId,
     label: getProgressPhotoCategoryLabel(photo),
     captureDate: context.captureDate,
@@ -116,6 +163,10 @@ function buildCanonicalView(photo, context) {
     timelinePlacement: analysis?.summary ?? context.synthesis?.summary ?? null,
     synthesisMetadata: { synthesisId: context.synthesis?.id ?? null, synthesisStatus: context.synthesis ? "complete" : "pending" },
     provenance: { sourceIds: photo.sourceIds ?? [], sourceHashes: photo.sourceHashes ?? [], resolvedSourceId: asset?.sourceId ?? null },
+    sourceOrder: photo.sourceOrder ?? photo.order ?? 0,
+    identityStatus: photo.identityStatus ?? (photo.userConfirmedIdentity === false ? "suggested" : "confirmed"),
+    userConfirmedIdentity: photo.userConfirmedIdentity !== false,
+    goalValidationRole: photo.goalValidationRole ?? (poseId === "front-relaxed" ? "primary" : "supporting"),
     hydrationDiagnostic: asset ? null : { stage: "canonical_hydration", canonicalViewId: photo.canonicalPhotoId ?? photo.id, unresolvedSourceIds: photo.sourceIds ?? [], repository: "ProgressPhotoRepository", reason: "No stored image path matched the canonical source identity." },
     sourceMode: "canonical",
   };
@@ -150,8 +201,40 @@ function buildLegacySessions(photos, weights, analyses) {
 function finalizeComparisons(sessions) {
   return sessions.map((session) => {
     const views = session.views.map((view) => { const compared=attachBestComparison(view, session, sessions);return{...compared,galleryInterpretation:composeGalleryInterpretation(compared),sourceHistory:sourceHistory(compared)}; });
-    return { ...session, views, comparedAgainst: sessionComparisonLabel(views), comparisonAvailability: summarizeComparisonAvailability(views) };
+    return { ...session, views, comparedAgainst: sessionComparisonLabel(views), comparisonAvailability: summarizeComparisonAvailability(views),
+      interpretationModes: views.map((view) => ({
+        currentViewId: view.canonicalViewId, poseIdentity: view.poseIdentity ?? view.pose,
+        currentPhotoSessionId: session.id, priorMatchFound: Boolean(view.comparison),
+        priorViewId: view.comparison?.previousCanonicalViewId ?? null,
+        priorPhotoSessionId: view.comparison?.previousSessionId ?? null,
+        earliestMatchFound: Boolean(view.comparison),
+        earliestViewId: view.comparison?.previousCanonicalViewId ?? null,
+        comparisonMode: view.comparison ? "historical_comparison" : "new_pose_baseline",
+        goalRelevance: view.poseId === "front-relaxed" ? "primary" : "supporting",
+        contributesToGoalValidation: view.poseId === "front-relaxed",
+        establishesBaseline: !view.comparison,
+      })),
+    };
   });
+}
+
+function clearPresentationComparison(view) {
+  const {
+    comparison: _comparison,
+    previousImageHref: _previousImageHref,
+    previousLabel: _previousLabel,
+    previousHydrationDiagnostic: _previousHydrationDiagnostic,
+    priorComparisonId: _priorComparisonId,
+    conditionDifferences: _conditionDifferences,
+    conditionSummary: _conditionSummary,
+    comparisonNarrative: _comparisonNarrative,
+    comparisonNarrativeSource: _comparisonNarrativeSource,
+    galleryInterpretation: _galleryInterpretation,
+    sourceHistory: _sourceHistory,
+    ...current
+  } = view;
+
+  return current;
 }
 function sourceHistory(view) { return view.comparison ? `This comparison uses your ${view.label} photos from ${formatDate(view.comparison.previousDate)} and ${formatDate(view.captureDate)}.` : `This is your ${view.label} photo from ${formatDate(view.captureDate)}.`; }
 

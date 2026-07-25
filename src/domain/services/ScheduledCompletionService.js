@@ -10,7 +10,7 @@ export function evaluateScheduledCompletion({ canonicalObjects = [], evidencePac
     if (type === "photo_session") {
       const completion = getFounderAlphaPhotoSessionCompletion(canonical?.payload?.photos ?? []);
       satisfied = Boolean(canonical) && completion.complete;
-      reason = satisfied ? "Confirmed canonical PhotoSession contains three unique required poses." : `Canonical PhotoSession is missing: ${completion.missingPoseIds.join(", ")}.`;
+      reason = satisfied ? "Confirmed canonical PhotoSession contains at least one active, usable, user-confirmed view." : "Canonical PhotoSession has no confirmed usable view.";
     }
     return { evidenceType: type, observedDate, canonicalEvidenceId: canonical?.canonicalId ?? null, satisfied, reason };
   });

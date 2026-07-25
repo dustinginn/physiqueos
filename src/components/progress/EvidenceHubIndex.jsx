@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  Activity,
-  Camera,
-  ChevronRight,
-  ClipboardList,
-  Dumbbell,
-  HeartPulse,
-  Salad,
-  ScanLine,
-  Scale,
-  Syringe,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import IconBadge from "../ui/IconBadge";
+import {
+  getEvidenceIconAppearanceClassName,
+  getEvidenceIconPresentation,
+} from "./EvidenceIconPresentation";
 import {
   orderEvidenceStreams,
   readEvidenceHubUsage,
@@ -22,18 +15,6 @@ import {
   recordEvidenceHubVisit,
   writeEvidenceHubUsage,
 } from "../../domain/services/EvidenceHubUsageService";
-
-const streamIcons = {
-  activity: Activity,
-  dexa: ScanLine,
-  "health-metrics": HeartPulse,
-  nutrition: Salad,
-  photos: Camera,
-  protocols: Syringe,
-  recovery: Activity,
-  training: Dumbbell,
-  weight: Scale,
-};
 
 export default function EvidenceHubIndex({ from, streams }) {
   const [recentIds, setRecentIds] = useState([]);
@@ -107,7 +88,7 @@ export default function EvidenceHubIndex({ from, streams }) {
 }
 
 function EvidenceStreamCard({ from, onVisit, stream }) {
-  const Icon = streamIcons[stream.id] ?? ClipboardList;
+  const { icon: Icon } = getEvidenceIconPresentation(stream.id);
   const href = from === "you" ? `${stream.href}?from=you` : stream.href;
   const summary = getCompactSummary(stream);
   const title = displayTitle(stream);
@@ -121,8 +102,8 @@ function EvidenceStreamCard({ from, onVisit, stream }) {
       onClick={() => onVisit(stream.id)}
     >
       <IconBadge
+        appearanceClassName={getEvidenceIconAppearanceClassName(stream.id)}
         className="h-8 min-h-8 w-8 min-w-8 flex-none aspect-square rounded-full"
-        color={stream.tone}
         icon={Icon}
         size="sm"
       />
@@ -150,6 +131,7 @@ function getCompactSummary(stream) {
     nutrition: "Last logged",
     photos: "Last session",
     dexa: "Last scan",
+    energy: "Latest",
   };
 
   if (datedLabels[stream.id]) {

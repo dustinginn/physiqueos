@@ -9,10 +9,48 @@ import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisSer
 import { extractManualNoteEvidence } from "../../../domain/services/DailyEventService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
 import { getLocalDateKey } from "../../../domain/utils/localDate";
+import {
+  getFounderRuntimeStore,
+  resolveFounderRuntimeStorePath,
+} from "../../../data/repositories/founderRuntimeStore";
+import { createFounderStoreUnitOfWork } from "../../../data/repositories/FounderStoreUnitOfWork";
+import { createRecoveryCheckInIngestionService } from "../../../domain/services/RecoveryCheckInIngestionService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
+
+export async function saveStructuredRecoveryCheckIn(formData) {
+  const user = await FounderRepositories.users.getCurrentUser();
+  if (!user) throw new Error("Founder user is not available.");
+  const now = new Date();
+  const liveStore = getFounderRuntimeStore();
+  const service = createRecoveryCheckInIngestionService({
+    unitOfWork: createFounderStoreUnitOfWork({
+      filePath: resolveFounderRuntimeStorePath(),
+      liveStore,
+      binding: {
+        storeIdentity: "founder_runtime_store",
+        storeKind: "production",
+        isolated: false,
+        productionAllowed: true,
+      },
+    }),
+  });
+  await service.save({
+    userId: user.id,
+    date: getLocalDateKey(now, user.timeZone),
+    recordedAt: now.toISOString(),
+    timezone: user.timeZone,
+    sleepDuration: normalizeOptionalNumber(formData.get("sleepDuration")),
+    subjectiveRecovery:
+      normalizeOptionalText(formData.get("subjectiveRecovery")) || null,
+    soreness: normalizeOptionalText(formData.get("soreness")) || null,
+  });
+  revalidatePath("/");
+  revalidatePath("/check-in/morning");
+  redirect("/check-in/morning?recovery=saved");
+}
 
 export async function saveMorningCheckIn(formData) {
   const user = await FounderRepositories.users.getCurrentUser();

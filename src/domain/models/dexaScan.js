@@ -57,6 +57,7 @@ export function createDEXAScan(data = {}) {
     },
     boneDensity: {
       totalBMD: null,
+      totalBMDUnit: "g/cm2",
       tScore: null,
       zScore: null,
       youngAdultZScore: null,

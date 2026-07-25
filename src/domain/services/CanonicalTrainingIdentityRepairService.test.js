@@ -24,7 +24,7 @@ describe("immutable Seated Cable Row canonical repair", () => {
     expect(result.correctionPackageId).toBe(SEATED_CABLE_ROW_REPAIR_PACKAGE_ID);
     expect(stale.quality).toEqual(expect.objectContaining({ status: "superseded", supersededBy: result.canonicalObject.canonicalId }));
     expect(active).toHaveLength(1);
-    expect(active[0].payload.exercises.map((exercise) => exercise.name)).toEqual(["Pull-Up", "Seated Cable Row"]);
+    expect(active[0].payload.exercises.map((exercise) => exercise.name)).toEqual(["Pull-Ups", "Seated Cable Rows"]);
     expect(active[0].payload.exercises[1].sets).toEqual([{ reps: 12, weight: 120 }, { reps: 15, weight: 120 }]);
     expect(result.correctionPackage.provenance.source_artifacts[0].text).toContain("Seater cable row");
   });

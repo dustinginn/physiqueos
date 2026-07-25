@@ -8,6 +8,7 @@ import {
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import { interpretProgressPhotos } from "../interpreters";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
@@ -16,7 +17,16 @@ import {
   isActiveCanonicalEvidenceObject,
 } from "./CanonicalReadModel";
 import { orderWeeklyAveragesNewestFirst } from "../utils/weeklyAverageOrdering";
-import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
+import {
+  createPhotoSessionReadModels,
+  reconcilePhotoSessionComparisons,
+} from "./CanonicalPhotoSessionReadService";
+import {
+  formatTrainingLoad,
+  isBodyweightSet,
+} from "../../presentation/trainingPresentation";
+import { orderEvidenceStreams } from "./EvidenceHubUsageService";
+import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -24,31 +34,93 @@ export function createProgressReportingService({ repositories }) {
   return {
     async getProgressHub(userId) {
       const context = await getProgressContext({ repositories, userId });
+      const report = buildProgressHub(context);
 
-      return buildProgressHub(context);
+      return {
+        ...report,
+        streams: orderEvidenceStreams(report.streams),
+      };
     },
 
-    async getWeightReport(userId) {
+    async getWeightReport(userId, options = {}) {
       const context = await getProgressContext({ repositories, userId });
+      const scopedContext = scopeWeightReportContext(
+        context,
+        options.dateWindow
+      );
 
-      return buildWeightReport(context);
+      return {
+        ...buildWeightReport(scopedContext, {
+          summaryContextId: options.summaryContextId,
+        }),
+        evidenceWindow: options.dateWindow ?? null,
+      };
     },
 
-    async getDEXAReport(userId) {
+    async getDEXAReport(userId, options = {}) {
       const context = await getProgressContext({ repositories, userId });
+      const scopedContext = scopeDEXAReportContext(
+        context,
+        options.scanWindow
+      );
 
-      return buildDEXAReport(context);
+      return {
+        ...buildDEXAReport(scopedContext),
+        evidenceWindow: options.scanWindow ?? null,
+      };
     },
 
-    async getActivityReport(userId) {
+    async getActivityReport(userId, options = {}) {
       const context = await getProgressContext({ repositories, userId });
+      const scopedContext = options.dateWindow
+        ? {
+            ...context,
+            activityDays: context.activityDays.filter((day) =>
+              isInsideDateWindow(day.observed_at, options.dateWindow)
+            ),
+          }
+        : context;
 
-      return buildActivityReport(context);
+      return {
+        ...buildActivityReport(scopedContext),
+        evidenceWindow: options.dateWindow ?? null,
+      };
     },
 
-    async getPlaceholderReport(streamId, userId) {
+    async getPlaceholderReport(streamId, userId, options = {}) {
       const context = await getProgressContext({ repositories, userId });
-      const stream = buildProgressHub(context).streams.find(
+      let scopedContext =
+        (streamId === "training" || streamId === "nutrition") && options.dateWindow
+          ? {
+              ...context,
+              ...(streamId === "training"
+                ? {
+                    trainingSessions: context.trainingSessions.filter((session) =>
+                      isInsideDateWindow(session.observed_at, options.dateWindow)
+                    ),
+                  }
+                : {
+                    nutritionDays: context.nutritionDays.filter((day) =>
+                      isInsideDateWindow(day.observed_at, options.dateWindow)
+                    ),
+                    nutritionEvidenceScoped: true,
+                  }),
+            }
+          : context;
+      if (streamId === "photos" && options.photoSessionWindow) {
+        scopedContext = {
+          ...context,
+          photoSessions: reconcilePhotoSessionComparisons(
+            context.photoSessions.filter((session) =>
+              isInsideDateWindow(
+                session.captureDate,
+                options.photoSessionWindow
+              )
+            )
+          ),
+        };
+      }
+      const stream = buildProgressHub(scopedContext).streams.find(
         (item) => item.id === streamId
       );
 
@@ -57,12 +129,47 @@ export function createProgressReportingService({ repositories }) {
       return {
         ...stream,
         dataSources: getDataSources(streamId),
-        entries: getPlaceholderEntries(streamId, context),
+        entries: getPlaceholderEntries(streamId, scopedContext),
         relatedGoals: getStreamRelatedGoals(streamId, context.goals),
-        ...getStreamReportExtras(streamId, context),
+        ...getStreamReportExtras(streamId, scopedContext),
+        ...(streamId === "training" && options.dateWindow
+          ? { trainingLibrary: getTrainingReportExtras(context).trainingLibrary }
+          : {}),
+        evidenceWindow: options.dateWindow ?? null,
       };
     },
   };
+}
+
+export function scopeWeightReportContext(context, dateWindow) {
+  if (!dateWindow) return context;
+
+  return {
+    ...context,
+    weights: context.weights.filter((entry) =>
+      isInsideDateWindow(entry.measuredAt, dateWindow)
+    ),
+    dexaScans: context.dexaScans.filter((scan) =>
+      isInsideDateWindow(scan.measuredAt, dateWindow)
+    ),
+  };
+}
+
+export function scopeDEXAReportContext(context, scanWindow) {
+  if (!scanWindow) return context;
+
+  return {
+    ...context,
+    dexaScans: context.dexaScans.filter((scan) =>
+      isInsideDateWindow(scan.measuredAt, scanWindow)
+    ),
+  };
+}
+
+function isInsideDateWindow(value, window) {
+  const date = String(value ?? "").slice(0, 10);
+  return (!window.startDate || date >= window.startDate) &&
+    (!window.endDate || date <= window.endDate);
 }
 
 async function getProgressContext({ repositories, userId }) {
@@ -187,6 +294,13 @@ function buildProgressHub(context) {
     activityDays,
     trainingSessions,
   });
+  const latestEnergyDay = reconcileEnergyDays({
+    nutritionDays,
+    activityDays,
+    dexaScans,
+  })
+    .filter((day) => day.completeness === "complete")
+    .at(-1);
 
   return {
     title: "Evidence Hub",
@@ -284,6 +398,20 @@ function buildProgressHub(context) {
         tone: activityUnderstanding.supportsCutProtocol ? "success" : "effort",
       },
       {
+        id: "energy",
+        title: "Energy",
+        metric: latestEnergyDay ? "Available" : "Not available",
+        trend: latestEnergyDay
+          ? "Derived intake and estimated expenditure history."
+          : "Energy history requires Nutrition, Activity, and DEXA evidence.",
+        trendLabel: "",
+        lastUpdated: latestEnergyDay?.date ?? null,
+        history: "",
+        href: "/progress/energy",
+        status: latestEnergyDay ? "available" : "placeholder",
+        tone: "primary",
+      },
+      {
         id: "training",
         title: "Training",
         metric: trainingSessions.length
@@ -349,10 +477,10 @@ function buildProgressHub(context) {
   };
 }
 
-function buildWeightReport({ weights, dexaScans, goals }) {
-  const first = weights.at(0);
-  const latest = weights.at(-1);
-  const previous = weights.at(-2);
+function buildWeightReport(
+  { weights, dexaScans, goals },
+  { summaryContextId = "all" } = {}
+) {
   const values = weights.map((entry) => ({
     id: entry.id,
     date: entry.measuredAt,
@@ -364,11 +492,10 @@ function buildWeightReport({ weights, dexaScans, goals }) {
         : "Morning weight",
   }));
   const weeklyAverages = getWeeklyAverages(values);
-  const lowest = values.reduce(
-    (lowestValue, entry) =>
-      !lowestValue || entry.value < lowestValue.value ? entry : lowestValue,
-    null
-  );
+  const summary = buildWeightSummary({
+    allWeights: weights,
+    contextId: summaryContextId,
+  });
 
   return {
     title: "Weight",
@@ -378,30 +505,7 @@ function buildWeightReport({ weights, dexaScans, goals }) {
       "goal_maintain_8_9_body_fat",
     ]),
     dataSources: getDataSources("weight"),
-    summary: [
-      {
-        label: "Latest",
-        value: latest ? formatWeight(latest.weight) : "Pending",
-      },
-      {
-        label: "Since Start",
-        value:
-          latest && first
-            ? formatSignedWeight(latest.weight.value - first.weight.value)
-            : "Pending",
-      },
-      {
-        label: "Last Change",
-        value:
-          latest && previous
-            ? formatSignedWeight(latest.weight.value - previous.weight.value)
-            : "Pending",
-      },
-      {
-        label: "Lowest",
-        value: lowest ? `${lowest.value.toFixed(1)} lb` : "Pending",
-      },
-    ],
+    summary,
     chart: {
       points: values,
       markers: dexaScans.map((scan) => ({
@@ -415,7 +519,86 @@ function buildWeightReport({ weights, dexaScans, goals }) {
   };
 }
 
-function buildDEXAReport({ dexaScans, goals }) {
+export function buildWeightSummary({
+  allWeights = [],
+  contextId = "all",
+  dateWindow = null,
+}) {
+  const scopedWeights = dateWindow
+    ? allWeights.filter((entry) =>
+        isInsideDateWindow(entry.measuredAt, dateWindow)
+      )
+    : allWeights;
+  const scopedFirst = scopedWeights.at(0);
+  const scopedLatest = scopedWeights.at(-1);
+  const scopedPrevious = scopedWeights.at(-2);
+  const overallLatest = allWeights.at(-1);
+  const highest = getWeightExtreme(scopedWeights, "highest");
+  const lowest = getWeightExtreme(scopedWeights, "lowest");
+
+  if (contextId !== "all" && scopedWeights.length === 0) {
+    const labels =
+      contextId === "build-lean-mass"
+        ? ["Latest", "Since Start", "Highest", "Lowest"]
+        : ["Latest", "Since Start", "Last Change", "Lowest"];
+
+    return labels.map((label) => ({ label, value: "Pending" }));
+  }
+
+  if (contextId === "build-lean-mass") {
+    return [
+      summaryMetric("Latest", overallLatest),
+      summaryChange("Since Start", scopedFirst, overallLatest),
+      summaryMetric("Highest", highest),
+      summaryMetric("Lowest", lowest),
+    ];
+  }
+
+  if (contextId === "visible-abs") {
+    return [
+      summaryMetric("Latest", scopedLatest),
+      summaryChange("Since Start", scopedFirst, scopedLatest),
+      summaryChange("Last Change", scopedPrevious, scopedLatest),
+      summaryMetric("Lowest", lowest),
+    ];
+  }
+
+  return [
+    summaryMetric("Latest", overallLatest),
+    summaryChange("Since First", allWeights.at(0), overallLatest),
+    summaryMetric("Highest", getWeightExtreme(allWeights, "highest")),
+    summaryMetric("Lowest", getWeightExtreme(allWeights, "lowest")),
+  ];
+}
+
+function getWeightExtreme(weights, direction) {
+  return weights.reduce((extreme, entry) => {
+    if (!extreme) return entry;
+    if (direction === "highest") {
+      return entry.weight.value > extreme.weight.value ? entry : extreme;
+    }
+    return entry.weight.value < extreme.weight.value ? entry : extreme;
+  }, null);
+}
+
+function summaryMetric(label, entry) {
+  return {
+    label,
+    value: entry ? formatWeight(entry.weight) : "Pending",
+  };
+}
+
+function summaryChange(label, first, last) {
+  return {
+    label,
+    value:
+      first && last && first !== last
+        ? formatSignedWeight(last.weight.value - first.weight.value)
+        : "Pending",
+  };
+}
+
+export function buildDEXAReport({ dexaScans, goals }) {
   const latest = dexaScans.at(-1);
   const previous = dexaScans.at(-2);
   const values = dexaScans.map((scan) => ({
@@ -505,13 +688,13 @@ function buildDEXAReport({ dexaScans, goals }) {
     latestMuscleBalance: latest?.muscleBalance ?? null,
     latestDetails: latest
       ? [
-          ["VAT Mass", latest.visceralAdiposeTissue?.mass?.value, "lb"],
-          ["VAT Volume", latest.visceralAdiposeTissue?.volume?.value, "in3"],
+          ["VAT Mass", latest.visceralAdiposeTissue?.mass?.value, " lb", 2],
+          ["VAT Volume", latest.visceralAdiposeTissue?.volume?.value, " in³", 2],
           ["Android Fat", latest.androidFatPercentage, "%"],
           ["Gynoid Fat", latest.gynoidFatPercentage, "%"],
-          ["A/G Ratio", latest.androidGynoidRatio, ""],
+          ["A/G Ratio", latest.androidGynoidRatio, "", 2],
           ["Bone Mineral Content", latest.boneMineralContent?.value, "lb"],
-          ["Total BMD", latest.boneDensity?.totalBMD, ""],
+          ["Total BMD", latest.boneDensity?.totalBMD, " g/cm²", 3],
           ["T-score", latest.boneDensity?.tScore, ""],
           ["Z-score", latest.boneDensity?.zScore, ""],
         ]
@@ -575,7 +758,7 @@ function buildActivityReport(context) {
   };
 }
 
-function getPlaceholderEntries(streamId, context) {
+export function getPlaceholderEntries(streamId, context) {
   if (streamId === "photos") {
     return getPhotoRecords(context).slice().reverse();
   }
@@ -588,12 +771,18 @@ function getPlaceholderEntries(streamId, context) {
   }
 
   if (streamId === "nutrition" && context.nutritionContext) {
-    return [
-      {
-        label: "Calorie Range",
-        value: `${context.nutritionContext.estimatedDailyCaloricIntake.min}-${context.nutritionContext.estimatedDailyCaloricIntake.max} kcal`,
-      },
-    ];
+    const calorieRange = getValidNutritionCalorieRange(
+      context.nutritionContext
+    );
+
+    return calorieRange
+      ? [
+          {
+            label: "Calorie Range",
+            value: `${calorieRange.min}-${calorieRange.max} ${calorieRange.unit}`,
+          },
+        ]
+      : [];
   }
 
   if (streamId === "training" && context.trainingSessions?.length > 0) {
@@ -614,16 +803,7 @@ function getPlaceholderEntries(streamId, context) {
   }
 
   if (streamId === "recovery") {
-    const recoveryEntries = context.checkIns
-      .filter((checkIn) => checkIn.recovery?.notes || checkIn.notes)
-      .slice()
-      .reverse()
-      .slice(0, 6)
-      .map((checkIn) => ({
-        label: formatDate(checkIn.date),
-        value: checkIn.recovery?.notes ?? checkIn.notes,
-      }));
-
+    const recoveryEntries = getCanonicalRecoveryRecords(context);
     if (recoveryEntries.length > 0) return recoveryEntries;
   }
 
@@ -788,13 +968,19 @@ function getProtocolReportExtras({ protocols }) {
   };
 }
 
-function getNutritionReportExtras({ nutritionContext, nutritionDays = [] }) {
+export function getNutritionReportExtras({
+  nutritionEvidenceScoped = false,
+  nutritionContext,
+  nutritionDays = [],
+}) {
   const latestNutritionDay = nutritionDays.at(-1) ?? null;
   const nutritionDayEntries = getNutritionDayEntries(nutritionDays);
   const latestContextEntry = nutritionContext ? getNutritionContextEntry(nutritionContext) : null;
   const latestNutrition = latestNutritionDay
     ? nutritionDayEntries[0]
-    : latestContextEntry;
+    : nutritionEvidenceScoped
+      ? null
+      : latestContextEntry;
 
   return {
     currentNutritionProtocol: getCurrentNutritionProtocol(nutritionContext),
@@ -1332,12 +1518,12 @@ function intersects(left = [], right = []) {
 }
 
 function getCurrentNutritionProtocol(nutritionContext) {
-  const calories = nutritionContext?.estimatedDailyCaloricIntake;
+  const calories = getValidNutritionCalorieRange(nutritionContext);
   const protein = nutritionContext?.proteinTarget;
 
   return {
     calorieTarget: calories
-      ? `${calories.min}-${calories.max} ${calories.unit ?? "kcal"}/day`
+      ? `${calories.min}-${calories.max} ${calories.unit}/day`
       : "Not set",
     goal: "Visible abs while preserving lean mass",
     mealStrategy: "Not set",
@@ -1385,7 +1571,7 @@ function getNutritionReportingLinks() {
 
 function getNutritionLibrary({ nutritionContext, nutritionDays }) {
   const hasLoggedNutrition = nutritionDays.length > 0;
-  const hasTarget = Boolean(nutritionContext?.estimatedDailyCaloricIntake);
+  const hasTarget = Boolean(getValidNutritionCalorieRange(nutritionContext));
 
   return [
     {
@@ -1445,9 +1631,15 @@ function getNutritionDayEntries(nutritionDays = []) {
 }
 
 function getNutritionContextEntry(nutritionContext) {
+  const hasCalorieTarget = Boolean(
+    getValidNutritionCalorieRange(nutritionContext)
+  );
+
   return {
     date: nutritionContext.updatedAt ?? nutritionContext.createdAt ?? "2026-06-29",
-    detail: "Current nutrition target context. No complete logged intake for this day.",
+    detail: hasCalorieTarget
+      ? "Current nutrition target context. No complete logged intake for this day."
+      : "Nutrition context saved. Calorie target is not set.",
     href: "/progress/nutrition/day/context",
     id: nutritionContext.id ?? "nutrition-context",
     label: "Nutrition context",
@@ -1457,11 +1649,39 @@ function getNutritionContextEntry(nutritionContext) {
 }
 
 function formatNutritionContextValue(nutritionContext) {
-  const calories = nutritionContext?.estimatedDailyCaloricIntake;
+  const calories = getValidNutritionCalorieRange(nutritionContext);
 
-  if (!calories) return "Current target";
+  if (!calories) return "Nutrition target not set";
 
-  return `${calories.min}-${calories.max} ${calories.unit ?? "kcal"} target`;
+  return `${calories.min}-${calories.max} ${calories.unit} target`;
+}
+
+export function getValidNutritionCalorieRange(nutritionContext) {
+  const range = nutritionContext?.estimatedDailyCaloricIntake;
+  if (
+    !range ||
+    range.min === null ||
+    range.min === undefined ||
+    range.min === "" ||
+    range.max === null ||
+    range.max === undefined ||
+    range.max === ""
+  ) {
+    return null;
+  }
+
+  const min = Number(range?.min);
+  const max = Number(range?.max);
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+    return null;
+  }
+
+  return {
+    min,
+    max,
+    unit: range?.unit ?? "kcal",
+  };
 }
 
 function formatNutritionDayValue(nutritionDay) {
@@ -1486,13 +1706,32 @@ function formatNutritionDayDetail(nutritionDay) {
   return parts.join(" · ") || "Nutrition evidence saved";
 }
 
-function getNutritionSourceLabels(nutritionDay = {}) {
+export function getNutritionSourceLabels(nutritionDay = {}) {
   const refs = [
     ...(nutritionDay.provenance?.source_artifact_refs ?? []),
     ...(nutritionDay.source?.source_artifact_refs ?? []),
   ];
+  const modality = String(nutritionDay.source?.modality ?? "").toLowerCase();
+  const integration = String(nutritionDay.source?.integration ?? "").toLowerCase();
+  const application = nutritionDay.source?.application;
 
-  if (nutritionDay.source?.application) return [nutritionDay.source.application];
+  if (
+    modality === "screenshot" ||
+    refs.some((ref) => /\.(png|jpe?g|webp)$/i.test(String(ref)))
+  ) {
+    return ["Screenshot"];
+  }
+  if (modality === "manual") return ["Manual"];
+  if (modality === "import" || modality === "file" || modality === "upload") {
+    return ["Import"];
+  }
+  if (
+    application &&
+    (integration || ["connector", "api", "integration"].includes(modality))
+  ) {
+    return [application];
+  }
+  if (application) return [application];
 
   return [...new Set(refs.map(formatSourceArtifactLabel).filter(Boolean))];
 }
@@ -1529,14 +1768,16 @@ function getActivityUnderstanding({ activityDays = [], trainingSessions = [] } =
     latestActivityDay?.daily_activity?.total_calories_burned ?? null;
   const exerciseMinutes =
     latestActivityDay?.daily_activity?.exercise_minutes ?? null;
-  const workoutActiveCalories =
-    latestActivityDay?.derived_metrics?.workout_active_calories ??
-    sumTrainingActiveCalories(
-      trainingSessions.filter(
-        (session) =>
-          getDateKey(session.observed_at) === getDateKey(latestActivityDay?.observed_at)
+  const workoutActiveCalories = latestActivityDay
+    ? latestActivityDay.derived_metrics?.workout_active_calories ??
+      sumTrainingActiveCalories(
+        trainingSessions.filter(
+          (session) =>
+            getDateKey(session.observed_at) ===
+            getDateKey(latestActivityDay.observed_at)
+        )
       )
-    );
+    : null;
   const nonWorkoutActiveCalories =
     latestActivityDay?.derived_metrics?.non_workout_active_calories ?? null;
 
@@ -1563,18 +1804,29 @@ function formatActivityHubMetric(activityDay = {}) {
   return "Activity day";
 }
 
-function formatActivityProtocolSupport(activityDay = {}) {
+export function formatActivityProtocolSupport(activityDay = {}) {
   const moveCalories = activityDay.daily_activity?.move_calories;
+  const effectiveTarget = getEffectiveTargetForActivityDay(activityDay);
 
-  if (!Number.isFinite(moveCalories)) return "Activity context available.";
-
-  const difference = moveCalories - ACTIVITY_TARGET_CALORIES;
-
-  if (difference >= 0) {
-    return `${difference} active calories above the current daily target.`;
+  if (!Number.isFinite(moveCalories) || !Number.isFinite(effectiveTarget)) {
+    return "Activity context available.";
   }
 
-  return `${Math.abs(difference)} active calories below the current daily target.`;
+  const difference = moveCalories - effectiveTarget;
+
+  if (difference >= 0) {
+    return `${difference} active calories above the recorded daily target.`;
+  }
+
+  return `${Math.abs(difference)} active calories below the recorded daily target.`;
+}
+
+export function getEffectiveTargetForActivityDay(activityDay = {}) {
+  const recordedTarget = Number(activityDay.daily_activity?.move_goal);
+
+  return Number.isFinite(recordedTarget) && recordedTarget > 0
+    ? recordedTarget
+    : null;
 }
 
 function getActivityAreas(understanding = {}) {
@@ -1805,6 +2057,9 @@ function getResistanceBreakdown(resistanceSessions = []) {
       const exerciseLabel = getCanonicalTrainingExerciseLabel(
         exercise.name ?? exercise.id
       );
+      const exerciseIdentity = resolveTrainingExerciseIdentity(
+        exercise.name ?? exercise.id
+      );
       const exerciseKey = getCanonicalTrainingExerciseSlug(
         exercise.name ?? exercise.id
       );
@@ -1813,6 +2068,8 @@ function getResistanceBreakdown(resistanceSessions = []) {
 
       if (!family.exercises.has(exerciseKey)) {
         family.exercises.set(exerciseKey, {
+          canonicalExerciseId:
+            exerciseIdentity.canonicalExerciseId ?? exerciseKey,
           id: exercise.id ?? exerciseLabel,
           label: exerciseLabel,
           sets: groupedSets,
@@ -2047,7 +2304,7 @@ function getExerciseSetGroupKey(set = {}) {
     return `duration-${set.duration_seconds}`;
   }
 
-  if (set.weight_unit === "bodyweight" || set.load_type === "bodyweight") {
+  if (isBodyweightSet(set)) {
     return `${set.reps}-bodyweight`;
   }
 
@@ -2059,11 +2316,10 @@ function formatGroupedExerciseSet(set = {}) {
     return `${set.count} x ${formatDurationSet(Number(set.duration_seconds))}`;
   }
 
-  if (set.unit === "bodyweight" || set.load_type === "bodyweight") {
-    return `${set.count} x ${set.reps} @ Bodyweight`;
-  }
-
-  return `${set.count} x ${set.reps} @ ${set.weight} ${set.unit}`;
+  return `${set.count} x ${set.reps} @ ${formatTrainingLoad({
+    ...set,
+    weight_unit: set.unit,
+  })}`;
 }
 
 function hasDurationSeconds(set = {}) {
@@ -2084,7 +2340,7 @@ function formatDurationSet(seconds) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function getWeeklyAverages(points) {
+export function getWeeklyAverages(points) {
   const weeks = new Map();
 
   points.forEach((point) => {
@@ -2211,7 +2467,7 @@ function getDataSources(streamId) {
       { name: "Medication/Supplement Integrations", status: "Future" },
     ],
     recovery: [
-      { name: "Founder Notes", status: "Connected" },
+      { name: "Morning Check-In", status: "Connected" },
       { name: "Oura", status: "Suggested" },
       { name: "Whoop", status: "Suggested" },
       { name: "Apple Health", status: "Suggested" },
@@ -2231,6 +2487,45 @@ function getDataSources(streamId) {
   };
 
   return sources[streamId] ?? [];
+}
+
+function getCanonicalRecoveryRecords(context) {
+  return (context.canonicalEvidenceObjects ?? [])
+    .filter((item) =>
+      item.evidence_type === "recovery" &&
+      item.payload?.schemaVersion === "recovery_evidence_v1" &&
+      item.payload?.status === "valid" &&
+      !item.payload?.supersededByEvidenceId
+    )
+    .sort((left, right) =>
+      String(right.payload.evidenceDate).localeCompare(
+        String(left.payload.evidenceDate)
+      )
+    )
+    .slice(0, 6)
+    .map((item) => ({
+      id: item.canonicalId,
+      label: recoveryMetricLabel(item.payload.metric),
+      value: recoveryMetricValue(item.payload),
+      date: item.payload.evidenceDate,
+      source: item.payload.source?.name ?? "Structured Recovery evidence",
+      correctionStatus: item.payload.isCorrection ? "Corrected" : "Original",
+    }));
+}
+
+function recoveryMetricLabel(metric) {
+  return {
+    sleep_duration: "Sleep duration",
+    subjective_recovery: "Subjective recovery",
+    soreness: "Overall soreness",
+  }[metric] ?? "Recovery metric";
+}
+
+function recoveryMetricValue(record) {
+  if (record.metric === "sleep_duration") {
+    return `${record.value} hours`;
+  }
+  return formatLabel(record.value);
 }
 
 function getStreamRelatedGoals(streamId, goals) {

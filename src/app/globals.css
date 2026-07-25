@@ -71,6 +71,7 @@
 }
 
 :root {
+  --mobile-shell-max-width: 393px;
   --background: #f7f8fa;
   --foreground: #0b1020;
   --surface: #ffffff;
@@ -126,6 +127,16 @@
   --chart-marker: #4f46e5;
   --chart-tooltip: #ffffff;
   --chart-line-primary: #3bc35b;
+  --energy-intake: #a16207;
+  --energy-expenditure: #1d4ed8;
+  --energy-balance: #15803d;
+  --macro-protein: #be123c;
+  --macro-carbohydrates: #b45309;
+  --macro-fat: #0369a1;
+  --meal-breakfast: #c2410c;
+  --meal-lunch: #047857;
+  --meal-dinner: #6d28d9;
+  --meal-snacks: #be185d;
   --confidence: #3bc35b;
   --confidence-track: #e5e7eb;
   --nav-bg: rgba(255,255,255,0.95);
@@ -200,6 +211,16 @@
   --chart-marker: #a78bfa;
   --chart-tooltip: #172235;
   --chart-line-primary: #4ade80;
+  --energy-intake: #fbbf24;
+  --energy-expenditure: #60a5fa;
+  --energy-balance: #4ade80;
+  --macro-protein: #fb7185;
+  --macro-carbohydrates: #fbbf24;
+  --macro-fat: #38bdf8;
+  --meal-breakfast: #fb923c;
+  --meal-lunch: #34d399;
+  --meal-dinner: #a78bfa;
+  --meal-snacks: #f472b6;
   --confidence: #4ade80;
   --confidence-track: rgba(148,163,184,0.22);
   --nav-bg: rgba(16,24,39,0.92);
@@ -218,6 +239,10 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+:root[data-theme="dark"] .coach-take-card {
+  background: #352778;
 }
 
 :root[data-theme="light"] {

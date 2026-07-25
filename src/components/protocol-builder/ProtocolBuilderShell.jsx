@@ -7,12 +7,14 @@ import Card from "../ui/Card";
 
 export default function ProtocolBuilderShell({
   backHref,
+  backLabel = "Operating Plan",
   children,
   currentStep,
   eyebrow = "Protocol Builder",
   onBack,
   onContinue,
   primaryLabel = "Continue",
+  submittingLabel = "Saving...",
   secondaryLabel = "Back",
   title,
   totalSteps,
@@ -28,13 +30,13 @@ export default function ProtocolBuilderShell({
 
   return (
     <main className="app-surface min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[393px] flex-col px-4 pt-8 pb-8">
+      <div className="mx-auto flex min-h-screen max-w-[393px] flex-col px-4 pt-8 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <Link
           className="inline-flex min-h-11 items-center gap-2 self-start text-sm font-semibold text-[var(--text-secondary)]"
           href={backHref}
         >
           <ArrowLeft size={18} />
-          Operating Plan
+          {backLabel}
         </Link>
 
         <div className="mt-5" aria-label={`Step ${currentStep} of ${totalSteps}`} role="progressbar" aria-valuemin={1} aria-valuemax={totalSteps} aria-valuenow={currentStep}>
@@ -69,7 +71,7 @@ export default function ProtocolBuilderShell({
             onClick={onContinue}
             type={currentStep === totalSteps ? "submit" : "button"}
           >
-            {isSubmitting ? "Activating..." : primaryLabel}
+            {isSubmitting ? submittingLabel : primaryLabel}
           </button>
         </div>
       </div>

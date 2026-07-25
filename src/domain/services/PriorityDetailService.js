@@ -1,6 +1,8 @@
+import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
+
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
-export function createPriorityDetailService({ repositories }) {
+export function createPriorityDetailService({ repositories, now = () => new Date() }) {
   return {
     async getPriorityDetail(priorityId, userId) {
       const user = userId
@@ -30,6 +32,7 @@ export function createPriorityDetailService({ repositories }) {
           goals,
           operatingPlan,
           operatingRhythm,
+          occurrenceDate: dateKey(now()),
         });
       }
 
@@ -60,12 +63,19 @@ function createProtocolPriorityDetail({
   goals,
   operatingPlan,
   operatingRhythm,
+  occurrenceDate,
 }) {
   if (!protocol) return null;
 
-  const currentDose = formatDose(protocol.dose);
+  const transition = resolveProtocolDoseTransition(protocol, occurrenceDate);
+  const currentDose = formatDose(transition.effectiveDose);
   const currentWeek = getCurrentProtocolWeek(protocol);
-  const nextDoseChange = getNextDoseChange(protocol);
+  const nextDoseChange = transition.nextDose
+    ? {
+        label: formatDose(transition.nextDose),
+        detail: `Planned for ${formatDate(transition.nextEffectiveDate)}.`,
+      }
+    : null;
 
   return {
     id: reminder.id,
@@ -74,6 +84,11 @@ function createProtocolPriorityDetail({
     subtitle: reminder.schedule?.timeOfDay === "night" ? "Tonight" : "Today",
     status: "Open",
     completable: true,
+    completionContext: {
+      occurrenceDate,
+      dose: currentDose,
+      protocolId: protocol.id,
+    },
     action: {
       label: "Continue",
       href: "/",
@@ -102,7 +117,9 @@ function createProtocolPriorityDetail({
         items: [
           {
             label: currentDose ?? "Dose pending",
-            detail: currentWeek ? `Current protocol week: ${currentWeek}` : "Week pending",
+            detail: transition.changeEffectiveToday
+              ? `Effective today. Previously ${formatDose(transition.previousDose)}.`
+              : currentWeek ? `Current protocol week: ${currentWeek}` : "Week pending",
           },
         ],
       },
@@ -116,7 +133,7 @@ function createProtocolPriorityDetail({
           {
             label: "Supports the current operating plan",
             detail:
-              "Protocol context helps PhysiqueOS interpret weight, body composition, appetite, recovery, and trajectory changes.",
+              "Supports the current operating plan and maintenance calibration while tapering appetite support after the cut.",
           },
         ],
       },
@@ -300,7 +317,7 @@ function getPreparationItems(protocol) {
   if (protocol.schedule?.timingContext === "fasted_before_bed") {
     return [
       {
-        label: "Finish eating before 7 PM",
+        label: "Finish eating approximately 2–3 hours before injection",
         detail: "Preserve the normal fasted-before-bed timing window.",
       },
       {
@@ -319,13 +336,16 @@ function getPreparationItems(protocol) {
 }
 
 function getRelatedGoalItems({ protocol, goals, operatingPlan }) {
-  const primaryGoal = goals.find(
-    (goal) => goal.id === operatingPlan?.primaryGoalId || goal.id === PRIMARY_GOAL_ID
-  );
+  const currentGoalIds = protocol.currentGoalIds ?? [];
+  const primaryGoal =
+    goals.find((goal) => currentGoalIds.includes(goal.id) && goal.status !== "completed") ??
+    goals.find((goal) => goal.id === operatingPlan?.primaryGoalId && goal.status !== "completed");
   const relatedGoals = goals.filter((goal) =>
     protocol.relatedGoalIds?.includes(goal.id)
   );
-  const supportingGoals = relatedGoals.filter((goal) => goal.id !== primaryGoal?.id);
+  const guardrails = relatedGoals.filter(
+    (goal) => goal.id !== primaryGoal?.id && /8[-–]9%|guardrail/i.test(`${goal.title} ${goal.type}`)
+  );
   const items = [];
 
   if (primaryGoal) {
@@ -335,10 +355,10 @@ function getRelatedGoalItems({ protocol, goals, operatingPlan }) {
     });
   }
 
-  if (supportingGoals.length > 0) {
+  if (guardrails.length > 0) {
     items.push({
-      label: "Supporting Objective",
-      detail: supportingGoals.map((goal) => formatGoalTitle(goal.title)).join(", "),
+      label: "Guardrail",
+      detail: guardrails.map((goal) => formatGoalTitle(goal.title)).join(", "),
     });
   }
 

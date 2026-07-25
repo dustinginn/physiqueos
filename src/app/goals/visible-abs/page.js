@@ -1,9 +1,9 @@
-import NarrativeGoalPreviewScreen from "../../../screens/NarrativeGoalPreviewScreen";
-import { getNarrativeGoalPresentation } from "../../../domain/services/NarrativeGoalPresentationLoader";
+import CompletedGoalPreviewScreen from "../../../screens/CompletedGoalPreviewScreen";
+import { getCompletedGoalPreview } from "../../../domain/services/CompletedGoalPreviewService";
 
 export const dynamic = "force-dynamic";
 
 export default async function VisibleAbsGoalPage() {
-  const narrative = await getNarrativeGoalPresentation("visibleAbs");
-  return <NarrativeGoalPreviewScreen narrative={narrative} />;
+  const journey = await getCompletedGoalPreview();
+  return <CompletedGoalPreviewScreen journey={journey} />;
 }

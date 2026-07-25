@@ -15,6 +15,8 @@ const PERSISTED_COLLECTIONS = [
   "weightEntries",
   "user",
   "goals",
+  "goalTransitionDrafts",
+  "goalProtocolTransitionDrafts",
   "nutritionContext",
   "operatingPlan",
   "dexaScans",
@@ -30,6 +32,7 @@ const PERSISTED_COLLECTIONS = [
   "evidencePackages",
   "canonicalEvidenceObjects",
   "evidenceReviews",
+  "migrationMarkers",
 ];
 const APPEND_ONLY_COLLECTIONS = [
   "evidencePackages",
@@ -68,12 +71,16 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
 
   return normalizeFounderRuntimeStore({
     version: founderSeedPack.version,
+    revision: Number.isSafeInteger(persisted.revision) ? persisted.revision : undefined,
+    lastCommitId: persisted.lastCommitId ?? undefined,
     updatedAt: persisted.updatedAt ?? founderSeedPack.importedAt,
     importedAt: founderSeedPack.importedAt,
     user: persisted.user ?? founderSeedPack.user,
     goals: mergeSeedWithPersisted(founderSeedPack.goals, persisted.goals, {
       fillMissingSeedFields: true,
     }),
+    goalTransitionDrafts: mergeSeedWithPersisted([], persisted.goalTransitionDrafts),
+    goalProtocolTransitionDrafts: mergeSeedWithPersisted([], persisted.goalProtocolTransitionDrafts),
     weightEntries: mergeSeedWithPersisted(
       founderSeedPack.weightEntries,
       persisted.weightEntries,
@@ -109,6 +116,7 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     analyses: mergeSeedWithPersisted(founderSeedPack.analyses, persisted.analyses),
     evidencePackages: mergeSeedWithPersisted([], persisted.evidencePackages),
     evidenceReviews: mergeSeedWithPersisted([], persisted.evidenceReviews),
+    migrationMarkers: mergeSeedWithPersisted([], persisted.migrationMarkers),
     canonicalEvidenceObjects: mergeSeedWithPersisted(
       [],
       persisted.canonicalEvidenceObjects
@@ -139,6 +147,12 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
     }),
     {
       version: store.version,
+      ...(Number.isSafeInteger(latestPersisted.revision)
+        ? {
+            revision: latestPersisted.revision,
+            lastCommitId: latestPersisted.lastCommitId ?? store.lastCommitId,
+          }
+        : {}),
       updatedAt: new Date().toISOString(),
     }
   );
@@ -173,6 +187,7 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
   } catch (error) {
     warnRuntimeStorePersistenceFailure(error);
     cleanupRuntimeStoreTempFile(tempPath);
+    if (options.throwOnError === true) throw error;
   }
 }
 
@@ -435,6 +450,8 @@ function normalizeFounderRuntimeStore(store) {
     goals: mergeSeedWithPersisted(founderSeedPack.goals, store.goals, {
       fillMissingSeedFields: true,
     }),
+    goalTransitionDrafts: store.goalTransitionDrafts ?? [],
+    goalProtocolTransitionDrafts: store.goalProtocolTransitionDrafts ?? [],
     weightEntries,
     analyses: normalizeAuthoritativeRecords(
       store.analyses,

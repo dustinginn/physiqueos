@@ -20,6 +20,8 @@ export const founderSeedPack = {
   importedAt: null,
   user: founderUser,
   goals: founderGoals,
+  goalTransitionDrafts: [],
+  goalProtocolTransitionDrafts: [],
   weightEntries: founderWeightEntries,
   dexaScans: founderDEXAScans,
   protocols: founderProtocols,

@@ -1,15 +1,23 @@
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../domain/services/ProgressReportingService";
+import { getWeightTimelineReport } from "../../../domain/services/WeightEvidenceContextService";
 import WeightReportScreen from "../../../screens/WeightReportScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function WeightProgressPage({ searchParams }) {
   const params = await searchParams;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
+  const { report, timeline } = await getWeightTimelineReport({
+    context: params?.context,
   });
-  const report = await service.getWeightReport();
 
-  return <WeightReportScreen from={params?.from} report={report} />;
+  return (
+    <WeightReportScreen
+      evidenceContext={{
+        ...timeline,
+        currentPath: "/progress/weight",
+        preservedParams: params?.from === "you" ? { from: "you" } : {},
+      }}
+      from={params?.from}
+      report={report}
+    />
+  );
 }

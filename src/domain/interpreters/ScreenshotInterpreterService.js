@@ -2182,10 +2182,22 @@ function reconcileNutritionMeals(meals = []) {
     });
   });
 
+  const mealOrder = new Map([
+    ["breakfast", 0],
+    ["lunch", 1],
+    ["dinner", 2],
+    ["snack", 3],
+    ["snacks", 3],
+  ]);
+
   return [...mealMap.values()].map((meal) => ({
     ...meal,
     foods: reconcileNutritionFoods(meal.foods ?? []),
-  }));
+  })).sort((first, second) => {
+    const firstOrder = mealOrder.get(String(first.name ?? "").toLowerCase()) ?? 99;
+    const secondOrder = mealOrder.get(String(second.name ?? "").toLowerCase()) ?? 99;
+    return firstOrder - secondOrder;
+  });
 }
 
 function normalizeNutritionMealForReconciliation(meal = {}) {
@@ -2214,12 +2226,13 @@ function normalizeNutritionMealForReconciliation(meal = {}) {
 function reconcileNutritionFoods(foods = []) {
   const foodMap = new Map();
 
-  foods.forEach((food) => {
+  foods.forEach((food, index) => {
     const canonicalName = cleanMetadataText(food.canonical_name ?? food.name);
     if (!canonicalName) return;
 
-    const meal = cleanMetadataText(food.meal);
-    const key = `${canonicalName.toLowerCase()}|${meal?.toLowerCase() ?? ""}`;
+    // Repeated foods remain distinct logged items. Only records with the same
+    // explicit identity are overlap copies eligible for reconciliation.
+    const key = food.id ? `id:${food.id}` : `occurrence:${index}`;
     const existing = foodMap.get(key);
 
     if (!existing) {

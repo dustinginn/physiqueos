@@ -1,34 +1,59 @@
 import { redirect } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import { getTrainingTimelineReport } from "../../../../../domain/services/TrainingEvidenceContextService";
 import { buildTrainingLibraryNavigation } from "../../../../../navigation/navigationRegistry";
+import { withTrainingTimelineContext } from "../../../../../navigation/trainingTimelineNavigation";
+import TrainingTimelineSelector from "../../../../../components/training/TrainingTimelineSelector";
 import TrainingKnowledgeScreen from "../../../../../screens/TrainingKnowledgeScreen";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrainingLibraryPage({ params }) {
+export default async function TrainingLibraryPage({ params, searchParams }) {
   const { path = [] } = await params;
+  const { context, from } = await searchParams;
   const legacyRedirect = getLegacyTrainingLibraryRedirect(path);
 
-  if (legacyRedirect) redirect(legacyRedirect);
+  if (legacyRedirect) {
+    redirect(withTrainingTimelineContext(legacyRedirect, context));
+  }
 
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
-  });
-  const report = await service.getPlaceholderReport("training");
-  const navigation = buildTrainingLibraryNavigation(path);
+  const { report, timeline } = await getTrainingTimelineReport({ context });
+  const baseNavigation = buildTrainingLibraryNavigation(path);
+  const currentPath = baseNavigation.route;
+  const returnTo = withTrainingTimelineContext(currentPath, timeline.contextId);
+  const adaptHref = (href) =>
+    withTrainingTimelineContext(href, timeline.contextId, { returnTo });
+  const navigation = {
+    ...baseNavigation,
+    breadcrumbs: baseNavigation.breadcrumbs.map((item) => ({
+      ...item,
+      href: adaptHref(item.href),
+    })),
+    parentRoute: adaptHref(baseNavigation.parentRoute),
+    route: baseNavigation.route,
+  };
 
   return (
     <TrainingKnowledgeScreen
       mode="library"
       navigation={navigation}
+      reportingOrigin={from === "reporting"}
       report={report}
       slug={path}
+      trainingEvidenceContext={{
+        adaptHref,
+        selector: (
+          <TrainingTimelineSelector currentPath={currentPath} timeline={timeline} />
+        ),
+        showSourceWorkouts: false,
+      }}
     />
   );
 }
 
-function getLegacyTrainingLibraryRedirect(path = []) {
+export function getLegacyTrainingLibraryRedirect(path = []) {
+  if (["seated_abductions", "seated-abductions"].includes(path.at(-1))) {
+    return "/progress/training/library/glutes/seated-hip-adductions";
+  }
   if (path[0] !== "resistance") return null;
 
   if (path.length <= 2) return "/progress/training/library";

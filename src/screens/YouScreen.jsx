@@ -2,16 +2,13 @@ import Link from "next/link";
 import {
   CalendarDays,
   ChevronRight,
-  Database,
-  LockKeyhole,
   PlugZap,
-  ShieldCheck,
-  Syringe,
   Target,
   UserRound,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
+import { formatActiveGoalCount } from "../domain/services/YouProfileService";
 
 export default function YouScreen({ profile }) {
   return (
@@ -32,7 +29,7 @@ export default function YouScreen({ profile }) {
         <div className="space-y-4">
           <OperatingStatus status={profile.operatingStatus} />
           <DoorwaySection
-            detail={`${profile.goals.supporting.length + (profile.goals.primary ? 1 : 0)} active`}
+            detail={formatActiveGoalCount(profile.operatingStatus.goals)}
             href={`${profile.goals.href}?from=you`}
             icon={Target}
             title="Goals"
@@ -44,40 +41,10 @@ export default function YouScreen({ profile }) {
             title="Operating Plan"
           />
           <DoorwaySection
-            detail={`${profile.protocols.active.length} active`}
-            href={profile.protocols.href}
-            icon={Syringe}
-            title="Protocols"
-          />
-          <DoorwaySection
-            detail={`${profile.evidenceSources.length} sources`}
-            href="/progress?from=you"
-            icon={Database}
-            title="Evidence Sources"
-          />
-          <DoorwaySection
             detail={`${profile.integrations.filter((item) => item.status === "Connected").length} connected`}
             href={null}
             icon={PlugZap}
             title="Integrations"
-          />
-          <DoorwaySection
-            detail="Theme, notifications, units, voice"
-            href={null}
-            icon={ShieldCheck}
-            title="Preferences"
-          />
-          <DoorwaySection
-            detail="Height, body source, default context"
-            href={null}
-            icon={UserRound}
-            title="About You"
-          />
-          <DoorwaySection
-            detail="Ownership, export, permissions"
-            href={null}
-            icon={LockKeyhole}
-            title="Privacy & Data"
           />
         </div>
       </div>
@@ -87,8 +54,7 @@ export default function YouScreen({ profile }) {
 
 function OperatingStatus({ status }) {
   const facts = [
-    { label: "Goals", value: `${status.goals} Active` },
-    { label: "Evidence Sources", value: status.evidenceSources },
+    { label: "Goals", value: formatActiveGoalCount(status.goals) },
     { label: "Active Protocols", value: status.activeProtocols },
     { label: "Integrations", value: status.connectedIntegrations },
   ];
@@ -110,7 +76,7 @@ function OperatingStatus({ status }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {facts.map((fact) => (
           <div key={fact.label} className="rounded-[12px] bg-[var(--surface-elevated)] p-3">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-muted)]">

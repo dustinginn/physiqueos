@@ -64,6 +64,9 @@ export async function getVisibleAbsDossier() {
 
   return {
     progress: evaluation?.progress ?? 0,
+    lifecycleState: evaluation?.lifecycleState ?? "active",
+    thresholdStatus: evaluation?.thresholdStatus ?? "in_progress",
+    requiredAction: evaluation?.requiredAction ?? null,
     confidence: evaluation?.goalConfidence?.value ?? evaluation?.confidence ?? 0,
     confidenceLevel:
       evaluation?.goalConfidence?.label ??

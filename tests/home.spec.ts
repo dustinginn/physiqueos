@@ -3212,14 +3212,17 @@ test("Resistance Training dashboard renders Performance Intelligence sections", 
   ).toBeVisible();
   await expect(page.getByText("Training", { exact: true })).toBeVisible();
   await expect(
-    page.getByLabel("Breadcrumb").getByText("Reporting", { exact: true })
+    page.getByLabel("Training reporting hierarchy").getByText("Reporting", { exact: true })
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resistance Summary" })).toBeVisible();
-  await expect(page.getByText("7 days", { exact: true })).toBeVisible();
-  await expect(page.getByText("30 days", { exact: true })).toBeVisible();
+  await expect(page.getByText("7 days", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("30 days", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Needs Data", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Improving", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Recent PRs", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Performance Status" })).toBeVisible();
+  await expect(page.getByText("Stable", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Plateauing", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Regressing", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Highlights" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs Attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Category Rollups" })).toBeVisible();
@@ -3256,6 +3259,11 @@ test("Training History reporting route still works after Resistance dashboard la
     page.getByRole("heading", { level: 1, name: "Training History" })
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent Training History" })).toBeVisible();
+  const hierarchy = page.getByLabel("Training reporting hierarchy");
+  await expect(hierarchy.getByText("Training", { exact: true })).toBeVisible();
+  await expect(hierarchy.getByText("Training Library", { exact: true })).toBeVisible();
+  await expect(hierarchy.getByText("Reporting", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Core · Hamstrings · Glutes · Walking/)).toBeVisible();
 });
 
 test("Training drawer headers and rows use theme-safe native press styling", () => {
@@ -3337,7 +3345,7 @@ test("Training session detail renders bodyweight and timed core sets without wei
 
   await expect(page.getByRole("heading", { name: "Core Training" })).toBeVisible();
   await expect(page.getByText("Hanging Leg Raise", { exact: true })).toBeVisible();
-  await expect(page.getByText("Set 1: 15 reps · Bodyweight")).toBeVisible();
+  await expect(page.getByText("Set 1: 15 reps · BW")).toBeVisible();
   await expect(page.getByText("Cable Crunch", { exact: true })).toBeVisible();
   await expect(page.getByText("Plank", { exact: true })).toBeVisible();
   await expect(page.getByText("Set 1: 1:15")).toBeVisible();
@@ -12147,21 +12155,14 @@ test("linked Cut Energy activation creates distinct coordinated protocols and pe
   await expect(service.activate({ userId: runtime.user.id })).rejects.toThrow(/already exists/i);
 });
 
-test("Operating Plan opens the combined Cut Energy Strategy Builder without activation @legacy-diagnostic", async ({ page }) => {
+test("Operating Plan archives the legacy Cut Energy Strategy creation route", async ({ page }) => {
   await page.goto("http://127.0.0.1:3000/profile/operating-plan");
-  await expect(page.getByRole("link", { name: /Energy Strategy Activity and Nutrition work together/i })).toHaveAttribute("href", "/profile/operating-plan/energy/new");
+  await expect(page.getByRole("link", { name: /Energy Strategy Activity and Nutrition work together/i })).toHaveCount(0);
   await page.goto("http://127.0.0.1:3000/profile/operating-plan/energy/new");
-  await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "9");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText(/Measured RMR/)).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("radio", { name: /Moderate.*Recommended/i })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "Continue" }).click();
-  const before = await page.getByText(/Estimated daily deficit/).locator("..").textContent();
-  await page.getByLabel("Daily active calories").fill("1100");
-  await expect(page.getByText(/Estimated daily deficit/).locator("..")).not.toHaveText(before);
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("radio", { name: /Relative to body weight/i })).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL("http://127.0.0.1:3000/profile/operating-plan");
+  await expect(page.getByText("Maintenance Calibration")).toBeVisible();
+  await expect(page.getByText("Cut Energy Strategy")).toHaveCount(0);
+  await expect(page.getByText("Step 1 of 9")).toHaveCount(0);
 });
 
 test("Execution items are first-class mutable Operating Plan commitments", async () => {

@@ -1,32 +1,43 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import TrainingTimelineSelector from "../../../../../components/training/TrainingTimelineSelector";
+import { getTrainingTimelineReport } from "../../../../../domain/services/TrainingEvidenceContextService";
+import { withTrainingTimelineContext } from "../../../../../navigation/trainingTimelineNavigation";
 import TrainingKnowledgeScreen from "../../../../../screens/TrainingKnowledgeScreen";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrainingReportingPage({ params }) {
+export default async function TrainingReportingPage({ params, searchParams }) {
   const { reportId } = await params;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
+  const query = await searchParams;
+  const { report, timeline } = await getTrainingTimelineReport({
+    context: query?.context,
   });
-  const report = await service.getPlaceholderReport("training");
+  const currentPath = `/progress/training/reporting/${reportId}`;
+  const returnTo = withTrainingTimelineContext(currentPath, timeline.contextId);
+  const adaptHref = (href) =>
+    withTrainingTimelineContext(href, timeline.contextId, { returnTo });
 
   if (!report?.reportingLinks?.some((item) => item.id === reportId)) notFound();
 
   return (
     <TrainingKnowledgeScreen
-      backHref="/progress/training"
+      backHref={adaptHref("/progress/training")}
       mode="reporting"
       navigation={{
         breadcrumbs: [
-          { href: "/progress/training", label: "Training" },
-          { href: "/progress/training", label: "Reporting" },
+          { href: adaptHref("/progress/training"), label: "Training" },
+          { href: adaptHref("/progress/training"), label: "Reporting" },
         ],
-        parentRoute: "/progress/training",
+        parentRoute: adaptHref("/progress/training"),
       }}
       report={report}
       slug={reportId}
+      trainingEvidenceContext={{
+        adaptHref,
+        selector: (
+          <TrainingTimelineSelector currentPath={currentPath} timeline={timeline} />
+        ),
+      }}
     />
   );
 }

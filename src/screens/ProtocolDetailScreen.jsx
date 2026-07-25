@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Activity,
   ArrowLeft,
   CalendarDays,
   ChevronRight,
@@ -13,15 +14,22 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
+import { formatGoalStartDate } from "../domain/utils/goalStartDate";
 
-export default function ProtocolDetailScreen({ from, goals, protocol }) {
+export default function ProtocolDetailScreen({ from, goals, lifecycleAction, protocol, version }) {
+  if (!protocol) {
+    const backHref = "/profile/operating-plan";
+    return <main className="app-surface min-h-screen"><div className="mx-auto max-w-[393px] px-4 pb-28 pt-10"><Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href={backHref}><ArrowLeft size={18}/>{from === "operating-plan" ? "Operating Plan" : "Protocols"}</Link><Card className="space-y-2"><h1 className="text-2xl font-extrabold text-[var(--text-primary)]">Supplement unavailable</h1><p className="text-sm font-semibold leading-6 text-[var(--text-secondary)]">This supplement strategy could not be found. Return to your Operating Plan to review the latest supplements.</p></Card></div></main>;
+  }
+  if (["peptide", "recovery", "supplement"].includes(protocol.category)) {
+    return <StrategyProtocolDetail from={from} goals={goals} lifecycleAction={lifecycleAction} protocol={protocol} version={version}/>;
+  }
   const supportedGoals = goals.filter((goal) =>
     protocol.relatedGoalIds?.includes(goal.id)
   );
   const currentPhase = getCurrentPhase(protocol);
-  const backHref =
-    from === "operating-plan" ? "/profile/operating-plan" : "/profile/protocols";
-  const backLabel = from === "operating-plan" ? "Operating Plan" : "Protocols";
+  const backHref = "/profile/operating-plan";
+  const backLabel = "Operating Plan";
 
   return (
     <main className="app-surface min-h-screen">
@@ -107,6 +115,36 @@ export default function ProtocolDetailScreen({ from, goals, protocol }) {
       </div>
     </main>
   );
+}
+
+function StrategyProtocolDetail({ from, goals, lifecycleAction, protocol, version }) {
+  const isRecovery = protocol.category === "recovery";
+  const isPeptide = protocol.category === "peptide";
+  const Icon = isRecovery ? Activity : isPeptide ? Syringe : Dumbbell;
+  const activeGoal = goals.find((goal) =>
+    goal.primary === true &&
+    goal.status === "active" &&
+    protocol.relatedGoalIds?.includes(goal.id)
+  );
+  const started = isPeptide ? formatGoalStartDate(protocol.startDate) : formatGoalStartDate(activeGoal?.timeline?.startDate);
+  const backHref = "/profile/operating-plan";
+  const backLabel = "Operating Plan";
+  const strategy = version?.supplementStrategy;
+  const purpose = strategy?.purpose ? { title: strategy.purpose, detail: strategy.role } : getProtocolPurpose(protocol);
+  return <main className="app-surface min-h-screen"><div className="mx-auto max-w-[393px] px-4 pb-28 pt-10">
+    <Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href={backHref}><ArrowLeft size={18}/>{backLabel}</Link>
+    <header className="mb-6"><div className="flex items-start gap-3"><IconBadge className="rounded-full" color={isPeptide?"effort":"success"} icon={Icon} size="lg"/><div><p className="text-sm font-semibold uppercase tracking-[.12em] text-[var(--primary)]">{isRecovery ? "Recovery Strategy" : isPeptide ? "Peptide Strategy" : "Supplement Strategy"}</p><h1 className="mt-1 text-3xl font-extrabold text-[var(--text-primary)]">{protocol.name}</h1></div></div></header>
+    <div className="space-y-4">
+      <Card className="space-y-2" variant="accent"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-[var(--primary)]">Purpose</p><h2 className="text-xl font-extrabold text-[var(--text-primary)]">{purpose.title}</h2><p className="text-sm leading-6 text-[var(--text-secondary)]">{purpose.detail}</p></Card>
+      <Card className="space-y-2"><h2 className="font-extrabold text-[var(--text-primary)]">Current Strategy</h2><p className="text-sm font-semibold text-[var(--text-secondary)]">{strategy?.role ?? (isRecovery ? "Active recovery support" : isPeptide ? "Active peptide strategy supporting the current Goal." : protocol.notes || "Active supplement support")}</p></Card>
+      <Card className="space-y-2"><h2 className="font-extrabold text-[var(--text-primary)]">Goal Supported</h2><p className="text-sm font-semibold text-[var(--text-secondary)]">{activeGoal?.title ?? "No current Goal is attached."}</p></Card>
+      {started&&<Card className="space-y-2"><h2 className="font-extrabold text-[var(--text-primary)]">Started</h2><p className="text-sm font-semibold text-[var(--text-secondary)]">{started}</p></Card>}
+      <Card className="space-y-2"><h2 className="font-extrabold text-[var(--text-primary)]">Status</h2><p className="text-sm font-semibold text-[var(--text-secondary)]">{formatLabel(protocol.status)}</p></Card>
+      {!isRecovery&&!isPeptide&&protocol.status==="active"&&<Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white" href={`/profile/operating-plan/supplements/${encodeURIComponent(protocol.id)}/edit`}>Edit Strategy</Link>}
+      {isPeptide&&<span aria-disabled="true" className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] px-4 text-sm font-extrabold text-[var(--text-muted)]">Edit Strategy</span>}
+      {!isRecovery&&!isPeptide&&lifecycleAction&&<form action={lifecycleAction}><button className="min-h-12 w-full rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-4 text-sm font-extrabold text-[var(--text-primary)]" type="submit">{protocol.status==="paused"?"Restore Supplement":"Pause Supplement"}</button></form>}
+    </div>
+  </div></main>;
 }
 
 function ProtocolPurpose({ protocol }) {

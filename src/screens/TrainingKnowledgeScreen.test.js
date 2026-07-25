@@ -2,8 +2,10 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   getCurrentExerciseBenchmark,
+  getExercisesForFlatTrainingGroup,
   getExerciseStatusGroups,
 } from "./TrainingKnowledgeScreen";
+import { getTrainingDaySummary } from "../presentation/trainingPresentation";
 
 const source = fs.readFileSync(new URL("./TrainingKnowledgeScreen.jsx", import.meta.url), "utf8");
 const drawerSource = fs.readFileSync(
@@ -13,10 +15,71 @@ const drawerSource = fs.readFileSync(
   ),
   "utf8"
 );
+const presentationSource = fs.readFileSync(
+  new URL("../presentation/trainingPresentation.js", import.meta.url),
+  "utf8"
+);
+const navigationRowSource = fs.readFileSync(
+  new URL(
+    "../components/training/TrainingNavigationButtonRow.jsx",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 const occurrence = ({ date, sets }) => ({
   exercise: { name: "Bench Press", sets },
   session: { date, id: `session-${date}` },
+});
+
+const taxonomyReport = {
+  trainingBreakdowns: {
+    resistance: [
+      {
+        label: "Lower Body",
+        movementFamilies: [
+          {
+            label: "Squat",
+            exercises: [
+              { canonicalExerciseId: "glute_squat", label: "Glute Squats", sets: [] },
+            ],
+          },
+          {
+            label: "Hip Hinge",
+            exercises: [
+              {
+                canonicalExerciseId: "romanian_deadlift",
+                label: "Romanian Deadlifts",
+                sets: [],
+              },
+            ],
+          },
+          {
+            label: "Hip Abduction",
+            exercises: [
+              {
+                canonicalExerciseId: "seated_abductions",
+                label: "Seated Hip Adductions",
+                sets: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+describe("Training Library corrected taxonomy", () => {
+  it("renders the authoritative seated hip movement under Glutes", () => {
+    expect(
+      getExercisesForFlatTrainingGroup({
+        groupSlug: "glutes",
+        report: taxonomyReport,
+      }).map((exercise) => exercise.label)
+    ).toEqual(["Glute Squats", "Romanian Deadlifts", "Seated Hip Adductions"]);
+    expect(source).not.toContain('"Adductors"');
+  });
 });
 
 describe("Exercise Detail mobile workflow", () => {
@@ -62,22 +125,24 @@ describe("Exercise Detail mobile workflow", () => {
     expect(result.bestSet).toBe("8 x 155 lb");
   });
 
-  it("keeps the existing volume, sets, set table, history, and source workouts", () => {
+  it("keeps the existing volume, sets, set table, and history with optional source workouts", () => {
     expect(source).toContain("getExerciseMetricItems(sets)");
     expect(source).toContain("<ExerciseSetList sets={sets} />");
     expect(source).toContain("ExerciseHistoryCard");
     expect(source).toContain('title="Source workouts"');
+    expect(source).toContain("showSourceWorkouts = true");
+    expect(source).toContain("showSourceWorkouts && (");
   });
 
   it("uses the shared touch-friendly Training Library hierarchy", () => {
-    expect(source).toContain('aria-label="Training Library hierarchy"');
-    expect(source).toContain("min-h-11");
+    expect(source).toContain('ariaLabel="Training Library hierarchy"');
+    expect(navigationRowSource).toContain("min-h-11");
     const header = source.indexOf("function TrainingLibraryHeader");
-    const training = source.indexOf('href: "/progress/training"', header);
-    const library = source.indexOf('href: "/progress/training/library"', header);
+    const training = source.indexOf('adaptHref("/progress/training")', header);
+    const library = source.indexOf('adaptHref("/progress/training/library")', header);
     expect(training).toBeGreaterThan(header);
     expect(library).toBeGreaterThan(training);
-    expect(source).toContain('href: "/progress/training/library"');
+    expect(source).toContain('adaptHref("/progress/training/library")');
     expect(source).toContain("item.href !== currentRoute");
     expect(source).toContain('navigationMode: "training-library"');
   });
@@ -107,7 +172,7 @@ describe("Exercise Detail mobile workflow", () => {
 });
 
 describe("Resistance Reporting exploration workflow", () => {
-  it("uses the approved Training, Training Library, Reporting navigation order", () => {
+  it("uses destination-only Reporting navigation chips", () => {
     const header = source.indexOf("function TrainingReportingHeader");
     const training = source.indexOf('label: "Training"', header);
     const library = source.indexOf('label: "Training Library"', training);
@@ -115,6 +180,7 @@ describe("Resistance Reporting exploration workflow", () => {
     expect(training).toBeGreaterThan(header);
     expect(library).toBeGreaterThan(training);
     expect(reporting).toBeGreaterThan(library);
+    expect(source).toContain('showReportingParent={content.title === "Training History"}');
     expect(source).toContain('aria-label="Training reporting hierarchy"');
     expect(source).toContain("min-h-11");
   });
@@ -135,40 +201,37 @@ describe("Resistance Reporting exploration workflow", () => {
     expect(categories).toBeGreaterThan(attention);
   });
 
-  it("includes all approved summary metrics and semantic status triggers", () => {
+  it("renders only the four actionable status triggers in Resistance Summary", () => {
     const report = source.indexOf("function getResistanceReportingContent");
     const prs = source.indexOf('key="prs"', report);
     const summarySource = source.slice(report, prs);
     [
-      "7 Days",
-      "30 Days",
-      "Recent PRs",
       "Improving",
       "Stable",
       "Plateauing",
       "Regressing",
-      "Needs Data",
     ].forEach((label) => expect(source).toContain(label));
+    ["7 Days", "30 Days", "Recent PRs", "Needs Data"].forEach((label) =>
+      expect(summarySource).not.toContain(label)
+    );
     expect(summarySource).toContain("<StatusDrawers");
     expect(summarySource).not.toContain("<ObservationList");
+    expect(summarySource).not.toContain("<PerformanceMetric");
   });
 
-  it("uses one controlled bottom drawer with semantic status triggers", () => {
+  it("uses one controlled floating sheet with semantic status triggers", () => {
     expect(source).toContain("function StatusDrawers");
     expect(source).toContain("<TrainingAnalysisDrawerGroup");
     expect(source).not.toContain("function AnalysisDrawer");
     expect(drawerSource).toContain("const [activeKey, setActiveKey] = useState(null)");
-    expect(drawerSource).toContain("open={Boolean(active)}");
-    expect(drawerSource).toContain('data-testid="training-analysis-bottom-drawer"');
-    expect(drawerSource).toContain("fixed inset-x-0 bottom-0");
-    expect(drawerSource).toContain("overflow-y-auto");
-    expect(drawerSource).toContain("Close training drawer");
-    expect(drawerSource).toContain("pb-[calc(6rem+env(safe-area-inset-bottom))]");
+    expect(drawerSource).toContain('open={Boolean(active) || activeKey === "__all__"}');
+    expect(drawerSource).toContain("FloatingSheet");
     expect(drawerSource).toContain("border-emerald-200/80");
     expect(drawerSource).toContain("border-amber-200/80");
     expect(drawerSource).toContain("border-rose-200/70");
     expect(source).toContain("getExerciseObservationHref(observation)");
     expect(drawerSource).toContain("href={item.href}");
+    expect(drawerSource).toContain('mode !== "status"');
   });
 
   it("places each exercise in its exact deterministic status drawer", () => {
@@ -193,24 +256,149 @@ describe("Resistance Reporting exploration workflow", () => {
     expect(groups.improving).toEqual([
       {
         detail: "Improving · Latest Jul 16",
-        href: "/progress/training/library/chest/incline-bench-press",
+        href: "/progress/training/library/chest/incline-bench-press?from=reporting",
         label: "Incline Bench Press",
       },
     ]);
     expect(groups.plateauing?.[0].href).toBe(
-      "/progress/training/library/core/cable-crunch"
+      "/progress/training/library/core/cable-crunches?from=reporting"
     );
   });
 
   it("keeps category browsing in Reporting until an exercise is selected", () => {
-    expect(source).toContain(
-      "function CategoryRollups({ exerciseObservations = [], observations = [] })"
-    );
-    expect(source).toContain(".map(toExerciseNavigationItem)");
+    expect(source).toContain("function CategoryRollups({");
+    expect(source).toContain("adaptHref = (href) => href");
     expect(source).toContain('title="Category Rollups"');
-    expect(source).toContain(
-      '<TrainingAnalysisDrawerGroup groups={groups} mode="list" />'
-    );
+    expect(source).toContain("previewItems={categories.slice(0, 3)}");
+    expect(source).toContain('sheetTitle="All Categories"');
+    expect(source).toContain('viewAllLabel="View all categories →"');
     expect(drawerSource).toContain("min-h-14 w-full");
+  });
+
+  it("limits highlights and attention previews to three", () => {
+    expect(source).toContain("return [...exerciseHighlights, ...categoryHighlight].slice(0, 3)");
+    expect(source).toContain("previewItems={items.slice(0, 3)}");
+    expect(source).toContain('sheetTitle="Needs Attention"');
+  });
+
+  it("caps Recent PRs at three and uses the shared FloatingSheet for overflow", () => {
+    expect(source).toContain("function RecentPrs");
+    expect(source).toContain("previewItems={items.slice(0, 3)}");
+    expect(source).toContain('sheetTitle="Recent PRs"');
+    const recentPrs = source.indexOf("function getRecentPrs");
+    const nextFunction = source.indexOf("function formatExerciseHighlight", recentPrs);
+    expect(source.slice(recentPrs, nextFunction)).not.toContain(".slice(");
+  });
+
+  it("uses BW throughout exercise reporting presentation", () => {
+    expect(source).toContain('return `${reps} reps · BW`');
+    expect(presentationSource).toContain('return "BW"');
+    expect(presentationSource).not.toContain('"Bodyweight"');
+  });
+
+  it("normalizes historical zero-load bodyweight benchmarks through the shared formatter", () => {
+    const result = getCurrentExerciseBenchmark([
+      occurrence({
+        date: "2026-07-16",
+        sets: [
+          {
+            load_type: "bodyweight",
+            reps: 12,
+            weight: 0,
+            weight_unit: "lb",
+          },
+        ],
+      }),
+    ]);
+    expect(result.bestSet).toBe("12 x BW");
+    expect(result.workingWeight).toBe("BW");
+    expect(source).toContain("formatTrainingLoad");
+    expect(source).not.toMatch(/Hanging Leg Raise.*BW|Pull-Up.*BW/);
+  });
+
+  it("uses one primary card surface treatment for all Reporting sections", () => {
+    const report = source.slice(
+      source.indexOf("function getResistanceReportingContent"),
+      source.indexOf("function ObservationList")
+    );
+    expect(report.match(/<DeepPageCard/g)).toHaveLength(6);
+    expect(report).not.toContain("bg-violet-50");
+  });
+
+  it("preserves Reporting context only for Reporting-origin exercise navigation", () => {
+    expect(source).toContain("reportingOrigin && breadcrumbs.length > 1");
+    expect(source).toContain('label: "Reporting"');
+    expect(source).toContain("?from=reporting");
+  });
+});
+
+describe("Training History presentation summaries", () => {
+  it("deduplicates canonical resistance categories within a day", () => {
+    expect(
+      getTrainingDaySummary([
+        {
+          label: "Resistance Training",
+          exercises: [
+            { name: "Incline Bench Press" },
+            { name: "Bench Press" },
+            { name: "Seated Cable Row" },
+          ],
+        },
+      ])
+    ).toBe("Chest · Back");
+  });
+
+  it("combines resistance and cardio classifications", () => {
+    expect(
+      getTrainingDaySummary([
+        {
+          label: "Resistance Training",
+          exercises: [
+            { name: "Hip Thrust" },
+            { name: "Lying Leg Curl" },
+          ],
+        },
+        { label: "Stair Stepper", exercises: [] },
+      ])
+    ).toBe("Glutes · Hamstrings · Cardio");
+  });
+
+  it("returns every distinct classification without overflow shorthand", () => {
+    expect(
+      getTrainingDaySummary([
+        {
+          label: "Resistance Training",
+          exercises: [
+            { name: "Bench Press" },
+            { name: "Seated Cable Row" },
+            { name: "Shoulder Press Machine" },
+          ],
+        },
+        { label: "Outdoor Walk", exercises: [] },
+      ])
+    ).toBe("Chest · Back · Shoulders · Walking");
+  });
+
+  it("falls back safely when a day cannot be classified", () => {
+    expect(
+      getTrainingDaySummary([
+        { label: "Unknown activity", exercises: [{ name: "Unknown movement" }] },
+      ])
+    ).toBeNull();
+  });
+
+  it("uses the Reporting navigation header on Training History", () => {
+    const history = source.indexOf('if (slug === "history")');
+    const nextBranch = source.indexOf("return {", history + 30);
+    expect(source.slice(history, nextBranch + 300)).toContain(
+      'navigationMode: "training-reporting"'
+    );
+    expect(source).toContain('aria-label="Training reporting hierarchy"');
+    const historyCard = source.slice(
+      source.indexOf("function TrainingDayHistoryCard"),
+      source.indexOf("function getLibraryContent")
+    );
+    expect(historyCard).toContain("getTrainingDaySummary(day.sessions)");
+    expect(historyCard).not.toContain("day.summary");
   });
 });

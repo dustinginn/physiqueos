@@ -74,3 +74,10 @@ node_modules/
 /.clean-dev*.log
 /.dev-server*.log
 /.ngrok*.log
+
+# Local Codex/dev-session artifacts
+/.codex-request-marker
+/.dev-theme.*.log
+/.energy-preview-dev.*.log
+/.pi-*-dev.*.log
+/.training-*-dev.*.log

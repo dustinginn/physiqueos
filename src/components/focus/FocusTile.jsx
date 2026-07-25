@@ -28,16 +28,18 @@ export default function FocusTile({
   completable = false,
   completeAction,
   completionId,
+  completionContext,
   density = "balanced",
   href,
   icon = "activity",
   color = "primary",
   completed = false,
+  changeLabel,
   onClick,
 }) {
   const Icon = iconMap[icon] ?? Activity;
   const showSubtitle = density !== "compact" && subtitle;
-  const showMetadata = density === "expanded" && metadata;
+  const showMetadata = (density === "expanded" || changeLabel) && metadata;
   const tone = getToneClasses(color);
   const classes = `
     flex
@@ -83,6 +85,11 @@ export default function FocusTile({
             {metadata}
           </span>
         )}
+        {changeLabel && (
+          <span className="mt-1 w-fit rounded-full bg-[color-mix(in_srgb,var(--chart-3)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--chart-3)]">
+            {changeLabel}
+          </span>
+        )}
       </span>
 
       <CompletionIndicator
@@ -112,11 +119,19 @@ export default function FocusTile({
                 {metadata}
               </span>
             )}
+            {changeLabel && (
+              <span className="mt-1 w-fit rounded-full bg-[color-mix(in_srgb,var(--chart-3)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--chart-3)]">
+                {changeLabel}
+              </span>
+            )}
           </span>
         </Link>
 
         <form action={completeAction} className="shrink-0">
           <input name="priorityId" type="hidden" value={completionId} />
+          <input name="occurrenceDate" type="hidden" value={completionContext?.occurrenceDate ?? ""} />
+          <input name="dose" type="hidden" value={completionContext?.dose ?? ""} />
+          <input name="protocolId" type="hidden" value={completionContext?.protocolId ?? ""} />
           <button
             aria-label={`Mark ${label} complete`}
             className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--divider)] bg-[var(--surface)] text-transparent transition hover:border-[var(--confidence)] hover:text-[var(--confidence)]"

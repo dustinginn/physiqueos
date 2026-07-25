@@ -6,7 +6,6 @@ import GoalsCard from "../components/cards/GoalsCard";
 import TodaysFocusCard from "../components/cards/TodaysFocusCard";
 import { HomeBriefingService } from "../domain/services/HomeBriefingService";
 import { completeHomePriority } from "../app/actions";
-import { generateScheduledDailyBriefing } from "../app/briefing/daily/actions";
 
 export default async function HomeScreen() {
   const briefing = await HomeBriefingService.getHomeBriefing();
@@ -26,12 +25,7 @@ export default async function HomeScreen() {
           <NextBestAction {...briefing.nextBestAction} />
 
           {briefing.latestAnalysis && (
-            <LatestAnalysisCard
-              {...briefing.latestAnalysis}
-              action={briefing.latestAnalysis.actionKind === "generate_daily"
-                ? generateScheduledDailyBriefing
-                : undefined}
-            />
+            <LatestAnalysisCard {...briefing.latestAnalysis} />
           )}
 
           <GoalsCard goals={briefing.goals} />

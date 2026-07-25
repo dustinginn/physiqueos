@@ -1,15 +1,19 @@
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../domain/services/ProgressReportingService";
+import { getDEXATimelineReport } from "../../../domain/services/DEXAEvidenceContextService";
 import DEXAReportScreen from "../../../screens/DEXAReportScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function DEXAProgressPage({ searchParams }) {
   const params = await searchParams;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
+  const { report, timeline } = await getDEXATimelineReport({
+    context: params?.context,
   });
-  const report = await service.getDEXAReport();
 
-  return <DEXAReportScreen from={params?.from} report={report} />;
+  return (
+    <DEXAReportScreen
+      evidenceContext={timeline}
+      from={params?.from}
+      report={report}
+    />
+  );
 }

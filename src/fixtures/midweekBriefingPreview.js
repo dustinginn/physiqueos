@@ -1,0 +1,18 @@
+const dates = ["2026-07-19", "2026-07-20", "2026-07-21"];
+const baseGoal = { id: "goal-build", title: "Build Lean Mass", target: { type: "numeric_change", metric: "lean_mass", amount: 10, unit: "lb" }, timeline: { startDate: "2026-07-20", targetDate: "2026-10-31" }, guardrails: [{ text: "Maintain approximately 8–9% body fat." }], phases: [{ id: "phase-1", name: "Establish Maintenance", status: "active", order: 0, timingMode: "fixed_duration", startDate: "2026-07-20", duration: { value: 4, unit: "weeks" } }] };
+const weights = dates.map((measuredAt, index) => ({ id: `weight-${index}`, measuredAt, weight: { value: 165.8 - index * .1, unit: "lb" } }));
+const dexa = (date="2026-07-18") => ({ id: `dexa-${date}`, measuredAt: date, leanMass: { value: 147.5, unit: "lb" }, fatMass: { value: 13.2, unit: "lb" }, bodyFatPercentage: { value: 8.1, unit: "%" }, restingMetabolicRate: { value: 1836, unit: "kcal/day" } });
+const nutrition = (date, calories, completeness="complete") => record("nutrition", date, { metadata: { completeness }, daily_totals: { calories, protein_g: 180 } });
+const activity = (date, move) => record("activity_day", date, { daily_activity: { move_calories: move } });
+const training = (date, names, seconds=3600, load=100) => record("training", date, { metadata: { activity_type: "Traditional Strength Training", duration_seconds: seconds }, exercises: names.map((name) => ({ name, sets: [{ reps: 10, weight: load, weight_unit: "lb" }, { reps: 10, weight: load, weight_unit: "lb" }] })) });
+
+export const midweekPreviewFixtures = {
+  current: { goal: baseGoal, weights, dexaScans: [dexa()], canonicalObjects: [...dates.map((date,index)=>nutrition(date,[2480,2510,2460][index])), ...dates.map((date,index)=>activity(date,[720,760,740][index])), training(dates[0],["Pull-Up","Seated Row"]), training(dates[2],["Romanian Deadlift","Leg Press"])] },
+  missingEnergy: { goal: baseGoal, weights, dexaScans: [dexa()], canonicalObjects: [nutrition(dates[0],2400,"partial"), activity(dates[0],720), training(dates[2],["Leg Press"])] },
+  trainingImprovement: { goal: baseGoal, weights, dexaScans: [dexa()], canonicalObjects: [...dates.map((date)=>nutrition(date,2600)), ...dates.map((date)=>activity(date,760)), training(dates[0],["Pull-Up","Row"]), training(dates[2],["Pull-Up","Row","Romanian Deadlift"],3600,110)] },
+  trainingWatch: { goal: baseGoal, weights, dexaScans: [dexa()], canonicalObjects: [...dates.map((date)=>nutrition(date,2500)), ...dates.map((date)=>activity(date,740)), training("2026-07-05",["Hanging Leg Raise","Biceps Curl"],3600,100), training("2026-07-12",["Hanging Leg Raise","Biceps Curl"],3600,100), training(dates[0],["Hanging Leg Raise","Biceps Curl"],3600,100), training(dates[2],["Biceps Curl"],3600,80)] },
+  underMaintenance: { goal: baseGoal, weights: weights.map((item,index)=>({...item,weight:{...item.weight,value:166-index*.5}})), dexaScans: [dexa()], canonicalObjects: [...dates.map((date)=>nutrition(date,2100)), ...dates.map((date)=>activity(date,950)), training(dates[0],["Pull-Up","Row"],3500)] },
+  newDexa: { goal: baseGoal, weights, dexaScans: [dexa(), {...dexa("2026-07-21"),leanMass:{value:148,unit:"lb"},bodyFatPercentage:{value:8.2,unit:"%"}}], canonicalObjects: [...dates.map((date)=>nutrition(date,2500)), ...dates.map((date)=>activity(date,750)), training(dates[0],["Pull-Up"]), training(dates[2],["Leg Press"])] },
+};
+
+function record(evidence_type, date, payload) { const id=`${evidence_type}-${date}-${payload.exercises?.map((item)=>item.name).join("-")??"day"}`; return { canonicalId:id, evidence_type, quality: { status: "complete" }, payload: { id, evidence_type, observed_at: date, ...payload } }; }

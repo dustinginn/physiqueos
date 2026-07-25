@@ -2,6 +2,12 @@ import {
   reconcileConfirmedEvidencePackage,
   reconcileEvidencePackageIntoCanonicalHistory,
 } from "../../domain/services/CanonicalEvidenceService";
+import {
+  createCanonicalRecoveryEvidenceObject,
+  createRecoveryEvidenceRecord,
+} from "../../domain/models/RecoveryEvidenceModel";
+
+export const RECOVERY_EVIDENCE_WINDOW_LIMIT = 64;
 
 export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [], options = {}) {
   async function reconcileFromEvidencePackages(userId) {
@@ -85,6 +91,61 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
     async upsertCanonicalEvidenceObjects(evidenceObjects = []) {
       return upsertCanonicalEvidenceObjects(evidenceObjects);
     },
+
+    async getRecoveryEvidenceById(userId, evidenceId) {
+      const object = canonicalEvidenceObjects.find(
+        (item) =>
+          item.canonicalId === evidenceId &&
+          item.userId === userId &&
+          item.evidence_type === "recovery"
+      );
+      return object?.payload ? structuredClone(object.payload) : null;
+    },
+
+    async listRecoveryEvidenceInWindow(userId, window, query = {}) {
+      return listRecoveryEvidenceInWindow(
+        canonicalEvidenceObjects,
+        userId,
+        window,
+        query
+      );
+    },
+
+    async saveRecoveryEvidence(input) {
+      const record = createRecoveryEvidenceRecord(input);
+      const existing = canonicalEvidenceObjects.find(
+        (item) => item.canonicalId === record.id
+      );
+      if (existing) {
+        if (existing.userId !== record.userId) {
+          throw new Error("Recovery evidence identity belongs to another user.");
+        }
+        if (JSON.stringify(existing.payload) !== JSON.stringify(record)) {
+          throw new Error("Recovery evidence value change requires an explicit correction.");
+        }
+        return structuredClone(existing.payload);
+      }
+      const changed = [];
+      if (record.supersedesEvidenceId || record.correctsEvidenceId) {
+        const priorId = record.supersedesEvidenceId ?? record.correctsEvidenceId;
+        const prior = canonicalEvidenceObjects.find(
+          (item) => item.canonicalId === priorId
+        );
+        validateCompatibleRecoveryLineage(prior, record);
+        changed.push({
+          ...prior,
+          payload: {
+            ...prior.payload,
+            status: "superseded",
+            supersededByEvidenceId: record.id,
+            updatedAt: record.updatedAt,
+          },
+        });
+      }
+      changed.push(createCanonicalRecoveryEvidenceObject(record));
+      await upsertCanonicalEvidenceObjects(changed);
+      return record;
+    },
   };
 
   async function upsertCanonicalEvidenceObjects(evidenceObjects = []) {
@@ -108,5 +169,70 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
       if (changed) options.onChange?.();
 
       return evidenceObjects;
+  }
+}
+
+export function listRecoveryEvidenceInWindow(
+  canonicalEvidenceObjects,
+  userId,
+  window,
+  {
+    metrics = null,
+    includeSuperseded = false,
+    limit = RECOVERY_EVIDENCE_WINDOW_LIMIT,
+  } = {}
+) {
+  if (!userId) throw new Error("Recovery evidence query requires userId.");
+  if (!window?.startDate || !window?.endDate) {
+    throw new Error("Recovery evidence query requires a bounded window.");
+  }
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > RECOVERY_EVIDENCE_WINDOW_LIMIT
+  ) {
+    throw new Error(`Recovery evidence query limit cannot exceed ${RECOVERY_EVIDENCE_WINDOW_LIMIT}.`);
+  }
+  const metricSet = metrics ? new Set(metrics) : null;
+  const unique = new Map();
+  canonicalEvidenceObjects
+    .filter((item) =>
+      item.userId === userId &&
+      item.evidence_type === "recovery" &&
+      item.payload?.evidenceDate >= window.startDate &&
+      item.payload?.evidenceDate <= window.endDate &&
+      (!metricSet || metricSet.has(item.payload.metric)) &&
+      item.payload.status !== "invalid" &&
+      (includeSuperseded ||
+        (item.payload.status !== "superseded" &&
+          !item.payload.supersededByEvidenceId))
+    )
+    .forEach((item) => unique.set(item.canonicalId, item.payload));
+  return [...unique.values()]
+    .sort((left, right) =>
+      `${left.evidenceDate}|${left.metric}|${left.source.kind}|${left.id}`
+        .localeCompare(
+          `${right.evidenceDate}|${right.metric}|${right.source.kind}|${right.id}`
+        )
+    )
+    .slice(0, limit)
+    .map((item) => structuredClone(item));
+}
+
+function validateCompatibleRecoveryLineage(prior, record) {
+  if (!prior || prior.evidence_type !== "recovery") {
+    throw new Error("Recovery evidence correction target was not found.");
+  }
+  if (prior.userId !== record.userId) {
+    throw new Error("Recovery evidence correction cannot cross users.");
+  }
+  if (
+    prior.payload.metric !== record.metric ||
+    prior.payload.scope?.region !== record.scope?.region
+  ) {
+    throw new Error("Recovery evidence correction metric scope must match.");
+  }
+  if (prior.payload.supersededByEvidenceId) {
+    throw new Error("Recovery evidence correction target is already superseded.");
   }
 }

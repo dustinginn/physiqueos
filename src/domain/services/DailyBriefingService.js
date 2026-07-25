@@ -10,13 +10,27 @@ import { orderWeeklyAveragesNewestFirst } from "../utils/weeklyAverageOrdering";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import founderVisibleAbsPhotoLedScenario from "../lab/goldenScenarios/founder-visible-abs-photo-led.json";
 import { createPreviousDayEvidenceWindow, createScheduledEvidenceWindow, isRecordAvailableByWindow, resolveScheduledBriefingExpectation } from "./BriefingEvidenceWindowService";
+import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
 import { composeNarrativeSurface } from "./NarrativeComposerService";
 import { createDailyNarrativeEvidenceCoverage } from "./NarrativeEvidenceCoverageService";
 import { getClaimLifecycle } from "./NarrativeEditorialPolicy";
+import { createDailyPIShadowResult } from "./DailyBriefingPIShadowService";
+import { createPIDecisionCadenceShadow } from "./PIDecisionCadenceShadowService";
+import {
+  renderDailyPICandidate,
+  selectAuthoritativeDailyPICandidates,
+} from "./DailyPINarrativeCandidateService";
+import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 const DAILY_BRIEFING_VERSION = "daily-briefing-v29-voice-calibration";
 const FOUNDER_PHOTO_LED_GOLDEN = founderVisibleAbsPhotoLedScenario.expected;
+
+// Explicit diagnostic boundary only. Production composition does not invoke,
+// return, persist, or render this result.
+export function createDailyBriefingPIShadowDiagnostic(input) {
+  return createDailyPIShadowResult(input);
+}
 
 export function createDailyBriefingService({ repositories, now = () => new Date(), scheduledComposer = null }) {
   async function composeDailyBriefing(userId, trigger = {}, options = {}) {
@@ -185,6 +199,40 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       trainingPerformanceSignal,
       weightStats,
     });
+    let dailyPIDecisionSource = null;
+    const dailyPISelection = resolveAuthoritativeDailyPISelection({
+      activeGoal,
+      briefingMemory,
+      evidenceWindow,
+      higherAuthorityActive:
+        options.artifactType === "event" ||
+        isHigherAuthorityDailyStory(narrativeStory, event),
+      protocols,
+      piResultOverride: options.piResultOverride ?? null,
+      sortedWeights,
+      trainingPerformanceReport,
+      canonicalTrainingEvidence: windowCanonicalEvidence.filter(
+        (item) => (item?.payload ?? item)?.evidence_type === "training"
+      ),
+      recoveryEvidenceRecords: windowCanonicalEvidence
+        .map((item) => item?.payload ?? item)
+        .filter((item) => item?.schemaVersion === "recovery_evidence_v1"),
+      directTrainingNarrationActive:
+        trainingPerformanceSignal?.shouldMention === true,
+      weightStats,
+      dailyEnergyAssessment: options.dailyEnergyAssessment ?? null,
+      dexaScans: sortedDEXA,
+      photoSessions: createPhotoSessionReadModels({
+        canonicalObjects: windowCanonicalEvidence,
+        legacyPhotos: sortedPhotos,
+        weights: sortedWeights,
+        analyses: windowAnalyses,
+      }),
+      onPIResult: (result) => {
+        dailyPIDecisionSource = result;
+      },
+    });
+    const renderedPI = renderSelectedDailyPI(dailyPISelection);
     const hero = getHeroSummary({
       narrativeStory,
       primaryEvaluation,
@@ -195,6 +243,54 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       weightStats,
       todayPriorities,
     });
+    const activePhase = activeGoal?.phases?.find(
+      (phase) => phase.status === "active"
+    ) ?? null;
+    if (
+      dailyPIDecisionSource &&
+      (
+        goalUsesRoutineDailyBriefing(activeGoal) ||
+        options.artifactType === "event"
+      )
+    ) {
+      void createPIDecisionCadenceShadow({
+        cadence: "daily",
+        evaluationDate:
+          evidenceWindow?.briefingDate ?? evidenceWindow?.endDate,
+        cadenceEligible: true,
+        evidenceWindow,
+        activeGoal,
+        activePhase,
+        rankedCandidates:
+          dailyPIDecisionSource.rankingResult?.rankedClaims ?? [],
+        claims: dailyPIDecisionSource.claims ?? [],
+        lifecycle: dailyPIDecisionSource.lifecycleResult,
+        evidenceCompleteness: dailyDecisionCompleteness(
+          dailyPIDecisionSource.coverage
+        ),
+        eventAuthority: {
+          state: options.artifactType === "event"
+            ? "event_owns_decision" : "no_event",
+        },
+        recommendationMetadata: recommendation?.id
+          ? {
+              id: recommendation.id,
+              kind: recommendation.type ?? recommendation.id,
+              priority: recommendation.priority ?? null,
+              count: 1,
+              compatibility: "unknown",
+            }
+          : null,
+        existingRecommendation: recommendation,
+        existingNarrative: narrativeStory,
+        memory: briefingMemory,
+        priorDecisionMemory: null,
+        renderingCompatible: false,
+        memoryCompatible: false,
+        integrationEnabled: false,
+        limitations: ["daily_decision_shadow_only"],
+      });
+    }
     const narrativeCoachInsight = {
       ...(narrativeStory.coachInsight ?? {}),
       text: applyDecisionSupportNarrativeFilter(narrativeStory.coachInsight?.text),
@@ -260,7 +356,10 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       currentChapter: narrativeStory?.theme ?? null,
       eventType: trigger.evidenceType,
       hero: eventNarrative?.hero ?? hero,
-      interpretation: eventNarrative?.interpretation ?? editorial.interpretation,
+      interpretation:
+        eventNarrative?.interpretation ??
+        renderedPI?.interpretation ??
+        editorial.interpretation,
       projection: primaryEvaluation?.projection,
       recommendation,
       temporalContext: evidenceWindow,
@@ -272,6 +371,10 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       evidenceCoverage: narrativeEvidenceCoverage,
       continuity: getNarrativeClaimContinuity({ briefingMemory, primaryEvaluation, trainingPerformanceSignal }),
     });
+    if (renderedPI?.supportingObservations?.length) {
+      composedNarrative.supportingObservations =
+        renderedPI.supportingObservations;
+    }
 
     return {
       version: DAILY_BRIEFING_VERSION,
@@ -364,6 +467,10 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
         primaryEvaluation,
         recommendation,
         trainingPerformanceSignal,
+        piCommunicatedClaimIds:
+          dailyPISelection.status === "selected"
+            ? dailyPISelection.communicatedClaimIds
+            : [],
       }),
       narrativeContinuity: { mode: briefingMemoryMode, sourceArtifactId: latestStoredBriefing?.id ?? null, sourceCadence: latestStoredBriefing?.cadence ?? null },
     };
@@ -400,32 +507,31 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
     },
 
     async getDailyBriefing(userId) {
-      const persisted = await this.getPersistedDailyBriefing(userId);
-      if (persisted) return persisted;
-      const user = userId
-        ? await repositories.users.getUserById(userId)
-        : await repositories.users.getCurrentUser();
-      const resolvedUserId = user?.id ?? userId;
-      if (!resolvedUserId) return null;
-      return this.generateDailyBriefing({
-        userId: resolvedUserId,
-        evidenceWindow: createPreviousDayEvidenceWindow({ now: now(), timeZone: user?.timeZone ?? "America/Los_Angeles" }),
-      });
+      return this.getPersistedDailyBriefing(userId);
     },
 
     async generateScheduledDailyBriefingForClosedWindow({ userId, asOf = now() } = {}) {
+      if (!repositories.protocols?.listActiveProtocols && !repositories.protocols?.listProtocols) {
+        const legacyExpectation = resolveScheduledBriefingExpectation({ now: asOf });
+        if (legacyExpectation.cadence !== "daily") {
+          return { state: "retired", reason: "routine_daily_cadence_retired", expectation: legacyExpectation };
+        }
+      }
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
       const resolvedUserId = user?.id ?? userId;
       if (!resolvedUserId) return { state: "not_eligible", reason: "user_not_found" };
+      const coachingUpdates = await createCoachingUpdatesReadService({ repositories })
+        .getCurrent({ userId: resolvedUserId });
 
       const expectation = resolveScheduledBriefingExpectation({
         now: asOf,
         timeZone: user?.timeZone ?? "America/Los_Angeles",
+        coachingUpdates,
       });
       if (expectation.cadence !== "daily") {
-        return { state: "blocked_by_precedence", expectation };
+        return { state: "retired", reason: "routine_daily_cadence_retired", expectation };
       }
       if (!expectation.closed) {
         return { state: "not_eligible", expectation, reason: "evidence_window_open" };
@@ -499,6 +605,7 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
     },
 
     async generateDailyBriefing({ userId, trigger = {}, evidenceWindow = null, artifactType = "scheduled" } = {}) {
+      if (artifactType !== "event") return { state: "retired", reason: "routine_daily_cadence_retired" };
       const user = userId
         ? await repositories.users.getUserById(userId)
         : await repositories.users.getCurrentUser();
@@ -2143,6 +2250,183 @@ function getDateKey(value) {
   return String(value ?? "").slice(0, 10);
 }
 
+export function resolveAuthoritativeDailyPISelection({
+  activeGoal,
+  briefingMemory = {},
+  dailyEnergyAssessment = null,
+  evidenceWindow,
+  higherAuthorityActive = false,
+  piResultOverride = null,
+  protocols = [],
+  sortedWeights = [],
+  trainingPerformanceReport,
+  canonicalTrainingEvidence,
+  recoveryEvidenceRecords = [],
+  directTrainingNarrationActive = false,
+  weightStats = {},
+  dexaScans = [],
+  photoSessions = [],
+  onPIResult = null,
+} = {}) {
+  const exactEvidenceWindow = evidenceWindow
+    ? {
+        ...evidenceWindow,
+        startDate: evidenceWindow.startDate ?? evidenceWindow.date,
+        endDate: evidenceWindow.endDate ?? evidenceWindow.date,
+      }
+    : null;
+  if (!exactEvidenceWindow?.startDate || !exactEvidenceWindow?.endDate) {
+    return {
+      status: "fallback",
+      reason: "exact_daily_inputs_unavailable",
+      primary: null,
+      supporting: [],
+      communicatedClaimIds: [],
+      diagnostics: [],
+    };
+  }
+  try {
+    const piResult = piResultOverride ?? createDailyPIShadowResult({
+      evidenceWindow: exactEvidenceWindow,
+      evaluationDate:
+        exactEvidenceWindow.briefingDate ?? exactEvidenceWindow.endDate,
+      timeZone: exactEvidenceWindow.timeZone ?? "America/Los_Angeles",
+      trainingReport: trainingPerformanceReport,
+      canonicalTrainingEvidence,
+      recoveryEvidenceRecords,
+      dailyWeightAssessment: createDailyWeightAssessment({
+        sortedWeights,
+        weightStats,
+      }),
+      ...(dailyEnergyAssessment
+        ? { dailyEnergyAssessment }
+        : {}),
+      activeGoal,
+      activePhase: activeGoal?.phases?.find(
+        (phase) => phase.status === "active"
+      ) ?? null,
+      relatedGoals: [],
+      protocols,
+      dexaScans,
+      photoSessions,
+      lifecycleMode: "new",
+    });
+    if (typeof onPIResult === "function") onPIResult(piResult);
+    return selectAuthoritativeDailyPICandidates({
+      piResult,
+      communicatedClaimIds: briefingMemory.communicatedClaimIds ?? [],
+      higherAuthorityActive,
+      directTrainingNarrationActive,
+    });
+  } catch (error) {
+    return {
+      status: "fallback",
+      reason: "pi_validation_failed",
+      primary: null,
+      supporting: [],
+      communicatedClaimIds: [],
+      diagnostics: [
+        {
+          code: "daily_pi_authoritative_selection_failed",
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        },
+      ],
+    };
+  }
+}
+
+function goalUsesRoutineDailyBriefing(goal) {
+  const configured = [
+    ...(goal?.briefingCadences ?? []),
+    ...(goal?.cadence?.briefings ?? []),
+    goal?.briefingCadence,
+  ].filter(Boolean).map(String);
+  return configured.includes("daily");
+}
+
+function dailyDecisionCompleteness(coverage = {}) {
+  const normalize = (value) =>
+    ["complete", "available"].includes(value) ? "complete"
+      : ["partial", "insufficient"].includes(value) ? "partial"
+        : "missing";
+  const training = normalize(coverage.training);
+  const energy = normalize(coverage.energy);
+  const recovery = normalize(coverage.recovery);
+  return {
+    overall: training === "complete" && energy === "complete"
+      ? "complete"
+      : training === "missing" && energy === "missing" ? "missing" : "partial",
+    training,
+    energy,
+    recovery,
+    bodyComposition: "unknown",
+  };
+}
+
+
+function createDailyWeightAssessment({ sortedWeights, weightStats }) {
+  const current = sortedWeights.slice(-7);
+  const comparison = sortedWeights.slice(-14, -7);
+  return {
+    currentAverage: weightStats.weeklyAverage,
+    comparisonAverage: weightStats.previousWeeklyAverage,
+    absoluteChange: weightStats.weekOverWeek,
+    direction:
+      weightStats.weekOverWeek == null
+        ? "not_applicable"
+        : weightStats.weekOverWeek > 0
+          ? "rising"
+          : weightStats.weekOverWeek < 0
+            ? "falling"
+            : "stable",
+    unit: weightStats.unit,
+    currentSampleCount: current.length,
+    comparisonSampleCount: comparison.length,
+    currentDateRange: evidenceRange(current),
+    comparisonDateRange: evidenceRange(comparison),
+    currentEvidenceIds: current.map((entry) => entry.id),
+    comparisonEvidenceIds: comparison.map((entry) => entry.id),
+  };
+}
+
+function evidenceRange(entries) {
+  if (!entries.length) return null;
+  return {
+    startDate: getDateKey(entries[0].measuredAt),
+    endDate: getDateKey(entries.at(-1).measuredAt),
+  };
+}
+
+function isHigherAuthorityDailyStory(narrativeStory, event) {
+  return Boolean(
+    event?.type &&
+      ![
+        "new_low_weight",
+        "held_low_weight",
+        "weight_fluctuation_resolved",
+      ].includes(event.type)
+  ) || [
+    "photo_led_golden",
+    "photo_interpreter",
+    "fluctuation_resolution",
+  ].includes(narrativeStory?.theme);
+}
+
+function renderSelectedDailyPI(selection) {
+  if (selection?.status !== "selected") return null;
+  const rendered = [
+    selection.primary,
+    ...(selection.supporting ?? []),
+  ].map(renderDailyPICandidate).filter(Boolean);
+  if (!rendered.length) return null;
+  return {
+    interpretation: rendered.map((item) => item.interpretation),
+    supportingObservations: rendered
+      .map((item) => item.supportingObservation)
+      .filter(Boolean),
+  };
+}
+
 function getUpdatedDailyBriefingMemory({
   briefingMemory,
   coachInsight,
@@ -2152,6 +2436,7 @@ function getUpdatedDailyBriefingMemory({
   primaryEvaluation,
   recommendation,
   trainingPerformanceSignal,
+  piCommunicatedClaimIds = [],
 }) {
   const currentThemes = [
     coachInsight.theme,
@@ -2177,12 +2462,18 @@ function getUpdatedDailyBriefingMemory({
     communicatedClaimIds: [
       ...(briefingMemory.communicatedClaimIds ?? []),
       ...(trainingPerformanceSignal?.communicatedClaimIds ?? []),
+      ...piCommunicatedClaimIds,
       getProjectionClaimId(primaryEvaluation),
       getMilestoneClaimId(primaryEvaluation),
     ].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).slice(-24),
     claimHistory: [
       ...(briefingMemory.claimHistory ?? []),
       ...(trainingPerformanceSignal?.claimIds ?? []).map((claimId) => ({ claimId, evidenceDate: trainingPerformanceSignal.evidenceDate ?? null })),
+      ...piCommunicatedClaimIds.map((claimId) => ({
+        claimId,
+        evidenceDate: null,
+        source: "daily_pi_semantic_selection",
+      })),
     ].slice(-48),
     recentNarrativeThemes: [
       ...(briefingMemory.recentNarrativeThemes ?? []),

@@ -9,6 +9,7 @@ export const TRAINING_NAVIGATION_CATEGORIES = [
   "hamstrings",
   "glutes",
   "calves",
+  "adductors",
 ];
 
 const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
@@ -28,9 +29,11 @@ const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "ez-bar-curls": "biceps",
   "forearm-curl": "biceps",
   "forearm-curls": "biceps",
+  "glute-squat": "glutes",
   "hanging-leg-raise": "core",
   "hanging-leg-raises": "core",
   "high-row-machine": "back",
+  "hyperextension-machine": "glutes",
   "incline-bench-press": "chest",
   "incline-dumbbell-press": "chest",
   "iso-lateral-high-row": "back",
@@ -42,6 +45,7 @@ const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "leg-press": "quads",
   "leg-press-high-and-narrow": "hamstrings",
   "leg-press-high-and-narrow-feet": "hamstrings",
+  "lying-leg-curl": "hamstrings",
   "machine-lateral-raise": "shoulders",
   "machine-lateral-raises": "shoulders",
   plank: "core",
@@ -52,8 +56,14 @@ const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "chest-flies-machine": "chest",
   "seated-cable-row": "back",
   "seated-cable-rows": "back",
-  "seated-abduction": "glutes",
-  "seated-abductions": "glutes",
+  "seated-abduction": "quads",
+  "seated-abductions": "quads",
+  "seated-hip-abduction": "quads",
+  "seated-hip-abductions": "quads",
+  "seated-adduction": "glutes",
+  "seated-adductions": "glutes",
+  "seated-hip-adduction": "glutes",
+  "seated-hip-adductions": "glutes",
   "shoulder-press-machine": "shoulders",
   "spider-curl": "biceps",
   "spider-curls": "biceps",
@@ -61,6 +71,7 @@ const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "reverse-curls": "biceps",
   "reverse-wrist-curl": "biceps",
   "reverse-wrist-curls": "biceps",
+  "romanian-deadlift": "glutes",
   squat: "quads",
   "sumo-squat": "glutes",
   "sumo-squat-machine": "glutes",
@@ -72,8 +83,23 @@ const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "triceps-push-downs": "triceps",
 };
 
+const EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES = {
+  glute_squat: "glutes",
+  hyperextension_machine: "glutes",
+  hack_squat: "quads",
+  leg_extension: "quads",
+  lying_leg_curl: "hamstrings",
+  romanian_deadlift: "glutes",
+  seated_abductions: "glutes",
+  seated_hip_adductions: "glutes",
+  seated_hip_abductions: "quads",
+  single_leg_leg_press: "quads",
+  sissy_squat: "quads",
+};
+
 const REGION_NAVIGATION_CATEGORIES = {
   back: "back",
+  adductors: "adductors",
   biceps: "biceps",
   calves: "calves",
   chest: "chest",
@@ -132,6 +158,18 @@ export function resolvePrimaryTrainingNavigationCategory(exercise = {}) {
     };
   }
 
+  const canonicalExerciseId = String(
+    exercise.canonicalExerciseId ?? exercise.canonicalId ?? ""
+  ).trim();
+  if (EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES[canonicalExerciseId]) {
+    return {
+      confidence: "high",
+      primaryNavigationCategory:
+        EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES[canonicalExerciseId],
+      source: "explicit_canonical_exercise_mapping",
+    };
+  }
+
   if (hasHamstringBiasedLegPressVariation(exercise)) {
     return {
       confidence: "high",
@@ -185,6 +223,72 @@ export function resolvePrimaryTrainingNavigationCategory(exercise = {}) {
     confidence: fallbackCategory ? "low" : "unmapped",
     primaryNavigationCategory: fallbackCategory,
     source: fallbackCategory ? "conservative_name_fallback" : "unmapped",
+  };
+}
+
+export function validateTrainingNavigationTaxonomy(
+  exercises = [],
+  { browsableCanonicalIds = [] } = {}
+) {
+  const registrations = new Map();
+  const unknownCategories = [];
+  const unmappedCanonicalIds = [];
+
+  exercises.forEach((exercise) => {
+    const canonicalId = String(
+      exercise.canonicalExerciseId ?? exercise.canonicalId ?? exercise.id ?? ""
+    ).trim();
+    if (!canonicalId) return;
+
+    const suppliedCategory =
+      exercise.primaryNavigationCategory ?? exercise.navigationCategory;
+    if (suppliedCategory && !normalizeNavigationCategory(suppliedCategory)) {
+      unknownCategories.push({
+        canonicalExerciseId: canonicalId,
+        category: suppliedCategory,
+      });
+    }
+
+    const category = resolvePrimaryTrainingNavigationCategory(
+      exercise
+    ).primaryNavigationCategory;
+    if (!category) {
+      unmappedCanonicalIds.push(canonicalId);
+      return;
+    }
+
+    registrations.set(canonicalId, [
+      ...(registrations.get(canonicalId) ?? []),
+      category,
+    ]);
+  });
+
+  const missingCanonicalIds = browsableCanonicalIds.filter(
+    (canonicalId) => !registrations.has(canonicalId)
+  );
+  const multiplePrimaryCategories = [...registrations]
+    .filter(([, categories]) => categories.length !== 1)
+    .map(([canonicalExerciseId, categories]) => ({
+      canonicalExerciseId,
+      categories,
+    }));
+
+  return {
+    valid:
+      unknownCategories.length === 0 &&
+      unmappedCanonicalIds.length === 0 &&
+      missingCanonicalIds.length === 0 &&
+      multiplePrimaryCategories.length === 0,
+    missingCanonicalIds,
+    multiplePrimaryCategories,
+    registrations: Object.fromEntries(
+      [...registrations].map(([canonicalExerciseId, categories]) => [
+        canonicalExerciseId,
+        categories[0],
+      ])
+    ),
+    unknownCategories,
+    unmappedCanonicalIds,
   };
 }
 

@@ -11,7 +11,21 @@ export async function completePriority(formData) {
     throw new Error("Priority id is required.");
   }
 
-  await FounderRepositories.reminders.completeReminder(priorityId);
+  const occurrenceDate = String(formData.get("occurrenceDate") ?? "");
+  const dose = String(formData.get("dose") ?? "");
+  const protocolId = String(formData.get("protocolId") ?? "");
+  if (occurrenceDate && dose && protocolId) {
+    await FounderRepositories.reminders.completeReminderFromEvidence(priorityId, {
+      id: `${priorityId}:${occurrenceDate}`,
+      completedAt: new Date().toISOString(),
+      evidenceDate: occurrenceDate,
+      effectiveDose: dose,
+      protocolId,
+      satisfactionType: "scheduled_protocol_execution",
+    });
+  } else {
+    await FounderRepositories.reminders.completeReminder(priorityId);
+  }
 
   revalidatePath("/");
   revalidatePath("/log");

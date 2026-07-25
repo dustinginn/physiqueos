@@ -1,7 +1,16 @@
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createCutEnergyStrategyService } from "../../../../../domain/services/CutEnergyStrategyService";
-import CutEnergyStrategyBuilderScreen from "../../../../../screens/CutEnergyStrategyBuilderScreen";
-import { activateCutEnergyStrategy } from "./actions";
+import { createOperatingPlanEnergyStrategyService } from "../../../../../domain/services/OperatingPlanEnergyStrategyService";
+
 export const dynamic = "force-dynamic";
-export default async function Page() { const user = await FounderRepositories.users.getCurrentUser(); const context = await createCutEnergyStrategyService({ repositories: FounderRepositories }).getBuilderContext(user.id); if (context.link) redirect("/profile/operating-plan?energy=active"); return <CutEnergyStrategyBuilderScreen action={activateCutEnergyStrategy} context={context} />; }
+
+export default async function Page() {
+  const user = await FounderRepositories.users.getCurrentUser();
+  if (!user) redirect("/profile/operating-plan");
+
+  await createOperatingPlanEnergyStrategyService({
+    repositories: FounderRepositories,
+  }).getActiveStrategy(user.id);
+
+  redirect("/profile/operating-plan");
+}

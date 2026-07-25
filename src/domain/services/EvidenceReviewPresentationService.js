@@ -1,4 +1,8 @@
 import { getCanonicalTrainingExerciseLabel } from "../models/trainingExerciseIdentity";
+import {
+  reconcileNutritionDayEvidence,
+  restoreCollapsedNutritionFoodDuplicates,
+} from "../models/nutritionDayEvidence";
 
 const INTERNAL_KEYS = new Set([
   "id", "canonicalId", "canonical_id", "created_at", "createdAt", "updated_at",
@@ -46,7 +50,7 @@ export function repairPendingReviewExerciseIdentities(evidencePackage = {}) {
     evidence_objects: (evidencePackage.evidence_objects ?? []).map((object) => object.evidence_type !== "training" ? object : ({
       ...object,
       exercises: (object.exercises ?? []).map((exercise) => /^front\s+raises?$/i.test(String(exercise.name ?? "").trim())
-        ? { ...exercise, name: "Cable Machine Front Raise", equipment: "cable" }
+        ? { ...exercise, name: "Cable Machine Front Raises", equipment: "cable" }
         : exercise),
     })),
   };
@@ -143,7 +147,59 @@ function presentActivity(object, common) {
 function presentNutrition(object, common) {
   const metadata = object.metadata ?? {};
   const totals = object.daily_totals ?? {};
-  return { ...common, title: "Nutrition", noun: "nutrition entry", metrics: compact([metric("Calories", calories(object.calories ?? metadata.calories ?? object.total_calories ?? totals.calories)), metric("Protein", unit(object.protein ?? metadata.protein ?? totals.protein_g, "g")), metric("Carbs", unit(object.carbs ?? metadata.carbs ?? totals.carbs_g, "g")), metric("Fat", unit(object.fat ?? metadata.fat ?? totals.fat_g, "g")), metric("Source", common.sourceLabel)]) };
+  const mealOrder = new Map([
+    ["breakfast", 0], ["lunch", 1], ["dinner", 2], ["snack", 3], ["snacks", 3],
+  ]);
+  const meals = (object.meals ?? []).map((meal) => {
+    const foods = restoreCollapsedNutritionFoodDuplicates(meal);
+    return {
+      id: meal.id,
+      name: meal.name ?? "Meal",
+      totals: meal.totals ?? {},
+      foodCount: foods.length,
+      summary: compact([
+        calories(meal.totals?.calories),
+        unit(meal.totals?.protein_g, "g protein"),
+        unit(meal.totals?.carbs_g, "g carbs"),
+        unit(meal.totals?.fat_g, "g fat"),
+      ]).join(" · "),
+      foods: foods.map((food) => ({
+        id: food.id,
+        name: food.name ?? food.canonical_name ?? "Food",
+        brand: food.brand ?? null,
+        serving: formatFoodServing(food),
+        calories: calories(food.nutrients?.calories),
+      })),
+    };
+  }).sort((first, second) =>
+    (mealOrder.get(first.name.toLowerCase()) ?? 99) -
+    (mealOrder.get(second.name.toLowerCase()) ?? 99)
+  );
+  const reconciliation = reconcileNutritionDayEvidence({ dailyTotals: totals, meals });
+
+  return {
+    ...common,
+    title: "Nutrition",
+    noun: "nutrition entry",
+    metrics: compact([
+      metric("Calories", calories(object.calories ?? metadata.calories ?? object.total_calories ?? totals.calories)),
+      metric("Protein", unit(object.protein ?? metadata.protein ?? totals.protein_g, "g")),
+      metric("Carbs", unit(object.carbs ?? metadata.carbs ?? totals.carbs_g, "g")),
+      metric("Fat", unit(object.fat ?? metadata.fat ?? totals.fat_g, "g")),
+      metric("Source", common.sourceLabel),
+    ]),
+    meals,
+    reconciliation: reconciliation.status === "reconciled"
+      ? "Meal totals match the daily total."
+      : reconciliation.status === "needs_review"
+        ? "Daily totals are authoritative; meal totals need review."
+        : null,
+  };
+}
+
+function formatFoodServing(food = {}) {
+  if (food.serving_size) return String(food.serving_size);
+  return finite(food.servings) == null ? null : `${formatNumber(food.servings)} serving`;
 }
 
 function presentDexa(object, common) {

@@ -7,10 +7,11 @@ export const EVIDENCE_HUB_CANONICAL_ORDER = [
   "photos",
   "dexa",
   "activity",
-  "protocols",
+  "energy",
   "recovery",
   "health-metrics",
 ];
+export const EVIDENCE_HUB_ARCHIVED_IDS = Object.freeze(["protocols"]);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_MS = 30 * DAY_MS;
@@ -121,9 +122,9 @@ export function rankRecentlyUsedEvidence(usage, now = new Date(), limit = 3) {
 
 export function orderEvidenceStreams(streams = []) {
   const order = new Map(EVIDENCE_HUB_CANONICAL_ORDER.map((id, index) => [id, index]));
-  return [...streams].sort((left, right) =>
-    (order.get(left.id) ?? order.size) - (order.get(right.id) ?? order.size)
-  );
+  return streams
+    .filter((stream) => order.has(stream.id))
+    .sort((left, right) => order.get(left.id) - order.get(right.id));
 }
 
 function recencyWeight(ageMs) {

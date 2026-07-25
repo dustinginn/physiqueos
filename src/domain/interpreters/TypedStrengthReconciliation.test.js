@@ -29,7 +29,7 @@ describe("typed strength reconciliation completeness", () => {
     expect(JSON.stringify(sourceArtifacts)).toBe(before);
     const presentation = createEvidenceReviewPresentation({ evidencePackage: { evidence_objects: [result], provenance: { source_artifacts: sourceArtifacts } } });
     expect(presentation.items[0].exercises.map((exercise) => exercise.name)).toEqual([
-      "Bulgarian Split Squat (Smith Machine)", "Pendulum Squat Machine", "Leg Extension", "Leg Press (Feet Middle)",
+      "Bulgarian Split Squat (Smith Machine)", "Pendulum Squat Machine", "Leg Extensions", "Leg Press (Feet Middle)",
     ]);
   });
 

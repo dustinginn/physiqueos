@@ -1,8 +1,4 @@
-import {
-  FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT,
-  getProgressPhotoCategoryId,
-  normalizeProgressPhotoCategory,
-} from "../models/progressPhotoPoseVocabulary";
+import { getProgressPhotoCategoryId, normalizeProgressPhotoCategory } from "../models/progressPhotoPoseVocabulary";
 
 export function createProvisionalPhotoSession({ reviewId = null, captureDate, photos = [], conditions = {}, comparisonCandidates = [] } = {}) {
   const normalizedPhotos = photos.map((photo, index) => ({
@@ -20,7 +16,7 @@ export function createProvisionalPhotoSession({ reviewId = null, captureDate, ph
     photos: normalizedPhotos,
     conditions,
     comparison_candidates: comparisonCandidates,
-    required_pose_ids: FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT.requiredPoseIds,
+    required_pose_ids: [],
     ...validation,
   };
 }
@@ -32,11 +28,15 @@ export function validateProvisionalPhotoSession(photos = []) {
     counts[id] = (counts[id] ?? 0) + 1;
     return counts;
   }, {});
-  const duplicate_pose_ids = Object.entries(poseCounts).filter(([id, count]) => id !== "unknown" && count > 1).map(([id]) => id);
-  const missing_required_pose_ids = FOUNDER_ALPHA_PHOTO_SESSION_CONTRACT.requiredPoseIds.filter((id) => !poseCounts[id]);
+  const duplicate_pose_ids = Object.entries(poseCounts).filter(([id,count])=>id!=="unknown"&&count>1).map(([id])=>id);
+  const missing_required_pose_ids = [];
+  const unconfirmed_photo_ids = active.filter((photo) =>
+    photo.identityStatus === "suggested" || photo.identityStatus === "needs_identity" || photo.userConfirmedIdentity === false
+  ).map((photo) => photo.id);
   return {
     duplicate_pose_ids,
     missing_required_pose_ids,
-    completion_state: duplicate_pose_ids.length === 0 && missing_required_pose_ids.length === 0 ? "complete" : "incomplete",
+    unconfirmed_photo_ids,
+    completion_state: active.length > 0 && unconfirmed_photo_ids.length === 0 ? "complete" : "incomplete",
   };
 }

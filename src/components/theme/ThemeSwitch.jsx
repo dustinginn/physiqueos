@@ -2,6 +2,11 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  applyThemePreference,
+  readThemePreference,
+  writeThemePreference,
+} from "./themeContract";
 
 const options = [
   { icon: Monitor, label: "System", value: "system" },
@@ -13,24 +18,26 @@ export default function ThemeSwitch() {
   const [theme, setTheme] = useState("system");
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem("physiqueos-theme") ?? "system";
+    const storedTheme = readThemePreference(window.localStorage);
     applyTheme(storedTheme);
     const stateSyncTimer = window.setTimeout(() => {
       setTheme(storedTheme);
     }, 0);
 
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const media = typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-color-scheme: dark)")
+      : null;
     const onChange = () => {
-      if ((window.localStorage.getItem("physiqueos-theme") ?? "system") === "system") {
+      if (readThemePreference(window.localStorage) === "system") {
         applyTheme("system");
       }
     };
 
-    media.addEventListener("change", onChange);
+    media?.addEventListener?.("change", onChange);
 
     return () => {
       window.clearTimeout(stateSyncTimer);
-      media.removeEventListener("change", onChange);
+      media?.removeEventListener?.("change", onChange);
     };
   }, []);
 
@@ -40,7 +47,7 @@ export default function ThemeSwitch() {
 
   function selectTheme(nextTheme) {
     setTheme(nextTheme);
-    window.localStorage.setItem("physiqueos-theme", nextTheme);
+    writeThemePreference(window.localStorage, nextTheme);
     applyTheme(nextTheme);
   }
 
@@ -67,13 +74,8 @@ export default function ThemeSwitch() {
 }
 
 function applyTheme(theme) {
-  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const resolvedTheme = theme === "system" ? (systemDark ? "dark" : "light") : theme;
-
   document.documentElement.classList.add("theme-transition");
-  document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
-  document.documentElement.dataset.theme = resolvedTheme;
-  document.documentElement.dataset.themePreference = theme;
+  applyThemePreference(document.documentElement, theme, window.matchMedia?.bind(window));
   window.setTimeout(() => {
     document.documentElement.classList.remove("theme-transition");
   }, 220);

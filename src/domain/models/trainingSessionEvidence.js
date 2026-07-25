@@ -860,7 +860,7 @@ export function splitStrengthTrainingExerciseClauses(text) {
     );
 
   const segments = preparedText
-    .split(/[.;\n]|\bthen\b/i)
+    .split(/;|(?<!\d)\.|\.(?!\d)|\n|\bthen\b/i)
     .map((segment) => cleanTrainingSegment(segment))
     .filter(Boolean);
 
@@ -1475,6 +1475,11 @@ function assignNumericTokenRoles(text) {
 
 function getNaturalExercisePatterns() {
   return [
+    { canonical: "Single-Leg Leg Press", pattern: /\b(?:single[-\s]+leg|unilateral)\s+(?:leg\s+)?press\b/gi },
+    { canonical: "Seated Hip Abductions", pattern: /\b(?:seated\s+)?hip\s+abductions?\b|\bseated\s+abductions?\b/gi },
+    { canonical: "Seated Hip Adductions", pattern: /\b(?:seated\s+)?hip\s+adductions?\b|\bseated\s+adductions?\b/gi },
+    { canonical: "Hack Squats", pattern: /\bhack\s+squats?\b/gi },
+    { canonical: "Sissy Squats", pattern: /\bsissy\s+squats?\b/gi },
     { canonical: "Leg Press (Feet Middle)", pattern: /\bleg\s+press\s*\(\s*feet\s+middle\s*\)|\bleg\s+press\s+feet\s+middle\b/gi },
     { canonical: "Leg Press (Feet High)", pattern: /\bleg\s+press\s*\(\s*feet\s+high\s*\)|\bleg\s+press\s+feet\s+high\b/gi },
     { canonical: "Leg Press (Feet Low)", pattern: /\bleg\s+press\s*\(\s*feet\s+low\s*\)|\bleg\s+press\s+feet\s+low\b/gi },
@@ -1482,20 +1487,19 @@ function getNaturalExercisePatterns() {
     { canonical: "Pendulum Squat Machine", pattern: /\bpendulum\s+squats?\s+machines?\b|\bpendulum\s+machines?\s+squats?\b/gi },
     { canonical: "Bulgarian Split Squat", pattern: /\bbulgarian\s+split\s+squats?\b/gi },
     { canonical: "Pendulum Squat", pattern: /\bpendulum\s+squats?\b/gi },
-    { canonical: "Leg Extension", pattern: /\bleg\s+extensions?(?:\s+machines?)?\b/gi },
+    { canonical: "Leg Extensions", pattern: /\bleg\s+extensions?(?:\s+machines?)?\b/gi },
     { canonical: "Leg Press, high and narrow feet", pattern: /\bleg\s+press\b[^.!?]{0,45}\b(?:feet\s+)?high\b[^.!?]{0,45}\bnarrow\b/gi },
-    { canonical: "Straight Bar Cable Pushdown", pattern: /\b(?:straight\s+bar\s+cable|cable\s+straight\s+bar)\s+push\s*downs?\b/gi },
+    { canonical: "Straight Bar Cable Pushdowns", pattern: /\b(?:straight\s+bar\s+cable|cable\s+straight\s+bar)\s+push\s*downs?\b/gi },
     { canonical: "Incline Dumbbell Press", pattern: /\b(?:incline\s+dumbbell|dumbbell\s+incline)\s+press(?:es)?\b/gi },
     { canonical: "Incline Bench Press", pattern: /\b(?:(?:barbell\s+)?incline\s+(?:barbell\s+)?bench\s+press|incline\s+barbell\s+press)\b/gi },
     { canonical: "Shoulder Press Machine", pattern: /\b(?:shoulder\s+press\s+machine|machine\s+shoulder\s+press|shoulder\s+press\s+on\s+the\s+machine|shoulder\s+press\s+machine)\b/gi },
     { canonical: "Chest Fly Machine", pattern: /\bchest\s+(?:fly|flies)\s+machine\b/gi },
-    { canonical: "Hanging Leg Raise", pattern: /\bhanging\s+leg\s+raises?\b/gi },
-    { canonical: "Seated Cable Row", pattern: /\bseated\s+cable\s+rows?\b/gi },
+    { canonical: "Hanging Leg Raises", pattern: /\bhanging\s+leg\s+raises?\b/gi },
+    { canonical: "Seated Cable Rows", pattern: /\bseated\s+cable\s+rows?\b/gi },
     { canonical: "Cable Pushdown", pattern: /\bcable\s+push\s*downs?\b/gi },
-    { canonical: "Cable Crunch", pattern: /\bcable\s+crunch(?:es)?\b/gi },
-    { canonical: "Pull-Up", pattern: /\bpull[-\s]?ups?\b/gi },
+    { canonical: "Cable Crunches", pattern: /\bcable\s+crunch(?:es)?\b/gi },
+    { canonical: "Pull-Ups", pattern: /\bpull[-\s]?ups?\b/gi },
     { canonical: "Bench Press", pattern: /\b(?:chest\s+)?bench\s+press\b/gi },
-    { canonical: "Hack Squat", pattern: /\bhack\s+squats?\b/gi },
     { canonical: "Lateral Raise", pattern: /\blateral\s+raises?\b/gi },
     { canonical: "Leg Press", pattern: /\bleg\s+press\b/gi },
     { canonical: "Leg Raise", pattern: /\bleg\s+raises?\b/gi },
@@ -1915,18 +1919,21 @@ function canonicalizeNaturalExerciseName(name) {
   const resolved = resolveTrainingExerciseIdentity(name);
   if (
     resolved.resolutionStatus === "resolved_high_confidence" &&
-    resolved.exercise?.body_region === "Lower Body"
+    (
+      resolved.exercise?.body_region === "Lower Body" ||
+      resolved.canonicalExerciseId === "hanging_leg_raise"
+    )
   ) {
     return resolved.canonicalExerciseName;
   }
-  if (/^hanging\s+leg\s+raises?$/i.test(name)) return "Hanging Leg Raise";
-  if (/^cable\s+crunch(?:es)?$/i.test(name)) return "Cable Crunch";
+  if (/^hanging\s+leg\s+raises?$/i.test(name)) return "Hanging Leg Raises";
+  if (/^cable\s+crunch(?:es)?$/i.test(name)) return "Cable Crunches";
   if (/^cable\s+push\s*downs?$/i.test(name)) return "Cable Pushdown";
-  if (/^pull[-\s]?ups?$/i.test(name)) return "Pull-Up";
+  if (/^pull[-\s]?ups?$/i.test(name)) return "Pull-Ups";
   if (/^straight\s+bar\s+cable\s+push\s*downs?$/i.test(name)) {
-    return "Straight Bar Cable Pushdown";
+    return "Straight Bar Cable Pushdowns";
   }
-  if (/^hack\s+squats?$/i.test(name)) return "Hack Squat";
+  if (/^hack\s+squats?$/i.test(name)) return "Hack Squats";
 
   return name;
 }
@@ -2040,7 +2047,7 @@ function isSetLine(value) {
 
 function hasAnySetLine(value) {
   return normalizeTrainingTextInput(value)
-    .split(/\n|[.;]|\bthen\b/i)
+    .split(/\n|;|(?<!\d)\.|\.(?!\d)|\bthen\b/i)
     .map((segment) => cleanTrainingSegment(segment))
     .some((segment) => isSetLine(segment));
 }
@@ -2396,7 +2403,10 @@ function cleanExerciseName(value) {
   const resolved = resolveTrainingExerciseIdentity(text);
   if (
     resolved.resolutionStatus === "resolved_high_confidence" &&
-    resolved.exercise?.body_region === "Lower Body"
+    (
+      resolved.exercise?.body_region === "Lower Body" ||
+      resolved.canonicalExerciseId === "hanging_leg_raise"
+    )
   ) {
     return resolved.canonicalExerciseName;
   }
@@ -2507,19 +2517,21 @@ function extractSpecificExerciseName(value) {
   if (/\blateral\s+raises\s+machines?\b/i.test(text)) return "Lateral Raises Machine";
   if (/\blateral\s+raise\s+machines?\b/i.test(text)) return "Lateral Raise Machine";
   if (/\blateral\s+raises?\b/i.test(text)) return "Lateral Raise";
-  if (/\bcable\s+machines?\s+front\s+raises?\b/i.test(text)) return "Cable Machine Front Raise";
+  if (/\bcable\s+machines?\s+front\s+raises?\b/i.test(text)) return "Cable Machine Front Raises";
   if (/\bdumbbell\s+front\s+raises?\b|\bdb\s+front\s+raises?\b/i.test(text)) return "Dumbbell Front Raise";
   if (/\bbarbell\s+front\s+raises?\b/i.test(text)) return "Barbell Front Raises";
   if (/\bfront\s+raises?\b/i.test(text)) return "Front Raises";
   if (/\bfront\s+rows?\b/i.test(text)) return "Front Rows";
-  if (/\bseated\s+abductions?\b/i.test(text)) return "Seated Abductions";
-  if (/\bhip\s+abductions?\s+machines?\b/i.test(text)) return "Hip Abduction Machine";
+  if (/\bseated\s+(?:hip\s+)?adductions?\b|\bhip\s+adductions?\s+machines?\b/i.test(text)) return "Seated Hip Adductions";
+  if (/\bseated\s+(?:hip\s+)?abductions?\b|\bhip\s+abductions?\s+machines?\b/i.test(text)) return "Seated Hip Abductions";
   if (/\bhip\s+thrusts?\b/i.test(text)) return "Hip Thrusts";
   if (/\bleg\s+press\b/i.test(text) && /\bhigh(?:er)?\b/i.test(text) && /\bnarrow|close\s+stance|feet\s+close\b/i.test(text)) {
     return "Leg Press, high and narrow feet";
   }
+  if (/\b(?:single[-\s]+leg|unilateral)\s+(?:leg\s+)?press\b/i.test(text)) return "Single-Leg Leg Press";
   if (/\bleg\s+press\b/i.test(text)) return "Leg Press";
-  if (/\bhack\s+squats?\b/i.test(text)) return "Hack Squat";
+  if (/\bhack\s+squats?\b/i.test(text)) return "Hack Squats";
+  if (/\bsissy\s+squats?\b/i.test(text)) return "Sissy Squats";
   if (/\bsumo\s+squats?\s+machines?\b/i.test(text)) return "Sumo Squat Machine";
   if (/\bsumo\s+squats?\b/i.test(text)) return "Sumo Squat";
   if (/\bhanging\s+leg\s+raises?\b/i.test(text)) return "Hanging Leg Raises";
@@ -2537,13 +2549,13 @@ function extractSpecificExerciseName(value) {
   if (/\bpull-?ups?\b/i.test(text)) return "Pull-Ups";
   if (/\blat\s+pulldowns?\b/i.test(text)) return "Lat Pulldown";
   if (/\biso[-\s]?lateral\s+high\s+rows?\b/i.test(text)) {
-    return "Iso-Lateral High Row";
+    return "Iso-Lateral High Rows";
   }
   if (/\b(?:hammer\s+strength\s+)?high\s+rows?\b/i.test(text)) {
     return titleExerciseName(text.match(/\b(?:hammer\s+strength\s+)?high\s+rows?\b/i)?.[0]);
   }
   if (/\bseated\s+(?:mid\s+)?cable\s+rows?\b/i.test(text)) {
-    return "Seated Cable Row";
+    return "Seated Cable Rows";
   }
   if (/\blow\s+cable\s+rows?\b/i.test(text)) return "Low Cable Row";
   if (/\bmid\s+cable\s+rows?\b/i.test(text)) {

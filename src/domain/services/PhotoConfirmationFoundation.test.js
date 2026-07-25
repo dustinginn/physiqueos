@@ -20,7 +20,8 @@ describe("photo confirmation foundation", () => {
   it("surfaces duplicate and missing poses", () => {
     const session = createProvisionalPhotoSession({ captureDate: "2026-07-12", photos: [photos[0], { ...photos[0], id: "retry" }] });
     expect(session.duplicate_pose_ids).toEqual(["front-relaxed"]);
-    expect(session.missing_required_pose_ids).toEqual(["back-relaxed", "back-flexed"]);
+    expect(session.missing_required_pose_ids).toEqual([]);
+    expect(session.completion_state).toBe("complete");
   });
 
   it("does not complete from provisional evidence and completes from canonical 3/3 truth", () => {

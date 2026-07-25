@@ -90,7 +90,7 @@ function SessionPriorityCard({ item }) {
               )}
             </div>
             <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--primary)_12%,transparent)] px-2 py-1 text-[10px] font-extrabold leading-none text-[var(--primary)]">
-              Continue
+              {item.completed ? "Completed" : "Continue"}
             </span>
           </div>
 

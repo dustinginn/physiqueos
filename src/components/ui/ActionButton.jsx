@@ -7,6 +7,7 @@ export default function ActionButton({
   icon,
   endIcon: EndIcon = ChevronRight,
   href,
+  disabled = false,
   onClick,
   type = "button",
   className = "",
@@ -59,6 +60,8 @@ export default function ActionButton({
     focus-visible:outline-offset-2
     focus-visible:outline-[var(--primary)]
     active:scale-[0.99]
+    disabled:cursor-not-allowed
+    disabled:opacity-50
     ${className}
   `;
 
@@ -78,6 +81,7 @@ export default function ActionButton({
     <button
       aria-label={ariaLabel}
       className={classes}
+      disabled={disabled}
       onClick={onClick}
       type={type}
     >

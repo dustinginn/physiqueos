@@ -5,16 +5,35 @@ import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
 import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../../../domain/services/CanonicalEvidenceService";
 import { createTrainingSessionCorrectionEvidencePackage } from "../../../../../domain/services/EvidenceCorrectionService";
+import {
+  normalizeTrainingContextId,
+  resolveTrainingReturnPath,
+} from "../../../../../navigation/trainingTimelineNavigation";
 
 export async function addTrainingSessionCorrection(formData) {
   const sessionId = String(formData.get("sessionId") ?? "").trim();
   const correctionText = String(formData.get("correctionText") ?? "").trim();
+  const contextId = normalizeTrainingContextId(
+    String(formData.get("context") ?? "")
+  );
+  const returnTo = resolveTrainingReturnPath({
+    contextId,
+    returnTo: String(formData.get("returnTo") ?? ""),
+  });
   const sessionPath = `/progress/training/session/${encodeURIComponent(sessionId)}`;
+  const sessionTarget = (status) => {
+    const params = new URLSearchParams({
+      context: contextId,
+      correction: status,
+      returnTo,
+    });
+    return `${sessionPath}?${params.toString()}`;
+  };
 
   if (!sessionId) redirect("/progress/training?correction=missing-session");
-  if (!correctionText) redirect(`${sessionPath}?correction=missing-details`);
+  if (!correctionText) redirect(sessionTarget("missing-details"));
 
-  let redirectTarget = `${sessionPath}?correction=saved`;
+  let redirectTarget = sessionTarget("saved");
 
   try {
     const user = await FounderRepositories.users.getCurrentUser();
@@ -31,7 +50,7 @@ export async function addTrainingSessionCorrection(formData) {
     );
 
     if (!targetCanonicalObject) {
-      redirectTarget = `${sessionPath}?correction=session-not-found`;
+      redirectTarget = sessionTarget("session-not-found");
     } else {
       const evidencePackage = createTrainingSessionCorrectionEvidencePackage({
         author: user.id,
@@ -68,7 +87,7 @@ export async function addTrainingSessionCorrection(formData) {
       stack: error?.stack,
     });
 
-    redirect(`${sessionPath}?correction=failed`);
+    redirect(sessionTarget("failed"));
   }
 
   redirect(redirectTarget);

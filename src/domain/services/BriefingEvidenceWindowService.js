@@ -1,5 +1,7 @@
 import { getLocalDateKey } from "../utils/localDate";
 
+export const ROUTINE_BRIEFING_CADENCE_VERSION = "routine_briefing_cadence_v2";
+
 export function createPreviousDayEvidenceWindow({ now = new Date(), timeZone = "America/Los_Angeles" } = {}) {
   const today = getDateKeyInTimeZone(now, timeZone);
   const target = new Date(`${today}T12:00:00Z`);
@@ -9,10 +11,18 @@ export function createPreviousDayEvidenceWindow({ now = new Date(), timeZone = "
   return { id: `daily:${date}:${timeZone}`, cadence: "daily", briefingDate: today, date, start: `${date}T00:00:00`, end: `${date}T23:59:59.999`, relativeLabel: "yesterday", sameDayEvidenceExcluded: true, timeZone, closed: true };
 }
 
-export function selectScheduledBriefingCadence({ now = new Date(), timeZone = "America/Los_Angeles", monthlyEnabled = false } = {}) {
+export function selectScheduledBriefingCadence({ now = new Date(), timeZone = "America/Los_Angeles", monthlyEnabled = false, coachingUpdates = null } = {}) {
   const parts = getDatePartsInTimeZone(now, timeZone);
   if (monthlyEnabled && parts.day === 1) return "monthly";
-  return parts.weekday === "Sun" ? "weekly" : "daily";
+  const configured = coachingUpdates ?? legacyCoachingUpdates();
+  const day = parts.weekday.toLowerCase();
+  const time = getTimeInTimeZone(now, timeZone);
+  if (configured.weekly?.enabled && day.startsWith(configured.weekly.day.slice(0, 3)) &&
+      time >= configured.weekly.localTime) return "weekly";
+  if (configured.midweek?.enabled && day.startsWith(configured.midweek.day.slice(0, 3)) &&
+      time >= configured.midweek.localTime) return "midweek";
+  if (configured.daily?.enabled) return "daily";
+  return "none";
 }
 
 export function createWeeklyEvidenceWindow({ now = new Date(), timeZone = "America/Los_Angeles" } = {}) {
@@ -36,32 +46,81 @@ export function createWeeklyEvidenceWindow({ now = new Date(), timeZone = "Ameri
   };
 }
 
+export function createMidweekEvidenceWindow({ now = new Date(), timeZone = "America/Los_Angeles", coachingUpdates = null } = {}) {
+  const briefingDate = getDateKeyInTimeZone(now, timeZone);
+  const configuredDay = coachingUpdates?.midweek?.day ?? "wednesday";
+  const currentDay = weekdayIndex(getDatePartsInTimeZone(now, timeZone).weekday);
+  const offset = weekdayIndex(configuredDay) - currentDay;
+  const resolvedBriefingDate = shiftDateKey(briefingDate, offset);
+  const startDate = shiftDateKey(resolvedBriefingDate, -3);
+  const endDate = shiftDateKey(resolvedBriefingDate, -1);
+  return { id: `midweek:${startDate}:${endDate}:${timeZone}`, cadence: "midweek", briefingDate: resolvedBriefingDate, date: endDate, startDate, endDate, start: `${startDate}T00:00:00`, end: `${endDate}T23:59:59.999`, relativeLabel: "Sunday through Tuesday", sameDayEvidenceExcluded: true, timeZone, closed: true };
+}
+
 export function createScheduledEvidenceWindow(options = {}) {
-  return selectScheduledBriefingCadence(options) === "weekly"
-    ? createWeeklyEvidenceWindow(options)
-    : createPreviousDayEvidenceWindow(options);
+  const cadence = selectScheduledBriefingCadence(options);
+  if (cadence === "daily") return createPreviousDayEvidenceWindow(options);
+  if (cadence === "weekly") return createWeeklyEvidenceWindow(options);
+  if (cadence === "midweek") return createMidweekEvidenceWindow(options);
+  if (cadence === "monthly") return null;
+  return null;
 }
 
 export function resolveScheduledBriefingExpectation({
   now = new Date(),
   timeZone = "America/Los_Angeles",
   monthlyEnabled = false,
+  coachingUpdates = null,
 } = {}) {
   const localDate = getDateKeyInTimeZone(now, timeZone);
-  const cadence = selectScheduledBriefingCadence({ now, timeZone, monthlyEnabled });
-  const evidenceWindow = createScheduledEvidenceWindow({ now, timeZone, monthlyEnabled });
+  const cadence = selectScheduledBriefingCadence({ now, timeZone, monthlyEnabled, coachingUpdates });
+  const evidenceWindow = createScheduledEvidenceWindow({ now, timeZone, monthlyEnabled, coachingUpdates });
 
   return {
     localDate,
-    briefingDate: evidenceWindow.briefingDate,
-    evidenceThroughDate: evidenceWindow.date,
+    briefingDate: evidenceWindow?.briefingDate ?? localDate,
+    evidenceThroughDate: evidenceWindow?.date ?? null,
     evidenceWindow,
-    windowId: evidenceWindow.id,
+    windowId: evidenceWindow?.id ?? null,
     cadence,
-    artifactId: `${cadence}_briefing_${evidenceWindow.date.replaceAll("-", "")}`,
-    closed: evidenceWindow.closed === true,
-    dailyEligible: cadence === "daily" && evidenceWindow.closed === true,
+    artifactId: evidenceWindow ? `${cadence}_briefing_${evidenceWindow.date.replaceAll("-", "")}` : null,
+    closed: evidenceWindow?.closed === true,
+    dailyEligible: cadence === "daily",
+    routineBriefingExpected: cadence !== "none",
+    productionRoutingStatus: cadence === "none" ? "not_scheduled" : "active",
+    cadenceVersion: ROUTINE_BRIEFING_CADENCE_VERSION,
   };
+}
+
+function legacyCoachingUpdates() {
+  return {
+    midweek: { enabled: true, day: "wednesday", localTime: "00:00" },
+    weekly: { enabled: true, day: "sunday", localTime: "00:00" },
+    daily: { enabled: false },
+  };
+}
+
+function getTimeInTimeZone(value, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone, hour: "2-digit", hour12: false, minute: "2-digit",
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.hour === "24" ? "00" : values.hour}:${values.minute}`;
+}
+
+function weekdayIndex(value) {
+  const key = String(value).slice(0, 3).toLowerCase();
+  return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(key);
+}
+
+export function retireLegacyDailyBriefingWork(records = []) {
+  return records.map((record) => isLegacyDailyWork(record)
+    ? { ...record, status: "retired", retiredBy: ROUTINE_BRIEFING_CADENCE_VERSION, retirementReason: "routine_daily_cadence_retired" }
+    : record);
+}
+
+function isLegacyDailyWork(record) {
+  return record?.cadence === "daily" || record?.briefingType === "daily" || /daily.?briefing/i.test(record?.type ?? record?.jobType ?? "");
 }
 
 export function isRecordAvailableByWindow(record, window, fields = []) {

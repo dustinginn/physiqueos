@@ -1,15 +1,19 @@
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../domain/services/ProgressReportingService";
+import { getActivityTimelineReport } from "../../../domain/services/ActivityEvidenceContextService";
 import ProgressPlaceholderScreen from "../../../screens/ProgressPlaceholderScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function ActivityProgressPage({ searchParams }) {
   const query = await searchParams;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
+  const { report, timeline } = await getActivityTimelineReport({
+    context: query?.context,
   });
-  const report = await service.getActivityReport();
 
-  return <ProgressPlaceholderScreen from={query?.from} report={report} />;
+  return (
+    <ProgressPlaceholderScreen
+      evidenceContext={timeline}
+      from={query?.from}
+      report={report}
+    />
+  );
 }

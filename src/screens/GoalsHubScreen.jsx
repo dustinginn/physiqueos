@@ -3,10 +3,9 @@ import {
   ArrowLeft,
   ChevronRight,
   Compass,
-  Dumbbell,
   Plus,
-  ShieldCheck,
   Target,
+  Trophy,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
@@ -14,6 +13,13 @@ import { FounderRepositories } from "../data/repositories/founderRepositories";
 import { GoalEvaluationService } from "../domain/services/GoalEvaluationService";
 import { GoalIntelligenceService } from "../domain/services/GoalIntelligenceService";
 import { createTrainingPerformanceIntelligenceReport } from "../domain/services/TrainingPerformanceIntelligenceService";
+import { getFounderRuntimeStore } from "../data/repositories/founderRuntimeStore";
+import {
+  safelyGetProductionGoalTransitionEntryPointState,
+} from "../domain/services/ProductionGoalTransitionEntryPointService";
+import { resolveGoalNavigationHref } from "../domain/services/GoalNavigationRouteResolver";
+import { composeCompletedGoalPreview } from "../domain/services/CompletedGoalPreviewService";
+import { resolveOverallGoalConfidenceReadModel } from "../domain/services/OverallGoalConfidenceReadService";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -44,15 +50,15 @@ export default async function GoalsHubScreen({ from } = {}) {
 
         <div className="space-y-6">
           <ActiveGoals from={from} goals={hub.activeGoals} />
-          <GoalRelationships relationships={hub.relationships} />
-          <AddGoalEntry />
+          <CompletedGoals from={from} goals={hub.completedGoals} />
+          <AddGoalEntry transitionEntry={hub.transitionEntry} />
         </div>
       </div>
     </main>
   );
 }
 
-async function getGoalsHub() {
+export async function getGoalsHub() {
   const user = await FounderRepositories.users.getCurrentUser();
   const userId = user?.id;
   const [
@@ -65,6 +71,8 @@ async function getGoalsHub() {
     nutritionContext,
     analyses,
     canonicalEvidence,
+    briefings,
+    checkIns,
   ] = await Promise.all([
     FounderRepositories.goals.listGoals(userId),
     FounderRepositories.goals.getActiveGoal(userId),
@@ -75,6 +83,8 @@ async function getGoalsHub() {
     FounderRepositories.nutritionContext.getNutritionContext(userId),
     FounderRepositories.analyses.listAnalyses(),
     FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
+    FounderRepositories.dailyBriefings.listDailyBriefings(userId),
+    FounderRepositories.dailyCheckIns.listCheckIns(userId),
   ]);
   const trainingPerformance = createTrainingPerformanceIntelligenceReport({
     canonicalObjects: canonicalEvidence,
@@ -93,19 +103,53 @@ async function getGoalsHub() {
     evaluations,
     activeGoal,
   });
-  const summaries = intelligence.goals.map((summary) =>
-    mapGoalSummary(summary, evaluations.find((item) => item.goalId === summary.id))
-  );
+  const canonicalConfidence = activeGoal?.type === "build_lean_mass"
+    ? resolveOverallGoalConfidenceReadModel({
+        activeGoal,
+        activeProtocols: protocols,
+        canonicalEvidence,
+        checkIns,
+        currentDate: new Date(),
+        dexaScans,
+        nutritionContext,
+        progressPhotos,
+        timeZone: user?.timeZone ?? "America/Los_Angeles",
+        trainingPerformance,
+      })
+    : null;
+  const summaries = intelligence.goals.map((summary) => {
+    const sourceGoal = goals.find((goal) => goal.id === summary.id);
+    return mapGoalSummary(
+      summary,
+      evaluations.find((item) => item.goalId === summary.id),
+      sourceGoal,
+      summary.id === activeGoal?.id ? canonicalConfidence : null
+    );
+  });
 
+  for (const goal of summaries.filter((item) => !item.navigation.available)) {
+    console.warn("[GoalNavigation] Goal detail route unavailable.", {
+      goalId: goal.id ?? null,
+      goalType: goal.goalType ?? null,
+      lifecycle: goal.lifecycleState ?? goal.status ?? null,
+      resolverCode: goal.navigation.code,
+    });
+  }
+
+  const transitionEntry = safelyGetProductionGoalTransitionEntryPointState(
+    structuredClone(getFounderRuntimeStore())
+  );
+  const completedGoal = goals.find((goal) => goal.id === VISIBLE_ABS_GOAL_ID && goal.status === "completed");
+  const completedJourney = completedGoal ? composeCompletedGoalPreview({ goals, dexaScans, progressPhotos, briefings, currentGoal: activeGoal }) : null;
   return {
-    activeGoals: summaries.filter((goal) => goal.status === "active"),
-    relationships: getRelationships(summaries),
+    activeGoals: summaries.filter((goal) => goal.id === activeGoal?.id),
+    completedGoals: completedJourney ? [{ id: completedJourney.preview.canonicalGoalId, title: completedJourney.hero.title, status: completedJourney.hero.status, dates: completedJourney.hero.dates, achievement: completedJourney.hero.achievement, href: "/goals/visible-abs" }] : [],
+    transitionEntry,
   };
 }
 
 function ActiveGoals({ from, goals }) {
   const primaryGoal = goals.find((goal) => goal.primary);
-  const supportingGoals = goals.filter((goal) => !goal.primary);
 
   return (
     <>
@@ -116,32 +160,48 @@ function ActiveGoals({ from, goals }) {
         </section>
       )}
 
-      {supportingGoals.length > 0 && (
-        <section className="space-y-3">
-          <SectionHeading title="Supporting Goals" />
-          <div className="space-y-2">
-            {supportingGoals.map((goal) => (
-              <GoalNavigationCard from={from} goal={goal} key={goal.id} />
-            ))}
-          </div>
-        </section>
-      )}
     </>
   );
 }
 
-function GoalNavigationCard({ from, goal, primary = false }) {
+function CompletedGoals({ from, goals }) {
+  if (goals.length === 0) return null;
+  return <section className="space-y-3"><SectionHeading title="Completed Goals"/><div className="space-y-2">{goals.map((goal)=><Link aria-label={`Open completed goal ${goal.title}`} className="group block min-h-11 rounded-[22px] border border-amber-200/80 bg-gradient-to-br from-amber-50/90 via-[var(--surface-elevated)] to-emerald-50/60 p-4 shadow-[0_18px_42px_-34px_rgba(180,83,9,.55)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)] dark:border-amber-300/15 dark:from-amber-300/[.08] dark:to-emerald-300/[.04]" href={withReturnContext(goal.href, from)} key={goal.id}><div className="flex min-w-0 items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-300/10 dark:text-amber-300"><Trophy aria-hidden size={19}/></span><div className="min-w-0 flex-1"><p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-300">Completed Goal</p><h2 className="mt-1 text-lg font-extrabold leading-tight text-[var(--text-primary)]">{goal.title}</h2><p className="mt-2 text-sm font-bold leading-5 text-[var(--text-secondary)]"><span>{goal.status}</span><span aria-hidden> · </span><span>{goal.dates}</span></p><p className="mt-1 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">{goal.achievement}</p></div><ChevronRight aria-hidden className="mt-5 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5" size={20}/></div></Link>)}</div></section>;
+}
+
+export function GoalNavigationCard({ from, goal, primary = false }) {
+  const className = `group block min-h-11 rounded-[22px] border p-4 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5] ${
+    primary
+      ? "border-violet-200 bg-gradient-to-br from-violet-50/90 via-[var(--surface-elevated)] to-emerald-50/60 shadow-[0_18px_42px_-34px_rgba(79,70,229,.8)] dark:border-violet-300/20 dark:from-violet-300/[.08] dark:to-emerald-300/[.04]"
+      : "border-[var(--divider)] bg-[var(--surface-elevated)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]"
+  }`;
+
+  if (!goal.navigation.available) {
+    return (
+      <article
+        className={className}
+        data-navigation-code={goal.navigation.code}
+        data-navigation-unavailable="true"
+      >
+        <GoalNavigationCardContent goal={goal} primary={primary} showChevron={false} />
+      </article>
+    );
+  }
+
   return (
     <Link
       aria-label={`Open ${goal.title}`}
-      className={`group block min-h-11 rounded-[22px] border p-4 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5] ${
-        primary
-          ? "border-violet-200 bg-gradient-to-br from-violet-50/90 via-[var(--surface-elevated)] to-emerald-50/60 shadow-[0_18px_42px_-34px_rgba(79,70,229,.8)] dark:border-violet-300/20 dark:from-violet-300/[.08] dark:to-emerald-300/[.04]"
-          : "border-[var(--divider)] bg-[var(--surface-elevated)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]"
-      }`}
-      href={withReturnContext(goal.href, from)}
+      className={className}
+      href={withReturnContext(goal.navigation.href, from)}
     >
-      <div className="flex items-start gap-3">
+      <GoalNavigationCardContent goal={goal} primary={primary} />
+    </Link>
+  );
+}
+
+function GoalNavigationCardContent({ goal, primary, showChevron = true }) {
+  return (
+    <div className="flex items-start gap-3">
         <IconBadge
           className="mt-0.5 shrink-0 rounded-full"
           color={goal.color}
@@ -161,68 +221,55 @@ function GoalNavigationCard({ from, goal, primary = false }) {
             <span>{goal.statusLabel}</span>
             <span aria-hidden="true"> • </span>
             <span className="tabular-nums text-slate-500">
-              {goal.confidence}% confidence
+              {formatConfidence(goal.confidence)}
             </span>
           </p>
         </div>
-        <ChevronRight
-          aria-hidden="true"
-          className="mt-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5"
-          size={20}
-        />
-      </div>
-    </Link>
+        {showChevron && (
+          <ChevronRight
+            aria-hidden="true"
+            className="mt-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5"
+            size={20}
+          />
+        )}
+    </div>
   );
 }
 
-function GoalRelationships({ relationships }) {
-  return (
-    <section className="space-y-3 rounded-[22px] border border-[var(--divider)] bg-[var(--surface-elevated)] p-4">
-      <SectionHeading title="Goal Relationships" />
-      {relationships.map((relationship) => (
-        <div key={relationship.parent.id}>
-          <div className="flex items-center gap-2">
-            <IconBadge className="rounded-full" color="primary" icon={Target} size="sm" />
-            <div>
-              <p className="text-sm font-extrabold text-slate-950">
-                {relationship.parent.title}
-              </p>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-                Supported by
-              </p>
-            </div>
-          </div>
-          <div className="ml-4 mt-3 space-y-2 border-l border-[var(--divider)] pl-4">
-            {relationship.supporting.map((goal) => (
-              <div className="flex items-center gap-2 py-1" key={goal.id}>
-                <IconBadge
-                  className="rounded-full"
-                  color={goal.color}
-                  icon={goal.icon}
-                  size="xs"
-                />
-                <span className="text-sm font-bold text-slate-800">{goal.title}</span>
-              </div>
-            ))}
+function AddGoalEntry({ transitionEntry }) {
+  if (!transitionEntry) {
+    return (
+      <Card className="border-dashed border-[#C7D2FE] bg-[#F8FAFF]">
+        <div className="flex items-center gap-3">
+          <IconBadge className="rounded-full" color="primary" icon={Plus} size="md" />
+          <div>
+            <h2 className="text-base font-extrabold text-slate-950">Add Goal</h2>
+            <p className="mt-1 text-sm font-medium leading-5 text-slate-600">
+              A new primary goal is not available right now.
+            </p>
           </div>
         </div>
-      ))}
-    </section>
-  );
-}
-
-function AddGoalEntry() {
+      </Card>
+    );
+  }
   return (
     <Card className="border-dashed border-[#C7D2FE] bg-[#F8FAFF]">
       <div className="flex items-center gap-3">
         <IconBadge className="rounded-full" color="primary" icon={Plus} size="md" />
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-base font-extrabold text-slate-950">Add Goal</h2>
           <p className="mt-1 text-sm font-medium leading-5 text-slate-600">
-            Start with what you are trying to accomplish.
+            {transitionEntry.copy}
           </p>
         </div>
       </div>
+      <Link
+        className="mt-4 flex min-h-12 w-full items-center justify-between rounded-[14px] bg-[var(--primary)] px-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.18)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
+        href={transitionEntry.href}
+      >
+        {transitionEntry.label}
+        <ChevronRight aria-hidden="true" size={19} />
+      </Link>
     </Card>
   );
 }
@@ -235,15 +282,30 @@ function SectionHeading({ title }) {
   );
 }
 
-function mapGoalSummary(summary, evaluation) {
+export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfidence) {
   const visual = getVisualIdentity(summary);
+  const navigation = resolveGoalNavigationHref({
+    id: summary.id,
+    type: sourceGoal?.type,
+    goalType: sourceGoal?.goalType,
+    title: summary.title,
+    lifecycleState: summary.lifecycleState,
+    status: sourceGoal?.status,
+  });
 
   return {
     ...summary,
     status: "active",
     title: normalizeGoalTitle(summary.title),
-    confidence: summary.confidence ?? evaluation?.confidence ?? 0,
-    href: getGoalHref(summary.id),
+    confidence: Number.isFinite(canonicalConfidence?.value)
+      ? {
+          value: canonicalConfidence.value,
+          band: canonicalConfidence.band,
+          source: canonicalConfidence.source,
+        }
+      : null,
+    goalType: sourceGoal?.type ?? sourceGoal?.goalType ?? null,
+    navigation,
     statusLabel: normalizeJourneyState(
       summary.primary
         ? evaluation?.projection?.completionStageLabel ?? "On Track"
@@ -254,34 +316,14 @@ function mapGoalSummary(summary, evaluation) {
   };
 }
 
-function getGoalHref(goalId) {
-  if (goalId === VISIBLE_ABS_GOAL_ID) return "/goals/visible-abs";
-  if (goalId === "goal_maintain_8_9_body_fat") return "/goals/maintenance";
-  if (goalId === "goal_preserve_lean_mass") return "/goals/lean-mass";
-
-  return null;
-}
-
-function getRelationships(goals) {
-  const primary = goals.find((goal) => goal.id === VISIBLE_ABS_GOAL_ID);
-  const supporting = goals.filter((goal) => goal.id !== VISIBLE_ABS_GOAL_ID);
-
-  if (!primary || supporting.length === 0) return [];
-
-  return [{ parent: primary, supporting }];
+function formatConfidence(confidence) {
+  if (!Number.isFinite(confidence?.value)) return "Confidence unavailable";
+  return `${confidence.value}% confidence`;
 }
 
 function getVisualIdentity(goal) {
   if (goal.id === VISIBLE_ABS_GOAL_ID) {
     return { icon: Target, color: "primary" };
-  }
-
-  if (goal.id === "goal_maintain_8_9_body_fat") {
-    return { icon: ShieldCheck, color: "success" };
-  }
-
-  if (goal.id === "goal_preserve_lean_mass") {
-    return { icon: Dumbbell, color: "effort" };
   }
 
   return { icon: Compass, color: "evidence" };
@@ -308,7 +350,7 @@ function normalizeJourneyState(state) {
 }
 
 function withReturnContext(href, from) {
-  if (from !== "you") return href;
+  if (!href || from !== "you") return href;
 
   return `${href}?from=you`;
 }

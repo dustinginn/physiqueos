@@ -183,7 +183,7 @@ async function createEvidencePackageFromStoredArtifacts({
 
   if (pdfArtifacts.length > 0) {
     packages.push(
-      createPdfEvidencePackage({
+      await createPdfEvidencePackage({
         artifacts: pdfArtifacts,
         capturedAt,
         submissionId,
@@ -427,14 +427,14 @@ function getProgressPhotoInterpreterRouting() {
   };
 }
 
-function createPdfEvidencePackage({ artifacts, capturedAt, submissionId, userId }) {
-  const pdfInterpretation = interpretPdfEvidence({
+async function createPdfEvidencePackage({ artifacts, capturedAt, submissionId, userId }) {
+  const pdfInterpretation = await interpretPdfEvidence({
     capturedAt,
     files: artifacts.map((artifact, index) => ({
       capturedAt,
       fileName: artifact.fileName,
       id: `${submissionId}_pdf_${index + 1}`,
-      text: artifact.text,
+      buffer: artifact.buffer,
       userId,
     })),
     id: `${submissionId}_pdf`,
@@ -723,7 +723,7 @@ async function storeEvidenceArtifact({
     mimeType,
     observedDate,
     relativePath,
-    text: buffer.toString("utf8").slice(0, 20000),
+    text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
   };
 }
@@ -759,7 +759,7 @@ async function createStoredArtifactFromExistingUpload({
     mimeType,
     observedDate,
     relativePath,
-    text: buffer.toString("utf8").slice(0, 20000),
+    text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
   };
 }

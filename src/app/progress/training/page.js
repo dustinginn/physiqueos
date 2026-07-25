@@ -1,15 +1,28 @@
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../domain/services/ProgressReportingService";
+import { getTrainingTimelineReport } from "../../../domain/services/TrainingEvidenceContextService";
+import { withTrainingTimelineContext } from "../../../navigation/trainingTimelineNavigation";
 import ProgressPlaceholderScreen from "../../../screens/ProgressPlaceholderScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrainingProgressPage({ searchParams }) {
   const query = await searchParams;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
+  const { report, timeline } = await getTrainingTimelineReport({
+    context: query?.context,
   });
-  const report = await service.getPlaceholderReport("training");
+  const currentPath = "/progress/training";
 
-  return <ProgressPlaceholderScreen from={query?.from} report={report} />;
+  return (
+    <ProgressPlaceholderScreen
+      evidenceContext={{
+        ...timeline,
+        adaptHref: (href) =>
+          withTrainingTimelineContext(href, timeline.contextId, {
+            returnTo: `${currentPath}?context=${timeline.contextId}`,
+          }),
+        currentPath,
+      }}
+      from={query?.from}
+      report={report}
+    />
+  );
 }

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { recoverEvidenceIntakeSubmissionFromArtifacts } from "./EvidenceIntakeService";
+import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
 
-export const PENDING_REVIEW_REPROCESS_VERSION = "typed-strength-reconciliation-v4-incline-bench";
+export const PENDING_REVIEW_REPROCESS_VERSION = "typed-strength-reconciliation-v5-bodyweight-semantics";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {
@@ -94,18 +95,135 @@ function preserveCandidateImmutables(previous, evidencePackage, fresh) {
     observed_date: previous?.observed_date ?? evidencePackage.observed_date,
     userId: previous?.userId ?? evidencePackage.userId,
     provenance: structuredClone(evidencePackage.provenance),
-    evidence_objects: (fresh.evidence_objects ?? []).map((object) => preserveSourceDerivedObjectFields(object, previous?.evidence_objects)),
+    evidence_objects: (fresh.evidence_objects ?? []).map((object) =>
+      preserveSourceDerivedObjectFields(object, previous?.evidence_objects, evidencePackage)
+    ),
   };
 }
 
-function preserveSourceDerivedObjectFields(freshObject, previousObjects = []) {
+function preserveSourceDerivedObjectFields(freshObject, previousObjects = [], evidencePackage = {}) {
   const prior = previousObjects.find((object) => sameEvidenceIdentity(object, freshObject));
   if (!prior) return freshObject;
   return {
     ...freshObject,
     captured_at: prior.captured_at ?? freshObject.captured_at,
     metadata: structuredClone(prior.metadata ?? freshObject.metadata),
+    exercises: preserveExerciseSetSemantics({
+      freshExercises: freshObject.exercises,
+      priorExercises: prior.exercises,
+      typedEvidence: getTypedEvidence(evidencePackage),
+    }),
   };
+}
+
+function preserveExerciseSetSemantics({ freshExercises, priorExercises, typedEvidence }) {
+  if (!Array.isArray(freshExercises) || !Array.isArray(priorExercises)) return freshExercises;
+
+  return freshExercises.map((freshExercise, exerciseIndex) => {
+    const priorExercise = priorExercises[exerciseIndex];
+    const freshIdentity = resolveTrainingExerciseIdentity(freshExercise?.name);
+    const priorIdentity = resolveTrainingExerciseIdentity(priorExercise?.name);
+    const sameCanonicalExercise = Boolean(
+      freshIdentity.canonicalExerciseId &&
+      freshIdentity.canonicalExerciseId === priorIdentity.canonicalExerciseId
+    );
+    const sameSetCount =
+      Array.isArray(freshExercise?.sets) &&
+      Array.isArray(priorExercise?.sets) &&
+      freshExercise.sets.length === priorExercise.sets.length;
+    const sourceBlock = getExerciseSourceBlock(typedEvidence, freshIdentity.canonicalExerciseId);
+    const blocksBodyweightNormalization = hasWeightedOrAssistedSignal(sourceBlock);
+    const bodyweightOnlyIdentity = freshIdentity.exercise?.default_load_type === "bodyweight";
+    const explicitBodyweightSource = /\bbody\s*weight\b|\bbodyweight\b|\bbw\b/i.test(sourceBlock);
+
+    return {
+      ...freshExercise,
+      id: sameCanonicalExercise ? priorExercise.id ?? freshExercise.id : freshExercise.id,
+      sets: (freshExercise?.sets ?? []).map((freshSet, setIndex) => {
+        if (!isZeroExternalLoad(freshSet) || blocksBodyweightNormalization) return freshSet;
+
+        const priorSet = sameCanonicalExercise && sameSetCount
+          ? priorExercise.sets[setIndex]
+          : null;
+        const semanticallyEquivalentPriorBodyweight =
+          isBodyweightSet(priorSet) &&
+          sameSetSemantics(priorSet, freshSet);
+
+        if (!explicitBodyweightSource && !bodyweightOnlyIdentity && !semanticallyEquivalentPriorBodyweight) {
+          return freshSet;
+        }
+
+        return {
+          ...freshSet,
+          load_type: "bodyweight",
+          measurement_type: "bodyweight_reps",
+          set_type: "bodyweight_reps",
+          weight: null,
+          weight_unit: null,
+          volume: null,
+        };
+      }),
+    };
+  });
+}
+
+function getTypedEvidence(evidencePackage) {
+  return (evidencePackage.provenance?.source_artifacts ?? [])
+    .filter((artifact) => artifact.kind === "typed_evidence" && artifact.text)
+    .map((artifact) => artifact.text)
+    .join("\n\n");
+}
+
+function getExerciseSourceBlock(typedEvidence, canonicalExerciseId) {
+  if (!typedEvidence || !canonicalExerciseId) return "";
+  const lines = String(typedEvidence).split(/\r?\n/);
+  const start = lines.findIndex(
+    (line) => resolveTrainingExerciseIdentity(line.trim()).canonicalExerciseId === canonicalExerciseId
+  );
+  if (start < 0) return "";
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (resolveTrainingExerciseIdentity(lines[index].trim()).canonicalExerciseId) {
+      end = index;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+function hasWeightedOrAssistedSignal(sourceBlock) {
+  if (/\bassist(?:ed|ance)?\b|\bcounterbalance(?:d)?\b/i.test(sourceBlock)) return true;
+  return [...String(sourceBlock).matchAll(
+    /\b(?:added|additional|weighted|with)\s+(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?|kg)\b/gi
+  )].some((match) => Number(match[1]) > 0);
+}
+
+function isZeroExternalLoad(set) {
+  return (
+    Number(set?.weight ?? set?.load) === 0 &&
+    set?.load_type !== "bodyweight" &&
+    set?.weight_unit !== "bodyweight"
+  );
+}
+
+function isBodyweightSet(set) {
+  return (
+    set?.load_type === "bodyweight" &&
+    (set?.weight === null || set?.weight === undefined) &&
+    (set?.weight_unit === null || set?.weight_unit === undefined || set?.weight_unit === "bodyweight")
+  );
+}
+
+function sameSetSemantics(left, right) {
+  return (
+    Number(left?.set_number) === Number(right?.set_number) &&
+    nullableNumber(left?.reps) === nullableNumber(right?.reps) &&
+    nullableNumber(left?.duration_seconds) === nullableNumber(right?.duration_seconds)
+  );
+}
+
+function nullableNumber(value) {
+  return value === null || value === undefined ? null : Number(value);
 }
 
 function sameEvidenceIdentity(left, right) {

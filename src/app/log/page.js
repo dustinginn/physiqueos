@@ -1,5 +1,6 @@
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService";
+import { createLoggedTodayService } from "../../domain/services/LoggedTodayService";
 import LogHubScreen from "../../screens/LogHubScreen";
 
 export const dynamic = "force-dynamic";
@@ -7,11 +8,20 @@ export const dynamic = "force-dynamic";
 export default async function LogPage({ searchParams }) {
   const params = await searchParams;
   const user = await FounderRepositories.users.getCurrentUser();
-  const evidenceReviews = await FounderRepositories.evidenceReviews.listReviews(user.id);
+  const [evidenceReviews, loggedToday] = await Promise.all([
+    FounderRepositories.evidenceReviews.listReviews(user.id),
+    createLoggedTodayService({
+      repositories: FounderRepositories,
+    }).getSummary({
+      userId: user.id,
+      timeZone: user.timeZone ?? user.timezone,
+    }),
+  ]);
 
   return (
     <LogHubScreen
       error={params?.error ?? null}
+      loggedToday={loggedToday}
       saved={params?.saved ?? null}
       uploadAnythingAction="/log/upload"
       pendingEvidenceReviews={projectPendingReviews(evidenceReviews)}

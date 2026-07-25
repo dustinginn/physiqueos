@@ -17,12 +17,20 @@ import {
 import Link from "next/link";
 import MobilePageHeader from "../components/navigation/MobilePageHeader";
 import TrainingAnalysisDrawerGroup from "../components/training/TrainingAnalysisDrawerGroup";
+import TrainingNavigationButtonRow from "../components/training/TrainingNavigationButtonRow";
 import Card from "../components/ui/Card";
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
 } from "../domain/models/trainingExerciseIdentity";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
+import {
+  formatTrainingLoad,
+  formatTrainingSetGlance,
+  getTrainingDaySummary,
+  isBodyweightSet,
+  normalizeTrainingSetsForPresentation,
+} from "../presentation/trainingPresentation";
 
 const FLAT_TRAINING_NAV_GROUPS = [
   "Chest",
@@ -40,20 +48,27 @@ const FLAT_TRAINING_NAV_GROUPS = [
 export default function TrainingKnowledgeScreen({
   backHref,
   correctionAction,
+  correctionNavigation,
   correctionStatus,
   mode,
   navigation,
+  reportingOrigin,
   report,
   session,
   slug,
+  trainingHref = "/progress/training",
+  trainingEvidenceContext,
 }) {
   const content = getPageContent({
     correctionAction,
+    correctionNavigation,
     correctionStatus,
     mode,
     report,
+    reportingOrigin,
     session,
     slug,
+    trainingEvidenceContext,
   });
 
   return (
@@ -61,19 +76,31 @@ export default function TrainingKnowledgeScreen({
       <div className="mx-auto max-w-[393px] px-4 pt-4 pb-24">
         {content.navigationMode === "training-library" ? (
           <TrainingLibraryHeader
+            adaptHref={trainingEvidenceContext?.adaptHref}
             description={content.summary}
             navigation={navigation}
+            reportingOrigin={reportingOrigin}
             title={content.title}
           />
         ) : content.navigationMode === "training-reporting" ? (
           <TrainingReportingHeader
+            adaptHref={trainingEvidenceContext?.adaptHref}
             description={content.summary}
+            showReportingParent={content.title === "Training History"}
             title={content.title}
           />
         ) : (
           <MobilePageHeader
-            breadcrumbs={navigation?.breadcrumbs}
+            breadcrumbs={mode === "session" ? [] : navigation?.breadcrumbs}
             description={content.summary}
+            navigationSlot={
+              mode === "session" ? (
+                <TrainingNavigationButtonRow
+                  ariaLabel="Workout Detail navigation"
+                  items={[{ href: trainingHref, label: "Training" }]}
+                />
+              ) : null
+            }
             parentHref={navigation?.parentRoute ?? backHref ?? "/progress/training"}
             parentLabel={getParentLabel(navigation)}
             sectionLabel={content.eyebrow}
@@ -81,18 +108,26 @@ export default function TrainingKnowledgeScreen({
           />
         )}
 
+        {trainingEvidenceContext?.selector ?? null}
         <div className="space-y-4">{content.sections}</div>
       </div>
     </main>
   );
 }
 
-function TrainingReportingHeader({ description, title }) {
+function TrainingReportingHeader({
+  adaptHref = (href) => href,
+  description,
+  showReportingParent = false,
+  title,
+}) {
   const hierarchy = [
-    { href: "/progress/training", label: "Training" },
-    { href: "/progress/training/library", label: "Training Library" },
-    { href: "/progress/training#reporting", label: "Reporting" },
-  ];
+    { href: adaptHref("/progress/training"), label: "Training" },
+    { href: adaptHref("/progress/training/library"), label: "Training Library" },
+    showReportingParent
+      ? { href: adaptHref("/progress/training#reporting"), label: "Reporting" }
+      : null,
+  ].filter(Boolean);
 
   return (
     <header className="mb-4">
@@ -125,13 +160,25 @@ function TrainingReportingHeader({ description, title }) {
   );
 }
 
-function TrainingLibraryHeader({ description, navigation, title }) {
+function TrainingLibraryHeader({
+  adaptHref = (href) => href,
+  description,
+  navigation,
+  reportingOrigin,
+  title,
+}) {
   const breadcrumbs = navigation?.breadcrumbs ?? [];
   const currentRoute = navigation?.route;
   const hierarchy = [
-    { href: "/progress/training", label: "Training" },
+    { href: adaptHref("/progress/training"), label: "Training" },
     currentRoute !== "/progress/training/library"
-      ? { href: "/progress/training/library", label: "Training Library" }
+      ? { href: adaptHref("/progress/training/library"), label: "Training Library" }
+      : null,
+    reportingOrigin && breadcrumbs.length > 1
+      ? {
+          href: adaptHref("/progress/training/reporting/resistance"),
+          label: "Reporting",
+        }
       : null,
     ...breadcrumbs.filter(
       (item) =>
@@ -154,20 +201,12 @@ function TrainingLibraryHeader({ description, navigation, title }) {
       <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-950">
         {title}
       </h1>
-      <nav
-        aria-label="Training Library hierarchy"
-        className="mt-3 flex flex-wrap gap-2"
-      >
-        {hierarchy.map((item) => (
-          <Link
-            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] px-3.5 text-sm font-extrabold text-slate-700 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 active:bg-[var(--surface-active)]"
-            href={item.href}
-            key={item.href}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      <div className="mt-3">
+        <TrainingNavigationButtonRow
+          ariaLabel="Training Library hierarchy"
+          items={hierarchy}
+        />
+      </div>
       {description && (
         <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">
           {description}
@@ -188,30 +227,40 @@ function getParentLabel(navigation) {
   return breadcrumbs.at(-2)?.label ?? "Training";
 }
 
-function getPageContent({ correctionAction, correctionStatus, mode, report, session, slug }) {
+function getPageContent({ correctionAction, correctionNavigation, correctionStatus, mode, report, reportingOrigin, session, slug, trainingEvidenceContext }) {
   if (mode === "session") {
-    return getSessionContent({ correctionAction, correctionStatus, session });
+    return getSessionContent({
+      correctionAction,
+      correctionNavigation,
+      correctionStatus,
+      session,
+    });
   }
-  if (mode === "library") return getLibraryContent({ report, slug });
+  if (mode === "library") return getLibraryContent({ report, reportingOrigin, slug, trainingEvidenceContext });
 
-  return getReportingContent({ report, slug });
+  return getReportingContent({ report, slug, trainingEvidenceContext });
 }
 
-function getReportingContent({ report, slug }) {
+function getReportingContent({ report, slug, trainingEvidenceContext }) {
   const reportingLink = (report.reportingLinks ?? []).find((item) => item.id === slug);
   const title = reportingLink?.label ?? "Training Report";
 
   if (slug === "resistance") {
-    return getResistanceReportingContent({ report });
+    return getResistanceReportingContent({
+      adaptHref: trainingEvidenceContext?.adaptHref,
+      report,
+    });
   }
 
   if (slug === "history") {
     return {
       eyebrow: "Reporting",
+      navigationMode: "training-reporting",
       title: "Training History",
       summary: "Browse recent training days and open the sessions you want to review.",
       sections: [
         <TrainingDayHistoryCard
+          adaptHref={trainingEvidenceContext?.adaptHref}
           days={report.trainingDays ?? []}
           key="training-history"
         />,
@@ -238,16 +287,23 @@ function getReportingContent({ report, slug }) {
   };
 }
 
-function getResistanceReportingContent({ report }) {
+function getResistanceReportingContent({
+  adaptHref = (href) => href,
+  report,
+}) {
   const performance = report.resistancePerformance;
-  const summary = performance?.summary ?? {};
   const statusCounts = getExerciseStatusCounts(performance?.exerciseObservations ?? []);
-  const statusGroups = getExerciseStatusGroups(
-    performance?.exerciseObservations ?? []
+  const statusGroups = Object.fromEntries(
+    Object.entries(
+      getExerciseStatusGroups(performance?.exerciseObservations ?? [])
+    ).map(([key, value]) => [key, adaptItems(value, adaptHref)])
   );
-  const highlights = getResistanceHighlights(performance);
-  const needsAttention = getResistanceNeedsAttention(performance);
-  const recentPrs = getRecentPrs(performance);
+  const highlights = adaptItems(getResistanceHighlights(performance), adaptHref);
+  const needsAttention = adaptItems(
+    getResistanceNeedsAttention(performance),
+    adaptHref
+  );
+  const recentPrs = adaptItems(getRecentPrs(performance), adaptHref);
 
   return {
     eyebrow: "Reporting",
@@ -257,36 +313,14 @@ function getResistanceReportingContent({ report }) {
     sections: [
       <DeepPageCard className="space-y-3" key="summary">
         <SectionHeader title="Resistance Summary" />
-        <div className="grid grid-cols-3 gap-2">
-          <PerformanceMetric
-            label="7 Days"
-            value={summary.resistance_sessions_last_7_days ?? 0}
-          />
-          <PerformanceMetric
-            label="30 Days"
-            value={
-              summary.exercises_trained_last_30_days ??
-              summary.exercises_tracked ??
-              0
-            }
-          />
-          <div className="rounded-xl border border-violet-200/70 px-2 py-2.5 text-violet-800 dark:border-violet-300/15 dark:text-violet-200">
-            <p className="text-[9px] font-extrabold uppercase leading-4 tracking-[0.05em]">
-              Recent PRs
-            </p>
-            <p className="mt-1 text-lg font-black leading-none">
-              {summary.recent_pr_count ?? 0}
-            </p>
-          </div>
-        </div>
         <StatusDrawers groups={statusGroups} statusCounts={statusCounts} />
       </DeepPageCard>,
       <DeepPageCard
-        className="space-y-2.5 border-violet-200/70 bg-violet-50/35 dark:border-violet-300/15 dark:bg-violet-300/[.035]"
+        className="space-y-2.5"
         key="prs"
       >
         <SectionHeader title="Recent PRs" />
-        <ObservationList emptyText="No recent PRs yet." items={recentPrs} />
+        <RecentPrs items={recentPrs} />
       </DeepPageCard>,
       <DeepPageCard className="space-y-2.5" key="highlights">
         <SectionHeader title="Highlights" />
@@ -297,28 +331,22 @@ function getResistanceReportingContent({ report }) {
       </DeepPageCard>,
       <DeepPageCard className="space-y-2.5" key="needs-attention">
         <SectionHeader title="Needs Attention" />
-        <ObservationList
-          emptyText="No clear training concerns yet."
-          items={needsAttention}
-        />
+        <NeedsAttention items={needsAttention} />
       </DeepPageCard>,
       <DeepPageCard className="space-y-2.5" key="categories">
         <SectionHeader title="Category Rollups" />
         <CategoryRollups
+          adaptHref={adaptHref}
           exerciseObservations={performance?.exerciseObservations ?? []}
           observations={performance?.categoryObservations ?? []}
         />
       </DeepPageCard>,
-      <MetadataFooter
-        items={[
-          {
-            label: "Source",
-            value: "Training sessions",
-          },
-        ]}
-        key="metadata"
-        title="Details"
-      />,
+      <DeepPageCard className="space-y-2.5" key="metadata">
+        <MetadataFooter
+          items={[{ label: "Source", value: "Training sessions" }]}
+          title="Details"
+        />
+      </DeepPageCard>,
     ],
   };
 }
@@ -346,13 +374,40 @@ function ObservationList({ emptyText, items = [] }) {
   );
 }
 
+function NeedsAttention({ items = [] }) {
+  if (!items.length) {
+    return <p className="text-sm font-semibold leading-6 text-slate-500">No clear training concerns yet.</p>;
+  }
+  return (
+    <TrainingAnalysisDrawerGroup
+      groups={items}
+      previewItems={items.slice(0, 3)}
+      sheetDescription="Exercises requiring review, with the latest supporting date."
+      sheetTitle="Needs Attention"
+    />
+  );
+}
+
+function RecentPrs({ items = [] }) {
+  if (!items.length) {
+    return <p className="text-sm font-semibold leading-6 text-slate-500">No recent PRs yet.</p>;
+  }
+  return (
+    <TrainingAnalysisDrawerGroup
+      groups={items}
+      previewItems={items.slice(0, 3)}
+      sheetDescription="All recent personal records in the current reporting order."
+      sheetTitle="Recent PRs"
+    />
+  );
+}
+
 function StatusDrawers({ groups, statusCounts }) {
   const statuses = [
     { key: "improving", label: "Improving", tone: "success" },
     { key: "stable", label: "Stable", tone: "stable" },
     { key: "plateauing", label: "Plateauing", tone: "warning" },
     { key: "regressing", label: "Regressing", tone: "danger" },
-    { key: "insufficient_data", label: "Needs Data", tone: "neutral" },
   ];
 
   return (
@@ -368,7 +423,11 @@ function StatusDrawers({ groups, statusCounts }) {
   );
 }
 
-function CategoryRollups({ exerciseObservations = [], observations = [] }) {
+function CategoryRollups({
+  adaptHref = (href) => href,
+  exerciseObservations = [],
+  observations = [],
+}) {
   const ordered = FLAT_TRAINING_NAV_GROUPS.map((label) => {
     const category = slugify(label);
 
@@ -383,7 +442,7 @@ function CategoryRollups({ exerciseObservations = [], observations = [] }) {
     );
   }
 
-  const groups = ordered.map((observation) => {
+  const categories = ordered.map((observation) => {
         const categoryLabel = toTitle(observation.category);
         const data = observation.explanation_data ?? {};
         const statusCounts = data.status_counts ?? {};
@@ -395,28 +454,33 @@ function CategoryRollups({ exerciseObservations = [], observations = [] }) {
             : null,
           data.latest_known_volume ? `${formatNumber(data.latest_known_volume)} lb` : null,
         ].filter(Boolean);
-        const exercises = exerciseObservations
-          .filter(
-            (exerciseObservation) =>
-              exerciseObservation.exercise.primaryNavigationCategory ===
-              observation.category
-          )
-          .map(toExerciseNavigationItem);
-
         return {
-          count: data.exercise_count ?? 0,
           description: `${parts.join(" · ")} · ${formatStatusCounts(statusCounts)}`,
-          drawerDescription: `${categoryLabel} exercises from current resistance-training analysis.`,
-          items: exercises,
+          detail: `${parts.join(" · ")} · ${formatStatusCounts(statusCounts)}`,
+          href: adaptHref(
+            `/progress/training/library/${observation.category}?from=reporting`
+          ),
           key: observation.category,
           label: categoryLabel,
-          tone: "neutral",
         };
       });
 
   return (
-    <TrainingAnalysisDrawerGroup groups={groups} mode="list" />
+    <TrainingAnalysisDrawerGroup
+      groups={categories}
+      previewItems={categories.slice(0, 3)}
+      sheetDescription="Choose a category to continue in the Training Library."
+      sheetTitle="All Categories"
+      viewAllLabel="View all categories →"
+    />
   );
+}
+
+function adaptItems(items = [], adaptHref) {
+  return items.map((item) => ({
+    ...item,
+    href: item.href ? adaptHref(item.href) : item.href,
+  }));
 }
 
 function getExerciseStatusCounts(exerciseObservations = []) {
@@ -460,7 +524,7 @@ function getExerciseObservationHref(observation) {
   const exercise = slugify(
     getCanonicalTrainingExerciseLabel(observation.exercise.name)
   );
-  return `/progress/training/library/${category}/${exercise}`;
+  return `/progress/training/library/${category}/${exercise}?from=reporting`;
 }
 
 function getResistanceHighlights(performance) {
@@ -478,25 +542,39 @@ function getResistanceHighlights(performance) {
         (observation.explanation_data?.status_counts?.improving ?? 0) > 1
     )
     .slice(0, 1)
-    .map((observation) => ({
-      label: toTitle(observation.category),
-      detail: `${observation.explanation_data.status_counts.improving} improving exercises`,
-      href: `/progress/training/library/${observation.category}`,
-    }));
+    .map((observation) => {
+      const exerciseNames = (performance?.exerciseObservations ?? [])
+        .filter(
+          (exercise) =>
+            exercise.status === "improving" &&
+            exercise.exercise.primaryNavigationCategory === observation.category
+        )
+        .slice(0, 2)
+        .map((exercise) => exercise.exercise.name);
 
-  return [...exerciseHighlights, ...categoryHighlight].slice(0, 4);
+      return {
+        label: toTitle(observation.category),
+        detail: exerciseNames.join(" · "),
+        href: `/progress/training/library/${observation.category}?from=reporting`,
+      };
+    });
+
+  return [...exerciseHighlights, ...categoryHighlight].slice(0, 3);
 }
 
 function getResistanceNeedsAttention(performance) {
   return (performance?.exerciseObservations ?? [])
     .filter((observation) => ["regressing", "plateauing"].includes(observation.status))
-    .slice(0, 4)
     .map((observation) => ({
       label: observation.exercise.name,
-      detail:
+      detail: [
         observation.status === "regressing"
           ? "Recent performance moved down."
           : "Multiple comparable sessions without clear overload.",
+        observation.evidence_date_range?.end
+          ? `Latest ${formatDate(observation.evidence_date_range.end)}`
+          : null,
+      ].filter(Boolean).join(" · "),
       href: getExerciseObservationHref(observation),
     }));
 }
@@ -504,7 +582,6 @@ function getResistanceNeedsAttention(performance) {
 function getRecentPrs(performance) {
   return (performance?.exerciseObservations ?? [])
     .filter((observation) => observation.explanation_data?.pr_detection?.detected)
-    .slice(0, 5)
     .map((observation) => ({
       label: observation.exercise.name,
       detail: formatPrDetail(observation.explanation_data.pr_detection.prs?.[0]),
@@ -527,7 +604,10 @@ function formatExerciseHighlight(observation) {
 function formatPrDetail(pr) {
   if (!pr) return "Performance PR detected.";
   if (pr.type === "reps_at_load") {
-    return `New reps-at-load PR: ${pr.value} reps at ${pr.load} ${pr.load_unit ?? "lb"}.`;
+    const load = pr.load_unit === "bodyweight" || pr.load == null || pr.load === 0
+      ? "BW"
+      : `${pr.load} ${pr.load_unit ?? "lb"}`;
+    return `New reps-at-load PR: ${pr.value} reps at ${load}.`;
   }
   if (pr.type === "session_volume") {
     return `Volume PR: ${formatNumber(pr.value)} ${pr.unit ?? "lb"}.`;
@@ -551,7 +631,7 @@ function formatStatusCounts(statusCounts = {}) {
   return parts.join(" · ") || "More history needed";
 }
 
-function TrainingDayHistoryCard({ days = [] }) {
+function TrainingDayHistoryCard({ adaptHref = (href) => href, days = [] }) {
   return (
     <HistoryCard emptyText="Training days will appear here." title="Recent Training History">
       {days.length > 0 && (
@@ -564,9 +644,11 @@ function TrainingDayHistoryCard({ days = [] }) {
                   <span className="block text-sm font-extrabold text-slate-950">
                     {day.label}
                   </span>
-                  <span className="mt-0.5 block text-xs font-bold text-slate-500">
-                    {day.summary}
-                  </span>
+                  {getTrainingDaySummary(day.sessions) && (
+                    <span className="mt-0.5 block text-xs font-extrabold leading-4 text-[var(--text-secondary)]">
+                      {getTrainingDaySummary(day.sessions)}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 text-sm font-extrabold text-[var(--primary)]">
                   &gt;
@@ -577,7 +659,7 @@ function TrainingDayHistoryCard({ days = [] }) {
                   {(day.sessions ?? []).map((session) => (
                     <InformationListItem
                       detail={session.detail || session.value}
-                      href={session.href}
+                      href={adaptHref(session.href)}
                       key={session.id}
                       label={session.label}
                     />
@@ -593,14 +675,22 @@ function TrainingDayHistoryCard({ days = [] }) {
   );
 }
 
-function getLibraryContent({ report, slug = [] }) {
+function getLibraryContent({ report, reportingOrigin, slug = [], trainingEvidenceContext }) {
   const path = Array.isArray(slug) ? slug : [slug].filter(Boolean);
-  const leafDetail = getLibraryLeafDetail({ path, report });
+  const leafDetail = getLibraryLeafDetail({
+    path,
+    report,
+    showSourceWorkouts: trainingEvidenceContext?.showSourceWorkouts,
+  });
   const title = path.length ? toTitle(path.at(-1)) : "Training Library";
 
   if (leafDetail) return leafDetail;
 
-  const children = getLibraryChildren({ path, report });
+  const children = getLibraryChildren({ path, report }).map((item) => ({
+    ...item,
+    href: trainingEvidenceContext?.adaptHref?.(item.href, item) ??
+      (reportingOrigin && path.length === 1 ? `${item.href}?from=reporting` : item.href),
+  }));
 
   return {
     eyebrow: "Training Library",
@@ -615,7 +705,12 @@ function getLibraryContent({ report, slug = [] }) {
   };
 }
 
-function getSessionContent({ correctionAction, correctionStatus, session }) {
+export function getSessionContent({
+  correctionAction,
+  correctionNavigation,
+  correctionStatus,
+  session,
+}) {
   if (!session) {
     return {
       eyebrow: "Workout Detail",
@@ -658,7 +753,7 @@ function getSessionContent({ correctionAction, correctionStatus, session }) {
                 {exercise.name}
               </p>
               <div className="mt-2 space-y-1">
-                {(exercise.sets ?? []).map((set, index) => (
+                {normalizeTrainingSetsForPresentation(exercise.sets ?? []).map((set, index) => (
                   <p
                     className="text-xs font-semibold text-slate-500"
                     key={`${set.set_number ?? index}-${set.reps ?? "duration"}-${set.duration_seconds ?? set.weight ?? "bodyweight"}`}
@@ -675,6 +770,7 @@ function getSessionContent({ correctionAction, correctionStatus, session }) {
         <TrainingSessionCorrectionCard
           action={correctionAction}
           key="correction"
+          navigation={correctionNavigation}
           session={session}
           status={correctionStatus}
         />
@@ -683,7 +779,7 @@ function getSessionContent({ correctionAction, correctionStatus, session }) {
   };
 }
 
-function TrainingSessionCorrectionCard({ action, session, status }) {
+function TrainingSessionCorrectionCard({ action, navigation, session, status }) {
   const message = getCorrectionStatusMessage(status);
 
   return (
@@ -700,6 +796,8 @@ function TrainingSessionCorrectionCard({ action, session, status }) {
       )}
       <form action={action} className="space-y-3">
         <input name="sessionId" type="hidden" value={session.id} />
+        <input name="context" type="hidden" value={navigation?.contextId ?? ""} />
+        <input name="returnTo" type="hidden" value={navigation?.returnTo ?? ""} />
         <textarea
           className="min-h-36 w-full rounded-[14px] border border-slate-200 bg-white p-3 text-sm font-semibold leading-6 text-slate-700 outline-none focus:border-indigo-500"
           name="correctionText"
@@ -824,11 +922,12 @@ function getLibraryChildren({ path, report }) {
   return [];
 }
 
-function getLibraryLeafDetail({ path, report }) {
+function getLibraryLeafDetail({ path, report, showSourceWorkouts }) {
   if (isFlatTrainingNavigationPath(path) && path.length >= 2) {
     return getExerciseDetailContent({
       exerciseSlug: path.at(-1),
       report,
+      showSourceWorkouts,
     });
   }
 
@@ -843,6 +942,7 @@ function getLibraryLeafDetail({ path, report }) {
     return getExerciseDetailContent({
       exerciseSlug: path[4],
       report,
+      showSourceWorkouts,
     });
   }
 
@@ -888,7 +988,7 @@ function getFlatTrainingExerciseCounts(report) {
   );
 }
 
-function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
+export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
   const regions = report.trainingBreakdowns?.resistance ?? [];
   const exercises = regions.flatMap((region) =>
     (region.movementFamilies ?? region.muscleGroups ?? []).flatMap((family) =>
@@ -957,7 +1057,11 @@ function getActivityDetailContent({ activitySlug, report }) {
   };
 }
 
-function getExerciseDetailContent({ exerciseSlug, report }) {
+function getExerciseDetailContent({
+  exerciseSlug,
+  report,
+  showSourceWorkouts = true,
+}) {
   const occurrences = getExerciseOccurrences({ exerciseSlug, report });
   const latest = occurrences[0];
   const title = latest?.exercise.name ?? toTitle(exerciseSlug);
@@ -974,11 +1078,13 @@ function getExerciseDetailContent({ exerciseSlug, report }) {
       />,
       <LastExerciseSessionCard key="last-session" occurrence={latest} />,
       <ExerciseHistoryCard key="history" occurrences={occurrences} />,
-      <ExerciseMetadataFooter
-        key="metadata"
-        records={occurrences.map((occurrence) => occurrence.session)}
-      />,
-    ],
+      showSourceWorkouts && (
+        <ExerciseMetadataFooter
+          key="metadata"
+          records={occurrences.map((occurrence) => occurrence.session)}
+        />
+      ),
+    ].filter(Boolean),
   };
 }
 
@@ -1201,7 +1307,7 @@ function ExerciseSetList({ sets = [] }) {
           ? formatDurationSet(Number(set.duration_seconds))
           : set.reps ?? "?",
         set: set.set_number ?? index + 1,
-        weight: formatSetWeight(set),
+        weight: formatTrainingLoad(set),
       }))}
     />
   );
@@ -1214,11 +1320,11 @@ function formatSetDetail(set = {}) {
 
   const reps = set.reps ?? "?";
 
-  if (set.weight_unit === "bodyweight" || set.load_type === "bodyweight") {
-    return `${reps} reps · Bodyweight`;
+  if (isBodyweightSet(set)) {
+    return `${reps} reps · BW`;
   }
 
-  return `${reps} reps @ ${formatSetWeight(set)}`;
+  return `${reps} reps @ ${formatTrainingLoad(set)}`;
 }
 
 function formatSetGlance(set = {}) {
@@ -1227,7 +1333,7 @@ function formatSetGlance(set = {}) {
   }
 
   const reps = set.reps ?? "?";
-  return `${reps} x ${formatSetWeight(set)}`;
+  return formatTrainingSetGlance(set);
 }
 
 function TrainingHistoryRow({ record }) {
@@ -1281,10 +1387,11 @@ function getExerciseOccurrences({ exerciseSlug, report }) {
         (exercise) => getCanonicalTrainingExerciseSlug(exercise.name) === targetSlug
       )
       .map((exercise) => ({
-        exercise: {
-          ...exercise,
-          name: getCanonicalTrainingExerciseLabel(exercise.name),
-        },
+         exercise: {
+           ...exercise,
+            name: getCanonicalTrainingExerciseLabel(exercise.name),
+            sets: normalizeTrainingSetsForPresentation(exercise.sets ?? []),
+         },
         session,
       }))
   );
@@ -1357,7 +1464,7 @@ export function getCurrentExerciseBenchmark(occurrences = []) {
     comparison,
     lastSession: formatDate(latest.session.date),
     workingWeight: latestStats.bestSet
-      ? formatSetWeight(latestStats.bestSet)
+      ? formatTrainingLoad(latestStats.bestSet)
       : "Pending",
   };
 }
@@ -1403,22 +1510,6 @@ function formatVolume(value) {
 
 function formatLifetimeSessions(count) {
   return `${count} lifetime ${count === 1 ? "session" : "sessions"}`;
-}
-
-function formatSetWeight(set = {}) {
-  if (hasDurationSeconds(set)) {
-    return "Timed";
-  }
-
-  if (set.weight_unit === "bodyweight") {
-    return "Bodyweight";
-  }
-
-  if (set.weight === null || set.weight === undefined || set.weight === "") {
-    return "BW";
-  }
-
-  return `${set.weight} ${set.weight_unit ?? "lb"}`;
 }
 
 function hasDurationSeconds(set = {}) {

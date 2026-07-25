@@ -1,4 +1,5 @@
 import { normalizeProgressPhotoCategory } from "../models/progressPhotoPoseVocabulary";
+import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
 
 const DAY_NAMES = [
   "sunday",
@@ -42,11 +43,15 @@ export function createDailyFocusService() {
           now,
         }),
       ].filter(Boolean);
+      const doseChangeItem = getDoseChangeItem({ protocols, today, now });
+      const mergedProtocolItems = protocolItems.map((item) =>
+        mergeDoseChangeIntoExecution(item, doseChangeItem, today)
+      );
       const highPriorityItems = [
         getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }),
         ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
-        getDoseChangeItem({ protocols, today, now }),
-        ...protocolItems,
+        isMergedDoseChange(doseChangeItem, mergedProtocolItems) ? null : doseChangeItem,
+        ...mergedProtocolItems,
         ...getPersistentReminderItems({ reminders, today, dayName }),
       ].filter(Boolean);
       const sessions = getDailySessionsFromItems(highPriorityItems);
@@ -54,7 +59,7 @@ export function createDailyFocusService() {
         sessions.flatMap((session) => session.items.map((item) => item.id))
       );
       const sessionPriorities = sessions
-        .filter((session) => session.pendingCount > 0)
+        .filter((session) => session.pendingCount > 0 || session.items.some((item) => item.satisfiedByEvidence))
         .map(mapSessionToPriority);
       const primaryItems = highPriorityItems.filter(
         (item) => !item.completed && !sessionItemIds.has(item.id)
@@ -226,7 +231,11 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
     const completedViewCount = normalizedExpectedViews.filter((expectedView) =>
       completedCategoryIds.has(expectedView)
     ).length;
+    const evidenceSatisfied = (reminder.completionHistory ?? []).some((entry) =>
+      entry.satisfactionType === "progress_photo_session_confirmed" && entry.evidenceDate === today
+    );
     const completed =
+      evidenceSatisfied ||
       normalizedExpectedViews.length > 0 &&
       normalizedExpectedViews.every((expectedView) =>
         completedCategoryIds.has(expectedView)
@@ -237,7 +246,7 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       id: reminder.id,
       label: reminder.title,
       subtitle: state.label,
-      metadata: formatProgressPhotoSetMetadata({
+      metadata: evidenceSatisfied ? "1/1 complete" : formatProgressPhotoSetMetadata({
         completedViewCount,
         expectedViews,
       }),
@@ -245,6 +254,7 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       icon: "camera",
       color: "evidence",
       completed,
+      satisfiedByEvidence: evidenceSatisfied,
       session: timeBlock,
       state: state.name,
       priority: state.priorityOffset + 12,
@@ -311,6 +321,7 @@ function mapSessionToPriority(session) {
       completed: item.completed,
       id: item.id,
       label: item.label,
+      satisfiedByEvidence: item.satisfiedByEvidence,
     })),
     priority: session.priority,
   };
@@ -332,7 +343,8 @@ function getProtocolItem({ reminders, protocols, title, today, dayName, now }) {
   if (completed) return null;
 
   const protocol = protocols.find((item) => item.id === reminder.linkedEntityId);
-  const doseText = formatDose(protocol?.dose);
+  const transition = resolveProtocolDoseTransition(protocol, today);
+  const doseText = formatDose(transition.effectiveDose);
   const state = getPriorityState(reminder.schedule?.timeOfDay, now);
 
   return {
@@ -346,13 +358,53 @@ function getProtocolItem({ reminders, protocols, title, today, dayName, now }) {
     completed,
     completable: true,
     completionId: reminder.id,
+    protocolId: protocol?.id,
+    occurrenceDate: today,
+    doseTransition: transition,
+    completionContext: {
+      occurrenceDate: today,
+      dose: doseText,
+      protocolId: protocol?.id,
+    },
     state: state.name,
     priority: state.priorityOffset + (title === "Retatrutide" ? 22 : 26),
   };
 }
 
+function mergeDoseChangeIntoExecution(item, notice, today) {
+  if (
+    !item ||
+    !notice ||
+    item.protocolId !== notice.protocolId ||
+    item.occurrenceDate !== today ||
+    notice.occurrenceDate !== today ||
+    notice.taperStepId !== item.doseTransition?.taperStepId
+  ) {
+    return item;
+  }
+
+  return {
+    ...item,
+    metadata: `${formatDose(item.doseTransition.effectiveDose)} tonight`,
+    changeLabel: "Taper begins today",
+  };
+}
+
+function isMergedDoseChange(notice, items) {
+  return Boolean(
+    notice &&
+      items.some(
+        (item) =>
+          item.protocolId === notice.protocolId &&
+          item.occurrenceDate === notice.occurrenceDate &&
+          item.changeLabel
+      )
+  );
+}
+
 function getDoseChangeItem({ protocols, today, now }) {
   const doseChange = protocols
+    .filter((protocol) => protocol.status === "active")
     .flatMap((protocol) =>
       (protocol.doseHistory ?? []).map((entry) => ({
         protocol,
@@ -375,6 +427,9 @@ function getDoseChangeItem({ protocols, today, now }) {
     completed: false,
     state: state.name,
     priority: state.priorityOffset + 6,
+    protocolId: doseChange.protocol.id,
+    occurrenceDate: today,
+    taperStepId: doseChange.entry.label ?? null,
   };
 }
 
