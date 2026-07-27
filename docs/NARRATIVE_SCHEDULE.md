@@ -10,6 +10,14 @@ This document is the authoritative cadence and Home precedence definition for Ph
 | Weekly | Every Sunday | Reviews the completed week. |
 | Monthly | The first day of every month | Reviews the previous completed calendar month. |
 
+## Canonical briefing family
+
+Daily, Midweek, and Weekly are one briefing family. Midweek asks what is happening so far and what should change before the week ends; Weekly is the same product after the evidence window closes, asking what the completed week established and what should carry forward. Midweek and Weekly therefore share their presentation primitives, section hierarchy, coaching voice, terminology, interactions, navigation, and layout rhythm wherever practical. A future Midweek presentation improvement should flow into Weekly unless the completed window genuinely requires additional context.
+
+The canonical cadence hierarchy is Hero, Snapshot, What Changed, Training, Interpretation, and Coach's Insight. A cadence may keep a section compact when its partial evidence window does not justify additional detail, but it should not invent an alternative presentation language.
+
+Monthly is intentionally separate. It remains a long-form, reflective, magazine-like, chapter-based, visual, and story-driven editorial experience; it is not constrained by the Midweek/Weekly component contract.
+
 ## Home precedence
 
 Home presents the highest-priority available Narrative in this order:

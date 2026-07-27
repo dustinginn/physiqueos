@@ -139,7 +139,9 @@ export function createTrainingSessionEvidenceFromText({
 }
 
 export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidence_0" } = {}) {
-  const normalizedText = normalizeNumberWords(normalizeSetLineMetadata(normalizeTrainingTextInput(text)));
+  const normalizedText = suppressInvalidCompactRepeatAssociations(
+    normalizeNumberWords(normalizeSetLineMetadata(normalizeTrainingTextInput(text)))
+  );
   if (
     !/strength|curl|press|row|squat|deadlift|bench|extension|raise|pull|pulldown|push\s*downs?|pushdowns?|leg|abduction|thrust|fly|flies|crunch|plank/i.test(normalizedText) &&
     !hasAnySetLine(normalizedText)
@@ -150,6 +152,9 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
   const naturalBlockParse = parseNaturalStrengthTrainingBlocks(normalizedText, {
     provenanceRef,
   });
+  const compactExercises = normalizeTrainingExercises(
+    parseCompactStrengthTrainingBlocks(normalizedText, { provenanceRef })
+  );
 
   const exerciseMap = new Map();
   const segments = splitStrengthTrainingExerciseClauses(normalizedText);
@@ -780,6 +785,16 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
   }
   const legacyExercises = normalizeTrainingExercises([...exerciseMap.values()]);
   const naturalExercises = normalizeTrainingExercises(naturalBlockParse.exercises);
+  if (
+    compactExercises.length > 0 &&
+    getExerciseParseCompletenessScore(compactExercises) >
+      Math.max(
+        getExerciseParseCompletenessScore(naturalExercises),
+        getExerciseParseCompletenessScore(legacyExercises)
+      )
+  ) {
+    return compactExercises;
+  }
 
   if (naturalExercises.length > 0 && legacyExercises.length === 0) {
     return naturalExercises;
@@ -804,6 +819,199 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
   }
 
   return legacyExercises;
+}
+
+function parseCompactStrengthTrainingBlocks(
+  text,
+  { provenanceRef = "typed_evidence_0" } = {}
+) {
+  const blocks = [];
+  let currentBlock = null;
+  let pendingRepeat = null;
+
+  for (const rawLine of normalizeTrainingTextInput(text).split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const identity = resolveTrainingExerciseIdentity(line);
+    if (identity.resolutionStatus === "resolved_high_confidence") {
+      currentBlock = {
+        identity: identity.exercise,
+        entries: [],
+      };
+      blocks.push(currentBlock);
+      pendingRepeat = null;
+      continue;
+    }
+
+    if (!currentBlock) continue;
+
+    const repeated = parseCompactRepeatDeclaration(line);
+    if (repeated) {
+      if (repeated.expression) {
+        const parsed = parseCompactSetExpression(repeated.expression);
+        if (parsed && repeated.valid) {
+          currentBlock.entries.push(
+            ...Array.from({ length: repeated.count }, () => ({ ...parsed }))
+          );
+        }
+        pendingRepeat = null;
+      } else {
+        pendingRepeat = repeated.valid ? repeated.count : "invalid";
+      }
+      continue;
+    }
+
+    const parsed = parseCompactSetExpression(line);
+    if (!parsed) {
+      pendingRepeat = null;
+      continue;
+    }
+    if (pendingRepeat === "invalid") {
+      pendingRepeat = null;
+      continue;
+    }
+
+    const count = Number.isInteger(pendingRepeat) ? pendingRepeat : 1;
+    currentBlock.entries.push(
+      ...Array.from({ length: count }, () => ({ ...parsed }))
+    );
+    pendingRepeat = null;
+  }
+
+  const parsedExercises = blocks
+    .map((block) => {
+      const recoveredEntries = recoverCompactDuplicateRepUnits(block.entries);
+      const exerciseMap = new Map();
+      for (const entry of recoveredEntries) {
+        if (!entry.complete) continue;
+        appendTrainingSets({
+          equipment: block.identity.equipment,
+          exerciseMap,
+          exerciseName: block.identity.name,
+          provenanceRef,
+          reps: entry.reps,
+          setCount: 1,
+          unit: entry.unit,
+          weight: entry.weight,
+        });
+      }
+      return exerciseMap.get(block.identity.name) ?? null;
+    })
+    .filter(Boolean);
+  const merged = new Map();
+  for (const exercise of parsedExercises) {
+    const existing = merged.get(exercise.name);
+    if (!existing) {
+      merged.set(exercise.name, exercise);
+      continue;
+    }
+    existing.sets.push(...exercise.sets);
+  }
+  return [...merged.values()];
+}
+
+function suppressInvalidCompactRepeatAssociations(value) {
+  const lines = normalizeTrainingTextInput(value).split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].trim().match(
+      /^(-?\d+(?:\.\d+)?)\s*(?:sets?\s*(?:of|:)|x)\s*(.*)$/i
+    );
+    if (!match) continue;
+    const count = Number(match[1]);
+    if (Number.isInteger(count) && count > 0 && count <= 50) continue;
+    const hasInlineExpression = Boolean(match[2].trim());
+    lines[index] = "";
+    if (hasInlineExpression) continue;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      if (!lines[next].trim()) continue;
+      lines[next] = "";
+      break;
+    }
+  }
+  return lines.join("\n");
+}
+
+function parseCompactRepeatDeclaration(value) {
+  const match = String(value ?? "").trim().match(
+    /^(\d+(?:\.\d+)?)\s*(?:sets?\s*(?:of|:)|x)\s*(.*)$/i
+  );
+  if (!match) return null;
+  const count = Number(match[1]);
+  return {
+    count,
+    expression: match[2].trim(),
+    valid: Number.isInteger(count) && count > 0 && count <= 50,
+  };
+}
+
+function parseCompactSetExpression(value) {
+  const text = String(value ?? "")
+    .trim()
+    .replace(/^\s*set\s+\d+\s*:\s*/i, "")
+    .replace(/[(),]/g, " ");
+  const tokenPattern =
+    /(\d+(?:\.\d+)?)\s*(reps?|r|pounds?|lbs?|lb|p|kg)\b/gi;
+  const tokens = [...text.matchAll(tokenPattern)].map((match) => ({
+    end: match.index + match[0].length,
+    start: match.index,
+    unit: match[2].toLowerCase(),
+    value: Number(match[1]),
+  }));
+  if (tokens.length !== 2 || tokens.some((token) => token.value <= 0)) return null;
+
+  const residue = text
+    .replace(tokenPattern, " ")
+    .replace(/\b(?:at|with)\b|[@:;x\u00d7-]/gi, " ")
+    .trim();
+  if (residue) return null;
+
+  const repTokens = tokens.filter((token) => /^r|^rep/.test(token.unit));
+  const loadTokens = tokens.filter((token) => !/^r|^rep/.test(token.unit));
+  if (repTokens.length === 1 && loadTokens.length === 1) {
+    return {
+      complete: true,
+      reps: repTokens[0].value,
+      unit: normalizeWeightUnit(loadTokens[0].unit),
+      weight: loadTokens[0].value,
+    };
+  }
+  if (repTokens.length === 2) {
+    return {
+      complete: false,
+      duplicateRepCandidate: true,
+      reps: repTokens[0].value,
+      suspectedWeight: repTokens[1].value,
+    };
+  }
+  return null;
+}
+
+function recoverCompactDuplicateRepUnits(entries) {
+  return entries.map((entry, index) => {
+    if (!entry.duplicateRepCandidate) return entry;
+    const previous = entries[index - 1];
+    const next = entries[index + 1];
+    const consistentAdjacentLoad =
+      previous?.complete &&
+      next?.complete &&
+      previous.weight === entry.suspectedWeight &&
+      next.weight === entry.suspectedWeight &&
+      previous.unit === next.unit;
+    const plausibleReps = Number.isInteger(entry.reps) && entry.reps > 0 && entry.reps <= 100;
+    const plausibleLoad =
+      Number.isFinite(entry.suspectedWeight) &&
+      entry.suspectedWeight > 0 &&
+      entry.suspectedWeight <= 2000;
+    if (!consistentAdjacentLoad || !plausibleReps || !plausibleLoad) return entry;
+    return {
+      complete: true,
+      recoveredFromDuplicateRepUnit: true,
+      reps: entry.reps,
+      unit: previous.unit,
+      weight: entry.suspectedWeight,
+    };
+  });
 }
 
 export function getStrengthTrainingBlockParseDiagnostics(text) {

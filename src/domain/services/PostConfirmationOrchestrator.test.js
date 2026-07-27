@@ -24,4 +24,34 @@ describe("PostConfirmationOrchestrator", () => {
     expect(retryHandlers.canonical_commit).not.toHaveBeenCalled();
     expect(retryHandlers.compatibility_writes).toHaveBeenCalledOnce();
   });
+
+  it("exposes newly created versus idempotently matched Training events in the confirmation result", async () => {
+    const newlyCreatedEvents = [{ id: "event-new" }];
+    const existingEvents = [{ id: "event-existing" }];
+    const handlers = Object.fromEntries(
+      POST_CONFIRMATION_STEP_ORDER.map((step) => [
+        step,
+        vi.fn(async () =>
+          step === "training_performance_events"
+            ? {
+                status: "completed",
+                outcome: "mixed",
+                newlyCreatedEvents,
+                existingEvents,
+              }
+            : { status: "completed" }
+        ),
+      ])
+    );
+    const result = await createPostConfirmationOrchestrator({
+      handlers,
+      reviewService: { recordCommitProgress: vi.fn() },
+    }).run({ reviewId: "review_1", commitProgress: {} });
+    expect(result.trainingPerformanceEventsResult).toEqual({
+      status: "completed",
+      outcome: "mixed",
+      newlyCreatedEvents,
+      existingEvents,
+    });
+  });
 });

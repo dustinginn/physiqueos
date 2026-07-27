@@ -1,42 +1,313 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  Dumbbell,
+  Flame,
+  Scale,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import Card from "../components/ui/Card";
-import IconBadge from "../components/ui/IconBadge";
-import ProgressLineChart from "../components/progress/ProgressLineChart";
 import EvidenceImage from "../components/progress/EvidenceImage";
+import BriefingConfidenceAnchor from "../components/briefings/BriefingConfidenceAnchor";
+import EnergyBalanceChart from "../components/briefings/EnergyBalanceChart";
+import {
+  TrainingPerformanceHighlights,
+} from "../components/briefings/TrainingPerformanceHighlights";
+import {
+  BriefingFeatureCard,
+  BriefingSectionHeading,
+  CadenceBriefingHero,
+} from "../components/briefings/CadenceBriefingPrimitives";
+import { createWeeklyBriefingScreenPresentation } from "../domain/services/WeeklyBriefingScreenPresentationService";
 
 export default function WeeklyBriefingScreen({ narrative }) {
-  const cards = narrative.cards;
-  const heroHighlights = normalizeWeeklyHeroHighlights(cards);
-  const heroMilestone = cards.hero.milestone??deriveWeeklyHeroMilestone(cards,heroHighlights);
-  return <main className="app-surface min-h-screen overflow-x-hidden"><div className="mx-auto max-w-[393px] px-4 pb-32 pt-10">
-    <Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href="/briefings/review"><ArrowLeft size={18}/>Briefing History</Link>
-    <section data-testid="weekly-hero" className="mb-6 space-y-4 rounded-[28px] border border-amber-100/80 bg-gradient-to-br from-white via-amber-50/45 to-violet-50/55 p-4 shadow-[0_18px_50px_-30px_rgba(79,70,229,.48)] dark:border-amber-300/10 dark:from-white/[.07] dark:via-amber-400/[.04] dark:to-violet-400/[.04]">
-      <div className="flex items-center gap-3"><IconBadge color="warning" icon={Sparkles} size="md"/><p className="text-sm font-semibold uppercase tracking-[0.12em] text-indigo-600">Weekly Briefing</p></div>
-      <h1 className="text-[30px] font-extrabold leading-[1.12] text-slate-950">{cards.hero.title}</h1>
-      <p className="text-sm font-semibold leading-6 text-slate-600">{cards.hero.body}</p>
-      {heroHighlights.length>0&&<div className="grid grid-cols-2 gap-2">{heroHighlights.map((item,index)=><WeeklyHeroTile item={item} key={`${item.domain}-${item.label}`} wide={heroHighlights.length%2===1&&index===heroHighlights.length-1}/>)}</div>}
-      {heroMilestone&&<div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-3 dark:border-emerald-300/15 dark:bg-emerald-300/5"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-emerald-700 dark:text-emerald-300">{heroMilestone.label}</p><p className="mt-1 text-sm font-extrabold leading-5 text-slate-900">{heroMilestone.value}</p></div>}
-    </section>
-    <div className="space-y-3">
-      <Card><Heading>Snapshot</Heading><h2 className="mt-1 text-lg font-extrabold">{cards.snapshot.title}</h2><div className="mt-3 grid grid-cols-2 gap-2">{cards.snapshot.facts.map((fact)=><div className="rounded-xl bg-[var(--surface-muted)] p-3" key={fact.label}><p className="text-[9px] font-extrabold uppercase tracking-[.08em] text-slate-400">{fact.label}</p><p className="mt-1 text-sm font-extrabold text-slate-700">{fact.value}</p></div>)}</div></Card>
-      <Card><Heading>Progress</Heading><h2 className="mt-1 text-lg font-extrabold">{cards.progress.title}</h2><div className="mt-3 space-y-3">
-        <section><p className="mb-2 text-xs font-extrabold text-slate-900">Weight</p><ProgressLineChart ariaLabel="Weekly weight" metricLabel="Weight" points={cards.progress.weight.points} suffix=" lb"/><p className="mt-2 text-xs font-semibold text-slate-500">Weekly average {cards.progress.weight.weeklyAverage?.toFixed(1)} lb · {cards.progress.weight.change?.toFixed(1)} lb change</p></section>
-        <section className="rounded-xl bg-[var(--surface-muted)] p-3"><p className="text-xs font-extrabold text-slate-900">DEXA</p><p className="mt-1 text-xs font-semibold text-slate-600">{cards.progress.dexa.occurredThisWeek?"DEXA completed this week.":"No DEXA this week."}</p>{cards.progress.dexa.latest&&<p className="mt-1 text-xs font-bold text-slate-500">Current anchor: {cards.progress.dexa.latest.bodyFat} · {cards.progress.dexa.latest.date}</p>}</section>
-        {cards.progress.photo&&<section className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-[var(--surface-muted)] p-3">{cards.progress.photo.thumbnailHref&&<EvidenceImage alt="Weekly Progress Photos" className="aspect-[3/4] w-16 rounded-lg object-cover" src={cards.progress.photo.thumbnailHref}/>}<div><p className="text-xs font-extrabold text-slate-900">Weekly Progress Photos</p><p className="mt-1 line-clamp-3 text-xs font-semibold leading-5 text-slate-600">{cards.progress.photo.summary}</p><Link className="mt-2 inline-flex text-xs font-extrabold text-[var(--primary)]" href={cards.progress.photo.href}>Open Photo Event →</Link></div></section>}
-        <WeeklyCompletion label="Training days" value={cards.progress.training.completedDays}/><WeeklyCompletion label="Activity days" value={cards.progress.activity.completedDays}/>
-      </div></Card>
-      <Card><Heading>Interpretation</Heading><h2 className="mt-1 text-lg font-extrabold">{cards.interpretation.title}</h2><p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{cards.interpretation.opening}</p><div className="mt-3 space-y-3">{cards.interpretation.domains.map((item)=><section className="rounded-xl bg-[var(--surface-muted)] p-3" key={item.domain}><p className="text-xs font-extrabold text-[var(--primary)]">{item.label??item.domain}</p><p className="mt-2 text-sm font-extrabold leading-5 text-slate-800">{item.highlight}</p><p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{item.insight}</p></section>)}</div>{cards.interpretation.synthesis&&<p className="mt-3 text-sm font-semibold leading-6 text-slate-700">{cards.interpretation.synthesis}</p>}<p className="mt-3 text-sm font-semibold leading-6 text-slate-600">{cards.interpretation.uncertainty}</p></Card>
-      <Card><Heading>{cards.coachInsight.title??"Coach’s Insight"}</Heading><div className="mt-3 space-y-3"><CoachBlock label="🎉 Biggest Win" value={cards.coachInsight.celebration}/><CoachBlock label="💪 Keep Building" value={cards.coachInsight.explanation}/><CoachBlock label="👀 Watch Next Week" value={cards.coachInsight.preparation}/></div></Card>
+  const presentation = createWeeklyBriefingScreenPresentation(narrative);
+  return <main className="app-surface min-h-screen overflow-x-hidden">
+    <div className="mx-auto max-w-[393px] px-4 pb-32 pt-10">
+      <Link
+        className="mb-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]"
+        href={presentation.navigation.backHref}
+      >
+        <ArrowLeft size={18}/>
+        {presentation.navigation.backLabel}
+      </Link>
+
+      <CadenceBriefingHero
+        body={presentation.hero.body}
+        confidence={presentation.hero.confidence && <BriefingConfidenceAnchor
+          confidence={presentation.hero.confidence}
+          testId="weekly-confidence"
+        />}
+        context={presentation.hero.goalLabel && <p className="mt-5 text-xs font-extrabold text-[var(--primary)]">
+          {presentation.hero.goalLabel}
+        </p>}
+        icon={Sparkles}
+        label={presentation.hero.eyebrow}
+        meta={<p className="whitespace-pre-line text-right text-[10px] font-bold text-[var(--text-secondary)]">
+          {presentation.hero.periodLabel}
+        </p>}
+        testId="weekly-hero"
+        title={presentation.hero.headline}
+      >
+        <WeeklyStrategyContext hero={presentation.hero}/>
+      </CadenceBriefingHero>
+
+      <div className="mt-3 space-y-3">
+        {presentation.energy && <WeeklyEnergy energy={presentation.energy}/>}
+        {presentation.weight && <WeeklyWeight weight={presentation.weight}/>}
+        {presentation.photos && <WeeklyPhotos photos={presentation.photos}/>}
+        {presentation.training.available && <WeeklyTraining training={presentation.training}/>}
+        {presentation.bodyComposition && <WeeklyBodyComposition body={presentation.bodyComposition}/>}
+        <WeeklyCoachTake insight={presentation.coachInsight}/>
+      </div>
     </div>
-  </div></main>;
+  </main>;
 }
 
-const weeklyHeroDomains={photos:{icon:"📸",label:"Visual Progress",tone:"border-violet-200/70 bg-violet-100/55 dark:border-violet-300/15 dark:bg-violet-400/[.08]",accent:"text-violet-700 dark:text-violet-300"},weight:{icon:"⚖️",label:"Weight Trend",tone:"border-orange-200/70 bg-orange-100/55 dark:border-orange-300/15 dark:bg-orange-400/[.08]",accent:"text-orange-700 dark:text-orange-300"},training:{icon:"💪",label:"Performance",tone:"border-indigo-200/70 bg-indigo-100/55 dark:border-indigo-300/15 dark:bg-indigo-400/[.08]",accent:"text-indigo-700 dark:text-indigo-300"},energy_balance:{icon:"🔥",label:"Activity",tone:"border-sky-200/70 bg-sky-100/55 dark:border-sky-300/15 dark:bg-sky-400/[.08]",accent:"text-sky-700 dark:text-sky-300"},evidence:{icon:"✦",label:"Weekly Evidence",tone:"border-slate-200/70 bg-white/75 dark:border-white/10 dark:bg-white/5",accent:"text-slate-600 dark:text-slate-300"}};
-function normalizeWeeklyHeroHighlights(cards){if(Array.isArray(cards.hero.highlightTiles))return cards.hero.highlightTiles.slice(0,4);const domains=cards.interpretation?.domains??[];return (cards.hero.highlights??[]).slice(0,4).map((value,index)=>{const domain=domains[index]?.domain??"evidence";const meta=weeklyHeroDomains[domain]??weeklyHeroDomains.evidence;return{domain,icon:meta.icon,label:meta.label,value};});}
-function deriveWeeklyHeroMilestone(cards,highlights){const progress=cards.progress??{};const supported=highlights.length>=3&&progress.activity?.completedDays===7&&(progress.photo||progress.weight?.change<0);return supported?{label:"Weekly Milestone",value:"Execution and outcome remained aligned across the full week."}:null;}
-function WeeklyHeroTile({item,wide=false}){const meta=weeklyHeroDomains[item.domain]??weeklyHeroDomains.evidence;const icon=item.icon??meta.icon;const value=stripRepeatedHeroIcon(item.value,icon);return <section className={`${wide?"col-span-2":""} flex min-h-28 flex-col rounded-2xl border p-3 shadow-[0_10px_24px_-18px_rgba(15,23,42,.45)] ${meta.tone}`}><div className="flex items-center gap-1.5"><span aria-hidden className="text-sm">{icon}</span><p className={`text-[9px] font-extrabold uppercase tracking-[.08em] ${meta.accent}`}>{item.label??meta.label}</p></div><p className="mt-3 text-sm font-black leading-5 text-slate-900">{value}</p>{item.detail&&<p className="mt-auto pt-2 text-[10px] font-bold leading-4 text-slate-500">{item.detail}</p>}</section>}
-function stripRepeatedHeroIcon(value,icon){const text=String(value??"");return icon&&text.startsWith(icon)?text.slice(icon.length).trimStart():text;}
-function WeeklyCompletion({label,value}){const percent=Math.min(100,Math.round((value/7)*100));return <section className="rounded-xl bg-[var(--surface-muted)] p-3"><div className="flex justify-between text-xs font-extrabold text-slate-700"><span>{label}</span><span>{value}/7</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[var(--primary)]" style={{width:`${percent}%`}}/></div></section>}
-function CoachBlock({label,value}){if(!value)return null;return <section><p className="text-[10px] font-extrabold uppercase tracking-[.08em] text-[var(--primary)]">{label}</p><p className="mt-1 text-sm font-semibold leading-6 text-slate-700">{value}</p></section>}
-function Heading({children}){return <p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-[var(--primary)]">{children}</p>}
+function WeeklyStrategyContext({ hero }) {
+  if (!hero.goalLabel && !hero.strategy) return null;
+  return <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--divider)] pt-3 text-[10px] font-bold text-[var(--text-secondary)]">
+    {hero.strategy?.name && <span>Current strategy: {hero.strategy.name}</span>}
+    {hero.strategy?.weekLabel && <span>{hero.strategy.weekLabel}</span>}
+    {hero.strategy?.reviewLabel && <span>Next: {hero.strategy.reviewLabel}</span>}
+  </div>;
+}
+
+function WeeklyEnergy({ energy }) {
+  return <BriefingFeatureCard
+    icon={Flame}
+    label="Energy Balance"
+    tone="effort"
+    title={energy.title || "Intake remained below estimated expenditure"}
+    testId="weekly-energy-balance"
+  >
+    <p className="text-[26px] font-black leading-8 text-[var(--chart-1)]">
+      {balanceHeadline(energy.averageBalance)}
+    </p>
+    {energy.narrative && <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+      {energy.narrative}
+    </p>}
+    <div className="mt-4 grid grid-cols-3 gap-2 border-y border-[var(--divider)] py-3">
+      <EnergyMetric color="var(--chart-3)" label="Avg intake" value={kcal(energy.averageIntake)}/>
+      <EnergyMetric color="var(--chart-2)" label="Avg expenditure" value={kcal(energy.averageExpenditure)}/>
+      <EnergyMetric color="var(--chart-1)" label="Avg balance" value={signedKcal(energy.averageBalance)}/>
+    </div>
+    <EnergyBalanceChart cadence="weekly" chart={energy.chart}/>
+  </BriefingFeatureCard>;
+}
+
+function WeeklyWeight({ weight }) {
+  return <Card>
+    <BriefingSectionHeading icon={Scale}>Weight Context</BriefingSectionHeading>
+    <p className="mt-2 text-2xl font-black text-[var(--text-primary)]">
+      {metric(weight.weeklyAverage, " lb")}
+    </p>
+    <p className="text-[10px] font-bold text-[var(--text-muted)]">
+      Completed-week average{Number.isFinite(weight.change) && ` · ${signedWeight(weight.change)} first to last`}
+    </p>
+    {weight.narrative && <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+      {weight.narrative}
+    </p>}
+  </Card>;
+}
+
+function WeeklyPhotos({ photos }) {
+  return <BriefingFeatureCard
+    icon={Camera}
+    label="Progress Photos"
+    tone="evidence"
+    title={photos.title}
+    testId="weekly-progress-photos"
+  >
+    <div className={photos.thumbnailHref ? "grid grid-cols-[76px_1fr] gap-3" : ""}>
+      {photos.thumbnailHref && <EvidenceImage
+        alt="Weekly Progress Photos"
+        className="aspect-[3/4] w-[76px] rounded-xl object-cover"
+        src={photos.thumbnailHref}
+      />}
+      <div>
+        <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+          {photos.narrative || photos.summary}
+        </p>
+        {photos.href && <Link
+          className="mt-2 inline-flex text-xs font-extrabold text-[var(--primary)]"
+          href={photos.href}
+        >
+          Open Photo Event →
+        </Link>}
+      </div>
+    </div>
+  </BriefingFeatureCard>;
+}
+
+function WeeklyTraining({ training }) {
+  return <BriefingFeatureCard
+    icon={Dumbbell}
+    label="Training Response"
+    tone="primary"
+    title={training.title}
+    testId="weekly-training-response"
+  >
+    {training.conclusion && <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+      {training.conclusion}
+    </p>}
+    <p className="mt-3 text-[10px] font-bold text-[var(--text-muted)]">
+      6 training days · {training.comparableCategoryCount} reviewed categories · {training.status.improving} improving · {training.status.plateauing} plateauing · {training.insufficientCount} insufficient
+    </p>
+    <TrainingPerformanceHighlights items={training.highlights.slice(0, 3)}/>
+    {training.priorityCategories.length > 0 && <div className="mt-5">
+      <p className="text-[10px] font-black uppercase tracking-[.08em] text-[var(--text-muted)]">
+        🎯 Priority Muscle Groups
+      </p>
+      <div className="mt-2 grid gap-2">
+        {training.priorityCategories.map((category) => <div
+          className="rounded-xl bg-[var(--surface-muted)] p-3"
+          key={category.id}
+        >
+          <p className="flex items-center gap-2 text-xs font-black text-[var(--text-primary)]">
+            <span
+              aria-label={category.status}
+              className={statusIndicatorClass(category.statusTone)}
+              data-status-tone={category.statusTone}
+            >●</span>
+            {category.label}
+          </p>
+          <p className="mt-1 text-[10px] font-bold leading-4 text-[var(--text-secondary)]">
+            {category.statusLabel} across {category.comparableExerciseCount} exercise{category.comparableExerciseCount === 1 ? "" : "s"}.
+          </p>
+        </div>)}
+      </div>
+    </div>}
+  </BriefingFeatureCard>;
+}
+
+function statusIndicatorClass(tone) {
+  if (tone === "success") return "text-[var(--chart-1)]";
+  if (tone === "warning") return "text-[var(--chart-3)]";
+  if (tone === "danger") return "text-[var(--destructive)]";
+  if (tone === "neutral") return "text-[var(--chart-2)]";
+  return "text-[var(--chart-5)]";
+}
+
+function WeeklyBodyComposition({ body }) {
+  return <BriefingFeatureCard
+    icon={ShieldCheck}
+    label="Body Composition"
+    tone="evidence"
+    title="Current Baseline"
+    testId="weekly-body-composition"
+  >
+    <div className="grid grid-cols-2 gap-2">
+      <BodyMetric label="Body fat" value={metric(body.bodyFat, "%")}/>
+      <BodyMetric label="Lean mass" value={metric(body.leanMass, " lb")}/>
+      <BodyMetric label="Fat mass" value={metric(body.fatMass, " lb")}/>
+      <BodyMetric label="DEXA date" value={longDate(body.date)}/>
+    </div>
+    {body.narrative && <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+      {body.narrative}
+    </p>}
+    {body.objective && <p className="mt-3 text-xs font-extrabold text-[var(--text-primary)]">
+      Current objective: {body.objective}
+    </p>}
+  </BriefingFeatureCard>;
+}
+
+function WeeklyCoachTake({ insight }) {
+  const actions = insight.actionItems.length
+    ? insight.actionItems
+    : [insight.keepBuilding, insight.watchNextWeek].filter(Boolean);
+  return <section
+    className="coach-take-card rounded-[24px] border border-white/10 bg-[color-mix(in_srgb,var(--primary)_82%,#171225)] p-5 text-white shadow-[0_18px_48px_rgba(12,8,28,.18)]"
+    data-testid="weekly-coach-take"
+  >
+    <p className="text-[10px] font-black uppercase tracking-[.12em] text-white/65">
+      Coach&apos;s Take
+    </p>
+    <CoachPoint emoji="💡" label="Biggest Takeaway" testId="weekly-biggest-takeaway">
+      {insight.biggestWin}
+    </CoachPoint>
+    <CoachPoint emoji="🧠" label="My Recommendation" separated testId="weekly-recommendation">
+      {insight.keepBuilding}
+    </CoachPoint>
+    <div className="mt-7 border-t border-white/10 pt-5">
+      <p className="text-[10px] font-black uppercase tracking-[.08em]">
+        <span aria-hidden>🎯</span>{" "}
+        <span className="text-white/70">Into Next Week</span>
+      </p>
+      <ol className="mt-3 space-y-3">
+        {actions.map((action, index) => <li
+          className="grid grid-cols-[1.25rem_1fr] items-start gap-2 text-sm font-semibold leading-6 text-white/90"
+          data-testid="weekly-next-action"
+          key={`${index}-${action}`}
+        >
+          <span className="pt-px text-center font-black text-white/50">{index + 1}</span>
+          <span>{action}</span>
+        </li>)}
+      </ol>
+    </div>
+  </section>;
+}
+
+function CoachPoint({ emoji, label, children, separated = false, testId }) {
+  return <div className={separated ? "mt-7 border-t border-white/10 pt-5" : "mt-5"}>
+    <p className="text-[10px] font-black uppercase tracking-[.08em]">
+      <span aria-hidden>{emoji}</span>{" "}
+      <span className="text-white/70">{label}</span>
+    </p>
+    <p className="mt-2 text-sm font-semibold leading-6 text-white/90" data-testid={testId}>{children}</p>
+  </div>;
+}
+
+function EnergyMetric({ color, label, value }) {
+  return <div className="min-w-0 px-1">
+    <p className="text-[8px] font-extrabold uppercase tracking-[.06em]" style={{ color }}>{label}</p>
+    <p className="mt-1 break-words text-[11px] font-black leading-4 text-[var(--text-primary)]">{value}</p>
+  </div>;
+}
+
+function BodyMetric({ label, value }) {
+  return <div className="min-w-0 rounded-xl bg-[var(--surface-muted)] p-3">
+    <p className="text-[9px] font-extrabold uppercase tracking-[.07em] text-[var(--text-muted)]">{label}</p>
+    <p className="mt-1 break-words text-xs font-black leading-5 text-[var(--text-primary)]">{value}</p>
+  </div>;
+}
+
+function balanceHeadline(value) {
+  if (!Number.isFinite(value)) return "Weekly estimate unavailable";
+  if (Math.abs(value) < 25) return "About even day to day";
+  return `${Math.abs(Math.round(value)).toLocaleString("en-US")} kcal/day ${value < 0 ? "below" : "above"}`;
+}
+
+function metric(value, suffix) {
+  return Number.isFinite(value)
+    ? `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`
+    : "Unavailable";
+}
+
+function longDate(value) {
+  return value
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(`${value}T12:00:00Z`))
+    : "Unavailable";
+}
+
+function kcal(value) {
+  return Number.isFinite(value)
+    ? `${Math.round(value).toLocaleString("en-US")} kcal`
+    : "Unavailable";
+}
+
+function signedKcal(value) {
+  if (!Number.isFinite(value)) return "Unavailable";
+  return `${value > 0 ? "+" : "−"}${Math.abs(Math.round(value)).toLocaleString("en-US")} kcal`;
+}
+
+function signedWeight(value) {
+  return `${value > 0 ? "+" : "−"}${Math.abs(value).toFixed(1)} lb`;
+}

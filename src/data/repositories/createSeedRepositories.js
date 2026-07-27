@@ -21,6 +21,8 @@ import { createReminderRepository } from "./ReminderRepository";
 import { createUserRepository } from "./UserRepository";
 import { createWeightRepository } from "./WeightRepository";
 import { createEvidenceReviewRepository } from "./EvidenceReviewRepository";
+import { createTrainingPerformanceEventRepository } from "./TrainingPerformanceEventRepository";
+import { createGoalConfidenceRepository } from "./GoalConfidenceRepository";
 
 export function createSeedRepositories(seedPack, options = {}) {
   const evidencePackages = seedPack.evidencePackages ?? [];
@@ -79,6 +81,14 @@ export function createSeedRepositories(seedPack, options = {}) {
       options
     ),
     evidenceReviews: createEvidenceReviewRepository(seedPack.evidenceReviews ?? [], options),
+    trainingPerformanceEvents: createTrainingPerformanceEventRepository(
+      seedPack.trainingPerformanceEvents ?? []
+    ),
+    goalConfidence: createGoalConfidenceRepository({
+      snapshots: seedPack.goalConfidenceSnapshots ?? [],
+      history: seedPack.goalConfidenceHistory ?? [],
+      continuitySeeds: seedPack.goalConfidenceContinuitySeeds ?? [],
+    }),
     canonicalEvidence: createCanonicalEvidenceRepository(
       seedPack.canonicalEvidenceObjects ?? [],
       { ...options, evidencePackages }

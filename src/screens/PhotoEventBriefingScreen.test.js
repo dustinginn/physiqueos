@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import {describe,expect,it} from "vitest";
+import {createOrdinaryPhotoComparisonEntries} from "./PhotoEventBriefingScreen";
 const source=fs.readFileSync(new URL("./PhotoEventBriefingScreen.jsx",import.meta.url),"utf8");
 describe("PhotoEventBriefingScreen V2",()=>{
   it("uses standard briefing hierarchy with a dark decision moment, not a dark report hero",()=>{expect(source).toContain("IconBadge");expect(source).toContain("Photo Event");expect(source).toContain("photo-event-user-decision");expect(source).toContain("bg-slate-950");});
@@ -11,6 +12,13 @@ describe("PhotoEventBriefingScreen V2",()=>{
   it("renders the page itself as a centered mobile application viewport",()=>{for(const value of ["mx-auto min-h-screen max-w-[393px]","pb-32","overflow-x-hidden","space-y-3"]){expect(source).toContain(value);}expect(source).toContain("grid-cols-3");});
   it("presents a bounded final decision and inactive next-goal preview",()=>{for(const value of ["photo-event-user-decision","experience.userDecision.completeLabel","experience.userDecision.keepOpenLabel","Only your explicit choice closes the goal","next-goal-preview","Coming next"]){expect(source).toContain(value);}expect(source).toContain("disabled");expect(source).not.toContain('href="/goals/new"');});
   it("separates recent and full-journey comparison sections",()=>{expect(source).toContain("Since last check-in");expect(source).toContain("From first upload to now");expect(source).toContain("recentComparisons");expect(source).toContain("journeyComparisons");});
+  it("renders persisted ordinary comparisons without requiring completion context",()=>{for(const value of ["createOrdinaryPhotoComparisonEntries","ordinaryComparisons.length","previousImageHref",'scope="ordinary"',"entry.supportingObservations","entry.findings"]){expect(source).toContain(value);}});
+  it("pairs five valid persisted current and historical views and omits malformed records",()=>{
+    const comparisons=Array.from({length:5},(_,index)=>({id:`view-${index}`,poseId:`pose-${index}`,label:`Pose ${index}`,imageHref:`/current-${index}.jpg`,previousImageHref:`/prior-${index}.jpg`,previousDate:"2026-07-18",headline:`Finding ${index}`,supportingObservations:["Supported"]}));
+    const result=createOrdinaryPhotoComparisonEntries({eventDate:"2026-07-25",cardContent:{progress:{comparisons:[...comparisons,{id:"bad",poseId:"bad"}]}}});
+    expect(result).toHaveLength(5);
+    expect(result[0]).toMatchObject({poseLabel:"Pose 0",firstDate:"2026-07-18",currentDate:"2026-07-25",observations:["Finding 0","Supported"],viewerGalleryItems:[{imageHref:"/prior-0.jpg",date:"2026-07-18"},{imageHref:"/current-0.jpg",date:"2026-07-25"}]});
+  });
   it("removes the duplicate latest-comparison card",()=>{expect(source).not.toContain("Latest comparison");expect(source).not.toContain("Recent change");});
   it("shows a retry path without presenting completion controls for uncertain results",()=>{expect(source).toContain("photo-event-retry");expect(source).toContain("Upload Again");expect(source).toContain('experience.state==="confirmed"');});
   it("keeps first-recorded views separate without fake prior cards",()=>{expect(source).toContain("New baseline views");expect(source).toContain("new-pose-baseline");expect(source).toContain("First recorded view");});

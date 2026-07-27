@@ -36,19 +36,37 @@ export function deriveHomeActiveChapterPresentation({
       item.relatedGoalIds?.includes(activeGoal.id)
   );
   const sourceGoal = goals.find((goal) => goal.id === activeGoal.sourceGoalId) ?? null;
+  const presentedConfidence = Number.isFinite(overallGoalConfidence?.value)
+    ? overallGoalConfidence.value : trajectory.confidence.numericValue;
+  const presentedConfidenceState = overallGoalConfidence?.label ??
+    trajectory.confidence.qualitativeLevel;
+  const canonicalDetail = overallGoalConfidence?.canonicalSeries ? {
+    qualitativeLevel: overallGoalConfidence.label,
+    supportingFactors: overallGoalConfidence.supportingContributors.map((item) =>
+      item.reason).filter(Boolean),
+    limitingFactors: overallGoalConfidence.limitingContributors.map((item) =>
+      item.reason).filter(Boolean),
+    clarifyingFactors: [],
+    uncertaintyStatement:
+      overallGoalConfidence.unresolvedUncertainty.join(" ") ||
+      overallGoalConfidence.primaryReason,
+    movement: overallGoalConfidence.movement,
+    delta: overallGoalConfidence.delta,
+    evidenceCutoff: overallGoalConfidence.evidenceCutoff,
+  } : null;
 
   return {
     activeGoalId: activeGoal.id,
     hero: {
-      confidence: trajectory.confidence.numericValue,
-      confidenceState: trajectory.confidence.qualitativeLevel,
+      confidence: presentedConfidence,
+      confidenceState: presentedConfidenceState,
       goalIcon: "dumbbell",
       goalLabel: activeGoal.title,
       headline: trajectory.activePhase?.phaseName ?? "Phase unavailable",
       primaryTimeline: trajectory.activePhase?.friendlyTimeline ?? "Timeline not established",
       plannedReviewDate: trajectory.activePhase?.calculatedPlannedReviewDate ?? null,
       supportLine: trajectory.activePhase?.purpose ?? "Phase details are unavailable.",
-      confidenceDetail: {
+      confidenceDetail: canonicalDetail ?? {
         qualitativeLevel: trajectory.confidence.qualitativeLevel,
         supportingFactors: trajectory.confidence.supportingFactors,
         limitingFactors: trajectory.confidence.limitingFactors,

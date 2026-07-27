@@ -16,7 +16,7 @@ describe("Build Lean Mass phase-aware production", () => {
       title: "Build Lean Mass",
       status: "Active Goal",
       destination: "Build 10 lb of lean mass by October 31, 2026",
-      confidence: "44% confidence",
+      confidence: "58% confidence",
       confidenceBand: "Moderate",
       editHref: expect.stringMatching(/^\/goals\/.+\/edit$/),
     });

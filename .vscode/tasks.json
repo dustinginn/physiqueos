@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "End Work Session",
+      "type": "shell",
+      "command": "& '${workspaceFolder}\\scripts\\endWorkSession.ps1'",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PHYSIQUEOS_SESSION_COMMIT_MESSAGE": "${input:commitMessage}"
+        },
+        "shell": {
+          "executable": "powershell.exe",
+          "args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command"
+          ]
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "commitMessage",
+      "type": "promptString",
+      "description": "Commit message (leave blank for a timestamped default)",
+      "default": ""
+    }
+  ]
+}

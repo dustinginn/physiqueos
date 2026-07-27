@@ -12,14 +12,21 @@ import {
 } from "../domain/services/EvidenceReviewPresentationService";
 import { createEvidenceExperiencePresentation } from "../domain/services/EvidenceExperiencePresentationService";
 import { createEvidenceSuccessNavigation } from "../domain/services/EvidenceSuccessNavigationService";
+import { createTrainingPerformanceSuccessPresentation } from "../domain/services/TrainingPerformanceSuccessPresentationService";
+import {
+  CanonicalProgressPhotoCategories,
+  getCanonicalProgressPhotoCategory,
+  getProgressPhotoDisplayLabel,
+} from "../domain/models/progressPhotoPoseVocabulary";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ confirmAction, discardAction, reprocessAction, review }) {
+export default function EvidenceReviewScreen({ confirmAction, discardAction, photoPoseAction, reprocessAction, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
   const experience = createEvidenceExperiencePresentation(review);
+  const trainingAchievements = createTrainingPerformanceSuccessPresentation(review);
   const status = review.status;
   const canEdit = ["pending", "commit_failed"].includes(status);
   const canContinue = status === "partially_committed";
@@ -30,7 +37,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
     );
   };
 
-  if (status === "confirmed") return <EvidenceSavedScreen experience={experience} />;
+  if (status === "confirmed") return <EvidenceSavedScreen experience={experience} trainingAchievements={trainingAchievements} />;
 
   return (
     <main className="app-surface min-h-screen">
@@ -45,7 +52,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} />
+            <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} review={review} />
           ))}
         </div>
 
@@ -69,6 +76,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
             </p>
           )}
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
+          {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
         </Card>
 
         <form action={confirmAction} className="mt-6">
@@ -89,7 +97,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, rep
   );
 }
 
-function EvidenceCard({ canEdit, item, onToggle }) {
+function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -149,9 +157,7 @@ function EvidenceCard({ canEdit, item, onToggle }) {
         </section>
       )}
 
-      {item.type === "photos" && <PhotoPreviews object={item.object} />}
-      {item.type !== "nutrition" && (item.sourceFiles.length > 0 || item.typedEvidence) && <details className="rounded-xl bg-[var(--surface-muted)]"><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-extrabold text-[var(--text-secondary)]">Original details</summary><div className="space-y-3 border-t border-[var(--divider)] p-3">{item.sourceFiles.length > 0 && <div><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-muted)]">Source files</p><ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{item.sourceFiles.map((file) => <li className="break-all" key={file}>{file}</li>)}</ul></div>}{item.typedEvidence && <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{item.typedEvidence}</p>}</div></details>}
-
+      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} object={item.object} review={review} />}
       <button
         aria-label={`${item.included ? "Exclude" : "Include"} ${item.title} ${item.date ?? ""}`.trim()}
         className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-extrabold text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-accent)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -207,7 +213,7 @@ function DiscardSubmitButton() {
   return <button className="min-h-12 w-full cursor-pointer rounded-2xl bg-red-600 px-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={pending} type="submit">{pending ? "Discarding..." : "Discard review"}</button>;
 }
 
-function EvidenceSavedScreen({ experience }) {
+function EvidenceSavedScreen({ experience, trainingAchievements }) {
   const [continueNavigation] = useState(() =>
     createEvidenceSuccessNavigation((destination) => {
       window.location.assign(destination);
@@ -221,13 +227,64 @@ function EvidenceSavedScreen({ experience }) {
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-success)] text-[var(--chart-1)]"><Check aria-hidden="true" size={30} strokeWidth={3} /></span>
         <h1 className="mt-7 text-3xl font-extrabold text-[var(--text-primary)]">{experience.savedTitle}</h1>
         <p className="mt-3 max-w-xs text-base leading-7 text-[var(--text-secondary)]">{experience.savedBody}</p>
+        {trainingAchievements && (
+          <section className="mt-7 w-full rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4 text-left">
+            <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--chart-1)]">{trainingAchievements.heading}</p>
+            <p className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{trainingAchievements.summary}</p>
+            <div className="mt-3 space-y-2">
+              {trainingAchievements.items.map((item) => (
+                <div className="rounded-xl bg-[var(--surface-muted)] px-3 py-2.5" key={`${item.exerciseName}-${item.eventType}-${item.detail}`}>
+                  <p className="text-sm font-extrabold text-[var(--text-primary)]">{item.exerciseName}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <button className="mt-9 min-h-14 w-full rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" onClick={continueNavigation} type="button">Continue</button>
       </section>
     </main>
   );
 }
 
-function PhotoPreviews({ object }) { const photos = (object.photos ?? []).filter((photo) => photo.active !== false); return <div className="grid grid-cols-3 gap-2">{photos.map((photo, index) => <EvidenceImage alt={`${photo.view ?? "Photo"} ${photo.pose ?? ""}`} className="aspect-[3/4] w-full rounded-xl object-cover" key={photo.id ?? index} src={privateEvidenceUrl(photo.storage_path ?? photo.imagePath)} />)}</div>; }
-function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]founder[\\/]/, "").replaceAll("\\", "/")}`; }
-function hasIncompletePhotoSet(object) { if (object.evidence_type !== "photo_session") return false; const poses = (object.photos ?? []).filter((photo) => photo.active !== false).map((photo) => `${photo.view}-${photo.pose}`.replace("rear-", "back-").replace("back-flexed", "back-flexed")); return new Set(poses).size !== poses.length || !["front-relaxed", "back-relaxed", "back-flexed"].every((pose) => poses.includes(pose)); }
+function PhotoPreviews({ action, canEdit, object, review }) {
+  const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
+  return <section aria-label="Photo pose review" className="space-y-4">
+    <div>
+      <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Match each photo to its pose</h3>
+      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">Each selection stays attached to this uploaded image.</p>
+    </div>
+    {photos.map((photo, index) => {
+      const poseId = getCanonicalProgressPhotoCategory(photo)?.id ?? "unknown";
+      return <article className="overflow-hidden rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)]" data-artifact-id={photo.source_artifact_ref} key={photo.source_artifact_ref ?? photo.id ?? index}>
+        <EvidenceImage
+          alt={poseId === "unknown" ? `Uploaded progress photo ${index + 1}` : getProgressPhotoDisplayLabel(photo)}
+          className="aspect-[3/4] w-full bg-black/5 object-contain"
+          src={privateEvidenceUrl(photo.storage_path ?? photo.imagePath)}
+        />
+        <div className="space-y-3 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="truncate text-xs font-bold text-[var(--text-secondary)]">{photo.file_name ?? `Photo ${index + 1}`}</p>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${poseId === "unknown" ? "bg-amber-100 text-amber-900" : "bg-[var(--surface-success)] text-[var(--text-primary)]"}`}>{poseId === "unknown" ? "Pose needed" : getProgressPhotoDisplayLabel(photo)}</span>
+          </div>
+          <form action={action} className="space-y-2">
+            <input name="reviewId" type="hidden" value={review.id} />
+            <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+            <input name="photoId" type="hidden" value={photo.id} />
+            <input name="sourceArtifactRef" type="hidden" value={photo.source_artifact_ref ?? ""} />
+            <label className="block text-xs font-extrabold text-[var(--text-secondary)]" htmlFor={`pose-${photo.id}`}>Pose</label>
+            <select className="min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold text-[var(--text-primary)] disabled:opacity-50" defaultValue={poseId === "unknown" ? "" : poseId} disabled={!canEdit || !action} id={`pose-${photo.id}`} name="poseId" required>
+              <option disabled value="">Choose pose</option>
+              {CanonicalProgressPhotoCategories.map((pose) => <option key={pose.id} value={pose.id}>{pose.label}</option>)}
+            </select>
+            <PhotoPoseSaveButton disabled={!canEdit || !action} />
+          </form>
+        </div>
+      </article>;
+    })}
+  </section>;
+}
+function PhotoPoseSaveButton({ disabled }) { const { pending } = useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? "Saving pose\u2026" : "Save pose"}</button>; }
+function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
+function hasIncompletePhotoSet(object) { return object.evidence_type === "photo_session" && (object.photos ?? []).filter((photo) => photo.active !== false).some((photo) => !getCanonicalProgressPhotoCategory(photo)); }
 function hasCommitFailure(review) { return ["commit_failed", "partially_committed"].includes(review.status); }

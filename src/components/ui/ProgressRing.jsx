@@ -7,6 +7,7 @@ export default function ProgressRing({
   trackColor = "var(--confidence-track)",
   className = "",
   animate = false,
+  showLabel = true,
 }) {
   const normalized = Math.min(Math.max(value, 0), 100);
   const center = size / 2;
@@ -63,12 +64,12 @@ export default function ProgressRing({
           {normalized}%
         </div>
 
-        <div
+        {showLabel && <div
           className="mt-1 max-w-[82%] text-center font-bold uppercase leading-[1.05] tracking-[0.035em] text-[var(--text-muted)]"
           style={{ fontSize: labelFontSize }}
         >
           {label}
-        </div>
+        </div>}
       </div>
     </div>
   );

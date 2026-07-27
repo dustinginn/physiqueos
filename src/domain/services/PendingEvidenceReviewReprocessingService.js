@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { recoverEvidenceIntakeSubmissionFromArtifacts } from "./EvidenceIntakeService";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
 
-export const PENDING_REVIEW_REPROCESS_VERSION = "typed-strength-reconciliation-v5-bodyweight-semantics";
+export const PENDING_REVIEW_REPROCESS_VERSION = "typed-strength-reconciliation-v6-compact-upload-grammar";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {

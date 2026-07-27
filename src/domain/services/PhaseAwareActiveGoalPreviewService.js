@@ -2,7 +2,9 @@ import { FounderRepositories } from "../../data/repositories/founderRepositories
 import { resolveHomeGoalTrajectory } from "./HomeGoalTrajectoryService";
 import { createGoalTrainingProgress } from "./GoalTrainingProgressService";
 import { resolveOverallGoalConfidenceReadModel } from "./OverallGoalConfidenceReadService";
+import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
+import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
 
 export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {
   const user = await repositories.users.getCurrentUser();
@@ -30,13 +32,18 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   const protocolTypes = new Set(protocols.map((item) => String(item.protocolType ?? item.type ?? item.category ?? "").toLowerCase()));
   const strategy = ["Energy", "Nutrition", "Activity", "Training", "Coaching Updates", "Peptide", "Supplement"].map((label) => ({ label, active: [...protocolTypes].some((type) => type.includes(label.toLowerCase().replace(" updates", ""))) }));
   const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /8.?9%|body fat/i.test(item)) ?? "Maintain approximately 8–9% body fat.";
-  const overallGoalConfidence = resolveOverallGoalConfidenceReadModel({ activeGoal: goal, activeProtocols: protocols, canonicalEvidence, checkIns, currentDate, dexaScans, nutritionContext, progressPhotos, timeZone, trainingPerformance: createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence, now: currentDate }) });
+  const legacyGoalConfidence = resolveOverallGoalConfidenceReadModel({ activeGoal: goal, activeProtocols: protocols, canonicalEvidence, checkIns, currentDate, dexaScans, nutritionContext, progressPhotos, timeZone, trainingPerformance: createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence, now: currentDate }) });
+  const overallGoalConfidence = resolveActiveGoalConfidencePresentation({
+    activeGoal: goal,
+    store: getFounderRuntimeStore(),
+    legacyReadModel: legacyGoalConfidence,
+  });
   const trainingProgress = createGoalTrainingProgress({ goal, phase: goal.phases.find((item)=>item.id===active.phaseId), canonicalObjects: canonicalEvidence, currentDate, timeZone });
   const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The final cut measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Maintenance phase activated", body: "The journey began by establishing a reliable maintenance baseline." }, { date: active.calculatedPlannedReviewDate, title: "Planned phase review", body: "Evidence will determine readiness for the Lean Mass Build phase." }, { date: upcoming.targetDate, title: "Goal destination", body: "A future DEXA will measure progress toward the 10 lb lean-mass target." }];
   if(trainingProgress.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
   turningPoints.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.title.localeCompare(b.title));
   return {
-    hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% confidence`, confidenceBand: overallGoalConfidence.band, confidenceDetail: overallGoalConfidence.explanation, confidenceSource: overallGoalConfidence.source, editHref: `/goals/${goal.id}/edit` },
+    hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% confidence`, confidenceBand: overallGoalConfidence.label, confidenceDetail: overallGoalConfidence.explanation, confidenceSource: overallGoalConfidence.source, confidenceMovement: overallGoalConfidence.movement, confidenceDelta: overallGoalConfidence.delta, confidenceAssessmentId: overallGoalConfidence.assessmentId, editHref: `/goals/${goal.id}/edit` },
     journey: [phaseCard(active, "orange"), phaseCard(upcoming, "green")],
     currentPhase: { title: active.phaseName, purpose: active.purpose, week: active.progress.presentationLabel, review: formatLongDate(active.calculatedPlannedReviewDate), evidence: "Daily weight, energy balance, recovery, and training performance establish whether maintenance is repeatable.", readiness: "Early evidence is accumulating. The phase remains active until maintenance is stable enough to support a deliberate surplus." },
     next: { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "DEXA is the primary outcome measure for lean-mass gain.", lead: "Training progression leads the day-to-day build signal.", guardrail },

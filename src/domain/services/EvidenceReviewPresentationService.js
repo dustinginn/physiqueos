@@ -3,6 +3,9 @@ import {
   reconcileNutritionDayEvidence,
   restoreCollapsedNutritionFoodDuplicates,
 } from "../models/nutritionDayEvidence";
+import {
+  getCanonicalProgressPhotoCategory,
+} from "../models/progressPhotoPoseVocabulary";
 
 const INTERNAL_KEYS = new Set([
   "id", "canonicalId", "canonical_id", "created_at", "createdAt", "updated_at",
@@ -208,7 +211,21 @@ function presentDexa(object, common) {
 }
 
 function presentPhotos(object, common) {
-  return { ...common, title: "Progress Photos", noun: "photo session", metrics: compact([metric("Views", (object.photos ?? []).filter((photo) => photo.active !== false).map((photo) => labelize(`${photo.view} ${photo.pose}`)).join(", ")), metric("Source", common.sourceLabel)]) };
+  const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
+  const poseSummary = formatPhotoPoseSummary(photos);
+  return { ...common, title: "Progress Photos", noun: "photo session", metrics: compact([metric("Poses", poseSummary), metric("Source", common.sourceLabel)]), photoPoseSummary: poseSummary };
+}
+
+export function formatPhotoPoseSummary(photos = []) {
+  const assigned = photos.map((photo) => getCanonicalProgressPhotoCategory(photo)).filter(Boolean);
+  const photoCount = photos.length;
+  const photoNoun = photoCount === 1 ? "photo" : "photos";
+  const prefix = `${photoCount} ${photoNoun} \u00B7`;
+  if (assigned.length === photoCount) {
+    return `${prefix} ${assigned.map((category) => category.label).join(", ")}`;
+  }
+  const unresolved = photoCount - assigned.length;
+  return `${prefix} ${unresolved} ${unresolved === 1 ? "pose" : "poses"} still to choose`;
 }
 
 function presentGeneric(object, common) {

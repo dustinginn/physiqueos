@@ -7,6 +7,7 @@ import WeeklyBriefingScreen from "../../../../screens/WeeklyBriefingScreen";
 import DEXAEventBriefingScreen from "../../../../screens/DEXAEventBriefingScreen";
 import MidweekBriefingScreen from "../../../../screens/MidweekBriefingScreen";
 import { resolveBriefingReviewArtifact } from "../../../../domain/services/BriefingReviewArtifactResolver";
+import { prepareWeeklyBriefingReviewPresentation } from "../../../../domain/services/WeeklyBriefingReviewPresentationService";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,15 @@ export default async function BriefingReviewPage({ params, searchParams }) {
     : null;
   if (artifact.briefing?.photoEventNarrative) return <PhotoEventBriefingScreen narrative={artifact.briefing.photoEventNarrative}/>;
   if (artifact.briefing?.dexaEventNarrative) return <DEXAEventBriefingScreen narrative={artifact.briefing.dexaEventNarrative}/>;
-  if (artifact.briefing?.weeklyNarrative) return <WeeklyBriefingScreen narrative={artifact.briefing.weeklyNarrative}/>;
+  if (artifact.briefing?.weeklyNarrative) {
+    const narrative = await prepareWeeklyBriefingReviewPresentation({
+      artifact,
+      repositories: FounderRepositories,
+      userId: user.id,
+      timeZone: user.timeZone,
+    });
+    return <WeeklyBriefingScreen narrative={narrative}/>;
+  }
   if (artifact.cadence === "midweek" && artifact.briefing) return <MidweekBriefingScreen briefing={artifact.briefing}/>;
   return <BriefingReviewScreen artifact={artifact} preview={preview}/>;
 }

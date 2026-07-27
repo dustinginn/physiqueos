@@ -3,7 +3,7 @@ import { FounderRepositories } from "../../../../data/repositories/founderReposi
 import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
 import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
-import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview } from "./actions";
+import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, updateEvidenceReviewPhotoPose } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,5 +15,5 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     : await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!review) notFound();
   const presentedReview = { ...review, interpretedEvidence: repairPendingReviewExerciseIdentities(review.interpretedEvidence) };
-  return <EvidenceReviewScreen confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
+  return <EvidenceReviewScreen confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} photoPoseAction={updateEvidenceReviewPhotoPose} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
 }

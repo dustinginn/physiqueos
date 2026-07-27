@@ -8,9 +8,27 @@ import EvidenceImage from "../components/progress/EvidenceImage";
 import IconBadge from "../components/ui/IconBadge";
 import ActionButton from "../components/ui/ActionButton";
 
+export function createOrdinaryPhotoComparisonEntries(narrative={}) {
+  return (narrative.cardContent?.progress?.comparisons??[])
+    .filter((entry)=>entry?.id&&entry?.poseId&&entry?.label&&entry?.imageHref&&entry?.previousImageHref&&entry?.previousDate)
+    .map((entry)=>({
+      id:entry.id,
+      poseId:entry.poseId,
+      poseLabel:entry.label,
+      firstDate:entry.previousDate,
+      currentDate:narrative.eventDate,
+      observations:[entry.headline,...(entry.supportingObservations??[]),...(entry.findings??[])].filter(Boolean),
+      viewerGalleryItems:[
+        {id:`${entry.id}-previous`,imageHref:entry.previousImageHref,date:entry.previousDate,roleLabel:"Previous",poseLabel:entry.label},
+        {id:`${entry.id}-current`,imageHref:entry.imageHref,date:narrative.eventDate,roleLabel:"Current",poseLabel:entry.label},
+      ],
+    }));
+}
+
 export default function PhotoEventBriefingScreen({ artifactId = null, completion = null, completeAction = null, narrative }) {
   const cards=narrative.cardContent;
   const completionExperience=narrative.completionExperience;
+  const ordinaryComparisons=createOrdinaryPhotoComparisonEntries(narrative);
   const completed=completion?.evidence?.finalPhotoSessionId===narrative.photoSessionId;
   const [viewer,setViewer]=useState(null);
   const viewerOpen=Boolean(viewer);
@@ -23,7 +41,7 @@ export default function PhotoEventBriefingScreen({ artifactId = null, completion
     <section className="mb-5 space-y-3" data-testid="photo-event-hero"><div className="flex items-center gap-3"><IconBadge color="warning" icon={Sparkles} size="md"/><p className="text-sm font-semibold uppercase tracking-[0.12em] text-indigo-600">Photo Event</p></div><h1 className="text-[30px] font-extrabold leading-[1.12] text-slate-950">{cards.hero.title}</h1><p className="text-sm font-semibold leading-6 text-slate-500">{cards.hero.body}</p></section>
     <div className="space-y-3">
       <Card data-testid="photo-event-snapshot"><Eyebrow>Snapshot</Eyebrow><h2 className="mt-1 text-lg font-extrabold">{cards.snapshot.title}</h2><div className="mt-3 grid grid-cols-3 gap-2 text-center"><SnapshotFact label="Date" value={formatDate(narrative.eventDate)}/><SnapshotFact label="Set" value={narrative.completion}/><SnapshotFact label="Weight" value={narrative.supportingEvidence.weight}/></div><p className="mt-3 text-xs font-semibold leading-5 text-slate-500">{cards.snapshot.poses.join(" · ")}</p><p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{cards.snapshot.conditions}</p><div className="mt-3 grid grid-cols-3 gap-2">{narrative.activeViews.map((view,index)=><button aria-label={`Open ${view.label} viewer`} className="overflow-hidden rounded-xl" key={view.id} onClick={()=>openViewer(narrative.activeViews.map((item)=>({id:item.id,imageHref:item.imageHref,date:narrative.eventDate,roleLabel:"Final",poseLabel:item.label})),index)} type="button"><EvidenceImage alt={view.label} className="aspect-[3/4] w-full object-cover" src={view.imageHref}/></button>)}</div></Card>
-      {completionExperience?<><ComparisonSection entries={completionExperience.recentComparisons} intro="The final week brought smaller refinements through the waist, lower midsection, and back conditioning." onOpen={openViewer} scope="recent" title="Since last check-in"/><ComparisonSection entries={completionExperience.journeyComparisons} intro="The full journey shows the larger transformation from the beginning of the cut to the final photo set." onOpen={openViewer} scope="journey" title="From first upload to now"/><Card data-testid="photo-event-new-baselines"><Eyebrow>Progress</Eyebrow><h2 className="mt-1 text-lg font-extrabold">New baseline views</h2><div className="mt-3 space-y-3">{completionExperience.newBaselineViews.map((view)=><NewBaselineCard key={view.id} onOpen={()=>openViewer([{id:view.id,imageHref:view.imageHref,date:narrative.eventDate,roleLabel:"First recorded",poseLabel:view.label}])} view={view}/>)}</div></Card></>:<Card data-testid="photo-event-progress"><Eyebrow>Progress</Eyebrow><h2 className="mt-1 text-lg font-extrabold">{cards.progress.title}</h2><p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{cards.progress.body}</p></Card>}
+      {completionExperience?<><ComparisonSection entries={completionExperience.recentComparisons} intro="The final week brought smaller refinements through the waist, lower midsection, and back conditioning." onOpen={openViewer} scope="recent" title="Since last check-in"/><ComparisonSection entries={completionExperience.journeyComparisons} intro="The full journey shows the larger transformation from the beginning of the cut to the final photo set." onOpen={openViewer} scope="journey" title="From first upload to now"/><Card data-testid="photo-event-new-baselines"><Eyebrow>Progress</Eyebrow><h2 className="mt-1 text-lg font-extrabold">New baseline views</h2><div className="mt-3 space-y-3">{completionExperience.newBaselineViews.map((view)=><NewBaselineCard key={view.id} onOpen={()=>openViewer([{id:view.id,imageHref:view.imageHref,date:narrative.eventDate,roleLabel:"First recorded",poseLabel:view.label}])} view={view}/>)}</div></Card></>:ordinaryComparisons.length?<ComparisonSection entries={ordinaryComparisons} intro={cards.progress.body} onOpen={openViewer} scope="ordinary" title={cards.progress.title}/>:<Card data-testid="photo-event-progress"><Eyebrow>Progress</Eyebrow><h2 className="mt-1 text-lg font-extrabold">{cards.progress.title}</h2><p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{cards.progress.body}</p></Card>}
       <Card data-testid="photo-event-interpretation"><Eyebrow>Interpretation</Eyebrow><h2 className="mt-1 text-lg font-extrabold">{cards.interpretation.title}</h2><div className="mt-2 space-y-2">{cards.interpretation.paragraphs.map((value)=><p className="text-sm font-semibold leading-6 text-slate-600" key={value}>{value}</p>)}</div></Card>
       <Card data-testid="photo-event-coach"><Eyebrow>Coach’s Insight</Eyebrow><p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{cards.coachInsight.body}</p>{!completionExperience&&narrative.nextMilestone?.label&&<p className="mt-3 rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-extrabold text-slate-600">Next: {narrative.nextMilestone.label}</p>}</Card>
       {completionExperience&&<CompletionDecision artifactId={artifactId} completeAction={completeAction} completed={completed} completion={completion} experience={completionExperience} narrative={narrative}/>}

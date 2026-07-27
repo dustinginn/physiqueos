@@ -20,6 +20,7 @@ import {
 import { resolveGoalNavigationHref } from "../domain/services/GoalNavigationRouteResolver";
 import { composeCompletedGoalPreview } from "../domain/services/CompletedGoalPreviewService";
 import { resolveOverallGoalConfidenceReadModel } from "../domain/services/OverallGoalConfidenceReadService";
+import { resolveActiveGoalConfidencePresentation } from "../domain/services/ActiveGoalConfidencePresentationReadService";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -103,7 +104,7 @@ export async function getGoalsHub() {
     evaluations,
     activeGoal,
   });
-  const canonicalConfidence = activeGoal?.type === "build_lean_mass"
+  const legacyConfidence = activeGoal?.type === "build_lean_mass"
     ? resolveOverallGoalConfidenceReadModel({
         activeGoal,
         activeProtocols: protocols,
@@ -115,6 +116,13 @@ export async function getGoalsHub() {
         progressPhotos,
         timeZone: user?.timeZone ?? "America/Los_Angeles",
         trainingPerformance,
+      })
+    : null;
+  const canonicalConfidence = activeGoal?.type === "build_lean_mass"
+    ? resolveActiveGoalConfidencePresentation({
+        activeGoal,
+        store: getFounderRuntimeStore(),
+        legacyReadModel: legacyConfidence,
       })
     : null;
   const summaries = intelligence.goals.map((summary) => {

@@ -3,6 +3,7 @@ import { createEvidenceReviewRepository } from "../../data/repositories/Evidence
 import { createEvidencePackageRepository } from "../../data/repositories/EvidencePackageRepository";
 import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
+import { JUL_25_STRENGTH_NOTE } from "../../fixtures/jul25TrainingEvidenceFixture";
 import { createPendingEvidenceReviewReprocessingService } from "./PendingEvidenceReviewReprocessingService";
 
 const REVIEW_ID = "evidence_review_20260715011556399";
@@ -47,6 +48,95 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("reprocesses the retained July 25 Training candidate in place without changing its Activity object or source package", async () => {
+    const packageId = "evidence_submission_20260726021441961_images";
+    const reviewId = "evidence_review_20260726021515848";
+    const artifacts = [
+      { id: "screenshot_0", kind: "screenshot", storage_path: "private/founder/evidence/uploads/IMG_1668.png" },
+      { id: "screenshot_1", kind: "screenshot", storage_path: "private/founder/evidence/uploads/IMG_1667.png" },
+      { id: "typed_evidence_0", kind: "typed_evidence", text: JUL_25_STRENGTH_NOTE },
+    ];
+    const activity = {
+      id: "training_2026-07-25_stair_stepper_1",
+      evidence_type: "training",
+      observed_at: "2026-07-25",
+      metadata: { activity_type: "Stair Stepper", duration_seconds: 1127, active_calories: 229, average_heart_rate: 142 },
+      exercises: [],
+    };
+    const strength = {
+      id: "training_2026-07-25_traditional_strength_training_1",
+      evidence_type: "training",
+      observed_at: "2026-07-25",
+      metadata: { activity_type: "Traditional Strength Training", duration_seconds: 6108, active_calories: 527, average_heart_rate: 109 },
+      exercises: [{ id: "legacy_partial", name: "Spider Curls", sets: [{ set_number: 1, reps: 14, weight: 40, weight_unit: "lb" }] }],
+    };
+    const evidencePackage = {
+      package_id: packageId,
+      captured_at: "2026-07-25",
+      observed_date: "2026-07-25",
+      userId: "founder",
+      provenance: { evidence_date: "2026-07-25", source_artifacts: artifacts },
+      evidence_objects: [structuredClone(activity), structuredClone(strength)],
+    };
+    const review = {
+      id: reviewId,
+      userId: "founder",
+      source: "universal_intake",
+      status: "pending",
+      createdAt: "2026-07-26T02:15:15.848Z",
+      updatedAt: "2026-07-26T02:15:15.848Z",
+      interpretedEvidence: structuredClone(evidencePackage),
+      evidenceTypes: ["training"],
+      confirmation: null,
+      commitProgress: {},
+      itemDecisions: {},
+    };
+    const changes = [];
+    const repositories = {
+      evidenceReviews: createEvidenceReviewRepository([review], { onChange: (name) => changes.push(name) }),
+      evidencePackages: createEvidencePackageRepository([evidencePackage]),
+      canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => []) },
+    };
+    const reinterpret = vi.fn(async () => ({
+      ...structuredClone(evidencePackage),
+      quality: { status: "complete" },
+      evidence_objects: [
+        structuredClone(activity),
+        { ...structuredClone(strength), exercises: parseStrengthTrainingText(JUL_25_STRENGTH_NOTE) },
+      ],
+    }));
+    const service = createPendingEvidenceReviewReprocessingService({ repositories, reinterpret, now: clock() });
+
+    const result = await service.reprocessPendingReviewInPlace(reviewId);
+    const updated = await repositories.evidenceReviews.getReviewById(reviewId);
+    const [updatedActivity, updatedStrength] = updated.interpretedEvidence.evidence_objects;
+
+    expect(result).toMatchObject({ changed: true, idempotent: false });
+    expect(updated).toMatchObject({ id: reviewId, status: "pending", confirmation: null });
+    expect(updatedActivity).toEqual(activity);
+    expect(updatedStrength.exercises.map((exercise) => exercise.name)).toEqual([
+      "Spider Curls",
+      "EZ Bar Curls",
+      "Cable Rope Pushdowns",
+      "Straight Bar Cable Pushdowns",
+      "Forearm Curls",
+    ]);
+    expect(updatedStrength.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(20);
+    expect(updatedStrength.exercises[4].sets.map((set) => [set.reps, set.weight])).toEqual([
+      [30, 80],
+      [28, 80],
+      [25, 80],
+      [26, 80],
+    ]);
+    expect(await repositories.evidencePackages.getEvidencePackageById(packageId)).toEqual(evidencePackage);
+    expect(changes).toEqual(["evidenceReviews", "evidenceReviews"]);
+
+    const replay = await service.reprocessPendingReviewInPlace(reviewId);
+    expect(replay).toMatchObject({ changed: false, idempotent: true });
+    expect(reinterpret).toHaveBeenCalledTimes(1);
+    expect(changes).toHaveLength(2);
+  });
+
   it("replaces only the pending candidate and remains idempotent", async () => {
     const state = fixture();
     const originalPackage = structuredClone(state.evidencePackage);

@@ -18,6 +18,17 @@ export function createEvidenceReviewRepository(reviews = [], options = {}) {
       options.onChange?.();
       return reviews[index];
     },
+    async updateReviewIfCurrent(id, expectedUpdatedAt, changes) {
+      const index = reviews.findIndex((review) => review.id === id);
+      if (index < 0) return null;
+      if (reviews[index].updatedAt !== expectedUpdatedAt) {
+        const error = repositoryError("REVIEW_STALE", "This evidence review changed. Reload it before saving pose selections.");
+        throw error;
+      }
+      reviews[index] = { ...reviews[index], ...structuredClone(changes), updatedAt: new Date().toISOString() };
+      options.onChange?.("evidenceReviews");
+      return structuredClone(reviews[index]);
+    },
     async claimPendingReviewReprocess(id, lifecycle) {
       const review = reviews.find((item) => item.id === id);
       if (!review) return null;

@@ -60,6 +60,16 @@ node_modules/
 /private/founder/tmp/
 /private/founder/operations/
 
+# Local developer output
+/logs/*
+!/logs/.gitkeep
+/screenshots/*.png
+/PhysiqueOS_Backup_*/
+/.backup-validation*/
+/backup-validation/
+/runtime-exports/
+/optional-safe-runtime-export/
+
 # Transitional protection for legacy root-level operational logs
 /controlled-restart*.log
 /daily-briefing-lifecycle-*.log

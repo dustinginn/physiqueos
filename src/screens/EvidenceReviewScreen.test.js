@@ -40,9 +40,19 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("Continue");
   });
 
-  it("removes Original details only from Nutrition while preserving useful review content", () => {
-    expect(screen).toContain('item.type !== "nutrition"');
-    expect(screen).toContain("Original details");
+  it("extends the existing saved screen with the persisted Training achievement receipt", () => {
+    expect(screen).toContain("createTrainingPerformanceSuccessPresentation(review)");
+    expect(screen).toContain("trainingAchievements.items.map");
+    expect(screen).toContain("trainingAchievements.heading");
+    expect(screen).toContain("trainingAchievements.summary");
+    expect(screen).toContain("<EvidenceSavedScreen");
+    expect(screen).not.toMatch(/existingEvents|TrainingPerformanceIntelligenceService|canonicalEvidence/);
+  });
+
+  it("removes Original details from every shared review card while preserving useful interpreted content", () => {
+    expect(screen).not.toContain("Original details");
+    expect(screen).not.toContain("item.sourceFiles");
+    expect(screen).not.toContain("item.typedEvidence");
     expect(screen).toContain("item.metrics.length");
     expect(screen).toContain("item.meals?.length");
     expect(screen).toContain("meal.foods.map");
@@ -62,6 +72,21 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("presentation.summary.included");
     expect(screen).toContain("presentation.summary.excluded");
     expect(screen).toContain("!presentation.summary.included || blockingPhotoIssue");
+  });
+
+  it("renders secure refresh-safe previews and independent canonical pose controls", () => {
+    expect(screen).toContain("Match each photo to its pose");
+    expect(screen).toContain("CanonicalProgressPhotoCategories.map");
+    expect(screen).toContain('name="sourceArtifactRef"');
+    expect(screen).toContain('name="expectedUpdatedAt"');
+    expect(screen).toContain("data-artifact-id");
+    expect(screen).toContain('replace(/^private[\\\\/]/i, "")');
+    expect(screen).not.toContain('replace(/^private[\\\\/]founder[\\\\/]/');
+    expect(screen).toContain("object-contain");
+    expect(screen).toContain("Choose a pose for every included photo before saving.");
+    expect(page).toContain("updateEvidenceReviewPhotoPose");
+    expect(actions).toContain("mergeAuthoritativePhotoSessions");
+    expect(actions).toContain("assertIncludedPhotoSessionsReady");
   });
 
   it("offers a bounded continuation after a partial commit without upload or edit controls", () => {

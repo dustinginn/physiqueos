@@ -32,7 +32,17 @@ const PERSISTED_COLLECTIONS = [
   "evidencePackages",
   "canonicalEvidenceObjects",
   "evidenceReviews",
+  "trainingPerformanceEvents",
+  "trainingPerformanceEventBatches",
+  "piEnergyConfidenceWorkItems",
+  "piEnergyFinalizationReceipts",
+  "piTrainingConfidenceWorkItems",
+  "piTrainingFinalizationReceipts",
+  "piLowerLevelConfidenceWorkerRuns",
   "migrationMarkers",
+  "goalConfidenceSnapshots",
+  "goalConfidenceHistory",
+  "goalConfidenceContinuitySeeds",
 ];
 const APPEND_ONLY_COLLECTIONS = [
   "evidencePackages",
@@ -40,6 +50,13 @@ const APPEND_ONLY_COLLECTIONS = [
   "progressPhotos",
   "dexaScans",
   "protocolVersions",
+  "trainingPerformanceEvents",
+  "trainingPerformanceEventBatches",
+  "piEnergyFinalizationReceipts",
+  "piTrainingFinalizationReceipts",
+  "piLowerLevelConfidenceWorkerRuns",
+  "goalConfidenceHistory",
+  "goalConfidenceContinuitySeeds",
 ];
 const AUTHORITATIVE_FOUNDER_WEIGHT_DATES = new Set([
   "2026-05-21",
@@ -116,7 +133,47 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     analyses: mergeSeedWithPersisted(founderSeedPack.analyses, persisted.analyses),
     evidencePackages: mergeSeedWithPersisted([], persisted.evidencePackages),
     evidenceReviews: mergeSeedWithPersisted([], persisted.evidenceReviews),
+    trainingPerformanceEvents: mergeSeedWithPersisted(
+      [],
+      persisted.trainingPerformanceEvents
+    ),
+    trainingPerformanceEventBatches: mergeSeedWithPersisted(
+      [],
+      persisted.trainingPerformanceEventBatches
+    ),
+    piEnergyConfidenceWorkItems: mergeSeedWithPersisted(
+      [],
+      persisted.piEnergyConfidenceWorkItems
+    ),
+    piEnergyFinalizationReceipts: mergeSeedWithPersisted(
+      [],
+      persisted.piEnergyFinalizationReceipts
+    ),
+    piTrainingConfidenceWorkItems: mergeSeedWithPersisted(
+      [],
+      persisted.piTrainingConfidenceWorkItems
+    ),
+    piTrainingFinalizationReceipts: mergeSeedWithPersisted(
+      [],
+      persisted.piTrainingFinalizationReceipts
+    ),
+    piLowerLevelConfidenceWorkerRuns: mergeSeedWithPersisted(
+      [],
+      persisted.piLowerLevelConfidenceWorkerRuns
+    ),
     migrationMarkers: mergeSeedWithPersisted([], persisted.migrationMarkers),
+    goalConfidenceSnapshots: mergeSeedWithPersisted(
+      [],
+      persisted.goalConfidenceSnapshots
+    ),
+    goalConfidenceHistory: mergeSeedWithPersisted(
+      [],
+      persisted.goalConfidenceHistory
+    ),
+    goalConfidenceContinuitySeeds: mergeSeedWithPersisted(
+      [],
+      persisted.goalConfidenceContinuitySeeds
+    ),
     canonicalEvidenceObjects: mergeSeedWithPersisted(
       [],
       persisted.canonicalEvidenceObjects
@@ -463,6 +520,16 @@ function normalizeFounderRuntimeStore(store) {
     ),
     dailyBriefings: normalizeDailyBriefingRecords(store.dailyBriefings),
     evidencePackages: store.evidencePackages ?? [],
+    trainingPerformanceEvents: store.trainingPerformanceEvents ?? [],
+    trainingPerformanceEventBatches:
+      store.trainingPerformanceEventBatches ?? [],
+    piEnergyConfidenceWorkItems: store.piEnergyConfidenceWorkItems ?? [],
+    piEnergyFinalizationReceipts: store.piEnergyFinalizationReceipts ?? [],
+    piTrainingConfidenceWorkItems: store.piTrainingConfidenceWorkItems ?? [],
+    piTrainingFinalizationReceipts:
+      store.piTrainingFinalizationReceipts ?? [],
+    piLowerLevelConfidenceWorkerRuns:
+      store.piLowerLevelConfidenceWorkerRuns ?? [],
     protocolVersions: store.protocolVersions ?? [],
     energyStrategyLinks: store.energyStrategyLinks ?? [],
     executionItems: store.executionItems ?? [],

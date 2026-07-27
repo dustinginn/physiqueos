@@ -8,11 +8,28 @@ import { createWeeklyBriefingPIResult } from "./WeeklyBriefingPIService";
 import { createPIDecisionCadenceShadow } from "./PIDecisionCadenceShadowService";
 import { adaptWeeklyPISelection } from "./WeeklyPINarrativeCandidateService";
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
+import { resolveWeeklyBriefingContext } from "./WeeklyBriefingContextService";
+import {
+  artifactIdForWeeklyWindow,
+  createWeeklyClosedWindowContract,
+} from "./WeeklyClosedWindowContract";
+import {
+  createFounderWeeklyBriefingPersistenceService,
+  createWeeklyPreparedCommit,
+  WeeklyPersistenceOutcome,
+} from "./WeeklyBriefingPersistenceService";
+import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
+import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePresentationService";
+import { createPICadenceBriefingPublicationService } from "./PICadenceBriefingPublicationService";
+import { createPICadenceBriefingLifecycleService } from "./PICadenceBriefingLifecycleService";
+import { createWeeklyEnergyProgressModel } from "./WeeklyBriefingPresentationService";
+import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
 
-const VERSION = "weekly_narrative_v5_1";
+const VERSION = "weekly_narrative_v5_2";
 const DEFAULT_WEEKLY_ACTIVITY_TARGET = 7000;
 
-export function composeWeeklyNarrative({ window, canonicalObjects = [], weights = [], dexaScans = [], photoEvent = null, goal = null, generatedAt = new Date().toISOString(), activityTarget = DEFAULT_WEEKLY_ACTIVITY_TARGET, trainingPerformance = null, weeklyEnergy = null, piNarrativeSelection = null } = {}) {
+export function composeWeeklyNarrative({ window, canonicalObjects = [], weights = [], dexaScans = [], photoEvent = null, goal = null, context = null, generatedAt = new Date().toISOString(), activityTarget = DEFAULT_WEEKLY_ACTIVITY_TARGET, trainingPerformance = null, trainingPerformanceEvents = [], weeklyEnergy = null, piNarrativeSelection = null } = {}) {
   const within = (value) => { const date=dateKey(value);return date>=window.startDate&&date<=window.endDate; };
   const active = canonicalObjects.filter((item)=>item.quality?.status!=="superseded");
   const weekly = active.filter((item)=>within(item.lastObservedAt));
@@ -37,31 +54,38 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
   const photoSessions = uniqueDays(payloads.filter((item)=>item.evidence_type==="photo_session").map((item)=>item.observed_at));
   const dexaCount = uniqueDays(payloads.filter((item)=>["dexa","dexa_scan","body_composition"].includes(item.evidence_type)).map((item)=>item.observed_at));
   const photoNarrative = photoEvent?.briefing?.photoEventNarrative??null;
-  const photoSummary = photoNarrative ? "The July 11 comparison showed continued waist tightening from the front while the rear views suggested upper-body muscle remained stable." : null;
+  const photoSummary = photoNarrative ? summarizePhotoEvent(photoNarrative) : null;
   const report = trainingPerformance??createTrainingPerformanceIntelligenceReport({canonicalObjects:active.filter((item)=>dateKey(item.lastObservedAt)<=window.endDate),now:new Date(`${window.endDate}T12:00:00Z`)});
+  const energyPresentation=createWeeklyEnergyProgressModel(weeklyEnergy?.current);
+  const trainingPresentation=createWeeklyTrainingPresentationModel({window,trainingDays,trainingReport:report,piObservations:context?.pi?.observations??[],context,energy:energyPresentation,performanceEvents:trainingPerformanceEvents});
   const weeklyPrs = (report.exerciseObservations??[]).filter((item)=>item.explanation_data?.pr_detection?.detected&&within(item.evidence_date_range?.end));
   const improving = (report.exerciseObservations??[]).filter((item)=>item.status==="improving"&&within(item.evidence_date_range?.end));
   const regression = (report.exerciseObservations??[]).filter((item)=>item.status==="regressing"&&within(item.evidence_date_range?.end));
   const prName = weeklyPrs[0] ? displayExerciseName(weeklyPrs[0], active) : null;
   const overloadName = !prName&&improving[0] ? displayExerciseName(improving[0],active) : null;
-  const goalName = goal?.title??"Visible Abs at Rest";
+  const goalName = context?.activeGoalSummary?.title??goal?.title??"the current goal";
+  const semanticGoalType = context?.semanticGoalType??"unknown";
   const latestDexa=[...dexaScans].sort((a,b)=>String(b.measuredAt).localeCompare(String(a.measuredAt)))[0]??null;
   const weeklyAverageText = averageWeight==null?null:`${averageWeight.toFixed(1)} lb weekly average`;
   const heroHighlights = [
-    photoSummary?"📸 Your progress photos showed the clearest visual progress of the week.":null,
+    photoSummary
+      ? semanticGoalType==="lean_mass_gain"
+        ? "📸 Your progress photos documented that recent condition is holding."
+        : "📸 Your progress photos added the clearest visual context of the week."
+      : null,
     weeklyAverageText?`⚖️ Weight averaged ${averageWeight.toFixed(1)} lb${weeklyLow!=null?` and reached a ${weeklyLow.toFixed(1)} lb weekly low`:""}.`:null,
     prName?`💪 ${prName} reached a new performance PR.`:overloadName?`💪 ${overloadName} showed supported progressive overload.`:null,
     activityDayCount?`🔥 ${activityDayCount} complete activity days totaled ${formatNumber(activityCalories)} active calories.`:null,
   ].filter(Boolean).slice(0,4);
   const heroHighlightTiles = [
-    photoSummary?{domain:"photos",icon:"📸",label:"Visual Progress",value:"Clearest visible change",detail:"Waist continued to tighten"}:null,
+    photoSummary?{domain:"photos",icon:"📸",label:"Photo Context",value:"Current condition documented",detail:"Directional guardrail evidence"}:null,
     weeklyAverageText?{domain:"weight",icon:"⚖️",label:"Weight Trend",value:`${averageWeight.toFixed(1)} lb average`,detail:weeklyLow!=null?`${weeklyLow.toFixed(1)} lb weekly low`:null}:null,
     prName?{domain:"training",icon:"💪",label:"Performance",value:`${prName} PR`,detail:`${trainingDays} training days`}:overloadName?{domain:"training",icon:"💪",label:"Performance",value:overloadName,detail:"Supported progressive overload"}:trainingDays?{domain:"training",icon:"💪",label:"Performance",value:`${trainingDays} training days`,detail:"Resistance work completed"}:null,
     activityDayCount?{domain:"energy_balance",icon:"🔥",label:"Activity",value:`${activityDayCount} complete days`,detail:`${formatNumber(activityCalories)} active calories`}:null,
   ].filter(Boolean).slice(0,4);
-  const heroMilestone = heroHighlightTiles.length>=3&&activityDayCount===7&&(photoSummary||weightChange<0)
+  const heroMilestone = heroHighlightTiles.length>=3&&activityDayCount===7&&(photoSummary||(semanticGoalType==="fat_loss"&&weightChange<0))
     ? {label:"Weekly Milestone",value:"Execution and outcome remained aligned across the full week."}
-    : prName&&weightChange<0
+    : semanticGoalType==="fat_loss"&&prName&&weightChange<0
       ? {label:"Weekly Milestone",value:"Training performance improved while weekly weight moved down."}
       : null;
   const facts=[
@@ -75,9 +99,9 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
     {label:"Nutrition",value:nutritionCount?`${nutritionCount} of 7 days complete`:"Not recorded"},
   ];
   const domains = [
-    photoSummary?{domain:"photos",label:"📸 Progress Photos",highlight:"Your July 11 progress photos showed the clearest visual progress of the week.",insight:"Your waist appeared to keep tightening from the front, while your upper-body muscle looked stable in the rear views."}:null,
+    photoSummary?{domain:"photos",label:"📸 Progress Photos",highlight:"Your current-period photos added a useful visual guardrail check.",insight:photoSummary}:null,
     averageWeight!=null?{domain:"weight",label:"⚖️ Weight",highlight:`You finished ${Math.abs(weightChange??0).toFixed(1)} lb ${weightChange!=null&&weightChange<0?"lower":"from where you began"}, with a ${averageWeight.toFixed(1)} lb weekly average${weeklyLow!=null?` and ${weeklyLow.toFixed(1)} lb low`:""}.`,insight:`Your weekly pattern matters more than any single weigh-in${previousAverage!=null&&averageWeight<previousAverage?`, and your average stayed below the prior week’s ${previousAverage.toFixed(1)} lb`:""}.`}:null,
-    trainingDays?{domain:"training",label:"💪 Training",highlight:prName?`You set a new ${prName} performance PR during ${trainingDays} resistance-training days.`:overloadName?`You built supported progressive overload on ${overloadName} across ${trainingDays} resistance-training days.`:`You completed ${trainingDays} resistance-training days without a supported new PR.`,insight:regression.length?`${displayExerciseName(regression[0],active)} deserves attention next week; one regression does not establish muscle loss.`:"You maintained or improved performance while body weight fell, which supports lean mass preservation."}:null,
+    trainingDays?{domain:"training",label:"💪 Training",highlight:trainingPresentation.conclusion,insight:trainingPresentation.phaseContext}:null,
     activityDayCount?{domain:"energy_balance",label:"🔥 Energy Balance",highlight:`You burned approximately ${formatNumber(activityCalories)} active calories across ${activityDayCount} complete days—${formatNumber(Math.abs(activityDifference))} ${activityDifference>=0?"above":"below"} the ${formatNumber(weeklyActivityTarget)} weekly target.`,insight:`You stayed ${activityAlignment} the planned activity level, which helps explain the week’s weight change. You recorded only ${nutritionCount} complete nutrition day${nutritionCount===1?"":"s"}, so there is not enough information to judge the full week${/visible abs|cut/i.test(goalName)?", although the recorded days supported the cut":""}.`}:null,
   ].filter(Boolean);
   if (weeklyEnergy?.current?.coverage?.pairedDayCount) domains.push({
@@ -86,21 +110,108 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
     highlight:`Recorded intake totaled ${formatNumber(weeklyEnergy.current.intake.total)} kcal and estimated expenditure totaled ${formatNumber(weeklyEnergy.current.estimatedExpenditure.total)} kcal across ${weeklyEnergy.current.coverage.pairedDayCount} paired days.`,
     insight:weeklyEnergyInsight(weeklyEnergy),
   });
-  const piEditorial = !photoEvent&&!dexaCount ? renderWeeklyPISelection(piNarrativeSelection) : null;
-  const celebration = photoSummary?"The biggest win was making visible progress while resistance performance stayed in the picture—the cut moved without asking you to give up training quality.":prName?`${prName} set a new PR while body weight continued moving down.`:weightChange!=null&&weightChange<0?`You finished the week ${Math.abs(weightChange).toFixed(1)} lb lower while keeping training and activity consistent.`:"You put together a complete week of useful execution without forcing an early plan change.";
+  const completionEvent = photoNarrative?.goalCompletionHandoff?.goalCompletionRecommended === true;
+  const piEditorial = !completionEvent ? renderWeeklyPISelection(piNarrativeSelection) : null;
+  const editorial = createGoalAwareEditorial({ context, semanticGoalType, goalName, weightChange, trainingDays, prName, photoSummary, weeklyEnergy, piEditorial });
+  const celebration = editorial.celebration;
   const id=`weekly_narrative_${window.startDate}_${window.endDate}`;
   return {
     id,weekId:window.id,weekStart:window.startDate,weekEnd:window.endDate,generatedAt,
-    summary:"This week kept the cut moving.",primaryStory:"This week kept the cut moving.",primaryEvidence:photoSummary?"photo_event":weightChange!=null?"weight":"execution",
-    supportingEvidence:domains.map((item)=>item.highlight),keyChanges:domains.map((item)=>item.highlight),stableSignals:[],risks:nutritionCount<7?[`Only ${nutritionCount} complete nutrition days were available.`]:[],wins:[celebration],goalMeaning:`The week remained aligned with ${goalName}.`,coachDirection:"Keep the same training and activity rhythm while preparing for the July 18 DEXA.",nextWeekFocus:"Use the July 18 DEXA as the next body-composition checkpoint.",
+    summary:editorial.summary,primaryStory:editorial.summary,primaryEvidence:photoSummary?"photo_event":weightChange!=null?"weight":"execution",
+    supportingEvidence:domains.map((item)=>item.highlight),keyChanges:domains.map((item)=>item.highlight),stableSignals:[],risks:nutritionCount<7?[`Only ${nutritionCount} complete nutrition days were available.`]:[],wins:[celebration],goalMeaning:editorial.goalMeaning,coachDirection:editorial.coachDirection,nextWeekFocus:editorial.nextWeekFocus,
     cards:{
-      hero:{id:`${id}_hero`,title:piEditorial?.title??"This week kept the cut moving.",body:piEditorial?.body??"Your waist continued to tighten, your weekly weight moved down, and you kept training well while staying close to your activity plan.",highlights:heroHighlights,highlightTiles:heroHighlightTiles,milestone:heroMilestone},
+      hero:{id:`${id}_hero`,title:piEditorial?.title??editorial.heroTitle,body:piEditorial?.body??editorial.heroBody,highlights:heroHighlights,highlightTiles:heroHighlightTiles,milestone:heroMilestone},
       snapshot:{id:`${id}_snapshot`,title:"The completed week",facts},
-      progress:{id:`${id}_progress`,title:"What changed",items:[photoSummary?{domain:"Photos",summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,weightChange!=null?{domain:"Weight",summary:`The week finished ${Math.abs(weightChange).toFixed(1)} lb ${weightChange<0?"lower":"higher"} than it began.`}:null].filter(Boolean),weight:{points:weekWeights.map((item)=>({date:item.measuredAt,value:item.weight.value})),weeklyAverage:averageWeight,weeklyLow,change:weightChange},dexa:{occurredThisWeek:Boolean(dexaCount),latest:latestDexa?formatDexaAnchor(latestDexa):null},photo:photoNarrative?{thumbnailHref:photoNarrative.activeViews?.find((view)=>view.poseId==="front-relaxed")?.imageHref??photoNarrative.activeViews?.[0]?.imageHref??null,summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,training:{completedDays:trainingDays,totalDays:7},activity:{completedDays:activityDayCount,totalDays:7,totalActiveCalories:activityCalories,dailyAverage:activityAverage,weeklyTarget:weeklyActivityTarget,difference:activityDifference}},
-      interpretation:{id:`${id}_interpretation`,title:"Why this week mattered",opening:piEditorial?.opening??"This week your progress photos, weight trend, training, and activity all told the same story: the current plan is still working.",domains,synthesis:piEditorial?.synthesis??"You continued losing weight, your waist appeared tighter, and your resistance performance held up while you stayed close to your activity target.",uncertainty:"The July 18 DEXA should tell us whether this week’s visual progress is translating into measurable fat loss while lean mass holds."},
-      coachInsight:{id:`${id}_coach`,title:"Coach’s Insight",celebration:`This was a strong week. ${celebration}`,explanation:"Keep building on the resistance training and consistent activity that made the week productive. Those habits are protecting training quality while the cut continues.",preparation:"Stay the course until the July 18 DEXA. Use it to confirm this week’s progress before making any changes to the plan."},
+      progress:{id:`${id}_progress`,title:"What changed",items:[photoSummary?{domain:"Photos",summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,weightChange!=null?{domain:"Weight",summary:`The week finished ${Math.abs(weightChange).toFixed(1)} lb ${weightChange<0?"lower":"higher"} than it began.`}:null].filter(Boolean),energy:energyPresentation,weight:{points:weekWeights.map((item)=>({date:item.measuredAt,value:item.weight.value})),weeklyAverage:averageWeight,weeklyLow,change:weightChange},dexa:{occurredThisWeek:Boolean(dexaCount),latest:latestDexa?formatDexaAnchor(latestDexa):null},photo:photoNarrative?{thumbnailHref:photoNarrative.activeViews?.find((view)=>view.poseId==="front-relaxed")?.imageHref??photoNarrative.activeViews?.[0]?.imageHref??null,summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,training:{completedDays:trainingDays,totalDays:7,presentation:trainingPresentation},activity:{completedDays:activityDayCount,totalDays:7,totalActiveCalories:activityCalories,dailyAverage:activityAverage,weeklyTarget:weeklyActivityTarget,difference:activityDifference}},
+      interpretation:{id:`${id}_interpretation`,title:"Why this week mattered",opening:piEditorial?.opening??editorial.opening,domains,synthesis:piEditorial?.synthesis??editorial.synthesis,uncertainty:editorial.uncertainty},
+      coachInsight:{id:`${id}_coach`,title:"Coach’s Insight",celebration:trainingDays?`This was a strong week. ${trainingPresentation.conclusion} ${trainingPresentation.phaseContext}`:`This was a strong week. ${celebration}`,explanation:editorial.explanation,preparation:editorial.preparation},
     },
-    references:weekly.map((item)=>item.canonicalId),provenance:{version:VERSION,photoEventId:photoEvent?.id??null,evidenceWindowId:window.id,trainingPerformanceGeneratedAt:report.generated_at??null},
+    context,references:weekly.map((item)=>item.canonicalId),provenance:{version:VERSION,photoEventId:photoEvent?.id??null,evidenceWindowId:window.id,trainingPerformanceGeneratedAt:report.generated_at??null},
+  };
+}
+
+function summarizePhotoEvent(photoNarrative) {
+  const summary = photoNarrative.overallSummary
+    ?? photoNarrative.cardContent?.hero?.body
+    ?? photoNarrative.cardContent?.progress?.summary;
+  return summary
+    ? `The current-period photo session added directional visual context: ${summary}`
+    : "The current-period photo session provided directional guardrail context without establishing a measured body-composition change.";
+}
+
+function createGoalAwareEditorial({
+  context, semanticGoalType, goalName, weightChange, trainingDays, prName,
+  photoSummary, weeklyEnergy, piEditorial,
+}) {
+  const paired = weeklyEnergy?.current?.coverage?.pairedDayCount ?? 0;
+  const missing = Math.max(0, 7 - paired);
+  const balance = weeklyEnergy?.current?.netBalance?.average;
+  const direction = !Number.isFinite(balance) ? "unresolved"
+    : balance < -100 ? "below likely maintenance"
+      : balance > 100 ? "above likely maintenance" : "near likely maintenance";
+  const coverage = paired
+    ? `${paired} paired intake-and-expenditure day${paired === 1 ? "" : "s"}${missing ? ` left ${missing} day${missing === 1 ? "" : "s"} unpaired` : " covered the full week"}`
+    : "paired intake-and-expenditure evidence was unavailable";
+  const milestone = context?.futureMilestone?.label ?? null;
+  const training = prName ? `${prName} improved` : trainingDays ? `${trainingDays} resistance-training days were recorded` : "Training evidence was limited";
+
+  if (semanticGoalType === "fat_loss") {
+    return {
+      summary: "This week added useful evidence about fat-loss progress.",
+      heroTitle: "The week remained aligned with the active fat-loss goal.",
+      heroBody: "Your Weight, Training, Energy, and body-composition evidence were interpreted under the current fat-loss plan.",
+      opening: "This week’s evidence was evaluated against the active fat-loss goal.",
+      synthesis: "Use the combined direction of weight, Energy, training, and measured body composition rather than any single metric.",
+      uncertainty: milestone ? `${milestone} is the next authoritative body-composition checkpoint.` : "No future authoritative body-composition milestone is currently active.",
+      celebration: prName ? `${prName} improved while the active fat-loss plan continued.` : "You collected useful evidence without forcing a conclusion from one metric.",
+      explanation: "Preserve training quality and judge fat-loss progress through the full evidence set.",
+      preparation: milestone ? `Keep the current plan steady until ${milestone}.` : "Keep the current plan steady until the evidence supports a reviewed change.",
+      goalMeaning: `The week was interpreted under ${goalName}, the active fat-loss goal.`,
+      coachDirection: "Continue the current plan only while the combined evidence supports the active fat-loss objective.",
+      nextWeekFocus: milestone ? `Use ${milestone} as the next measurement boundary.` : "Gather another complete week before making an unsupported change.",
+    };
+  }
+
+  if (semanticGoalType === "lean_mass_gain") {
+    const calibration = context?.activePhase?.name === "Establish Maintenance"
+      && context?.operatingState?.value === "calibration";
+    return {
+      summary: calibration ? "The maintenance-calibration picture is becoming clearer." : "This week added evidence for the active lean-mass goal.",
+      heroTitle: piEditorial?.title ?? (calibration ? "Calibration remains the right focus." : "Training and Energy frame the lean-mass goal this week."),
+      heroBody: calibration
+        ? `The canonical Energy assessment reads ${direction}, and ${coverage}. ${training}; that supports calibration, not a claim of measured lean-mass change.`
+        : `${training}. Weight and Energy remain context until measured body composition can confirm lean-mass change.`,
+      opening: calibration
+        ? "This week was about learning whether intake is supporting maintenance while training and the body-fat guardrail remain stable."
+        : "This week’s evidence was evaluated against the active lean-mass goal.",
+      synthesis: `${training}. The Energy direction is ${direction}; ${coverage}. ${photoSummary ? "Photos add directional guardrail context without measuring body fat or lean tissue." : "Measured body-composition evidence is still needed to establish tissue change."}`,
+      uncertainty: milestone
+        ? `The latest completed DEXA remains historical context. ${milestone} is the next authoritative measurement.`
+        : "The latest completed DEXA remains historical context; no future authoritative measurement is currently active.",
+      celebration: prName ? `${prName} improved while calibration continued; that supports the goal without proving tissue gain.` : "You added useful calibration evidence without forcing a premature phase decision.",
+      explanation: "Training performance can support the lean-mass goal, but weight change or one PR cannot establish measured lean-mass change.",
+      preparation: paired < 7
+        ? `Hold the current plan and gather a more complete Energy week${milestone ? ` before ${milestone}` : ""}.`
+        : `Use the complete Energy trend to review whether a bounded intake adjustment is warranted${milestone ? ` before ${milestone}` : ""}.`,
+      goalMeaning: `${goalName} is active. Body fat is a guardrail while lean mass is the primary measured outcome.`,
+      coachDirection: paired < 7 ? "Remain in calibration and gather more complete paired Energy evidence." : "Review the calibrated Energy direction without automatically advancing the phase.",
+      nextWeekFocus: milestone ? `Preserve training quality and prepare for ${milestone}.` : "Preserve training quality and gather enough evidence for the next reviewed calibration decision.",
+    };
+  }
+
+  return {
+    summary: "This week added useful evidence without establishing a goal-specific conclusion.",
+    heroTitle: "The week is best treated as neutral evidence.",
+    heroBody: "Training, Weight, Energy, and body-composition evidence remain available, but active goal context is incomplete.",
+    opening: "This week’s evidence can be described without assuming a cut, maintenance phase, or lean-gain objective.",
+    synthesis: "Keep each measured direction in context and avoid converting incomplete evidence into a goal judgment.",
+    uncertainty: milestone ? `${milestone} is the next active measurement.` : "No future authoritative measurement is currently active.",
+    celebration: "You collected useful evidence without forcing an unsupported conclusion.",
+    explanation: "A goal-safe interpretation avoids treating weight or visual change as inherently positive.",
+    preparation: "Continue the established plan until canonical goal context supports a reviewed recommendation.",
+    goalMeaning: "Active goal semantics were unavailable, so the Weekly interpretation remains neutral.",
+    coachDirection: "Hold the established plan and restore authoritative goal context before changing direction.",
+    nextWeekFocus: "Gather complete evidence and resolve the active goal context.",
   };
 }
 
@@ -110,19 +221,113 @@ function recoveryWeeklyText(state){return({training_progress_with_stable_recover
 
 function trainingEnergyWeeklyText(state){return({progress_with_positive_support:"Training improved while estimated Energy support remained positive.",progress_with_neutral_support:"Training improved while estimated Energy balance remained near neutral.",progress_despite_negative_support:"Training improved despite a negative estimated Energy balance.",stable_with_positive_support:"Training remained stable while estimated Energy balance was positive.",stable_with_declining_support:"Training remained stable while estimated Energy support weakened.",decline_with_negative_support:"Training declined while estimated Energy balance was negative.",decline_despite_positive_support:"Training declined despite positive estimated Energy support.",insufficient:"The Training and Energy relationship remains uncertain because evidence coverage was incomplete."})[state]??null;}
 
-export function createWeeklyNarrativeService({repositories,now=()=>new Date()}){const service={
+export function createFounderWeeklyNarrativeService({repositories,now=()=>new Date(),weeklyPersistence,confidenceStoreResolver,cadenceLifecycle}={}){
+  const publication = cadenceLifecycle ? null :
+    createPICadenceBriefingPublicationService({ now });
+  return createWeeklyNarrativeService({
+    repositories,
+    now,
+    weeklyPersistence: weeklyPersistence??createFounderWeeklyBriefingPersistenceService({now}),
+    confidenceStoreResolver: confidenceStoreResolver??(()=>getFounderRuntimeStore()),
+    cadenceLifecycle: cadenceLifecycle ??
+      createPICadenceBriefingLifecycleService({ publicationService: publication, now }),
+  });
+}
+
+export function createWeeklyNarrativeService({repositories,now=()=>new Date(),weeklyPersistence=null,confidenceStoreResolver=()=>null,cadenceLifecycle=null}){const service={
  async getLatest({userId,weekId=null}={}){if(weekId)return findExisting(repositories,userId,weekId);return repositories.dailyBriefings.getLatestWeeklyBriefing?repositories.dailyBriefings.getLatestWeeklyBriefing(userId):null;},
- async generateForCurrentWindow({userId,asOf=now()}={}){const user=userId?await repositories.users.getUserById(userId):await repositories.users.getCurrentUser();const resolvedUserId=user?.id??userId;if(!resolvedUserId)return{state:"not_eligible",reason:"user_not_found"};const timeZone=user?.timeZone??"America/Los_Angeles";const coachingUpdates=await createCoachingUpdatesReadService({repositories}).getCurrent({userId:resolvedUserId});if(selectScheduledBriefingCadence({now:asOf,timeZone,coachingUpdates})!=="weekly")return{state:"not_eligible",reason:"not_weekly_day"};const artifact=await buildWeeklyArtifact({repositories,userId:resolvedUserId,now:()=>asOf,persist:true,reason:"scheduled_weekly_cadence"});return{state:"completed",artifact};},
- async preview({userId}){return buildWeeklyArtifact({repositories,userId,now,persist:false});},
- async generate({userId,reason="explicit_generation"}){return buildWeeklyArtifact({repositories,userId,now,persist:true,reason});},
- async catchUpLatestClosedWindow({userId,reason="missed_run_catch_up"}){const preview=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason});const existing=await findExisting(repositories,userId,preview.evidenceWindow.id);return existing??buildWeeklyArtifact({repositories,userId,now,persist:true,reason});},
- async regenerate({userId,reason}){if(!reason)throw new Error("Weekly regeneration requires an explicit reason.");const existing=await service.getLatest({userId});if(!existing)throw new Error("Weekly regeneration requires a persisted Weekly artifact.");const artifact=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason,windowOverride:existing.evidenceWindow,existingArtifactId:existing.id});await repositories.dailyBriefings.createDailyBriefing(artifact);return artifact;},
+ async generateForCurrentWindow({userId,asOf=now()}={}){const user=userId?await repositories.users.getUserById(userId):await repositories.users.getCurrentUser();const resolvedUserId=user?.id??userId;if(!resolvedUserId)return{state:"not_eligible",reason:"user_not_found"};const timeZone=user?.timeZone??"America/Los_Angeles";const coachingUpdates=await createCoachingUpdatesReadService({repositories}).getCurrent({userId:resolvedUserId});if(selectScheduledBriefingCadence({now:asOf,timeZone,coachingUpdates})!=="weekly")return{state:"not_eligible",reason:"not_weekly_day"};try{const artifact=await service.generate({userId:resolvedUserId,reason:"scheduled_weekly_cadence",asOf});return{state:"completed",artifact};}catch(error){return{state:"failed",reason:error?.code??"weekly_persistence_failure",error:typedError(error)};}},
+ async preview({userId}){return buildWeeklyArtifact({repositories,userId,now,persist:false,confidenceStoreResolver});},
+ async generate({userId,reason="explicit_generation",asOf=null}){const artifact=await buildWeeklyArtifact({repositories,userId,now:asOf?()=>asOf:now,persist:false,reason,confidenceStoreResolver});if(cadenceLifecycle){const result=await publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation:"create"});if(result.committed||result.status==="matched")return result.artifact;const error=new Error(result.error?.message??`Weekly cadence publication failed: ${result.status}`);error.code=result.status;throw error;}const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const result=await persistence.commit(createWeeklyPreparedCommit({operation:"normal_generation",artifact,baseline,reason}));return committedArtifactOrThrow(result);},
+ async prepareClosedWindow({userId,windowContract}){
+   const validation=createWeeklyClosedWindowContract(windowContract,{now:now()});
+   if(validation.status!=="valid")return validation;
+   const {contract}=validation;
+   const existing=await findExisting(repositories,userId,contract.window.id);
+   if(existing&&!sameWeeklyIdentity(existing,contract))return conflictResult(existing,contract);
+   if(existing)return{status:"matched",contract,artifact:existing,preparation:prepareSummary(existing,true)};
+   try{
+     const baseline=requireWeeklyPersistence(weeklyPersistence).captureBaseline();
+     const artifact=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason:contract.reason,windowOverride:contract.window,existingArtifactId:contract.expectedArtifactId,confidenceStoreResolver});
+     return{status:"prepared",contract,artifact,baseline,preparation:prepareSummary(artifact,false)};
+   }catch(error){return{status:"generation_failure",contract,error:typedError(error)};}
+ },
+ async catchUpClosedWindow({userId,windowContract}){
+   const prepared=await service.prepareClosedWindow({userId,windowContract});
+   if(prepared.status==="matched"||prepared.status==="artifact_identity_mismatch")return prepared;
+   if(prepared.status!=="prepared")return prepared;
+   const {contract,artifact}=prepared;
+   const replay=await findExisting(repositories,userId,contract.window.id);
+   if(replay&&!sameWeeklyIdentity(replay,contract))return conflictResult(replay,contract);
+   if(replay)return{status:"matched",contract,artifact:replay};
+   const result=cadenceLifecycle?await publishWeeklyCadence({cadenceLifecycle,artifact,reason:contract.reason,operation:"catch_up"}):await requireWeeklyPersistence(weeklyPersistence).commit(createWeeklyPreparedCommit({operation:"catch_up",artifact,baseline:prepared.baseline,reason:contract.reason}));
+   if(cadenceLifecycle){if(result.committed)return{status:result.status,contract,artifact:result.artifact,commit:{revision:result.revision,commitId:result.commitId,updatedAt:result.updatedAt}};return{status:result.status,contract,artifact:result.artifact,error:result.error};}
+   if(result.status===WeeklyPersistenceOutcome.CREATED)return{status:"created",contract,artifact:result.artifact,commit:{revision:result.revision,commitId:result.commitId,updatedAt:result.updatedAt}};
+   if(result.status===WeeklyPersistenceOutcome.MATCHED)return{status:"matched",contract,artifact:result.artifact};
+   return{status:result.status,contract,error:result.error};
+ },
+ async catchUpLatestClosedWindow({userId,reason="missed_run_catch_up"}){
+   const user=await repositories.users.getCurrentUser();
+   const timeZone=user?.timeZone??"America/Los_Angeles";
+   const window=createWeeklyEvidenceWindow({now:now(),timeZone});
+   return service.catchUpClosedWindow({userId,windowContract:{cadence:"weekly",startDate:window.startDate,endDate:window.endDate,briefingDate:window.briefingDate,timeZone,expectedArtifactId:artifactIdForWeeklyWindow(window.startDate,window.endDate),source:"latest_closed_window",reason}});
+ },
+ async prepareRegeneration({userId,reason,targetArtifactId=null}){if(!reason)throw new Error("Weekly regeneration requires an explicit reason.");const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const existing=targetArtifactId?await repositories.dailyBriefings.getBriefingById?.(targetArtifactId)??(await repositories.dailyBriefings.listDailyBriefings?.(userId))?.find((item)=>item.id===targetArtifactId)??null:await service.getLatest({userId});if(!existing)throw new Error("Weekly regeneration requires a persisted Weekly artifact.");if(targetArtifactId&&existing.id!==targetArtifactId)throw new Error("Weekly regeneration target identity changed.");const artifact=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason,windowOverride:existing.evidenceWindow,existingArtifactId:existing.id,ignoreExisting:true,confidenceStoreResolver});const existingAssessmentId=existing.briefing?.weeklyNarrative?.goalConfidence?.assessmentId;if(existingAssessmentId&&existingAssessmentId===artifact.briefing?.weeklyNarrative?.goalConfidence?.assessmentId&&existing.briefing?.weeklyNarrative?.goalConfidence?.source===artifact.briefing?.weeklyNarrative?.goalConfidence?.source)return{status:"matched",artifact:existing,existing,baseline,preparedCommit:null};const preparedCommit=createWeeklyPreparedCommit({operation:"regeneration",artifact,baseline,expectedExistingArtifact:existing,reason});return{status:"prepared",artifact,existing,baseline,preparedCommit};},
+ async executePreparedRegeneration({prepared}){if(prepared?.status==="matched")return{status:"matched",artifact:prepared.artifact,committed:false};const result=await requireWeeklyPersistence(weeklyPersistence).commit(prepared?.preparedCommit);return result;},
+ async regenerate({userId,reason,targetArtifactId=null}){const prepared=await service.prepareRegeneration({userId,reason,targetArtifactId});const result=await service.executePreparedRegeneration({prepared});return committedArtifactOrThrow(result);},
  async getOrCreate({userId,preview=false}){if(preview)return service.preview({userId});const existing=await service.getLatest({userId});return existing??service.generate({userId,reason:"legacy_explicit_generation"});}
 };return service;}
 
 export function getWeeklyVersionStatus(artifact){const version=artifact?.briefing?.weeklyNarrative?.provenance?.version??artifact?.briefing?.version??null;return{current:version===VERSION,persistedVersion:version,expectedVersion:VERSION};}
 
-async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,windowOverride=null,existingArtifactId=null}) {
+function sameWeeklyIdentity(artifact, contract) {
+  return artifact?.id === contract.expectedArtifactId
+    && artifact?.cadence === "weekly"
+    && artifact?.artifactType === "scheduled"
+    && artifact?.evidenceWindow?.id === contract.window.id
+    && artifact?.evidenceWindow?.startDate === contract.startDate
+    && artifact?.evidenceWindow?.endDate === contract.endDate
+    && artifact?.evidenceWindow?.briefingDate === contract.briefingDate;
+}
+function conflictResult(artifact, contract) {
+  return {
+    status: "artifact_identity_mismatch",
+    contract,
+    existingArtifactId: artifact?.id ?? null,
+    error: { code: "semantic_identity_conflict", message: "An existing artifact conflicts with the requested Weekly identity." },
+  };
+}
+function typedError(error) {
+  return { code: error?.code ?? "unknown_error", message: String(error?.message ?? error) };
+}
+function prepareSummary(artifact, exists) {
+  const narrative=artifact?.briefing?.weeklyNarrative;
+  const energy=narrative?.cards?.interpretation?.domains?.find((item)=>item.domain==="estimated_energy");
+  return {
+    windowIdentity: artifact?.evidenceWindow?.id ?? null,
+    artifactId: artifact?.id ?? null,
+    productionStatus: exists ? "existing" : "missing",
+    goal: narrative?.context?.activeGoalSummary ?? null,
+    phase: narrative?.context?.activePhase ?? null,
+    operatingState: narrative?.context?.operatingState ?? null,
+    energyCoverage: energy?.highlight ?? null,
+    piStatus: narrative?.context?.pi?.status ?? "unavailable",
+    milestone: narrative?.context?.futureMilestone ?? null,
+    narrativeVersion: narrative?.provenance?.version ?? null,
+    semanticValidation: validatePreparedNarrative(narrative),
+    expectedCommitScope: exists ? [] : ["dailyBriefings"],
+  };
+}
+function validatePreparedNarrative(narrative) {
+  const text=JSON.stringify(narrative??{});
+  return {
+    currentGoalAware: narrative?.context?.activeGoalSummary?.semanticType==="lean_mass_gain",
+    staleCutLanguageAbsent: !/kept the cut moving|while the cut continues|preparing for the July 18 DEXA/i.test(text),
+    unsupportedLeanMassClaimAbsent: !/proved? (?:new )?(?:muscle|lean[- ]mass)|confirmed (?:new )?(?:muscle|lean[- ]mass)/i.test(text),
+  };
+}
+
+async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,windowOverride=null,existingArtifactId=null,ignoreExisting=false,confidenceStoreResolver}) {
   const user=await repositories.users.getCurrentUser();
   const timeZone=user?.timeZone??"America/Los_Angeles";
   const window=windowOverride??createWeeklyEvidenceWindow({now:now(),timeZone});
@@ -134,7 +339,7 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
   const continuityPromise=loadLatestCadenceBriefingContinuity({
     repository:repositories.dailyBriefings,userId,cadence:"weekly",excludeArtifactId:artifactId,
   });
-  const [canonicalObjects,weights,dexaScans,artifacts,goal,activityTarget,continuity,progressPhotos,analyses]=await Promise.all([
+  const [canonicalObjects,weights,dexaScans,artifacts,goal,activityTarget,continuity,progressPhotos,analyses,trainingPerformanceEvents]=await Promise.all([
     repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
     repositories.weights.listWeightEntries(userId),
     repositories.dexaScans?.listDEXAScans(userId)??[],
@@ -144,8 +349,9 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
     continuityPromise,
     repositories.progressPhotos?.listPhotos(userId)??[],
     repositories.analyses?.listAnalyses?.()??[],
+    repositories.trainingPerformanceEvents?.listTrainingPerformanceEvents?.()??[],
   ]);
-  const existing=artifacts.find((item)=>item.id===existingArtifactId)??artifacts.find((item)=>item.cadence==="weekly"&&item.evidenceWindow?.id===window.id)??null;
+  const existing=ignoreExisting?null:(artifacts.find((item)=>item.id===existingArtifactId)??artifacts.find((item)=>item.cadence==="weekly"&&item.evidenceWindow?.id===window.id)??null);
   const photoEvent=artifacts.filter((item)=>item.artifactType==="event"&&item.trigger?.evidenceType==="photo_session"&&String(item.briefing?.photoEventNarrative?.eventDate??"")>=window.startDate&&String(item.briefing?.photoEventNarrative?.eventDate??"")<=window.endDate).sort((a,b)=>String(b.generatedAt).localeCompare(String(a.generatedAt)))[0]??null;
   const generatedAt=now().toISOString();
   const trainingPerformance=createTrainingPerformanceIntelligenceReport({canonicalObjects:canonicalObjects.filter((item)=>dateKey(item.lastObservedAt)<=window.endDate),now:new Date(`${window.endDate}T12:00:00Z`),generatedAt});
@@ -164,7 +370,17 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
     weeklyEnergy=null;
   }
   const adaptedSelection=authoritative?adaptWeeklyPISelection(authoritative.selection):null;
-  let narrative=composeWeeklyNarrative({window,canonicalObjects,weights,dexaScans,photoEvent,goal,activityTarget,generatedAt,trainingPerformance,weeklyEnergy,piNarrativeSelection:adaptedSelection});
+  const context=await resolveWeeklyBriefingContext({
+    repositories,userId,window,timeZone,activeGoal:goal,dexaScans,photoEvent,piResult:authoritative,
+  });
+  let narrative=composeWeeklyNarrative({window,canonicalObjects,weights,dexaScans,photoEvent,goal,context,activityTarget,generatedAt,trainingPerformance,trainingPerformanceEvents,weeklyEnergy,piNarrativeSelection:adaptedSelection});
+  const confidence=resolveActiveGoalConfidencePresentation({
+    activeGoal:goal,
+    activePhase,
+    store:confidenceStoreResolver(),
+  });
+  const goalConfidence=createBriefingGoalConfidenceBlock(confidence,{capturedAt:generatedAt});
+  if(goalConfidence)narrative={...narrative,goalConfidence};
   const handoff=photoEvent?.briefing?.photoEventNarrative?.goalCompletionHandoff;
   const completionRecommended=handoff?.goalCompletionRecommended===true;
   if(completionRecommended){
@@ -175,7 +391,8 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
     const eventState=completionRecommended?"goal_completion_owns_surface":photoEvent?"event_owns_decision":goal?.status==="transitioning"?"goal_transition_owns_surface":"no_event";
     void createPIDecisionCadenceShadow({cadence:"weekly",evaluationDate:window.endDate,cadenceEligible:true,evidenceWindow:window,activeGoal:goal,activePhase,rankedCandidates:authoritative.candidates??[],claims:authoritative.claims??[],lifecycle:authoritative.lifecycleResult,evidenceCompleteness:{overall:weeklyEnergy?.current?.coverage?.state==="complete"?"complete":"partial",training:authoritative.coverage?.training?"complete":"missing",energy:weeklyEnergy?.current?.coverage?.state==="complete"?"complete":"partial",recovery:authoritative.recoveryPI?.assessment?.completeness??"missing",bodyComposition:dexaScans.length?"complete":"missing"},eventAuthority:{state:eventState,sourceId:photoEvent?.id??null},recommendationMetadata:null,existingRecommendation:{coachDirection:narrative.coachDirection,nextWeekFocus:narrative.nextWeekFocus},existingNarrative:{summary:narrative.summary,primaryStory:narrative.primaryStory},sundayHandoff:null,memory:continuity?.memory??null,priorDecisionMemory:null,renderingCompatible:false,memoryCompatible:false,integrationEnabled:false,limitations:["weekly_decision_shadow_only"]});
   }
-  const artifact={id:existing?.id??artifactId,userId,artifactType:"scheduled",cadence:"weekly",generatedAt:narrative.generatedAt,evidenceWindow:window,lifecycle:{openedAt:null,consumedAt:null},generation:{reason,source:"explicit_weekly_operation",diagnostics:discoveryFailed?["bounded_weekly_artifact_discovery_failed"]:[]},briefing:{version:VERSION,weeklyNarrative:narrative}};
+  const confidenceDiagnostic=goalConfidence?[]:[`goal_confidence_unavailable:${confidence.fallbackReason??confidence.status}`];
+  const artifact={id:existing?.id??artifactId,userId,artifactType:"scheduled",cadence:"weekly",generatedAt:narrative.generatedAt,evidenceWindow:window,lifecycle:{openedAt:null,consumedAt:null},generation:{reason,source:"explicit_weekly_operation",diagnostics:[...(discoveryFailed?["bounded_weekly_artifact_discovery_failed"]:[]),...confidenceDiagnostic]},briefing:{version:VERSION,weeklyNarrative:narrative}};
   if(authoritative){
     try {
       const communicated=[...(authoritative.selection.primary??[]),...(authoritative.selection.supporting??[])].map((entry)=>entry.candidate.id);
@@ -184,7 +401,6 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
       // Optional bounded memory must never block Weekly generation.
     }
   }
-  if(persist&&!existing)await repositories.dailyBriefings.createDailyBriefing(artifact);
   return existing??artifact;
 }
 async function getWeeklyActivityTarget(repositories,userId){const protocol=await repositories.protocols?.getActiveProtocolByType?.(userId,"activity");const version=protocol?await repositories.protocolVersions?.getCurrentVersion?.(protocol.id):null;return version?.evaluationWindows?.find((item)=>item.cadence==="weekly")?.target??DEFAULT_WEEKLY_ACTIVITY_TARGET;}
@@ -203,3 +419,6 @@ function formatNumber(value){return Math.round(value).toLocaleString("en-US");}
 function signedKcal(value){if(!Number.isFinite(value))return"not available";return`${value>0?"+":""}${Math.round(value).toLocaleString("en-US")} kcal`;}
 function formatDate(value){const [y,m,d]=value.split("-").map(Number);return new Date(y,m-1,d).toLocaleDateString("en-US",{month:"short",day:"numeric"});}
 function formatDexaAnchor(scan){const bodyFat=scan.bodyFatPercentage?.value??scan.bodyFatPercentage;return{date:dateKey(scan.measuredAt??scan.date),bodyFat:Number.isFinite(Number(bodyFat))?`${Number(bodyFat).toFixed(1)}% body fat`:"Body-composition baseline"};}
+function requireWeeklyPersistence(service){if(!service?.captureBaseline||!service?.commit){const error=new Error("Canonical Weekly persistence is unavailable.");error.code="weekly_persistence_unavailable";throw error;}return service;}
+function committedArtifactOrThrow(result){if([WeeklyPersistenceOutcome.CREATED,WeeklyPersistenceOutcome.REGENERATED,WeeklyPersistenceOutcome.MATCHED].includes(result?.status))return result.artifact;const error=new Error(result?.error?.message??"Weekly persistence failed.");error.code=result?.status??"weekly_persistence_failure";throw error;}
+function publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation}){const context=artifact.briefing.weeklyNarrative.context,goal=context.activeGoal,phase=context.activeGoal?.phases?.find((item)=>item.status==="active")??context.activePhase;return cadenceLifecycle.publish({cadence:"weekly",operation,artifact,activeGoal:goal,activePhase:phase,operatingState:context.operatingState?.value??context.operatingState,piEnvelope:context.pi,reason,replacementAuthorized:false});}

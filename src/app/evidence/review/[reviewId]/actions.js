@@ -19,13 +19,38 @@ import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/Pho
 import { normalizePhotoInterpretationToStructuredObservations } from "../../../../domain/interpreters/PhotoObservationModel";
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
-import { createDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
-import { createPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
+import { createFounderDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
+import { createFounderPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
+import {
+  createPhotoInterpreterGoalContext,
+  resolvePhotoEventContext,
+} from "../../../../domain/services/PhotoEventContextService";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
+import { produceTrainingPerformanceEvents } from "../../../../domain/services/TrainingPerformanceEventProducer";
+import {
+  createTrainingPerformanceEventPersistenceService,
+  TrainingPerformanceEventPersistenceOutcome,
+} from "../../../../domain/services/TrainingPerformanceEventPersistenceService";
+import {
+  getFounderRuntimeStore,
+  resolveFounderRuntimeStorePath,
+} from "../../../../data/repositories/founderRuntimeStore";
+import {
+  createPILowerLevelCanonicalEvidenceCommitService,
+} from "../../../../domain/services/PILowerLevelCanonicalEvidenceCommitService";
+import {
+  createPILowerLevelConfidenceWorkEnqueueService,
+  isPIEnergyConfidenceEnqueueEnabled,
+  isPITrainingConfidenceEnqueueEnabled,
+} from "../../../../domain/services/PILowerLevelConfidenceWorkEnqueueService";
+import {
+  createPISemanticFingerprint,
+} from "../../../../domain/services/PILowerLevelConfidenceContracts";
 import { assertValidDexaScan } from "../../../../domain/services/DEXAContract";
 import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/services/DEXAReadModelAdapter";
 import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
+import { getCanonicalProgressPhotoCategory } from "../../../../domain/models/progressPhotoPoseVocabulary";
 
 export async function reprocessEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
@@ -49,7 +74,9 @@ export async function confirmEvidenceReview(formData) {
   let submittedItemDecisions;
   try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
   catch { throw new Error("The evidence selection is invalid."); }
+  evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
+  assertIncludedPhotoSessionsReady(evidencePackage);
   validateDexaObjectsBeforeCommit(evidencePackage);
 
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
@@ -57,7 +84,7 @@ export async function confirmEvidenceReview(formData) {
   let orchestrationResult;
   try {
     const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
-    const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, user }) });
+    const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, reviewId, user }) });
     orchestrationResult = await orchestrator.run({ reviewId, evidencePackage, userId: user.id, commitProgress: currentReview.commitProgress ?? {} });
     await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id });
   } catch (error) {
@@ -82,25 +109,92 @@ export async function updateEvidenceReviewItemDecision(formData) {
   revalidatePath(`/evidence/review/${reviewId}`);
 }
 
+export async function updateEvidenceReviewPhotoPose(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoPose(reviewId, {
+    expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+    photoId: String(formData.get("photoId") ?? ""),
+    poseId: String(formData.get("poseId") ?? ""),
+    sourceArtifactRef: String(formData.get("sourceArtifactRef") ?? ""),
+    updatedBy: user.id,
+  });
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(`/evidence/review/${reviewId}?pose=saved`);
+}
+
 function applyPersistedItemDecisions(evidencePackage, decisions = {}) {
   return { ...evidencePackage, evidence_objects: (evidencePackage.evidence_objects ?? []).map((item) => ({
     ...item, removed: decisions[item.id]?.included === false,
   })) };
 }
 
-function createHandlers({ evidencePackage, user }) {
+function mergeAuthoritativePhotoSessions(submitted = {}, authoritative = {}) {
+  const photoSessions = new Map(
+    (authoritative.evidence_objects ?? [])
+      .filter((item) => item.evidence_type === "photo_session")
+      .map((item) => [item.id, item])
+  );
+  return {
+    ...submitted,
+    evidence_objects: (submitted.evidence_objects ?? []).map((item) =>
+      item.evidence_type === "photo_session" && photoSessions.has(item.id)
+        ? structuredClone(photoSessions.get(item.id))
+        : item
+    ),
+  };
+}
+
+function assertIncludedPhotoSessionsReady(evidencePackage) {
+  for (const object of evidencePackage.evidence_objects ?? []) {
+    if (object.removed || object.evidence_type !== "photo_session") continue;
+    const unresolved = (object.photos ?? []).filter((photo) =>
+      photo.active !== false && !getCanonicalProgressPhotoCategory(photo)
+    );
+    if (unresolved.length) {
+      throw new Error(`Choose a pose for ${unresolved.length === 1 ? "the remaining photo" : `all ${unresolved.length} remaining photos`} before saving.`);
+    }
+  }
+}
+
+function createHandlers({ evidencePackage, reviewId, user }) {
   let canonical = null;
   let analyses = [];
+  let trainingAnalysis = null;
   const committedPackage = { ...evidencePackage, evidence_objects: (evidencePackage.evidence_objects ?? []).filter((item) => item.removed !== true) };
   return {
     canonical_commit: async () => {
-      const scopedResult = await FounderRepositories.canonicalEvidence.reconcileConfirmedEvidencePackage(committedPackage, user.id);
+      const energySourceCommit = committedPackage.evidence_objects.some(
+        (item) => [
+          "nutrition", "activity", "activity_day",
+          "dexa", "dexa_scan", "body_composition",
+        ]
+          .includes(item.evidence_type)
+      );
+      const scopedResult =
+        energySourceCommit && isPIEnergyConfidenceEnqueueEnabled()
+          ? await createPILowerLevelCanonicalEvidenceCommitService({
+              runtimeStorePath: resolveFounderRuntimeStorePath(),
+              liveStore: getFounderRuntimeStore(),
+            }).commitConfirmedEvidencePackage(committedPackage, user.id)
+          : await FounderRepositories.canonicalEvidence
+              .reconcileConfirmedEvidencePackage(committedPackage, user.id);
+      if (
+        energySourceCommit &&
+        isPIEnergyConfidenceEnqueueEnabled() &&
+        scopedResult.committed !== true &&
+        scopedResult.outcome !== "source_matched"
+      ) {
+        throw new Error(`Canonical evidence commit failed: ${scopedResult.outcome}`);
+      }
       canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       if (committedPackage.evidence_objects.some((item) => item.evidence_type === "photo_session")) {
         canonical = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
         await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(canonical);
       }
-      return { status: "completed", canonicalEvidenceIds: canonical.filter((item) => item.quality?.status !== "superseded").map((item) => item.canonicalId), reconciliationScope: scopedResult.scope, ...scopedResult.report };
+      return { status: "completed", canonicalEvidenceIds: canonical.filter((item) => item.quality?.status !== "superseded").map((item) => item.canonicalId), reconciliationScope: scopedResult.scope ?? scopedResult.reconciliationScope, lowerLevelWork: scopedResult.lowerLevelWork ?? [], ...scopedResult.report };
     },
     compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ evidencePackage, user }) }),
     scheduled_completion: async () => {
@@ -137,7 +231,164 @@ function createHandlers({ evidencePackage, user }) {
     analysis: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       analyses = await runDomainAnalysis({ canonical, evidencePackage, user });
+      trainingAnalysis =
+        analyses.find((analysis) => analysis.id === `analysis_training_${evidencePackage.package_id}`) ??
+        null;
       return { status: "completed", analysisIds: analyses.map((item) => item.id), synthesisIds: analyses.filter((item) => item.metadata?.photoSessionSynthesis).map((item) => item.id) };
+    },
+    training_performance_events: async ({ results }) => {
+      const trainingObjects = committedPackage.evidence_objects.filter(
+        (item) => item.evidence_type === "training" && (item.exercises ?? []).length > 0
+      );
+      if (trainingObjects.length === 0) {
+        return {
+          status: "completed",
+          outcome: TrainingPerformanceEventPersistenceOutcome.NO_EVENTS,
+          newlyCreatedEvents: [],
+          existingEvents: [],
+        };
+      }
+      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      const analysisId =
+        trainingAnalysis?.id ??
+        results.analysis?.analysisIds?.find((id) => id === `analysis_training_${evidencePackage.package_id}`);
+      trainingAnalysis ??= analysisId
+        ? await FounderRepositories.analyses.getAnalysisById(analysisId)
+        : null;
+      if (!trainingAnalysis) {
+        throw new Error("Persisted Training analysis is unavailable for performance-event generation.");
+      }
+      const events = trainingObjects.flatMap((session) => {
+        const canonicalSession = canonical.find(
+          (item) =>
+            item.quality?.status === "active" &&
+            item.evidence_type === "training" &&
+            item.payload?.id === session.id
+        );
+        if (!canonicalSession) {
+          throw new Error(`Confirmed canonical Training session is unavailable: ${session.id}`);
+        }
+        return produceTrainingPerformanceEvents({
+          canonicalTrainingSession: canonicalSession,
+          trainingAnalysis,
+          sourceReviewId: reviewId,
+          sourceEvidencePackageId: evidencePackage.package_id,
+        });
+      });
+      const lowerLevelEnabled = isPITrainingConfidenceEnqueueEnabled();
+      const coordinator =
+        createPILowerLevelConfidenceWorkEnqueueService();
+      const eventIds = events.map((event) => event.id).sort();
+      const batchId = `training_event_batch|${createPISemanticFingerprint({
+        packageId: evidencePackage.package_id,
+        analysisId: trainingAnalysis.id,
+        sessionIds: trainingObjects.map((item) => item.id).sort(),
+        eventIds,
+      }).slice(7)}`;
+      const batch = {
+        id: batchId,
+        status: "finalized",
+        sourceCommitId: "pending_source_commit",
+        sourceEvidencePackageId: evidencePackage.package_id,
+        sourceReviewId: reviewId,
+        finalizedReportId: trainingAnalysis.id,
+        canonicalTrainingSessionIds:
+          trainingObjects.map((item) => item.id).sort(),
+        performanceEventIds: eventIds,
+        zeroEventCompletion: eventIds.length === 0,
+        finalizedAt: trainingAnalysis.createdAt,
+      };
+      const persistence = await createTrainingPerformanceEventPersistenceService({
+        runtimeStorePath: resolveFounderRuntimeStorePath(),
+        liveStore: getFounderRuntimeStore(),
+      }).persistEventBatch(events, lowerLevelEnabled ? {
+        batchId,
+        batch,
+        mutateCandidate: (candidate) => {
+          for (const session of trainingObjects) {
+            const canonicalSession = canonical.find(
+              (item) =>
+                item.evidence_type === "training" &&
+                item.quality?.status === "active" &&
+                item.payload?.id === session.id
+            );
+            const sessionEvents = events.filter(
+              (event) => event.sourceSessionId === session.id
+            );
+            coordinator.stageTrainingFinalization(candidate, {
+              canonicalTrainingSessionId:
+                canonicalSession?.payload?.id ?? session.id,
+              finalizedTrainingReportId: trainingAnalysis.id,
+              sourceTrainingEvidenceIds: [
+                canonicalSession?.canonicalId ?? session.id,
+              ],
+              performanceEventBatchId: batchId,
+              performanceEventIds: sessionEvents.map((event) => event.id),
+              zeroEventCompletion: sessionEvents.length === 0,
+              categoryRollupFingerprint: createPISemanticFingerprint(
+                trainingAnalysis.metadata?.trainingPerformance
+                  ?.categoryObservations ?? []
+              ),
+              sourceSemanticFingerprint: createPISemanticFingerprint({
+                canonicalSession,
+                finalizedReportId: trainingAnalysis.id,
+                performanceEventIds:
+                  sessionEvents.map((event) => event.id).sort(),
+              }),
+              evidenceCutoff: `${String(
+                session.observed_at
+              ).slice(0, 10)}T23:59:59.999Z`,
+            });
+          }
+        },
+        finalizeCandidate: ({ stagedState, commitId }) => {
+          const persistedBatch = stagedState.trainingPerformanceEventBatches
+            ?.find((item) => item.id === batchId);
+          if (persistedBatch) persistedBatch.sourceCommitId = commitId;
+          for (const work of stagedState.piTrainingConfidenceWorkItems ?? []) {
+            work.sourceCommitLinks = (work.sourceCommitLinks ?? []).map(
+              (link) => link.commitId === "pending_source_commit"
+                ? { ...link, commitId }
+                : link
+            );
+          }
+        },
+        validateFinalized: (candidate) =>
+          trainingObjects.every((session) =>
+            candidate.piTrainingConfidenceWorkItems?.some(
+              (work) =>
+                work.canonicalTrainingSessionId === session.id &&
+                work.performanceEventBatchId === batchId
+            )
+          ),
+      } : {});
+      if (
+        [
+          TrainingPerformanceEventPersistenceOutcome.COLLISION,
+          TrainingPerformanceEventPersistenceOutcome.CONCURRENCY_CONFLICT,
+          TrainingPerformanceEventPersistenceOutcome.PERSISTENCE_FAILURE,
+          TrainingPerformanceEventPersistenceOutcome
+            .COMMITTED_PUBLICATION_FAILURE,
+        ].includes(persistence.outcome)
+      ) {
+        throw new Error(`Training performance-event persistence failed: ${persistence.outcome}`);
+      }
+      return {
+        status: "completed",
+        outcome: persistence.outcome,
+        newlyCreatedEvents: persistence.newEvents,
+        existingEvents: persistence.existingEvents,
+        performanceEventBatchId: persistence.batch?.id ?? null,
+        lowerLevelWorkIds: lowerLevelEnabled
+          ? trainingObjects.map((session) =>
+              getFounderRuntimeStore().piTrainingConfidenceWorkItems
+                ?.find((work) =>
+                  work.canonicalTrainingSessionId === session.id &&
+                  work.performanceEventBatchId === batchId
+                )?.id
+            ).filter(Boolean)
+          : [],
+      };
     },
     goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user }),
     event_eligibility: async () => {
@@ -152,7 +403,7 @@ function createHandlers({ evidencePackage, user }) {
         const object = (evidencePackage.evidence_objects ?? []).find((item) => item.evidence_type === type || (type === "dexa" && ["dexa_scan", "body_composition"].includes(item.evidence_type)));
         const canonicalId = getStableCanonicalId(object, user.id);
         if (type === "photo_session") {
-          const result = await createPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+          const result = await createFounderPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
           if (result.status !== "completed" || !result.artifactId) {
             throw new Error(`${result.code ?? "photo_event_briefing_failed"}: ${result.message ?? "Photo Event briefing was not created."}`);
           }
@@ -160,7 +411,7 @@ function createHandlers({ evidencePackage, user }) {
           photoSessionIds.push(result.sessionId);
           continue;
         }
-        const artifact = await createDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
+        const artifact = await createFounderDEXAEventNarrativeService({ repositories: FounderRepositories }).generate({ userId: user.id, scanId: canonicalId });
         if (!artifact?.artifactId && !artifact?.id) throw new Error("dexa_event_briefing_failed: DEXA Event briefing was not created.");
         artifacts.push(artifact.artifactId ?? artifact.id);
       }
@@ -243,11 +494,14 @@ function preserveCanonicalTimestamps(existing, candidate) {
 async function runDomainAnalysis({ canonical, evidencePackage, user }) {
   const created = [];
   const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
-  const photoGoalContext = completionIntent?.confirmationPurpose === "visible_abs_completion"
-    ? "Visible Abs completion evaluation. For Front Relaxed, directly state whether lower abs are visibly present at rest, and identify any pose, abdominal visibility, lighting, framing, editing, or confidence limitation. Rear views cannot confirm completion."
-    : "Visible Abs at Rest";
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
     if (object.evidence_type === "photo_session") {
+      const photoEventContext = await resolvePhotoEventContext({
+        repositories: FounderRepositories,
+        userId: user.id,
+        evidenceDate: object.observed_at,
+      });
+      const photoGoalContext = createPhotoInterpreterGoalContext(photoEventContext, completionIntent);
       const sessionId = `photo_session_${user.id}_${String(object.observed_at).slice(0, 10)}`;
       const perView = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {

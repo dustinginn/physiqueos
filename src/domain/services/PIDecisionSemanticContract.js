@@ -1,4 +1,43 @@
 export const PI_DECISION_SEMANTIC_VERSION = "pi_decision_semantics_v1";
+export const PI_GOAL_CONFIDENCE_COMPANION_PROPERTY =
+  "goalConfidenceAssessment";
+export const PI_DECISION_COMPANION_OUTPUTS = Object.freeze({
+  goalConfidenceAssessment: Object.freeze({
+    semanticType: "goal_progress_confidence",
+    optional: true,
+    distinctFrom: Object.freeze([
+      "observation_confidence",
+      "claim_confidence",
+      "decision_confidence",
+      "presentation_readiness",
+      "evidence_completeness",
+    ]),
+  }),
+});
+
+export function attachPIGoalConfidenceCompanion(
+  decisionResult,
+  goalConfidenceAssessment
+) {
+  if (!decisionResult || typeof decisionResult !== "object" ||
+      Array.isArray(decisionResult)) {
+    throw new Error("PI decision result must be an object.");
+  }
+  if (goalConfidenceAssessment == null) return Object.freeze({
+    ...structuredClone(decisionResult),
+  });
+  if (
+    goalConfidenceAssessment.assessmentType !== "goal_progress_confidence" ||
+    goalConfidenceAssessment.schemaVersion !== "pi_goal_confidence_assessment_v1"
+  ) {
+    throw new Error("Invalid PI goal-confidence companion.");
+  }
+  return deepFreeze({
+    ...structuredClone(decisionResult),
+    [PI_GOAL_CONFIDENCE_COMPANION_PROPERTY]:
+      structuredClone(goalConfidenceAssessment),
+  });
+}
 
 export const PI_DECISION_POLICY = Object.freeze({
   maintain_current_plan: Object.freeze({
@@ -65,4 +104,10 @@ function reviewPolicy(domain) {
     renderingConcept: `review_${domain}_without_prescription`,
     prohibitedInference: "no_exact_action_diagnosis_or_causality",
   });
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreeze);
+  return Object.freeze(value);
 }

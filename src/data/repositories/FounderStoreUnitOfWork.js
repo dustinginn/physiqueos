@@ -62,6 +62,7 @@ export function createFounderStoreUnitOfWork({
   serialize = defaultSerialize,
   publish = publishFounderStoreInPlace,
   stageFrom = liveStore,
+  validatePersistedBaseline = null,
 } = {}) {
   if (!filePath) throw new Error("Founder-store unit of work requires a file path.");
   if (!liveStore || typeof liveStore !== "object") {
@@ -159,6 +160,26 @@ export function createFounderStoreUnitOfWork({
               }
 
               const current = readPersistedStore(fileSystem, filePath);
+              if (typeof validatePersistedBaseline === "function") {
+                let baselineValidation;
+                try {
+                  baselineValidation = await validatePersistedBaseline(
+                    structuredClone(current)
+                  );
+                } catch (cause) {
+                  throw unitError("VALIDATION_FAILED", "Founder-store persisted baseline validation failed.", {
+                    cause,
+                    expectedRevision,
+                    commitId,
+                  });
+                }
+                if (baselineValidation === false || baselineValidation?.valid === false) {
+                  throw unitError("VALIDATION_FAILED", "Founder-store persisted baseline changed before commit.", {
+                    expectedRevision,
+                    commitId,
+                  });
+                }
+              }
               assertRevision(expectedRevision, getFounderStoreRevision(current), commitId);
               const committedState = structuredClone(stagedState);
               committedState.revision = nextRevision(expectedRevision);
@@ -223,6 +244,7 @@ export function createFounderStoreUnitOfWork({
                 serialized,
                 expectedRevision,
                 commitId,
+                validatePersistedBaseline,
               });
 
               try {
@@ -265,7 +287,14 @@ export function createFounderStoreUnitOfWork({
   };
 }
 
-function persistCandidate({ filePath, fileSystem, serialized, expectedRevision, commitId }) {
+function persistCandidate({
+  filePath,
+  fileSystem,
+  serialized,
+  expectedRevision,
+  commitId,
+  validatePersistedBaseline,
+}) {
   const directory = path.dirname(filePath);
   const tempPath = path.join(
     directory,
@@ -292,6 +321,28 @@ function persistCandidate({ filePath, fileSystem, serialized, expectedRevision, 
     }
 
     const current = readPersistedStore(fileSystem, filePath);
+    if (typeof validatePersistedBaseline === "function") {
+      let validation;
+      try {
+        validation = validatePersistedBaseline(structuredClone(current));
+      } catch (cause) {
+        throw unitError("VALIDATION_FAILED", "Founder-store persisted baseline validation failed before replacement.", {
+          cause,
+          expectedRevision,
+          commitId,
+        });
+      }
+      if (
+        validation?.then ||
+        validation === false ||
+        validation?.valid === false
+      ) {
+        throw unitError("VALIDATION_FAILED", "Founder-store persisted baseline changed before replacement.", {
+          expectedRevision,
+          commitId,
+        });
+      }
+    }
     assertRevision(expectedRevision, getFounderStoreRevision(current), commitId);
 
     try {

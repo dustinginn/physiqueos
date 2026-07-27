@@ -50,6 +50,7 @@ export default function TrainingKnowledgeScreen({
   correctionAction,
   correctionNavigation,
   correctionStatus,
+  exerciseRecords,
   mode,
   navigation,
   reportingOrigin,
@@ -63,6 +64,7 @@ export default function TrainingKnowledgeScreen({
     correctionAction,
     correctionNavigation,
     correctionStatus,
+    exerciseRecords,
     mode,
     report,
     reportingOrigin,
@@ -227,7 +229,7 @@ function getParentLabel(navigation) {
   return breadcrumbs.at(-2)?.label ?? "Training";
 }
 
-function getPageContent({ correctionAction, correctionNavigation, correctionStatus, mode, report, reportingOrigin, session, slug, trainingEvidenceContext }) {
+function getPageContent({ correctionAction, correctionNavigation, correctionStatus, exerciseRecords, mode, report, reportingOrigin, session, slug, trainingEvidenceContext }) {
   if (mode === "session") {
     return getSessionContent({
       correctionAction,
@@ -236,7 +238,7 @@ function getPageContent({ correctionAction, correctionNavigation, correctionStat
       session,
     });
   }
-  if (mode === "library") return getLibraryContent({ report, reportingOrigin, slug, trainingEvidenceContext });
+  if (mode === "library") return getLibraryContent({ exerciseRecords, report, reportingOrigin, slug, trainingEvidenceContext });
 
   return getReportingContent({ report, slug, trainingEvidenceContext });
 }
@@ -675,12 +677,13 @@ function TrainingDayHistoryCard({ adaptHref = (href) => href, days = [] }) {
   );
 }
 
-function getLibraryContent({ report, reportingOrigin, slug = [], trainingEvidenceContext }) {
+function getLibraryContent({ exerciseRecords, report, reportingOrigin, slug = [], trainingEvidenceContext }) {
   const path = Array.isArray(slug) ? slug : [slug].filter(Boolean);
   const leafDetail = getLibraryLeafDetail({
     path,
     report,
     showSourceWorkouts: trainingEvidenceContext?.showSourceWorkouts,
+    exerciseRecords,
   });
   const title = path.length ? toTitle(path.at(-1)) : "Training Library";
 
@@ -922,10 +925,11 @@ function getLibraryChildren({ path, report }) {
   return [];
 }
 
-function getLibraryLeafDetail({ path, report, showSourceWorkouts }) {
+function getLibraryLeafDetail({ exerciseRecords, path, report, showSourceWorkouts }) {
   if (isFlatTrainingNavigationPath(path) && path.length >= 2) {
     return getExerciseDetailContent({
       exerciseSlug: path.at(-1),
+      exerciseRecords,
       report,
       showSourceWorkouts,
     });
@@ -941,6 +945,7 @@ function getLibraryLeafDetail({ path, report, showSourceWorkouts }) {
   if (path[0] === "resistance" && path.length >= 5) {
     return getExerciseDetailContent({
       exerciseSlug: path[4],
+      exerciseRecords,
       report,
       showSourceWorkouts,
     });
@@ -1059,6 +1064,7 @@ function getActivityDetailContent({ activitySlug, report }) {
 
 function getExerciseDetailContent({
   exerciseSlug,
+  exerciseRecords,
   report,
   showSourceWorkouts = true,
 }) {
@@ -1076,6 +1082,12 @@ function getExerciseDetailContent({
         key="benchmark"
         occurrences={occurrences}
       />,
+      exerciseRecords && (
+        <ExercisePerformanceRecordsCard
+          key="performance-records"
+          model={exerciseRecords}
+        />
+      ),
       <LastExerciseSessionCard key="last-session" occurrence={latest} />,
       <ExerciseHistoryCard key="history" occurrences={occurrences} />,
       showSourceWorkouts && (
@@ -1086,6 +1098,50 @@ function getExerciseDetailContent({
       ),
     ].filter(Boolean),
   };
+}
+
+function ExercisePerformanceRecordsCard({ model }) {
+  return (
+    <Card className="space-y-3" padding="sm">
+      <div>
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">
+          Durable achievements
+        </p>
+        <h2 className="mt-0.5 text-lg font-extrabold text-slate-950">
+          {model.heading}
+        </h2>
+      </div>
+      <div className="divide-y divide-[var(--divider)]">
+        {model.records.map((record) => (
+          <div className="py-2.5 first:pt-0 last:pb-0" key={record.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[13px] font-extrabold leading-5 text-[var(--text-primary)]">
+                  {record.title}
+                </p>
+                <p className="mt-0.5 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
+                  {record.value}
+                </p>
+              </div>
+              <span className="shrink-0 text-[11px] font-bold text-[var(--text-muted)]">
+                {formatDate(record.workoutDate)}
+              </span>
+            </div>
+            {record.detail && (
+              <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-secondary)]">
+                {record.detail}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+      {model.countLabel && (
+        <p className="text-[11px] font-semibold text-[var(--text-muted)]">
+          {model.countLabel}
+        </p>
+      )}
+    </Card>
+  );
 }
 
 function MostRecentTrainingCard({ record, value }) {
