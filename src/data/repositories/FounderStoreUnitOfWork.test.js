@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FounderStoreUnitOfWorkErrorCode as E,
@@ -384,9 +385,23 @@ describe("FounderStoreUnitOfWork", () => {
 
   it("leaves the real production runtime byte-for-byte unchanged", () => {
     const production = "private/founder/runtime-store.json";
+    const beforeStat = fs.statSync(production);
     const before = bytes(production);
+    const beforeHash = createHash("sha256").update(before).digest("hex");
     const parsed = JSON.parse(before);
     expect(getFounderStoreRevision(parsed)).toBeGreaterThanOrEqual(LEGACY_FOUNDER_STORE_REVISION);
-    expect(bytes(production)).toEqual(before);
+    const after = bytes(production);
+    const afterStat = fs.statSync(production);
+    const afterHash = createHash("sha256").update(after).digest("hex");
+    const afterParsed = JSON.parse(after);
+
+    expect(after.equals(before)).toBe(true);
+    expect(afterHash).toBe(beforeHash);
+    expect(afterStat.size).toBe(beforeStat.size);
+    expect(afterStat.mtimeMs).toBe(beforeStat.mtimeMs);
+    expect(getFounderStoreRevision(afterParsed)).toBe(parsed.revision);
+    expect(afterParsed.lastCommitId).toBe(parsed.lastCommitId);
+    expect(fs.existsSync(`${production}.tmp`)).toBe(false);
+    expect(fs.existsSync(`${production}.bak`)).toBe(false);
   }, 30_000);
 });

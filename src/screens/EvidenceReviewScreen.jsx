@@ -58,7 +58,17 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, pho
 
         {hasCommitFailure(review) && (
           <Card className="mt-6" variant="warning">
-            <div className="flex gap-3"><AlertTriangle aria-hidden="true" size={20} /><div><h2 className="font-extrabold">Your photos are saved</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">{canContinue ? "The photo review finished, but its follow-up did not. Finish saving without re-uploading or repeating completed work." : "Saving paused safely. Try again to continue; completed steps will not run again."}</p></div></div>
+            <div className="flex gap-3">
+              <AlertTriangle aria-hidden="true" size={20} />
+              <div>
+                <h2 className="font-extrabold">{`Your ${experience.noun} is saved`}</h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  {canContinue
+                    ? `The ${experience.noun} review finished, but its follow-up did not. Finish saving without re-uploading or repeating completed work.`
+                    : "Saving paused safely. Try again to continue; completed steps will not run again."}
+                </p>
+              </div>
+            </div>
           </Card>
         )}
 

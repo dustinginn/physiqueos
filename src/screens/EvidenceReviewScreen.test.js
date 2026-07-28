@@ -91,7 +91,7 @@ describe("EvidenceReviewScreen selection interaction", () => {
 
   it("offers a bounded continuation after a partial commit without upload or edit controls", () => {
     expect(screen).toContain('const canContinue = status === "partially_committed"');
-    expect(screen).toContain("Your photos are saved");
+    expect(screen).toContain("Your ${experience.noun} is saved");
     expect(screen).toContain("Finish saving");
     expect(screen).toContain("without re-uploading or repeating completed work");
   });

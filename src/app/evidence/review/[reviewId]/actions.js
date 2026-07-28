@@ -46,11 +46,16 @@ import {
 import {
   createPISemanticFingerprint,
 } from "../../../../domain/services/PILowerLevelConfidenceContracts";
+import { resolveConfirmedCanonicalTrainingSession } from "../../../../domain/services/ConfirmedCanonicalTrainingSessionResolver";
 import { assertValidDexaScan } from "../../../../domain/services/DEXAContract";
 import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/services/DEXAReadModelAdapter";
 import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
 import { getCanonicalProgressPhotoCategory } from "../../../../domain/models/progressPhotoPoseVocabulary";
+
+function uniqueStrings(values = []) {
+  return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
 
 export async function reprocessEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
@@ -91,10 +96,14 @@ export async function confirmEvidenceReview(formData) {
     await service.failCommit(reviewId, error);
     throw error;
   }
-  ["/", "/briefing/daily", "/progress", "/progress/photos", "/progress/dexa", "/progress/training", "/timeline"].forEach(revalidatePath);
+  const publication = publishPostConfirmationRefreshes(orchestrationResult);
   const photoSessionId = orchestrationResult?.briefingResult?.photoSessionIds?.[0];
-  if (photoSessionId) redirect(`/briefings/photo/${photoSessionId}`);
-  redirect(`/evidence/review/${reviewId}?confirmed=1`);
+  if (photoSessionId) {
+    const photoPath = `/briefings/photo/${photoSessionId}${publication?.warning ? `?refresh=${encodeURIComponent(publication.warning)}` : ""}`;
+    redirect(photoPath);
+  }
+  const confirmedPath = `/evidence/review/${reviewId}?confirmed=1${publication?.warning ? `&refresh=${encodeURIComponent(publication.warning)}` : ""}`;
+  redirect(confirmedPath);
 }
 
 export async function updateEvidenceReviewItemDecision(formData) {
@@ -194,7 +203,20 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         canonical = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
         await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(canonical);
       }
-      return { status: "completed", canonicalEvidenceIds: canonical.filter((item) => item.quality?.status !== "superseded").map((item) => item.canonicalId), reconciliationScope: scopedResult.scope ?? scopedResult.reconciliationScope, lowerLevelWork: scopedResult.lowerLevelWork ?? [], ...scopedResult.report };
+      return {
+        status: "completed",
+        canonicalEvidenceIds: canonical
+          .filter((item) => item.quality?.status !== "superseded")
+          .map((item) => item.canonicalId),
+        canonicalCommitResults: buildCanonicalCommitResults({
+          committedPackage,
+          canonical,
+          report: scopedResult.report ?? {},
+        }),
+        reconciliationScope: scopedResult.scope ?? scopedResult.reconciliationScope,
+        lowerLevelWork: scopedResult.lowerLevelWork ?? [],
+        ...scopedResult.report,
+      };
     },
     compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ evidencePackage, user }) }),
     scheduled_completion: async () => {
@@ -252,29 +274,32 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       const analysisId =
         trainingAnalysis?.id ??
         results.analysis?.analysisIds?.find((id) => id === `analysis_training_${evidencePackage.package_id}`);
-      trainingAnalysis ??= analysisId
-        ? await FounderRepositories.analyses.getAnalysisById(analysisId)
-        : null;
+      trainingAnalysis ??=
+        analyses.find((analysis) => analysis.id === analysisId) ??
+        (analysisId ? await FounderRepositories.analyses.getAnalysisById(analysisId) : null);
       if (!trainingAnalysis) {
         throw new Error("Persisted Training analysis is unavailable for performance-event generation.");
       }
-      const events = trainingObjects.flatMap((session) => {
-        const canonicalSession = canonical.find(
-          (item) =>
-            item.quality?.status === "active" &&
-            item.evidence_type === "training" &&
-            item.payload?.id === session.id
-        );
-        if (!canonicalSession) {
+      const canonicalCommitResults = results.canonical_commit?.canonicalCommitResults ?? [];
+      const resolvedTrainingSessions = trainingObjects.map((session) => {
+        const resolution = resolveConfirmedCanonicalTrainingSession({
+          reviewItem: session,
+          canonicalEvidenceObjects: canonical,
+          canonicalCommitResults,
+        });
+        if (resolution.status !== "resolved" || !resolution.canonicalSession) {
           throw new Error(`Confirmed canonical Training session is unavailable: ${session.id}`);
         }
-        return produceTrainingPerformanceEvents({
+        return { reviewItem: session, canonicalSession: resolution.canonicalSession };
+      });
+      const events = resolvedTrainingSessions.flatMap(({ canonicalSession }) =>
+        produceTrainingPerformanceEvents({
           canonicalTrainingSession: canonicalSession,
           trainingAnalysis,
           sourceReviewId: reviewId,
           sourceEvidencePackageId: evidencePackage.package_id,
-        });
-      });
+        })
+      );
       const lowerLevelEnabled = isPITrainingConfidenceEnqueueEnabled();
       const coordinator =
         createPILowerLevelConfidenceWorkEnqueueService();
@@ -282,7 +307,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       const batchId = `training_event_batch|${createPISemanticFingerprint({
         packageId: evidencePackage.package_id,
         analysisId: trainingAnalysis.id,
-        sessionIds: trainingObjects.map((item) => item.id).sort(),
+        sessionIds: resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
         eventIds,
       }).slice(7)}`;
       const batch = {
@@ -293,7 +318,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         sourceReviewId: reviewId,
         finalizedReportId: trainingAnalysis.id,
         canonicalTrainingSessionIds:
-          trainingObjects.map((item) => item.id).sort(),
+          resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
         performanceEventIds: eventIds,
         zeroEventCompletion: eventIds.length === 0,
         finalizedAt: trainingAnalysis.createdAt,
@@ -305,22 +330,13 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         batchId,
         batch,
         mutateCandidate: (candidate) => {
-          for (const session of trainingObjects) {
-            const canonicalSession = canonical.find(
-              (item) =>
-                item.evidence_type === "training" &&
-                item.quality?.status === "active" &&
-                item.payload?.id === session.id
-            );
-            const sessionEvents = events.filter(
-              (event) => event.sourceSessionId === session.id
-            );
+          for (const { reviewItem: session, canonicalSession } of resolvedTrainingSessions) {
+            const sessionEvents = events.filter((event) => event.sourceSessionId === session.id);
             coordinator.stageTrainingFinalization(candidate, {
-              canonicalTrainingSessionId:
-                canonicalSession?.payload?.id ?? session.id,
+              canonicalTrainingSessionId: canonicalSession.canonicalId,
               finalizedTrainingReportId: trainingAnalysis.id,
               sourceTrainingEvidenceIds: [
-                canonicalSession?.canonicalId ?? session.id,
+                canonicalSession.canonicalId,
               ],
               performanceEventBatchId: batchId,
               performanceEventIds: sessionEvents.map((event) => event.id),
@@ -335,9 +351,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
                 performanceEventIds:
                   sessionEvents.map((event) => event.id).sort(),
               }),
-              evidenceCutoff: `${String(
-                session.observed_at
-              ).slice(0, 10)}T23:59:59.999Z`,
+              evidenceCutoff: `${String(session.observed_at).slice(0, 10)}T23:59:59.999Z`,
             });
           }
         },
@@ -354,10 +368,10 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           }
         },
         validateFinalized: (candidate) =>
-          trainingObjects.every((session) =>
+          resolvedTrainingSessions.every(({ canonicalSession }) =>
             candidate.piTrainingConfidenceWorkItems?.some(
               (work) =>
-                work.canonicalTrainingSessionId === session.id &&
+                work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
                 work.performanceEventBatchId === batchId
             )
           ),
@@ -380,10 +394,10 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         existingEvents: persistence.existingEvents,
         performanceEventBatchId: persistence.batch?.id ?? null,
         lowerLevelWorkIds: lowerLevelEnabled
-          ? trainingObjects.map((session) =>
+          ? resolvedTrainingSessions.map(({ canonicalSession }) =>
               getFounderRuntimeStore().piTrainingConfidenceWorkItems
                 ?.find((work) =>
-                  work.canonicalTrainingSessionId === session.id &&
+                  work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
                   work.performanceEventBatchId === batchId
                 )?.id
             ).filter(Boolean)
@@ -418,11 +432,38 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       return { status: "completed", artifactIds: artifacts, photoSessionIds, freshness: eligible.length ? "event_generated" : "scheduled_preserved" };
     },
     home_refresh: async ({ results }) => {
-      revalidatePath("/");
-      revalidatePath("/briefing/daily");
-      return { status: "completed", invalidatedPaths: ["/", "/briefing/daily"], refreshKey: `home_${evidencePackage.package_id}`, artifactIds: results.briefing?.artifactIds ?? [] };
+      return {
+        status: "completed",
+        pathsToRevalidate: ["/", "/briefing/daily", "/progress", "/progress/photos", "/progress/dexa", "/progress/training", "/timeline"],
+        tagsToRevalidate: [],
+        redirectPath: `/evidence/review/${reviewId}?confirmed=1`,
+        refreshKey: `home_${evidencePackage.package_id}`,
+        artifactIds: results.briefing?.artifactIds ?? [],
+      };
     },
   };
+}
+
+function publishPostConfirmationRefreshes(orchestrationResult) {
+  const publication = orchestrationResult?.homeRefreshResult ?? orchestrationResult?.results?.home_refresh ?? null;
+  const paths = uniqueStrings(publication?.pathsToRevalidate ?? []);
+  const tags = uniqueStrings(publication?.tagsToRevalidate ?? []);
+  try {
+    paths.forEach((path) => revalidatePath(path));
+    return { status: "published", paths, tags, warning: null, redirectPath: publication?.redirectPath ?? null };
+  } catch (error) {
+    const isRequestContextError = String(error?.message ?? error).includes("static generation store missing in revalidatePath");
+    if (!isRequestContextError) {
+      throw error;
+    }
+    return {
+      status: "deferred",
+      paths,
+      tags,
+      warning: "refresh_deferred",
+      redirectPath: publication?.redirectPath ?? null,
+    };
+  }
 }
 
 async function commitCompatibilityRepositories({ evidencePackage, user }) {
@@ -540,6 +581,54 @@ async function runDomainAnalysis({ canonical, evidencePackage, user }) {
     await FounderRepositories.analyses.createAnalysis(analysis); created.push(analysis);
   }
   return created;
+}
+
+function buildCanonicalCommitResults({ committedPackage, canonical = [], report = {} } = {}) {
+  const canonicalTrainingSessions = canonical.filter(
+    (item) => item?.evidence_type === "training" && item?.quality?.status === "active"
+  );
+  const reviewItems = (committedPackage?.evidence_objects ?? []).filter(
+    (item) => item?.evidence_type === "training" && item?.removed !== true
+  );
+  const reportTrainingIds = uniqueStrings([
+    ...(report.addedCanonicalIds ?? []),
+    ...(report.updatedCanonicalIds ?? []),
+  ]).filter((id) => canonicalTrainingSessions.some((item) => item.canonicalId === id));
+
+  return reviewItems.map((reviewItem, index) => {
+    const sourceRefs = uniqueStrings([
+      reviewItem.id,
+      ...(reviewItem.source?.source_artifact_refs ?? []),
+      ...(reviewItem.provenance?.source_artifact_refs ?? []),
+      ...(reviewItem.references?.source_artifact_refs ?? []),
+    ]);
+    const match = canonicalTrainingSessions.find((candidate) => {
+      const candidateRefs = uniqueStrings([
+        ...(candidate?.provenance?.source_artifact_refs ?? []),
+        ...(candidate?.provenance?.contributing_evidence_object_ids ?? []),
+        ...(candidate?.source?.source_artifact_refs ?? []),
+      ]);
+      return sourceRefs.length > 0 && sourceRefs.every((ref) => candidateRefs.includes(ref));
+    });
+    const fallbackId = reportTrainingIds[index];
+    const fallback = canonicalTrainingSessions.find((candidate) => candidate.canonicalId === fallbackId);
+    const selected = match ?? fallback;
+    if (!selected) return null;
+    return [
+      {
+        canonicalEntityType: "training",
+        canonicalEntityId: selected.canonicalId,
+        reviewItemId: reviewItem.id,
+        sourceEvidenceId: sourceRefs[0] ?? reviewItem.id,
+        originalNormalizedId: reviewItem.id,
+        canonicalSourceReferences: uniqueStrings([
+          ...(selected?.provenance?.source_artifact_refs ?? []),
+          ...(selected?.provenance?.contributing_evidence_object_ids ?? []),
+          ...(selected?.source?.source_artifact_refs ?? []),
+        ]),
+      },
+    ];
+  }).filter(Boolean);
 }
 
 function validateDexaObjectsBeforeCommit(evidencePackage) {

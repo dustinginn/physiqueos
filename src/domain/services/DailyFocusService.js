@@ -1,5 +1,7 @@
 import { normalizeProgressPhotoCategory } from "../models/progressPhotoPoseVocabulary";
 import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
+import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
+import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
 
 const DAY_NAMES = [
   "sunday",
@@ -152,7 +154,7 @@ function getPersistentReminderItems({ reminders, today, dayName }) {
       (reminder) =>
         reminder.persistenceMode === "always_visible" &&
         reminder.active &&
-        reminderAppliesToday(reminder, dayName)
+        reminderAppliesToday(reminder, dayName, today)
     )
     .map((reminder) => {
       const completed = isSameLocalDate(reminder.completedAt, today);
@@ -206,7 +208,7 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       item.linkedEvidenceType === "progress_photo" &&
       item.active &&
       isProgressPhotoReminder(item) &&
-      reminderAppliesToday(item, dayName)
+      reminderAppliesToday(item, dayName, today)
   );
 
   if (photoReminders.length === 0) return [];
@@ -333,7 +335,7 @@ function getProtocolItem({ reminders, protocols, title, today, dayName, now }) {
       item.title === title &&
       item.type === "protocol_reminder" &&
       item.active &&
-      reminderAppliesToday(item, dayName)
+      reminderAppliesToday(item, dayName, today)
   );
 
   if (!reminder) return null;
@@ -506,14 +508,28 @@ function shouldSurfaceFallbackHabits({ checkIns, latestWeight, weightEntries, to
   return recentEvidenceDays < 4 || knownMissedHabit;
 }
 
-function reminderAppliesToday(reminder, dayName) {
+function reminderAppliesToday(reminder, dayName, localDate = null) {
   if (reminder.schedule?.type === "daily" || reminder.schedule?.cadence === "daily") {
     return true;
   }
 
   const daysOfWeek = reminder.schedule?.daysOfWeek ?? [];
 
-  if (daysOfWeek.length > 0) return daysOfWeek.includes(dayName);
+  if (daysOfWeek.length > 0 && !daysOfWeek.includes(dayName)) return false;
+
+  if (Number(reminder.schedule?.interval ?? 1) > 1 && localDate) {
+    try {
+      const recurrence = normalizeProtocolRecurrence(reminder.schedule, {
+        fallbackTimezone: reminder.schedule.timezone,
+        fallbackAnchorDate: reminder.schedule.anchorDate,
+      });
+      return isProtocolDateOnCycle(recurrence, localDate);
+    } catch {
+      return false;
+    }
+  }
+
+  if (daysOfWeek.length > 0) return true;
 
   return reminder.schedule?.dayOfWeek === dayName;
 }
@@ -671,7 +687,7 @@ function getMostRecentUnknownOccurrence({
     const date = toDateKey(cursor);
     const dayName = DAY_NAMES[cursor.getDay()];
 
-    if (!reminderAppliesToday(reminder, dayName)) continue;
+    if (!reminderAppliesToday(reminder, dayName, date)) continue;
 
     const state = classifyReminderOccurrence({
       checkIns,

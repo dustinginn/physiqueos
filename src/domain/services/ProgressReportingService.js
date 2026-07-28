@@ -27,6 +27,11 @@ import {
 } from "../../presentation/trainingPresentation";
 import { orderEvidenceStreams } from "./EvidenceHubUsageService";
 import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
+import {
+  assessWorkoutDuplicatePair,
+  getWorkoutDuplicateIdentityKey,
+} from "./WorkoutDuplicateIdentityService";
+import { normalizeIdentityPart } from "./normalizeIdentityPart";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -1297,17 +1302,7 @@ function getEvidenceObjectIdentity(evidenceObject) {
   }
 
   if (isTrainingSession(evidenceObject)) {
-    const metadata = evidenceObject.metadata ?? {};
-
-    return [
-      "training",
-      getDateKey(evidenceObject.observed_at),
-      metadata.activity_type,
-      metadata.active_calories,
-      metadata.distance,
-      metadata.start_time ?? metadata.started_at ?? metadata.start,
-      metadata.duration_seconds,
-    ].join("|");
+    return getWorkoutDuplicateIdentityKey(evidenceObject);
   }
 
   return [evidenceObject.evidence_type, evidenceObject.id].join("|");
@@ -1352,152 +1347,7 @@ function comparableActivityMetric(left, right) {
 
 function isCompatibleTrainingPayload(left = {}, right = {}) {
   if (!isTrainingSession(left) || !isTrainingSession(right)) return false;
-
-  const leftMetadata = left.metadata ?? {};
-  const rightMetadata = right.metadata ?? {};
-
-  if (getDateKey(left.observed_at) !== getDateKey(right.observed_at)) return false;
-  if (normalizeIdentityPart(leftMetadata.activity_type) !== normalizeIdentityPart(rightMetadata.activity_type)) {
-    return false;
-  }
-
-  if (isTrainingExerciseEnrichmentPair(left, right)) return true;
-
-  return (
-    hasSufficientSharedTrainingIdentity(leftMetadata, rightMetadata) &&
-    areTrainingIdentityPartsCompatible(leftMetadata, rightMetadata)
-  );
-}
-
-function areTrainingIdentityPartsCompatible(leftMetadata = {}, rightMetadata = {}) {
-  return (
-    compatibleOptionalIdentityPart(
-      leftMetadata.active_calories,
-      rightMetadata.active_calories
-    ) &&
-    compatibleOptionalIdentityPart(leftMetadata.distance, rightMetadata.distance) &&
-    compatibleOptionalNumber(
-      leftMetadata.duration_seconds,
-      rightMetadata.duration_seconds,
-      120
-    ) &&
-    compatibleOptionalIdentityPart(leftMetadata.start_time, rightMetadata.start_time) &&
-    compatibleOptionalIdentityPart(leftMetadata.end_time, rightMetadata.end_time)
-  );
-}
-
-function isTrainingExerciseEnrichmentPair(left = {}, right = {}) {
-  const leftMetadata = left.metadata ?? {};
-  const rightMetadata = right.metadata ?? {};
-
-  if (!isResistanceActivityType(leftMetadata.activity_type)) return false;
-  if (!isResistanceActivityType(rightMetadata.activity_type)) return false;
-
-  const leftExerciseOnly = isExerciseOnlyTrainingPayload(left);
-  const rightExerciseOnly = isExerciseOnlyTrainingPayload(right);
-  if (leftExerciseOnly === rightExerciseOnly) return false;
-
-  const exerciseOnlyPayload = leftExerciseOnly ? left : right;
-  const workoutPayload = leftExerciseOnly ? right : left;
-  const exerciseOnlyMetadata = exerciseOnlyPayload.metadata ?? {};
-
-  const exerciseOnlyHasNoWorkoutMetrics = ![
-    exerciseOnlyMetadata.active_calories,
-    exerciseOnlyMetadata.distance,
-    exerciseOnlyMetadata.duration_seconds,
-    exerciseOnlyMetadata.start_time,
-    exerciseOnlyMetadata.end_time,
-  ].some((value) => value !== null && value !== undefined && value !== "");
-
-  return (
-    exerciseOnlyHasNoWorkoutMetrics &&
-    hasOverlappingExerciseNames(exerciseOnlyPayload.exercises, workoutPayload.exercises)
-  );
-}
-
-function isExerciseOnlyTrainingPayload(payload = {}) {
-  const metadata = payload.metadata ?? {};
-
-  return (
-    (payload.exercises ?? []).length > 0 &&
-    ![
-      metadata.active_calories,
-      metadata.distance,
-      metadata.duration_seconds,
-      metadata.start_time,
-      metadata.end_time,
-    ].some((value) => value !== null && value !== undefined && value !== "")
-  );
-}
-
-function hasOverlappingExerciseNames(left = [], right = []) {
-  if ((left ?? []).length === 0 || (right ?? []).length === 0) return false;
-
-  const rightNames = new Set(
-    right.map((exercise) => normalizeIdentityPart(exercise?.name)).filter(Boolean)
-  );
-
-  return left.some((exercise) =>
-    rightNames.has(normalizeIdentityPart(exercise?.name))
-  );
-}
-
-function isResistanceActivityType(activityType) {
-  return /strength|traditional strength|resistance|weight/i.test(
-    String(activityType ?? "")
-  );
-}
-
-function hasSufficientSharedTrainingIdentity(leftMetadata = {}, rightMetadata = {}) {
-  if (bothPresent(leftMetadata.start_time, rightMetadata.start_time)) return true;
-  if (bothPresent(leftMetadata.end_time, rightMetadata.end_time)) return true;
-
-  const compatibleMetricCount = [
-    ["active_calories", 0],
-    ["distance", 0],
-    ["duration_seconds", 120],
-    ["average_heart_rate", 3],
-  ].filter(([key, tolerance]) => {
-    if (!bothPresent(leftMetadata[key], rightMetadata[key])) return false;
-    return compatibleOptionalNumber(leftMetadata[key], rightMetadata[key], tolerance);
-  }).length;
-
-  return compatibleMetricCount >= 2;
-}
-
-function compatibleOptionalNumber(left, right, tolerance = 0) {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
-
-  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) {
-    return normalizeIdentityPart(left) === normalizeIdentityPart(right);
-  }
-
-  return Math.abs(leftNumber - rightNumber) <= tolerance;
-}
-
-function bothPresent(left, right) {
-  return (
-    left !== null &&
-    left !== undefined &&
-    left !== "" &&
-    right !== null &&
-    right !== undefined &&
-    right !== ""
-  );
-}
-
-function compatibleOptionalIdentityPart(left, right) {
-  if (left === null || left === undefined || left === "") return true;
-  if (right === null || right === undefined || right === "") return true;
-
-  return normalizeIdentityPart(left) === normalizeIdentityPart(right);
-}
-
-function normalizeIdentityPart(value) {
-  if (value === null || value === undefined || value === "") return "";
-
-  return String(value).trim().toLowerCase();
+  return assessWorkoutDuplicatePair(left, right).outcome === "duplicate";
 }
 
 function uniqueStrings(values = []) {

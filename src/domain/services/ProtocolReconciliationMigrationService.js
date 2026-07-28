@@ -6,6 +6,10 @@ import {
   reconcileGoalPlanningBaseline,
 } from "./GoalEditCriticalStateFingerprintService.js";
 import { createFounderStoreUnitOfWork } from "../../data/repositories/FounderStoreUnitOfWork.js";
+import {
+  ActiveProtocolLineageClassification,
+  classifyActiveProtocolLineage,
+} from "./ActiveProtocolLineageInvariantService.js";
 
 export const PROTOCOL_RECONCILIATION_MIGRATION_ID =
   "visible_abs_to_build_lean_mass_protocol_reconciliation_v1";
@@ -169,7 +173,7 @@ export function applyProtocolReconciliationPlan(store, plan, { migratedAt = new 
       retained.push(legacy.id);
       cancelled.push(planned.id);
     } else {
-      promoteProtocol(planned, legacy, plan, migratedAt);
+      promoteProtocol(candidate, planned, legacy, plan, migratedAt);
       activated.push(planned.id);
       if (legacy) superseded.push(legacy.id);
     }
@@ -221,6 +225,11 @@ export function validateProtocolReconciliationPostState(before, after, plan) {
     if (!authoritative?.currentGoalIds?.includes(plan.targetGoalId)) failures.push(`TARGET_GOAL_MISSING:${pair.authoritativeProtocolId}`);
     if (pair.legacyProtocolId && !authoritative?.historicalGoalIds?.includes(plan.sourceGoalId)) {
       failures.push(`HISTORY_MISSING:${pair.authoritativeProtocolId}`);
+    }
+    if (pair.action === "promote"
+        && classifyActiveProtocolLineage(after, pair.authoritativeProtocolId)?.classification
+          !== ActiveProtocolLineageClassification.VALID) {
+      failures.push(`ACTIVE_LINEAGE_INVALID:${pair.authoritativeProtocolId}`);
     }
   }
   const semanticKeys = activeProtocols.map(activeSemanticKey);
@@ -349,7 +358,26 @@ function retainProtocol(legacy, planned, plan, at) {
   planned.reconciliation = { migrationId: plan.migrationId, action: "cancelled_planned_copy", reconciledAt: at };
 }
 
-function promoteProtocol(planned, legacy, plan, at) {
+function promoteProtocol(store, planned, legacy, plan, at) {
+  const versions = (store.protocolVersions ?? [])
+    .filter((item) => item.protocolId === planned.id);
+  const eligible = versions.filter((item) =>
+    item.status === "planned" && !item.endedAt
+    && item.confirmation?.authority === "accepted_goal_transition");
+  const activeVersions = versions.filter((item) =>
+    item.status === "active" && !item.endedAt);
+  if (eligible.length !== 1 || activeVersions.length !== 0) {
+    fail("INVALID_INITIAL_VERSION_LINEAGE",
+      "A promoted transition protocol requires exactly one planned initial version.", {
+        protocolId: planned.id,
+        eligibleVersionIds: eligible.map((item) => item.id),
+        activeVersionIds: activeVersions.map((item) => item.id),
+      });
+  }
+  const initialVersion = eligible[0];
+  initialVersion.status = "active";
+  initialVersion.activatedAt = at;
+  planned.currentVersionId = initialVersion.id;
   planned.status = "active";
   planned.currentGoalIds = [plan.targetGoalId];
   planned.historicalGoalIds = legacy ? unique([...(legacy.relatedGoalIds ?? []), plan.sourceGoalId]) : [];

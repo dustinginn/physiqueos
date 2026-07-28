@@ -1,4 +1,6 @@
 import { isConfirmedUsablePhoto } from "../models/progressPhotoPoseVocabulary";
+import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
+import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
 
 export const PHOTO_PRIORITY_SATISFACTION_TYPE = "progress_photo_session_confirmed";
 
@@ -60,6 +62,17 @@ function reminderMatchesDate(reminder, dateKey) {
   const day = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"][date.getUTCDay()];
   const schedule = reminder.schedule ?? {};
   if (schedule.type === "daily" || schedule.cadence === "daily") return true;
+  if (Number(schedule.interval ?? 1) > 1) {
+    try {
+      const recurrence = normalizeProtocolRecurrence(schedule, {
+        fallbackTimezone: schedule.timezone,
+        fallbackAnchorDate: schedule.anchorDate,
+      });
+      return isProtocolDateOnCycle(recurrence, dateKey);
+    } catch {
+      return false;
+    }
+  }
   const days = schedule.daysOfWeek?.length ? schedule.daysOfWeek : [schedule.preferredDay ?? schedule.dayOfWeek].filter(Boolean);
   return days.includes(day);
 }
