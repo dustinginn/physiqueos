@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { MONTHLY_DECISION_SCHEMA_FIELDS, MONTHLY_STORY_TYPES, composeMonthlyBriefingPreview, createMonthlyBriefingPreviewService } from "./MonthlyBriefingPreviewService";
+import {
+  MONTHLY_DECISION_SCHEMA_FIELDS,
+  MONTHLY_SCORE_WEIGHTS,
+  MONTHLY_STORY_TYPES,
+  composeMonthlyBriefingPreview,
+  createMonthlyBriefingPreviewService,
+  normalizeMonthlyEvidenceRefs,
+  rankMonthlyCandidates,
+} from "./MonthlyBriefingPreviewService";
 import { monthlyPreviewFixtures } from "../../fixtures/monthlyBriefingPreview";
 
 const baseWeights = [
@@ -12,6 +20,7 @@ const baseGoal = {
   id: "goal-visible-abs",
   title: "Visible Abs at Rest",
   timeline: { startDate: "2026-05-01", targetDate: "2026-07-18" },
+  completionEvent: { id: "goal-completion-visible-abs-2026-07-18", completedAt: "2026-07-18" },
 };
 
 const baseDexaScans = [
@@ -59,6 +68,8 @@ const ordinaryInput = {
   syntheticContinuation: monthlyPreviewFixtures.ordinaryMonth.syntheticContinuation,
 };
 
+const FIXED_GENERATED_AT = "2026-07-30T18:00:00.000Z";
+
 const baseCompose = (fixture, synthetic = fixture.syntheticContinuation) => composeMonthlyBriefingPreview({
   weights: fixture.weights,
   dexaScans: fixture.dexaScans,
@@ -68,6 +79,8 @@ const baseCompose = (fixture, synthetic = fixture.syntheticContinuation) => comp
   trainingObservations: fixture.trainingObservations ?? [],
   goal: fixture.goal,
   syntheticContinuation: synthetic,
+  generatedAt: FIXED_GENERATED_AT,
+  previewWindow: fixture.previewWindow,
 });
 
 const makeSyntheticAsReal = (fixture) => ({
@@ -160,7 +173,7 @@ describe("Monthly Briefing Preview stabilization", () => {
     expect(completion.storyWindow.endDate).toBe("2026-07-18");
     expect(completion.storyId).toBe(ids.goal_completion);
     expect(completion.storyId).toContain("2026-07-18");
-    expect(completion.evidenceRefs.join(" ")).toContain("goal_2026-07-18");
+    expect(completion.evidenceRefs).toContain("goal-completion-visible-abs-2026-07-18");
     expect(baseline).toBeTruthy();
     expect(baseline.provenance.bodyFat).toBe(7.7);
     expect(baseline.timeWindow.startDate).toBe("2026-07-18");
@@ -183,11 +196,11 @@ describe("Monthly Briefing Preview stabilization", () => {
     });
     const synthetic = july.editorialDecision.synthetic;
 
-    expect(latestReal).toBe("2026-06-30");
+    expect(latestReal).toBe("2026-07-28");
     expect(synthetic.active).toBe(true);
-    expect(synthetic.realEvidenceCutoff).toBe("2026-06-30");
-    expect(synthetic.syntheticStart).toBe("2026-07-01");
-    expect(synthetic.syntheticEnd).toBe("2026-07-30");
+    expect(synthetic.realEvidenceCutoff).toBe("2026-07-28");
+    expect(synthetic.syntheticStart).toBe("2026-07-29");
+    expect(synthetic.syntheticEnd).toBe("2026-07-31");
 
     const syntheticDates = [
       ...julyInput.syntheticContinuation.weights,
@@ -199,7 +212,7 @@ describe("Monthly Briefing Preview stabilization", () => {
       .map((entry) => entry.measuredAt || entry.date || entry.capturedAt)
       .filter(Boolean)
       .sort();
-    expect(syntheticDates.every((date) => date > "2026-06-30")).toBe(true);
+    expect(syntheticDates.every((date) => date > "2026-07-28")).toBe(true);
   });
 
   it("keeps carry-in comparison context separate from July story windows", () => {
@@ -262,7 +275,7 @@ describe("Monthly Briefing Preview stabilization", () => {
     const ordinary = baseCompose(ordinaryInput);
     const decision = ordinary.editorialDecision;
     ["goal_completion", "goal_start", "phase_transition", "dexa_baseline", "new_baseline", "risk_signal", "interruption", "dexa_comparison", "dexa_contradiction"].forEach((type) => {
-      expect(getByType(decision, type)).toBeNull();
+      expect(getByType(decision, type)).toBeUndefined();
     });
     expect(getByType(decision, "photo_progression")).toBeTruthy();
     expect(getByType(decision, "training_evolution")).toBeTruthy();
@@ -273,8 +286,134 @@ describe("Monthly Briefing Preview stabilization", () => {
 
   it("does not include unsupported risk/interruption stories from July fixture", () => {
     const july = baseCompose(julyInput);
-    expect(getByType(july.editorialDecision, "risk_signal")).toBeNull();
-    expect(getByType(july.editorialDecision, "interruption")).toBeNull();
+    expect(getByType(july.editorialDecision, "risk_signal")).toBeUndefined();
+    expect(getByType(july.editorialDecision, "interruption")).toBeUndefined();
+  });
+
+  it("preserves canonical string and record evidence identity without placeholders", () => {
+    expect(normalizeMonthlyEvidenceRefs("dexa_2026-07-18")).toEqual(["dexa_2026-07-18"]);
+    expect(normalizeMonthlyEvidenceRefs([
+      "dexa_2026-07-18",
+      { canonicalId: "canonical-dexa" },
+      { id: "photo_2026-07-16" },
+      "dexa_2026-07-18",
+      {},
+      "",
+    ])).toEqual(["dexa_2026-07-18", "canonical-dexa", "photo_2026-07-16"]);
+
+    const decision = baseCompose(julyInput).editorialDecision;
+    expect(decision.candidates.flatMap((candidate) => candidate.evidenceRefs)).not.toContain("record_");
+    const photo = getByType(decision, "photo_progression");
+    expect(photo?.exclusionReason ?? "").not.toMatch(/^merged_into_.*(?:baseline)/);
+  });
+
+  it("emits true score order with the documented deterministic tie-breaker", () => {
+    const tied = rankMonthlyCandidates([
+      { storyId: "z", score: 500, strategicSignificance: 8, evidenceStrength: 8 },
+      { storyId: "b", score: 500, strategicSignificance: 9, evidenceStrength: 7 },
+      { storyId: "a", score: 500, strategicSignificance: 9, evidenceStrength: 7 },
+      { storyId: "low", score: 499, strategicSignificance: 10, evidenceStrength: 10 },
+    ]);
+    expect(tied.map((candidate) => candidate.storyId)).toEqual(["a", "b", "z", "low"]);
+    expect(tied.map((candidate) => candidate.scoreRank)).toEqual([1, 2, 3, 4]);
+
+    const decision = baseCompose(julyInput).editorialDecision;
+    expect(decision.scoreRankedCandidateIds).toEqual(
+      [...decision.candidates].sort((left, right) => left.scoreRank - right.scoreRank).map((candidate) => candidate.storyId),
+    );
+    expect(decision.candidates.every((candidate) => Number.isInteger(candidate.scoreRank) && candidate.scoreRank > 0)).toBe(true);
+  });
+
+  it("preserves final merge state and metadata on both candidates", () => {
+    const decision = baseCompose(julyInput).editorialDecision;
+    const merged = decision.candidates.find((candidate) => candidate.exclusionReason?.startsWith("merged_into_"));
+    expect(merged).toBeTruthy();
+    expect(merged.scoreRank).toBeGreaterThan(0);
+    expect(merged.exclusionReason).not.toBe("editorial_capacity_exceeded");
+    expect(merged.mergeMetadata).toMatchObject({
+      mergeTargetId: expect.any(String),
+      mergeReason: expect.any(String),
+      transferredEvidenceRefs: expect.any(Array),
+      transferredSourceClaimRefs: expect.any(Array),
+      transferredProvenance: expect.any(Object),
+    });
+
+    const primary = decision.candidates.find((candidate) => candidate.storyId === merged.mergeMetadata.mergeTargetId);
+    expect(primary.mergeMetadata.mergedCandidateIds).toContain(merged.storyId);
+    expect(primary.mergeMetadata.retainedEvidenceRefs).toEqual(expect.arrayContaining(merged.evidenceRefs));
+    expect(primary.mergeMetadata.retainedSourceClaimRefs).toEqual(expect.arrayContaining(merged.sourceClaimRefs));
+    expect(primary.mergeMetadata.retainedProvenance).toHaveLength(2);
+    expect(primary.mergeMetadata.mergedStoryTypes).toEqual(expect.arrayContaining([primary.storyType, merged.storyType]));
+  });
+
+  it("keeps capacity, merge, and duplicate suppression semantically distinct", () => {
+    const decision = baseCompose(julyInput).editorialDecision;
+    const capacity = decision.candidates.filter((candidate) => candidate.exclusionReason === "editorial_capacity_exceeded");
+    const merged = decision.candidates.filter((candidate) => candidate.exclusionReason?.startsWith("merged_into_"));
+    expect(merged.length).toBeGreaterThan(0);
+    expect(capacity.every((candidate) => candidate.mergeMetadata === null)).toBe(true);
+    expect(merged.every((candidate) => candidate.exclusionReason !== "editorial_capacity_exceeded")).toBe(true);
+  });
+
+  it("retains score rank separately from rendered order and explains every rendered position", () => {
+    const decision = baseCompose(julyInput).editorialDecision;
+    decision.candidates.forEach((candidate) => {
+      if (candidate.included) {
+        expect(candidate.renderedOrder).toBeGreaterThan(0);
+        expect(candidate.renderedOrderReason).toBeTruthy();
+      } else {
+        expect(candidate.renderedOrder).toBeNull();
+        expect(candidate.renderedOrderReason).toBeNull();
+      }
+    });
+    expect(decision.candidates.some((candidate) => candidate.included && candidate.scoreRank !== candidate.renderedOrder)).toBe(true);
+  });
+
+  it("normalizes weights and keeps scores internally consistent in the 0-1000 range", () => {
+    const weightTotal = Object.values(MONTHLY_SCORE_WEIGHTS).reduce((total, value) => total + value, 0);
+    expect(weightTotal).toBeCloseTo(1, 12);
+
+    const syntheticDecision = baseCompose(julyInput).editorialDecision;
+    const realDecision = baseCompose(julyInput, makeSyntheticAsReal(julyInput).syntheticContinuation).editorialDecision;
+    syntheticDecision.candidates.forEach((candidate) => {
+      const contributorTotal = Object.values(candidate.scoreContributors)
+        .reduce((total, contributor) => total + Math.round(contributor.weighted * 100), 0) / 100;
+      expect(candidate.score).toBeGreaterThanOrEqual(0);
+      expect(candidate.score).toBeLessThanOrEqual(1000);
+      expect(contributorTotal).toBe(candidate.score);
+    });
+    expect(syntheticDecision.candidates.map(({ storyId, score }) => [storyId, score]))
+      .toEqual(realDecision.candidates.map(({ storyId, score }) => [storyId, score]));
+  });
+
+  it("produces deeply deterministic decisions from an injected generation timestamp", () => {
+    const first = baseCompose(julyInput);
+    const repeated = baseCompose(julyInput);
+    expect(repeated.editorialDecision).toEqual(first.editorialDecision);
+
+    const changed = composeMonthlyBriefingPreview({ ...julyInput, generatedAt: "2026-07-30T19:00:00.000Z" });
+    const firstComparable = structuredClone(first);
+    const changedComparable = structuredClone(changed);
+    expect(first.editorialDecision.generatedAt).toBe(FIXED_GENERATED_AT);
+    expect(changed.editorialDecision.generatedAt).toBe("2026-07-30T19:00:00.000Z");
+    firstComparable.editorialDecision.generatedAt = null;
+    firstComparable.provenance.generatedAt = null;
+    changedComparable.editorialDecision.generatedAt = null;
+    changedComparable.provenance.generatedAt = null;
+    expect(changedComparable).toEqual(firstComparable);
+  });
+
+  it("validates semantic candidate state rather than key presence alone", () => {
+    const decision = baseCompose(julyInput).editorialDecision;
+    decision.candidates.forEach((candidate) => {
+      MONTHLY_DECISION_SCHEMA_FIELDS.forEach((field) => expect(candidate).toHaveProperty(field));
+      expect(candidate.evidenceRefs).not.toContain("record_");
+      expect(candidate.scoreRank).toBeGreaterThan(0);
+      if (candidate.exclusionReason?.startsWith("merged_into_")) {
+        expect(candidate.mergeMetadata.mergeTargetId).toBeTruthy();
+        expect(candidate.mergeMetadata.mergeReason).toBeTruthy();
+      }
+    });
   });
 
   it("keeps ranked editorial candidate schema and suppression metadata deterministic", () => {
@@ -332,4 +471,3 @@ describe("Monthly Briefing Preview stabilization", () => {
     expect(JSON.stringify(baseDailyBriefings)).toBe(beforeDaily);
   });
 });
-

@@ -1,8 +1,35 @@
-export function createMobileEvidenceReviewFixture({ noneIncluded = false } = {}) {
+export function createMobileEvidenceReviewFixture({ newExercise = false, noneIncluded = false } = {}) {
   const evidenceObjects = [
     training("fixture-training-jul-13", "2026-07-13", "Traditional Strength Training"),
     training("fixture-stair-stepper-jul-13", "2026-07-13", "Stair Stepper", []),
   ];
+  if (newExercise) {
+    evidenceObjects[0].exercises.splice(1, 0, {
+      id: "provisional_exercise_fixture",
+      name: "Bicep Curl Machine",
+      canonicalExerciseId: null,
+      resolutionStatus: "unresolved_provisional",
+      sets: Array.from({ length: 4 }, (_, index) => ({
+        set_number: index + 1,
+        reps: 18,
+        weight: 75,
+        weight_unit: "lb",
+        provenance_ref: "typed_evidence_0",
+      })),
+      provisionalExercise: {
+        provisionalExerciseId: "provisional_exercise_fixture",
+        rawSubmittedName: "Bicep Curl Machine",
+        normalizedDisplayName: "Bicep Curl Machine",
+        resolutionStatus: "unresolved",
+        suggestedCanonicalName: "Bicep Curl Machine",
+        suggestedPrimaryMuscleGroup: "Biceps",
+        suggestedMovementPattern: "Elbow Flexion",
+        suggestedEquipment: "Machine",
+        suggestedLaterality: "Bilateral",
+        suggestedAliases: ["Machine Bicep Curl", "Biceps Curl Machine"],
+      },
+    });
+  }
   return {
     id: "fixture-mobile-review",
     userId: "fixture-user",

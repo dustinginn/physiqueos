@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { interpretPdfEvidence } from "../interpreters/PdfInterpreter";
-import { interpretScreenshotsWithVision } from "../interpreters/ScreenshotInterpreterService";
+import {
+  interpretScreenshotsWithVision,
+  reconcileIndependentlyInterpretedScreenshotPackages,
+} from "../interpreters/ScreenshotInterpreterService";
 import { interpretTextEvidence } from "../interpreters/TextInterpreter";
 import {
   CanonicalProgressPhotoCategories,
@@ -245,24 +248,210 @@ async function createImageEvidencePackage({
   submissionId,
   typedEvidence,
 }) {
-  const result = await interpretScreenshotsWithVision({
+  return interpretScreenshotArtifactsIndividually({
+    artifacts,
+    evidenceDate,
     expectedEvidenceType,
-    screenshots: artifacts.map((artifact) => ({
-      dataUrl: artifact.dataUrl,
-      fileName: artifact.fileName,
-      evidenceDate,
-      mimeType: artifact.mimeType,
-      uploadedAt: artifact.uploadedAt,
-    })),
     submissionId: `${submissionId}_images`,
+    typedEvidence,
+  });
+}
+
+export async function interpretScreenshotArtifactsIndividually({
+  artifacts = [],
+  evidenceDate,
+  expectedEvidenceType,
+  interpret = interpretScreenshotsWithVision,
+  submissionId,
+  typedEvidence,
+} = {}) {
+  const outcomes = [];
+  const candidatePackages = [];
+  const screenshots = artifacts.map((artifact) => ({
+    dataUrl: artifact.dataUrl,
+    evidenceDate,
+    fileName: artifact.fileName,
+    id: artifact.id,
+    mimeType: artifact.mimeType,
+    uploadedAt: artifact.uploadedAt,
+  }));
+
+  // Deliberately sequential: bounded concurrency of one avoids request bursts while
+  // preserving stable file ordering independent of provider response latency.
+  for (let index = 0; index < artifacts.length; index += 1) {
+    const artifact = artifacts[index];
+    const screenshot = screenshots[index];
+    try {
+      const result = await interpret({
+        expectedEvidenceType,
+        screenshots: [screenshot],
+        submissionId: `${submissionId}_file_${index + 1}`,
+        typedEvidence: null,
+      });
+      const evidencePackage = remapScreenshotArtifactReferences(
+        result.evidencePackage,
+        artifact.id
+      );
+      const candidates = (evidencePackage?.evidence_objects ?? []).filter(
+        (object) => !["auto", "unknown", "unrecognized"].includes(object.evidence_type)
+      );
+      const failed = result.provider === "fallback";
+      const status = failed
+        ? "interpretation_failure"
+        : candidates.length > 0
+          ? "candidates"
+          : "unrecognized";
+      const outcome = createPerFileInterpretationOutcome({
+        artifact,
+        candidates,
+        index,
+        reason:
+          failed
+            ? result.fallbackReason ?? result.warning ?? "Interpreter fallback."
+            : candidates.length === 0
+              ? "No canonical evidence candidate was recognized."
+              : null,
+        status,
+        uploadSessionId: submissionId,
+      });
+      outcomes.push(outcome);
+      if (!failed && candidates.length > 0) {
+        candidatePackages.push({
+          ...evidencePackage,
+          evidence_objects: candidates,
+        });
+      }
+    } catch (error) {
+      outcomes.push(
+        createPerFileInterpretationOutcome({
+          artifact,
+          candidates: [],
+          index,
+          reason: error?.message ?? "Screenshot interpretation failed.",
+          status: "interpretation_failure",
+          uploadSessionId: submissionId,
+        })
+      );
+    }
+  }
+
+  const reconciled = reconcileIndependentlyInterpretedScreenshotPackages({
+    expectedEvidenceType,
+    packages: candidatePackages,
+    screenshots,
+    submissionId,
     typedEvidence: normalizeText(typedEvidence),
   });
 
-  return addProviderSelectionDiagnostics(result.evidencePackage, {
-    fallbackReason: result.fallbackReason,
-    provider: result.provider,
-    warning: result.warning,
-  });
+  return {
+    ...reconciled,
+    diagnostics: {
+      stages: [
+        {
+          id: `${submissionId}_per_file_interpretation`,
+          label: "Per-file screenshot interpretation",
+          inputScreenshotCount: artifacts.length,
+          perFileOutcomeCount: outcomes.length,
+          perFileOutcomes: outcomes,
+          evidenceObjectCount: outcomes.reduce(
+            (count, outcome) => count + outcome.candidateCount,
+            0
+          ),
+          canonicalObjectCounts: createCanonicalObjectCounts(
+            candidatePackages.flatMap((evidencePackage) => evidencePackage.evidence_objects)
+          ),
+        },
+        {
+          id: `${submissionId}_screenshot_reconciliation`,
+          label: "Per-file screenshot reconciliation",
+          evidenceObjectCount: reconciled.evidence_objects?.length ?? 0,
+          reconciledCategories: uniqueStrings(
+            (reconciled.evidence_objects ?? []).map((object) => object.evidence_type)
+          ),
+          sourceArtifactRefs: artifacts.map((artifact) => artifact.id),
+          dispositions: createReconciliationDispositions({
+            outcomes,
+            reconciledObjects: reconciled.evidence_objects ?? [],
+          }),
+          canonicalObjectCounts: createCanonicalObjectCounts(
+            reconciled.evidence_objects ?? []
+          ),
+        },
+        ...(reconciled.diagnostics?.stages ?? []),
+      ],
+      warnings: [
+        ...(reconciled.diagnostics?.warnings ?? []),
+        ...outcomes
+          .filter((outcome) => outcome.status !== "candidates")
+          .map((outcome) => `${outcome.fileId}: ${outcome.reason}`),
+      ],
+    },
+  };
+}
+
+function createPerFileInterpretationOutcome({
+  artifact,
+  candidates,
+  index,
+  reason,
+  status,
+  uploadSessionId,
+}) {
+  return {
+    candidateCount: candidates.length,
+    categories: uniqueStrings(candidates.map((object) => object.evidence_type)),
+    confidence: uniqueStrings(
+      candidates.flatMap((object) => [
+        object.confidence?.extraction,
+        object.confidence?.interpretation,
+      ])
+    ),
+    fileId: artifact.id,
+    fileIndex: index,
+    fileName: artifact.fileName,
+    mimeType: artifact.mimeType,
+    reason,
+    status,
+    storedArtifactRef: artifact.id,
+    uploadSessionId,
+  };
+}
+
+function createReconciliationDispositions({ outcomes, reconciledObjects }) {
+  const retainedRefs = new Set(
+    reconciledObjects.flatMap(
+      (object) => object.provenance?.source_artifact_refs ?? []
+    )
+  );
+  return outcomes.map((outcome) => ({
+    fileId: outcome.fileId,
+    disposition:
+      outcome.status !== "candidates"
+        ? outcome.status
+        : retainedRefs.has(outcome.fileId)
+          ? "retained_or_merged"
+          : "candidate_not_retained",
+    reason:
+      outcome.reason ??
+      (retainedRefs.has(outcome.fileId)
+        ? "Candidate provenance is represented after reconciliation."
+        : "Candidate provenance was not represented after reconciliation."),
+  }));
+}
+
+function remapScreenshotArtifactReferences(value, artifactId) {
+  if (Array.isArray(value)) {
+    return value.map((item) => remapScreenshotArtifactReferences(item, artifactId));
+  }
+  if (!value || typeof value !== "object") {
+    return value === "screenshot_0" ? artifactId : value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      remapScreenshotArtifactReferences(item, artifactId),
+    ])
+  );
 }
 
 function createProgressPhotoEvidencePackage({

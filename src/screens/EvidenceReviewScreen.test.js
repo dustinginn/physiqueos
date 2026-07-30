@@ -116,3 +116,15 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).not.toMatch(/evidence-retention|uploaded files may remain|storage implementation|backend retention/i);
   });
 });
+
+describe("EvidenceReviewScreen new exercise gate", () => {
+  it("keeps resolution inline and disables final save until it is complete", () => {
+    expect(screen).toContain("New exercise detected");
+    expect(screen).toContain("Add new");
+    expect(screen).toContain("Map existing");
+    expect(screen).toContain("Remove from workout");
+    expect(screen).toContain("Canonical exercise name");
+    expect(screen).toContain("unresolvedExercises.length > 0");
+    expect(screen).toContain("Resolve ${unresolvedCount} new exercise");
+  });
+});

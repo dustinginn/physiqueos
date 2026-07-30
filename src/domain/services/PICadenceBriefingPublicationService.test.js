@@ -60,6 +60,49 @@ describe("PI cadence briefing publication", () => {
     expect(saved.dailyBriefings).toEqual([]);
     expect(saved.goalConfidenceHistory).toEqual([]);
   });
+
+  it("publishes Monthly with the existing cutoff-valid confidence reference", async () => {
+    const fixture = setup();
+    const baseline = fixture.service.captureBaseline();
+    const artifact = {
+      id: "monthly_briefing_user_202607",
+      userId: "user",
+      artifactType: "scheduled",
+      cadence: "monthly",
+      evidenceWindow: {
+        id: "monthly:2026-07-01:2026-07-31:America/Los_Angeles",
+      },
+      briefing: {
+        monthlyNarrative: {
+          confidence: {
+            assessmentId: fixture.assessment.id,
+            score: fixture.assessment.score.current,
+          },
+        },
+        monthlyPresentation: { hero: {} },
+      },
+    };
+    const result = await fixture.service.publish({
+      schemaVersion: "pi_cadence_briefing_publication_v1",
+      cadence: "monthly",
+      operation: "create",
+      artifact,
+      artifactConfidenceAssessmentId: fixture.assessment.id,
+      confidencePublicationCommand: null,
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+    });
+    const saved = JSON.parse(fs.readFileSync(fixture.filePath, "utf8"));
+
+    expect(result).toMatchObject({
+      status: "briefing_created_confidence_matched",
+      committed: true,
+      revision: 8,
+    });
+    expect(saved.dailyBriefings).toEqual([artifact]);
+    expect(saved.goalConfidenceSnapshots).toEqual([]);
+    expect(saved.goalConfidenceHistory).toEqual([]);
+  });
 });
 
 function setup() {

@@ -1,4 +1,5 @@
 import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
+import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -304,7 +305,13 @@ function createFallbackPriorityDetail(priorityId, goals) {
           {
             label: "Supports the current goal",
             detail: primaryGoal
-              ? `This priority supports ${primaryGoal.title}.`
+              ? `This priority supports ${resolveUserFacingObjectLanguage({
+                  objectType: "goal",
+                  canonicalId: primaryGoal.id,
+                  displayName: primaryGoal.title,
+                  specificity: "specific",
+                  narrativeContext: "priority_coaching",
+                }).selectedReference}.`
               : "This priority supports the active operating plan.",
           },
         ],

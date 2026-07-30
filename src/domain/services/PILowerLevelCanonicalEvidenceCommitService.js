@@ -12,6 +12,8 @@ import {
   createPILowerLevelConfidenceWorkEnqueueService,
 } from "./PILowerLevelConfidenceWorkEnqueueService";
 import { createPISemanticFingerprint } from "./PILowerLevelConfidenceContracts";
+import { findCanonicalExerciseConflict } from "./CanonicalExerciseLibraryService";
+import { registerRuntimeTrainingExercises } from "../models/trainingExerciseIdentity";
 
 export const PILowerLevelSourceCommitOutcome = Object.freeze({
   SOURCE_COMMITTED_WORK_ENQUEUED: "source_committed_work_enqueued",
@@ -33,7 +35,11 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
     throw new Error("Lower-level canonical commit requires a bound Founder store.");
   }
   return Object.freeze({
-    async commitConfirmedEvidencePackage(evidencePackage, userId) {
+    async commitConfirmedEvidencePackage(
+      evidencePackage,
+      userId,
+      { canonicalExerciseDefinitions = [] } = {}
+    ) {
       const transaction = createUnitOfWork({
         filePath: runtimeStorePath,
         liveStore,
@@ -44,6 +50,23 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
       const enqueueResults = [];
       try {
         await transaction.mutate((candidate) => {
+          candidate.canonicalExerciseLibrary ??= [];
+          for (const definition of canonicalExerciseDefinitions) {
+            const conflict = findCanonicalExerciseConflict(
+              definition,
+              candidate.canonicalExerciseLibrary
+            );
+            if (conflict) {
+              throw new Error(
+                `"${definition.name}" matches the existing exercise "${conflict.name}".`
+              );
+            }
+            candidate.canonicalExerciseLibrary.push({
+              ...definition,
+              created_at: definition.created_at ?? now().toISOString(),
+              created_by: userId,
+            });
+          }
           reconciliation = reconcileConfirmedEvidencePackage({
             evidencePackage,
             existingCanonicalObjects: candidate.canonicalEvidenceObjects ?? [],
@@ -116,7 +139,10 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
             }
           }
         });
-        if (!reconciliation || reconciliation.changedObjects.length === 0) {
+        if (
+          (!reconciliation || reconciliation.changedObjects.length === 0) &&
+          canonicalExerciseDefinitions.length === 0
+        ) {
           transaction.abort();
           return sourceResult(
             PILowerLevelSourceCommitOutcome.SOURCE_MATCHED,
@@ -133,6 +159,10 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
               candidate.canonicalEvidenceObjects?.some(
                 (item) => item.canonicalId === record.canonicalId
               )
+            ) && canonicalExerciseDefinitions.every((definition) =>
+              candidate.canonicalExerciseLibrary?.some(
+                (item) => item.id === definition.id
+              )
             ) && enqueueResults.every((item) =>
               candidate.piEnergyConfidenceWorkItems?.some(
                 (work) => work.id === item.workId &&
@@ -143,6 +173,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
             );
           },
         });
+        registerRuntimeTrainingExercises(liveStore.canonicalExerciseLibrary ?? []);
         return sourceResult(
           enqueueResults.every((item) => item.outcome === "matched")
             ? PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED
@@ -153,6 +184,12 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
             committed: true,
             revision: committed.revision,
             commitId: committed.commitId,
+            report: {
+              ...(reconciliation?.report ?? {}),
+              newCanonicalExercises: canonicalExerciseDefinitions.map(
+                ({ id, name }) => ({ id, name })
+              ),
+            },
           }
         );
       } catch (error) {

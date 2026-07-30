@@ -1,6 +1,7 @@
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { expectedPhaseReviewDate } from "./GoalPhaseTimelineIntegrityService";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
 const DAY_MS = 86400000;
 export const GOAL_TRAINING_PRIORITY_GROUPS = Object.freeze(["Lower Body", "Core", "Arms"]);
@@ -51,7 +52,14 @@ export function composeGoalTrainingProgress({ goal, phase, period = resolveGoalT
 
 export function createTrainingProgressCheckpoint({ goalId, phaseId, phaseName, reviewDate, readinessState }) {
   const completed = readinessState === "ready";
-  return Object.freeze({ id: `goal-training-progress|${goalId}|${phaseId}|${reviewDate}`, type: "training_progress_review", date: reviewDate, title: "First four-week training review", phaseName, completed, turningPoint: completed ? { date: reviewDate, title: "Four-week training review", body: `Longitudinal training evidence became ready for the ${phaseName} phase.` } : null });
+  const phaseReference = resolveUserFacingObjectLanguage({
+    objectType: "phase",
+    canonicalId: phaseId,
+    displayName: phaseName,
+    specificity: "coaching",
+    narrativeContext: "long_term_training_review",
+  }).selectedReference;
+  return Object.freeze({ id: `goal-training-progress|${goalId}|${phaseId}|${reviewDate}`, type: "training_progress_review", date: reviewDate, title: "First four-week training review", phaseName, completed, turningPoint: completed ? { date: reviewDate, title: "Four-week training review", body: `Your long-term training review is ready for ${phaseReference}.` } : null });
 }
 
 function toMovementComparison(observation, comparabilityBlocks) {

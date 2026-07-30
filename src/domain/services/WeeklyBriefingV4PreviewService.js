@@ -1,5 +1,6 @@
 import { createWeeklyEvidenceWindow } from "./BriefingEvidenceWindowService";
 import { composeWeeklyNarrative } from "./WeeklyNarrativeService";
+import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
 export const WEEKLY_V4_PREVIEW_VERSION = "weekly_briefing_v4_preview";
 
@@ -30,8 +31,9 @@ export function composeWeeklyBriefingV4Preview({base,window,canonicalObjects=[],
   const energy=weeklyEnergy({canonicalObjects,window,dexaScans});
   const continuity=resolveContinuity(midweekArtifact,energy,narrative.cards.interpretation?.domains??[]);
   const goalName=historicalGoal?.title??goalNameFromNarrative(narrative)??"Current Goal";
+  const goalReference=resolveUserFacingObjectLanguage({objectType:"goal",canonicalId:historicalGoal?.id??null,displayName:goalName,specificity:"coaching",narrativeContext:"weekly_preview"}).selectedReference;
   const energyDomain=narrative.cards.interpretation?.domains?.find((item)=>item.domain==="energy_balance");
-  if(energyDomain){energyDomain.highlight=energy.conclusion;energyDomain.insight=energy.opportunity??`The completed week supports repeating the behaviors that kept ${goalName} moving forward.`;}
+  if(energyDomain){energyDomain.highlight=energy.conclusion;energyDomain.insight=energy.opportunity??`The completed week supports repeating the behaviors that kept ${goalReference} moving forward.`;}
   narrative.generatedAt=generatedAt;
   narrative.preview={version:WEEKLY_V4_PREVIEW_VERSION,readOnly:true,canonicalPresentation:"weekly_narrative_v5_1",historicalGoalId:historicalGoal?.id??narrative.completionContext?.goalId??null,midweekIntegrated:Boolean(midweekArtifact),energy};
   narrative.cards.interpretation={...narrative.cards.interpretation,title:"What the completed week established",opening:continuity.opening??narrative.cards.interpretation.opening,synthesis:continuity.synthesis??narrative.cards.interpretation.synthesis,uncertainty:continuity.uncertainty??narrative.cards.interpretation.uncertainty};

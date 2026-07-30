@@ -52,6 +52,11 @@ import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/servic
 import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
 import { getCanonicalProgressPhotoCategory } from "../../../../domain/models/progressPhotoPoseVocabulary";
+import { createCanonicalExerciseWorkoutCommitService } from "../../../../domain/services/CanonicalExerciseWorkoutCommitService";
+import {
+  assertNoUnresolvedProvisionalExercises,
+  canonicalDefinitionsPendingCreation,
+} from "../../../../domain/services/CanonicalExerciseLibraryService";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -80,7 +85,9 @@ export async function confirmEvidenceReview(formData) {
   try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
   catch { throw new Error("The evidence selection is invalid."); }
   evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
+  evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
+  assertNoUnresolvedProvisionalExercises(evidencePackage);
   assertIncludedPhotoSessionsReady(evidencePackage);
   validateDexaObjectsBeforeCommit(evidencePackage);
 
@@ -104,6 +111,32 @@ export async function confirmEvidenceReview(formData) {
   }
   const confirmedPath = `/evidence/review/${reviewId}?confirmed=1${publication?.warning ? `&refresh=${encodeURIComponent(publication.warning)}` : ""}`;
   redirect(confirmedPath);
+}
+
+export async function resolveEvidenceReviewExercise(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const mode = String(formData.get("resolutionMode") ?? "new");
+  await createEvidenceReviewService({ repositories: FounderRepositories })
+    .resolveProvisionalExercise(reviewId, {
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      provisionalExerciseId: String(formData.get("provisionalExerciseId") ?? ""),
+      mode,
+      canonicalExerciseId: String(formData.get("canonicalExerciseId") ?? ""),
+      definition: {
+        canonicalName: formData.get("canonicalName"),
+        primaryMuscleGroup: formData.get("primaryMuscleGroup"),
+        movementPattern: formData.get("movementPattern"),
+        equipment: formData.get("equipment"),
+        laterality: formData.get("laterality"),
+        aliases: formData.get("aliases"),
+      },
+      updatedBy: user.id,
+    });
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(`/evidence/review/${reviewId}?exercise=resolved`);
 }
 
 export async function updateEvidenceReviewItemDecision(formData) {
@@ -156,6 +189,23 @@ function mergeAuthoritativePhotoSessions(submitted = {}, authoritative = {}) {
   };
 }
 
+function mergeAuthoritativeTrainingSessions(submitted = {}, authoritative = {}) {
+  const training = new Map(
+    (authoritative.evidence_objects ?? [])
+      .filter((item) => item.evidence_type === "training")
+      .map((item) => [item.id, item])
+  );
+  return {
+    ...submitted,
+    evidence_objects: (submitted.evidence_objects ?? []).map((item) =>
+      item.evidence_type === "training" &&
+      training.get(item.id)?.exercises?.some((exercise) => exercise.provisionalExercise)
+        ? structuredClone(training.get(item.id))
+        : item
+    ),
+  };
+}
+
 function assertIncludedPhotoSessionsReady(evidencePackage) {
   for (const object of evidencePackage.evidence_objects ?? []) {
     if (object.removed || object.evidence_type !== "photo_session") continue;
@@ -182,12 +232,20 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         ]
           .includes(item.evidence_type)
       );
+      const newExerciseDefinitions = canonicalDefinitionsPendingCreation(committedPackage);
       const scopedResult =
         energySourceCommit && isPIEnergyConfidenceEnqueueEnabled()
           ? await createPILowerLevelCanonicalEvidenceCommitService({
               runtimeStorePath: resolveFounderRuntimeStorePath(),
               liveStore: getFounderRuntimeStore(),
-            }).commitConfirmedEvidencePackage(committedPackage, user.id)
+            }).commitConfirmedEvidencePackage(committedPackage, user.id, {
+              canonicalExerciseDefinitions: newExerciseDefinitions,
+            })
+          : newExerciseDefinitions.length > 0
+          ? await createCanonicalExerciseWorkoutCommitService({
+              runtimeStorePath: resolveFounderRuntimeStorePath(),
+              liveStore: getFounderRuntimeStore(),
+            }).commit(committedPackage, user.id)
           : await FounderRepositories.canonicalEvidence
               .reconcileConfirmedEvidencePackage(committedPackage, user.id);
       if (

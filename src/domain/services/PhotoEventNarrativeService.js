@@ -101,7 +101,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
       journeyComparisons: completionComparisons?.journeyComparisons ?? [],
       newBaselineViews: completionComparisons?.newBaselines?.map((view)=>activeViews.find((item)=>item.id===view.id)).filter(Boolean) ?? [],
       userDecision: goalCompletionHandoff.requiredUserDecision ? {
-        question: "PhysiqueOS sees the Visible Abs goal as complete. Do you agree?",
+        question: "The cut appears complete. Do you agree?",
         completeLabel: "Complete Goal",
         keepOpenLabel: "Keep Goal Open",
       } : null,
@@ -341,19 +341,19 @@ function ordinaryEventCopy({goalContext,limitation,milestone}){
   const leanMassGoal=/lean mass|muscle/i.test(goalTitle);
   const calibration=/calibration|maintenance/i.test(`${phaseName} ${operatingState}`);
   const activeCut=/\bcut\b|fat loss|visible abs/i.test(goalTitle);
-  const milestoneSentence=milestone?.label?` ${milestone.label} can add a future body-composition checkpoint.`:"";
+  const milestoneSentence=milestone?.label?` ${milestone.label} will give us the next body-composition comparison.`:"";
   if(leanMassGoal&&calibration)return{
     title:"Today’s photos show your recent condition is holding steady.",
     summary:"The matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.",
-    goalMeaning:"The photos are consistent with the current maintenance-calibration phase. A one-week visual interval is not enough to claim new lean-mass gain.",
+    goalMeaning:"The photos fit what we would expect while you settle into maintenance. One week is far too soon to claim new muscle.",
     interpretation:"Across the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.",
     limitation:`${limitation} Interpret small changes cautiously over this short interval.${milestoneSentence}`,
-    coach:`Keep capture conditions consistent and let the trend develop across several check-ins.${milestone?.label?` Use ${milestone.label} as the next measurement checkpoint.`:""}`,
+    coach:`Keep photo conditions consistent and let the pattern develop across several check-ins.${milestone?.label?` Use ${milestone.label} as the next useful comparison.`:""}`,
   };
   if(activeCut)return{
     title:"Today’s photos add a new check-in on your current goal.",
     summary:"The matched views add current visual evidence without overstating change from a single interval.",
-    goalMeaning:`The photos add evidence for ${goalTitle}, while the observed comparison and supporting measurements determine whether meaningful progress is present.`,
+    goalMeaning:"The photos add a useful visual check on your cut, while weight, training, and body composition tell us whether the change is meaningful.",
     interpretation:"The matched views should be read alongside weight, training, nutrition, and body-composition evidence. Only changes supported by those records should be treated as progress.",
     limitation:`${limitation}${milestoneSentence}`,
     coach:`Keep the next photo session as consistent as possible.${milestone?.label?` Reassess alongside ${milestone.label}.`:""}`,
@@ -383,7 +383,7 @@ function completionEventCopy(status,{latestDexa,priorDexa,baselineDexa},result){
     summary:"The Jul 18 DEXA reached 7.7% body fat, the full photo journey shows a substantially leaner waist and midsection, and the final front relaxed view supports visible abs at rest. The evidence as a whole indicates that the goal is complete.",
     progress:"The May-to-Jul 18 journey shows how far the waist and midsection changed. The separate Jul 11-to-Jul 18 comparison captures the smaller final-week refinement.",
     interpretation:[`${dexaSentence} ${leanSentence} The photos reinforce that result: from the beginning of the cut through today, your waist is substantially leaner, abdominal definition is clearer, and your upper body has been preserved.`, "The final front relaxed photo was taken later in the day after training, so it is not a perfect laboratory comparison. It is still clear enough to assess when viewed alongside the full journey, the recent same-pose comparisons, and the supporting views.", "The evidence supports completion, while your explicit confirmation remains the final step."],
-    coach:"PhysiqueOS sees the Visible Abs goal as complete. If you agree, close the goal without extending the deficit to chase an outcome the evidence already supports.",
+    coach:"The cut appears complete. If you agree, close it without extending the deficit to chase an outcome you have already reached.",
     goalMeaning:"The totality of objective and visual evidence supports completion with moderate confidence. The goal remains open until you explicitly agree.",
     coachingDirection:"Review the full journey, then decide whether you agree that this chapter is complete.",
   };

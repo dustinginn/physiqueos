@@ -12,14 +12,25 @@ $nextPath = Join-Path $repositoryRoot "node_modules\next\dist\bin\next"
 $metadataPath = Join-Path $repositoryRoot "logs\physiqueos-runtime.json"
 $controlPath = Join-Path $repositoryRoot "logs\physiqueos-runtime-control.json"
 $monitorScript = Join-Path $repositoryRoot "scripts\monitorPhysiqueOS.ps1"
+$ownershipHelper = Join-Path $repositoryRoot "scripts\physiqueosRuntimeOwnership.ps1"
 $localUrl = "http://127.0.0.1:3000"
+. $ownershipHelper
 
-function Get-Listener {
-  $row = netstat -ano -p TCP | Select-String -Pattern "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)" | Select-Object -First 1
-  if (-not $row) { return $null }
-  $match = [regex]::Match($row.Line, "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)")
-  if (-not $match.Success) { return $null }
-  [pscustomobject]@{ address = $match.Groups[1].Value; port = 3000; pid = [int]$match.Groups[2].Value }
+function Get-Listeners {
+  @(
+    netstat -ano -p TCP |
+      Select-String -Pattern "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)" |
+      ForEach-Object {
+        $match = [regex]::Match($_.Line, "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)")
+        if ($match.Success) {
+          [pscustomobject]@{
+            address = $match.Groups[1].Value
+            port = 3000
+            pid = [int]$match.Groups[2].Value
+          }
+        }
+      }
+  )
 }
 
 function Get-ProcessRecord([int]$ProcessId) {
@@ -27,6 +38,7 @@ function Get-ProcessRecord([int]$ProcessId) {
   Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue |
     Select-Object @{n="pid";e={$_.ProcessId}}, @{n="parentPid";e={$_.ParentProcessId}},
       @{n="name";e={$_.Name}}, @{n="commandLine";e={$_.CommandLine}},
+      @{n="sessionId";e={$_.SessionId}},
       @{n="startedAt";e={ if ($_.CreationDate) { $_.CreationDate.ToString("o") } else { $null } }}
 }
 
@@ -52,11 +64,21 @@ function Test-Health([string]$Url) {
   }
 }
 
-$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-$taskInfo = if ($task) { Get-ScheduledTaskInfo -TaskName $taskName } else { $null }
-$monitorTask = Get-ScheduledTask -TaskName $monitorTaskName -ErrorAction SilentlyContinue
-$monitorInfo = if ($monitorTask) { Get-ScheduledTaskInfo -TaskName $monitorTaskName } else { $null }
-$listener = Get-Listener
+$taskQuery = Get-PhysiqueOSTaskQueryResult -TaskName $taskName
+$task = $taskQuery.task
+$taskInfo = if ($taskQuery.status -eq "readable") {
+  try { Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction Stop } catch { $null }
+} else { $null }
+$monitorTaskQuery = Get-PhysiqueOSTaskQueryResult -TaskName $monitorTaskName
+$monitorTask = $monitorTaskQuery.task
+$monitorInfo = if ($monitorTaskQuery.status -eq "readable") {
+  try { Get-ScheduledTaskInfo -TaskName $monitorTaskName -ErrorAction Stop } catch { $null }
+} else { $null }
+$listeners = @(Get-Listeners)
+$listenerPids = @($listeners | Select-Object -ExpandProperty pid -Unique)
+$listener = if ($listenerPids.Count -eq 1) {
+  $listeners | Where-Object { $_.pid -eq $listenerPids[0] } | Select-Object -First 1
+} else { $null }
 $process = if ($listener) { Get-ProcessRecord -ProcessId $listener.pid } else { $null }
 $ancestors = if ($process) { @(Get-Ancestors $process) } else { @() }
 $expectedArguments = "`"$nextPath`" start --hostname 0.0.0.0 --port 3000"
@@ -68,9 +90,6 @@ $taskMatches = [bool]($task -and
 $monitorMatches = [bool]($monitorTask -and $monitorTask.Actions.Count -eq 1 -and
   $monitorTask.Actions[0].Execute -like "*\WindowsPowerShell\v1.0\powershell.exe" -and
   $monitorTask.Actions[0].Arguments -like "*-File `"$monitorScript`"*")
-$processMatches = [bool]($process -and
-  $process.name -eq "node.exe" -and
-  $process.commandLine -like "*$nextPath*start --hostname 0.0.0.0 --port 3000*")
 $forbiddenAncestor = @($ancestors | Select-Object -Skip 1 | Where-Object {
   $_.name -in @("powershell.exe", "pwsh.exe", "cmd.exe", "WindowsTerminal.exe", "Code.exe")
 }).Count -gt 0
@@ -88,28 +107,33 @@ $control = if (Test-Path -LiteralPath $controlPath) {
   } catch { $null }
 } else { $null }
 $desiredState = if ($control) { [string]$control.desiredState } else { "unknown" }
+$ownership = Get-PhysiqueOSRuntimeOwnershipDecision `
+  -TaskQueryStatus $taskQuery.status `
+  -Task $task `
+  -TaskInfo $taskInfo `
+  -Listeners $listeners `
+  -Process $process `
+  -Ancestors $ancestors `
+  -HealthOk ([bool]$health.ok) `
+  -ExpectedNodePath $nodePath `
+  -ExpectedNextPath $nextPath `
+  -ExpectedRepositoryRoot $repositoryRoot
+$canonicalOwnership = $ownership.ownershipDecision -eq "canonical"
 
-$overall = if (-not $taskMatches -or -not $monitorMatches -or -not $control) {
-  "task_invalid"
-} elseif ($listener -and -not $processMatches) {
-  "foreign_listener"
-} elseif ($listener -and ($taskState -ne "Running" -or -not $taskMatches -or $forbiddenAncestor)) {
-  "task_process_mismatch"
-} elseif ($desiredState -eq "stopped" -and -not $listener) {
-  "intentionally_stopped"
-} elseif ($control.lastRecoveryOutcome -eq "recovery_failed" -or [int]$control.consecutiveRecoveryFailures -ge 3) {
-  "recovery_failed"
-} elseif ($listener -and $health.ok -and $taskState -eq "Running") {
-  "healthy"
-} elseif (-not $listener -and $control.lastRecoveryOutcome -eq "recovery_invoked") {
-  "recovering"
-} elseif ($taskState -eq "Running" -and -not $listener) {
-  "starting"
-} elseif (-not $listener -and $desiredState -eq "running") {
-  "recovery_pending"
-} else {
-  "unhealthy"
-}
+$overall = Get-PhysiqueOSRuntimeOverallState `
+  -TaskQueryStatus $taskQuery.status `
+  -MonitorTaskQueryStatus $monitorTaskQuery.status `
+  -TaskDefinitionMatches $taskMatches `
+  -MonitorDefinitionMatches $monitorMatches `
+  -ControlValid ([bool]$control) `
+  -ListenerPresent ($listeners.Count -gt 0) `
+  -CanonicalOwnership $canonicalOwnership `
+  -DesiredState $desiredState `
+  -TaskState $taskState `
+  -ForbiddenAncestor $forbiddenAncestor `
+  -HealthOk ([bool]$health.ok) `
+  -LastRecoveryOutcome $(if ($control) { [string]$control.lastRecoveryOutcome } else { $null }) `
+  -ConsecutiveRecoveryFailures $(if ($control) { [int]$control.consecutiveRecoveryFailures } else { 0 })
 
 $lanAddress = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
   Where-Object { $_.IPAddress -match "^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)" -and $_.InterfaceAlias -notmatch "Loopback|WSL|vEthernet|Virtual|VPN" } |
@@ -126,24 +150,28 @@ $uptimeSeconds = if ($process -and $process.startedAt) { [math]::Floor(((Get-Dat
   overallState = $overall
   desiredState = $desiredState
   task = [ordered]@{
-    installed = [bool]$task
+    installed = if ($taskQuery.status -eq "readable") { [bool]$task } else { $null }
+    queryStatus = $taskQuery.status
     matchesCanonicalDefinition = $taskMatches
     state = $taskState
     lastRunTime = if ($taskInfo) { $taskInfo.LastRunTime.ToString("o") } else { $null }
     lastTaskResult = if ($taskInfo) { $taskInfo.LastTaskResult } else { $null }
   }
   monitorTask = [ordered]@{
-    installed = [bool]$monitorTask
+    installed = if ($monitorTaskQuery.status -eq "readable") { [bool]$monitorTask } else { $null }
+    queryStatus = $monitorTaskQuery.status
     matchesCanonicalDefinition = $monitorMatches
     state = $monitorState
     lastRunTime = if ($monitorInfo -and $monitorInfo.LastRunTime) { $monitorInfo.LastRunTime.ToString("o") } else { $null }
     lastTaskResult = if ($monitorInfo) { $monitorInfo.LastTaskResult } else { $null }
   }
   listener = $listener
+  listeners = $listeners
   process = $process
   ancestorChain = $ancestors
   uptimeSeconds = $uptimeSeconds
   health = $health
+  ownership = $ownership
   localUrl = $localUrl
   lanUrl = if ($lanAddress) { "http://${lanAddress}:3000" } else { $null }
   ngrok = $ngrokStatus

@@ -21,6 +21,9 @@ $ngrokPath = "C:\Users\dusti\AppData\Local\ngrok\ngrok.exe"
 $ngrokWorkingDirectory = "C:\Users\dusti\AppData\Local\ngrok"
 $ngrokControlPath = Join-Path $logsDirectory "physiqueos-ngrok-control.json"
 $ngrokMonitorLog = Join-Path $logsDirectory "physiqueos-ngrok-monitor.log"
+$cadenceRunnerPath = Join-Path $repositoryRoot "scripts\runBriefingCadence.mjs"
+$ownershipHelper = Join-Path $repositoryRoot "scripts\physiqueosRuntimeOwnership.ps1"
+. $ownershipHelper
 
 function Write-MonitorLog([string]$Message) {
   New-Item -ItemType Directory -Path $logsDirectory -Force | Out-Null
@@ -156,17 +159,64 @@ function Invoke-NgrokMonitor {
   }
 }
 
-function Get-Listener {
-  $row = netstat -ano -p TCP | Select-String -Pattern "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)" | Select-Object -First 1
-  if (-not $row) { return $null }
-  $match = [regex]::Match($row.Line, "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)")
-  if (-not $match.Success) { return $null }
-  [pscustomobject]@{ address = $match.Groups[1].Value; pid = [int]$match.Groups[2].Value }
+function Invoke-BriefingCadenceRunner {
+  if (-not (Test-Path -LiteralPath $cadenceRunnerPath -PathType Leaf)) {
+    Write-MonitorLog "cadenceOutcome=runner_missing action=none"
+    return
+  }
+  try {
+    $output = & $nodePath $cadenceRunnerPath "--source=runtime_monitor" 2>&1
+    $exitCode = $LASTEXITCODE
+    $summary = ($output | Select-Object -Last 1)
+    try {
+      $result = $summary | ConvertFrom-Json
+      $outcomes = @($result.outcomes | ForEach-Object {
+        "$($_.cadenceKey):$($_.resultStatus)"
+      }) -join ","
+      Write-MonitorLog "cadenceOutcome=completed exitCode=$exitCode runId=$($result.runId) outcomes=$outcomes"
+    } catch {
+      Write-MonitorLog "cadenceOutcome=invalid_result exitCode=$exitCode"
+    }
+  } catch {
+    Write-MonitorLog "cadenceOutcome=isolated_failure type=$($_.Exception.GetType().Name)"
+  }
+}
+
+function Get-Listeners {
+  @(
+    netstat -ano -p TCP |
+      Select-String -Pattern "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)" |
+      ForEach-Object {
+        $match = [regex]::Match($_.Line, "TCP\s+([^\s]+):3000\s+[^\s]+\s+LISTENING\s+(\d+)")
+        if ($match.Success) {
+          [pscustomobject]@{
+            address = $match.Groups[1].Value
+            port = 3000
+            pid = [int]$match.Groups[2].Value
+          }
+        }
+      }
+  )
 }
 
 function Get-ProcessRecord([int]$ProcessId) {
   if (-not $ProcessId) { return $null }
-  Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+  Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue |
+    Select-Object @{n="pid";e={$_.ProcessId}}, @{n="parentPid";e={$_.ParentProcessId}},
+      @{n="name";e={$_.Name}}, @{n="commandLine";e={$_.CommandLine}},
+      @{n="sessionId";e={$_.SessionId}},
+      @{n="startedAt";e={ if ($_.CreationDate) { $_.CreationDate.ToString("o") } else { $null } }}
+}
+
+function Get-Ancestors($process) {
+  if (-not $process) { return @() }
+  $parent = if ($process.parentPid) {
+    Get-ProcessRecord -ProcessId ([int]$process.parentPid)
+  } else { $null }
+  $grandparent = if ($parent -and $parent.parentPid) {
+    Get-ProcessRecord -ProcessId ([int]$parent.parentPid)
+  } else { $null }
+  return @($process, $parent, $grandparent | Where-Object { $null -ne $_ })
 }
 
 function Save-Outcome($State, [string]$Outcome, [bool]$Failed = $false) {
@@ -197,7 +247,22 @@ if (-not (Test-Path -LiteralPath $buildIdPath -PathType Leaf)) {
   exit 0
 }
 
-$task = Get-ScheduledTask -TaskName $productionTaskName -ErrorAction SilentlyContinue
+$taskQuery = Get-PhysiqueOSTaskQueryResult -TaskName $productionTaskName
+$task = $taskQuery.task
+if ($taskQuery.status -eq "access_denied") {
+  Save-Outcome $control "task_access_denied" $true
+  exit 0
+}
+if ($taskQuery.status -ne "readable") {
+  Save-Outcome $control $(if ($taskQuery.status -eq "not_found") { "task_invalid" } else { "task_query_failed" }) $true
+  exit 0
+}
+$taskInfo = try {
+  Get-ScheduledTaskInfo -TaskName $productionTaskName -ErrorAction Stop
+} catch {
+  Save-Outcome $control "task_query_failed" $true
+  exit 0
+}
 $expectedArguments = "`"$nextPath`" start --hostname 0.0.0.0 --port 3000"
 $taskValid = [bool]($task -and $task.Actions.Count -eq 1 -and
   $task.Actions[0].Execute -eq $nodePath -and
@@ -208,21 +273,40 @@ if (-not $taskValid) {
   exit 0
 }
 
-$listener = Get-Listener
-if ($listener) {
-  $process = Get-ProcessRecord -ProcessId $listener.pid
-  $canonical = [bool]($process -and $process.Name -eq "node.exe" -and
-    $process.CommandLine -like "*$nextPath*start --hostname 0.0.0.0 --port 3000*")
-  if (-not $canonical) {
+$listeners = @(Get-Listeners)
+$listenerPids = @($listeners | Select-Object -ExpandProperty pid -Unique)
+$listener = if ($listenerPids.Count -eq 1) {
+  $listeners | Where-Object { $_.pid -eq $listenerPids[0] } | Select-Object -First 1
+} else { $null }
+if ($listeners.Count -gt 0) {
+  $process = if ($listener) {
+    Get-ProcessRecord -ProcessId $listener.pid
+  } else { $null }
+  $ancestors = if ($process) { @(Get-Ancestors $process) } else { @() }
+  $healthOk = $false
+  try {
+    $health = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 5
+    $healthOk = $health.StatusCode -eq 200
+  } catch {}
+  $ownership = Get-PhysiqueOSRuntimeOwnershipDecision `
+    -TaskQueryStatus $taskQuery.status `
+    -Task $task `
+    -TaskInfo $taskInfo `
+    -Listeners $listeners `
+    -Process $process `
+    -Ancestors $ancestors `
+    -HealthOk $healthOk `
+    -ExpectedNodePath $nodePath `
+    -ExpectedNextPath $nextPath `
+    -ExpectedRepositoryRoot $repositoryRoot
+  if ($ownership.ownershipDecision -ne "canonical") {
     Save-Outcome $control "foreign_listener" $true
     exit 0
   }
-  try {
-    $health = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 5
-    if ($health.StatusCode -eq 200) {
+  if ($healthOk) {
       $metadata = [ordered]@{
         schemaVersion = 2; taskName = $productionTaskName; listenerPid = $listener.pid
-        processStartedAt = if ($process.CreationDate) { $process.CreationDate.ToString("o") } else { $null }
+        processStartedAt = $process.startedAt
         healthCheckedAt = (Get-Date).ToString("o"); port = 3000; hostname = "0.0.0.0"
         repositoryPath = $repositoryRoot; nodePath = $nodePath; taskState = [string]$task.State
         healthStatus = "healthy"
@@ -232,9 +316,9 @@ if ($listener) {
       Move-Item -LiteralPath $metadataTemporary -Destination $metadataPath -Force
       Save-Outcome $control "healthy"
       Invoke-NgrokMonitor
+      Invoke-BriefingCadenceRunner
       exit 0
-    }
-  } catch {}
+  }
   $priorUnhealthy = if ($null -ne $control.consecutiveUnhealthyChecks) { [int]$control.consecutiveUnhealthyChecks } else { 0 }
   $control.consecutiveUnhealthyChecks = $priorUnhealthy + 1
   Save-Outcome $control "unhealthy"

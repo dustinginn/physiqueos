@@ -117,7 +117,7 @@ function validateCommand(command) {
   if (command.schemaVersion !== "pi_cadence_briefing_publication_v1") {
     return "Unsupported cadence publication contract.";
   }
-  if (!["midweek", "weekly"].includes(command.cadence) ||
+  if (!["midweek", "weekly", "monthly"].includes(command.cadence) ||
       command.artifact?.cadence !== command.cadence) return "Cadence identity is invalid.";
   if (!["create", "catch_up", "regenerate"].includes(command.operation)) {
     return "Cadence publication operation is invalid.";
@@ -127,7 +127,9 @@ function validateCommand(command) {
   }
   const embedded = command.cadence === "midweek"
     ? command.artifact?.briefing?.goalConfidence
-    : command.artifact?.briefing?.weeklyNarrative?.goalConfidence;
+    : command.cadence === "weekly"
+      ? command.artifact?.briefing?.weeklyNarrative?.goalConfidence
+      : command.artifact?.briefing?.monthlyNarrative?.confidence;
   if (!embedded?.assessmentId ||
       embedded.assessmentId !== command.artifactConfidenceAssessmentId) {
     return "Briefing confidence identity is invalid.";
@@ -173,7 +175,9 @@ function findOccurrence(store, artifact) {
 function artifactConfidenceId(artifact) {
   return artifact.cadence === "midweek"
     ? artifact.briefing?.goalConfidence?.assessmentId
-    : artifact.briefing?.weeklyNarrative?.goalConfidence?.assessmentId;
+    : artifact.cadence === "weekly"
+      ? artifact.briefing?.weeklyNarrative?.goalConfidence?.assessmentId
+      : artifact.briefing?.monthlyNarrative?.confidence?.assessmentId;
 }
 function sameSemanticArtifact(left, right) {
   return left.id === right.id &&

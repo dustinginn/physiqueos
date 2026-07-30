@@ -10,6 +10,7 @@ import {
 import {
   createPIDEXAEventLifecycleService,
 } from "./PIDEXAEventLifecycleService";
+import { composePIEditorialParagraph } from "./PIEditorialTranslationService";
 
 export const DEXA_EVENT_VERSION = "dexa_event_v1_6_0";
 export const DEXA_PRESENTATION_VERSION = "dexa_event_presentation_v1_6_0";
@@ -207,8 +208,12 @@ function composeFirstDEXAEventNarrative({
     hero: {
       title: "This scan establishes a body-composition baseline.",
       body: goalAware
-        ? `Measured lean tissue is ${format(values.leanMass)} lb and body fat is ${format(values.bodyFat)}%. A later comparable scan is required before Build Lean Mass progress can be assessed.`
-        : `This scan records the current body-composition measurements without inferring a trend or goal outcome.`,
+        ? composePIEditorialParagraph({
+            observation: `You have ${format(values.leanMass)} lb of measured lean tissue at ${format(values.bodyFat)}% body fat`,
+            interpretation: "This is the starting point for building muscle, not proof of progress yet",
+            forwardImplication: "A later DEXA will show whether lean mass is increasing while body fat stays controlled",
+          })
+        : "This scan records where your body composition stands today. A later comparable scan will be needed before calling it a trend.",
       results: [
         { emoji: "💪", label: "Lean Tissue", value: `${format(values.leanMass)} lb`, context: goalAware ? "Primary baseline measure" : "Baseline measure" },
         { emoji: "◈", label: "Body Fat", value: `${format(values.bodyFat)}%`, context: goalAware ? guardrailLabel(guardrail) : "Baseline measure" },
@@ -240,14 +245,14 @@ function composeFirstDEXAEventNarrative({
       goalProgress: null,
       guardrailStatus: goalAware ? guardrailLabel(guardrail) : null,
       phaseMeaning: context?.activePhase
-        ? `This baseline informs ${context.activePhase.name}; it does not advance or mutate the phase.`
-        : "No phase conclusion is inferred.",
+        ? "This scan gives the current phase a starting point, but one measurement is not a reason to change the plan."
+        : "Without an active phase to compare against, this scan should be treated as a starting point.",
     },
     coachInsight: {
-      biggestWin: "A canonical measurement baseline is now available for future comparison.",
-      protect: "Keep future scan preparation comparable so the next interval is interpretable.",
-      watch: "Watch the next comparable DEXA for measured direction rather than inferring a trend today.",
-      next: "Continue the current reviewed strategy until longitudinal evidence supports a change.",
+      biggestWin: "You now have a measured starting point for every future comparison.",
+      protect: "Prepare for future scans the same way so small changes are easier to trust.",
+      watch: "Let the next comparable DEXA establish the direction instead of reading progress into one scan.",
+      next: "Keep the current plan steady until a later comparison gives us a reason to change it.",
     },
     goalCompletionHandoff: null,
     supportingEvidence: { evidenceIds: [] },
@@ -333,13 +338,13 @@ function composeGoalAwareDEXAEventNarrative({
     ? bodyFatGuardrailMeaning({ guardrail, bodyFatDelta, phaseCalibration })
     : "No active body-fat guardrail is available, so this scan is presented as body-composition evidence rather than a goal verdict.";
   const uncertainty = piFallback
-    ? "PI context was unavailable for this event. The interpretation is therefore limited to the measured scan-to-scan changes and does not infer a goal or phase decision."
-    : "One scan cannot prove tissue-gain causality. Hydration, glycogen, food mass, scan preparation, and true tissue change can all influence measured lean tissue, so comparable scans and the surrounding Training, Energy, Recovery, and Photo evidence remain important.";
+    ? "We can compare the two scans, but the surrounding goal context is incomplete, so this result should not change the plan by itself."
+    : "One scan cannot prove that every change in lean tissue is new muscle. Hydration, glycogen, food, and scan preparation can all affect the number, so training, weight, nutrition, recovery, and progress photos still matter.";
   const phaseMeaning = phaseCalibration
     ? phaseCalibrationMeaning({ leanState, guardrail })
     : context?.activePhase
-      ? `This result informs ${context.activePhase.name}, but narration does not advance or mutate the phase.`
-      : "No active phase context is available, so no phase recommendation is inferred.";
+      ? "This result helps us judge the current phase, but one scan is not enough to move into the next one."
+      : "Without an active phase to compare against, this scan should not change the plan by itself.";
   const next = nextDecision({ goalAware, leanState, guardrail, phaseCalibration, decisionContext: context?.pi?.decisionContext, futureMilestone: context?.futureMilestone });
 
   const narrative = {
@@ -361,8 +366,8 @@ function composeGoalAwareDEXAEventNarrative({
         ? heroTitle({ leanState, guardrail })
         : "This scan updates the body-composition picture.",
       body: goalAware
-        ? `Measured lean tissue ${describeLeanChange(leanDelta)} since the last scan, while body fat moved from ${format(headline.bodyFat.previous)}% to ${format(headline.bodyFat.current)}%. These are separate goal and guardrail signals.`
-        : `Since the last scan, measured lean tissue changed ${signed(leanDelta)} lb and body fat changed ${signed(bodyFatDelta)} percentage points. No goal-specific success claim is inferred.`,
+        ? `Measured lean tissue ${describeLeanChange(leanDelta)} since the last scan, while body fat moved from ${format(headline.bodyFat.previous)}% to ${format(headline.bodyFat.current)}%. The useful question is whether you are adding muscle without letting body fat move beyond the range you chose.`
+        : `Since the last scan, measured lean tissue changed ${signed(leanDelta)} lb and body fat changed ${signed(bodyFatDelta)} percentage points. Whether that is good or bad depends on the goal you are pursuing.`,
       results: [
         { emoji: "💪", label: "Lean Tissue", value: `${signed(leanDelta)} lb`, context: goalAware ? "Primary goal measure" : "Measured change" },
         { emoji: "◈", label: "Body Fat", value: `${format(headline.bodyFat.current)}%`, context: goalAware ? guardrailLabel(guardrail) : `${signed(bodyFatDelta)} points` },
@@ -395,8 +400,8 @@ function composeGoalAwareDEXAEventNarrative({
       opening: primary,
       fatLoss: goalAware
         ? guardrailMeaning
-        : `Measured fat mass changed ${signed(headline.fatMass.delta)} lb. Without an active goal semantic, that direction is neither automatically successful nor unsuccessful.`,
-      leanMass: `Measured lean tissue ${describeLeanChange(leanDelta)}. ${leanState === "decreased" ? "A decline deserves review, but it is not a tissue diagnosis from one scan." : "The measured direction should be confirmed with comparable preparation and longitudinal evidence."}`,
+        : `Measured fat mass changed ${signed(headline.fatMass.delta)} lb. That change only matters in relation to the goal you are pursuing.`,
+      leanMass: `Measured lean tissue ${describeLeanChange(leanDelta)}. ${leanState === "decreased" ? "That deserves a closer look, although one scan cannot tell us whether true muscle was lost." : "Prepare for the next scan the same way so we can see whether the direction holds."}`,
       regional: regionalInterpretation(regionalFat, regionalLean),
       supportingEvidence: supportingText,
       stoodOut: null,
@@ -408,13 +413,13 @@ function composeGoalAwareDEXAEventNarrative({
     coachInsight: {
       biggestWin: goalAware
         ? biggestWin({ leanState, guardrail })
-        : "The scan adds an objective body-composition checkpoint without forcing it into an unavailable goal narrative.",
+        : "You now have a clear body-composition comparison to discuss alongside your current goal.",
       protect: phaseCalibration
-        ? "Protect the calibration signal: keep intake, activity, training, recovery, and scan preparation consistent enough to distinguish a stable maintenance platform from continued deficit."
-        : "Protect measurement comparability and productive training while this result is evaluated with the broader evidence.",
+        ? "Keep intake, activity, training, recovery, and scan preparation consistent enough to tell whether you have actually reached maintenance."
+        : "Keep scan preparation consistent and protect productive training while we see whether this direction continues.",
       watch: goalAware
         ? watchSignal({ leanState, guardrail })
-        : "Watch the next comparable scan and the surrounding evidence before assigning goal meaning.",
+        : "Use the next comparable scan, along with training and weight, before deciding what this change means.",
       next,
     },
     goalCompletionHandoff: null,
@@ -461,72 +466,72 @@ function inferSemanticGoalType(goal) {
 function leanMassMeaning({ leanState, leanDelta, guardrail, phaseCalibration }) {
   if (leanState === "increased") {
     const qualification = guardrail.status === "above"
-      ? "The primary measure advanced, but the body-fat guardrail requires review."
+      ? "Lean tissue moved up, but body fat also moved beyond the range you chose."
       : guardrail.status === "within" || guardrail.status === "near_boundary"
-        ? "The primary measure advanced while the configured body-fat guardrail remained supported."
-        : "The primary measure advanced, but guardrail status is not fully supported.";
-    return `Measured lean tissue increased ${format(Math.abs(leanDelta))} lb. ${qualification} One scan supports progress; it does not prove the cause or automatically advance the phase.`;
+        ? "Lean tissue moved up while body fat stayed within the range you chose."
+        : "Lean tissue moved up, but we cannot yet judge body fat against a clear target range.";
+    return `Measured lean tissue increased ${format(Math.abs(leanDelta))} lb. ${qualification} That is encouraging, but one scan cannot prove how much of the change is new muscle.`;
   }
   if (leanState === "decreased") {
-    return `Measured lean tissue decreased ${format(Math.abs(leanDelta))} lb. This does not support current goal progress, but measurement uncertainty and the surrounding evidence must be reviewed before treating it as a durable decline.`;
+    return `Measured lean tissue decreased ${format(Math.abs(leanDelta))} lb. That is not the direction we want, but hydration, glycogen, food, and preparation can all affect one scan. Review training, nutrition, recovery, and the next comparable scan before assuming muscle was lost.`;
   }
-  return `Measured lean tissue was effectively flat at ${signed(leanDelta)} lb. ${phaseCalibration ? "The body-composition guardrail can still inform calibration, but lean-mass progress is not yet established." : "The scan does not yet establish lean-mass progress."}`;
+  return `Measured lean tissue was effectively flat at ${signed(leanDelta)} lb. ${phaseCalibration ? "Body fat can still help us judge whether you have reached maintenance, but this scan does not show new muscle yet." : "This scan does not show new muscle yet."}`;
 }
 
 function neutralMeaning({ leanState, leanDelta, bodyFatDelta }) {
-  return `This scan shows measured lean tissue ${leanState === "flat" ? "remaining effectively flat" : `${leanState} ${format(Math.abs(leanDelta))} lb`} and body fat changing ${signed(bodyFatDelta)} percentage points. Active goal context is unavailable, so neither direction is labeled success or failure.`;
+  return `This scan shows measured lean tissue ${leanState === "flat" ? "remaining effectively flat" : `${leanState} ${format(Math.abs(leanDelta))} lb`} and body fat changing ${signed(bodyFatDelta)} percentage points. Whether that is a good result depends on the goal you are pursuing.`;
 }
 
 function bodyFatGuardrailMeaning({ guardrail, bodyFatDelta, phaseCalibration }) {
-  if (guardrail.status === "unknown") return "The active goal does not provide a resolvable body-fat range for this result, so guardrail compliance is unknown.";
-  if (guardrail.status === "above") return `Body fat is above the configured ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% guardrail. Primary-measure progress cannot be treated as uncomplicated success until strategy is reviewed.`;
-  if (guardrail.status === "below") return `Body fat is below the configured ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% guardrail. Lower is not automatically better for this goal${phaseCalibration ? "; it may indicate that maintenance has not yet been established or that a continued deficit is constraining the build" : ""}.`;
-  const boundary = guardrail.status === "near_boundary" ? "near a boundary of" : "within";
-  return `Body fat remains ${boundary} the configured ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% guardrail after changing ${signed(bodyFatDelta)} percentage points. Small DEXA changes should be interpreted with measurement uncertainty.`;
+  if (guardrail.status === "unknown") return "There is no clear body-fat range to judge this result against, so focus on the measured change rather than calling it good or bad.";
+  if (guardrail.status === "above") return `Body fat is above your chosen ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% range. Review the calorie plan before treating the lean-tissue increase as an uncomplicated win.`;
+  if (guardrail.status === "below") return `Body fat is below your chosen ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% range. Lower is not automatically better${phaseCalibration ? "; it may mean you are still eating below maintenance and limiting stronger training" : ""}.`;
+  const boundary = guardrail.status === "near_boundary" ? "near the edge of" : "within";
+  return `Body fat remains ${boundary} your chosen ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% range after changing ${signed(bodyFatDelta)} percentage points. Small DEXA changes still need a comparable follow-up before we overinterpret them.`;
 }
 
 function phaseCalibrationMeaning({ leanState, guardrail }) {
-  if (guardrail.status === "below") return "Establish Maintenance remains a calibration task. This result may indicate continued deficit; it does not support automatically advancing into the dedicated build phase.";
-  if (guardrail.status === "above") return "Establish Maintenance remains active, but the guardrail direction warrants a strategy review before any phase advancement.";
-  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "The result supports the current maintenance-calibration strategy, but one scan is not enough to declare maintenance established or execute a phase transition.";
-  return "Remain in calibration while intake, expenditure, training, recovery, and weight stability provide enough evidence for the next reviewed phase decision.";
+  if (guardrail.status === "below") return "You may still be eating below maintenance. Keep this phase steady instead of moving into a dedicated muscle-building push too soon.";
+  if (guardrail.status === "above") return "Body fat moved beyond the range you chose, so review the calorie plan before moving into the next phase.";
+  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "This is the result we hoped to see, but one scan is not enough to prove that maintenance is established or to rush into the next phase.";
+  return "Keep intake, training, recovery, and weight steady long enough to understand how your body is responding before changing phases.";
 }
 
 function nextDecision({ goalAware, leanState, guardrail, phaseCalibration, decisionContext, futureMilestone }) {
-  const milestone = futureMilestone ? ` The next authoritative measurement is ${futureMilestone.label}.` : "";
-  if (!goalAware) return `Use the broader evidence and a future comparable measurement before making a goal or phase decision.${milestone}`.trim();
+  const milestone = futureMilestone ? ` ${futureMilestone.label} will be the next useful comparison.` : "";
+  if (!goalAware) return `Use training, weight, nutrition, recovery, and a future comparable scan before changing the plan.${milestone}`.trim();
   const advisory = decisionContext?.integrationEnabled === false
-    ? " Decision Intelligence is advisory only; no phase transition was executed."
+    ? " This result has not changed your phase."
     : "";
   if (leanState === "decreased" || guardrail.status === "above") {
-    return `Review Energy, Training, Recovery, and scan comparability before changing the strategy.${advisory}${milestone}`.trim();
+    return `Review nutrition, training, recovery, and scan preparation before changing the plan.${advisory}${milestone}`.trim();
   }
   if (phaseCalibration) {
-    return `Keep calibrating until the phase criteria establish a stable maintenance platform; this scan alone does not advance the phase.${advisory}${milestone}`.trim();
+    return `Keep the plan steady until weight, training, and calorie intake show that maintenance is stable; this scan alone is not enough to move into the next phase.${advisory}${milestone}`.trim();
   }
-  return `Continue the current phase and confirm the direction with longitudinal evidence.${advisory}${milestone}`.trim();
+  return `Continue the current phase and see whether the same direction appears in a later comparable scan.${advisory}${milestone}`.trim();
 }
 
 function heroTitle({ leanState, guardrail }) {
-  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "Lean mass moved forward while the guardrail held.";
-  if (leanState === "increased" && guardrail.status === "above") return "Lean mass moved forward, but the guardrail needs review.";
+  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "Lean mass increased while body fat stayed controlled.";
+  if (leanState === "increased" && guardrail.status === "above") return "Lean mass increased, but body fat needs attention.";
   if (leanState === "decreased") return "Lean mass moved in the wrong measured direction.";
-  if (guardrail.status === "above") return "Lean mass was flat while the guardrail worsened.";
-  return "The guardrail held, but lean-mass progress is not established yet.";
+  if (guardrail.status === "above") return "Lean mass was flat while body fat moved too high.";
+  return "Body fat stayed controlled, but new muscle is not established yet.";
 }
 
 function biggestWin({ leanState, guardrail }) {
-  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "The direct goal measure improved without a supported body-fat guardrail breach.";
-  if (leanState === "increased") return "Measured lean tissue increased, which is direct progress on the primary measure, even though the guardrail prevents treating the result as uncomplicated success.";
-  if (["within", "near_boundary"].includes(guardrail.status)) return "The body-fat guardrail remained supported while the primary measure awaits clearer progress.";
-  return "The scan supplied a clear decision signal instead of hiding an unfavorable or uncertain result.";
+  if (leanState === "increased" && ["within", "near_boundary"].includes(guardrail.status)) return "Measured lean tissue increased while body fat stayed within the range you chose.";
+  if (leanState === "increased") return "Measured lean tissue increased, which is encouraging even though body fat keeps it from being an uncomplicated win.";
+  if (["within", "near_boundary"].includes(guardrail.status)) return "Body fat stayed within the range you chose while we wait for a clearer increase in lean tissue.";
+  return "The scan gave you a clear reason to review the plan instead of guessing from weight alone.";
 }
 
 function watchSignal({ leanState, guardrail }) {
-  if (leanState === "decreased") return "Watch whether the lean-tissue decline repeats under comparable preparation and whether Training, Energy, or Recovery evidence explains the direction.";
-  if (guardrail.status === "above") return "Watch whether body fat remains above the configured boundary and whether Energy calibration needs review.";
-  if (guardrail.status === "below") return "Watch for continued deficit, inadequate intake, or stalled Training progression rather than treating additional leanness as automatic success.";
-  return "Watch whether comparable scans and Training performance confirm durable lean-mass progress while the guardrail remains stable.";
+  if (leanState === "decreased") return "Watch whether the lean-tissue drop repeats with comparable preparation and whether training, nutrition, or recovery helps explain it.";
+  if (guardrail.status === "above") return "Watch whether body fat stays above the range you chose and whether calorie intake needs to come down slightly.";
+  if (guardrail.status === "below") return "Watch for signs that you are still under-eating, especially stalled training or continued weight loss.";
+  return "Watch whether training and a later comparable scan confirm that lean tissue is continuing to increase while body fat stays controlled.";
 }
 
 function guardrailLabel(result) {

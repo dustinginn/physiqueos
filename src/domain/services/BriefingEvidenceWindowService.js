@@ -57,12 +57,49 @@ export function createMidweekEvidenceWindow({ now = new Date(), timeZone = "Amer
   return { id: `midweek:${startDate}:${endDate}:${timeZone}`, cadence: "midweek", briefingDate: resolvedBriefingDate, date: endDate, startDate, endDate, start: `${startDate}T00:00:00`, end: `${endDate}T23:59:59.999`, relativeLabel: "Sunday through Tuesday", sameDayEvidenceExcluded: true, timeZone, closed: true };
 }
 
+export function createMonthlyEvidenceWindow({
+  now = new Date(),
+  timeZone = "America/Los_Angeles",
+} = {}) {
+  const localDate = getDateKeyInTimeZone(now, timeZone);
+  const localDay = Number(localDate.slice(-2));
+  const briefingMonth = localDay === 1
+    ? shiftMonth(localDate.slice(0, 7), -1)
+    : localDate.slice(0, 7);
+  const startDate = `${briefingMonth}-01`;
+  const endDate = lastDateOfMonth(briefingMonth);
+  const deliveryDate = firstDateOfMonth(shiftMonth(briefingMonth, 1));
+  const cutoff = localDateTimeToUtc({
+    date: endDate,
+    time: "23:59:59.999",
+    timeZone,
+  }).toISOString();
+
+  return {
+    id: `monthly:${startDate}:${endDate}:${timeZone}`,
+    cadence: "monthly",
+    briefingMonth,
+    briefingDate: deliveryDate,
+    deliveryDate,
+    date: endDate,
+    startDate,
+    endDate,
+    start: `${startDate}T00:00:00`,
+    end: `${endDate}T23:59:59.999`,
+    cutoff,
+    relativeLabel: "the previous completed calendar month",
+    sameDayEvidenceExcluded: true,
+    timeZone,
+    closed: localDay === 1,
+  };
+}
+
 export function createScheduledEvidenceWindow(options = {}) {
   const cadence = selectScheduledBriefingCadence(options);
   if (cadence === "daily") return createPreviousDayEvidenceWindow(options);
   if (cadence === "weekly") return createWeeklyEvidenceWindow(options);
   if (cadence === "midweek") return createMidweekEvidenceWindow(options);
-  if (cadence === "monthly") return null;
+  if (cadence === "monthly") return createMonthlyEvidenceWindow(options);
   return null;
 }
 
@@ -152,4 +189,65 @@ function shiftDateKey(dateKey, days) {
   const date = new Date(`${dateKey}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function shiftMonth(monthKey, months) {
+  const date = new Date(`${monthKey}-01T12:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  return date.toISOString().slice(0, 7);
+}
+
+function firstDateOfMonth(monthKey) {
+  return `${monthKey}-01`;
+}
+
+function lastDateOfMonth(monthKey) {
+  const firstOfFollowing = new Date(`${shiftMonth(monthKey, 1)}-01T12:00:00Z`);
+  firstOfFollowing.setUTCDate(firstOfFollowing.getUTCDate() - 1);
+  return firstOfFollowing.toISOString().slice(0, 10);
+}
+
+function localDateTimeToUtc({ date, time, timeZone }) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute, secondWithMilliseconds = "0"] = time.split(":");
+  const [second, milliseconds = "0"] = secondWithMilliseconds.split(".");
+  const desired = Date.UTC(
+    year,
+    month - 1,
+    day,
+    Number(hour),
+    Number(minute),
+    Number(second),
+    Number(milliseconds.padEnd(3, "0").slice(0, 3))
+  );
+  let guess = desired;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date(guess))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value])
+    );
+    const represented = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour === "24" ? "0" : parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+      Number(milliseconds.padEnd(3, "0").slice(0, 3))
+    );
+    const adjustment = desired - represented;
+    guess += adjustment;
+    if (adjustment === 0) break;
+  }
+  return new Date(guess);
 }

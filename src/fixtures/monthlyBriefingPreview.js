@@ -1,6 +1,6 @@
-const MONTHLY_JULY_FIXTURE_ID = "monthly_monthly_preview_july_2026_v2";
-const MONTHLY_JULY_FIXTURE_VERSION = "monthly-preview-fixture-v2";
-const MONTHLY_JULY_FIXTURE_SEED = "monthly-preview-july-2026-seed-v2";
+const MONTHLY_JULY_FIXTURE_ID = "monthly_preview_july_2026_v4";
+const MONTHLY_JULY_FIXTURE_VERSION = "monthly-preview-fixture-v4";
+const MONTHLY_JULY_FIXTURE_SEED = "monthly-preview-july-2026-seed-v4";
 const MONTHLY_CONTROL_FIXTURE_ID = "monthly_monthly_preview_control_v1";
 const MONTHLY_CONTROL_FIXTURE_VERSION = "monthly-preview-control-v1";
 const MONTHLY_CONTROL_FIXTURE_SEED = "monthly-preview-control-seed-v1";
@@ -20,37 +20,60 @@ export const monthlyPreviewFixtures = {
     fixtureId: MONTHLY_JULY_FIXTURE_ID,
     fixtureVersion: MONTHLY_JULY_FIXTURE_VERSION,
     fixtureSeed: MONTHLY_JULY_FIXTURE_SEED,
-    syntheticDateRange: null,
+    previewWindow: { startDate: "2026-07-01", endDate: "2026-07-31", deliveryDate: "2026-08-01", storyWindowStart: "2026-07-01" },
+    observedCutoff: "2026-07-28",
     weights: [
       { id: "jun-01", measuredAt: "2026-06-01", weight: { value: 177.1, unit: "lb" } },
       { id: "jun-15", measuredAt: "2026-06-15", weight: { value: 171.6, unit: "lb" } },
       { id: "jun-30", measuredAt: "2026-06-30", weight: { value: 166.8, unit: "lb" } },
+      { id: "jul-08-observed", measuredAt: "2026-07-08", weight: { value: 166.7, unit: "lb" }, source: "observed_fixture" },
     ],
     dexaScans: [
       {
-        id: "dexa-jun-20",
-        measuredAt: "2026-06-20",
-        leanMass: { value: 148.7, unit: "lb" },
-        fatMass: { value: 18.9, unit: "lb" },
-        bodyFatPercentage: { value: 10.8, unit: "%" },
-        source: "real",
+        id: "dexa-jul-18-observed",
+        measuredAt: "2026-07-18",
+        leanMass: { value: 147.5, unit: "lb" },
+        fatMass: { value: 12.8, unit: "lb" },
+        bodyFatPercentage: { value: 7.7, unit: "%" },
+        isNewBaseline: true,
+        baselineRole: "goal_transition_reference",
+        source: "observed_fixture",
+        isSynthetic: false,
       },
     ],
     progressPhotos: [
       { id: "photo-06-05", capturedAt: "2026-06-05", view: "front", imagePath: "private/founder/photos/2026-06-05-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
       { id: "photo-06-26", capturedAt: "2026-06-26", view: "front", imagePath: "private/founder/photos/2026-06-26-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
+      { id: "photo-07-16-observed", capturedAt: "2026-07-16", view: "front", imagePath: "private/founder/photos/2026-07-16-front.JPEG", source: { type: "photo", name: "Observed fixture" }, isSynthetic: false },
     ],
     energyContinuations: [
       { id: "real-energy-06-07", date: "2026-06-07", balance: -820, estimatedIntake: 2470, estimatedExpenditure: 3290, source: "real" },
       { id: "real-energy-06-14", date: "2026-06-14", balance: -760, estimatedIntake: 2580, estimatedExpenditure: 3340, source: "real" },
       { id: "real-energy-06-21", date: "2026-06-21", balance: -520, estimatedIntake: 2530, estimatedExpenditure: 3050, source: "real" },
       { id: "real-energy-06-28", date: "2026-06-28", balance: -490, estimatedIntake: 2440, estimatedExpenditure: 2930, source: "real" },
+      { id: "observed-energy-07-12", date: "2026-07-12", balance: -420, estimatedIntake: 2440, estimatedExpenditure: 2860, source: "observed_fixture" },
     ],
     trainingObservations: [
       { id: "train-06-06", date: "2026-06-06", movement: "bench", direction: "improving", area: "upper" },
       { id: "train-06-12", date: "2026-06-12", movement: "squat", direction: "improving", area: "lower" },
       { id: "train-06-20", date: "2026-06-20", movement: "row", direction: "stable", area: "back" },
       { id: "train-06-27", date: "2026-06-27", movement: "deadlift", direction: "improving", area: "lower" },
+      { id: "observed-train-07-16", date: "2026-07-16", movement: "row", direction: "stable", area: "back", source: "observed_fixture" },
+      {
+        id: "observed-train-07-28",
+        date: "2026-07-28",
+        movement: "lower_body_strength",
+        direction: "stable",
+        area: "lower",
+        source: "canonical_fixture",
+        session: {
+          activityType: "Traditional Strength Training",
+          exerciseCount: 5,
+          workingSetCount: 20,
+          durationSeconds: 4801,
+          exercises: ["Hack Squats", "Leg Extensions", "Sissy Squats", "Single-Leg Leg Press", "Seated Hip Abductions"],
+        },
+      },
     ],
     dailyBriefings: [
       {
@@ -73,57 +96,40 @@ export const monthlyPreviewFixtures = {
       },
       phases: [
         { id: "phase-visible-abs", name: "Visible Abs", startDate: "2026-05-01", status: "completed", duration: { value: 8, unit: "weeks" } },
-        { id: "phase-build-lean-mass", name: "Build Lean Mass", startDate: "2026-06-29", status: "active", duration: { value: 16, unit: "weeks" } },
+        { id: "phase-build-lean-mass", name: "Build Lean Mass", startDate: "2026-07-18", status: "active", duration: { value: 16, unit: "weeks" } },
       ],
+      completionEvent: {
+        id: "goal-completion-visible-abs-2026-07-18",
+        completedAt: "2026-07-18",
+        source: "fixture_owned_completed_goal",
+        outcome: "completed",
+        displayName: "Visible Abs",
+      },
     },
     syntheticContinuation: {
       fixtureId: MONTHLY_JULY_FIXTURE_ID,
       fixtureVersion: MONTHLY_JULY_FIXTURE_VERSION,
       fixtureSeed: MONTHLY_JULY_FIXTURE_SEED,
-      syntheticDateRange: { startDate: null, endDate: "2026-07-30" },
+      syntheticDateRange: { startDate: "2026-07-29", endDate: "2026-07-31" },
       weights: [
-        makeSyntheticRecord({ id: "jul-08", measuredAt: "2026-07-08", weight: { value: 166.7, unit: "lb" } }),
-        makeSyntheticRecord({ id: "jul-22", measuredAt: "2026-07-22", weight: { value: 166.6, unit: "lb" } }),
         makeSyntheticRecord({ id: "jul-30", measuredAt: "2026-07-30", weight: { value: 166.5, unit: "lb" } }),
       ],
-      dexaScans: [
-        makeSyntheticRecord({
-          id: "dexa-jul-18",
-          measuredAt: "2026-07-18",
-          leanMass: { value: 147.5, unit: "lb" },
-          fatMass: { value: 12.8, unit: "lb" },
-          bodyFatPercentage: { value: 7.7, unit: "%" },
-          isNewBaseline: true,
-          baselineRole: "goal_transition_reference",
-        }),
-      ],
+      dexaScans: [],
       progressPhotos: [
         makeSyntheticRecord({
-          id: "photo-07-16",
-          capturedAt: "2026-07-16",
+          id: "photo-07-31",
+          capturedAt: "2026-07-31",
           view: "front",
-          imagePath: "private/founder/photos/2026-07-16-front.JPEG",
-          source: { type: "photo", name: "preview_fixture" },
-        }),
-        makeSyntheticRecord({
-          id: "photo-07-30",
-          capturedAt: "2026-07-30",
-          view: "front",
-          imagePath: "private/founder/photos/2026-07-30-front.JPEG",
+          imagePath: "private/founder/photos/2026-07-31-front.JPEG",
           source: { type: "photo", name: "preview_fixture" },
         }),
       ],
       energyContinuations: [
-        makeSyntheticRecord({ id: "energy-2026-07-05", date: "2026-07-05", balance: -650, estimatedIntake: 2450, estimatedExpenditure: 3100 }),
-        makeSyntheticRecord({ id: "energy-2026-07-12", date: "2026-07-12", balance: -520, estimatedIntake: 2460, estimatedExpenditure: 2980 }),
-        makeSyntheticRecord({ id: "energy-2026-07-19", date: "2026-07-19", balance: -310, estimatedIntake: 2425, estimatedExpenditure: 2735 }),
-        makeSyntheticRecord({ id: "energy-2026-07-26", date: "2026-07-26", balance: -160, estimatedIntake: 2410, estimatedExpenditure: 2570 }),
+        makeSyntheticRecord({ id: "energy-2026-07-29", date: "2026-07-29", balance: -190, estimatedIntake: 2400, estimatedExpenditure: 2590 }),
+        makeSyntheticRecord({ id: "energy-2026-07-30", date: "2026-07-30", balance: -160, estimatedIntake: 2410, estimatedExpenditure: 2570 }),
       ],
       trainingObservations: [
-        makeSyntheticRecord({ id: "train-07-02", date: "2026-07-02", movement: "bench", direction: "improving", issue: null }),
-        makeSyntheticRecord({ id: "train-07-09", date: "2026-07-09", movement: "squat", direction: "improving", issue: null }),
-        makeSyntheticRecord({ id: "train-07-16", date: "2026-07-16", movement: "row", direction: "plateauing", issue: "plateauing" }),
-        makeSyntheticRecord({ id: "train-07-23", date: "2026-07-23", movement: "deadlift", direction: "improving", issue: null }),
+        makeSyntheticRecord({ id: "train-07-30", date: "2026-07-30", movement: "deadlift", direction: "improving", issue: null }),
       ],
     },
   },
@@ -131,7 +137,8 @@ export const monthlyPreviewFixtures = {
     fixtureId: MONTHLY_CONTROL_FIXTURE_ID,
     fixtureVersion: MONTHLY_CONTROL_FIXTURE_VERSION,
     fixtureSeed: MONTHLY_CONTROL_FIXTURE_SEED,
-    syntheticDateRange: null,
+    previewWindow: { startDate: "2026-06-01", endDate: "2026-06-30", deliveryDate: "2026-06-01", storyWindowStart: "2026-06-01" },
+    observedCutoff: "2026-06-30",
     weights: [
       { id: "ord-06-02", measuredAt: "2026-06-02", weight: { value: 170.6, unit: "lb" } },
       { id: "ord-06-09", measuredAt: "2026-06-09", weight: { value: 170.5, unit: "lb" } },

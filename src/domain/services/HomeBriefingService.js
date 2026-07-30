@@ -66,6 +66,7 @@ export function createHomeBriefingService({
         latestDailyBriefing,
         latestMidweekBriefing,
         latestWeeklyBriefing,
+        latestMonthlyBriefing,
         latestEventBriefing,
         canonicalEvidence,
       ] = resolvedUserId
@@ -87,6 +88,7 @@ export function createHomeBriefingService({
             repositories.dailyBriefings?.getLatestScheduledDailyBriefing?.(resolvedUserId) ?? repositories.dailyBriefings?.getLatestDailyBriefing?.(resolvedUserId) ?? null,
             repositories.dailyBriefings?.getLatestMidweekBriefing?.(resolvedUserId) ?? null,
             repositories.dailyBriefings?.getLatestWeeklyBriefing?.(resolvedUserId) ?? null,
+            repositories.dailyBriefings?.getLatestMonthlyBriefing?.(resolvedUserId) ?? null,
             repositories.dailyBriefings?.getLatestActiveEventBriefing?.(resolvedUserId) ?? null,
             repositories.canonicalEvidence?.listCanonicalEvidenceObjects(resolvedUserId) ?? [],
           ])
@@ -105,6 +107,7 @@ export function createHomeBriefingService({
             [],
             await repositories.analyses.getLatestAnalysis(),
             await repositories.analyses.listAnalyses?.() ?? [],
+            null,
             null,
             null,
             null,
@@ -199,6 +202,7 @@ export function createHomeBriefingService({
         dailyArtifact: currentDailyBriefing,
         eventArtifact: latestEventBriefing,
         midweekArtifact: latestMidweekBriefing,
+        monthlyArtifact: latestMonthlyBriefing,
         now: now(),
         timeZone: user?.timeZone ?? "America/Los_Angeles",
         weeklyArtifact: latestWeeklyBriefing,
@@ -403,6 +407,23 @@ export function mapBriefingCard({
       createdAt: artifact?.generatedAt ?? null,
       tone: "insight",
       prompt: artifact ? "Review the week so far." : "No persisted Midweek Briefing is available yet.",
+      href: selection.href,
+      freshnessState: artifact ? "current" : "missing",
+    };
+  }
+
+  if (selection.briefingType === "monthly") {
+    const artifact = selection.artifact;
+    return {
+      id: artifact?.id ?? "monthly-briefing-unavailable",
+      sectionLabel: "Monthly Briefing",
+      title: artifact ? "Monthly Briefing Ready" : "Monthly Briefing Unavailable",
+      summary: artifact?.briefing?.monthlyPresentation?.hero?.thesis ?? null,
+      createdAt: artifact?.generatedAt ?? null,
+      tone: "insight",
+      prompt: artifact
+        ? "Review the completed month."
+        : "No persisted Monthly Briefing is available yet.",
       href: selection.href,
       freshnessState: artifact ? "current" : "missing",
     };

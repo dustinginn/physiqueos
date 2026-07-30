@@ -1,3 +1,9 @@
+import { composeMonthlyNarrativeModel } from "./MonthlyNarrativeCompositionService";
+import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
+import {
+  createMonthlyBriefingGoalConfidenceBlockFromAssessment,
+} from "./BriefingGoalConfidencePresentationService";
+
 const PREVIEW_ID = "monthly_briefing_preview_2026_07_01";
 const PREVIEW_WINDOW = {
   startDate: "2026-06-01",
@@ -9,18 +15,18 @@ export const MONTHLY_NARRATIVE_PREVIEW_VERSION = "monthly_narrative_preview_v5";
 export const MONTHLY_EDITORIAL_DECISION_VERSION = "monthly_editorial_decision_preview_v1";
 
 export const MONTHLY_SCORE_WEIGHTS = Object.freeze({
-  strategicSignificance: 0.22,
-  evidenceStrength: 0.19,
-  novelty: 0.08,
-  durability: 0.08,
-  goalRelevance: 0.1,
-  phaseRelevance: 0.07,
-  decisionImpact: 0.11,
-  confidenceImpact: 0.06,
-  contradictionOrRisk: 0.06,
-  recencyWithinWindow: 0.07,
-  futureRelevance: 0.05,
-  dominantThesisSupport: 0.01,
+  strategicSignificance: 0.2,
+  evidenceStrength: 0.17272727272727273,
+  novelty: 0.07272727272727272,
+  durability: 0.07272727272727272,
+  goalRelevance: 0.09090909090909091,
+  phaseRelevance: 0.06363636363636363,
+  decisionImpact: 0.1,
+  confidenceImpact: 0.05454545454545454,
+  contradictionOrRisk: 0.05454545454545454,
+  recencyWithinWindow: 0.06363636363636363,
+  futureRelevance: 0.045454545454545456,
+  dominantThesisSupport: 0.00909090909090909,
 });
 
 const MONTHLY_BOUNDED_MILESTONE_TYPES = Object.freeze(["goal_completion"]);
@@ -77,6 +83,7 @@ export const REQUIRED_CANDIDATE_FIELDS = Object.freeze([
   "included",
   "exclusionReason",
   "renderedOrder",
+  "renderedOrderReason",
   "mergeMetadata",
   "provenance",
 ]);
@@ -230,8 +237,16 @@ function filterByWindow(items, field, window) {
   return listInWindow(items, field, window);
 }
 
-function toEvidenceRefs(items) {
-  return [...new Set((items ?? []).map((item) => item?.id || item?.storyId || `${item?.source || "record"}_${toDateKey(item?.date || item?.measuredAt || item?.generatedAt)}`))];
+export function normalizeMonthlyEvidenceRefs(items) {
+  const values = Array.isArray(items) ? items : [items];
+  const normalized = values
+    .map((item) => {
+      if (typeof item === "string") return item.length > 0 ? item : null;
+      if (!item || typeof item !== "object") return null;
+      return item.canonicalId ?? item.evidenceId ?? item.id ?? item.storyId ?? null;
+    })
+    .filter((value) => typeof value === "string" && value.length > 0 && value !== "record_");
+  return [...new Set(normalized)];
 }
 
 function buildTimeWindow(startDate, endDate, label) {
@@ -334,7 +349,7 @@ function createCandidate(overrides) {
     storyType: overrides.storyType,
     title: overrides.title,
     timeWindow: overrides.timeWindow,
-    evidenceRefs: toEvidenceRefs(overrides.evidenceRefs),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(overrides.evidenceRefs),
     sourceClaimRefs: [...new Set(overrides.sourceClaimRefs ?? [])],
     evidenceStrength: clamp(overrides.evidenceStrength ?? 0),
     narrativeIntent: overrides.narrativeIntent,
@@ -356,6 +371,7 @@ function createCandidate(overrides) {
     included: overrides.included ?? false,
     exclusionReason: overrides.exclusionReason ?? null,
     renderedOrder: null,
+    renderedOrderReason: null,
     mergeMetadata: overrides.mergeMetadata ?? null,
     provenance: overrides.provenance || { source: "monthly_story_candidate" },
   };
@@ -363,10 +379,11 @@ function createCandidate(overrides) {
 
 function scoreDimension(value, weight) {
   const safe = clamp(value, 0, 10);
+  const weightedHundredths = Math.round(safe * weight * 10000);
   return {
     value: safe,
     weight,
-    weighted: roundOne(safe * weight * 100),
+    weighted: weightedHundredths / 100,
   };
 }
 
@@ -386,7 +403,8 @@ function applyDeterministicScoring(candidate) {
     dominantThesisSupport: scoreDimension(candidate.dominantThesisSupport, MONTHLY_SCORE_WEIGHTS.dominantThesisSupport),
   };
 
-  const score = round(Object.values(contributions).reduce((total, entry) => total + entry.weighted, 0));
+  const score = Object.values(contributions)
+    .reduce((totalHundredths, entry) => totalHundredths + Math.round(entry.weighted * 100), 0) / 100;
   return {
     ...candidate,
     scoreContributors: contributions,
@@ -394,12 +412,16 @@ function applyDeterministicScoring(candidate) {
   };
 }
 
-function rankCandidates(candidates) {
+export function rankMonthlyCandidates(candidates) {
+  // Exact stable tie-breaker: score, strategic significance, evidence strength, then story ID.
   const ranked = [...candidates]
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
+      if (right.strategicSignificance !== left.strategicSignificance) {
+        return right.strategicSignificance - left.strategicSignificance;
+      }
       if (right.evidenceStrength !== left.evidenceStrength) return right.evidenceStrength - left.evidenceStrength;
-      return right.recencyWithinWindow - left.recencyWithinWindow;
+      return left.storyId.localeCompare(right.storyId);
     })
     .map((candidate, index) => ({ ...candidate, scoreRank: index + 1 }));
 
@@ -469,10 +491,9 @@ function shouldMerge(candidate, existing) {
 }
 
 function suppressionReasonFor(candidate, selected) {
-  if (selected.length >= 7) return "editorial_capacity_reached";
-  if (candidate.score < 32) return "insufficient_evidence_strength";
+  if (candidate.score < 32) return "insufficient_evidence";
   if (selected.some((entry) => hasThesisOverlap(candidate, entry) && entry.storyType !== "contradiction")) {
-    return "dominant_narrative_overlap";
+    return "duplicate_thesis";
   }
   return null;
 }
@@ -485,7 +506,7 @@ function applyMergeAndSuppression(scoredCandidates) {
   for (const candidate of ordered) {
     if (candidate.score < 32 && selected.length >= 4) {
       candidate.included = false;
-      candidate.exclusionReason = "below_inclusion_threshold";
+      candidate.exclusionReason = "insufficient_evidence";
       continue;
     }
 
@@ -496,7 +517,11 @@ function applyMergeAndSuppression(scoredCandidates) {
       candidate.exclusionReason = `merged_into_${existing.storyId}`;
       candidate.mergeMetadata = {
         mergedInto: existing.storyId,
-        reason: "thesis_overlap_and_evidence_overlap",
+        mergeTargetId: existing.storyId,
+        mergeReason: "goal_transition_or_evidence_overlap",
+        transferredEvidenceRefs: [...candidate.evidenceRefs],
+        transferredSourceClaimRefs: [...candidate.sourceClaimRefs],
+        transferredProvenance: candidate.provenance,
       };
 
       existing.mergeMetadata = {
@@ -505,9 +530,10 @@ function applyMergeAndSuppression(scoredCandidates) {
         primaryStoryType: existing.storyType,
         mergeReason: "goal_transition_or_evidence_overlap",
         retainedEvidenceRefs: [...new Set([...existing.evidenceRefs, ...candidate.evidenceRefs])],
-        retainedProvenance: [...new Set([existing.storyId, existing.provenance?.source, candidate.provenance?.source].filter(Boolean))],
+        retainedSourceClaimRefs: [...new Set([...existing.sourceClaimRefs, ...candidate.sourceClaimRefs])],
+        retainedProvenance: [existing.provenance, candidate.provenance],
+        mergedStoryTypes: [...new Set([existing.storyType, candidate.storyType])],
       };
-      existing.mergeMetadata.retainedEvidenceRefs = existing.mergeMetadata.retainedEvidenceRefs;
       mergedDecisions.push({
         primary: existing.storyId,
         mergedCandidateId: candidate.storyId,
@@ -544,7 +570,6 @@ function applyMergeAndSuppression(scoredCandidates) {
 };
 
 function applyEditorialOrdering(includedCandidates) {
-  const milestonePriority = new Set(["goal_completion", "new_baseline", "goal_start", "phase_transition"]);
   const renderPriority = {
     new_baseline: 1,
     energy_trend: 2,
@@ -583,6 +608,13 @@ function applyEditorialOrdering(includedCandidates) {
   const ordered = [...rankedEditorial, ...rankedBounded].map((candidate, index) => ({
     ...candidate,
     renderedOrder: index + 1,
+    renderedOrderReason: isBoundedMilestoneType(candidate.storyType)
+      ? "bounded_milestone_after_primary_stories"
+      : candidate.scoreRank === index + 1
+        ? "score_order_preserved"
+        : ["new_baseline", "dexa_baseline", "weight_context"].includes(candidate.storyType)
+          ? "current_state_before_supporting_context"
+          : "editorial_coherence_sequence",
   }));
 
   const adjustments = ordered
@@ -592,9 +624,7 @@ function applyEditorialOrdering(includedCandidates) {
       scoreRank: candidate.scoreRank,
       renderedOrder: candidate.renderedOrder,
       reason:
-        candidate.storyType === "new_baseline" && candidate.storyType !== "goal_completion"
-          ? "coherence_preserve_strategy_chain"
-          : "coherence_adjustment",
+        candidate.renderedOrderReason,
     }));
 
   return { ordered, adjustments };
@@ -604,23 +634,18 @@ function deduceGoalStartDate(goal) {
   return goal?.timeline?.startDate || null;
 }
 
-function deduceGoalTargetDate(goal) {
-  if (goal?.timeline?.targetDate) return goal.timeline.targetDate;
-  if (goal?.targetDate) return goal.targetDate;
-  return null;
-}
-
-function latestGoalPhase(goal) {
+function latestGoalPhase(goal, monthWindow) {
   const phases = Array.isArray(goal?.phases) ? goal.phases : [];
   return phases
     .map((phase) => ({ ...phase, startDate: toDateKey(phase.startDate) }))
-    .filter((phase) => phase.startDate >= PREVIEW_WINDOW.startDate && phase.startDate <= PREVIEW_WINDOW.endDate)
+    .filter((phase) => phase.startDate >= monthWindow.startDate && phase.startDate <= monthWindow.endDate)
     .sort((a, b) => b.startDate.localeCompare(a.startDate))[0] ?? null;
 }
 
 function makeGoalCompletionCandidate(goal, closeDailyBriefing, monthWindow) {
-  const completionDate = deduceGoalTargetDate(goal);
-  if (!goal || !completionDate) return null;
+  const completionEvent = goal?.completionEvent;
+  const completionDate = toDateKey(completionEvent?.completedAt ?? completionEvent?.date);
+  if (!goal || !completionEvent?.id || !completionDate) return null;
   if (toDateKey(completionDate) < monthWindow.startDate || toDateKey(completionDate) > monthWindow.endDate) return null;
   const completionWindow = getCarryInAwareWindow(
     [{ date: completionDate, id: `goal-completion-${toDateKey(completionDate)}` }],
@@ -639,7 +664,7 @@ function makeGoalCompletionCandidate(goal, closeDailyBriefing, monthWindow) {
     storyWindow: completionWindow.storyWindow,
     comparisonWindow: completionWindow.comparisonWindow,
     carryInContext: completionWindow.carryInContext,
-    evidenceRefs: [goal.id || "goal_completion", closeDailyBriefing?.id || "goal_close", `goal_${toDateKey(completionDate)}`],
+    evidenceRefs: [goal.id, completionEvent.id, closeDailyBriefing?.id].filter(Boolean),
     sourceClaimRefs: ["goal_completion", "completion_boundary"],
     narrativeIntent: "goal_boundary",
     evidenceStrength: 9,
@@ -658,6 +683,7 @@ function makeGoalCompletionCandidate(goal, closeDailyBriefing, monthWindow) {
     provenance: {
       source: "monthly_goal_completion_candidate",
       goalId: goal.id,
+      completionEventId: completionEvent.id,
       completionDate: toDateKey(completionDate),
       goalResult: closeDailyBriefing?.goalStatus?.primary?.progress ?? closeDailyBriefing?.goal?.result ?? null,
     },
@@ -700,7 +726,7 @@ function makeGoalStartCandidate(goal, monthWindow) {
 }
 
 function makePhaseTransitionCandidate(goal, monthWindow) {
-  const phase = latestGoalPhase(goal);
+  const phase = latestGoalPhase(goal, monthWindow);
   if (!phase || !phase.startDate) return null;
   const transitionWindow = getCarryInAwareWindow(
     [{ date: phase.startDate, id: phase.id || `phase-${phase.name || "transition"}`, phaseName: phase.name }],
@@ -719,7 +745,7 @@ function makePhaseTransitionCandidate(goal, monthWindow) {
     storyWindow: transitionWindow.storyWindow,
     comparisonWindow: transitionWindow.comparisonWindow,
     carryInContext: transitionWindow.carryInContext,
-    evidenceRefs: [...toEvidenceRefs([phase]), goal.id || "goal"],
+    evidenceRefs: [...normalizeMonthlyEvidenceRefs([phase]), goal.id || "goal"],
     sourceClaimRefs: ["phase_transition", "phase_start"],
     narrativeIntent: "goal_transition_context",
     evidenceStrength: 8,
@@ -863,7 +889,7 @@ function makeDexaComparisonCandidate(dexaScans, monthWindow) {
     storyWindow: comparisonWindow.storyWindow,
     comparisonWindow: comparisonWindow.comparisonWindow,
     carryInContext: comparisonWindow.carryInContext,
-    evidenceRefs: toEvidenceRefs([...comparisonWindow.storyRecords, ...comparisonWindow.comparisonRecords]),
+    evidenceRefs: normalizeMonthlyEvidenceRefs([...comparisonWindow.storyRecords, ...comparisonWindow.comparisonRecords]),
     sourceClaimRefs: ["dexa_comparison", "directional_context"],
     narrativeIntent: "composition_direction",
     evidenceStrength: 6,
@@ -914,7 +940,7 @@ function makeDexaContradictionCandidate(dexaScans, weights, monthWindow) {
     storyWindow: contradictionWindow.storyWindow,
     comparisonWindow: contradictionWindow.comparisonWindow,
     carryInContext: contradictionWindow.carryInContext,
-    evidenceRefs: toEvidenceRefs([latest, ...weightsSorted]),
+    evidenceRefs: normalizeMonthlyEvidenceRefs([latest, ...weightsSorted]),
     sourceClaimRefs: ["composition_signals", "risk_signal"],
     narrativeIntent: "interpretation_qualification",
     evidenceStrength: 5,
@@ -958,7 +984,7 @@ function makeEnergyTrendCandidate(energyContinuations, monthWindow) {
     storyWindow: windowed.storyWindow,
     comparisonWindow: windowed.comparisonWindow,
     carryInContext: windowed.carryInContext,
-    evidenceRefs: toEvidenceRefs(filtered),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(filtered),
     sourceClaimRefs: ["energy_balance", "energy_trajectory"],
     narrativeIntent: "energy_stability",
     evidenceStrength: clamp(filtered.length * 2, 0, 10),
@@ -1005,7 +1031,7 @@ function makeTrainingCandidate(trainingObservations, monthWindow) {
     storyWindow: windowed.storyWindow,
     comparisonWindow: windowed.comparisonWindow,
     carryInContext: windowed.carryInContext,
-    evidenceRefs: toEvidenceRefs(filtered),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(filtered),
     sourceClaimRefs: ["training_observations", "movement_progress"],
     narrativeIntent: "training_progress",
     evidenceStrength: clamp(improvingShare * 10, 0, 10),
@@ -1044,7 +1070,7 @@ function makeRecoveryIssueCandidate(trainingObservations, monthWindow) {
     storyWindow: issueWindow.storyWindow,
     comparisonWindow: issueWindow.comparisonWindow,
     carryInContext: issueWindow.carryInContext,
-    evidenceRefs: toEvidenceRefs(issueRecords),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(issueRecords),
     sourceClaimRefs: ["fatigue_signal", "recovery_risk"],
     narrativeIntent: "recovery_risk_gate",
     evidenceStrength: clamp(issueRecords.length * 2.2, 0, 10),
@@ -1088,7 +1114,7 @@ function makeRecommendationCandidate(closeBriefings, monthWindow) {
     storyType: "recommendation_change",
     title: "Recommendation posture strengthened and remained coherent through the month.",
     timeWindow: buildTimeWindow(windowFiltered[0].generatedAt, windowFiltered.at(-1).generatedAt, "Recommendation continuity"),
-    evidenceRefs: toEvidenceRefs(windowFiltered),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(windowFiltered),
     sourceClaimRefs: ["recommendation_continuity", "confidence_window"],
     narrativeIntent: "recommendation_stability",
     evidenceStrength: clamp(Math.abs(endConfidence - startConfidence), 0, 10),
@@ -1134,7 +1160,7 @@ function makeConfidenceShiftCandidate(closeBriefings, monthWindow) {
     storyType: "confidence_shift",
     title: "Confidence moved materially, with decision signal review support.",
     timeWindow: buildTimeWindow(filtered[0].generatedAt, filtered.at(-1).generatedAt, "Confidence dynamics"),
-    evidenceRefs: toEvidenceRefs(filtered),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(filtered),
     sourceClaimRefs: ["confidence_delta", "decision_readiness"],
     narrativeIntent: "confidence_trajectory",
     evidenceStrength: clamp(Math.abs(end - start), 0, 10),
@@ -1175,7 +1201,7 @@ function makePhotoProgressionCandidate(photos, monthWindow) {
     storyWindow: windowed.storyWindow,
     comparisonWindow: windowed.comparisonWindow,
     carryInContext: windowed.carryInContext,
-    evidenceRefs: toEvidenceRefs([...windowed.storyRecords, ...windowed.comparisonRecords]),
+    evidenceRefs: normalizeMonthlyEvidenceRefs([...windowed.storyRecords, ...windowed.comparisonRecords]),
     sourceClaimRefs: ["photo_progression", "visual_context"],
     narrativeIntent: "visual_progression",
     evidenceStrength: clamp(inWindow.length * 2, 0, 10),
@@ -1218,7 +1244,7 @@ function makeWeightContextCandidate(weights, monthWindow) {
     storyWindow: windowed.storyWindow,
     comparisonWindow: windowed.comparisonWindow,
     carryInContext: windowed.carryInContext,
-    evidenceRefs: toEvidenceRefs([...windowed.storyRecords, ...windowed.comparisonRecords]),
+    evidenceRefs: normalizeMonthlyEvidenceRefs([...windowed.storyRecords, ...windowed.comparisonRecords]),
     sourceClaimRefs: ["weight_series", "scale_context"],
     narrativeIntent: "weight_grounding",
     evidenceStrength: clamp(valid.length * 1.4, 0, 10),
@@ -1264,7 +1290,7 @@ function makeRiskSignalCandidate(weights, monthWindow) {
     storyWindow: riskWindow.storyWindow,
     comparisonWindow: riskWindow.comparisonWindow,
     carryInContext: riskWindow.carryInContext,
-    evidenceRefs: toEvidenceRefs(sorted),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(sorted),
     sourceClaimRefs: ["weight_variance", "risk_monitoring"],
     narrativeIntent: "risk_signal_context",
     evidenceStrength: clamp(delta, 0, 10),
@@ -1307,7 +1333,7 @@ function makeInterruptionCandidate(weights, photos, monthWindow) {
     storyWindow: interruptionWindow.storyWindow,
     comparisonWindow: interruptionWindow.comparisonWindow,
     carryInContext: interruptionWindow.carryInContext,
-    evidenceRefs: toEvidenceRefs(inWindow),
+    evidenceRefs: normalizeMonthlyEvidenceRefs(inWindow),
     sourceClaimRefs: ["continuity_gap", "observation_gap"],
     narrativeIntent: "continuity_check",
     evidenceStrength: clamp(maxGap / 2, 0, 10),
@@ -1371,52 +1397,42 @@ function listMonthScopeCandidateSet(evidence, goal, monthWindow) {
 
 function selectMonthCandidates(evidence, goal, monthWindow) {
   const candidates = listMonthScopeCandidateSet(evidence, goal, monthWindow).map((candidate) => ({ ...candidate, included: true }));
-  const ranked = rankCandidates(candidates);
+  const ranked = rankMonthlyCandidates(candidates);
   const merged = applyMergeAndSuppression(ranked);
 
-  const orderedMap = applyEditorialOrdering(merged.selected);
-  const rankedEditorial = orderedMap.ordered.filter((candidate) => !isBoundedMilestoneType(candidate.storyType));
-  const boundedCandidates = orderedMap.ordered.filter((candidate) => isBoundedMilestoneType(candidate.storyType));
-  const editorialCapacity = Math.min(MONTHLY_EDITORIAL_CAPACITY, rankedEditorial.length);
-  const selectedEditorial = rankedEditorial.slice(0, editorialCapacity);
-  const renderedCandidateIds = [
-    ...selectedEditorial,
-    ...boundedCandidates,
-  ].map((candidate) => candidate.storyId);
+  const eligibleEditorial = merged.selected.filter((candidate) => !isBoundedMilestoneType(candidate.storyType));
+  const boundedCandidates = merged.selected.filter((candidate) => isBoundedMilestoneType(candidate.storyType));
+  const selectedEditorial = eligibleEditorial.slice(0, MONTHLY_EDITORIAL_CAPACITY);
+  const capacityExcluded = eligibleEditorial.slice(MONTHLY_EDITORIAL_CAPACITY);
+  const orderedMap = applyEditorialOrdering([...selectedEditorial, ...boundedCandidates]);
+  const renderedCandidateIds = orderedMap.ordered.map((candidate) => candidate.storyId);
   const rankedEditorialStoryIds = selectedEditorial.map((candidate) => candidate.storyId);
-  const orderedCandidates = orderedMap.ordered.map((candidate, index) => ({ ...candidate, renderedOrder: index + 1 }));
-
-  const adjustedCandidates = candidates.map((candidate) => {
-    const updated = orderedCandidates.find((item) => item.storyId === candidate.storyId);
-    return updated ? { ...updated } : candidate;
-  });
-
-  const included = adjustedCandidates.filter((candidate) => candidate.included);
-  const editorialSelectedSet = new Set(selectedEditorial.map((candidate) => candidate.storyId));
-  const boundedSelectedSet = new Set(boundedCandidates.map((candidate) => candidate.storyId));
-
-  for (let index = 0; index < adjustedCandidates.length; index += 1) {
-    const candidate = adjustedCandidates[index];
-    const keeps = editorialSelectedSet.has(candidate.storyId) || boundedSelectedSet.has(candidate.storyId);
-    if (keeps) {
-      candidate.included = true;
-      if (!candidate.mergeMetadata) {
-        candidate.mergeMetadata = null;
-      }
-    } else if (candidate.included) {
-      if (!candidate.inclusionReason) {
-        candidate.inclusionReason = "editorial_capacity_reached";
-      }
-      candidate.exclusionReason = "editorial_capacity_exceeded";
-      candidate.included = false;
-      if (!candidate.renderedOrder) candidate.renderedOrder = null;
+  const renderedById = new Map(orderedMap.ordered.map((candidate) => [candidate.storyId, candidate]));
+  const capacityExcludedIds = new Set(capacityExcluded.map((candidate) => candidate.storyId));
+  const adjustedCandidates = merged.candidates.map((candidate) => {
+    const rendered = renderedById.get(candidate.storyId);
+    if (rendered) return { ...rendered, included: true, exclusionReason: null };
+    if (capacityExcludedIds.has(candidate.storyId)) {
+      return {
+        ...candidate,
+        included: false,
+        inclusionReason: null,
+        exclusionReason: "editorial_capacity_exceeded",
+        renderedOrder: null,
+        renderedOrderReason: null,
+      };
     }
-  }
+    return {
+      ...candidate,
+      renderedOrder: null,
+      renderedOrderReason: null,
+    };
+  });
 
   return {
     candidates: adjustedCandidates,
-    orderedCandidates: selectedEditorial,
-    scoreRankedCandidateIds: adjustedCandidates.map((candidate) => candidate.storyId),
+    orderedCandidates: orderedMap.ordered,
+    scoreRankedCandidateIds: ranked.map((candidate) => candidate.storyId),
     renderedCandidateIds: renderedCandidateIds,
     rankedEditorialStoryIds,
     mergedDecisions: merged.mergedDecisions,
@@ -1462,7 +1478,7 @@ function deriveBoundedMilestones(candidates) {
     .map((candidate) => candidate.storyId);
 }
 
-function createEditorialDecision({ evidence, goal, monthWindow }) {
+function createEditorialDecision({ evidence, goal, monthWindow, generatedAt }) {
   const {
     candidates,
     orderedCandidates,
@@ -1485,7 +1501,7 @@ function createEditorialDecision({ evidence, goal, monthWindow }) {
   return freeze({
     id: `${PREVIEW_ID}_editorial_decision`,
     version: MONTHLY_EDITORIAL_DECISION_VERSION,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     previewWindow: monthWindow,
     synthetic: {
       active: syntheticActive,
@@ -1566,7 +1582,11 @@ function composeLegacyMonthlyNarrative(evidence, monthWindow, currentDexa, prior
     id: PREVIEW_ID,
     preview: true,
     version: MONTHLY_NARRATIVE_PREVIEW_VERSION,
-    reviewWindow: monthWindow,
+    reviewWindow: {
+      startDate: monthWindow.startDate,
+      endDate: monthWindow.endDate,
+      deliveryDate: monthWindow.deliveryDate,
+    },
     deliveryDate: monthWindow.deliveryDate,
     hero: {
       title: deriveHeroTitle(roundOne(weightChange ?? 0), bodyFat, confidence ?? 0),
@@ -1695,25 +1715,38 @@ function mergeContinuationEvidence(baseEvidence, continuation, monthWindow) {
     const date = toDateKey(item?.[field] ?? item?.measuredAt ?? item?.generatedAt ?? item?.date);
     return date > resolvedSyntheticRange.realEvidenceCutoffDate && date <= syntheticEndDate;
   });
+  const accepted = {
+    weights: continuationFilter(continuation.weights, "measuredAt"),
+    dexaScans: continuationFilter(continuation.dexaScans, "measuredAt"),
+    progressPhotos: continuationFilter(continuation.progressPhotos, "capturedAt"),
+    dailyBriefings: continuationFilter(continuation.dailyBriefings, "generatedAt"),
+    energyContinuations: continuationFilter(continuation.energyContinuations, "date"),
+    trainingObservations: continuationFilter(continuation.trainingObservations, "date"),
+  };
+  const syntheticContinuations = Object.values(accepted)
+    .flat()
+    .sort((left, right) => inferDate(left).localeCompare(inferDate(right)) || String(left.id).localeCompare(String(right.id)));
+  const syntheticDates = syntheticContinuations.map(inferDate).filter(Boolean);
   const full = {
-    weights: [...baseEvidence.weights, ...continuationFilter(continuation.weights, "measuredAt")],
-    dexaScans: [...baseEvidence.dexaScans, ...continuationFilter(continuation.dexaScans, "measuredAt")],
-    progressPhotos: [...baseEvidence.progressPhotos, ...continuationFilter(continuation.progressPhotos, "capturedAt")],
-    dailyBriefings: [...baseEvidence.dailyBriefings, ...continuationFilter(continuation.dailyBriefings, "generatedAt")],
-    energyContinuations: [...baseEvidence.energyContinuations, ...continuationFilter(continuation.energyContinuations, "date")],
-    trainingObservations: [...baseEvidence.trainingObservations, ...continuationFilter(continuation.trainingObservations, "date")],
-    syntheticContinuations: [...continuation.records],
+    weights: [...baseEvidence.weights, ...accepted.weights],
+    dexaScans: [...baseEvidence.dexaScans, ...accepted.dexaScans],
+    progressPhotos: [...baseEvidence.progressPhotos, ...accepted.progressPhotos],
+    dailyBriefings: [...baseEvidence.dailyBriefings, ...accepted.dailyBriefings],
+    energyContinuations: [...baseEvidence.energyContinuations, ...accepted.energyContinuations],
+    trainingObservations: [...baseEvidence.trainingObservations, ...accepted.trainingObservations],
+    syntheticContinuations,
     syntheticFixtureId: continuation.fixtureId,
     syntheticFixtureVersion: continuation.fixtureVersion,
     syntheticFixtureSeed: continuation.fixtureSeed,
-    syntheticDateRange: resolvedSyntheticRange,
+    syntheticDateRange: syntheticDates.length ? {
+      startDate: syntheticDates[0],
+      endDate: syntheticDates.at(-1),
+      realEvidenceCutoffDate: resolvedSyntheticRange.realEvidenceCutoffDate,
+    } : null,
     syntheticRealEvidenceCutoff: resolvedSyntheticRange.realEvidenceCutoffDate,
-    syntheticStartDate: resolvedSyntheticRange.startDate,
-    syntheticEndDate,
+    syntheticStartDate: syntheticDates[0] ?? null,
+    syntheticEndDate: syntheticDates.at(-1) ?? null,
   };
-  if (full.syntheticContinuations.length > 0) {
-    full.syntheticDateRange = resolvedSyntheticRange;
-  }
   return full;
 }
 
@@ -1733,10 +1766,17 @@ export function composeMonthlyBriefingPreview({
   energyContinuations = [],
   trainingObservations = [],
   goal = null,
+  goalConfidence = null,
   syntheticContinuation = null,
   generatedAt = new Date().toISOString(),
+  previewWindow = PREVIEW_WINDOW,
 } = {}) {
-  const monthWindow = PREVIEW_WINDOW;
+  const monthWindow = {
+    startDate: toDateKey(previewWindow.startDate),
+    endDate: toDateKey(previewWindow.endDate),
+    deliveryDate: toDateKey(previewWindow.deliveryDate ?? previewWindow.startDate),
+    storyWindowStart: toDateKey(previewWindow.storyWindowStart ?? previewWindow.deliveryDate ?? previewWindow.startDate),
+  };
   const baseEvidence = {
     weights: listInWindow(weights, "measuredAt", monthWindow),
     dexaScans: filterByWindow(dexaScans, "measuredAt", monthWindow),
@@ -1749,19 +1789,6 @@ export function composeMonthlyBriefingPreview({
 
   const continuation = normalizeSyntheticContinuation(syntheticContinuation);
   const fullEvidence = mergeContinuationEvidence(baseEvidence, continuation, monthWindow);
-  if (continuation.records.length > 0) {
-    // synth-first continuation can include explicit synthetic lists outside window checks above
-    const additionalEnergy = (continuation.energyContinuations ?? []).filter((record) => {
-      const date = toDateKey(record.date);
-      return date >= monthWindow.startDate && date <= monthWindow.endDate;
-    });
-    const additionalTrain = (continuation.trainingObservations ?? []).filter((record) => {
-      const date = toDateKey(record.date);
-      return date >= monthWindow.startDate && date <= monthWindow.endDate;
-    });
-    fullEvidence.energyContinuations = [...fullEvidence.energyContinuations, ...additionalEnergy];
-    fullEvidence.trainingObservations = [...fullEvidence.trainingObservations, ...additionalTrain];
-  }
 
   const narrativeEvidence = {
     weights: baseEvidence.weights,
@@ -1784,15 +1811,31 @@ export function composeMonthlyBriefingPreview({
     evidence: fullEvidence,
     goal,
     monthWindow,
+    generatedAt,
+  });
+  const monthlyNarrative = composeMonthlyNarrativeModel({
+    confidence: goalConfidence,
+    decision: editorialDecision,
+    evidence: {
+      ...baseEvidence,
+      goal,
+      previewWindow: monthWindow,
+    },
   });
   return freeze({
     ...narrative,
     id: PREVIEW_ID,
     preview: true,
     version: MONTHLY_NARRATIVE_PREVIEW_VERSION,
-    reviewWindow: monthWindow,
+    reviewWindow: {
+      startDate: monthWindow.startDate,
+      endDate: monthWindow.endDate,
+      deliveryDate: monthWindow.deliveryDate,
+    },
     deliveryDate: monthWindow.deliveryDate,
     editorialDecision,
+    goalConfidence,
+    monthlyNarrative,
     provenance: {
       ...narrative.provenance,
       previewOnly: true,
@@ -1810,23 +1853,423 @@ export function composeMonthlyBriefingPreview({
 
 export function createMonthlyBriefingPreviewService({ repositories }) {
   return {
-    async preview({ userId, syntheticContinuation = null }) {
-      const [weights, dexaScans, progressPhotos, dailyBriefings, goal] = await Promise.all([
-        repositories.weights.listWeightEntries(userId),
-        repositories.dexaScans.listDEXAScans(userId),
-        repositories.progressPhotos.listPhotos(userId),
-        repositories.dailyBriefings.listDailyBriefings(userId),
-        repositories.goals.getActiveGoal(userId),
-      ]);
-
-      return composeMonthlyBriefingPreview({
+    async preview({
+      userId,
+      orchestration = {},
+      syntheticContinuation = orchestration.syntheticContinuation ?? null,
+    }) {
+      const [
         weights,
         dexaScans,
         progressPhotos,
         dailyBriefings,
-        goal,
-        syntheticContinuation,
+        goals,
+        canonicalEvidenceObjects,
+        trainingPerformanceEvents,
+      ] = await Promise.all([
+        repositories.weights.listWeightEntries(userId),
+        repositories.dexaScans.listDEXAScans(userId),
+        repositories.progressPhotos.listPhotos(userId),
+        repositories.dailyBriefings.listDailyBriefings(userId),
+        repositories.goals.listGoals
+          ? repositories.goals.listGoals(userId)
+          : repositories.goals.getActiveGoal(userId).then((goal) => goal ? [goal] : []),
+        repositories.canonicalEvidence?.listCanonicalEvidenceObjects(userId) ?? [],
+        repositories.trainingPerformanceEvents?.listTrainingPerformanceEvents() ?? [],
+      ]);
+
+      const activeGoal = goals.find(
+        (goal) => goal.status === "active" && goal.type === "build_lean_mass"
+      ) ?? goals.find((goal) => goal.primary && goal.status === "active") ?? null;
+      const previewWindow = orchestration.previewWindow ?? PREVIEW_WINDOW;
+      const monthlyGoal = orchestration.goal ?? resolveMonthlyGoalContext({
+        activeGoal,
+        goals,
+        monthWindow: previewWindow,
+        timeZone: orchestration.timeZone ?? "America/Los_Angeles",
       });
+      const resolvedDexaScans = applyDexaScenarioAnnotations(
+        dexaScans,
+        orchestration.dexaScans,
+      );
+      const evidenceWindow = resolveMonthlyGoalEvidenceWindow({
+        activeGoal,
+        orchestration,
+        previewWindow,
+      });
+      const canonical = composeCanonicalMonthlyEvidence({
+        canonicalEvidenceObjects,
+        dexaScans: resolvedDexaScans,
+        evidenceWindow,
+        trainingPerformanceEvents,
+      });
+      const observedCutoff = resolveRealObservedCutoff({
+        evidenceWindow,
+        records: [
+          ...canonical.trainingRecords,
+          ...canonical.nutritionRecords,
+          ...canonical.activityRecords,
+        ],
+      });
+      const goalConfidence = resolveMonthlyGoalConfidenceAssessment({
+        activeGoal,
+        cutoff: orchestration.confidenceCutoff ??
+          endOfUtcDay(observedCutoff ?? previewWindow.endDate),
+        generatedAt: orchestration.generatedAt,
+        repository: repositories.goalConfidence,
+      });
+      const acceptedSyntheticContinuation = filterSyntheticContinuation({
+        continuation: syntheticContinuation,
+        observedCutoff,
+        realEnergyDates: canonical.energyContinuations.map((record) => record.date),
+        realTrainingDates: canonical.trainingObservations.map((record) => record.date),
+      });
+      const evidenceFixture = {
+        ...orchestration,
+        observedCutoff,
+        weights,
+        dexaScans: resolvedDexaScans,
+        progressPhotos,
+        dailyBriefings,
+        goal: monthlyGoal,
+        energyContinuations: canonical.energyContinuations,
+        trainingObservations: canonical.trainingObservations,
+        syntheticContinuation: acceptedSyntheticContinuation,
+        evidenceResolution: {
+          goalId: activeGoal?.id ?? null,
+          authoredGoalStartDate: activeGoal?.timeline?.startDate ?? null,
+          startDate: evidenceWindow.startDate,
+          endDate: evidenceWindow.endDate,
+          observedCutoff,
+          trainingRecordCount: canonical.trainingRecords.length,
+          trainingDates: uniqueDates(canonical.trainingRecords),
+          nutritionRecordCount: canonical.nutritionRecords.length,
+          nutritionDates: uniqueDates(canonical.nutritionRecords),
+          activityRecordCount: canonical.activityRecords.length,
+          activityDates: uniqueDates(canonical.activityRecords),
+          completeEnergyDates: canonical.energyContinuations.map((record) => record.date),
+        },
+      };
+      const narrative = composeMonthlyBriefingPreview({
+        weights,
+        dexaScans: resolvedDexaScans,
+        progressPhotos,
+        dailyBriefings,
+        energyContinuations: canonical.energyContinuations,
+        trainingObservations: canonical.trainingObservations,
+        goal: evidenceFixture.goal,
+        goalConfidence,
+        syntheticContinuation: acceptedSyntheticContinuation,
+        generatedAt: orchestration.generatedAt,
+        previewWindow,
+      });
+
+      return Object.freeze({ ...narrative, evidenceFixture });
     },
   };
 }
+
+export function resolveMonthlyGoalConfidenceAssessment({
+  activeGoal,
+  cutoff,
+  generatedAt,
+  repository,
+} = {}) {
+  const activePhase = activeGoal?.phases?.find((phase) => phase.status === "active");
+  if (!repository || !activeGoal?.id || !activePhase?.id || !cutoff) return null;
+  const selected = createPIGoalConfidenceReadService({ repository })
+    .getGoalConfidenceAssessmentAtOrBefore({
+      goalId: activeGoal.id,
+      phaseId: activePhase.id,
+      cutoff,
+    });
+  if (!selected) return null;
+  const block = createMonthlyBriefingGoalConfidenceBlockFromAssessment(
+    selected.assessment,
+    {
+      capturedAt: generatedAt ?? null,
+      captureSemantics: "canonical_assessment_at_monthly_cutoff",
+    }
+  );
+  if (!block) return null;
+  return Object.freeze({
+    ...block,
+    supportingReasons: selectMonthlyConfidenceReasons(block.supportingReasons),
+    limitingReasons: selectMonthlyConfidenceReasons(block.limitingReasons),
+    historyRecordId: selected.historyRecordId,
+    selectionSource: selected.source,
+    temporalCutoff: selected.selectedAtOrBefore,
+  });
+}
+
+function selectMonthlyConfidenceReasons(reasons = []) {
+  return reasons.filter((reason) => !/\bcalibration\b/i.test(reason)).slice(0, 2);
+}
+
+function resolveMonthlyGoalEvidenceWindow({ activeGoal, orchestration, previewWindow }) {
+  const completedAt = orchestration.goal?.completionEvent?.completedAt;
+  const transitionStart = completedAt ? addCalendarDays(toDateKey(completedAt), 1) : null;
+  const authoredStart = toDateKey(activeGoal?.timeline?.startDate);
+  return {
+    startDate: transitionStart || authoredStart || toDateKey(previewWindow.startDate),
+    endDate: toDateKey(previewWindow.endDate),
+  };
+}
+
+function resolveMonthlyGoalContext({
+  activeGoal,
+  goals,
+  monthWindow,
+  timeZone,
+}) {
+  if (!activeGoal) return null;
+  const completedGoal = goals.find((goal) => {
+    if (goal.status !== "completed" || !goal.completedAt) return false;
+    const completedDate = dateInTimeZone(goal.completedAt, timeZone);
+    return completedDate >= toDateKey(monthWindow.startDate) &&
+      completedDate <= toDateKey(monthWindow.endDate);
+  });
+  if (!completedGoal) return activeGoal;
+  const completionDate = dateInTimeZone(completedGoal.completedAt, timeZone);
+  return {
+    ...activeGoal,
+    title: completedGoal.title,
+    timeline: {
+      ...(activeGoal.timeline ?? {}),
+      startDate: completedGoal.timeline?.startDate ??
+        completedGoal.startDate ??
+        activeGoal.timeline?.startDate,
+    },
+    phases: [
+      {
+        id: `${completedGoal.id}_completed_phase`,
+        name: completedGoal.title,
+        startDate: completedGoal.timeline?.startDate ?? completedGoal.startDate,
+        endDate: completionDate,
+        status: "completed",
+      },
+      ...(activeGoal.phases ?? []),
+    ],
+    completionEvent: {
+      id: `goal_completion_${completedGoal.id}_${completionDate}`,
+      completedAt: completionDate,
+      source: "canonical_completed_goal",
+      outcome: "completed",
+      displayName: completedGoal.title,
+      goalId: completedGoal.id,
+    },
+  };
+}
+
+function dateInTimeZone(value, timeZone) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function applyDexaScenarioAnnotations(realScans, scenarioScans = []) {
+  const annotations = new Map(
+    scenarioScans.map((scan) => [toDateKey(scan.measuredAt ?? scan.date), scan])
+  );
+  return realScans.map((scan) => {
+    const annotation = annotations.get(toDateKey(scan.measuredAt ?? scan.date));
+    if (!annotation) return scan;
+    return {
+      ...scan,
+      isNewBaseline: annotation.isNewBaseline ?? scan.isNewBaseline,
+      baselineRole: annotation.baselineRole ?? scan.baselineRole,
+    };
+  });
+}
+
+function composeCanonicalMonthlyEvidence({
+  canonicalEvidenceObjects,
+  dexaScans,
+  evidenceWindow,
+  trainingPerformanceEvents,
+}) {
+  const payloads = (canonicalEvidenceObjects ?? [])
+    .filter(isActiveCanonicalEvidenceObject)
+    .map((record) => record.payload
+      ? { ...record.payload, _canonicalId: record.canonicalId ?? null }
+      : record)
+    .filter((record) => record.removed !== true);
+  const inWindow = (record) => {
+    const date = canonicalRecordDate(record);
+    return date >= evidenceWindow.startDate && date <= evidenceWindow.endDate;
+  };
+  const trainingRecords = payloads
+    .filter((record) => record.evidence_type === "training" && inWindow(record))
+    .sort(compareCanonicalRecords);
+  const nutritionRecords = payloads
+    .filter((record) => record.evidence_type === "nutrition" && inWindow(record))
+    .sort(compareCanonicalRecords);
+  const activityRecords = payloads
+    .filter((record) => record.evidence_type === "activity_day" && inWindow(record))
+    .sort(compareCanonicalRecords);
+  const nutritionDays = latestRecordPerDate(nutritionRecords);
+  const activityDays = latestRecordPerDate(activityRecords);
+  const calendarDates = createCalendarDates(evidenceWindow.startDate, evidenceWindow.endDate);
+  const energyDays = reconcileEnergyDays({
+    nutritionDays,
+    activityDays,
+    dexaScans,
+    calendarDates,
+  });
+  const performanceEvents = (trainingPerformanceEvents ?? []).filter(
+    (event) =>
+      event.workoutDate >= evidenceWindow.startDate &&
+      event.workoutDate <= evidenceWindow.endDate
+  );
+  const performanceSessionIds = new Set(
+    performanceEvents.flatMap((event) => [
+      event.sourceSessionId,
+      event.sourceCanonicalTrainingId,
+    ]).filter(Boolean)
+  );
+
+  return {
+    trainingRecords,
+    nutritionRecords,
+    activityRecords,
+    energyContinuations: energyDays
+      .filter((day) => day.completeness === "complete")
+      .map((day) => ({
+        id: `monthly-energy-${day.date}`,
+        date: day.date,
+        balance: day.energyBalance,
+        estimatedIntake: day.calorieIntake,
+        estimatedExpenditure: day.estimatedExpenditure,
+        rmr: day.rmr,
+        activeCalories: day.activeCalories,
+        source: "canonical_founder_evidence",
+        isSynthetic: false,
+        evidenceRefs: [day.nutritionDayId, day.activityDayId, day.rmrScanId].filter(Boolean),
+      })),
+    trainingObservations: trainingRecords.flatMap((record) => {
+      const areas = resolveTrainingMovementAreas(record);
+      const improving = performanceSessionIds.has(record.id) ||
+        performanceSessionIds.has(record._canonicalId);
+      return areas.map((area) => ({
+        id: `${record.id}-${normalizeObservationKey(area)}`,
+        date: canonicalRecordDate(record),
+        movement: area,
+        area,
+        direction: improving ? "improving" : "stable",
+        source: "canonical_founder_evidence",
+        sourceSessionId: record.id,
+        isSynthetic: false,
+      }));
+    }),
+  };
+}
+
+function resolveTrainingMovementAreas(record) {
+  const regions = new Set(
+    (record.exercises ?? [])
+      .map((exercise) => String(exercise.body_region ?? "").trim())
+      .filter(Boolean)
+      .map((region) => region.toLowerCase())
+  );
+  if (regions.size) return [...regions].sort();
+  const activityType = String(record.metadata?.activity_type ?? "training").toLowerCase();
+  if (activityType.includes("walk") || activityType.includes("stepper") || activityType.includes("cardio")) {
+    return ["cardio"];
+  }
+  return ["training"];
+}
+
+function latestRecordPerDate(records) {
+  const byDate = new Map();
+  records.forEach((record) => {
+    const date = canonicalRecordDate(record);
+    const current = byDate.get(date);
+    if (!current || canonicalCompletenessScore(record) >= canonicalCompletenessScore(current)) {
+      byDate.set(date, record);
+    }
+  });
+  return [...byDate.values()];
+}
+
+function canonicalCompletenessScore(record) {
+  const limitations = record.quality?.limitations ?? [];
+  const totals = record.daily_totals ?? {};
+  const populatedTotals = Object.values(totals).filter(
+    (value) => value !== null && value !== undefined
+  ).length;
+  return populatedTotals * 10 +
+    (record.meals?.length ?? 0) * 2 -
+    limitations.length * 20;
+}
+
+function resolveRealObservedCutoff({ evidenceWindow, records }) {
+  return records
+    .map(canonicalRecordDate)
+    .filter((date) => date >= evidenceWindow.startDate && date <= evidenceWindow.endDate)
+    .sort()
+    .at(-1) ?? evidenceWindow.startDate;
+}
+
+function filterSyntheticContinuation({
+  continuation,
+  observedCutoff,
+  realEnergyDates,
+  realTrainingDates,
+}) {
+  if (!continuation) return null;
+  const realEnergy = new Set(realEnergyDates);
+  const realTraining = new Set(realTrainingDates);
+  const afterCutoff = (record) => inferDate(record) > observedCutoff;
+  return {
+    ...continuation,
+    weights: (continuation.weights ?? []).filter(afterCutoff),
+    dexaScans: (continuation.dexaScans ?? []).filter(afterCutoff),
+    progressPhotos: (continuation.progressPhotos ?? []).filter(afterCutoff),
+    dailyBriefings: (continuation.dailyBriefings ?? []).filter(afterCutoff),
+    energyContinuations: (continuation.energyContinuations ?? [])
+      .filter(afterCutoff)
+      .filter((record) => !realEnergy.has(inferDate(record))),
+    trainingObservations: (continuation.trainingObservations ?? [])
+      .filter(afterCutoff)
+      .filter((record) => !realTraining.has(inferDate(record))),
+  };
+}
+
+function canonicalRecordDate(record) {
+  return toDateKey(record?.metadata?.date ?? record?.observed_at ?? record?.date);
+}
+
+function compareCanonicalRecords(left, right) {
+  return canonicalRecordDate(left).localeCompare(canonicalRecordDate(right)) ||
+    String(left.id).localeCompare(String(right.id));
+}
+
+function uniqueDates(records) {
+  return [...new Set(records.map(canonicalRecordDate))].sort();
+}
+
+function createCalendarDates(startDate, endDate) {
+  const dates = [];
+  for (let date = startDate; date <= endDate; date = addCalendarDays(date, 1)) dates.push(date);
+  return dates;
+}
+
+function addCalendarDays(value, days) {
+  const date = new Date(`${value}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function endOfUtcDay(value) {
+  const date = toDateKey(value);
+  return date ? `${date}T23:59:59.999Z` : null;
+}
+
+function normalizeObservationKey(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
+import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";

@@ -1432,7 +1432,11 @@ export function assessTypedStrengthParseCompleteness({ existingExercises = [], p
   const missingIdentities = recognizedIdentities.filter((identity) => !parsedIdentities.has(identity));
   const lowerCardinality = existingTypedIdentities.length > 0 && parsedIdentities.size < existingTypedIdentities.length;
   const missingWouldDiscardExisting = existingTypedIdentities.length > 0 && missingIdentities.length > 0;
-  const complete = parsedIdentities.size > 0 && !missingWouldDiscardExisting && !lowerCardinality;
+  const complete =
+    parsedIdentities.size > 0 &&
+    missingIdentities.length === 0 &&
+    !missingWouldDiscardExisting &&
+    !lowerCardinality;
   return {
     status: complete ? "complete" : "incomplete_preserved_existing",
     complete,
@@ -2678,7 +2682,7 @@ function mergeStrengthExercises(existingExercises, newExercises) {
 
     exerciseMap.set(key, {
       ...existing,
-      sets: normalizeStrengthSets([...existing.sets, ...exercise.sets]),
+      sets: reconcileStrengthExerciseSets(existing.sets, exercise.sets),
       provenance_ref: [
         ...new Set([existing.provenance_ref, exercise.provenance_ref].filter(Boolean)),
       ].join(", "),
@@ -2686,6 +2690,37 @@ function mergeStrengthExercises(existingExercises, newExercises) {
   });
 
   return [...exerciseMap.values()];
+}
+
+function reconcileStrengthExerciseSets(existingSets, newSets) {
+  const normalizedExisting = normalizeStrengthSets(existingSets);
+  const normalizedNew = normalizeStrengthSets(newSets);
+  const sharedLength = Math.min(normalizedExisting.length, normalizedNew.length);
+  const hasMatchingOrdinalPrefix =
+    sharedLength > 0 &&
+    normalizedExisting
+      .slice(0, sharedLength)
+      .every((set, index) => areEquivalentStrengthSets(set, normalizedNew[index]));
+
+  if (hasMatchingOrdinalPrefix) {
+    return normalizedNew.length >= normalizedExisting.length
+      ? normalizedNew
+      : normalizedExisting;
+  }
+
+  return normalizeStrengthSets([...normalizedExisting, ...normalizedNew]);
+}
+
+function areEquivalentStrengthSets(left, right) {
+  return (
+    left?.reps === right?.reps &&
+    left?.weight === right?.weight &&
+    left?.weight_unit === right?.weight_unit &&
+    left?.duration_seconds === right?.duration_seconds &&
+    left?.load_type === right?.load_type &&
+    left?.measurement_type === right?.measurement_type &&
+    left?.set_type === right?.set_type
+  );
 }
 
 function normalizeStrengthExercises(exercises) {
@@ -3248,6 +3283,7 @@ function normalizeScreenshotInput(screenshot = {}) {
       ? screenshot.evidenceDate
       : null,
     fileName: screenshot.fileName ?? "uploaded-screenshot",
+    id: screenshot.id ?? null,
     mimeType: screenshot.mimeType ?? "image/png",
     uploadedAt: screenshot.uploadedAt ?? new Date().toISOString(),
   };
@@ -3262,12 +3298,68 @@ function normalizeTypedEvidenceInput(value) {
 
 function toSourceArtifact(screenshot, index) {
   return {
-    id: `screenshot_${index}`,
+    id: screenshot.id ?? `screenshot_${index}`,
     kind: "screenshot",
     file_name: screenshot.fileName,
     mime_type: screenshot.mimeType,
     uploaded_at: screenshot.uploadedAt,
   };
+}
+
+export function reconcileIndependentlyInterpretedScreenshotPackages({
+  expectedEvidenceType = null,
+  packages = [],
+  screenshots = [],
+  submissionId = `screenshot_submission_${Date.now()}`,
+  typedEvidence = null,
+} = {}) {
+  const normalizedScreenshots = screenshots.map(normalizeScreenshotInput);
+  const evidenceObjects = packages.flatMap(
+    (evidencePackage) => evidencePackage?.evidence_objects ?? []
+  );
+  const firstPackage = packages.find(Boolean) ?? {};
+
+  if (evidenceObjects.length === 0) {
+    return {
+      ...createFallbackEvidencePackage({
+        expectedEvidenceType,
+        normalizedScreenshots,
+        submissionId,
+        typedEvidence: normalizeTypedEvidenceInput(typedEvidence),
+      }),
+      detected_evidence_objects: [],
+      detected_evidence_type: "unrecognized",
+      evidence_objects: [],
+      quality: {
+        extraction_confidence: "low",
+        interpreter_confidence: "low",
+        status: "limited",
+        limitations: ["No screenshot produced a canonical evidence candidate."],
+      },
+    };
+  }
+
+  const sourceArtifacts = normalizedScreenshots.map(toSourceArtifact);
+  const combinedOutput = {
+    ...firstPackage,
+    package_id: submissionId,
+    captured_at: firstPackage.captured_at ?? new Date().toISOString(),
+    detected_evidence_objects: getDetectedCanonicalEvidenceObjects(evidenceObjects),
+    detected_evidence_type: "mixed",
+    detected_evidence_type_confidence: "high",
+    evidence_objects: evidenceObjects,
+    provenance: {
+      submission_id: submissionId,
+      source_artifacts: sourceArtifacts,
+    },
+  };
+
+  return normalizeEvidencePackage(combinedOutput, {
+    expectedEvidenceType,
+    normalizedScreenshots,
+    submissionId,
+    typedEvidence: normalizeTypedEvidenceInput(typedEvidence),
+  });
 }
 
 function toTypedEvidenceArtifact({ typedEvidence }) {

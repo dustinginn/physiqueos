@@ -75,10 +75,11 @@ describe("PhysiqueOS production scheduled runtime", () => {
     })).toBe("stale_metadata");
     expect(classifyRuntimeStatus({ foreignListener: true })).toBe("foreign_listener");
     expect(classifyRuntimeStatus({ taskProcessMismatch: true })).toBe("task_process_mismatch");
-    const content = script("statusPhysiqueOS.ps1");
+    const content = `${script("statusPhysiqueOS.ps1")}\n${script("physiqueosRuntimeOwnership.ps1")}`;
     for (const state of [
       "healthy", "starting", "intentionally_stopped", "recovering", "recovery_pending",
-      "recovery_failed", "foreign_listener", "task_invalid", "task_process_mismatch", "unhealthy",
+      "recovery_failed", "foreign_listener", "task_invalid", "task_process_mismatch",
+      "control_state_mismatch", "task_access_denied", "task_query_failed", "unhealthy",
     ]) {
       expect(content).toContain(`"${state}"`);
     }
@@ -139,9 +140,17 @@ describe("PhysiqueOS production scheduled runtime", () => {
     const content = script("monitorPhysiqueOS.ps1");
     expect(content).toContain('Start-ScheduledTask -TaskName $productionTaskName');
     expect(content).not.toMatch(/Start-Process|Stop-Process|taskkill|Invoke-Expression/i);
-    expect(content).not.toMatch(/\bnpx(?:\.cmd)?\b|\bnpm\s+exec\b/i);
+    expect(content).not.toMatch(/\bnpx(?:\.cmd)?\b|\bnpm\s+exec\b|tsx/i);
     expect(content).not.toMatch(/while\s*\(|do\s*\{/i);
     expect(content).toContain("Length -gt 1048576");
+    expect(content).toContain("Invoke-BriefingCadenceRunner");
+    expect(content).toContain("$nodePath $cadenceRunnerPath");
+    expect(content).toContain('"--source=runtime_monitor"');
+    expect(content.lastIndexOf('Save-Outcome $control "healthy"'))
+      .toBeLessThan(content.lastIndexOf("Invoke-BriefingCadenceRunner"));
+    expect(content).toContain("cadenceOutcome=isolated_failure");
+    expect(content).toContain("outcomes=$outcomes");
+    expect(content).not.toContain("result=$summary");
   });
 
   it("start and stop atomically establish desired state before lifecycle action", () => {

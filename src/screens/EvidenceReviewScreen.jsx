@@ -21,7 +21,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ confirmAction, discardAction, photoPoseAction, reprocessAction, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, photoPoseAction, reprocessAction, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
@@ -31,6 +31,14 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, pho
   const canEdit = ["pending", "commit_failed"].includes(status);
   const canContinue = status === "partially_committed";
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
+  const unresolvedExercises = (evidencePackage.evidence_objects ?? []).flatMap((object) =>
+    object.evidence_type === "training" && object.removed !== true
+      ? (object.exercises ?? []).filter((exercise) =>
+          exercise.removed !== true &&
+          exercise.provisionalExercise?.resolutionStatus === "unresolved"
+        )
+      : []
+  );
   const toggleItem = (item) => {
     setItemDecisions((current) =>
       toggleEvidenceReviewItemDecision(current, item.object.id, item.included)
@@ -55,6 +63,20 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, pho
             <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} review={review} />
           ))}
         </div>
+
+        {unresolvedExercises.length > 0 && (
+          <section aria-label="New exercises" className="mt-6 space-y-4">
+            {unresolvedExercises.map((exercise) => (
+              <NewExerciseCard
+                action={exerciseResolutionAction}
+                canonicalExercises={canonicalExercises}
+                exercise={exercise}
+                key={exercise.provisionalExercise.provisionalExerciseId}
+                review={review}
+              />
+            ))}
+          </section>
+        )}
 
         {hasCommitFailure(review) && (
           <Card className="mt-6" variant="warning">
@@ -87,6 +109,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, pho
           )}
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
           {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
+          {unresolvedExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{unresolvedExercises.length} new exercise{unresolvedExercises.length === 1 ? "" : "s"} need{unresolvedExercises.length === 1 ? "s" : ""} details before this workout can be saved.</p>}
         </Card>
 
         <form action={confirmAction} className="mt-6">
@@ -94,7 +117,7 @@ export default function EvidenceReviewScreen({ confirmAction, discardAction, pho
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(evidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton disabled={!canContinue && (!presentation.summary.included || blockingPhotoIssue)} retry={canContinue} savingLabel={experience.savingLabel} />
+            <ConfirmButton disabled={!canContinue && (!presentation.summary.included || blockingPhotoIssue || unresolvedExercises.length > 0)} retry={canContinue} savingLabel={experience.savingLabel} unresolvedCount={unresolvedExercises.length} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><ReprocessButton /></form>}
@@ -181,9 +204,68 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
   );
 }
 
-function ConfirmButton({ disabled, retry, savingLabel }) {
+function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
+  const [mode, setMode] = useState("new");
+  const provisional = exercise.provisionalExercise;
+  const fieldClass = "mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-white px-3 text-sm font-semibold text-[var(--text-primary)]";
+  return (
+    <Card className="space-y-4" variant="warning">
+      <div>
+        <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">New exercise detected</p>
+        <h2 className="mt-1 text-xl font-extrabold text-[var(--text-primary)]">{provisional.normalizedDisplayName}</h2>
+        <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{exercise.sets?.length ?? 0} sets</p>
+        <ul className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
+          {(exercise.sets ?? []).map((set, index) => <li key={index}>{set.reps} reps{set.weight != null ? ` at ${set.weight} lb` : ""}</li>)}
+        </ul>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "new" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => setMode("new")} type="button">Add new</button>
+        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "existing" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => setMode("existing")} type="button">Map existing</button>
+      </div>
+      <form action={action} className="space-y-3">
+        <input name="reviewId" type="hidden" value={review.id} />
+        <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+        <input name="provisionalExerciseId" type="hidden" value={provisional.provisionalExerciseId} />
+        <input name="resolutionMode" type="hidden" value={mode} />
+        {mode === "new" ? <>
+          <ReviewField className={fieldClass} defaultValue={provisional.suggestedCanonicalName} label="Canonical exercise name" name="canonicalName" />
+          <ReviewField className={fieldClass} defaultValue={provisional.suggestedPrimaryMuscleGroup} label="Primary muscle group" name="primaryMuscleGroup" />
+          <ReviewField className={fieldClass} defaultValue={provisional.suggestedMovementPattern} label="Movement pattern" name="movementPattern" />
+          <ReviewField className={fieldClass} defaultValue={provisional.suggestedEquipment} label="Equipment type" name="equipment" />
+          <ReviewField className={fieldClass} defaultValue={provisional.suggestedLaterality} label="Laterality" name="laterality" />
+          <ReviewField className={fieldClass} defaultValue={(provisional.suggestedAliases ?? []).join(", ")} label="Aliases (optional)" name="aliases" required={false} />
+        </> : <label className="block text-sm font-extrabold text-[var(--text-primary)]">Existing exercise
+          <select className={fieldClass} name="canonicalExerciseId" required>
+            <option value="">Choose an exercise</option>
+            {canonicalExercises.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+          </select>
+        </label>}
+        <ExerciseResolutionButton />
+      </form>
+      <form action={action}>
+        <input name="reviewId" type="hidden" value={review.id} />
+        <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+        <input name="provisionalExerciseId" type="hidden" value={provisional.provisionalExerciseId} />
+        <input name="resolutionMode" type="hidden" value="remove" />
+        <button className="min-h-11 w-full rounded-xl border border-[var(--divider)] px-3 text-sm font-bold text-[var(--text-secondary)]" type="submit">Remove from workout</button>
+      </form>
+    </Card>
+  );
+}
+
+function ReviewField({ className, defaultValue, label, name, required = true }) {
+  return <label className="block text-sm font-extrabold text-[var(--text-primary)]">{label}<input className={className} defaultValue={defaultValue ?? ""} name={name} required={required} /></label>;
+}
+
+function ExerciseResolutionButton() {
   const { pending } = useFormStatus();
-  return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Finishing your upload\u2026" : savingLabel) : retry ? "Finish saving" : "Save included evidence"}</button>;
+  return <button className="min-h-12 w-full rounded-xl bg-[var(--primary)] px-3 text-sm font-extrabold text-white disabled:opacity-50" disabled={pending} type="submit">{pending ? "Saving exercise\u2026" : "Confirm exercise details"}</button>;
+}
+
+function ConfirmButton({ disabled, retry, savingLabel, unresolvedCount = 0 }) {
+  const { pending } = useFormStatus();
+  const label = unresolvedCount > 0 ? `Resolve ${unresolvedCount} new exercise${unresolvedCount === 1 ? "" : "s"} to save` : retry ? "Finish saving" : "Save included evidence";
+  return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Finishing your upload\u2026" : savingLabel) : label}</button>;
 }
 
 function ReprocessButton() {

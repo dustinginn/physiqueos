@@ -26,7 +26,7 @@ if ($task.Actions.Count -ne 1 -or $action.Execute -ne $nodePath -or
 }
 
 $before = & $statusScript | ConvertFrom-Json
-if ($before.listener -and $before.overallState -notin @("healthy", "task_process_mismatch")) {
+if ($before.listener -and $before.overallState -notin @("healthy", "task_process_mismatch", "control_state_mismatch")) {
   throw "Refusing to stop: port 3000 is not owned by the canonical runtime."
 }
 $listenerPid = if ($before.listener) { [int]$before.listener.pid } else { $null }

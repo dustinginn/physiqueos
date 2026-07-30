@@ -15,6 +15,7 @@ Founder Alpha uses the Next.js App Router under `src/app`.
 | `/` | Home decision surface | `HomeScreen`, `HomeBriefingService` |
 | `/briefing/daily` | Daily Briefing | `DailyBriefingScreen`, `DailyBriefingService` |
 | `/briefings/monthly/preview/2026-07-01` | Isolated June 2026 Monthly Briefing architecture preview | `MonthlyBriefingScreen`, `MonthlyBriefingPreviewService` |
+| `/briefings/monthly/[artifactId]` | Read-only persisted production Monthly Briefing | `MonthlyBriefingScreen`, `MonthlyBriefingService` |
 | `/briefings/midweek/preview` | Read-only Wednesday Midweek Briefing preview | `MidweekBriefingScreen`, `MidweekBriefingPreviewService` |
 | `/check-in/morning` | Morning Check-In | `MorningCheckInScreen`, check-in actions |
 | `/analysis/[analysisId]` | Saved Analysis detail | `AnalysisScreen`, `AnalysisRepository` |
@@ -70,7 +71,7 @@ Narrative briefing screens:
 * `WeeklyBriefingScreen`
 * `DEXAEventBriefingScreen`
 * `PhotoEventBriefingScreen`
-* `MonthlyBriefingScreen` (preview-only architecture)
+* `MonthlyBriefingScreen` (shared preview and immutable production artifact renderer)
 
 Goal screens:
 
@@ -132,7 +133,8 @@ Key services:
 * `DailyFocusService`: daily priorities/focus support.
 * `PriorityDetailService`: operational priority detail view model.
 * `AnalysisService`: deterministic Analysis generation.
-* `MonthlyBriefingPreviewService`: read-only composition of the fixed June 1–30 Monthly Narrative preview delivered July 1, 2026.
+* `MonthlyBriefingPreviewService`: read-only composition boundary for deterministic Monthly development previews.
+* `MonthlyBriefingService`: production calendar-window, identity, real-evidence composition, confidence transport, and immutable Monthly publication.
 
 Repository implementations live in `src/data/repositories`.
 

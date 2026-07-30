@@ -1,0 +1,12 @@
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.69:3001
+- Environments: .env.local
+✓ Ready in 405ms
+Creating turbopack project {
+  dir: 'C:\\Users\\dusti\\Documents\\GitHub\\physiqueos',
+  testMode: true
+}
+- Experiments (use with caution):
+  · serverActions
+

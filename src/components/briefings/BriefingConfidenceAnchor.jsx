@@ -3,11 +3,12 @@ import ConfidenceRing from "../ui/ConfidenceRing";
 export default function BriefingConfidenceAnchor({
   confidence,
   testId = "briefing-confidence",
+  topBorder = testId !== "midweek-confidence",
 }) {
   if (!confidence) return null;
   return (
     <div
-      className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-4 border-y border-[var(--divider)] py-4"
+      className={`grid grid-cols-[104px_minmax(0,1fr)] items-center gap-4 border-b border-[var(--divider)] py-4 ${topBorder ? "border-t" : ""}`}
       data-testid={testId}
     >
       <ConfidenceRing

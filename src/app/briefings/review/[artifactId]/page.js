@@ -6,8 +6,10 @@ import PhotoEventBriefingScreen from "../../../../screens/PhotoEventBriefingScre
 import WeeklyBriefingScreen from "../../../../screens/WeeklyBriefingScreen";
 import DEXAEventBriefingScreen from "../../../../screens/DEXAEventBriefingScreen";
 import MidweekBriefingScreen from "../../../../screens/MidweekBriefingScreen";
+import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
 import { resolveBriefingReviewArtifact } from "../../../../domain/services/BriefingReviewArtifactResolver";
 import { prepareWeeklyBriefingReviewPresentation } from "../../../../domain/services/WeeklyBriefingReviewPresentationService";
+import { prepareMidweekBriefingReviewPresentation } from "../../../../domain/services/MidweekBriefingPresentationService";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,11 @@ export default async function BriefingReviewPage({ params, searchParams }) {
     });
     return <WeeklyBriefingScreen narrative={narrative}/>;
   }
-  if (artifact.cadence === "midweek" && artifact.briefing) return <MidweekBriefingScreen briefing={artifact.briefing}/>;
+  if (artifact.cadence === "midweek" && artifact.briefing) {
+    return <MidweekBriefingScreen briefing={prepareMidweekBriefingReviewPresentation({ artifact })}/>;
+  }
+  if (artifact.cadence === "monthly" && artifact.briefing?.monthlyPresentation) {
+    return <MonthlyBriefingScreen presentation={artifact.briefing.monthlyPresentation}/>;
+  }
   return <BriefingReviewScreen artifact={artifact} preview={preview}/>;
 }

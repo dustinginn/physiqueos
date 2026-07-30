@@ -53,13 +53,26 @@ const RESERVED_EXERCISE_HEADERS = new Set([
 export const LEGACY_TRAINING_EXERCISE_ID_REMAP = Object.freeze({
   seated_abductions: "seated_hip_adductions",
 });
+const runtimeTrainingExercises = new Map();
+
+export function registerRuntimeTrainingExercises(exercises = []) {
+  runtimeTrainingExercises.clear();
+  exercises.forEach((candidate) => {
+    if (candidate?.id && candidate?.name) runtimeTrainingExercises.set(candidate.id, candidate);
+  });
+}
+
+export function listCanonicalTrainingExerciseIdentities() {
+  return [...FOUNDER_ALPHA_TRAINING_EXERCISES, ...runtimeTrainingExercises.values()];
+}
 
 export function resolveTrainingExerciseIdentity(value, { workoutFocus = null } = {}) {
   const sourceExercisePhrase = String(value ?? "").trim();
   const normalizedExercisePhrase = normalizeExercisePhrase(sourceExercisePhrase);
 
   if (!sourceExercisePhrase) return createUnrecognizedResolution(sourceExercisePhrase);
-  const exactCurrentIdentity = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+  const identities = listCanonicalTrainingExerciseIdentities();
+  const exactCurrentIdentity = identities.find(
     (exerciseIdentity) => exerciseIdentity.id === sourceExercisePhrase
   );
   if (exactCurrentIdentity) {
@@ -100,7 +113,7 @@ export function resolveTrainingExerciseIdentity(value, { workoutFocus = null } =
     };
   }
 
-  const match = findExerciseAliasMatch(normalizedExercisePhrase);
+  const match = findExerciseAliasMatch(normalizedExercisePhrase, identities);
   if (!match) return createUnrecognizedResolution(sourceExercisePhrase);
 
   return {
@@ -171,9 +184,9 @@ function exercise(id, name, aliases, equipment, bodyRegion, primaryMuscleGroups,
   };
 }
 
-function findExerciseAliasMatch(normalizedPhrase) {
+function findExerciseAliasMatch(normalizedPhrase, identities = listCanonicalTrainingExerciseIdentities()) {
   const matches = [];
-  FOUNDER_ALPHA_TRAINING_EXERCISES.forEach((candidate) => {
+  identities.forEach((candidate) => {
     [candidate.name, ...candidate.aliases].forEach((alias) => {
       const normalizedAlias = normalizeExercisePhrase(alias);
       if (normalizedPhrase === normalizedAlias) {

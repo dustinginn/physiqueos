@@ -9,6 +9,8 @@ describe("Daily Briefing user-facing editorial policy", () => {
     "No material state change was found in the evidence window.",
     "We're still moving toward the next scheduled measurement.",
     "Measurement remains pending.",
+    "Training supplied the first forward signal.",
+    "The briefing shows that Build Lean Mass has a new reference window.",
   ])("rejects internal or vague narration: %s", (text) => expect(isUserFacingNarrationAllowed(text)).toBe(false));
 
   it.each(["The next DEXA will tell us whether the recent loss remained mostly fat.", "Saturday's photos will show whether lower-ab definition is becoming more consistent.", "This weekend's weekly average is more useful than today's single weigh-in."])("allows named useful checkpoints: %s", (text) => expect(isUserFacingNarrationAllowed(text)).toBe(true));
@@ -31,5 +33,7 @@ describe("Daily Briefing user-facing editorial policy", () => {
   it("recognizes generic action and filler concepts after normalization", () => {
     expect(inspectUserFacingLanguage("  Continue the current plan. ")).toMatchObject({ genericAction: true });
     expect(inspectUserFacingLanguage("Strength is holding up.")).toMatchObject({ fillerSupport: true });
+    expect(inspectUserFacingLanguage("Progress spans eleven movement areas."))
+      .toMatchObject({ unnaturalAILanguage: true });
   });
 });

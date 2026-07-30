@@ -8,6 +8,7 @@ export function resolveHomeBriefingSelection({
   dailyArtifact = null,
   eventArtifact = null,
   midweekArtifact = null,
+  monthlyArtifact = null,
   now = new Date(),
   timeZone = "America/Los_Angeles",
   weeklyArtifact = null,
@@ -31,6 +32,18 @@ export function resolveHomeBriefingSelection({
       localDate,
       reason: "active_same_day_event",
     };
+  }
+  const validMonthly = isCadenceArtifactReady(monthlyArtifact, "monthly") &&
+    isMonthlyInPromotionWindow(monthlyArtifact, localDate)
+    ? monthlyArtifact
+    : null;
+  if (validMonthly) {
+    return cadenceSelection(
+      validMonthly,
+      "monthly",
+      localDate,
+      "monthly_delivery_day"
+    );
   }
   const validMidweek = isCadenceArtifactReady(midweekArtifact, "midweek") &&
     isMidweekInPromotionWindow(midweekArtifact, { localDate, now, scheduledCadence, timeZone, coachingUpdates })
@@ -70,6 +83,7 @@ export function isCadenceArtifactReady(artifact, cadence) {
   if (hasInvalidLifecycleStatus(artifact)) return false;
   if (cadence === "midweek" && !artifact.briefing.hero) return false;
   if (cadence === "weekly" && !artifact.briefing.weeklyNarrative && !artifact.briefing.hero) return false;
+  if (cadence === "monthly" && !artifact.briefing.monthlyPresentation) return false;
   return true;
 }
 
@@ -86,8 +100,14 @@ function cadenceSelection(artifact, cadence, localDate, reason) {
   return {
     artifact,
     briefingType: cadence,
-    href: `/briefings/review/${artifact.id}`,
-    label: cadence === "midweek" ? "Midweek Briefing" : "Weekly Briefing",
+    href: cadence === "monthly"
+      ? `/briefings/monthly/${artifact.id}`
+      : `/briefings/review/${artifact.id}`,
+    label: cadence === "midweek"
+      ? "Midweek Briefing"
+      : cadence === "monthly"
+        ? "Monthly Briefing"
+        : "Weekly Briefing",
     localDate,
     reason,
   };
@@ -115,6 +135,14 @@ function isWeeklyInPromotionWindow(artifact, localDate) {
   const recentSunday = shiftDate(localDate, -new Date(`${localDate}T12:00:00Z`).getUTCDay());
   return artifact.evidenceWindow?.startDate === shiftDate(recentSunday, -7) &&
     artifact.evidenceWindow?.endDate === shiftDate(recentSunday, -1);
+}
+
+function isMonthlyInPromotionWindow(artifact, localDate) {
+  return (
+    artifact.deliveryDate === localDate ||
+    artifact.evidenceWindow?.deliveryDate === localDate ||
+    artifact.evidenceWindow?.briefingDate === localDate
+  );
 }
 
 function shiftDate(value, amount) {

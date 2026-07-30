@@ -25,5 +25,8 @@ describe("MidweekBriefingScreen", () => {
     expect(html).toContain("max-w-[393px]");
     expect(html).toContain("overflow-x-hidden");
     expect(html).toContain("pb-32");
+    expect(html).toContain("Calories are moving closer to supporting stronger training.");
+    expect(html).toContain("Intake still appears slightly below maintenance");
+    expect(html).not.toMatch(/led by (?:Single-Leg|Pull-Up|Row)/);
   });
 });

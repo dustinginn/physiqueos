@@ -1,3 +1,5 @@
+import { auditPIEditorialVoice } from "./PIEditorialTranslationService";
+
 const SYSTEM_STATE_CONCEPTS = [
   /\b(?:trend|context|projection|trajectory|forecast|state|status|assessment)\s+(?:(?:was|has been|remains?)\s+)?(?:updated|refreshed|unchanged|preserved|stable|confirmed)\b/i,
   /\bcurrent\s+(?:projection|trajectory|forecast|milestone|observation|confidence)\s+(?:state|snapshot)\b/i,
@@ -16,17 +18,31 @@ const FILLER_SUPPORT = /^(?:the trend is aligned|strength is holding up|training
 
 export function inspectUserFacingLanguage(value) {
   const text = normalize(value);
+  const canonicalEditorial = auditPIEditorialVoice(text ?? []);
   return {
     systemState: text ? SYSTEM_STATE_CONCEPTS.some((pattern) => pattern.test(text)) : false,
     vagueCheckpoint: text ? VAGUE_CHECKPOINTS.some((pattern) => pattern.test(text)) : false,
     genericAction: text ? GENERIC_ACTIONS.test(text) : false,
     fillerSupport: text ? FILLER_SUPPORT.test(text) : false,
+    internalProductLanguage: canonicalEditorial.issues.some(
+      (issue) => issue.category === "internal_product_language"
+    ),
+    unnaturalAILanguage: canonicalEditorial.issues.some(
+      (issue) => issue.category === "unnatural_ai_language"
+    ),
+    systemCenteredLanguage: canonicalEditorial.issues.some(
+      (issue) => issue.category === "system_centered_language"
+    ),
   };
 }
 
 export function isUserFacingNarrationAllowed(value) {
   const result = inspectUserFacingLanguage(value);
-  return !result.systemState && !result.vagueCheckpoint;
+  return !result.systemState &&
+    !result.vagueCheckpoint &&
+    !result.internalProductLanguage &&
+    !result.unnaturalAILanguage &&
+    !result.systemCenteredLanguage;
 }
 
 export function filterEditorialNarration(items = []) {

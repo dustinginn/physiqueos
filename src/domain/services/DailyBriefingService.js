@@ -21,6 +21,7 @@ import {
   selectAuthoritativeDailyPICandidates,
 } from "./DailyPINarrativeCandidateService";
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
+import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 const DAILY_BRIEFING_VERSION = "daily-briefing-v29-voice-calibration";
@@ -2542,13 +2543,20 @@ export function getTrainingPerformanceBriefingSignal({
     null;
   const recentPrCount = eligiblePrClaims.length;
   const improvingCount = eligibleImproving.length;
+  const leadExerciseLanguage = resolveUserFacingObjectLanguage({
+    objectType: "exercise",
+    displayName: regressing[0]?.exercise?.name ?? leadExercise,
+    specificity: "specific",
+    narrativeContext: "daily_training_coaching",
+  });
+  const leadExerciseReference = leadExerciseLanguage.sentenceReference;
   const performancePhrase =
     regressing.length > 0
-      ? `${regressing[0].exercise.name} is showing a material performance drop`
+      ? `${leadExerciseReference} ${leadExerciseLanguage.agreement.be} showing a material performance drop`
       : recentPrCount > 0 && leadExercise
-      ? `${leadExercise} produced a recent performance PR`
+      ? `${leadExerciseReference} produced a recent performance PR`
       : improvingCount > 0 && leadExercise
-        ? `${leadExercise} is still progressing`
+        ? `${leadExerciseReference} ${leadExerciseLanguage.agreement.be} still progressing`
         : `${summary.resistance_sessions_last_7_days ?? 0} resistance sessions landed in the last 7 days`;
   const supportPhrase =
     weightStats.weekOverWeek !== null && weightStats.weekOverWeek < 0

@@ -786,6 +786,13 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
   const legacyExercises = normalizeTrainingExercises([...exerciseMap.values()]);
   const naturalExercises = normalizeTrainingExercises(naturalBlockParse.exercises);
   if (
+    compactExercises.some(
+      (exercise) => exercise.resolutionStatus === "unresolved_provisional"
+    )
+  ) {
+    return compactExercises;
+  }
+  if (
     compactExercises.length > 0 &&
     getExerciseParseCompletenessScore(compactExercises) >
       Math.max(
@@ -829,7 +836,9 @@ function parseCompactStrengthTrainingBlocks(
   let currentBlock = null;
   let pendingRepeat = null;
 
-  for (const rawLine of normalizeTrainingTextInput(text).split("\n")) {
+  const sourceLines = normalizeTrainingTextInput(text).split("\n");
+  for (let lineIndex = 0; lineIndex < sourceLines.length; lineIndex += 1) {
+    const rawLine = sourceLines[lineIndex];
     const line = rawLine.trim();
     if (!line) continue;
 
@@ -837,6 +846,27 @@ function parseCompactStrengthTrainingBlocks(
     if (identity.resolutionStatus === "resolved_high_confidence") {
       currentBlock = {
         identity: identity.exercise,
+        entries: [],
+      };
+      blocks.push(currentBlock);
+      pendingRepeat = null;
+      continue;
+    }
+
+    const nextContentIndex = sourceLines.findIndex(
+      (candidate, index) => index > lineIndex && candidate.trim()
+    );
+    const nextLine = nextContentIndex >= 0 ? sourceLines[nextContentIndex].trim() : "";
+    if (
+      identity.resolutionStatus === "unrecognized" &&
+      isStructurallyValidUnknownExerciseHeading(line, nextLine)
+    ) {
+      currentBlock = {
+        identity: createProvisionalExerciseIdentity({
+          line,
+          lineIndex,
+          provenanceRef,
+        }),
         entries: [],
       };
       blocks.push(currentBlock);
@@ -859,6 +889,20 @@ function parseCompactStrengthTrainingBlocks(
       } else {
         pendingRepeat = repeated.valid ? repeated.count : "invalid";
       }
+      continue;
+    }
+
+    const suffixRepeated = parseCompactSuffixRepeatDeclaration(line);
+    if (suffixRepeated) {
+      const parsed = parseCompactSuffixSetExpression(
+        suffixRepeated.expression
+      );
+      if (parsed && suffixRepeated.valid) {
+        currentBlock.entries.push(
+          ...Array.from({ length: suffixRepeated.count }, () => ({ ...parsed }))
+        );
+      }
+      pendingRepeat = null;
       continue;
     }
 
@@ -896,7 +940,17 @@ function parseCompactStrengthTrainingBlocks(
           weight: entry.weight,
         });
       }
-      return exerciseMap.get(block.identity.name) ?? null;
+      const parsed = exerciseMap.get(block.identity.name) ?? null;
+      if (!parsed || !block.identity.provisional) return parsed;
+      return {
+        ...parsed,
+        canonicalExerciseId: null,
+        resolutionStatus: "unresolved_provisional",
+        provisionalExercise: {
+          ...block.identity.provisional,
+          sets: parsed.sets,
+        },
+      };
     })
     .filter(Boolean);
   const merged = new Map();
@@ -909,6 +963,85 @@ function parseCompactStrengthTrainingBlocks(
     existing.sets.push(...exercise.sets);
   }
   return [...merged.values()];
+}
+
+function isStructurallyValidUnknownExerciseHeading(line, nextLine) {
+  const normalized = String(line ?? "").trim();
+  if (
+    !normalized ||
+    /\d/.test(normalized) ||
+    /[:.!?]$/.test(normalized) ||
+    /^(?:notes?|comments?|warm-?up|cool-?down|workout|summary|sets?|reps?|weight|load)$/i.test(normalized)
+  ) return false;
+  const words = normalized.split(/\s+/);
+  if (words.length < 2 || words.length > 8) return false;
+  if (!words.every((word) => /^[a-z][a-z'()/-]*$/i.test(word))) return false;
+  return Boolean(
+    parseCompactRepeatDeclaration(nextLine) ||
+    parseCompactSuffixRepeatDeclaration(nextLine) ||
+    parseCompactSetExpression(nextLine)
+  );
+}
+
+function createProvisionalExerciseIdentity({ line, lineIndex, provenanceRef }) {
+  const normalizedName = line
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+  const normalizedKey = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const suggestions = inferProvisionalExerciseSuggestions(normalizedName);
+  return {
+    id: `provisional_exercise_${stableExerciseHash(`${normalizedKey}|${lineIndex}|${provenanceRef}`)}`,
+    name: normalizedName,
+    equipment: suggestions.equipment,
+    provisional: {
+      provisionalExerciseId: `provisional_exercise_${stableExerciseHash(`${normalizedKey}|${lineIndex}|${provenanceRef}`)}`,
+      rawSubmittedName: line.trim(),
+      normalizedDisplayName: normalizedName,
+      originalSourceText: line,
+      sourceLineRange: { start: lineIndex + 1, end: lineIndex + 1 },
+      sourceProvenance: { sourceArtifactRefs: [provenanceRef] },
+      resolutionStatus: "unresolved",
+      suggestedCanonicalName: normalizedName,
+      suggestedPrimaryMuscleGroup: suggestions.primaryMuscleGroup,
+      suggestedMovementPattern: suggestions.movementPattern,
+      suggestedEquipment: suggestions.equipment,
+      suggestedLaterality: suggestions.laterality,
+      suggestedAliases: suggestions.aliases,
+      matchingCanonicalCandidates: [],
+    },
+  };
+}
+
+function inferProvisionalExerciseSuggestions(name) {
+  const text = name.toLowerCase();
+  if (/\bbiceps?\b|\bbicep\b/.test(text) && /\bcurl\b/.test(text)) {
+    return {
+      primaryMuscleGroup: "Biceps",
+      movementPattern: "Elbow Flexion",
+      equipment: /\bmachine\b/.test(text) ? "Machine" : null,
+      laterality: "Bilateral",
+      aliases: /\bmachine\b/.test(text)
+        ? ["Machine Bicep Curl", "Biceps Curl Machine"]
+        : [],
+    };
+  }
+  return {
+    primaryMuscleGroup: null,
+    movementPattern: null,
+    equipment: /\bmachine\b/.test(text) ? "Machine" : null,
+    laterality: null,
+    aliases: [],
+  };
+}
+
+function stableExerciseHash(value) {
+  let hash = 2166136261;
+  for (const character of String(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function suppressInvalidCompactRepeatAssociations(value) {
@@ -942,6 +1075,41 @@ function parseCompactRepeatDeclaration(value) {
     count,
     expression: match[2].trim(),
     valid: Number.isInteger(count) && count > 0 && count <= 50,
+  };
+}
+
+function parseCompactSuffixRepeatDeclaration(value) {
+  const match = String(value ?? "").trim().match(
+    /^(.+?)\s+[x\u00d7]\s*(\S+)\s*$/i
+  );
+  if (!match) return null;
+  const countToken = match[2];
+  const count = /^\d+$/.test(countToken) ? Number(countToken) : null;
+  return {
+    count,
+    expression: match[1].trim(),
+    valid: Number.isInteger(count) && count > 0 && count <= 50,
+  };
+}
+
+function parseCompactSuffixSetExpression(value) {
+  const parsed = parseCompactSetExpression(value);
+  if (parsed) return parsed;
+
+  const implicitPounds = String(value ?? "").trim().match(
+    /^(\d+(?:\.\d+)?)\s*(?:reps?|r)\s+(\d+(?:\.\d+)?)$/i
+  );
+  if (!implicitPounds) return null;
+
+  const reps = Number(implicitPounds[1]);
+  const weight = Number(implicitPounds[2]);
+  if (reps <= 0 || weight <= 0) return null;
+
+  return {
+    complete: true,
+    reps,
+    unit: "lb",
+    weight,
   };
 }
 
@@ -2215,6 +2383,14 @@ function isSetLine(value) {
 
   if (getTimedSetContinuationMatch(text)) return true;
 
+  const suffixRepeated = parseCompactSuffixRepeatDeclaration(text);
+  if (suffixRepeated) {
+    return (
+      suffixRepeated.valid &&
+      Boolean(parseCompactSuffixSetExpression(suffixRepeated.expression))
+    );
+  }
+
   if (
     /^(\d+)(?:\s*[x×]\s*|\s*@\s*|\s+reps?\s*(?:@|at)?\s*)@?\s*(?:body\s*weight|bodyweight|body-weight|bw|own\s+body\s+weight)$/i.test(
       text
@@ -2314,6 +2490,11 @@ export function normalizeTrainingExercises(exercises) {
       return {
         id: exercise.id ?? exercise.exercise_id ?? createExerciseId(name),
         name,
+        canonicalExerciseId: exercise.canonicalExerciseId ?? null,
+        resolutionStatus: exercise.resolutionStatus ?? "resolved",
+        provisionalExercise: exercise.provisionalExercise
+          ? { ...exercise.provisionalExercise, sets }
+          : null,
         ...normalizeExerciseMetadata(exercise, name),
         sets,
         provenance_ref: exercise.provenance_ref ?? sets[0]?.provenance_ref ?? "unknown",

@@ -6,6 +6,7 @@ import {
   resolveDEXAEventContext,
 } from "./DEXAEventContextService";
 import { composeDEXAEventNarrative } from "./DEXAEventNarrativeService";
+import { auditPIEditorialVoice } from "./PIEditorialTranslationService";
 
 const userId = "user_founder_001";
 const june = founderDEXAScans.find((scan) => scan.measuredAt === "2026-06-20");
@@ -162,13 +163,13 @@ describe("DEXA Event canonical context", () => {
   });
 });
 
-describe("Build Lean Mass DEXA narration", () => {
+describe("muscle-building DEXA narration", () => {
   it.each([
-    [{ leanDelta: 1.2, bodyFat: 8.4 }, /primary measure advanced.*guardrail remained supported/i],
-    [{ leanDelta: 1.2, bodyFat: 9.4 }, /primary measure advanced.*guardrail requires review/i],
-    [{ leanDelta: 0.1, bodyFat: 8.4 }, /effectively flat.*progress is not yet established/i],
+    [{ leanDelta: 1.2, bodyFat: 8.4 }, /lean tissue moved up.*body fat stayed within/i],
+    [{ leanDelta: 1.2, bodyFat: 9.4 }, /lean tissue moved up.*body fat.*beyond the range/i],
+    [{ leanDelta: 0.1, bodyFat: 8.4 }, /effectively flat.*does not show new muscle yet/i],
     [{ leanDelta: 0.1, bodyFat: 9.4 }, /effectively flat/i],
-    [{ leanDelta: -1.1, bodyFat: 8.2 }, /does not support current goal progress.*measurement uncertainty/i],
+    [{ leanDelta: -1.1, bodyFat: 8.2 }, /not the direction we want.*hydration.*preparation/i],
   ])("separates lean outcome and guardrail state for %o", (values, expected) => {
     const narrative = compose(futureScan(values));
     expect(narrative.interpretation.opening).toMatch(expected);
@@ -178,18 +179,34 @@ describe("Build Lean Mass DEXA narration", () => {
   it("does not celebrate below-range body fat or weight gain as lean-mass proof", () => {
     const scan = futureScan({ leanDelta: 0, bodyFat: 7.5 });
     const narrative = compose(scan);
-    expect(narrative.interpretation.guardrailStatus).toMatch(/Lower is not automatically better.*continued deficit/i);
+    expect(narrative.interpretation.guardrailStatus).toMatch(/Lower is not automatically better.*eating below maintenance/i);
     expect(narrative.hero.results.find((item) => item.label === "DEXA Weight").context).toMatch(/not proof/i);
-    expect(narrative.interpretation.opening).toMatch(/progress is not yet established/i);
+    expect(narrative.interpretation.opening).toMatch(/does not show new muscle yet/i);
     expect(narrative.interpretation.opening).not.toMatch(/uncomplicated success|progress is established/i);
+  });
+
+  it("passes the canonical coach-voice audit while preserving measured detail", () => {
+    const narrative = compose(futureScan());
+    const narration = [
+      narrative.hero.title,
+      narrative.hero.body,
+      ...Object.values(narrative.interpretation),
+      ...Object.values(narrative.coachInsight),
+    ].filter((value) => typeof value === "string");
+
+    expect(auditPIEditorialVoice(narration)).toMatchObject({
+      passes: true,
+      issues: [],
+    });
+    expect(narration.join(" ")).toMatch(/lean tissue.*body fat.*DEXA/i);
   });
 
   it("keeps calibration advisory, never mutates phase, and excludes stale goal language", () => {
     const before = structuredClone(goal);
     const narrative = compose(futureScan());
     const serialized = JSON.stringify(narrative);
-    expect(narrative.interpretation.phaseMeaning).toMatch(/one scan is not enough.*phase transition/i);
-    expect(narrative.coachInsight.next).toMatch(/does not advance the phase.*advisory only/i);
+    expect(narrative.interpretation.phaseMeaning).toMatch(/one scan is not enough.*next phase/i);
+    expect(narrative.coachInsight.next).toMatch(/not enough to move into the next phase.*has not changed your phase/i);
     expect(narrative.pi).toMatchObject({ status: "ready", decisionStatus: "advisory", decisionAdvisoryOnly: true });
     expect(narrative.goalCompletionHandoff).toBeNull();
     expect(goal).toEqual(before);
@@ -206,7 +223,7 @@ describe("Build Lean Mass DEXA narration", () => {
       },
     });
     expect(narrative.pi).toMatchObject({ status: "fallback", failure: { code: "pi_context_failure" } });
-    expect(narrative.interpretation.uncertainty).toMatch(/PI context was unavailable.*measured scan-to-scan/i);
+    expect(narrative.interpretation.uncertainty).toMatch(/compare the two scans.*goal context is incomplete/i);
     expect(JSON.stringify(narrative)).not.toMatch(/finish line of the cut|cut accomplished/i);
   });
 
@@ -230,7 +247,7 @@ describe("Build Lean Mass DEXA narration", () => {
       }),
     });
     expect(narrative.hero.title).toMatch(/updates the body-composition picture/i);
-    expect(narrative.interpretation.opening).toMatch(/Active goal context is unavailable/i);
+    expect(narrative.interpretation.opening).toMatch(/good result depends on the goal you are pursuing/i);
     expect(narrative.goalCompletionHandoff).toBeNull();
     expect(JSON.stringify(narrative)).not.toMatch(/finish line of the cut|Build Lean Mass|Visible Abs/i);
   });

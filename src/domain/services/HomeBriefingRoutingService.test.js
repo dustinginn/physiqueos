@@ -33,6 +33,16 @@ const previousWeekly = artifact("weekly", {
     endDate: "2026-07-18",
   },
 });
+const monthly = artifact("monthly", {
+  generatedAt: "2026-08-01T07:00:00Z",
+  window: {
+    id: "monthly:2026-07-01:2026-07-31:America/Los_Angeles",
+    briefingDate: "2026-08-01",
+    deliveryDate: "2026-08-01",
+    startDate: "2026-07-01",
+    endDate: "2026-07-31",
+  },
+});
 const photoEvent = {
   id: "event",
   artifactType: "event",
@@ -157,6 +167,38 @@ describe("artifact-backed Home briefing routing", () => {
     });
   });
 
+  it("promotes Monthly on its delivery date without hiding an active Event", () => {
+    expect(select("2026-08-01", {
+      monthlyArtifact: monthly,
+      weeklyArtifact: weekly,
+    })).toMatchObject({
+      briefingType: "monthly",
+      artifact: monthly,
+      href: "/briefings/monthly/monthly",
+      reason: "monthly_delivery_day",
+    });
+    expect(select("2026-08-01", {
+      eventArtifact: {
+        ...photoEvent,
+        briefing: {
+          photoEventNarrative: { eventDate: "2026-08-01" },
+        },
+      },
+      monthlyArtifact: monthly,
+    })).toMatchObject({
+      briefingType: "event",
+    });
+  });
+
+  it("returns to routine cadence selection after Monthly delivery day", () => {
+    expect(select("2026-08-02", {
+      monthlyArtifact: monthly,
+    })).toMatchObject({
+      briefingType: "none",
+      artifact: null,
+    });
+  });
+
   it("keeps direct Daily reads non-mutating", async () => {
     const create = vi.fn();
     const consume = vi.fn();
@@ -192,6 +234,8 @@ function artifact(cadence, { generatedAt, id = cadence, window }) {
     lifecycle: { generationStatus: "completed" },
     briefing: cadence === "midweek"
       ? { hero: { summary: "Week so far" } }
-      : { weeklyNarrative: { cards: { hero: { body: "Completed week" } } } },
+      : cadence === "monthly"
+        ? { monthlyPresentation: { hero: { thesis: "Completed month" } } }
+        : { weeklyNarrative: { cards: { hero: { body: "Completed week" } } } },
   };
 }

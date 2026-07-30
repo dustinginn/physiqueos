@@ -2,16 +2,42 @@ import {
   CanonicalProgressPhotoCategories,
   normalizeProgressPhotoCategory,
 } from "../models/progressPhotoPoseVocabulary";
+import {
+  assertNoUnresolvedProvisionalExercises,
+  createCanonicalExerciseDefinition,
+  findCanonicalExerciseConflict,
+  resolveProvisionalExerciseInPackage,
+} from "./CanonicalExerciseLibraryService";
+import { listCanonicalTrainingExerciseIdentities } from "../models/trainingExerciseIdentity";
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
     async stage({ userId, evidencePackage, source = "universal_intake" }) {
       const timestamp = now().toISOString();
       const id = `evidence_review_${timestamp.replace(/\D/g, "")}`;
+      const evidenceObjects = evidencePackage?.evidence_objects ?? [];
+      const evidenceTypes = unique(evidenceObjects.map((item) => item.evidence_type));
+      const interpretedEvidence = {
+        ...evidencePackage,
+        diagnostics: {
+          ...(evidencePackage?.diagnostics ?? {}),
+          stages: [
+            ...(evidencePackage?.diagnostics?.stages ?? []),
+            {
+              id: `${id}_review_composition`,
+              label: "Evidence Review composition",
+              preparedSaveCommandCount: evidenceObjects.length,
+              reviewCandidateCount: evidenceObjects.length,
+              reviewCategoryList: evidenceTypes,
+            },
+          ],
+          warnings: evidencePackage?.diagnostics?.warnings ?? [],
+        },
+      };
       const review = {
         id, userId, source, status: "pending", createdAt: timestamp, updatedAt: timestamp,
-        interpretedEvidence: evidencePackage,
-        evidenceTypes: unique((evidencePackage?.evidence_objects ?? []).map((item) => item.evidence_type)),
+        interpretedEvidence,
+        evidenceTypes,
         confirmation: null,
         commitProgress: {},
         itemDecisions: {},
@@ -21,6 +47,7 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
     async confirm(id, { evidencePackage, confirmedBy } = {}) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review is no longer pending.");
+      assertNoUnresolvedProvisionalExercises(evidencePackage ?? review.interpretedEvidence);
       const timestamp = now().toISOString();
       return repositories.evidenceReviews.updateReview(id, {
         status: "confirmed",
@@ -31,7 +58,62 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
     async beginCommit(id) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
+      assertNoUnresolvedProvisionalExercises(review.interpretedEvidence);
       return repositories.evidenceReviews.updateReview(id, { status: "committing", commitError: null });
+    },
+    async resolveProvisionalExercise(id, {
+      expectedUpdatedAt,
+      provisionalExerciseId,
+      mode,
+      canonicalExerciseId,
+      definition,
+      updatedBy,
+    }) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("EXERCISE_REVIEW_NOT_EDITABLE", "This exercise review cannot be edited.");
+      }
+      if (!expectedUpdatedAt || review.updatedAt !== expectedUpdatedAt) {
+        throw reviewError("REVIEW_STALE", "This evidence review changed. Reload it before resolving the exercise.");
+      }
+      let canonical;
+      if (mode === "existing") {
+        canonical = listCanonicalTrainingExerciseIdentities().find(
+          (candidate) => candidate.id === canonicalExerciseId
+        );
+        if (!canonical) {
+          throw reviewError("CANONICAL_EXERCISE_UNAVAILABLE", "Choose an existing exercise.");
+        }
+      } else if (mode === "new") {
+        canonical = createCanonicalExerciseDefinition({
+          ...definition,
+          createdAt: now().toISOString(),
+        });
+        const conflict = findCanonicalExerciseConflict(canonical);
+        if (conflict) {
+          throw reviewError(
+            "CANONICAL_EXERCISE_DUPLICATE",
+            `"${canonical.name}" matches "${conflict.name}". Map to the existing exercise instead.`
+          );
+        }
+      } else if (mode !== "remove") {
+        throw reviewError("EXERCISE_RESOLUTION_INVALID", "Choose how to resolve this exercise.");
+      }
+      const interpretedEvidence = resolveProvisionalExerciseInPackage(
+        review.interpretedEvidence,
+        provisionalExerciseId,
+        { mode, canonical }
+      );
+      if (typeof repositories.evidenceReviews.updateReviewIfCurrent !== "function") {
+        throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "Exercise editing is temporarily unavailable.");
+      }
+      return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, {
+        interpretedEvidence,
+        exerciseResolutionEditing: {
+          updatedAt: now().toISOString(),
+          updatedBy,
+        },
+      });
     },
     async failCommit(id, error) {
       const review = await repositories.evidenceReviews.getReviewById(id);

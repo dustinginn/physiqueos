@@ -14,6 +14,47 @@ export default async function BriefingHistoryPage() {
     <Link className="font-bold text-[var(--primary)]" href="/">← Home</Link>
     <h1 className="mt-5 text-3xl font-extrabold">Briefing History</h1>
     {founderPhotoArtifact && <Link className="mt-4 inline-flex rounded-xl border border-[var(--divider)] px-4 py-3 text-sm font-extrabold text-[var(--primary)]" href={`/briefings/review/${founderPhotoArtifact.id}`}>Founder link · July 11 photo-era artifact</Link>}
-    <div className="mt-6 space-y-3">{artifacts.map((item) => <Link className="block rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4" href={`/briefings/review/${item.id}`} key={item.id}><p className="font-extrabold">{item.cadence === "midweek" ? "Midweek Briefing" : item.briefing?.hero?.title ?? item.id}</p><p className="mt-1 text-xs text-slate-500">{item.cadence === "midweek" ? `Sunday–Tuesday · ${item.evidenceWindow?.startDate}–${item.evidenceWindow?.endDate}` : `${item.cadence} · ${item.generatedAt}`}</p></Link>)}</div>
+    <div className="mt-6 space-y-3">{artifacts.map((item) => <Link className="block min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4" href={artifactHref(item)} key={item.id}><p className="break-words font-extrabold">{artifactTitle(item)}</p><p className="mt-1 break-words text-xs text-slate-500">{artifactSubtitle(item)}</p></Link>)}</div>
   </div></main>;
+}
+
+function artifactHref(item) {
+  return item.cadence === "monthly"
+    ? `/briefings/monthly/${item.id}`
+    : `/briefings/review/${item.id}`;
+}
+
+function artifactTitle(item) {
+  if (item.cadence === "monthly") {
+    return `Monthly Briefing · ${formatMonth(item.briefingMonth ?? item.evidenceWindow?.startDate)}`;
+  }
+  if (item.cadence === "midweek") return "Midweek Briefing";
+  return item.briefing?.hero?.title ?? item.id;
+}
+
+function artifactSubtitle(item) {
+  if (item.cadence === "monthly") {
+    return `Delivered ${formatDate(item.deliveryDate ?? item.evidenceWindow?.briefingDate)}`;
+  }
+  if (item.cadence === "midweek") {
+    return `Sunday–Tuesday · ${item.evidenceWindow?.startDate}–${item.evidenceWindow?.endDate}`;
+  }
+  return `${item.cadence} · ${item.generatedAt}`;
+}
+
+function formatMonth(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${String(value).slice(0, 7)}-01T12:00:00Z`));
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${String(value).slice(0, 10)}T12:00:00Z`));
 }

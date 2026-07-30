@@ -24,7 +24,9 @@ import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePrese
 import { createPICadenceBriefingPublicationService } from "./PICadenceBriefingPublicationService";
 import { createPICadenceBriefingLifecycleService } from "./PICadenceBriefingLifecycleService";
 import { createWeeklyEnergyProgressModel } from "./WeeklyBriefingPresentationService";
+import { composePIEditorialParagraph } from "./PIEditorialTranslationService";
 import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
+import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 
 const VERSION = "weekly_narrative_v5_2";
 const DEFAULT_WEEKLY_ACTIVITY_TARGET = 7000;
@@ -58,11 +60,14 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
   const report = trainingPerformance??createTrainingPerformanceIntelligenceReport({canonicalObjects:active.filter((item)=>dateKey(item.lastObservedAt)<=window.endDate),now:new Date(`${window.endDate}T12:00:00Z`)});
   const energyPresentation=createWeeklyEnergyProgressModel(weeklyEnergy?.current);
   const trainingPresentation=createWeeklyTrainingPresentationModel({window,trainingDays,trainingReport:report,piObservations:context?.pi?.observations??[],context,energy:energyPresentation,performanceEvents:trainingPerformanceEvents});
+  const trainingCopy=weeklyTrainingCoachCopy(trainingPresentation,{semanticGoalType:context?.semanticGoalType??"unknown"});
   const weeklyPrs = (report.exerciseObservations??[]).filter((item)=>item.explanation_data?.pr_detection?.detected&&within(item.evidence_date_range?.end));
   const improving = (report.exerciseObservations??[]).filter((item)=>item.status==="improving"&&within(item.evidence_date_range?.end));
   const regression = (report.exerciseObservations??[]).filter((item)=>item.status==="regressing"&&within(item.evidence_date_range?.end));
-  const prName = weeklyPrs[0] ? displayExerciseName(weeklyPrs[0], active) : null;
-  const overloadName = !prName&&improving[0] ? displayExerciseName(improving[0],active) : null;
+  const prLabel = weeklyPrs[0] ? displayExerciseName(weeklyPrs[0], active) : null;
+  const overloadLabel = !prLabel&&improving[0] ? displayExerciseName(improving[0],active) : null;
+  const prName = exerciseNarrativeReference(prLabel);
+  const overloadName = exerciseNarrativeReference(overloadLabel);
   const goalName = context?.activeGoalSummary?.title??goal?.title??"the current goal";
   const semanticGoalType = context?.semanticGoalType??"unknown";
   const latestDexa=[...dexaScans].sort((a,b)=>String(b.measuredAt).localeCompare(String(a.measuredAt)))[0]??null;
@@ -74,13 +79,13 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
         : "📸 Your progress photos added the clearest visual context of the week."
       : null,
     weeklyAverageText?`⚖️ Weight averaged ${averageWeight.toFixed(1)} lb${weeklyLow!=null?` and reached a ${weeklyLow.toFixed(1)} lb weekly low`:""}.`:null,
-    prName?`💪 ${prName} reached a new performance PR.`:overloadName?`💪 ${overloadName} showed supported progressive overload.`:null,
+    prName?`💪 ${sentenceStart(prName)} reached a new performance PR.`:overloadName?`💪 ${sentenceStart(overloadName)} showed supported progressive overload.`:null,
     activityDayCount?`🔥 ${activityDayCount} complete activity days totaled ${formatNumber(activityCalories)} active calories.`:null,
   ].filter(Boolean).slice(0,4);
   const heroHighlightTiles = [
     photoSummary?{domain:"photos",icon:"📸",label:"Photo Context",value:"Current condition documented",detail:"Directional guardrail evidence"}:null,
     weeklyAverageText?{domain:"weight",icon:"⚖️",label:"Weight Trend",value:`${averageWeight.toFixed(1)} lb average`,detail:weeklyLow!=null?`${weeklyLow.toFixed(1)} lb weekly low`:null}:null,
-    prName?{domain:"training",icon:"💪",label:"Performance",value:`${prName} PR`,detail:`${trainingDays} training days`}:overloadName?{domain:"training",icon:"💪",label:"Performance",value:overloadName,detail:"Supported progressive overload"}:trainingDays?{domain:"training",icon:"💪",label:"Performance",value:`${trainingDays} training days`,detail:"Resistance work completed"}:null,
+    prLabel?{domain:"training",icon:"💪",label:"Performance",value:`${prLabel} PR`,detail:`${trainingDays} training days`}:overloadLabel?{domain:"training",icon:"💪",label:"Performance",value:overloadLabel,detail:"Supported progressive overload"}:trainingDays?{domain:"training",icon:"💪",label:"Performance",value:`${trainingDays} training days`,detail:"Resistance work completed"}:null,
     activityDayCount?{domain:"energy_balance",icon:"🔥",label:"Activity",value:`${activityDayCount} complete days`,detail:`${formatNumber(activityCalories)} active calories`}:null,
   ].filter(Boolean).slice(0,4);
   const heroMilestone = heroHighlightTiles.length>=3&&activityDayCount===7&&(photoSummary||(semanticGoalType==="fat_loss"&&weightChange<0))
@@ -101,7 +106,7 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
   const domains = [
     photoSummary?{domain:"photos",label:"📸 Progress Photos",highlight:"Your current-period photos added a useful visual guardrail check.",insight:photoSummary}:null,
     averageWeight!=null?{domain:"weight",label:"⚖️ Weight",highlight:`You finished ${Math.abs(weightChange??0).toFixed(1)} lb ${weightChange!=null&&weightChange<0?"lower":"from where you began"}, with a ${averageWeight.toFixed(1)} lb weekly average${weeklyLow!=null?` and ${weeklyLow.toFixed(1)} lb low`:""}.`,insight:`Your weekly pattern matters more than any single weigh-in${previousAverage!=null&&averageWeight<previousAverage?`, and your average stayed below the prior week’s ${previousAverage.toFixed(1)} lb`:""}.`}:null,
-    trainingDays?{domain:"training",label:"💪 Training",highlight:trainingPresentation.conclusion,insight:trainingPresentation.phaseContext}:null,
+    trainingDays?{domain:"training",label:"💪 Training",highlight:trainingCopy.conclusion,insight:trainingCopy.phaseContext}:null,
     activityDayCount?{domain:"energy_balance",label:"🔥 Energy Balance",highlight:`You burned approximately ${formatNumber(activityCalories)} active calories across ${activityDayCount} complete days—${formatNumber(Math.abs(activityDifference))} ${activityDifference>=0?"above":"below"} the ${formatNumber(weeklyActivityTarget)} weekly target.`,insight:`You stayed ${activityAlignment} the planned activity level, which helps explain the week’s weight change. You recorded only ${nutritionCount} complete nutrition day${nutritionCount===1?"":"s"}, so there is not enough information to judge the full week${/visible abs|cut/i.test(goalName)?", although the recorded days supported the cut":""}.`}:null,
   ].filter(Boolean);
   if (weeklyEnergy?.current?.coverage?.pairedDayCount) domains.push({
@@ -124,9 +129,39 @@ export function composeWeeklyNarrative({ window, canonicalObjects = [], weights 
       snapshot:{id:`${id}_snapshot`,title:"The completed week",facts},
       progress:{id:`${id}_progress`,title:"What changed",items:[photoSummary?{domain:"Photos",summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,weightChange!=null?{domain:"Weight",summary:`The week finished ${Math.abs(weightChange).toFixed(1)} lb ${weightChange<0?"lower":"higher"} than it began.`}:null].filter(Boolean),energy:energyPresentation,weight:{points:weekWeights.map((item)=>({date:item.measuredAt,value:item.weight.value})),weeklyAverage:averageWeight,weeklyLow,change:weightChange},dexa:{occurredThisWeek:Boolean(dexaCount),latest:latestDexa?formatDexaAnchor(latestDexa):null},photo:photoNarrative?{thumbnailHref:photoNarrative.activeViews?.find((view)=>view.poseId==="front-relaxed")?.imageHref??photoNarrative.activeViews?.[0]?.imageHref??null,summary:photoSummary,href:`/briefings/photo/${photoEvent.trigger.evidenceId}`}:null,training:{completedDays:trainingDays,totalDays:7,presentation:trainingPresentation},activity:{completedDays:activityDayCount,totalDays:7,totalActiveCalories:activityCalories,dailyAverage:activityAverage,weeklyTarget:weeklyActivityTarget,difference:activityDifference}},
       interpretation:{id:`${id}_interpretation`,title:"Why this week mattered",opening:piEditorial?.opening??editorial.opening,domains,synthesis:piEditorial?.synthesis??editorial.synthesis,uncertainty:editorial.uncertainty},
-      coachInsight:{id:`${id}_coach`,title:"Coach’s Insight",celebration:trainingDays?`This was a strong week. ${trainingPresentation.conclusion} ${trainingPresentation.phaseContext}`:`This was a strong week. ${celebration}`,explanation:editorial.explanation,preparation:editorial.preparation},
+      coachInsight:{id:`${id}_coach`,title:"Coach’s Insight",celebration:trainingDays?`This was a strong week. ${trainingCopy.conclusion} ${trainingCopy.phaseContext}`:`This was a strong week. ${celebration}`,explanation:editorial.explanation,preparation:editorial.preparation},
     },
     context,references:weekly.map((item)=>item.canonicalId),provenance:{version:VERSION,photoEventId:photoEvent?.id??null,evidenceWindowId:window.id,trainingPerformanceGeneratedAt:report.generated_at??null},
+  };
+}
+
+function weeklyTrainingCoachCopy(model, { semanticGoalType } = {}) {
+  const counts = model?.counts ?? {};
+  if (!model?.comparableCategoryCount) {
+    return {
+      conclusion: "Training was consistent, but the comparison history is not broad enough to call this a weekly progression trend.",
+      phaseContext: semanticGoalType === "lean_mass_gain"
+        ? "That is encouraging for building muscle, but it cannot confirm new lean mass."
+        : "Protecting training quality matters, but one week cannot confirm new lean mass.",
+    };
+  }
+  if (counts.regressing > 0) {
+    return {
+      conclusion: "Training slipped across more than one comparable area this week.",
+      phaseContext: "That deserves attention before assuming the current plan is fully supporting performance.",
+    };
+  }
+  if (counts.improving > 0) {
+    return {
+      conclusion: "Training progressed across multiple comparable areas this week.",
+      phaseContext: semanticGoalType === "lean_mass_gain"
+        ? "That is the response we want while building muscle, although a later DEXA still has to confirm tissue change."
+        : "That is a strong sign that training quality is holding.",
+    };
+  }
+  return {
+    conclusion: "Training held steady across the areas we could compare.",
+    phaseContext: "At this stage, holding performance is a useful result and supports keeping the plan steady.",
   };
 }
 
@@ -150,25 +185,25 @@ function createGoalAwareEditorial({
     : balance < -100 ? "below likely maintenance"
       : balance > 100 ? "above likely maintenance" : "near likely maintenance";
   const coverage = paired
-    ? `${paired} paired intake-and-expenditure day${paired === 1 ? "" : "s"}${missing ? ` left ${missing} day${missing === 1 ? "" : "s"} unpaired` : " covered the full week"}`
-    : "paired intake-and-expenditure evidence was unavailable";
+    ? `you logged both intake and expenditure on ${paired} day${paired === 1 ? "" : "s"}${missing ? `, while ${missing} day${missing === 1 ? "" : "s"} still had one side missing` : " across the full week"}`
+    : "we do not yet have a day with both intake and expenditure logged";
   const milestone = context?.futureMilestone?.label ?? null;
   const training = prName ? `${prName} improved` : trainingDays ? `${trainingDays} resistance-training days were recorded` : "Training evidence was limited";
 
   if (semanticGoalType === "fat_loss") {
     return {
-      summary: "This week added useful evidence about fat-loss progress.",
-      heroTitle: "The week remained aligned with the active fat-loss goal.",
-      heroBody: "Your Weight, Training, Energy, and body-composition evidence were interpreted under the current fat-loss plan.",
-      opening: "This week’s evidence was evaluated against the active fat-loss goal.",
-      synthesis: "Use the combined direction of weight, Energy, training, and measured body composition rather than any single metric.",
-      uncertainty: milestone ? `${milestone} is the next authoritative body-composition checkpoint.` : "No future authoritative body-composition milestone is currently active.",
-      celebration: prName ? `${prName} improved while the active fat-loss plan continued.` : "You collected useful evidence without forcing a conclusion from one metric.",
-      explanation: "Preserve training quality and judge fat-loss progress through the full evidence set.",
+      summary: "This week gave us a clearer read on how the cut is progressing.",
+      heroTitle: "The cut stayed on track this week.",
+      heroBody: "Your weight, training, calorie intake, and body composition still point in the same direction.",
+      opening: "This week, the useful question is whether you are getting leaner without giving up training quality.",
+      synthesis: "Judge the cut by the combined pattern in weight, training, nutrition, and body composition rather than any single number.",
+      uncertainty: milestone ? `${milestone} will show whether the recent direction holds.` : "A future DEXA will be needed to confirm the body-composition result.",
+      celebration: prName ? `${prName} improved while the cut continued.` : "You stayed consistent without overreacting to one metric.",
+      explanation: "Protect training quality and judge fat loss from the full pattern.",
       preparation: milestone ? `Keep the current plan steady until ${milestone}.` : "Keep the current plan steady until the evidence supports a reviewed change.",
-      goalMeaning: `The week was interpreted under ${goalName}, the active fat-loss goal.`,
-      coachDirection: "Continue the current plan only while the combined evidence supports the active fat-loss objective.",
-      nextWeekFocus: milestone ? `Use ${milestone} as the next measurement boundary.` : "Gather another complete week before making an unsupported change.",
+      goalMeaning: "The plan is still aimed at finishing the cut without sacrificing muscle.",
+      coachDirection: "Continue the plan while weight, training, and recovery remain aligned with the cut.",
+      nextWeekFocus: milestone ? `Keep conditions steady so ${milestone} gives us a clean comparison.` : "Complete another consistent week before making a change.",
     };
   }
 
@@ -176,26 +211,26 @@ function createGoalAwareEditorial({
     const calibration = context?.activePhase?.name === "Establish Maintenance"
       && context?.operatingState?.value === "calibration";
     return {
-      summary: calibration ? "The maintenance-calibration picture is becoming clearer." : "This week added evidence for the active lean-mass goal.",
-      heroTitle: piEditorial?.title ?? (calibration ? "Calibration remains the right focus." : "Training and Energy frame the lean-mass goal this week."),
+      summary: calibration ? "We are getting closer to understanding how much food will support stable weight and stronger training." : "This week gave us a clearer read on your muscle-building phase.",
+      heroTitle: piEditorial?.title ?? (calibration ? "Keep finding the intake that supports training without moving weight too quickly." : "Training and nutrition frame this week."),
       heroBody: calibration
-        ? `The canonical Energy assessment reads ${direction}, and ${coverage}. ${training}; that supports calibration, not a claim of measured lean-mass change.`
-        : `${training}. Weight and Energy remain context until measured body composition can confirm lean-mass change.`,
+        ? `Your calorie balance was ${direction}, and ${coverage}. ${training}. That helps us tune the plan, but it is too early to claim new muscle.`
+        : `${training}. Weight and calorie intake help explain the week, while a later DEXA will tell us whether lean mass changed.`,
       opening: calibration
         ? "This week was about learning whether intake is supporting maintenance while training and the body-fat guardrail remain stable."
-        : "This week’s evidence was evaluated against the active lean-mass goal.",
-      synthesis: `${training}. The Energy direction is ${direction}; ${coverage}. ${photoSummary ? "Photos add directional guardrail context without measuring body fat or lean tissue." : "Measured body-composition evidence is still needed to establish tissue change."}`,
+        : "This week was about whether training is responding well enough to support building muscle.",
+      synthesis: `${training}. Your calorie balance was ${direction}; ${coverage}. ${photoSummary ? "Progress photos can show whether your condition is holding, but they cannot measure new muscle." : "A later DEXA is still needed to confirm body-composition change."}`,
       uncertainty: milestone
-        ? `The latest completed DEXA remains historical context. ${milestone} is the next authoritative measurement.`
-        : "The latest completed DEXA remains historical context; no future authoritative measurement is currently active.",
-      celebration: prName ? `${prName} improved while calibration continued; that supports the goal without proving tissue gain.` : "You added useful calibration evidence without forcing a premature phase decision.",
-      explanation: "Training performance can support the lean-mass goal, but weight change or one PR cannot establish measured lean-mass change.",
+        ? `Your last DEXA is the starting point. ${milestone} will show whether lean mass has changed.`
+        : "Your last DEXA is the starting point; a later comparable scan will be needed to confirm change.",
+      celebration: prName ? `${prName} improved, which is encouraging even though one lift cannot prove new muscle.` : "You gave us more information without forcing a decision too early.",
+      explanation: "Better training supports building muscle, but one lift or a small weight change cannot confirm new tissue.",
       preparation: paired < 7
-        ? `Hold the current plan and gather a more complete Energy week${milestone ? ` before ${milestone}` : ""}.`
-        : `Use the complete Energy trend to review whether a bounded intake adjustment is warranted${milestone ? ` before ${milestone}` : ""}.`,
-      goalMeaning: `${goalName} is active. Body fat is a guardrail while lean mass is the primary measured outcome.`,
-      coachDirection: paired < 7 ? "Remain in calibration and gather more complete paired Energy evidence." : "Review the calibrated Energy direction without automatically advancing the phase.",
-      nextWeekFocus: milestone ? `Preserve training quality and prepare for ${milestone}.` : "Preserve training quality and gather enough evidence for the next reviewed calibration decision.",
+        ? `Hold the current plan and log intake and expenditure more completely${milestone ? ` before ${milestone}` : ""}.`
+        : `Use the full week to decide whether a small calorie adjustment is warranted${milestone ? ` before ${milestone}` : ""}.`,
+      goalMeaning: "The goal is to add muscle while keeping body fat controlled.",
+      coachDirection: paired < 7 ? "Keep the plan steady and complete more nutrition logs before changing calories." : "Review the calorie trend without rushing into the next phase.",
+      nextWeekFocus: milestone ? `Protect training quality and prepare for ${milestone}.` : "Protect training quality and collect enough complete days to make the next decision confidently.",
     };
   }
 
@@ -216,7 +251,77 @@ function createGoalAwareEditorial({
 }
 
 function weeklyEnergyInsight({current,comparison}){const prior=comparison?.netBalance?.average;const comparisonText=Number.isFinite(prior)?` The prior comparable week averaged ${signedKcal(prior)} per paired day.`:" The prior comparable week is incomplete.";return `Estimated balance was ${signedKcal(current.netBalance.total)} for the recorded week, averaging ${signedKcal(current.netBalance.average)} per paired day.${comparisonText} Coverage included ${current.coverage.completePairedDayCount} complete and ${current.coverage.partialPairedDayCount} partial paired days. Expenditure uses the eligible DEXA RMR plus active calories and remains an estimate.`;}
-function renderWeeklyPISelection(selection){const candidate=selection?.primary;if(!candidate)return null;if(candidate.editorialTemplateKey==="weekly_body_fat_guardrail")return{title:"Comparable photos provide the clearest guardrail signal this week.",body:"The visual direction is useful for monitoring the body-fat guardrail, but it is not a body-fat measurement.",opening:"Comparable photo evidence supplied a directional early-phase guardrail signal.",synthesis:"Keep the visual direction in context and wait for measured body-composition evidence before making a quantified conclusion."};if(candidate.editorialTemplateKey==="weekly_direct_training")return{title:"Training provided the clearest signal this week.",body:"Your representative resistance-training evidence showed the most material change, while Weight and Energy remain supporting context.",opening:"Training carried the clearest supported weekly meaning without turning Weight or estimated Energy balance into a verdict.",synthesis:"Use the measured training direction as the lead signal and keep the remaining evidence in context."};if(candidate.editorialTemplateKey==="weekly_direct_recovery")return{title:"Recovery evidence provides useful weekly context.",body:"Structured Recovery indicators changed materially in the current evidence window.",opening:"Recovery supplied a current observational signal without establishing a diagnosis or cause.",synthesis:"Keep the structured Recovery direction in context alongside Training and Energy evidence."};if(candidate.editorialTemplateKey==="weekly_energy_calibration")return{title:"The week is best read through Energy context.",body:"Recorded intake, estimated expenditure, and evidence coverage provide the clearest calibration signal without establishing exact maintenance.",opening:"Energy evidence supplied the most material routine-domain context this week.",synthesis:"Treat the estimated balance as calibration context, not as proof of success, failure, or a body-composition outcome."};if(candidate.relationshipKind==="training_energy_relationship"){const text=trainingEnergyWeeklyText(candidate.renderingContext?.relationshipState);return text?{title:"Training and Energy add context to each other this week.",body:text,opening:text,synthesis:"Use the relationship as observational context without treating estimated Energy balance as the cause of the Training direction."}:null;}if(candidate.relationshipKind==="recovery_training_relationship"||candidate.relationshipKind==="recovery_energy_relationship"){const text=recoveryWeeklyText(candidate.renderingContext?.relationshipState);return text?{title:"Recovery adds context to this week's evidence.",body:text,opening:text,synthesis:"Use this as an observational relationship without treating either domain as the cause of the other."}:null;}return{title:"Training, Weight, and Energy need to be read together.",body:"The strongest supported relationship this week came from how the measured domains moved together.",opening:"The shared evidence is more informative as a relationship than as isolated domain changes.",synthesis:"Keep the measured directions separate from Goal judgment and use the relationship as coaching context."};}
+function renderWeeklyPISelection(selection) {
+  const candidate = selection?.primary;
+  if (!candidate) return null;
+  if (candidate.editorialTemplateKey === "weekly_body_fat_guardrail") {
+    return {
+      title: "Your progress photos are the most useful check this week.",
+      body: "The photos can show whether your physique is moving in the right direction, but they cannot measure body fat.",
+      opening: "Your latest progress photos give us a useful early look at whether your condition is changing.",
+      synthesis: "Keep the photo conditions consistent and wait for a DEXA before putting a number on the change.",
+    };
+  }
+  if (candidate.editorialTemplateKey === "weekly_direct_training") {
+    return {
+      title: "Training told us the most this week.",
+      body: "Your major lifts showed the clearest change, while weight and calorie intake helped explain the setting around it.",
+      opening: "The most important development this week was how your training performed.",
+      synthesis: "Use the overall training pattern to guide the week ahead, not one weigh-in or calorie estimate.",
+    };
+  }
+  if (candidate.editorialTemplateKey === "weekly_direct_recovery") {
+    return {
+      title: "Recovery deserves attention this week.",
+      body: "Your recovery markers changed enough to affect how we should read training and nutrition.",
+      opening: "The way you recovered this week adds important context to your training response.",
+      synthesis: "Keep training and nutrition steady enough to see whether the recovery change persists.",
+    };
+  }
+  if (candidate.editorialTemplateKey === "weekly_energy_calibration") {
+    return {
+      title: "Your calorie balance is the most useful part of this week.",
+      body: composePIEditorialParagraph({
+        observation: "Your logged intake and estimated expenditure give us the clearest picture of whether you are eating enough",
+        interpretation: "The estimate helps us understand the direction, but it cannot establish your exact maintenance calories",
+        whyItMatters: "That distinction keeps us from changing the plan based on false precision",
+      }),
+      opening: "Your intake versus expenditure gives us the most useful context for this week.",
+      synthesis: "Use the estimate to guide the next week, while letting weight and training show whether the plan is actually working.",
+    };
+  }
+  if (candidate.relationshipKind === "training_energy_relationship") {
+    const text = trainingEnergyWeeklyText(
+      candidate.renderingContext?.relationshipState
+    );
+    return text ? {
+      title: "Training and nutrition help explain each other this week.",
+      body: text,
+      opening: text,
+      synthesis: "Use the pattern as context, without assuming calorie estimates caused the training result.",
+    } : null;
+  }
+  if (
+    candidate.relationshipKind === "recovery_training_relationship" ||
+    candidate.relationshipKind === "recovery_energy_relationship"
+  ) {
+    const text = recoveryWeeklyText(
+      candidate.renderingContext?.relationshipState
+    );
+    return text ? {
+      title: "Recovery helps explain this week.",
+      body: text,
+      opening: text,
+      synthesis: "Use the pattern to guide what you watch next without assuming one change caused the other.",
+    } : null;
+  }
+  return {
+    title: "Training, weight, and nutrition need to be read together.",
+    body: "The clearest conclusion comes from how those parts moved together, not from any one number.",
+    opening: "Your week makes more sense when training, weight, and nutrition are viewed together.",
+    synthesis: "Keep each measure in its proper role and use the overall pattern to guide the week ahead.",
+  };
+}
 function recoveryWeeklyText(state){return({training_progress_with_stable_recovery:"Training improved while Recovery indicators remained stable.",training_progress_with_improving_recovery:"Training and Recovery indicators improved together.",training_progress_despite_strained_recovery:"Training improved despite weaker Recovery indicators.",training_stability_with_strained_recovery:"Training remained stable while Recovery indicators weakened.",training_decline_with_strained_recovery:"Training declined while Recovery indicators also weakened.",training_decline_despite_stable_recovery:"Training declined even though Recovery indicators remained stable.",training_volume_growth_with_stable_recovery:"Training volume increased while Recovery indicators remained stable.",training_volume_growth_with_declining_recovery:"Training volume increased while Recovery indicators weakened.",recovery_stability_with_positive_energy_support:"Recovery indicators remained stable while estimated Energy support was positive.",recovery_stability_with_neutral_energy_support:"Recovery indicators remained stable while estimated Energy support was near neutral.",recovery_strain_with_negative_energy_balance:"Recovery indicators weakened while estimated Energy balance was negative.",recovery_strain_despite_positive_energy_support:"Recovery indicators weakened despite positive estimated Energy support.",recovery_improvement_despite_negative_energy_balance:"Recovery indicators improved despite a negative estimated Energy balance."})[state]??null;}
 
 function trainingEnergyWeeklyText(state){return({progress_with_positive_support:"Training improved while estimated Energy support remained positive.",progress_with_neutral_support:"Training improved while estimated Energy balance remained near neutral.",progress_despite_negative_support:"Training improved despite a negative estimated Energy balance.",stable_with_positive_support:"Training remained stable while estimated Energy balance was positive.",stable_with_declining_support:"Training remained stable while estimated Energy support weakened.",decline_with_negative_support:"Training declined while estimated Energy balance was negative.",decline_despite_positive_support:"Training declined despite positive estimated Energy support.",insufficient:"The Training and Energy relationship remains uncertain because evidence coverage was incomplete."})[state]??null;}
@@ -409,6 +514,8 @@ function isResistanceTrainingSession(item={}){return item.evidence_type==="train
 function isCompleteActivityDay(item={}){return item.evidence_type==="activity_day"&&item.quality?.status!=="incomplete"&&Number.isFinite(Number(item.daily_activity?.move_calories));}
 function isCompleteNutritionDay(item={}){return item.evidence_type==="nutrition"&&item.quality?.status!=="incomplete"&&item.metadata?.completeness!=="incomplete";}
 function displayExerciseName(observation,canonical){if(observation.exercise?.key==="cable_pushdown"&&canonical.some((item)=>(item.payload?.exercises??[]).some((exercise)=>/cable rope pushdowns?/i.test(exercise.name))))return "Cable Rope Pushdowns";return observation.exercise?.name??"Resistance training";}
+function exerciseNarrativeReference(value){return value?resolveUserFacingObjectLanguage({objectType:"exercise",displayName:value,specificity:"specific",narrativeContext:"weekly_training_narrative"}).selectedReference:null;}
+function sentenceStart(value){return `${String(value??"").charAt(0).toUpperCase()}${String(value??"").slice(1)}`;}
 function uniqueDays(values){return new Set(values.map(dateKey).filter(Boolean)).size;}
 function average(values){const numbers=values.map(Number).filter(Number.isFinite);return numbers.length?numbers.reduce((sum,value)=>sum+value,0)/numbers.length:null;}
 function round(value){return Number(value.toFixed(1));}
