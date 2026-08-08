@@ -16,6 +16,20 @@ afterEach(() => {
 });
 
 describe("End Work Session staged-file preflight", () => {
+  it("runs the embedded-repository audit before git add -A", () => {
+    const script = fs.readFileSync(
+      path.resolve("scripts", "endWorkSession.ps1"),
+      "utf8",
+    );
+    const auditIndex = script.indexOf("assertSafeEmbeddedRepositories.ps1");
+    const addIndex = script.indexOf('@("add", "-A")');
+    const stagedIndex = script.indexOf("assertSafeStagedFiles.ps1");
+
+    expect(auditIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(auditIndex);
+    expect(stagedIndex).toBeGreaterThan(addIndex);
+  });
+
   it("rejects generated Next.js rollback cache paths", () => {
     const repository = createRepository();
     writeFile(

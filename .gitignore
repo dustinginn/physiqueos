@@ -74,6 +74,10 @@ node_modules/
 /runtime-exports/
 /optional-safe-runtime-export/
 
+# Retired local release workspaces (source is reconciled into canonical root)
+/deployment/cumulative-production-*-source/
+/deployment/retatrutide-support-*-source/
+
 # Transitional protection for legacy root-level operational logs
 /controlled-restart*.log
 /daily-briefing-lifecycle-*.log

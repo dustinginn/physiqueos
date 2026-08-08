@@ -42,6 +42,11 @@ try {
   }
 
   Write-Host ""
+  Write-Host "Auditing embedded repositories before staging..." -ForegroundColor Cyan
+  & (Join-Path $PSScriptRoot "assertSafeEmbeddedRepositories.ps1") `
+    -RepositoryRoot $repositoryRoot
+
+  Write-Host ""
   Invoke-CheckedGit -Arguments @("-c", "color.status=always", "status")
 
   Write-Host ""

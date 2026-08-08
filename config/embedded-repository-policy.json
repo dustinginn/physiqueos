@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "physiqueos_embedded_repository_policy_v1",
+  "traversalExclusions": [
+    ".git",
+    ".next",
+    ".next.failed-*",
+    ".next.rollback-*",
+    "node_modules",
+    "coverage",
+    "playwright-report",
+    "test-results"
+  ],
+  "repositories": [],
+  "externalArtifacts": [
+    {
+      "id": "physiqueos-release-preservation-20260807-233817",
+      "purpose": "Gate A raw-byte production release provenance",
+      "manifestSha256": "39FB2677712DCF6A6D9A8AF8C8F39329ED6ADF5248E5E89333BB2C834794DCBB",
+      "manifestPathEnvironmentVariable": "PHYSIQUEOS_RELEASE_PRESERVATION_MANIFEST",
+      "requiredForSourceRecovery": false,
+      "recoveryInstructions": "Use the preservation-set ID and manifest SHA-256 recorded in deployment/cumulative-production-reconciliation-20260808.json to locate and verify the external archive. Canonical application source recovery does not depend on this archive after reconciliation."
+    }
+  ]
+}

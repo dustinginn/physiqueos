@@ -9,7 +9,7 @@
   "cumulativeBaseCommit": "bb2c7399714af041a1f4b8dfeac09342d57cdc97",
   "productionBuildId": "G0LLHlrIUpAmtapjBo09-",
   "productionSourceIdentity": "sha256_8a665d2b24b4e93dadeebafcc776d390b720e3db33f9161ce4c5fd4f39faa99e",
-  "canonicalReconciliationCommit": "RESOLVE_TO_FIRST_COMMIT_CONTAINING_THIS_MANIFEST",
+  "canonicalReconciliationCommit": "edccfe0512dda9a3fda7eb6f26dc33bc8a22f65f",
   "classificationCounts": {
     "A": 306,
     "B": 37,
