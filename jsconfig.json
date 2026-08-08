@@ -3,5 +3,13 @@
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".next.failed-*",
+    ".next.rollback-*",
+    "deployment/cumulative-production-20260807-source",
+    "deployment/retatrutide-support-v1-source"
+  ]
 }
