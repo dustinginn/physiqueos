@@ -19,7 +19,7 @@ import {
   buildCoachingUpdatesRequest,
   createCoachingUpdatesEditorModel,
 } from "../../../../../../../domain/services/CoachingUpdatesEditorService";
-import { createCoachingUpdatesTransactionService } from "../../../../../../../domain/services/CoachingUpdatesTransactionService";
+import { createCoachingUpdatesStrategyManagementService } from "../../../../../../../domain/services/CoachingUpdatesStrategyManagementService";
 import { coachingUpdatesEditorMessage } from "../../../../../../../domain/services/StrategyEditorService";
 
 export async function saveStrategy(context, _priorState, formData) {
@@ -46,20 +46,47 @@ export async function saveStrategy(context, _priorState, formData) {
     if (!model || !goal) return { message: "These coaching settings are not available right now." };
     const requested = buildCoachingUpdatesRequest(formData, model);
     const liveStore = getFounderRuntimeStore();
-    const result = await createCoachingUpdatesTransactionService({
+    const photoRecurrence = context.coachingContext?.photoRecurrence;
+    const photoContext = context.coachingContext?.photo;
+    if (!photoRecurrence || !photoContext) return { message: "The Progress Photos schedule is unavailable. Reload and try again." };
+    const result = await createCoachingUpdatesStrategyManagementService({
       runtimeStorePath: resolveFounderRuntimeStorePath(),
       liveStore,
-    }).update({
-      protocolId,
-      expectedCurrentVersionId,
-      effectiveDate: getLocalDateKey(),
-      ...requested,
-      goalAssociation: { goalId: goal.id, relationship: "supports" },
-      provenance: {
+    }).save({
+      expectedRevision: context.coachingContext.expectedRevision,
+      expectedSemanticDigest: context.coachingContext.expectedSemanticDigest,
+      coaching: {
+        protocolId,
+        expectedCurrentVersionId,
+        effectiveDate: getLocalDateKey(),
+        ...requested,
+        goalAssociation: { goalId: goal.id, relationship: "supports" },
+        provenance: {
+          author: { type: "user", id: user.id, displayName: user.displayName ?? "Founder" },
+          reason: "Update active Coaching Updates strategy.",
+          confirmation: { confirmedByUser: true, authority: "founder_direct_strategy_edit" },
+          details: { source: "direct_coaching_updates_edit" },
+        },
+      },
+      photos: {
+        ...photoContext,
+        reminderEnabled: requested.photos.reminderEnabled,
+        effectiveDate: getLocalDateKey(),
+        recurrence: {
+          ...photoRecurrence,
+          interval: requested.photos.cadence === "weekly_interval_2" ? 2 : 1,
+          weekdays: [requested.photos.day],
+          timeOfDay: requested.photos.timeOfDay,
+        },
         author: { type: "user", id: user.id, displayName: user.displayName ?? "Founder" },
-        reason: "Update active Coaching Updates strategy.",
-        confirmation: { confirmedByUser: true, authority: "founder_direct_strategy_edit" },
-        details: { source: "direct_coaching_updates_edit" },
+      },
+      dexa: {
+        userId: user.id,
+        goalId: goal.id,
+        timezone: model.timeZone,
+        expectedRevision: context.coachingContext.dexaExpectedRevision,
+        draft: requested.dexa,
+        author: { type: "user", id: user.id, displayName: user.displayName ?? "Founder" },
       },
     });
     if (result.outcome !== "success") return { message: coachingUpdatesEditorMessage(result.outcome) };
@@ -68,6 +95,8 @@ export async function saveStrategy(context, _priorState, formData) {
     revalidatePath("/profile/operating-plan");
     revalidatePath("/");
     revalidatePath("/briefing/daily");
+    revalidatePath("/progress/photos");
+    revalidatePath("/progress/dexa");
     redirect(`${detailPath}?saved=1`);
   }
   const built = buildStrategySuccessorPayload({ form: formData, protocol, strategyType, version });

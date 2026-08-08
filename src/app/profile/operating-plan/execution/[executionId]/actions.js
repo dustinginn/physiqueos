@@ -11,8 +11,75 @@ import { validateExecutionItem } from "../../../../../domain/models/executionIte
 import {
   createProgressPhotosExecutionScheduleService,
 } from "../../../../../domain/services/ProgressPhotosExecutionScheduleService";
+import {
+  buildRecurringSupportDraftFromFormData,
+  createRecurringSupportManagementService,
+} from "../../../../../domain/services/RecurringSupportManagementService";
 
 const PROGRESS_PHOTOS_ID = "execution_progress_photos";
+
+export async function saveFoamRollingSupport(context, _previousState, formData) {
+  const user = await FounderRepositories.users.getCurrentUser();
+  const [execution, protocol, reminders] = await Promise.all([
+    FounderRepositories.executionItems.getExecutionItemById(context.executionId),
+    FounderRepositories.protocols.getProtocolById(context.protocolId),
+    FounderRepositories.reminders.listReminders(user.id),
+  ]);
+  const reminder = reminders.find((item) => item.id === context.reminderId);
+  const draft = buildRecurringSupportDraftFromFormData(formData);
+
+  if (
+    !execution ||
+    execution.userId !== user.id ||
+    execution.id !== "execution_foam_roll" ||
+    !protocol ||
+    protocol.userId !== user.id ||
+    protocol.category !== "recovery" ||
+    protocol.status !== "active" ||
+    !reminder ||
+    reminder.linkedEntityId !== protocol.id
+  ) {
+    return { message: "Foam Rolling Support is no longer available." };
+  }
+  if (
+    Number(context.expectedRevision) !==
+    Number(execution.executionRevision ?? 1)
+  ) {
+    return {
+      message: "This Support schedule changed while you were editing it. Review the latest version and try again.",
+    };
+  }
+
+  const result = await createRecurringSupportManagementService({
+    runtimeStorePath: resolveFounderRuntimeStorePath(),
+    liveStore: getFounderRuntimeStore(),
+  }).save({
+    protocolId: protocol.id,
+    protocolCategory: "recovery",
+    executionId: execution.id,
+    reminderId: reminder.id,
+    userId: user.id,
+    expectedRevision: execution.executionRevision ?? 1,
+    draft,
+  });
+
+  if (result.outcome !== "success") {
+    return {
+      message:
+        result.outcome === "unchanged"
+          ? "No changes to save."
+          : result.reason ?? "Review the Support settings and try again.",
+    };
+  }
+
+  const strategyPath = `/profile/protocols/${encodeURIComponent(protocol.id)}?from=operating-plan`;
+  revalidatePath("/profile/operating-plan", "page");
+  revalidatePath(`/profile/operating-plan/execution/${encodeURIComponent(execution.id)}`, "page");
+  revalidatePath(`/priorities/${encodeURIComponent(reminder.id)}`, "page");
+  revalidatePath(strategyPath, "page");
+  revalidatePath("/", "page");
+  redirect(strategyPath);
+}
 
 export async function saveExecutionItem(previousState, submittedFormData) {
   const formData = submittedFormData ?? previousState;

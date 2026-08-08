@@ -1910,6 +1910,10 @@ export function getResistanceBreakdown(resistanceSessions = []) {
       const exerciseIdentity = resolveTrainingExerciseIdentity(
         exercise.name ?? exercise.id
       );
+      const primaryMuscleGroups = getResistanceExercisePrimaryMuscleGroups({
+        exercise,
+        exerciseIdentity,
+      });
       const exerciseKey = getCanonicalTrainingExerciseSlug(
         exercise.name ?? exercise.id
       );
@@ -1924,6 +1928,7 @@ export function getResistanceBreakdown(resistanceSessions = []) {
             : "historical_only",
           id: exercise.id ?? exerciseLabel,
           label: exerciseLabel,
+          primaryMuscleGroups,
           sets: groupedSets,
         });
         return;
@@ -1950,6 +1955,26 @@ export function getResistanceBreakdown(resistanceSessions = []) {
       muscleGroups: movementFamilies,
     };
   });
+}
+
+function getResistanceExercisePrimaryMuscleGroups({
+  exercise,
+  exerciseIdentity,
+}) {
+  const canonicalPrimaryMuscleGroups =
+    exerciseIdentity.exercise?.primary_muscle_groups;
+  if (Array.isArray(canonicalPrimaryMuscleGroups) && canonicalPrimaryMuscleGroups.length) {
+    return [...canonicalPrimaryMuscleGroups];
+  }
+
+  if (Array.isArray(exercise.primary_muscle_groups) && exercise.primary_muscle_groups.length) {
+    return [...exercise.primary_muscle_groups];
+  }
+
+  const storedPrimaryMuscleGroupId = String(
+    exercise.primary_muscle_group_id ?? ""
+  ).trim();
+  return storedPrimaryMuscleGroupId ? [storedPrimaryMuscleGroupId] : [];
 }
 
 function inferMovementFamily(exercise = {}) {

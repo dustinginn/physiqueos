@@ -29,7 +29,7 @@ describe("supplement strategy presentation", () => {
     expect(editor).not.toMatch(/name="(?:dose|units|frequency|timing|reminders|priority|notes)"/);
   });
 
-  it("adds only configured supplements to Execution and reuses their summaries", () => {
+  it("keeps support schedules out of Operating Plan navigation", () => {
     const protocols = [
       { id: "tongkat", category: "supplement", status: "active", name: "Tongkat Ali" },
       { id: "fadogia", category: "supplement", status: "active", name: "Fadogia Agrestis" },
@@ -40,16 +40,18 @@ describe("supplement strategy presentation", () => {
       protocolRootId: "tongkat", active: true, cadence: { type: "daily" },
       preferredSchedule: { daysOfWeek: [], timeOfDay: "morning" },
     }];
-    const execution = buildOperatingPlan({ protocols, executionItems, energyStrategy: null, nutritionContext: null, trainingProtocol: null })
-      .find((section) => section.title === "Execution");
-    expect(execution.items.map((item) => [item.title, item.detail])).toEqual([
-      ["Tongkat Ali", "Daily · Morning"],
-    ]);
-    expect(execution.items.some((item) => item.title === "Fadogia Agrestis")).toBe(false);
-    expect(execution.items.some((item) => item.title === "Multivitamin")).toBe(false);
+    const plan = buildOperatingPlan({ protocols, executionItems, energyStrategy: null, nutritionContext: null, trainingProtocol: null });
+    const supplements = plan.find((section) => section.title === "Supplements");
+    expect(plan.some((section) => section.title === "Execution")).toBe(false);
+    expect(supplements.items).toEqual([expect.objectContaining({
+      title: "Supplement Strategy",
+      detail: "Tongkat Ali, Fadogia Agrestis",
+    })]);
+    expect(JSON.stringify(supplements)).not.toMatch(/Daily|Morning|execution_supplement/);
+    expect(JSON.stringify(supplements)).not.toContain("Multivitamin");
     protocols[2].status = "active";
     const restored = buildOperatingPlan({ protocols, executionItems, energyStrategy: null, nutritionContext: null, trainingProtocol: null })
-      .find((section) => section.title === "Execution");
-    expect(restored.items.some((item) => item.title === "Multivitamin")).toBe(false);
+      .find((section) => section.title === "Supplements");
+    expect(restored.items[0].detail).toBe("Tongkat Ali, Fadogia Agrestis, Multivitamin");
   });
 });

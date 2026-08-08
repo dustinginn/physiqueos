@@ -26,7 +26,11 @@ describe("Operating Plan strategy domains", () => {
         active: true,
         cadence: { type: "daily" },
         linkedProtocolId: "recovery",
-        preferredSchedule: { timeOfDay: "17:00" },
+        preferredSchedule: {
+          startDate: "2026-07-23",
+          endDate: null,
+          timeOfDay: "17:00",
+        },
         type: "recovery",
       }],
     });

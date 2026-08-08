@@ -26,6 +26,19 @@ const smithMachineHipThrust = {
   source: "evidence_review_user_confirmed",
 };
 
+const reverseFlyMachine = {
+  id: "reverse_fly_machine",
+  name: "Reverse Fly Machine",
+  aliases: [],
+  equipment: "Machine",
+  body_region: "upper_body",
+  primary_muscle_group_id: "back",
+  primary_muscle_groups: ["Back"],
+  secondary_muscle_groups: [],
+  movement_pattern: null,
+  source: "evidence_review_user_confirmed",
+};
+
 afterEach(() => registerRuntimeTrainingExercises([]));
 
 describe("historical training exercise canonical materialization", () => {
@@ -200,6 +213,149 @@ describe("historical training exercise canonical materialization", () => {
       bestSet: "15 x 20 lb",
       lastSession: "Jul 7",
       workingWeight: "20 lb",
+    });
+  });
+
+  it("places Reverse Fly Machine under Back without changing canonical identity or history", () => {
+    registerRuntimeTrainingExercises([reverseFlyMachine]);
+    const reverseFlyExercise = {
+      id: "reverse_fly_machine",
+      canonicalExerciseId: "reverse_fly_machine",
+      name: "Reverse Fly Machine",
+      body_region: "upper_body",
+      primary_muscle_group_id: "back",
+      primary_muscle_groups: ["Back"],
+      muscle_groups: ["Chest", "Shoulders", "Triceps"],
+      sets: [
+        { set_number: 1, reps: 17, weight: 50, weight_unit: "lb", volume: 850 },
+        { set_number: 2, reps: 17, weight: 70, weight_unit: "lb", volume: 1190 },
+        { set_number: 3, reps: 10, weight: 90, weight_unit: "lb", volume: 900 },
+        { set_number: 4, reps: 11, weight: 80, weight_unit: "lb", volume: 880 },
+      ],
+    };
+    const chestFlyExercise = {
+      id: "chest_fly_machine",
+      canonicalExerciseId: "chest_fly_machine",
+      name: "Chest Fly Machine",
+      body_region: "Chest",
+      primary_muscle_groups: ["Chest"],
+      sets: [
+        { set_number: 1, reps: 12, weight: 100, weight_unit: "lb", volume: 1200 },
+      ],
+    };
+    const historicalSession = {
+      id: "training|authoritative|reverse-fly-history",
+      date: "2026-08-02",
+      metadata: { activity_type: "Traditional Strength Training" },
+      exercises: [reverseFlyExercise, chestFlyExercise],
+    };
+    const originalSession = structuredClone(historicalSession);
+    const resistance = getResistanceBreakdown([historicalSession]);
+    const report = {
+      trainingBreakdowns: { resistance },
+      trainingDays: [{ sessions: [historicalSession] }],
+    };
+    const backExercises = getExercisesForFlatTrainingGroup({
+      groupSlug: "back",
+      report,
+    });
+    const chestExercises = getExercisesForFlatTrainingGroup({
+      groupSlug: "chest",
+      report,
+    });
+    const projectedReverseFly = backExercises.find(
+      (exercise) => exercise.canonicalExerciseId === "reverse_fly_machine"
+    );
+
+    expect(projectedReverseFly).toMatchObject({
+      canonicalExerciseId: "reverse_fly_machine",
+      label: "Reverse Fly Machine",
+      navigationCategorySource: "primary_muscle_mapping",
+      primaryMuscleGroups: ["Back"],
+      primaryNavigationCategory: "back",
+    });
+    expect(chestExercises).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        canonicalExerciseId: "chest_fly_machine",
+        label: "Chest Fly Machine",
+        primaryNavigationCategory: "chest",
+      }),
+    ]));
+    expect(chestExercises).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ canonicalExerciseId: "reverse_fly_machine" }),
+    ]));
+    expect(reverseFlyExercise.sets).toHaveLength(4);
+    expect(reverseFlyExercise.sets.reduce((total, set) => total + set.volume, 0))
+      .toBe(3820);
+    expect(getTrainingLibraryExercisePresentation({
+      exerciseSlug: "reverse_fly_machine",
+      report,
+    })).toMatchObject({
+      canonicalExerciseId: "reverse_fly_machine",
+      displayName: "Reverse Fly Machine",
+      historicalOnly: false,
+    });
+    expect(historicalSession).toEqual(originalSession);
+  });
+
+  it("prefers runtime canonical primary muscle over stale stored aggregates", () => {
+    registerRuntimeTrainingExercises([smithMachineHipThrust]);
+    const historicalSession = {
+      id: "training|runtime-canonical-primary-muscle",
+      date: "2026-08-01",
+      metadata: { activity_type: "Traditional Strength Training" },
+      exercises: [{
+        id: "smith_machine_hip_thrust",
+        name: "Smith Machine Hip Thrusts",
+        body_region: "full_body",
+        primary_muscle_groups: ["Chest"],
+        muscle_groups: ["Chest", "Shoulders", "Triceps"],
+        sets: [{ set_number: 1, reps: 10, weight: 100, weight_unit: "lb" }],
+      }],
+    };
+    const resistance = getResistanceBreakdown([historicalSession]);
+    const report = { trainingBreakdowns: { resistance } };
+    const projectedExercise = resistance
+      .flatMap((region) => region.movementFamilies)
+      .flatMap((family) => family.exercises)
+      .find((exercise) => exercise.canonicalExerciseId === "smith_machine_hip_thrust");
+
+    expect(projectedExercise).toMatchObject({
+      canonicalExerciseId: "smith_machine_hip_thrust",
+      primaryMuscleGroups: ["Glutes"],
+    });
+    expect(getExercisesForFlatTrainingGroup({ groupSlug: "glutes", report }))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          canonicalExerciseId: "smith_machine_hip_thrust",
+          navigationCategorySource: "primary_muscle_mapping",
+          primaryNavigationCategory: "glutes",
+        }),
+      ]));
+    expect(getExercisesForFlatTrainingGroup({ groupSlug: "chest", report }))
+      .toEqual([]);
+  });
+
+  it("falls back to explicit stored primary-muscle metadata for historical-only exercises", () => {
+    const resistance = getResistanceBreakdown([{
+      id: "training|stored-primary-muscle-fallback",
+      exercises: [{
+        id: "historical_cable_halo",
+        name: "Historical Cable Halo",
+        body_region: "upper_body",
+        primary_muscle_group_id: "shoulders",
+        primary_muscle_groups: [],
+        muscle_groups: ["Chest"],
+        sets: [],
+      }],
+    }]);
+    const projectedExercise = resistance
+      .flatMap((region) => region.movementFamilies)
+      .flatMap((family) => family.exercises)[0];
+
+    expect(projectedExercise).toMatchObject({
+      canonicalExerciseId: null,
+      primaryMuscleGroups: ["shoulders"],
     });
   });
 });

@@ -9,7 +9,10 @@ const route = fs.readFileSync(new URL("../app/profile/operating-plan/strategy/[s
 
 describe("Operating Plan clarity routes", () => {
   it("preserves the approved card set while omitting Hydration", () => {
-    for (const title of ["Execution", "Coaching Updates", "Energy Strategy", "Nutrition", "Peptides", "Recovery", "Supplements", "Training"]) expect(plan).toContain(`title: "${title}"`);
+    for (const title of ["Coaching Updates", "Energy Strategy", "Nutrition", "Peptides", "Recovery", "Supplements", "Tracking", "Training"]) expect(plan).toContain(`title: "${title}"`);
+    expect(plan).not.toContain('title: "Execution"');
+    expect(plan).not.toContain("OperatingPlanDrawer");
+    expect(plan).not.toContain("recurring commitments");
     expect(plan).not.toContain("nutrition-hydration");
     expect(plan).not.toContain('title: "Hydration"');
   });
@@ -22,9 +25,9 @@ describe("Operating Plan clarity routes", () => {
     expect(route).toContain("strategyId, strategyType");
   });
 
-  it("preserves Recovery and Execution destinations", () => {
+  it("preserves Recovery destination while retiring generic Execution navigation", () => {
     expect(plan).toContain("`/profile/protocols/${recoveryProtocols[0].id}?from=operating-plan`");
-    expect(plan).toContain("`/profile/operating-plan/execution/${item.id}`");
+    expect(plan).not.toContain("`/profile/operating-plan/execution/${item.id}`");
   });
 
   it("provides a safe viewer-facing missing state and no peptide fields", () => {

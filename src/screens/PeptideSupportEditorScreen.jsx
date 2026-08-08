@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import Card from "../components/ui/Card";
-import { formatSupportSchedulePreview } from "../domain/models/SupportScheduleModel";
 import { formatDosingStrategyPreview } from "../domain/models/PeptideDosingStrategyModel";
+import SupportScheduleEditor, {
+  isSupportScheduleReady,
+  SupportChoice as Choice,
+  SupportEditorSection as Section,
+  SupportField as Field,
+  SupportPreview as Preview,
+  SupportQuestion as Question,
+  SupportSelect as Select,
+} from "./SupportScheduleEditor";
 
-const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const initialState = { message: null };
 
 export default function PeptideSupportEditorScreen({ action, hydration, protocol }) {
@@ -14,11 +20,9 @@ export default function PeptideSupportEditorScreen({ action, hydration, protocol
   const [schedule, setSchedule] = useState(hydration.supportSchedule);
   const [strategy, setStrategy] = useState(hydration.dosingStrategy);
   const [reminder, setReminder] = useState(hydration.reminderPreference);
-  const schedulePreview = useMemo(() => formatSupportSchedulePreview(schedule), [schedule]);
   const dosingPreview = useMemo(() => formatDosingStrategyPreview(strategy, hydration.legacyTimeline), [strategy, hydration.legacyTimeline]);
-  const scheduleReady = Boolean(schedule.startDate && (schedule.frequency === "daily" || schedule.frequency === "every_x_days" || schedule.daysOfWeek.length));
+  const scheduleReady = isSupportScheduleReady(schedule);
   const dosingReady = strategy.pattern === "custom" ? hydration.legacyTimeline.length > 0 : Boolean(strategy.startDate && strategy.startingDose.amount && strategy.startingDose.unit);
-  const set = (key, value) => setSchedule((current) => ({ ...current, [key]: value }));
   const setDose = (key, value) => setStrategy((current) => ({ ...current, [key]: value }));
 
   return <main className="app-surface min-h-screen"><div className="mx-auto max-w-[393px] px-4 pb-28 pt-10">
@@ -31,17 +35,7 @@ export default function PeptideSupportEditorScreen({ action, hydration, protocol
       <input name="legacyPriority" type="hidden" value={hydration.legacyPriority}/>
       <input name="timingContext" type="hidden" value={hydration.timingContext}/>
 
-      <Section number="1" title="Schedule">
-        <Question label="How often?"><Select value={schedule.frequency} onChange={(event) => set("frequency", event.target.value)} options={[["daily","Daily"],["weekly","Weekly"],["specific_days","Specific days"],["every_x_days","Every X days"]]}/></Question>
-        {schedule.frequency === "weekly" && <Question label="Which day?"><Select value={schedule.daysOfWeek[0] ?? ""} onChange={(event) => set("daysOfWeek", [event.target.value])} options={DAYS.map((day) => [day, capitalize(day)])}/></Question>}
-        {schedule.frequency === "specific_days" && <Question label="Which days?"><div className="grid grid-cols-2 gap-2">{DAYS.map((day) => <Check key={day} label={capitalize(day)} checked={schedule.daysOfWeek.includes(day)} onChange={(checked) => set("daysOfWeek", checked ? [...schedule.daysOfWeek, day] : schedule.daysOfWeek.filter((item) => item !== day))}/>)}</div></Question>}
-        {schedule.frequency === "every_x_days" && <Question label="Repeat interval"><Field min="1" type="number" value={schedule.intervalDays} onChange={(event) => set("intervalDays", Number(event.target.value))}/></Question>}
-        <Question label="When?"><Select value={schedule.timing} onChange={(event) => set("timing", event.target.value)} options={[["morning","Morning"],["afternoon","Afternoon"],["evening","Evening"],["specific","Specific time"]]}/></Question>
-        {schedule.timing === "specific" && <Question label="Local time"><Field type="time" value={schedule.specificTime} onChange={(event) => set("specificTime", event.target.value)}/></Question>}
-        <Question label="Starts"><Field type="date" value={schedule.startDate} onChange={(event) => set("startDate", event.target.value)}/></Question>
-        <Question label="Ends"><div className="grid grid-cols-2 gap-2"><Choice active={!schedule.endDate} label="Until changed" onClick={() => set("endDate", null)}/><Choice active={Boolean(schedule.endDate)} label="Choose date" onClick={() => set("endDate", schedule.endDate ?? schedule.startDate)}/></div>{schedule.endDate && <Field className="mt-2" type="date" value={schedule.endDate} onChange={(event) => set("endDate", event.target.value)}/>}</Question>
-        <Preview title="Schedule preview" lines={[schedulePreview]}/>
-      </Section>
+      <SupportScheduleEditor onChange={setSchedule} schedule={schedule} />
 
       {scheduleReady && <Section number="2" title="Dosing Strategy">
         <Question label="How will the dose change over time?"><Select value={strategy.pattern} onChange={(event) => setDose("pattern", event.target.value)} options={[["stay","Stay at this dose"],["titrate_up","Titrate up"],["titrate_down","Titrate down"],["up_hold_down","Titrate up → hold → titrate down"],["custom","Custom (compatibility)"]]}/></Question>
@@ -63,12 +57,4 @@ export default function PeptideSupportEditorScreen({ action, hydration, protocol
   </div></main>;
 }
 
-function Section({ children, number, title }) { return <Card className="space-y-4"><div className="flex items-center gap-3"><span className="flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-extrabold text-white">{number}</span><h2 className="text-xl font-extrabold">{title}</h2></div>{children}</Card>; }
-function Question({ children, label }) { return <div><p className="mb-2 text-sm font-extrabold">{label}</p>{children}</div>; }
-function Field({ className = "", ...props }) { return <input {...props} className={`${className} min-h-11 w-full rounded-xl border border-[var(--divider)] bg-white px-3 text-sm font-semibold`}/>; }
-function Select({ options, ...props }) { return <select {...props} className="min-h-11 w-full rounded-xl border border-[var(--divider)] bg-white px-3 text-sm font-semibold">{options.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>; }
-function Choice({ active, label, onClick }) { return <button className={`min-h-11 rounded-xl border px-3 text-sm font-bold ${active ? "border-[var(--primary)] bg-blue-50 text-[var(--primary)]" : "border-[var(--divider)]"}`} onClick={onClick} type="button">{label}</button>; }
-function Check({ checked, label, onChange }) { return <label className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--divider)] px-3 text-sm font-semibold"><input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox"/>{label}</label>; }
 function Interval({ count, label, setCount, setUnit, unit }) { return <Question label={label}><div className="grid grid-cols-2 gap-2"><Field min="1" type="number" value={count} onChange={(event) => setCount(Number(event.target.value))}/><Select value={unit} onChange={(event) => setUnit(event.target.value)} options={[["days","Days"],["weeks","Weeks"]]}/></div></Question>; }
-function Preview({ lines, title }) { return <div className="rounded-2xl bg-[var(--surface-muted)] p-3"><p className="text-[10px] font-extrabold uppercase tracking-[.08em] text-[var(--text-muted)]">{title}</p><div className="mt-2 space-y-1">{lines.map((line,index) => <p className="text-sm font-semibold leading-5" key={`${line}-${index}`}>{line}</p>)}</div></div>; }
-function capitalize(value) { return value.charAt(0).toUpperCase() + value.slice(1); }

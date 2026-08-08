@@ -70,16 +70,20 @@ export function coachingUpdatesEditorMessage(outcome) {
     expected_version_conflict: "Your coaching schedule changed while you were editing it. Review the latest settings and try again.",
     invalid_midweek_schedule: "Review the selected coaching schedule and try again.",
     invalid_weekly_schedule: "Review the selected coaching schedule and try again.",
+    invalid_monthly_schedule: "Review the selected monthly schedule and try again.",
+    invalid_event_briefing_preference: "Review the event review settings and try again.",
+    invalid: "Review the Progress Photos and DEXA schedules and try again.",
     daily_not_permitted: "Routine Daily Briefings are not available for this Goal.",
     no_routine_surface: "Keep at least one coaching update enabled.",
     invalid_notification_preference: "Choose how you want to receive coaching updates.",
-    invalid_goal_policy: "These coaching settings are not available for the current Goal.",
+    invalid_goal_policy: "These coaching settings are not available for your current goal.",
     scheduler_application_failure: "We could not update your coaching schedule. Nothing was changed.",
     home_resolution_failure: "We could not update your coaching schedule. Nothing was changed.",
     verification_failure: "We could not confirm your coaching schedule. Nothing was changed.",
     concurrency_conflict: "Your coaching schedule changed while you were editing it. Review the latest settings and try again.",
     persistence_failure: "We could not update your coaching schedule. Nothing was changed.",
     rollback_failure: "We could not confirm your coaching schedule. Review the current settings before trying again.",
+    publication_failure: "Your coaching settings saved, but the page could not refresh automatically.",
   })[outcome] ?? "We could not update your coaching schedule. Nothing was changed.";
 }
 

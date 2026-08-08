@@ -3,7 +3,7 @@ import { Activity, ArrowLeft, Dumbbell, Syringe } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 import { resolvePeptideDose, formatPeptideDose, formatPeptideExecutionSummary } from "../domain/services/ExecutionPhaseResolver";
-import { formatSupplementExecutionSummary } from "../domain/services/SupplementExecutionManagementService";
+import { formatSupplementSupportSummary } from "../domain/services/SupplementSupportManagementService";
 import { formatExecutionSchedule } from "./OperatingPlanScreen";
 
 const DOMAIN_PRESENTATION = Object.freeze({
@@ -220,7 +220,7 @@ function buildSupportMethod({ category, executionItem, goalReference, localDate,
       id: protocol.id,
       name: protocol.name,
       purpose: supplementPurpose(protocol, version, goalReference),
-      supportSummary: formatSupplementExecutionSummary(executionItem),
+      supportSummary: formatSupplementSupportSummary(executionItem),
       editSupportHref: `/profile/operating-plan/execution/supplements/${encodeURIComponent(protocol.id)}?edit=1`,
     });
   }

@@ -3,6 +3,7 @@ import { createFieldProvenance, createSource } from "./recordMetadata";
 export const ReminderType = {
   EVIDENCE_REMINDER: "evidence_reminder",
   PROTOCOL_REMINDER: "protocol_reminder",
+  SUPPLEMENT_REMINDER: "supplement_reminder",
   PROTOCOL: "protocol",
   PROGRESS_PHOTO: "progress_photo",
   DEXA: "dexa",

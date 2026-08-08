@@ -11,7 +11,11 @@ import {
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
-import { createNutritionDayEvidenceObject } from "../models/nutritionDayEvidence";
+import {
+  createNutritionDayEvidenceObject,
+  NutritionDailyTotalsScope,
+  reconcileNutritionDayEvidence,
+} from "../models/nutritionDayEvidence";
 
 const DEFAULT_SCREENSHOT_MODEL = "gpt-4.1-mini";
 const SCREENSHOT_EVIDENCE_SCHEMA_VERSION = "physiqueos-evidence-v1";
@@ -172,6 +176,8 @@ function getScreenshotSystemPrompt() {
     "For strength training, use the canonical TrainingSession shape: the training session is the evidence_object; metadata holds workout-level fields; exercises is an array of child exercises; sets are child records inside each exercise.",
     "Never emit Spider Curls, EZ Bar Curls, or other exercises as standalone training evidence_objects. They must be nested under the matching Traditional Strength Training evidence_object.",
     "For nutrition, use the canonical NutritionDay shape: the calendar day is the evidence_object; daily_totals, targets, meals, and foods are structured children. Screenshots are artifacts that enrich NutritionDay.",
+    "For every NutritionDay candidate, classify metadata.daily_totals_scope as full_day_summary only when daily_totals explicitly summarize the entire day, partial_meal_subtotal when they total only the meals or section visible in that artifact, or unknown when the scope is not explicit. Set metadata.daily_totals_source_artifact_refs to only the artifacts supporting those daily_totals.",
+    "A partial meal-detail subtotal must never be labeled full_day_summary. A daily summary screen is full_day_summary even when separate meal-detail screenshots are supplied in the same submission.",
     "Multiple nutrition screenshots for the same date should enrich the same NutritionDay when dates agree. Do not create separate NutritionDay evidence_objects for daily summary, macro report, nutrient report, meal detail, and food detail screens from the same day.",
     "For nutrition, capture every visible nutrient and do not stop at calories. If food-level macros or nutrients are visible, store them on the food. If meal totals are visible, store meal totals independently from food totals.",
     "For nutrition macro reports, capture grams, percent of calories, and goal percent for protein, carbohydrates, and fat.",
@@ -232,7 +238,7 @@ function getScreenshotUserPrompt({
       workoutGranularityRule:
         "One visible workout row or workout detail screenshot equals one training evidence_object. Preserve repeated activity names as separate sessions when row-specific values differ. Calories are not required; distance-only, duration-only, pace-only, or time-range-only workouts must still be emitted with active_calories:null.",
       canonicalNutritionDaySchema:
-        "NutritionDayEvidenceObject = { id, evidence_type:'nutrition', observed_at, source, metadata:{date,source,completeness,meal_count,food_count,goal_set,confidence,provenance}, daily_totals:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg}, targets:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg}, macro_percentages:{protein:{grams,percent_of_calories,goal_percent},carbohydrates:{grams,percent_of_calories,goal_percent},fat:{grams,percent_of_calories,goal_percent}}, goal_status:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg each with actual,goal,difference,unit}, nutrients:[{name,total,goal,remaining,unit,percent_daily_value,provenance_ref}], meals:[{id,name,completeness,known_foods,additional_foods_detected,totals,foods:[{id,canonical_name,name,brand,serving_size,servings,meal,nutrients,percent_of_daily_goals,visible_nutrients,provenance_ref,provenance}],provenance_ref,provenance}], confidence, provenance }. NutritionDay metadata must not include TrainingSession fields like activity_type, active_calories, distance, pace, heart rate, or location.",
+        "NutritionDayEvidenceObject = { id, evidence_type:'nutrition', observed_at, source, metadata:{date,source,completeness,daily_totals_scope:'full_day_summary'|'partial_meal_subtotal'|'unknown',daily_totals_source_artifact_refs,meal_count,food_count,goal_set,confidence,provenance}, daily_totals:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg}, targets:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg}, macro_percentages:{protein:{grams,percent_of_calories,goal_percent},carbohydrates:{grams,percent_of_calories,goal_percent},fat:{grams,percent_of_calories,goal_percent}}, goal_status:{calories,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg each with actual,goal,difference,unit}, nutrients:[{name,total,goal,remaining,unit,percent_daily_value,provenance_ref}], meals:[{id,name,completeness,known_foods,additional_foods_detected,totals,foods:[{id,canonical_name,name,brand,serving_size,servings,meal,nutrients,percent_of_daily_goals,visible_nutrients,provenance_ref,provenance}],provenance_ref,provenance}], confidence, provenance }. NutritionDay metadata must not include TrainingSession fields like activity_type, active_calories, distance, pace, heart rate, or location.",
       canonicalActivityDaySchema:
         "ActivityDayEvidenceObject = { id, evidence_type:'activity_day', observed_at, source, metadata:{date,source,confidence,provenance}, daily_activity:{move_calories,move_goal,exercise_minutes,exercise_goal,stand_hours,stand_goal,total_calories_burned,ring_completion:{move,exercise,stand}}, derived_metrics:{workout_active_calories,non_workout_active_calories,training_sessions_referenced}, references:{training_session_ids}, confidence, provenance }. ActivityDay is a daily summary, not a workout.",
       sharedEnvelopeRule:
@@ -2044,6 +2050,11 @@ function canonicalizeNutritionDayEvidenceObject({
       metadataCompleteness && metadataCompleteness !== "partial"
         ? metadataCompleteness
         : inferredCompleteness,
+    daily_totals_scope:
+      evidenceObject.metadata?.daily_totals_scope ??
+      NutritionDailyTotalsScope.UNKNOWN,
+    daily_totals_source_artifact_refs:
+      evidenceObject.metadata?.daily_totals_source_artifact_refs ?? [],
     confidence:
       evidenceObject.metadata?.confidence ??
       evidenceObject.confidence?.interpretation ??
@@ -2085,7 +2096,9 @@ function mergeNutritionDayObjects(objects, index) {
     ),
   ];
 
-  return objects.reduce(
+  const dailyTotalsAuthority = selectNutritionDailyTotalsAuthority(objects);
+  const orderedObjects = orderNutritionObjectsByAuthority(objects);
+  const merged = orderedObjects.reduce(
     (merged, object) => ({
       ...merged,
       id: merged.id ?? object.id ?? `nutrition_day_${index + 1}`,
@@ -2098,14 +2111,7 @@ function mergeNutritionDayObjects(objects, index) {
         source_artifact_refs: sourceArtifactRefs,
       },
       metadata: mergeMetadata(merged.metadata, object.metadata),
-      daily_totals: mergeNutritionTotals(merged.daily_totals, object.daily_totals),
       targets: mergeNutritionTotals(merged.targets, object.targets),
-      macro_percentages: mergeMacroPercentages(
-        merged.macro_percentages,
-        object.macro_percentages
-      ),
-      goal_status: mergeGoalStatus(merged.goal_status, object.goal_status),
-      nutrients: [...(merged.nutrients ?? []), ...(object.nutrients ?? [])],
       meals: [...(merged.meals ?? []), ...(object.meals ?? [])],
       values: [...(merged.values ?? []), ...(object.values ?? [])],
       confidence: {
@@ -2135,6 +2141,164 @@ function mergeNutritionDayObjects(objects, index) {
       provenance: { source_artifact_refs: sourceArtifactRefs },
     }
   );
+
+  return {
+    ...merged,
+    metadata: {
+      ...merged.metadata,
+      daily_totals_scope:
+        dailyTotalsAuthority?.scope ?? NutritionDailyTotalsScope.UNKNOWN,
+      daily_totals_source_artifact_refs:
+        dailyTotalsAuthority?.sourceArtifactRefs ?? [],
+    },
+    daily_totals: dailyTotalsAuthority?.object.daily_totals ?? {},
+    macro_percentages: mergeScopedNutritionSummaryField(
+      orderedObjects,
+      "macro_percentages"
+    ),
+    goal_status: mergeScopedNutritionSummaryField(
+      orderedObjects,
+      "goal_status"
+    ),
+    nutrients: mergeScopedNutritionNutrients(orderedObjects),
+  };
+}
+
+function selectNutritionDailyTotalsAuthority(objects = []) {
+  const candidates = objects
+    .filter((object) => hasMeaningfulNutritionTotals(object.daily_totals))
+    .map((object) => ({
+      object,
+      scope: resolveNutritionDailyTotalsScope(object),
+      sourceArtifactRefs: getNutritionDailyTotalsSourceArtifactRefs(object),
+    }))
+    .sort(compareNutritionAuthorityCandidates);
+
+  return candidates.at(-1) ?? null;
+}
+
+function orderNutritionObjectsByAuthority(objects = []) {
+  return [...objects].sort((first, second) =>
+    compareNutritionAuthorityCandidates(
+      { object: first, scope: resolveNutritionDailyTotalsScope(first) },
+      { object: second, scope: resolveNutritionDailyTotalsScope(second) }
+    )
+  );
+}
+
+function compareNutritionAuthorityCandidates(first, second) {
+  const rankDifference = nutritionScopeRank(first.scope) -
+    nutritionScopeRank(second.scope);
+  if (rankDifference !== 0) return rankDifference;
+  return stableNutritionValue(first.object).localeCompare(
+    stableNutritionValue(second.object)
+  );
+}
+
+function nutritionScopeRank(scope) {
+  return ({
+    [NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL]: 0,
+    [NutritionDailyTotalsScope.UNKNOWN]: 1,
+    [NutritionDailyTotalsScope.FULL_DAY_SUMMARY]: 2,
+  })[scope] ?? 1;
+}
+
+function resolveNutritionDailyTotalsScope(object = {}) {
+  const explicit = object.metadata?.daily_totals_scope;
+  if (Object.values(NutritionDailyTotalsScope).includes(explicit)) {
+    return explicit;
+  }
+  if (!hasMeaningfulNutritionTotals(object.daily_totals)) {
+    return NutritionDailyTotalsScope.UNKNOWN;
+  }
+  const meals = object.meals ?? [];
+  if (
+    meals.length > 0 &&
+    reconcileNutritionDayEvidence({
+      dailyTotals: object.daily_totals,
+      meals,
+    }).status === "reconciled"
+  ) {
+    return NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL;
+  }
+  if (
+    meals.length === 0 &&
+    (
+      hasMeaningfulMacroPercentages(object.macro_percentages) ||
+      hasMeaningfulGoalStatus(object.goal_status) ||
+      (object.nutrients ?? []).length > 0
+    )
+  ) {
+    return NutritionDailyTotalsScope.FULL_DAY_SUMMARY;
+  }
+  return NutritionDailyTotalsScope.UNKNOWN;
+}
+
+function getNutritionDailyTotalsSourceArtifactRefs(object = {}) {
+  const explicit = object.metadata?.daily_totals_source_artifact_refs ?? [];
+  if (explicit.length > 0) return [...new Set(explicit.filter(Boolean))].sort();
+  return [
+    ...new Set([
+      ...(object.provenance?.source_artifact_refs ?? []),
+      ...(object.source?.source_artifact_refs ?? []),
+    ].filter(Boolean)),
+  ].sort();
+}
+
+function mergeScopedNutritionSummaryField(objects, field) {
+  return objects.reduce(
+    (merged, object) => mergeNutritionNestedValues(merged, object[field]),
+    {}
+  );
+}
+
+function mergeNutritionNestedValues(first = {}, second = {}) {
+  const merged = { ...first };
+  Object.entries(second ?? {}).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === "") return;
+    merged[key] = value && typeof value === "object" && !Array.isArray(value)
+      ? mergeNutritionNestedValues(merged[key], value)
+      : value;
+  });
+  return merged;
+}
+
+function mergeScopedNutritionNutrients(objects = []) {
+  const byName = new Map();
+  objects.forEach((object) => {
+    (object.nutrients ?? []).forEach((nutrient) => {
+      const name = cleanMetadataText(nutrient.name);
+      if (!name) return;
+      byName.set(name.toLowerCase(), { ...nutrient, name });
+    });
+  });
+  return [...byName.values()];
+}
+
+function hasMeaningfulMacroPercentages(value = {}) {
+  return Object.values(value ?? {}).some((macro) =>
+    Object.values(macro ?? {}).some(
+      (item) => item !== null && item !== undefined && item !== ""
+    )
+  );
+}
+
+function hasMeaningfulGoalStatus(value = {}) {
+  return Object.values(value ?? {}).some((status) =>
+    Object.values(status ?? {}).some(
+      (item) => item !== null && item !== undefined && item !== ""
+    )
+  );
+}
+
+function stableNutritionValue(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(stableNutritionValue).join(",")}]`;
+  }
+  return `{${Object.keys(value).sort().map((key) =>
+    `${JSON.stringify(key)}:${stableNutritionValue(value[key])}`
+  ).join(",")}}`;
 }
 
 function reconcileNutritionMeals(meals = []) {
@@ -3493,6 +3657,8 @@ const nutritionMetadataSchema = {
     "date",
     "source",
     "completeness",
+    "daily_totals_scope",
+    "daily_totals_source_artifact_refs",
     "meal_count",
     "food_count",
     "goal_set",
@@ -3503,6 +3669,14 @@ const nutritionMetadataSchema = {
     date: { type: ["string", "null"] },
     source: { type: ["string", "null"] },
     completeness: { type: ["string", "null"] },
+    daily_totals_scope: {
+      type: "string",
+      enum: Object.values(NutritionDailyTotalsScope),
+    },
+    daily_totals_source_artifact_refs: {
+      type: "array",
+      items: { type: "string" },
+    },
     meal_count: { type: ["number", "null"] },
     food_count: { type: ["number", "null"] },
     goal_set: { type: ["boolean", "null"] },

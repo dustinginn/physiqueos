@@ -803,8 +803,8 @@ function normalizeFounderOperatingPlan(operatingPlan) {
           return {
             ...protocol,
             title: "Weekly Progress Photo Set",
-            dayOfWeek: "saturday",
-            timeOfDay: "afternoon",
+            dayOfWeek: normalizePhotoWeekday(protocol.dayOfWeek),
+            timeOfDay: normalizePhotoTimeOfDay(protocol.timeOfDay),
             expectedViews: ["front-relaxed", "back-relaxed", "back-flexed"],
           };
         }
@@ -813,8 +813,8 @@ function normalizeFounderOperatingPlan(operatingPlan) {
           return {
             ...protocol,
             active: false,
-            dayOfWeek: "saturday",
-            timeOfDay: "afternoon",
+            dayOfWeek: normalizePhotoWeekday(protocol.dayOfWeek),
+            timeOfDay: normalizePhotoTimeOfDay(protocol.timeOfDay),
           };
         }
 
@@ -866,22 +866,60 @@ function normalizeFounderReminder(reminder) {
 }
 
 function normalizeFounderPhotoReminder(reminder, { expectedViews, linkedEntityType, title }) {
+  const schedule = normalizeFounderPhotoSchedule(reminder.schedule);
+
   return {
     ...reminder,
     title,
     linkedEntityType: linkedEntityType ?? reminder.linkedEntityType,
-    schedule: {
-      ...reminder.schedule,
-      preferredDay: "saturday",
-      daysOfWeek: ["saturday"],
-      timeOfDay: "afternoon",
-    },
+    schedule,
     defaultContext: {
       ...reminder.defaultContext,
-      morning: false,
+      morning: schedule.timeOfDay === "morning",
     },
     expectedViews,
   };
+}
+
+const PHOTO_WEEKDAYS = new Set([
+  "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+]);
+const PHOTO_DAYPARTS = new Set(["morning", "afternoon", "evening", "night"]);
+
+function normalizeFounderPhotoSchedule(schedule = {}) {
+  const persistedDays = Array.isArray(schedule.daysOfWeek)
+    ? schedule.daysOfWeek.map(normalizePhotoWeekdayOrNull).filter(Boolean)
+    : [];
+  const fallbackDay =
+    normalizePhotoWeekdayOrNull(schedule.preferredDay) ??
+    normalizePhotoWeekdayOrNull(schedule.dayOfWeek) ??
+    persistedDays[0] ??
+    "saturday";
+
+  return {
+    ...schedule,
+    preferredDay: normalizePhotoWeekdayOrNull(schedule.preferredDay) ?? fallbackDay,
+    dayOfWeek: normalizePhotoWeekdayOrNull(schedule.dayOfWeek) ?? fallbackDay,
+    daysOfWeek: persistedDays.length > 0 ? persistedDays : [fallbackDay],
+    timeOfDay: normalizePhotoTimeOfDay(schedule.timeOfDay),
+  };
+}
+
+function normalizePhotoWeekday(value) {
+  return normalizePhotoWeekdayOrNull(value) ?? "saturday";
+}
+
+function normalizePhotoWeekdayOrNull(value) {
+  const normalized = String(value ?? "").toLowerCase();
+  return PHOTO_WEEKDAYS.has(normalized) ? normalized : null;
+}
+
+function normalizePhotoTimeOfDay(value) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (PHOTO_DAYPARTS.has(normalized) || /^([01]\d|2[0-3]):[0-5]\d$/.test(normalized)) {
+    return normalized;
+  }
+  return "afternoon";
 }
 
 export function resolveFounderRuntimeStorePath({ cwd = process.cwd(), env = process.env } = {}) {

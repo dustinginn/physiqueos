@@ -11,23 +11,23 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
-import OperatingPlanDrawer from "../components/operating-plan/OperatingPlanDrawer";
 import { getOperatingPlanStrategyHref } from "../domain/services/OperatingPlanStrategyDetailService";
-import { formatSupplementExecutionSummary } from "../domain/services/SupplementExecutionManagementService";
-import { formatPeptideExecutionSummary } from "../domain/services/PeptideExecutionManagementService";
-import { DEXA_APPOINTMENT_ID, formatDexaAppointmentSummary } from "../domain/services/DexaAppointmentManagementService";
+import {
+  resolveMorningWeighInSupport,
+} from "../domain/services/TrackingSupportService";
 
 export default function OperatingPlanScreen({
   activityActivated = false,
   nutritionContext,
   protocols,
+  reminders = [],
   trainingActivated = false,
   trainingProtocol,
   energyActivated = false,
   energyStrategy,
   executionItems = [],
 }) {
-  const plan = buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, trainingProtocol });
+  const plan = buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol });
 
   return (
     <main className="app-surface min-h-screen">
@@ -86,7 +86,6 @@ export default function OperatingPlanScreen({
 
 function PlanSection({ section }) {
   if (section.supplements) return <Card className="space-y-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><Link className="inline-flex min-h-11 items-center text-xs font-extrabold text-[var(--primary)]" href="/profile/operating-plan/supplements/new">Add Supplement</Link></div><div className="space-y-2">{section.items.map((item)=><PlanRow item={item} key={item.id}/>)}</div></Card>;
-  if (section.drawer) return <Card className="space-y-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><OperatingPlanDrawer description={section.subtitle} preview={section.preview} title={section.title}>{section.items.map((item)=><PlanRow hideStatus item={item} key={item.id}/>)}</OperatingPlanDrawer></Card>;
   return (
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -112,7 +111,7 @@ function PlanSection({ section }) {
   );
 }
 
-function PlanRow({ hideStatus = false, item }) {
+function PlanRow({ item }) {
   const Wrapper = item.href ? Link : "div";
   const wrapperProps = item.href ? { href: item.href } : {};
 
@@ -130,48 +129,26 @@ function PlanRow({ hideStatus = false, item }) {
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {!hideStatus && <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+        <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--text-muted)]">
           {item.status}
-        </span>}
+        </span>
         {item.href && <ChevronRight className="text-[var(--text-muted)]" size={16} />}
       </div>
     </Wrapper>
   );
 }
 
-export function buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, trainingProtocol }) {
+export function buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders = [], trainingProtocol }) {
   const activeProtocols = protocols.filter((protocol) => protocol.status === "active");
   const supplements = activeProtocols.filter((protocol) => protocol.category === "supplement");
   const recoveryProtocols = activeProtocols.filter((protocol) => protocol.category === "recovery");
   const coachingProtocol = activeProtocols.find((protocol) => protocol.category === "briefings");
   const peptides = activeProtocols.filter((protocol) => protocol.category === "peptide");
-  const recurringExecutionItems = deriveAuthoritativeRecurringExecutionItems({
+  const morningWeighIn = resolveMorningWeighInSupport({
     executionItems,
     protocols: activeProtocols,
+    reminders,
   });
-  const visibleExecutionItems = recurringExecutionItems.filter((item) => !["supplement","peptide","protocol"].includes(item.type));
-  const supplementExecutionItems = supplements.flatMap((protocol) => {
-    const configured = recurringExecutionItems.find((item) => item.type === "supplement" && item.protocolRootId === protocol.id);
-    if (!configured) return [];
-    return {
-      id: configured.id,
-      title: protocol.name,
-      detail: formatSupplementExecutionSummary(configured),
-      href: `/profile/operating-plan/execution/supplements/${protocol.id}`,
-      status: "Execution",
-    };
-  });
-  const allExecutionItems = [...visibleExecutionItems.map(buildExecutionPlanItem), ...supplementExecutionItems];
-  const peptideExecutionItems = peptides.flatMap((protocol) => {
-    const configured=recurringExecutionItems.find((item)=>
-      ["peptide","protocol"].includes(item.type) &&
-      [item.protocolRootId,item.linkedProtocolId].includes(protocol.id)
-    );
-    if (!configured) return [];
-    return {id:configured.id,title:protocol.name,detail:formatPeptideExecutionSummary(configured,new Intl.DateTimeFormat("en-CA",{timeZone:"America/Los_Angeles"}).format(new Date())),href:`/profile/operating-plan/execution/peptides/${protocol.id}`,status:"Execution"};
-  });
-  allExecutionItems.push(...peptideExecutionItems);
-  allExecutionItems.sort((left, right) => String(left.id).localeCompare(String(right.id)));
 
   return [
     {
@@ -182,13 +159,25 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
       items: [buildEnergyStrategyPlanItem(energyStrategy)],
     },
     {
+      icon: Scale,
+      title: "Tracking",
+      subtitle: "Recurring measurements",
+      tone: "evidence",
+      items: [{
+        id: "tracking",
+        title: "Tracking",
+        detail: morningWeighIn?.supportSummary ?? "Morning Weigh-In Support",
+        href: "/profile/operating-plan/tracking",
+        status: morningWeighIn ? "Active" : "Review",
+      }],
+    },
+    {
       icon: Dumbbell,
       title: "Training",
       subtitle: trainingProtocol ? "Active protocol" : "Protocol not defined",
       tone: "effort",
       items: [buildTrainingPlanItem(trainingProtocol)],
     },
-    { icon: Scale, title: "Execution", subtitle: `${allExecutionItems.length} recurring commitments`, tone: "evidence", drawer: true, preview: allExecutionItems.slice(0,3).map((item)=>item.title).join("\n")+`\n+${Math.max(0,allExecutionItems.length-3)} more`, items: allExecutionItems },
     {
       icon: Dumbbell,
       title: "Supplements",
@@ -259,7 +248,7 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
         status: "Active",
       }],
     }] : []),
-  ].filter((section) => section.items.length > 0).sort((a,b)=>["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"].indexOf(a.title)-["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"].indexOf(b.title));
+  ].filter((section) => section.items.length > 0).sort((a,b)=>["Energy Strategy","Nutrition","Training","Recovery","Peptides","Supplements","Tracking","Coaching Updates"].indexOf(a.title)-["Energy Strategy","Nutrition","Training","Recovery","Peptides","Supplements","Tracking","Coaching Updates"].indexOf(b.title));
 }
 
 export function isConcreteExecutionItem(item) {
@@ -295,7 +284,6 @@ export function deriveAuthoritativeRecurringExecutionItems({
   }).sort((left, right) => String(left.id).localeCompare(String(right.id)));
 }
 
-function buildExecutionPlanItem(item) { return { id: item.id, title: item.id === "execution_dexa" ? "DEXA Scan" : item.title, detail: formatExecutionSchedule(item), href: `/profile/operating-plan/execution/${item.id}`, status: "Execution" }; }
 export function formatExecutionSchedule(item) { const schedule=item.preferredSchedule??{}; const time=formatExecutionTime(schedule.timeOfDay); if(item.cadence?.type==="daily")return schedule.timeOfDay==="morning"?"Every morning":joinSummary("Daily",time);if(item.cadence?.type==="scheduled_date")return schedule.date?joinSummary(new Date(`${schedule.date}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"}),time):"Not scheduled";if(schedule.daysOfWeek?.length)return joinSummary(formatDayRange(schedule.daysOfWeek),time || daypart(schedule.timeOfDay));return formatPersistence(item.cadence?.type)||"Not scheduled"; }
 function formatExecutionTime(value){if(!value)return"";if(/^\d{2}:\d{2}$/.test(value)){const [hour,minute]=value.split(":").map(Number);return new Date(2000,0,1,hour,minute).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});}return formatPersistence(value);}
 function formatDayRange(days){const names=days.map(formatPersistence);if(names.join(",").toLowerCase()==="sunday,monday,tuesday,wednesday,thursday")return"Sun–Thu";return names.length===1?names[0]:names.join(", ");}

@@ -11,8 +11,19 @@ import {
   ExecutionPriorityOperationalState,
   findExecutionForProtocol,
   formatExecutionDose,
+  formatExecutionSchedule,
   projectExecutionPriority,
 } from "./ExecutionPriorityProjectionService";
+import {
+  DexaPriorityStage,
+  projectDexaAppointmentPriority,
+} from "./DexaAppointmentLifecycleService";
+import {
+  isMorningWeighInDue,
+  isMorningWeighInSatisfied,
+  MORNING_WEIGH_IN_REMINDER_ID,
+  resolveMorningWeighInSupport,
+} from "./TrackingSupportService";
 
 const DAY_NAMES = [
   "sunday",
@@ -29,6 +40,7 @@ const MORNING_RECONCILIATION_REMINDER_TYPES = new Set([
   "protocol",
   "protocol_reminder",
   "recovery_reminder",
+  "supplement_reminder",
   "progress_photo",
   "dexa",
   "morning_weigh_in",
@@ -83,9 +95,18 @@ export function createDailyFocusService() {
       });
       const executionBackedProtocolIds = new Set(
         protocols
-          .filter((item) => ["peptide", "supplement"].includes(item.category))
+          .filter((item) => ["peptide", "recovery", "supplement"].includes(item.category))
           .map((item) => item.id)
           .filter(Boolean)
+      );
+      const executionBackedReminderIds = new Set(
+        reminders
+          .filter(
+            (reminder) =>
+              executionBackedProtocolIds.has(reminder.linkedEntityId) &&
+              isExecutionBackedReminder(reminder)
+          )
+          .map((reminder) => reminder.id)
       );
       const doseChangeItem = getLegacyReminderOnlyDoseChangeItem({
         excludedProtocolIds: executionBackedProtocolIds,
@@ -93,12 +114,32 @@ export function createDailyFocusService() {
         today,
         now,
       });
+      const morningWeightItem = getMorningWeightItem({
+        checkIns,
+        executionItems,
+        latestWeight,
+        now,
+        protocols,
+        reminders,
+        timeZone,
+        today,
+        weightEntries,
+      });
       const highPriorityItems = [
-        getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }),
+        morningWeightItem,
+        ...getDexaAppointmentItems({ executionItems, now, timeZone }),
         ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
         doseChangeItem,
         ...executionProtocolItems,
-        ...getPersistentReminderItems({ reminders, today, dayName }),
+        ...getPersistentReminderItems({
+          reminders,
+          today,
+          dayName,
+          excludedReminderIds: new Set([
+            ...executionBackedReminderIds,
+            ...(morningWeightItem ? [MORNING_WEIGH_IN_REMINDER_ID] : []),
+          ]),
+        }),
       ].filter(Boolean);
       const sessions = getDailySessionsFromItems(highPriorityItems);
       const sessionItemIds = new Set(
@@ -132,16 +173,20 @@ export function createDailyFocusService() {
     },
     getDailySessions({
       checkIns = [],
+      executionItems = [],
       latestWeight = null,
       now = new Date(),
       progressPhotos = [],
+      protocols = [],
       reminders = [],
+      timeZone = DEFAULT_LOCAL_TIME_ZONE,
+      weightEntries = [],
     } = {}) {
-      const today = toDateKey(now);
-      const dayName = DAY_NAMES[now.getDay()];
+      const today = getLocalDateKey(now, timeZone);
+      const dayName = getDayName(today);
       const todaysCheckIn = checkIns.find((checkIn) => checkIn.date === today);
       const items = [
-        getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }),
+        getMorningWeightItem({ checkIns, executionItems, latestWeight, now, protocols, reminders, timeZone, today, weightEntries }),
         ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
       ].filter(Boolean);
 
@@ -392,10 +437,16 @@ function getDayName(dateKey) {
   return DAY_NAMES[index];
 }
 
-function getPersistentReminderItems({ reminders, today, dayName }) {
+function getPersistentReminderItems({
+  reminders,
+  today,
+  dayName,
+  excludedReminderIds = new Set(),
+}) {
   return reminders
     .filter(
       (reminder) =>
+        !excludedReminderIds.has(reminder.id) &&
         reminder.persistenceMode === "always_visible" &&
         reminder.active &&
         reminderAppliesToday(reminder, dayName, today)
@@ -424,26 +475,80 @@ function getPersistentReminderItems({ reminders, today, dayName }) {
     .filter(Boolean);
 }
 
-function getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }) {
-  const completed =
-    Boolean(todaysCheckIn?.weightEntryId) ||
-    isSameLocalDate(latestWeight?.measuredAt, today);
-
-  const state = getPriorityState("morning", now);
-
+function getMorningWeightItem({ checkIns, executionItems, latestWeight, now, protocols, reminders, timeZone, today, weightEntries }) {
+  const support = resolveMorningWeighInSupport({ executionItems, protocols, reminders });
+  if (!support) {
+    const legacyReminder = reminders.find((item) => item.id === MORNING_WEIGH_IN_REMINDER_ID);
+    if (legacyReminder?.active === false) return null;
+    const todaysCheckIn = checkIns.find((item) => item.date === today);
+    return getLegacyMorningWeightItem({ latestWeight, todaysCheckIn, today, now, timeZone });
+  }
+  if (!support.reminder.active || !isMorningWeighInDue(support.supportSchedule, today)) return null;
+  const completed = isMorningWeighInSatisfied({
+    checkIns,
+    latestWeight,
+    localDate: today,
+    reminder: support.reminder,
+    timeZone,
+    weightEntries,
+  });
+  const timing = support.executionItem.preferredSchedule?.timeOfDay;
+  const state = getPriorityState(timing, now, timeZone);
   return {
-    id: "verified-weight",
-    label: "Morning Weight",
+    id: support.reminder.id,
+    label: "Morning Weigh-In",
     subtitle: state.label,
-    metadata: "Fasted",
-    href: "/check-in/morning",
+    metadata: support.supportSummary,
+    href: completed ? `/priorities/${support.reminder.id}` : "/check-in/morning",
     icon: "scale",
     color: "evidence",
     completed,
-    session: "morning",
+    satisfiedByEvidence: completed,
+    completable: false,
+    session: getSessionTimeBlock(timing),
     state: state.name,
     priority: state.priorityOffset + 10,
   };
+}
+
+function getLegacyMorningWeightItem({ latestWeight, todaysCheckIn, today, now, timeZone }) {
+  const completed = Boolean(todaysCheckIn?.weightEntryId) || isSameLocalDate(latestWeight?.measuredAt, today);
+  const state = getPriorityState("morning", now, timeZone);
+  return {
+    id: "verified-weight", label: "Morning Weight", subtitle: state.label, metadata: "Fasted",
+    href: "/check-in/morning", icon: "scale", color: "evidence", completed,
+    session: "morning", state: state.name, priority: state.priorityOffset + 10,
+  };
+}
+
+function getDexaAppointmentItems({ executionItems, now, timeZone }) {
+  const appointment = executionItems.find((item) => item.id === "execution_next_dexa");
+  const projection = projectDexaAppointmentPriority({
+    appointment,
+    now,
+    timeZone: appointment?.timezone ?? timeZone,
+  });
+  if (!projection) return [];
+  const upload = projection.stage === DexaPriorityStage.UPLOAD_RESULTS;
+
+  return [{
+    id: projection.priorityId,
+    label: projection.label,
+    subtitle: projection.subtitle,
+    metadata: projection.metadata,
+    href: projection.href,
+    icon: "target",
+    color: upload ? "warning" : "evidence",
+    completed: false,
+    completable: false,
+    executionId: appointment.id,
+    occurrenceDate: projection.scheduledDate,
+    state: upload ? "overdue" : "upcoming",
+    priority: projection.priority,
+    changeLabel: upload ? "Results needed" : null,
+    alwaysShowMetadata: true,
+    dexaProjection: projection,
+  }];
 }
 
 function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }) {
@@ -532,7 +637,7 @@ function getDailySessionsFromItems(items) {
     const completedCount = sessionItems.filter((item) => item.completed).length;
     const pendingCount = sessionItems.length - completedCount;
     const pendingItems = sessionItems.filter((item) => !item.completed);
-    const dedicatedWeight = pendingItems.length === 1 && pendingItems[0].id === "verified-weight" ? pendingItems[0] : null;
+    const dedicatedWeight = pendingItems.length === 1 && ["verified-weight", MORNING_WEIGH_IN_REMINDER_ID].includes(pendingItems[0].id) ? pendingItems[0] : null;
 
     return {
       id: `${timeBlock}-check-in`,
@@ -582,7 +687,7 @@ function getExecutionBackedProtocolItems({
   today,
 }) {
   const executionBackedProtocols = protocols.filter((protocol) =>
-    ["peptide", "supplement"].includes(protocol.category)
+    ["peptide", "recovery", "supplement"].includes(protocol.category)
   );
   const protocolById = new Map(
     executionBackedProtocols.map((protocol) => [protocol.id, protocol])
@@ -592,7 +697,7 @@ function getExecutionBackedProtocolItems({
     reminders
       .filter(
         (reminder) =>
-          reminder.type === "protocol_reminder" &&
+          isExecutionBackedReminder(reminder) &&
           reminder.active === false &&
           protocolById.has(reminder.linkedEntityId)
       )
@@ -602,7 +707,7 @@ function getExecutionBackedProtocolItems({
   reminders
     .filter(
       (reminder) =>
-        reminder.type === "protocol_reminder" &&
+        isExecutionBackedReminder(reminder) &&
         reminder.active &&
         protocolById.has(reminder.linkedEntityId)
     )
@@ -629,6 +734,7 @@ function getExecutionBackedProtocolItems({
       const protocol = protocolById.get(protocolId);
       const reminder = remindersByProtocol.get(protocolId)?.[0] ?? null;
       const match = findExecutionForProtocol(executionItems, protocolId);
+      if (match.executionItem?.reminderPreference === "none") return null;
       const projection = projectExecutionPriority({
         executionItem: match.executionItem,
         localDate: today,
@@ -671,6 +777,8 @@ function getExecutionBackedProtocolItems({
         projection.transitionEffectiveToday
       );
       const setupCopy = getExecutionSetupCopy(projection.operationalReason);
+      const recoverySupport = protocol.category === "recovery";
+      const supplementSupport = protocol.category === "supplement";
 
       return {
         id: projection.priorityId,
@@ -681,12 +789,23 @@ function getExecutionBackedProtocolItems({
             : projection.timeOfDayLabel,
         metadata: setupRequired
           ? setupCopy.metadata
-          : formatDoseAction(doseText, projection.timeOfDayLabel),
+          : doseText
+            ? formatDoseAction(doseText, projection.timeOfDayLabel)
+            : (() => {
+                const supportExecution = executionItems.find(
+                  (item) => item.id === projection.executionId
+                );
+                return formatExecutionSchedule({
+                  ...supportExecution?.preferredSchedule,
+                  cadence: supportExecution?.cadence?.type,
+                  interval: supportExecution?.cadence?.interval,
+                });
+              })(),
         href: setupRequired
           ? projection.executionHref
           : `/priorities/${projection.historyAnchorId}`,
-        icon: "syringe",
-        color: setupRequired ? "warning" : "effort",
+        icon: recoverySupport ? "activity" : supplementSupport ? "utensils" : "syringe",
+        color: setupRequired ? "warning" : recoverySupport ? "success" : "effort",
         completed: false,
         completable: projection.completable,
         completionId: projection.historyAnchorId,
@@ -703,15 +822,21 @@ function getExecutionBackedProtocolItems({
             }
           : null,
         state: state.name,
-        priority: state.priorityOffset + 22 + index,
+        priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,
         changeLabel: setupRequired
           ? setupCopy.label
           : transitionLabel,
-        actionLabel: setupRequired ? "Review Execution" : null,
+        actionLabel: setupRequired
+          ? recoverySupport || supplementSupport ? "Review Support" : "Review Execution"
+          : null,
         alwaysShowMetadata: true,
       };
     })
     .filter(Boolean);
+}
+
+function isExecutionBackedReminder(reminder) {
+  return ["protocol_reminder", "recovery_reminder", "supplement_reminder"].includes(reminder?.type);
 }
 
 function getExecutionSetupCopy(reason) {

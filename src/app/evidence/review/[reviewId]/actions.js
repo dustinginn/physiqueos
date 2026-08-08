@@ -13,6 +13,10 @@ import { createAnalysis } from "../../../../domain/models/analysis";
 import { createCanonicalPhotoSession } from "../../../../domain/models/photoSession";
 import { createPostConfirmationOrchestrator } from "../../../../domain/services/PostConfirmationOrchestrator";
 import { evaluateScheduledCompletion } from "../../../../domain/services/ScheduledCompletionService";
+import {
+  reconcileDexaAppointmentFromConfirmedEvidence,
+  reconcileHistoricalDexaExecutionFromConfirmedEvidence,
+} from "../../../../domain/services/DexaAppointmentLifecycleService";
 import { synthesizePhotoSessionObservations } from "../../../../domain/services/PhotoSessionService";
 import { createTrainingPerformanceIntelligenceReport } from "../../../../domain/services/TrainingPerformanceIntelligenceService";
 import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/PhotoInterpreterService";
@@ -21,6 +25,7 @@ import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterp
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
 import { createFounderDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
 import { createFounderPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
+import { filterEligibleEventBriefingTypes, resolveEventBriefingPreferencesFromStore } from "../../../../domain/services/CoachingUpdatesReadService";
 import {
   createPhotoInterpreterGoalContext,
   resolvePhotoEventContext,
@@ -293,20 +298,25 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           if (satisfaction.record) completionRecords.push(satisfaction.record.id);
           continue;
         }
-        const reminderId = { weight: "reminder_morning_weight", photo_session: "reminder_weekly_progress_photo_set", dexa: "reminder_dexa" }[result.evidenceType];
+        if (result.evidenceType === "dexa") {
+          const confirmation = {
+            repositories: FounderRepositories,
+            canonicalEvidenceId: result.canonicalEvidenceId,
+            confirmedAt: new Date().toISOString(),
+            evidenceDate: result.observedDate,
+          };
+          const current = await reconcileDexaAppointmentFromConfirmedEvidence(confirmation);
+          const reconciliation = current.matched
+            ? current
+            : await reconcileHistoricalDexaExecutionFromConfirmedEvidence(confirmation);
+          if (reconciliation.matched) completionRecords.push(reconciliation.completionId);
+          continue;
+        }
+        const reminderId = { weight: "reminder_morning_weight" }[result.evidenceType];
         if (!reminderId) continue;
         const completion = { id: `${reminderId}:${result.observedDate}:${result.canonicalEvidenceId}`, completedAt: `${result.observedDate}T12:00:00.000Z`, canonicalEvidenceId: result.canonicalEvidenceId, evidenceType: result.evidenceType, source: "PostConfirmationOrchestrator" };
         const record = await FounderRepositories.reminders.completeReminderFromEvidence(reminderId, completion);
         if (record) completionRecords.push(record.id);
-        else if (result.evidenceType === "dexa") {
-          const item = await FounderRepositories.executionItems.getExecutionItemById("execution_dexa");
-          if (item) {
-            const history = item.completionHistory ?? [];
-            const next = history.some((entry) => entry.id === completion.id) ? history : [...history, completion];
-            await FounderRepositories.executionItems.saveExecutionItem({ ...item, completedAt: completion.completedAt, completedByEvidenceId: completion.canonicalEvidenceId, completionHistory: next, updatedAt: new Date().toISOString() });
-            completionRecords.push(completion.id);
-          }
-        }
       }
       return { status: "completed", results, completionRecordIds: completionRecords };
     },
@@ -471,9 +481,11 @@ function createHandlers({ evidencePackage, reviewId, user }) {
     },
     briefing: async ({ results }) => {
       const eligible = results.event_eligibility?.eligible ?? [];
+      const eventPreferences = resolveEventBriefingPreferencesFromStore(getFounderRuntimeStore());
+      const briefable = filterEligibleEventBriefingTypes(eligible, eventPreferences);
       const artifacts = [];
       const photoSessionIds = [];
-      for (const type of eligible) {
+      for (const type of briefable) {
         const object = (evidencePackage.evidence_objects ?? []).find((item) => item.evidence_type === type || (type === "dexa" && ["dexa_scan", "body_composition"].includes(item.evidence_type)));
         const canonicalId = getStableCanonicalId(object, user.id);
         if (type === "photo_session") {
@@ -489,7 +501,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         if (!artifact?.artifactId && !artifact?.id) throw new Error("dexa_event_briefing_failed: DEXA Event briefing was not created.");
         artifacts.push(artifact.artifactId ?? artifact.id);
       }
-      return { status: "completed", artifactIds: artifacts, photoSessionIds, freshness: eligible.length ? "event_generated" : "scheduled_preserved" };
+      return { status: "completed", artifactIds: artifacts, photoSessionIds, freshness: briefable.length ? "event_generated" : "scheduled_preserved" };
     },
     home_refresh: async ({ results }) => {
       return {

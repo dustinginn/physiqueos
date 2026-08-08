@@ -1,4 +1,9 @@
 export const NUTRITION_DAY_SCHEMA_VERSION = "nutrition-day-v1";
+export const NutritionDailyTotalsScope = Object.freeze({
+  FULL_DAY_SUMMARY: "full_day_summary",
+  PARTIAL_MEAL_SUBTOTAL: "partial_meal_subtotal",
+  UNKNOWN: "unknown",
+});
 export const NUTRITION_RECONCILIATION_TOLERANCE = {
   calories: 25,
   protein_g: 2,
@@ -76,6 +81,11 @@ export function createNutritionDayEvidenceObject({
       date,
       source: source.application ?? source.modality ?? "manual",
       completeness: metadata.completeness ?? "partial",
+      daily_totals_scope: normalizeDailyTotalsScope(
+        metadata.daily_totals_scope
+      ),
+      daily_totals_source_artifact_refs:
+        metadata.daily_totals_source_artifact_refs ?? [],
       meal_count: metadata.meal_count ?? meals.length,
       food_count: metadata.food_count ?? countFoods(meals),
       goal_set: metadata.goal_set ?? hasNutritionGoals({ goalStatus, targets }),
@@ -507,4 +517,10 @@ function withoutEmptyValues(object) {
       ([, value]) => value !== null && value !== undefined && value !== ""
     )
   );
+}
+
+function normalizeDailyTotalsScope(value) {
+  return Object.values(NutritionDailyTotalsScope).includes(value)
+    ? value
+    : NutritionDailyTotalsScope.UNKNOWN;
 }

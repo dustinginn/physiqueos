@@ -25,6 +25,8 @@ export const CoachingUpdatesTransactionOutcome = Object.freeze({
   INVALID_GOAL_POLICY: "invalid_goal_policy",
   INVALID_MIDWEEK_SCHEDULE: "invalid_midweek_schedule",
   INVALID_WEEKLY_SCHEDULE: "invalid_weekly_schedule",
+  INVALID_MONTHLY_SCHEDULE: "invalid_monthly_schedule",
+  INVALID_EVENT_BRIEFING_PREFERENCE: "invalid_event_briefing_preference",
   DAILY_NOT_PERMITTED: "daily_not_permitted",
   NO_ROUTINE_SURFACE: "no_routine_surface",
   INVALID_NOTIFICATION_PREFERENCE: "invalid_notification_preference",
@@ -54,21 +56,9 @@ export function createCoachingUpdatesTransactionService({
       const transaction = unit.begin();
       try {
         const staged = await transaction.mutate((store) => {
-          const prepared = prepareTransaction(store, command, now());
+          const prepared = prepareCoachingUpdatesTransaction(store, command, now());
           if (!prepared.ok) throw new TransactionFailure(prepared.outcome, prepared.reason);
-          applyPreparedActiveProtocolSuccessor(store, prepared.successor);
-          try {
-            faults.schedulerApplication?.(store, prepared);
-          } catch {
-            throw new TransactionFailure(CoachingUpdatesTransactionOutcome.SCHEDULER_APPLICATION_FAILURE, "Future schedule application failed.");
-          }
-          verifySchedulerApplication(store, prepared.successor.successor.id);
-          try {
-            faults.homeResolution?.(store, prepared);
-          } catch {
-            throw new TransactionFailure(CoachingUpdatesTransactionOutcome.HOME_RESOLUTION_FAILURE, "Home cadence resolution failed.");
-          }
-          verifyHomeResolution(store, prepared);
+          applyPreparedCoachingUpdatesTransaction(store, prepared, faults);
           return {
             protocolId: prepared.protocol.id,
             previousVersionId: prepared.successor.current.id,
@@ -104,7 +94,7 @@ export function createCoachingUpdatesTransactionService({
   };
 }
 
-function prepareTransaction(store, command, timestamp) {
+export function prepareCoachingUpdatesTransaction(store, command, timestamp) {
   const protocol = store.protocols?.find((item) => item.id === command.protocolId);
   if (!protocol || (protocol.protocolType ?? protocol.category) !== "briefings") {
     return rejected(CoachingUpdatesTransactionOutcome.PROTOCOL_NOT_FOUND, "Coaching Updates protocol was not found.");
@@ -161,13 +151,35 @@ function prepareTransaction(store, command, timestamp) {
   return { ok: true, protocol, goal, configuration, successor };
 }
 
+export function applyPreparedCoachingUpdatesTransaction(store, prepared, faults = {}) {
+  applyPreparedActiveProtocolSuccessor(store, prepared.successor);
+  try {
+    faults.schedulerApplication?.(store, prepared);
+  } catch {
+    throw new TransactionFailure(CoachingUpdatesTransactionOutcome.SCHEDULER_APPLICATION_FAILURE, "Future schedule application failed.");
+  }
+  verifySchedulerApplication(store, prepared.successor.successor.id);
+  try {
+    faults.homeResolution?.(store, prepared);
+  } catch {
+    throw new TransactionFailure(CoachingUpdatesTransactionOutcome.HOME_RESOLUTION_FAILURE, "Home cadence resolution failed.");
+  }
+  verifyHomeResolution(store, prepared);
+}
+
+export function verifyPreparedCoachingUpdatesTransaction(store, command, successorId) {
+  return verifyTransaction(store, command, successorId);
+}
+
 function canonicalConfiguration(command) {
   return {
     schemaVersion: COACHING_UPDATES_SCHEMA_VERSION,
     timeZone: command.timeZone,
     midweek: structuredClone(command.midweek),
     weekly: structuredClone(command.weekly),
-    daily: structuredClone(command.daily),
+    monthly: structuredClone(command.monthly ?? { enabled: true, dayOfMonth: 1, localTime: "00:00" }),
+    daily: structuredClone(command.daily ?? { enabled: false }),
+    eventBriefings: structuredClone(command.eventBriefings ?? { photo: true, dexa: true }),
     notificationPreference: command.notificationPreference,
     scheduleApplication: { status: "active", appliesTo: "future_eligible_runs" },
   };
@@ -193,7 +205,6 @@ function verifyTransaction(store, command, successorId) {
     verifyActiveProtocolSuccessorState(store, command.protocolId, successorId) &&
     model &&
     sameConfiguration(model, canonicalConfiguration(command)) &&
-    model.eventBriefings.photo && model.eventBriefings.dexa &&
     schedulerCanResolve(model),
   );
 }
@@ -224,7 +235,9 @@ function sameConfiguration(left, right) {
     timeZone: value?.timeZone,
     midweek: value?.midweek,
     weekly: value?.weekly,
-    daily: value?.daily,
+    monthly: value?.monthly ?? { enabled: true, dayOfMonth: 1, localTime: "00:00" },
+    daily: value?.daily ?? { enabled: false },
+    eventBriefings: value?.eventBriefings ?? { photo: true, dexa: true },
     notificationPreference: value?.notificationPreference,
     scheduleApplication: value?.scheduleApplication,
   });

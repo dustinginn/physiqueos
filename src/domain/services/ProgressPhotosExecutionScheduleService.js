@@ -77,9 +77,7 @@ export function createProgressPhotosExecutionScheduleService({
               currentPreparation.reason ?? currentPreparation.outcome,
             );
           }
-          applyPreparedActiveProtocolSuccessor(store, currentPreparation.successorTransition);
-          reconcileProjection(store, currentPreparation);
-          reconcileReminder(store, currentPreparation);
+          applyPreparedProgressPhotosScheduleSuccessor(store, currentPreparation);
         });
         const committed = await transaction.commit({
           validateFinalized(candidate) {
@@ -143,6 +141,7 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
       },
       recurrence,
       recurrenceIdentity: createProtocolRecurrenceIdentity(recurrence),
+      reminderEnabled: reminder?.active !== false,
       scheduleSummary: formatProtocolRecurrenceSummary(recurrence),
       nextOccurrenceSummary: formatNextProtocolOccurrence(nextOccurrence),
       intervalTwoNextDueAt: intervalTwoNextOccurrence?.scheduledLocalDate ?? null,
@@ -169,6 +168,43 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
       expectedFileHash: baseline?.fileHash ?? null,
     },
   });
+}
+
+export function prepareProgressPhotosReminderEnablement(store, command = {}) {
+  const reminder = store.reminders?.find((item) => item.id === PROGRESS_PHOTOS_REMINDER_ID);
+  if (!reminder) {
+    return rejected("not_found", "The Progress Photos reminder is unavailable.");
+  }
+  if (typeof command.enabled !== "boolean") {
+    return rejected("invalid", "Choose whether Progress Photos reminders are enabled.");
+  }
+  if ((reminder.active !== false) === command.enabled) {
+    return Object.freeze({
+      ok: true,
+      outcome: "unchanged",
+      changed: false,
+      enabled: command.enabled,
+      reminderId: reminder.id,
+    });
+  }
+  return Object.freeze({
+    ok: true,
+    outcome: "ready",
+    changed: true,
+    enabled: command.enabled,
+    reminderId: reminder.id,
+  });
+}
+
+export function applyPreparedProgressPhotosReminderEnablement(store, prepared) {
+  const reminder = store.reminders?.find((item) => item.id === prepared.reminderId);
+  if (!reminder) throw new Error("The Progress Photos reminder is unavailable.");
+  reminder.active = prepared.enabled;
+}
+
+export function verifyPreparedProgressPhotosReminderEnablement(store, prepared) {
+  const reminder = store.reminders?.find((item) => item.id === prepared.reminderId);
+  return reminder?.active === prepared.enabled;
 }
 
 export function readProgressPhotosPersistedBaseline(runtimeStorePath) {
@@ -293,6 +329,16 @@ function reconcileProjection(store, prepared) {
   };
   item.protocolRootId = prepared.protocolId;
   item.protocolVersionId = prepared.successorVersionId;
+}
+
+export function applyPreparedProgressPhotosScheduleSuccessor(store, prepared) {
+  applyPreparedActiveProtocolSuccessor(store, prepared.successorTransition);
+  reconcileProjection(store, prepared);
+  reconcileReminder(store, prepared);
+}
+
+export function verifyPreparedProgressPhotosScheduleSuccessor(store, prepared) {
+  return verifyCandidate(store, prepared);
 }
 function reconcileReminder(store, prepared) {
   const reminder = store.reminders.find((entry) => entry.id === prepared.reminderId);

@@ -64,7 +64,11 @@ export function supportScheduleToReminder(value, timingContext = "") {
 export function hydrateSupportSchedule(executionItem, protocol) {
   const cadence = executionItem?.cadence ?? {};
   const preferred = executionItem?.preferredSchedule ?? {};
-  const frequency = cadence.type === "specific_weekdays" ? "specific_days" : cadence.type;
+  const frequency = cadence.type === "specific_weekdays"
+    ? "specific_days"
+    : cadence.type === "every_other_day"
+      ? "every_x_days"
+      : cadence.type;
   const daysOfWeek = preferred.daysOfWeek ?? protocol?.schedule?.daysOfWeek ?? [];
   return normalizeSupportSchedule({
     frequency: daysOfWeek.length > 1
@@ -73,9 +77,11 @@ export function hydrateSupportSchedule(executionItem, protocol) {
         ? frequency
         : "weekly",
     daysOfWeek,
-    intervalDays: cadence.interval ?? preferred.intervalDays ?? 1,
+    intervalDays: cadence.type === "every_other_day"
+      ? 2
+      : cadence.interval ?? preferred.intervalDays ?? 1,
     timeOfDay: preferred.timeOfDay ?? protocol?.schedule?.timeOfDay,
-    startDate: preferred.startDate ?? protocol?.startDate ?? "",
+    startDate: preferred.startDate ?? preferred.anchorDate ?? protocol?.startDate ?? dateOnly(protocol?.activatedAt),
     endDate: preferred.endDate ?? protocol?.endDate ?? null,
   });
 }
@@ -96,7 +102,9 @@ export function formatSupportSchedulePreview(value) {
   const schedule = normalizeSupportSchedule(value);
   let frequency;
   if (schedule.frequency === "daily") frequency = "Daily";
-  else if (schedule.frequency === "every_x_days") frequency = `Every ${schedule.intervalDays} ${schedule.intervalDays === 1 ? "day" : "days"}`;
+  else if (schedule.frequency === "every_x_days") frequency = schedule.intervalDays === 2
+    ? "Every other day"
+    : `Every ${schedule.intervalDays} ${schedule.intervalDays === 1 ? "day" : "days"}`;
   else {
     const days = schedule.daysOfWeek.map((day) => DAY_LABELS[day]);
     frequency = schedule.daysOfWeek.join(",") === "sunday,monday,tuesday,wednesday,thursday"
@@ -106,13 +114,34 @@ export function formatSupportSchedulePreview(value) {
   const time = formatTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
   const start = schedule.startDate ? `starting ${formatDate(schedule.startDate)}` : "start date needed";
   const end = schedule.endDate ? `ending ${formatDate(schedule.endDate)}` : "until changed";
-  return `${frequency} ${time ? `at ${time}` : ""}, ${start}, ${end}.`.replace(/\s+/g, " ");
+  const timingPhrase = schedule.timing === "specific"
+    ? time ? `at ${time}` : ""
+    : time ? `in the ${time.toLowerCase()}` : "";
+  return `${frequency} ${timingPhrase}, ${start}, ${end}.`.replace(/\s+/g, " ");
+}
+
+export function formatSupportScheduleSummary(value) {
+  const schedule = normalizeSupportSchedule(value);
+  let frequency;
+  if (schedule.frequency === "daily") frequency = "Daily";
+  else if (schedule.frequency === "every_x_days") frequency = schedule.intervalDays === 2
+    ? "Every other day"
+    : `Every ${schedule.intervalDays} ${schedule.intervalDays === 1 ? "day" : "days"}`;
+  else {
+    const days = schedule.daysOfWeek.map((day) => DAY_LABELS[day]);
+    frequency = schedule.daysOfWeek.join(",") === "sunday,monday,tuesday,wednesday,thursday"
+      ? "Sun–Thu"
+      : days.length === 1 ? `${days[0]}s` : joinNatural(days);
+  }
+  const time = formatTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
+  return [frequency, time].filter(Boolean).join(" · ");
 }
 
 function normalizeDaypart(value) {
   if (value === "before_bed" || value === "night") return "evening";
   return ["morning", "afternoon", "evening"].includes(value) ? value : "evening";
 }
+function dateOnly(value) { return /^\d{4}-\d{2}-\d{2}/.test(value ?? "") ? String(value).slice(0, 10) : ""; }
 function positiveInteger(value, fallback) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback; }
 function isDateOnly(value) { return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "") && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)); }
 function formatDate(value) { return new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); }

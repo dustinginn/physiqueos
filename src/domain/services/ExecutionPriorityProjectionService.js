@@ -25,8 +25,8 @@ export const ExecutionPriorityOperationalReason = Object.freeze({
 export function findExecutionForProtocol(executionItems = [], protocolId) {
   const matches = executionItems.filter(
     (item) =>
-      item?.protocolRootId === protocolId &&
-      ["peptide", "supplement"].includes(item.type)
+      [item?.protocolRootId, item?.linkedProtocolId].includes(protocolId) &&
+      ["peptide", "recovery", "supplement"].includes(item.type)
   );
 
   return {
@@ -222,7 +222,9 @@ export function formatExecutionSchedule(schedule) {
   const days = schedule.cadence === "daily" || schedule.type === "daily"
     ? "Daily"
     : schedule.cadence === "every_x_days" || schedule.type === "every_x_days"
-      ? `Every ${schedule.interval ?? schedule.intervalDays ?? 1} days`
+      ? Number(schedule.interval ?? schedule.intervalDays ?? 1) === 2
+        ? "Every other day"
+        : `Every ${schedule.interval ?? schedule.intervalDays ?? 1} days`
       : formatDays(schedule.daysOfWeek);
   const exactTime = formatExactTime(schedule.timeOfDay);
 

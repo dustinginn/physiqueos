@@ -12,6 +12,17 @@ import {
   getLocalDateKey,
   resolveLocalTimeZone,
 } from "../utils/localDate";
+import {
+  createDexaPriorityId,
+  DexaPriorityStage,
+  isCurrentScheduledDexaAppointment,
+  parseDexaPriorityId,
+} from "./DexaAppointmentLifecycleService";
+import { formatSupportSchedulePreview } from "../models/SupportScheduleModel";
+import {
+  MORNING_WEIGH_IN_REMINDER_ID,
+  resolveMorningWeighInSupport,
+} from "./TrackingSupportService";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -42,13 +53,40 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
         ]);
 
-      if (reminder?.type === "protocol_reminder") {
+      const dexaPriority = parseDexaPriorityId(priorityId);
+      if (dexaPriority) {
+        const appointment = executionItems.find((item) => item.id === "execution_next_dexa");
+        if (isCurrentScheduledDexaAppointment(appointment) &&
+            appointment.preferredSchedule?.date === dexaPriority.scheduledDate) {
+          return createDexaAppointmentPriorityDetail({
+            appointment,
+            goals,
+            operatingPlan,
+            stage: dexaPriority.stage,
+          });
+        }
+        return null;
+      }
+
+      if (reminder?.id === MORNING_WEIGH_IN_REMINDER_ID) {
+        const support = resolveMorningWeighInSupport({
+          executionItems,
+          protocols,
+          reminders: [reminder],
+          userId: resolvedUserId,
+        });
+        return support
+          ? createMorningWeighInPriorityDetail({ goals, operatingPlan, support })
+          : null;
+      }
+
+      if (["protocol_reminder", "recovery_reminder", "supplement_reminder"].includes(reminder?.type)) {
         const protocol = protocols.find(
           (item) => item.id === reminder.linkedEntityId
         );
         if (
           protocol &&
-          ["peptide", "supplement"].includes(protocol.category)
+          ["peptide", "recovery", "supplement"].includes(protocol.category)
         ) {
           const match = findExecutionForProtocol(
             executionItems,
@@ -67,13 +105,29 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             timeZone,
           });
 
-          return createExecutionPriorityDetail({
-            executionItem: match.executionItem,
-            goals,
-            operatingPlan,
-            projection,
-            protocol,
-          });
+          return protocol.category === "recovery"
+            ? createNonDosingSupportPriorityDetail({
+                executionItem: match.executionItem,
+                goals,
+                operatingPlan,
+                projection,
+                protocol,
+              })
+            : protocol.category === "supplement"
+              ? createSupplementSupportPriorityDetail({
+                  executionItem: match.executionItem,
+                  goals,
+                  operatingPlan,
+                  projection,
+                  protocol,
+                })
+              : createExecutionPriorityDetail({
+                  executionItem: match.executionItem,
+                  goals,
+                  operatingPlan,
+                  projection,
+                  protocol,
+                });
         }
 
         return createLegacyReminderOnlyProtocolPriorityDetail({
@@ -88,6 +142,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
 
       if (reminder?.linkedEvidenceType === "progress_photo") {
         return createProgressPhotoPriorityDetail({
+          executionItem: executionItems.find((item) => item.id === "execution_progress_photos"),
           reminder,
           goals,
           operatingPlan,
@@ -202,15 +257,7 @@ function createExecutionPriorityDetail({
         title: "Preparation",
         items: getExecutionPreparationItems(executionItem),
       },
-      ...(executionItem?.notes
-        ? [{
-            title: "Execution Notes",
-            items: [{
-              label: "Saved Support note",
-              detail: executionItem.notes,
-            }],
-          }]
-        : []),
+      ...getExecutionNotesSections(executionItem),
       {
         title: "Why it matters",
         items: [
@@ -251,6 +298,245 @@ function createExecutionPriorityDetail({
             },
           ]
         : []),
+    ],
+  };
+}
+
+function createNonDosingSupportPriorityDetail({
+  executionItem,
+  goals,
+  operatingPlan,
+  projection,
+  protocol,
+}) {
+  if (!protocol || !projection) return null;
+  const actionable =
+    projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
+  const setupRequired = [
+    ExecutionPriorityOperationalState.MISSING_EXECUTION,
+    ExecutionPriorityOperationalState.SETUP_REQUIRED,
+  ].includes(projection.operationalState);
+
+  return {
+    id: projection.priorityId,
+    title: projection.title,
+    eyebrow: "Priority Detail",
+    subtitle: projection.timeOfDayLabel,
+    status: actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    completable: actionable && projection.completable,
+    completionContext:
+      actionable && projection.completable
+        ? {
+            occurrenceDate: projection.localDate,
+            dose: null,
+            protocolId: projection.protocolRootId,
+          }
+        : null,
+    action: {
+      label: setupRequired ? "Review Support" : "View Support",
+      href: projection.executionHref,
+    },
+    executionProjection: projection,
+    provenance: projection.provenance,
+    sections: [
+      {
+        title: "What",
+        items: [{
+          label: actionable ? projection.title : "Support setup required",
+          detail: actionable
+            ? "Complete the scheduled recovery support."
+            : "Review the saved Support schedule before recording completion.",
+        }],
+      },
+      {
+        title: "When",
+        items: [{
+          label: formatExecutionSchedule({
+            ...executionItem?.preferredSchedule,
+            cadence: executionItem?.cadence?.type,
+          }),
+          detail: "Timing comes from the saved Support schedule.",
+        }],
+      },
+      ...getExecutionNotesSections(executionItem),
+      {
+        title: "Why it matters",
+        items: [{
+          label: "Supports the current recovery strategy",
+          detail:
+            protocol.purpose ??
+            "This recovery method supports training readiness and consistency.",
+        }],
+      },
+      {
+        title: "Related Goals",
+        items: getRelatedGoalItems({ protocol, goals, operatingPlan }),
+      },
+      ...(actionable
+        ? [{
+            title: "Completion",
+            items: [{
+              label: "Mark Complete",
+              detail: "Completion remains recorded against the existing reminder history.",
+            }],
+          }]
+        : []),
+    ],
+  };
+}
+
+function createSupplementSupportPriorityDetail({
+  executionItem,
+  goals,
+  operatingPlan,
+  projection,
+  protocol,
+}) {
+  if (!protocol || !projection) return null;
+  const actionable =
+    projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
+  const setupRequired = [
+    ExecutionPriorityOperationalState.MISSING_EXECUTION,
+    ExecutionPriorityOperationalState.SETUP_REQUIRED,
+  ].includes(projection.operationalState);
+  const dose = formatExecutionDose({
+    amount: projection.currentDose,
+    unit: projection.doseUnit,
+  });
+
+  return {
+    id: projection.priorityId,
+    title: projection.title,
+    eyebrow: "Priority Detail",
+    subtitle: projection.timeOfDayLabel,
+    status: actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    completable: actionable && projection.completable,
+    completionContext:
+      actionable && projection.completable
+        ? {
+            occurrenceDate: projection.localDate,
+            dose,
+            protocolId: projection.protocolRootId,
+          }
+        : null,
+    action: {
+      label: setupRequired ? "Review Support" : "View Support",
+      href: projection.executionHref,
+    },
+    executionProjection: projection,
+    provenance: projection.provenance,
+    sections: [
+      {
+        title: "What",
+        items: [{
+          label: actionable ? projection.title : "Support setup required",
+          detail: actionable
+            ? "Complete the scheduled supplement support."
+            : "Review the saved Support schedule before recording completion.",
+        }],
+      },
+      {
+        title: "When",
+        items: [{
+          label: formatExecutionSchedule({
+            ...executionItem?.preferredSchedule,
+            cadence: executionItem?.cadence?.type,
+            interval: executionItem?.cadence?.interval,
+          }),
+          detail: "Timing comes from the saved Support schedule.",
+        }],
+      },
+      {
+        title: "Dose / Quantity",
+        items: [{
+          label: dose ?? "Not specified",
+          detail: dose
+            ? "Uses the quantity saved with this Support method."
+            : "No quantity is currently configured.",
+        }],
+      },
+      ...getExecutionNotesSections(executionItem),
+      {
+        title: "Why it matters",
+        items: [{
+          label: "Supports the current supplement strategy",
+          detail:
+            protocol.purpose ??
+            "This supplement supports the current strategy.",
+        }],
+      },
+      {
+        title: "Related Goals",
+        items: getRelatedGoalItems({ protocol, goals, operatingPlan }),
+      },
+      ...(actionable
+        ? [{
+            title: "Completion",
+            items: [{
+              label: "Mark Complete",
+              detail: "Completion is recorded against the canonical Support reminder.",
+            }],
+          }]
+        : []),
+    ],
+  };
+}
+
+function getExecutionNotesSections(executionItem) {
+  return executionItem?.notes
+    ? [{
+        title: "Execution Notes",
+        items: [{
+          label: "Saved Support note",
+          detail: executionItem.notes,
+        }],
+      }]
+    : [];
+}
+
+function createMorningWeighInPriorityDetail({ goals, operatingPlan, support }) {
+  return {
+    id: support.reminder.id,
+    title: "Morning Weigh-In",
+    eyebrow: "Priority Detail",
+    subtitle: support.supportSummary,
+    status: support.reminder.active ? "Open" : "Reminder off",
+    completable: false,
+    action: { label: "Log Weight", href: "/check-in/morning" },
+    sections: [
+      {
+        title: "What",
+        items: [{
+          label: "Record your weight",
+          detail: "A valid weight recorded for today satisfies this routine automatically.",
+        }],
+      },
+      {
+        title: "When",
+        items: [{
+          label: formatSupportSchedulePreview(support.supportSchedule),
+          detail: "Timing comes from the saved Support schedule.",
+        }],
+      },
+      ...getExecutionNotesSections(support.executionItem),
+      {
+        title: "Why it matters",
+        items: [{
+          label: "Track the body-weight trend",
+          detail: "This evidence helps PI evaluate progress and energy strategy against the current goal.",
+        }],
+      },
+      {
+        title: "Related Goals",
+        items: getRelatedGoalItems({ protocol: support.protocol, goals, operatingPlan }),
+      },
+      {
+        title: "Completion",
+        items: [{
+          label: "Evidence-driven",
+          detail: "No separate completion is needed after today's valid weight is recorded.",
+        }],
+      },
     ],
   };
 }
@@ -364,12 +650,12 @@ function createLegacyReminderOnlyProtocolPriorityDetail({
   };
 }
 
-function createProgressPhotoPriorityDetail({ reminder, goals, operatingPlan }) {
+function createProgressPhotoPriorityDetail({ executionItem, reminder, goals, operatingPlan }) {
   return {
     id: reminder.id,
     title: reminder.title,
     eyebrow: "Priority Detail",
-    subtitle: "Morning evidence",
+    subtitle: formatProgressPhotoScheduleSubtitle(reminder.schedule),
     status: "Open",
     completable: false,
     action: {
@@ -382,7 +668,7 @@ function createProgressPhotoPriorityDetail({ reminder, goals, operatingPlan }) {
         items: [
           {
             label: reminder.title,
-            detail: `Capture ${formatExpectedViews(reminder.expectedViews)} under standard conditions.`,
+            detail: `Upload ${formatExpectedViews(reminder.expectedViews)} to complete today's check-in.`,
           },
         ],
       },
@@ -391,20 +677,11 @@ function createProgressPhotoPriorityDetail({ reminder, goals, operatingPlan }) {
         items: [
           {
             label: formatSchedule(reminder.schedule),
-            detail: "Use the founder default photo conditions for consistent comparisons.",
+            detail: "This occurrence follows your saved Progress Photos schedule.",
           },
         ],
       },
-      {
-        title: "How",
-        items: [
-          {
-            label: "Standard conditions",
-            detail:
-              "Morning, fasted, same lighting, same mirror, no pump, and not post-workout.",
-          },
-        ],
-      },
+      ...getExecutionNotesSections(executionItem),
       {
         title: "Why it matters",
         items: [
@@ -425,12 +702,115 @@ function createProgressPhotoPriorityDetail({ reminder, goals, operatingPlan }) {
           {
             label: "Upload photos",
             detail:
-              "Photo upload completion will be connected in the progress-photo workflow.",
+              "Confirmed photo evidence satisfies the matching scheduled occurrence.",
           },
         ],
       },
     ],
   };
+}
+
+function createDexaAppointmentPriorityDetail({ appointment, goals, operatingPlan, stage }) {
+  const upload = stage === DexaPriorityStage.UPLOAD_RESULTS;
+  const preparationNote = String(appointment.preparationNote ?? "").trim();
+  const date = formatDexaDate(appointment.preferredSchedule.date);
+  const time = formatTimeOfDay(appointment.preferredSchedule.timeOfDay);
+  const title = getDexaPriorityTitle(stage);
+
+  return {
+    id: createDexaPriorityId(appointment.preferredSchedule.date, stage),
+    title,
+    eyebrow: "Priority Detail",
+    subtitle: getDexaPrioritySubtitle(stage, time),
+    status: upload ? "Action needed" : "Upcoming",
+    completable: false,
+    action: {
+      label: upload ? "Upload DEXA Results" : "View DEXA Appointment",
+      href: upload ? "/evidence/dexa" : "/profile/operating-plan/execution/dexa",
+    },
+    sections: [
+      {
+        title: "What",
+        items: [{
+          label: title,
+          detail: upload
+            ? "The scheduled scan time has passed. Upload the results so the appointment can be reconciled with confirmed evidence."
+            : "Your DEXA appointment remains scheduled. This priority does not complete the scan itself.",
+        }],
+      },
+      {
+        title: "When",
+        items: [{
+          label: [date, time].filter(Boolean).join(" · "),
+          detail: `Timing uses ${appointment.timezone ?? "your local timezone"}.`,
+        }],
+      },
+      ...(!upload && preparationNote
+        ? [{
+            title: "Preparation",
+            items: [{ label: "Saved preparation note", detail: preparationNote }],
+          }]
+        : []),
+      {
+        title: "Why it matters",
+        items: [{
+          label: "Body-composition calibration",
+          detail: "Confirmed DEXA evidence updates the body-composition record supporting your current strategy.",
+        }],
+      },
+      {
+        title: upload ? "Completion" : "Appointment completion",
+        items: [{
+          label: upload ? "Upload confirmed results" : "Evidence completes this appointment",
+          detail: "Matching confirmed DEXA evidence completes the scheduled appointment and suppresses its remaining priorities.",
+        }],
+      },
+      {
+        title: "Related Goals",
+        items: getRelatedGoalItems({ protocol: {
+          currentGoalIds: appointment.linkedGoalIds,
+          relatedGoalIds: appointment.linkedGoalIds,
+        }, goals, operatingPlan }),
+      },
+    ].filter((section) => section.items.length > 0),
+  };
+}
+
+function getDexaPriorityTitle(stage) {
+  if (stage === DexaPriorityStage.WEEK_BEFORE) return "DEXA in 1 week";
+  if (stage === DexaPriorityStage.DAY_BEFORE) return "DEXA tomorrow";
+  if (stage === DexaPriorityStage.MORNING_OF) return "DEXA this morning";
+  if (stage === DexaPriorityStage.APPOINTMENT) return "DEXA appointment";
+  return "Upload DEXA results";
+}
+
+function getDexaPrioritySubtitle(stage, time) {
+  if (stage === DexaPriorityStage.WEEK_BEFORE) return "Upcoming appointment";
+  if (stage === DexaPriorityStage.DAY_BEFORE) return time ? `Tomorrow at ${time}` : "Tomorrow";
+  if (stage === DexaPriorityStage.MORNING_OF) return time ? `Today at ${time}` : "This morning";
+  if (stage === DexaPriorityStage.APPOINTMENT) return time ? `Today at ${time}` : "Today";
+  return "Results are ready to upload";
+}
+
+function formatDexaDate(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatProgressPhotoScheduleSubtitle(schedule = {}) {
+  const timeOfDay = String(schedule.timeOfDay ?? "").toLowerCase();
+  if (["morning", "afternoon", "evening"].includes(timeOfDay)) {
+    return `Scheduled for this ${timeOfDay}.`;
+  }
+  if (timeOfDay === "night") return "Scheduled for tonight.";
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(timeOfDay)) {
+    return `Scheduled for ${formatTimeOfDay(timeOfDay)}.`;
+  }
+  return "Scheduled for today.";
 }
 
 function createReminderPriorityDetail({ reminder, goals, operatingPlan }) {

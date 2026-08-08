@@ -29,7 +29,7 @@ const strategyStatements = [
 ].map((id) => ({ active: true, id, title: id }));
 
 describe("Operating Plan execution presentation", () => {
-  it("shows only concrete recurring actions", () => {
+  it("does not expose concrete recurring actions as a standalone navigation section", () => {
     const sections = buildOperatingPlan({
       energyStrategy: null,
       executionItems: [...recurringItems, ...strategyStatements],
@@ -37,16 +37,8 @@ describe("Operating Plan execution presentation", () => {
       protocols: peptideProtocols,
       trainingProtocol: null,
     });
-    const execution = sections.find((section) => section.title === "Execution");
-    expect(execution.subtitle).toBe("5 recurring commitments");
-    expect(execution.items.map((item) => item.id)).toEqual([
-      "execution_foam_roll",
-      "execution_morning_weigh_in",
-      "execution_progress_photos",
-      "execution_retatrutide",
-      "execution_tesamorelin",
-    ]);
-    expect(execution.items.some((item) => item.id === "execution_dexa")).toBe(false);
+    expect(sections.some((section) => section.title === "Execution")).toBe(false);
+    expect(JSON.stringify(sections)).not.toContain("recurring commitments");
   });
 
   it("classifies strategy, review, and coaching statements without altering source records", () => {
@@ -89,7 +81,7 @@ describe("Operating Plan execution presentation", () => {
     expect(formatExecutionSchedule({ cadence: { type: "scheduled_date" }, preferredSchedule: {} })).toBe("Not scheduled");
   });
 
-  it("renders Execution first and all strategy sections in the required order", () => {
+  it("renders the final V2 destinations in the required order", () => {
     const protocols=[
       {id:"briefings",category:"briefings",status:"active"},
       ...peptideProtocols,
@@ -97,12 +89,11 @@ describe("Operating Plan execution presentation", () => {
       {id:"supplement",name:"Supplement",category:"supplement",status:"active"},
     ];
     const sections=buildOperatingPlan({energyStrategy:null,executionItems:[recurringItems[0]],nutritionContext:null,protocols,trainingProtocol:null});
-    expect(sections.map((section)=>section.title)).toEqual(["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"]);
+    expect(sections.map((section)=>section.title)).toEqual(["Energy Strategy","Nutrition","Training","Recovery","Peptides","Supplements","Tracking","Coaching Updates"]);
     const peptides=sections.find((section)=>section.title==="Peptides");
     expect(peptides.items.map((item)=>item.title)).toEqual(["Peptide Strategy"]);
     expect(peptides.items[0].detail).toBe("Retatrutide, Tesamorelin");
     expect(peptides.items.every((item)=>item.href.startsWith("/profile/protocols/")&&!item.href.includes("/execution/"))).toBe(true);
-    const execution=sections[0];
-    expect(execution.items.map((item)=>item.id)).toEqual(["execution_morning_weigh_in"]);
+    expect(sections.some((section)=>section.title==="Execution")).toBe(false);
   });
 });
