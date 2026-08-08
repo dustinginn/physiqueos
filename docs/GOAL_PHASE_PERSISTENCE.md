@@ -7,9 +7,9 @@ array can be persisted after removing authored phases. Both resolve through the
 read-only implicit compatibility path, while a non-empty explicit collection
 overrides it.
 
-Persisted phase objects contain only `id`, `goalId`, `name`, `purpose`, `status`,
-`order`, phase timing, criteria, guardrails, transition policy, and creation/update
-timestamps. The strict authored adapter rejects implicit flags, recommendation
+Persisted phase objects contain the legacy identity/timing fields and may
+additively contain canonical lifecycle/review/projection/completion/extension
+fields defined by Phase Review. The strict authored adapter rejects implicit flags, recommendation
 metadata, draft data, planning signals, source context, and every other unknown
 persistence field. IDs are explicit and never derived from editable labels.
 

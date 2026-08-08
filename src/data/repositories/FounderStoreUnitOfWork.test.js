@@ -298,7 +298,7 @@ describe("FounderStoreUnitOfWork", () => {
       persistenceErrorPropagation: true,
       scope: "founder_store_unit_of_work",
       repositoryParticipation: false,
-      crossProcessLocking: false,
+      crossProcessLocking: true,
     });
   });
 

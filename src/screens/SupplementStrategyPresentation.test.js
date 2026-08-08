@@ -15,16 +15,17 @@ describe("supplement strategy presentation", () => {
     const supplements = plan.find((section) => section.title === "Supplements");
     expect(supplements.supplements).toBe(true);
     expect(supplements.items).toEqual([expect.objectContaining({
-      title: "Creatine", detail: "Not configured", status: "Active",
+      title: "Supplement Strategy", detail: "Creatine", status: "Active",
     })]);
     expect(JSON.stringify(supplements)).not.toMatch(/5 g|daily|timing|reminder|priority|timeline/i);
   });
 
   it("keeps detail and editor copy free of execution fields", () => {
-    const detail = fs.readFileSync(path.join(process.cwd(), "src/screens/ProtocolDetailScreen.jsx"), "utf8");
+    const detail = fs.readFileSync(path.join(process.cwd(), "src/screens/StrategyDomainScreen.jsx"), "utf8");
     const editor = fs.readFileSync(path.join(process.cwd(), "src/screens/SupplementStrategyEditorScreen.jsx"), "utf8");
-    const strategySection = detail.slice(detail.indexOf("function StrategyProtocolDetail"), detail.indexOf("function ProtocolPurpose"));
-    expect(strategySection).not.toMatch(/Dose|Frequency|Timing|Reminder|Priority|Timeline/);
+    expect(detail).toContain("Current support summary");
+    expect(detail).toContain("Edit Support");
+    expect(detail).not.toMatch(/Reminder|Priority|Timeline/);
     expect(editor).not.toMatch(/name="(?:dose|units|frequency|timing|reminders|priority|notes)"/);
   });
 

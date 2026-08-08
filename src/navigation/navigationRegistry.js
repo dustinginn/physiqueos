@@ -1,3 +1,5 @@
+import { resolveCanonicalTrainingMuscleGroup } from "../domain/models/trainingMuscleGroupIdentity";
+
 const NAVIGATION_ENTRIES = [
   {
     breadcrumbLabel: "Evidence",
@@ -132,7 +134,7 @@ function getTrainingSegmentLabel(segment) {
     "lower-body": "Lower Body",
   };
 
-  return knownLabels[segment] ?? toTitle(segment);
+  return knownLabels[segment] ?? resolveCanonicalTrainingMuscleGroup(segment)?.label ?? toTitle(segment);
 }
 
 function normalizeRoute(route) {

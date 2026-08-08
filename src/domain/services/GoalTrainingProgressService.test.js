@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { composeGoalTrainingProgress, createGoalTrainingProgress, createTrainingProgressCheckpoint, resolveGoalTrainingReviewPeriod } from "./GoalTrainingProgressService";
 
-const phase={id:"phase-1",name:"Establish Maintenance",status:"active",startDate:"2026-07-20",timingMode:"fixed_duration",duration:{value:4,unit:"weeks"}};
+const phase={id:"phase-1",name:"Establish Maintenance",status:"active",startDate:"2026-07-19",startedAt:"2026-07-19",plannedReviewAt:"2026-08-15",timingMode:"completion_criteria",duration:null};
 const goal={id:"goal-build"};
-const period={start:"2026-07-20",end:"2026-08-16",reviewDate:"2026-08-17",comparisonMode:"phase_aligned_four_week_review"};
+const period={start:"2026-07-19",end:"2026-08-15",reviewDate:"2026-08-15",comparisonMode:"evidence_based_phase_review"};
 function observation({id="romanian_deadlift",name="Romanian Deadlift",group="Lower Body",status="improving",confidence="moderate",start="2026-07-20",end="2026-08-03",latest=11680,previous=10560,percent=10.6,prs=[],latestSets=4,previousSets=4}={}){return{exercise:{key:id,name,primaryNavigationCategory:group},status,confidence,evidence_date_range:{start,end},supporting_session_ids:[`${id}-1`,`${id}-2`],explanation_data:{last_session:{total_volume:latest,set_count:latestSets},previous_comparable_session:{total_volume:previous,set_count:previousSets},volume_trend:{latest,previous,percent_change:percent},pr_detection:{detected:prs.length>0,prs}}};}
 function result({observations=[],today="2026-07-30"}={}){return composeGoalTrainingProgress({goal,phase,period,today,report:{exerciseObservations:observations}})}
 
 describe("Goal Training Progress",()=>{
   it("aligns the first review to the phase boundary",()=>{expect(resolveGoalTrainingReviewPeriod({phase})).toEqual(period);});
-  it("derives future phase timing instead of hard-coding August",()=>{expect(resolveGoalTrainingReviewPeriod({phase:{...phase,id:"p2",startDate:"2026-09-01"}})).toMatchObject({start:"2026-09-01",end:"2026-09-28",reviewDate:"2026-09-29"});});
-  it("keeps timezone-safe date boundaries",()=>{const value=createGoalTrainingProgress({goal,phase,canonicalObjects:[],currentDate:new Date("2026-08-17T06:30:00Z"),timeZone:"America/Los_Angeles"});expect(value.readinessState).toBe("waiting_for_evidence");});
+  it("derives future phase timing instead of hard-coding August",()=>{expect(resolveGoalTrainingReviewPeriod({phase:{...phase,id:"p2",startDate:"2026-09-01",startedAt:"2026-09-01",plannedReviewAt:"2026-09-29"}})).toMatchObject({start:"2026-09-01",end:"2026-09-29",reviewDate:"2026-09-29"});});
+  it("keeps timezone-safe date boundaries",()=>{const value=createGoalTrainingProgress({goal,phase,canonicalObjects:[],currentDate:new Date("2026-08-17T06:30:00Z"),timeZone:"America/Los_Angeles"});expect(value.readinessState).toBe("limited");});
   it("waits with no repeated movement and does not conclude progress",()=>{expect(result()).toMatchObject({readinessState:"waiting_for_evidence",comparableMovementCount:0,checkpointEligibility:false});});
   it("forms with one defensible repeated priority movement before review",()=>{expect(result({observations:[observation()]})).toMatchObject({readinessState:"forming",comparableMovementCount:1});});
   it("becomes ready at the boundary with enough comparable priority movements",()=>{const value=result({today:"2026-08-17",observations:[observation(),observation({id:"cable_curl",name:"Cable Curl",group:"Arms",latest:4200,previous:4000,percent:5})]});expect(value).toMatchObject({readinessState:"ready",checkpointEligibility:true});expect(value.checkpoint.turningPoint).not.toBeNull();});

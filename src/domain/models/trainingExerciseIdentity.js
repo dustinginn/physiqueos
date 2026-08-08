@@ -1,5 +1,6 @@
 export const FOUNDER_ALPHA_TRAINING_EXERCISES = [
   exercise("bench_press", "Bench Press", ["bench press", "barbell bench press", "flat bench press", "chest press", "bench"], "barbell", "Chest", ["Chest", "Triceps", "Front Delts"], "Horizontal Press"),
+  exercise("chest_press_machine", "Chest Press Machine", ["chest press machine", "machine chest press"], "machine", "Chest", ["Chest"], "Horizontal Press", { secondaryMuscleGroups: ["Shoulders", "Triceps"] }),
   exercise("incline_bench_press", "Incline Bench Press", ["incline bench press", "incline bench", "barbell incline bench press", "barbell incline bench", "incline barbell bench press", "incline barbell press"], "barbell", "Chest", ["Upper Chest", "Triceps", "Front Delts"], "Incline Press"),
   exercise("incline_dumbbell_press", "Incline Dumbbell Press", ["incline dumbbell press", "dumbbell incline press", "incline dumbbell presses", "incline db press", "incline db presses"], "dumbbell", "Chest", ["Upper Chest", "Triceps", "Front Delts"], "Incline Press"),
   exercise("chest_fly_machine", "Chest Fly Machine", ["chest fly machine", "machine chest fly", "machine fly", "chest fly", "chest flies", "pec fly machine", "pec deck", "pec deck fly"], "machine", "Chest", ["Chest"], "Chest Fly"),
@@ -10,6 +11,7 @@ export const FOUNDER_ALPHA_TRAINING_EXERCISES = [
   exercise("lateral_raise_machine", "Lateral Raises Machine", ["lateral raise machine", "lateral raises machine", "machine lateral raise", "machine lateral raises"], "machine", "Shoulders", ["Side Delts"], "Lateral Raise"),
   exercise("lateral_raise", "Lateral Raise", ["lateral raise", "lateral raises", "side lateral raise", "side lateral raises", "dumbbell lateral raise", "dumbbell lateral raises", "cable lateral raise", "cable lateral raises"], null, "Shoulders", ["Side Delts"], "Lateral Raise"),
   exercise("cable_machine_front_raise", "Cable Machine Front Raises", ["cable machine front raise", "cable machine front raises"], "cable", "Shoulders", ["Front Delts"], "Front Raise"),
+  exercise("barbell_front_raises", "Barbell Front Raises", ["barbell front raise", "barbell front raises"], "barbell", "Shoulders", ["Front Delts"], "Front Raise"),
   exercise("dumbbell_front_raise", "Dumbbell Front Raise", ["dumbbell front raise", "dumbbell front raises", "db front raise", "db front raises"], "dumbbell", "Shoulders", ["Front Delts"], "Front Raise"),
   exercise("front_raise", "Front Raise", ["front raise", "front raises"], null, "Shoulders", ["Front Delts"], "Front Raise"),
   exercise("spider_curl", "Spider Curls", ["spider curl", "spider curls", "dumbbell spider curl", "dumbbell spider curls"], "dumbbell", "Arms", ["Biceps"], "Elbow Flexion"),
@@ -37,6 +39,7 @@ export const FOUNDER_ALPHA_TRAINING_EXERCISES = [
   exercise("seated_hip_abductions", "Seated Hip Abductions", ["seated hip abduction", "seated hip abductions", "hip abduction", "hip abductions", "hip abduction machine", "seated abduction", "seated abductions"], "hip_abduction_machine", "Quads", ["Quads", "Hip Abductors"], "Hip Abduction"),
   exercise("seated_hip_adductions", "Seated Hip Adductions", ["seated hip adduction", "seated hip adductions", "hip adduction", "hip adductions", "hip adduction machine", "seated adduction", "seated adductions"], "hip_adduction_machine", "Glutes", ["Glutes", "Adductors"], "Hip Adduction"),
   exercise("glute_squat", "Glute Squats", ["glute squat", "glute squats"], null, "Lower Body", ["Glutes", "Quads"], "Squat"),
+  exercise("hip_thrusts", "Hip Thrusts", ["hip thrust", "hip thrusts"], null, "Lower Body", ["Glutes"], "Hip Thrust", { secondaryMuscleGroups: ["Hamstrings"] }),
   exercise("squat", "Squat", ["squat", "squats", "barbell squat", "barbell squats"], "barbell", "Lower Body", ["Quads", "Glutes"], "Squat"),
   exercise("smith_machine_reverse_lunge", "Smith Machine Reverse Lunge", ["smith machine reverse lunge", "smith machine reverse lunges", "smith reverse lunge", "smith reverse lunges", "reverse lunge on the smith machine", "reverse lunges on the smith machine", "deficit smith machine reverse lunge", "deficit smith machine reverse lunges"], "smith_machine", "Lower Body", ["Quads", "Glutes", "Hamstrings"], "Reverse Lunge", { modifiers: ["deficit"] }),
   exercise("dumbbell_reverse_lunge", "Dumbbell Reverse Lunge", ["dumbbell reverse lunge", "dumbbell reverse lunges", "reverse dumbbell lunge", "reverse dumbbell lunges", "reverse lunge with dumbbells", "reverse lunges with dumbbells", "deficit dumbbell reverse lunge", "deficit dumbbell reverse lunges"], "dumbbell", "Lower Body", ["Quads", "Glutes", "Hamstrings"], "Reverse Lunge", { modifiers: ["deficit"] }),
@@ -58,7 +61,9 @@ const runtimeTrainingExercises = new Map();
 export function registerRuntimeTrainingExercises(exercises = []) {
   runtimeTrainingExercises.clear();
   exercises.forEach((candidate) => {
-    if (candidate?.id && candidate?.name) runtimeTrainingExercises.set(candidate.id, candidate);
+    if (candidate?.id && candidate?.name) {
+      runtimeTrainingExercises.set(candidate.id, normalizeRuntimeExercise(candidate));
+    }
   });
 }
 
@@ -180,14 +185,14 @@ function exercise(id, name, aliases, equipment, bodyRegion, primaryMuscleGroups,
     movement_pattern: movementPattern,
     name,
     primary_muscle_groups: primaryMuscleGroups,
-    secondary_muscle_groups: [],
+    secondary_muscle_groups: options.secondaryMuscleGroups ?? [],
   };
 }
 
 function findExerciseAliasMatch(normalizedPhrase, identities = listCanonicalTrainingExerciseIdentities()) {
   const matches = [];
   identities.forEach((candidate) => {
-    [candidate.name, ...candidate.aliases].forEach((alias) => {
+    [candidate.name, ...(candidate.aliases ?? [])].forEach((alias) => {
       const normalizedAlias = normalizeExercisePhrase(alias);
       if (normalizedPhrase === normalizedAlias) {
         matches.push({ alias, exercise: candidate, score: normalizedAlias.length });
@@ -255,8 +260,28 @@ export function normalizeExercisePhrase(value) {
     .replace(/[-_]/g, " ")
     .replace(/\bdb\b/g, "dumbbell")
     .replace(/\bez\b/g, "ez")
+    .replace(/\bpresses\b/g, "press")
+    .replace(/\bflies\b/g, "fly")
+    .replace(
+      /\b(thrust|curl|squat|lunge|row|raise|extension|abduction|adduction)s\b/g,
+      "$1"
+    )
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeRuntimeExercise(candidate) {
+  return {
+    ...candidate,
+    aliases: Array.isArray(candidate.aliases) ? candidate.aliases : [],
+    modifiers: Array.isArray(candidate.modifiers) ? candidate.modifiers : [],
+    primary_muscle_groups: Array.isArray(candidate.primary_muscle_groups)
+      ? candidate.primary_muscle_groups
+      : [],
+    secondary_muscle_groups: Array.isArray(candidate.secondary_muscle_groups)
+      ? candidate.secondary_muscle_groups
+      : [],
+  };
 }
 
 function slugify(value) {

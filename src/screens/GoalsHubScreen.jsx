@@ -19,8 +19,8 @@ import {
 } from "../domain/services/ProductionGoalTransitionEntryPointService";
 import { resolveGoalNavigationHref } from "../domain/services/GoalNavigationRouteResolver";
 import { composeCompletedGoalPreview } from "../domain/services/CompletedGoalPreviewService";
-import { resolveOverallGoalConfidenceReadModel } from "../domain/services/OverallGoalConfidenceReadService";
 import { resolveActiveGoalConfidencePresentation } from "../domain/services/ActiveGoalConfidencePresentationReadService";
+import { resolveCommittedPhaseContext } from "../domain/services/FounderPhaseCorrectionService";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -104,25 +104,10 @@ export async function getGoalsHub() {
     evaluations,
     activeGoal,
   });
-  const legacyConfidence = activeGoal?.type === "build_lean_mass"
-    ? resolveOverallGoalConfidenceReadModel({
-        activeGoal,
-        activeProtocols: protocols,
-        canonicalEvidence,
-        checkIns,
-        currentDate: new Date(),
-        dexaScans,
-        nutritionContext,
-        progressPhotos,
-        timeZone: user?.timeZone ?? "America/Los_Angeles",
-        trainingPerformance,
-      })
-    : null;
   const canonicalConfidence = activeGoal?.type === "build_lean_mass"
     ? resolveActiveGoalConfidencePresentation({
         activeGoal,
         store: getFounderRuntimeStore(),
-        legacyReadModel: legacyConfidence,
       })
     : null;
   const summaries = intelligence.goals.map((summary) => {
@@ -232,6 +217,11 @@ function GoalNavigationCardContent({ goal, primary, showChevron = true }) {
               {formatConfidence(goal.confidence)}
             </span>
           </p>
+          {goal.phase && (
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              {goal.phase.name} · {goal.phase.reviewState === "due" ? "Review due" : `Planned review ${formatDate(goal.phase.plannedReviewAt)}`}
+            </p>
+          )}
         </div>
         {showChevron && (
           <ChevronRight
@@ -300,6 +290,8 @@ export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfide
     lifecycleState: summary.lifecycleState,
     status: sourceGoal?.status,
   });
+  const phase = sourceGoal?.phases?.length
+    ? resolveCommittedPhaseContext(sourceGoal).activePhase : null;
 
   return {
     ...summary,
@@ -314,6 +306,14 @@ export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfide
       : null,
     goalType: sourceGoal?.type ?? sourceGoal?.goalType ?? null,
     navigation,
+    phase: phase ? {
+      id: phase.id,
+      name: phase.name,
+      status: phase.status,
+      startedAt: phase.startedAt,
+      plannedReviewAt: phase.plannedReviewAt,
+      reviewState: phase.effectiveReviewState ?? phase.reviewState,
+    } : null,
     statusLabel: normalizeJourneyState(
       summary.primary
         ? evaluation?.projection?.completionStageLabel ?? "On Track"
@@ -327,6 +327,12 @@ export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfide
 function formatConfidence(confidence) {
   if (!Number.isFinite(confidence?.value)) return "Confidence unavailable";
   return `${confidence.value}% confidence`;
+}
+
+function formatDate(value) {
+  if (!value) return "not scheduled";
+  return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" })
+    .format(new Date(`${value}T12:00:00Z`));
 }
 
 function getVisualIdentity(goal) {

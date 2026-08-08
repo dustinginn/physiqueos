@@ -1,89 +1,71 @@
-import { resolveOverallGoalConfidenceReadModel } from "./OverallGoalConfidenceReadService";
+import { ConfidencePublisherRegistry } from
+  "../confidence/ConfidencePublisherRegistry";
+import { resolveActiveGoalConfidencePresentation } from
+  "./ActiveGoalConfidencePresentationReadService";
+
+export const CONFIDENCE_NON_PUBLISHERS = Object.freeze([
+  "daily", "energy", "training", "nutrition", "activity", "weight",
+  "recovery", "raw_evidence_upload",
+]);
 
 export function diagnoseGoalConfidenceArchitecture(store, {
-  currentDate = new Date("2026-07-23T12:00:00Z"),
+  dailyBriefing = null,
+  homeConfidence = null,
 } = {}) {
   const activeGoal = (store.goals ?? []).find(
-    (goal) => goal.status === "active" && goal.type === "build_lean_mass"
-  );
-  if (!activeGoal) throw new Error("An active goal is required.");
-  const base = inputs(store, activeGoal, currentDate);
-  const current = resolveOverallGoalConfidenceReadModel(base);
-  const fixture = (overrides) => resolveOverallGoalConfidenceReadModel({
-    ...base,
-    activeProtocols: [],
-    canonicalEvidence: [],
-    checkIns: [],
-    dexaScans: [],
-    nutritionContext: null,
-    progressPhotos: [],
-    trainingPerformance: null,
-    ...overrides,
-  }).value;
+    (goal) => goal.primary && goal.status === "active"
+  ) ?? (store.goals ?? []).find((goal) => goal.status === "active") ?? null;
+  const canonical = resolveActiveGoalConfidencePresentation({
+    activeGoal,
+    store,
+  });
+  const daily = dailyOwnership({ canonical, dailyBriefing, homeConfidence });
 
   return Object.freeze({
-    canonical: current,
-    storage: {
-      persisted: false,
-      snapshotCount: 0,
-      causalDriverRecordCount: 0,
-      legacyEvaluationConfidenceComputedSeparately: true,
-    },
-    rules: {
-      base: 24,
-      eachBooleanExecutionInput: 5,
-      invalidTimelinePenalty: -10,
-      phaseOutcomeEvidenceBonus: 5,
-      ambitiousGoalCap: 49,
-      floor: 12,
-      ceiling: 58,
-      rounding: "integer arithmetic",
-      timeAloneMovesScore: false,
-      repeatedIdenticalEvidenceMovesScore: false,
-    },
-    fixtureMovement: {
-      newlyActivatedInsufficientHistory: fixture({}),
-      oneStrongExecutionWeek: fixture({
-        activeProtocols: [{}],
-        checkIns: [{}],
-        nutritionContext: {},
-        trainingPerformance: { sessions: [{}] },
-      }),
-      incompleteDataWeek: fixture({}),
-      weightIncreaseWithoutPerformance: fixture({}),
-      productiveTrainingStableWeight: fixture({ trainingPerformance: { sessions: [{}] } }),
-      bodyFatAboveGuardrail: fixture({ dexaScans: [{ bodyFat: { value: 10 } }] }),
-      dexaConfirmedLeanGain: fixture({ dexaScans: [{ leanMass: { value: 150 } }] }),
-      contradictoryDexaAndScale: fixture({ dexaScans: [{}] }),
-      noNewMeaningfulEvidence: current.value,
-      repeatedIdenticalEvidence: current.value,
-    },
-    dimensions: {
-      execution: ["nutrition presence", "training presence", "activity/check-in presence", "protocol presence", "photo or DEXA presence"],
-      direction: [],
-      outcome: ["phase outcome evidence boolean only"],
-    },
-    weekly: {
-      consumesCanonicalConfidence: false,
-      hasWindowStartSnapshot: false,
-      hasWindowEndSnapshot: false,
-      hasPointChange: false,
-      hasCausalDrivers: false,
-    },
+    canonical,
+    storage: Object.freeze({
+      persisted: true,
+      snapshotCount: (store.goalConfidenceSnapshots ?? []).length,
+      historyCount: (store.goalConfidenceHistory ?? []).length,
+      currentAssessmentId: canonical.assessmentId,
+    }),
+    ownership: Object.freeze({
+      readOwner: "ActiveGoalConfidencePresentationReadService",
+      calculationOwner: "BriefingForecastFinalizer",
+      persistenceOwner: "CanonicalBriefingConfidencePublicationService",
+      legacyFallback: false,
+      daily,
+    }),
+    publishers: Object.freeze({
+      authorized: ConfidencePublisherRegistry.listAuthorizedPublishers(),
+      nonPublishers: CONFIDENCE_NON_PUBLISHERS,
+    }),
   });
 }
 
-function inputs(store, activeGoal, currentDate) {
-  return {
-    activeGoal,
-    activeProtocols: (store.protocols ?? []).filter((item) => item.status === "active"),
-    canonicalEvidence: store.canonicalEvidenceObjects ?? [],
-    checkIns: store.dailyCheckIns ?? [],
-    currentDate,
-    dexaScans: store.dexaScans ?? [],
-    nutritionContext: store.nutritionContext ?? null,
-    progressPhotos: store.progressPhotos ?? [],
-    timeZone: store.user?.timezone ?? "UTC",
-    trainingPerformance: null,
-  };
+function dailyOwnership({ canonical, dailyBriefing, homeConfidence }) {
+  const dailyConfidence = dailyBriefing?.goalConfidence ?? null;
+  const inspected = dailyBriefing != null;
+  const sameAsCanonical = !inspected || Boolean(
+    dailyConfidence?.assessmentId === canonical.assessmentId &&
+    dailyConfidence?.value === canonical.value &&
+    dailyBriefing?.hero?.confidence === canonical.value
+  );
+  const sameAsHome = !homeConfidence || Boolean(
+    homeConfidence.assessmentId === canonical.assessmentId &&
+    homeConfidence.value === canonical.value &&
+    homeConfidence.movement === canonical.movement
+  );
+  return Object.freeze({
+    readOwner: "ActiveGoalConfidencePresentationReadService",
+    publisher: false,
+    localGoalEvaluationDisplay: false,
+    overallGoalConfidenceFallback: false,
+    inspected,
+    sameAssessmentAsCanonical: sameAsCanonical,
+    sameAssessmentAsHome: sameAsHome,
+    sameMovementAsHome: sameAsHome,
+    assessmentId: dailyConfidence?.assessmentId ?? canonical.assessmentId,
+    percentage: dailyBriefing?.hero?.confidence ?? canonical.value,
+  });
 }

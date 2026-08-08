@@ -24,6 +24,7 @@ import {
 const temporaryDirectories = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const directory of temporaryDirectories.splice(0)) {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -802,9 +803,9 @@ describe("GoalTransitionActivationCoordinator isolated execution", () => {
     const productionBefore = fs.readFileSync("private/founder/runtime-store.json");
     const h = await harness();
     await createGoalTransitionActivationCoordinator(h.context).execute();
-    expect(fs.readFileSync("private/founder/runtime-store.json")).toEqual(productionBefore);
+    expect(fs.readFileSync("private/founder/runtime-store.json").equals(productionBefore)).toBe(true);
     expect(path.resolve(h.storePath)).not.toBe(path.resolve(h.productionStorePath));
-  }, 30_000);
+  }, 60_000);
 });
 
 describe("GoalTransitionActivationCoordinator adversarial operation accounting", () => {

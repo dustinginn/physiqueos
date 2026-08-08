@@ -55,10 +55,12 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
         confirmation: { confirmedAt: timestamp, confirmedBy },
       });
     },
-    async beginCommit(id) {
+    async beginCommit(id, { evidencePackage } = {}) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
-      assertNoUnresolvedProvisionalExercises(review.interpretedEvidence);
+      assertNoUnresolvedProvisionalExercises(
+        evidencePackage ?? review.interpretedEvidence
+      );
       return repositories.evidenceReviews.updateReview(id, { status: "committing", commitError: null });
     },
     async resolveProvisionalExercise(id, {

@@ -275,6 +275,7 @@ describe("WeeklyBriefingPersistenceService", () => {
     const service = createWeeklyNarrativeService({
       repositories,
       weeklyPersistence: persistence,
+      confidenceStoreResolver: () => liveStore,
       now: () => new Date("2026-07-26T15:00:00.000Z"),
     });
     const before = persistence.captureBaseline();
@@ -299,7 +300,7 @@ describe("WeeklyBriefingPersistenceService", () => {
     });
   });
 
-  it("regenerates the accepted artifact only in an isolated clone with six paired days", async () => {
+  it("regenerates the latest accepted artifact only in an isolated clone with seven paired days", async () => {
     const source = fs.readFileSync(
       path.resolve(process.cwd(), "private/founder/runtime-store.json")
     );
@@ -317,6 +318,7 @@ describe("WeeklyBriefingPersistenceService", () => {
     const service = createWeeklyNarrativeService({
       repositories,
       weeklyPersistence: persistence,
+      confidenceStoreResolver: () => liveStore,
       now: () => new Date("2026-07-26T15:00:00.000Z"),
     });
     const before = persistence.captureBaseline();
@@ -326,13 +328,13 @@ describe("WeeklyBriefingPersistenceService", () => {
     });
     const after = persistence.captureBaseline();
     const narrative = regenerated.briefing.weeklyNarrative;
-    expect(regenerated.id).toBe("weekly_briefing_2026-07-19_2026-07-25");
+    expect(regenerated.id).toBe("weekly_briefing_2026-07-26_2026-08-01");
     expect(narrative.provenance.version).toBe("weekly_narrative_v5_2");
-    expect(narrative.cards.progress.activity.completedDays).toBe(6);
+    expect(narrative.cards.progress.activity.completedDays).toBe(7);
     expect(
       narrative.cards.interpretation.domains.find((item) => item.domain === "estimated_energy")
         .highlight
-    ).toMatch(/across 6 paired days/);
+    ).toMatch(/across 7 paired days/);
     expect(narrative.context).toMatchObject({
       activeGoalSummary: { title: "Build Lean Mass" },
       activePhase: { name: "Establish Maintenance" },

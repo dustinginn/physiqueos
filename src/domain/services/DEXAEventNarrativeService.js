@@ -4,9 +4,8 @@ import {
   classifyBodyFatGuardrail,
   resolveDEXAEventContext,
 } from "./DEXAEventContextService";
-import {
-  createPIDEXAEventPublicationService,
-} from "./PIDEXAEventPublicationService";
+import { createCanonicalBriefingConfidencePublicationService } from
+  "./CanonicalBriefingConfidencePublicationService";
 import {
   createPIDEXAEventLifecycleService,
 } from "./PIDEXAEventLifecycleService";
@@ -600,7 +599,7 @@ export function createFounderDEXAEventNarrativeService({
   eventLifecycle,
 } = {}) {
   const publication = eventLifecycle ? null :
-    createPIDEXAEventPublicationService({ now });
+    createCanonicalBriefingConfidencePublicationService({ now });
   return createDEXAEventNarrativeService({
     repositories,
     now,
@@ -686,7 +685,7 @@ export function createDEXAEventNarrativeService({
         scanId,
         persist: true,
         operation: "regenerate",
-        confidenceMode: "matched-only",
+        confidenceMode: "publish-successor",
         replacementAuthorized: true,
         reason,
         ignoreExisting: true,

@@ -62,6 +62,23 @@ describe("atomic canonical exercise and workout commit", () => {
     expect(liveStore).toEqual(before);
     expect(JSON.parse(fs.readFileSync(filePath, "utf8"))).toEqual(before);
   });
+
+  it("writes neither exercise nor workout when the canonical muscle-group ID is invalid", async () => {
+    const { filePath, liveStore } = isolatedStore();
+    const before = structuredClone(liveStore);
+    const evidencePackage = packageFixture();
+    evidencePackage.evidence_objects[0].exercises[0]
+      .provisionalExercise.confirmedDefinition.primary_muscle_group_id =
+        "removed_group";
+    await expect(createCanonicalExerciseWorkoutCommitService({
+      runtimeStorePath: filePath,
+      liveStore,
+    }).commit(evidencePackage, "founder")).rejects.toMatchObject({
+      code: "CANONICAL_EXERCISE_MUSCLE_GROUP_INVALID",
+    });
+    expect(liveStore).toEqual(before);
+    expect(JSON.parse(fs.readFileSync(filePath, "utf8"))).toEqual(before);
+  });
 });
 
 function isolatedStore() {
@@ -85,6 +102,7 @@ function packageFixture() {
     aliases: ["Machine Bicep Curl", "Biceps Curl Machine"],
     equipment: "Machine",
     body_region: "upper_body",
+    primary_muscle_group_id: "biceps",
     primary_muscle_groups: ["Biceps"],
     movement_pattern: "Elbow Flexion",
     laterality: "Bilateral",

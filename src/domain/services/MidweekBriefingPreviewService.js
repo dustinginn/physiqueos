@@ -6,6 +6,7 @@ import {
   createCadenceEnergyAssessment,
 } from "./CadenceEnergyAssessmentService";
 import { composePIEditorialParagraph } from "./PIEditorialTranslationService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import {
   createMidweekEditorialNarrative,
   createMidweekExerciseWatchNarrative,
@@ -63,7 +64,7 @@ export function composeMidweekBriefingPreview({ window, timeZone = "America/Los_
   const trainingReport = createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalObjects.filter((item) => dateKey(item?.payload?.observed_at ?? item?.observed_at) <= window.endDate), now: new Date(`${window.endDate}T12:00:00Z`) });
   const trainingAnalysis = analyzeTraining(training, window, trainingReport);
   const weight = weightContext(windowWeights, priorWeights, goal);
-  const activePhase = (goal?.phases ?? []).find((phase) => phase.status === "active") ?? null;
+  const activePhase = goal ? resolveCommittedPhaseContext(goal, { asOf: window.briefingDate }).activePhase : null;
   const phase = phaseContext(activePhase, window.briefingDate, energy, trainingAnalysis);
   const dexa = dexaContext(newDexa, baselineDexa, goal);
   const decision = coachingDecision({ energy, training: trainingAnalysis, weight });

@@ -50,7 +50,7 @@ describe("GoalPhase domain contract", () => {
   });
 
   it.each([
-    ["status", "paused", "GOAL_PHASE_STATUS_UNSUPPORTED"],
+    ["status", "expired", "GOAL_PHASE_STATUS_UNSUPPORTED"],
     ["timingMode", "indefinite", "GOAL_PHASE_TIMING_MODE_UNSUPPORTED"],
     ["transitionPolicy", "silent", "GOAL_PHASE_TRANSITION_POLICY_UNSUPPORTED"],
   ])("rejects unsupported %s values", (field, value, code) => {
@@ -88,7 +88,7 @@ describe("GoalPhase domain contract", () => {
   });
 
   it("exports exactly the supported enum values", () => {
-    expect(Object.values(GoalPhaseStatus)).toEqual(["upcoming", "active", "completed", "skipped"]);
+    expect(Object.values(GoalPhaseStatus)).toEqual(["upcoming", "planned", "active", "review_due", "review_pending_decision", "completed", "skipped", "superseded", "paused"]);
     expect(Object.values(GoalPhaseTimingMode)).toEqual(["fixed_duration", "target_date", "completion_criteria"]);
     expect(Object.values(GoalPhaseTransitionPolicy)).toEqual(["manual_review", "evidence_review", "automatic"]);
   });

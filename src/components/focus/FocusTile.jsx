@@ -35,11 +35,14 @@ export default function FocusTile({
   color = "primary",
   completed = false,
   changeLabel,
+  actionLabel,
+  alwaysShowMetadata = false,
   onClick,
 }) {
   const Icon = iconMap[icon] ?? Activity;
   const showSubtitle = density !== "compact" && subtitle;
-  const showMetadata = (density === "expanded" || changeLabel) && metadata;
+  const showMetadata =
+    (density === "expanded" || changeLabel || alwaysShowMetadata) && metadata;
   const tone = getToneClasses(color);
   const classes = `
     flex
@@ -92,10 +95,16 @@ export default function FocusTile({
         )}
       </span>
 
-      <CompletionIndicator
-        aria-label={completed ? "Completed" : "Not completed"}
-        completed={completed}
-      />
+      {actionLabel ? (
+        <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--chart-3)_14%,transparent)] px-2 py-1 text-[9px] font-extrabold leading-none text-[var(--chart-3)]">
+          {actionLabel}
+        </span>
+      ) : (
+        <CompletionIndicator
+          aria-label={completed ? "Completed" : "Not completed"}
+          completed={completed}
+        />
+      )}
     </>
   );
 

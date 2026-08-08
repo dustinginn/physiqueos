@@ -47,15 +47,17 @@ describe("production protocol reconciliation state", () => {
     ]);
   });
 
-  it("merges the Retatrutide transition into its sole execution priority", () => {
+  it("projects the Retatrutide transition from its sole canonical Execution record", () => {
     const priorities = createDailyFocusService().getDailyFocus({
       checkIns: store.dailyCheckIns,
+      executionItems: store.executionItems,
       latestWeight: store.weightEntries.at(-1),
       weightEntries: store.weightEntries,
       protocols: store.protocols,
       progressPhotos: store.progressPhotos,
       reminders: store.reminders,
       now: new Date(2026, 6, 23, 8),
+      timeZone: "America/Los_Angeles",
     });
     const ids = priorities.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -64,10 +66,41 @@ describe("production protocol reconciliation state", () => {
     expect(ids).not.toContain("dose-change-protocol_retatrutide_founder-2026-07-23");
     expect(priorities.find((item) => item.id === "reminder_retatrutide")).toMatchObject({
       metadata: "1.5 mg tonight",
-      changeLabel: "Taper begins today",
+      changeLabel: "New phase begins today",
       completable: true,
       completionId: "reminder_retatrutide",
+      executionId: "execution_retatrutide",
     });
+  });
+
+  it("renders the live July 30 Retatrutide occurrence as setup-required without legacy taper copy", () => {
+    const priorities = createDailyFocusService().getDailyFocus({
+      checkIns: store.dailyCheckIns,
+      executionItems: store.executionItems,
+      latestWeight: store.weightEntries.at(-1),
+      weightEntries: store.weightEntries,
+      protocols: store.protocols,
+      progressPhotos: store.progressPhotos,
+      reminders: store.reminders,
+      now: new Date("2026-07-30T19:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+    });
+    const retatrutide = priorities.find(
+      (item) => item.id === "reminder_retatrutide"
+    );
+
+    expect(retatrutide).toMatchObject({
+      label: "Retatrutide",
+      subtitle: "Tonight",
+      metadata: "Dose schedule needs update",
+      changeLabel: "No active phase",
+      actionLabel: "Review Execution",
+      completable: false,
+      executionId: "execution_retatrutide",
+    });
+    expect(JSON.stringify(retatrutide)).not.toMatch(
+      /1 mg tonight|Taper begins today/
+    );
   });
 
   it("keeps one future source for Foam Rolling and current Build Lean Mass context", () => {

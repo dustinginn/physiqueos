@@ -10,6 +10,11 @@ import {
   createEvidenceReviewPresentation,
   toggleEvidenceReviewItemDecision,
 } from "../domain/services/EvidenceReviewPresentationService";
+import {
+  listExercisesWithoutCanonicalIdentity,
+  listUnresolvedProvisionalExercises,
+  searchCanonicalExerciseOptions,
+} from "../domain/services/CanonicalExerciseLibraryService";
 import { createEvidenceExperiencePresentation } from "../domain/services/EvidenceExperiencePresentationService";
 import { createEvidenceSuccessNavigation } from "../domain/services/EvidenceSuccessNavigationService";
 import { createTrainingPerformanceSuccessPresentation } from "../domain/services/TrainingPerformanceSuccessPresentationService";
@@ -18,6 +23,11 @@ import {
   getCanonicalProgressPhotoCategory,
   getProgressPhotoDisplayLabel,
 } from "../domain/models/progressPhotoPoseVocabulary";
+import {
+  resolveCanonicalTrainingMuscleGroup,
+  searchCanonicalTrainingMuscleGroups,
+  suggestCanonicalTrainingMuscleGroup,
+} from "../domain/models/trainingMuscleGroupIdentity";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
@@ -31,13 +41,19 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   const canEdit = ["pending", "commit_failed"].includes(status);
   const canContinue = status === "partially_committed";
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
-  const unresolvedExercises = (evidencePackage.evidence_objects ?? []).flatMap((object) =>
-    object.evidence_type === "training" && object.removed !== true
-      ? (object.exercises ?? []).filter((exercise) =>
-          exercise.removed !== true &&
-          exercise.provisionalExercise?.resolutionStatus === "unresolved"
-        )
-      : []
+  const evidenceWithLocalDecisions = {
+    ...evidencePackage,
+    evidence_objects: (evidencePackage.evidence_objects ?? []).map((object) => ({
+      ...object,
+      removed: itemDecisions[object.id]?.included === false,
+    })),
+  };
+  const unresolvedExercises = listUnresolvedProvisionalExercises(
+    evidenceWithLocalDecisions
+  );
+  const blockingExercises = listExercisesWithoutCanonicalIdentity(
+    evidenceWithLocalDecisions,
+    { canonicalExercises }
   );
   const toggleItem = (item) => {
     setItemDecisions((current) =>
@@ -109,7 +125,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           )}
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
           {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
-          {unresolvedExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{unresolvedExercises.length} new exercise{unresolvedExercises.length === 1 ? "" : "s"} need{unresolvedExercises.length === 1 ? "s" : ""} details before this workout can be saved.</p>}
+          {blockingExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{blockingExercises.length} exercise {blockingExercises.length === 1 ? "identity needs" : "identities need"} details before this workout can be saved.</p>}
         </Card>
 
         <form action={confirmAction} className="mt-6">
@@ -117,7 +133,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(evidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton disabled={!canContinue && (!presentation.summary.included || blockingPhotoIssue || unresolvedExercises.length > 0)} retry={canContinue} savingLabel={experience.savingLabel} unresolvedCount={unresolvedExercises.length} />
+            <ConfirmButton blockingCount={blockingExercises.length} disabled={blockingExercises.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><ReprocessButton /></form>}
@@ -144,7 +160,31 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
 
       {item.metrics.length > 0 && <dl className="grid grid-cols-2 gap-3">{item.metrics.map((metric) => <div className="rounded-xl bg-[var(--surface-muted)] p-3" key={metric.label}><dt className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{metric.label}</dt><dd className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{metric.value}</dd></div>)}</dl>}
 
-      {item.exercises?.length > 0 && <section><h3 className="text-sm font-extrabold text-[var(--text-primary)]">Exercises</h3><div className="mt-3 space-y-4">{item.exercises.map((exercise, index) => <div key={`${exercise.name}-${index}`}><p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>{exercise.sets.length ? <ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{exercise.sets.map((set, setIndex) => <li key={`${set}-${setIndex}`}>• {set}</li>)}</ul> : <p className="mt-1 text-sm text-[var(--text-muted)]">Set details unavailable</p>}</div>)}</div></section>}
+      {item.exercises?.length > 0 && (
+        <section>
+          <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Exercises</h3>
+          <div className="mt-3 space-y-4">
+            {item.exercises.map((exercise, index) => (
+              <div key={`${exercise.name}-${index}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>
+                  {exercise.provisionalExerciseId && (
+                    <a
+                      className="shrink-0 rounded-full bg-[var(--surface-warning)] px-2.5 py-1 text-xs font-extrabold text-[var(--text-primary)] underline decoration-transparent underline-offset-2 hover:decoration-current focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+                      href={`#new-exercise-${exercise.provisionalExerciseId}`}
+                    >
+                      New exercise
+                    </a>
+                  )}
+                </div>
+                {exercise.sets.length
+                  ? <ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{exercise.sets.map((set, setIndex) => <li key={`${set}-${setIndex}`}>• {set}</li>)}</ul>
+                  : <p className="mt-1 text-sm text-[var(--text-muted)]">Set details unavailable</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {item.meals?.length > 0 && (
         <section>
@@ -206,10 +246,53 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
 
 function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
   const [mode, setMode] = useState("new");
+  const [searchQuery, setSearchQuery] = useState("");
   const provisional = exercise.provisionalExercise;
-  const fieldClass = "mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-white px-3 text-sm font-semibold text-[var(--text-primary)]";
+  const inferredMuscleGroup =
+    suggestCanonicalTrainingMuscleGroup(provisional.normalizedDisplayName);
+  const persistedMuscleGroup =
+    provisional.suggestedPrimaryMuscleGroupConfidence === "high"
+      ? resolveCanonicalTrainingMuscleGroup(
+          provisional.suggestedPrimaryMuscleGroupId ??
+            provisional.suggestedPrimaryMuscleGroup
+        )
+      : null;
+  const suggestedMuscleGroup =
+    persistedMuscleGroup ??
+    (inferredMuscleGroup.confidence === "high"
+      ? inferredMuscleGroup.muscleGroup
+      : null);
+  const [muscleGroupQuery, setMuscleGroupQuery] = useState("");
+  const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState(
+    () => suggestedMuscleGroup?.id ?? ""
+  );
+  const matchingCanonicalExercises = searchCanonicalExerciseOptions(
+    canonicalExercises,
+    searchQuery
+  );
+  const matchingMuscleGroups =
+    searchCanonicalTrainingMuscleGroups(muscleGroupQuery);
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    setSearchQuery("");
+    setMuscleGroupQuery("");
+    setPrimaryMuscleGroupId(
+      nextMode === "new" ? suggestedMuscleGroup?.id ?? "" : ""
+    );
+  };
+  const changeMuscleGroupSearch = (query) => {
+    const matches = searchCanonicalTrainingMuscleGroups(query);
+    setMuscleGroupQuery(query);
+    if (
+      primaryMuscleGroupId &&
+      !matches.some((candidate) => candidate.id === primaryMuscleGroupId)
+    ) {
+      setPrimaryMuscleGroupId("");
+    }
+  };
+  const fieldClass = "mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)]";
   return (
-    <Card className="space-y-4" variant="warning">
+    <Card className="scroll-mt-4 space-y-4" id={`new-exercise-${provisional.provisionalExerciseId}`} tabIndex={-1} variant="warning">
       <div>
         <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">New exercise detected</p>
         <h2 className="mt-1 text-xl font-extrabold text-[var(--text-primary)]">{provisional.normalizedDisplayName}</h2>
@@ -219,8 +302,8 @@ function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
         </ul>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "new" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => setMode("new")} type="button">Add new</button>
-        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "existing" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => setMode("existing")} type="button">Map existing</button>
+        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "new" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => changeMode("new")} type="button">Add new</button>
+        <button className={`min-h-11 rounded-xl border px-2 text-sm font-extrabold ${mode === "existing" ? "border-[var(--primary)] bg-[var(--surface-accent)]" : "border-[var(--divider)]"}`} onClick={() => changeMode("existing")} type="button">Map existing</button>
       </div>
       <form action={action} className="space-y-3">
         <input name="reviewId" type="hidden" value={review.id} />
@@ -229,17 +312,65 @@ function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
         <input name="resolutionMode" type="hidden" value={mode} />
         {mode === "new" ? <>
           <ReviewField className={fieldClass} defaultValue={provisional.suggestedCanonicalName} label="Canonical exercise name" name="canonicalName" />
-          <ReviewField className={fieldClass} defaultValue={provisional.suggestedPrimaryMuscleGroup} label="Primary muscle group" name="primaryMuscleGroup" />
-          <ReviewField className={fieldClass} defaultValue={provisional.suggestedMovementPattern} label="Movement pattern" name="movementPattern" />
-          <ReviewField className={fieldClass} defaultValue={provisional.suggestedEquipment} label="Equipment type" name="equipment" />
-          <ReviewField className={fieldClass} defaultValue={provisional.suggestedLaterality} label="Laterality" name="laterality" />
-          <ReviewField className={fieldClass} defaultValue={(provisional.suggestedAliases ?? []).join(", ")} label="Aliases (optional)" name="aliases" required={false} />
-        </> : <label className="block text-sm font-extrabold text-[var(--text-primary)]">Existing exercise
-          <select className={fieldClass} name="canonicalExerciseId" required>
-            <option value="">Choose an exercise</option>
-            {canonicalExercises.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-          </select>
-        </label>}
+          <div className="min-w-0 space-y-2">
+            <label className="block text-sm font-extrabold text-[var(--text-primary)]" htmlFor={`${provisional.provisionalExerciseId}-muscle-search`}>
+              Primary muscle group <span aria-hidden="true">*</span>
+            </label>
+            <input
+              className={`${fieldClass} mt-0 max-w-full`}
+              id={`${provisional.provisionalExerciseId}-muscle-search`}
+              onChange={(event) => changeMuscleGroupSearch(event.target.value)}
+              placeholder="Search muscle groups"
+              type="search"
+              value={muscleGroupQuery}
+            />
+            <select
+              aria-label="Primary muscle group"
+              className={`${fieldClass} mt-0 max-w-full truncate`}
+              name="primaryMuscleGroupId"
+              onChange={(event) => setPrimaryMuscleGroupId(event.target.value)}
+              required
+              value={primaryMuscleGroupId}
+            >
+              <option value="">Choose a muscle group</option>
+              {matchingMuscleGroups.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </option>
+              ))}
+            </select>
+            {matchingMuscleGroups.length === 0 && (
+              <p className="text-sm font-semibold text-[var(--text-secondary)]">
+                No matching muscle group.
+              </p>
+            )}
+            {suggestedMuscleGroup && primaryMuscleGroupId === suggestedMuscleGroup.id && (
+              <p className="text-xs font-semibold text-[var(--text-muted)]">
+                Suggested from the exercise name. You can choose another option.
+              </p>
+            )}
+          </div>
+          <details className="rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
+            <summary className="cursor-pointer text-sm font-extrabold text-[var(--text-primary)]">Optional details</summary>
+            <div className="mt-3 space-y-3">
+              <ReviewField className={fieldClass} defaultValue={provisional.suggestedMovementPattern} label="Movement pattern" name="movementPattern" required={false} />
+              <ReviewField className={fieldClass} defaultValue={provisional.suggestedEquipment} label="Equipment type" name="equipment" required={false} />
+              <ReviewField className={fieldClass} defaultValue={provisional.suggestedLaterality} label="Laterality" name="laterality" required={false} />
+              <ReviewField className={fieldClass} defaultValue={(provisional.suggestedAliases ?? []).join(", ")} label="Aliases" name="aliases" required={false} />
+            </div>
+          </details>
+        </> : <div className="space-y-3">
+          <label className="block text-sm font-extrabold text-[var(--text-primary)]">Search exercises
+            <input className={fieldClass} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Name or alias" type="search" value={searchQuery} />
+          </label>
+          <label className="block text-sm font-extrabold text-[var(--text-primary)]">Existing exercise
+            <select className={fieldClass} name="canonicalExerciseId" required>
+              <option value="">Choose an exercise</option>
+              {matchingCanonicalExercises.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+            </select>
+          </label>
+          {matchingCanonicalExercises.length === 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">No canonical exercise matches that search.</p>}
+        </div>}
         <ExerciseResolutionButton />
       </form>
       <form action={action}>
@@ -262,9 +393,9 @@ function ExerciseResolutionButton() {
   return <button className="min-h-12 w-full rounded-xl bg-[var(--primary)] px-3 text-sm font-extrabold text-white disabled:opacity-50" disabled={pending} type="submit">{pending ? "Saving exercise\u2026" : "Confirm exercise details"}</button>;
 }
 
-function ConfirmButton({ disabled, retry, savingLabel, unresolvedCount = 0 }) {
+function ConfirmButton({ blockingCount = 0, disabled, retry, savingLabel }) {
   const { pending } = useFormStatus();
-  const label = unresolvedCount > 0 ? `Resolve ${unresolvedCount} new exercise${unresolvedCount === 1 ? "" : "s"} to save` : retry ? "Finish saving" : "Save included evidence";
+  const label = blockingCount > 0 ? `Resolve ${blockingCount} exercise ${blockingCount === 1 ? "identity" : "identities"} to save` : retry ? "Finish saving" : "Save included evidence";
   return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Finishing your upload\u2026" : savingLabel) : label}</button>;
 }
 

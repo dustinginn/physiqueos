@@ -1,136 +1,106 @@
-import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
+import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
+import { createCanonicalConfidenceReadService } from
+  "../confidence/CanonicalConfidenceReadService";
 import {
-  createPIPhotoGoalConfidencePreparationService,
-} from "./PIPhotoGoalConfidencePreparationService";
-import {
-  createBriefingGoalConfidenceBlockFromAssessment,
-} from "./BriefingGoalConfidencePresentationService";
-import {
-  createPIPhotoConfidenceReasoning,
-} from "./PIPhotoConfidenceReasoningService";
+  adaptPhotoEventToEvidenceDescriptors,
+  adaptProductionGoalToCanonicalContract,
+  isQualifyingPhotoEventInterpretation,
+} from "../confidence/ProductionConfidenceContextAdapter";
+import { createBriefingGoalConfidenceBlockFromV2 } from
+  "./BriefingGoalConfidencePresentationService";
 
-export function createPIPhotoEventLifecycleService({
-  publicationService,
-  now = () => new Date(),
-} = {}) {
+export function createPIPhotoEventLifecycleService({ publicationService,
+  now = () => new Date() } = {}) {
   if (!publicationService) throw new Error("Photo Event publication service is required.");
+  const finalizer = createBriefingForecastFinalizer({ publicationService, now });
   return Object.freeze({
-    async publish({
-      operation = "create",
-      confidenceMode = "publish-successor",
-      artifact,
-      session,
-      context,
-      reason,
-      replacementAuthorized = false,
-    } = {}) {
+    async publish({ operation = "create", confidenceMode = "publish-successor",
+      artifact, session, context, reason,
+      replacementAuthorized = false } = {}) {
+      if (confidenceMode === "matched-only") return typed("carried_forward",
+        "Non-qualifying Photo Events carry the prior assessment without publication.");
       const goal = context?.activeGoal;
       const phase = context?.activePhase;
-      if (!goal?.id || !phase?.id || !session?.id) {
-        return typed("not_eligible",
-          "Photo confidence requires an active Goal, phase, and canonical session.");
+      const narrative = artifact?.briefing?.photoEventNarrative;
+      const meaningful = isQualifyingPhotoEventInterpretation({
+        narrative, goalId: goal?.id,
+      });
+      if (!goal?.id || !phase?.id || !session?.id || !meaningful) {
+        return typed("photo_event_not_qualifying",
+          "Photo publication requires meaningful Goal-relevant visual interpretation.");
       }
       const baseline = publicationService.captureBaseline();
-      const readService = createPIGoalConfidenceReadService({
-        store: baseline.store,
+      const replacementTarget = operation === "regenerate"
+        ? baseline.store.dailyBriefings?.find((item) => item.id === artifact.id) ?? null
+        : null;
+      const current = createCanonicalConfidenceReadService({ store: baseline.store })
+        .getCurrent({ goalId: goal.id, phaseId: phase.id });
+      if (!current.assessment) return typed("canonical_predecessor_required",
+        "Photo Confidence requires a canonical predecessor.");
+      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
+        activePhase: phase,
       });
-      const series = readService.getGoalConfidenceSeries({
-        goalId: goal.id, phaseId: phase.id,
-      });
-      let assessment;
-      let publicationCommand = null;
-      let receipt = null;
-      let reasoning = null;
-      if (confidenceMode === "matched-only") {
-        assessment = series.latestCanonicalAssessment;
-        if (!assessment) return typed("not_eligible",
-          "Canonical confidence is unavailable for matched-only Photo publication.");
-      } else {
-        reasoning = createPIPhotoConfidenceReasoning({
-          session,
-          narrative: artifact.briefing.photoEventNarrative,
-          context,
-        });
-        if (!reasoning.publicationEligible ||
-            ["inconclusive", "neutral", "limiting"].includes(reasoning.role)) {
-          assessment = series.latestCanonicalAssessment;
-          if (!assessment) return typed("incomplete_pi_input",
-            "Photo comparison is insufficient and no canonical confidence assessment exists.");
-        } else {
-          const prepared = await createPIPhotoGoalConfidencePreparationService({
-          readService, now,
-          }).prepare({
-          triggerType: "photo_event",
-          occurrenceId: artifact.id,
-          goalContext: {
-            goalId: goal.id,
-            semanticGoalType: /lean mass/i.test(goal.title ?? "")
-              ? "build_lean_mass" : goal.type,
-          },
-          phaseContext: {
-            phaseId: phase.id,
-            semanticPhaseType: phase.semanticType ?? phase.name,
-          },
-          operatingState: context.operatingState?.value,
-          evidenceCutoff: `${dateKey(session.captureDate)}T23:59:59.999Z`,
-          assessmentContext: { eventId: artifact.id },
-          preparedPIReasoning: reasoning,
-          piVersion: "pi_v3",
-          generatedAt: now().toISOString(),
-          expectedRevision: baseline.revision,
-          expectedSemanticDigest: baseline.semanticDigest,
-          expectedCurrentSnapshot: series.currentSnapshot,
-          publicationReason: reason,
-          });
-          if (prepared.status === "visual_evidence_already_consumed") {
-            assessment = prepared.assessment;
-            receipt = prepared.receipt;
-          } else if (prepared.status === "prepared_successor") {
-            assessment = prepared.assessment;
-            publicationCommand = prepared.publicationCommand;
-            receipt = prepared.receipt;
-          } else {
-            return { ...typed(prepared.status, prepared.reason),
-              preparation: prepared };
-          }
-        }
-      }
-      const role = reasoning?.role ?? "neutral";
-      const candidate = structuredClone(artifact);
-      candidate.briefing.photoEventNarrative.goalConfidence = {
-        ...createBriefingGoalConfidenceBlockFromAssessment(assessment, {
-          capturedAt: now().toISOString(),
-          captureSemantics: "photo_assessment_at_atomic_event_publication",
-        }),
-        canonicalPhotoSessionId: session.id,
-        visualEvidenceRole: role,
-      };
-      return publicationService.publish({
-        schemaVersion: "pi_photo_event_publication_v1",
-        operation,
-        confidenceMode,
-        artifact: candidate,
-        photoSessionId: session.id,
-        comparisonIds: reasoning?.comparison?.comparisonIds ?? [],
-        occurrenceId: artifact.id,
-        artifactConfidenceAssessmentId: assessment.id,
-        confidencePublicationCommand: publicationCommand,
+      const cutoff = iso(session.capturedAt ?? session.captureDate ?? session.date);
+      const result = await finalizer.finalize({
+        publisherType: "photo_event_briefing", userId: artifact.userId,
+        occurrenceId: artifact.id, artifactId: artifact.id,
+        cadenceOrEventType: "photo", goalContract, phaseId: phase.id,
+        evidenceWindow: { id: `photo_event|${session.id}`, start: cutoff,
+          cutoff, closed: true },
+        strategyContext: goalContract.strategyHypothesis,
+        executionContext: { adequacy: "unknown", elapsedTimeAdequacy: "unknown",
+          refs: [] },
+        evidenceDescriptors: adaptPhotoEventToEvidenceDescriptors({ session, narrative }),
+        previousCanonicalAssessment: current.assessment,
+        publicationCutoff: cutoff, finalizedAt: now().toISOString(),
+        idempotencyKey: `confidence_v2|photo|${artifact.id}`,
+        expectedPriorAssessmentId: current.assessment.id,
+        expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
         expectedSemanticDigest: baseline.semanticDigest,
-        expectedCurrentSnapshot: series.currentSnapshot,
         replacementAuthorized,
-        publicationReason: reason,
-        triggerReceipt: receipt,
+        replacesArtifactId: replacementTarget?.id ?? null,
+        replacesAssessmentId:
+          replacementTarget?.confidencePublication?.assessmentId ?? null,
+        qualifyingPhotoEvent: true,
+        sourceLineage: { reason, canonicalPhotoSessionId: session.id },
+        elapsedTimeAdequacy: "unknown",
+        phaseReviewContext: {
+          activeGoal: goal, activePhase: phase,
+          reviewMilestone: phase.reviewMilestone ?? null,
+          currentArtifact: { id: artifact.id, evidenceTypes: ["photo_event"],
+            evidenceIdentities: [session.id] },
+          artifactType: "photo_event", eventIdentity: artifact.id,
+          evidenceIdentity: session.id, artifactTimestamp: cutoff,
+          publicationTimestamp: now().toISOString(), currentDate: cutoff,
+          reviewState: phase.reviewState,
+          decisionHistory: baseline.store.phaseReviewDecisions ?? [],
+          expectedStoreRevision: baseline.revision,
+        },
+        composeArtifact: (outputs) => {
+          const candidate = structuredClone(artifact);
+          candidate.briefing.photoEventNarrative.goalConfidence = {
+            ...createBriefingGoalConfidenceBlockFromV2({
+              assessment: outputs.confidenceAssessment,
+              projection: outputs.numericConfidenceProjection,
+              narrativeAssessment: outputs.narrativeAssessment,
+              capturedAt: now().toISOString(),
+            }),
+            canonicalPhotoSessionId: session.id,
+          };
+          return { artifact: candidate };
+        },
       });
+      return result.commitResult ?? typed(result.status, "Photo finalization did not commit.");
     },
   });
 }
-function typed(status, message) {
-  return {
-    status, committed: false,
-    error: message ? { code: status, message } : null,
-  };
+function iso(value) {
+  const raw = String(value ?? "");
+  const parsed = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? `${raw}T23:59:59.999Z` : raw);
+  if (!Number.isFinite(parsed)) throw new Error("Photo cutoff is invalid.");
+  return new Date(parsed).toISOString();
 }
-function dateKey(value) {
-  return String(value ?? "").slice(0, 10);
-}
+function typed(status, message) { return { status, committed: false,
+  error: message ? { code: status, message } : null }; }

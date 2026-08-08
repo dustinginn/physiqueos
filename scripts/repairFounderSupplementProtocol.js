@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 import {
   createSupplementProtocolStateRepairService,
 } from "../src/domain/services/SupplementProtocolStateRepairService.js";
@@ -20,7 +21,8 @@ if (!args.has("--apply") || !protocolId || !expectedGoalId) {
 }
 
 const runtimeStorePath = path.resolve(process.cwd(), "private", "founder", "runtime-store.json");
-const liveStore = JSON.parse(fs.readFileSync(runtimeStorePath, "utf8"));
+const liveStore = readOperationalJsonFileSync(runtimeStorePath,
+  { stage: "supplement_protocol_repair_source" });
 const result = await createSupplementProtocolStateRepairService({
   runtimeStorePath,
   liveStore,

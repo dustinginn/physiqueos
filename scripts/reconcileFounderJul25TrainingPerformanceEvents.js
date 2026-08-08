@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 import { createTrainingPerformanceEventPersistenceService } from "../src/domain/services/TrainingPerformanceEventPersistenceService";
 import {
   createJuly25TrainingPerformanceReconciliationService,
@@ -22,7 +23,8 @@ async function main() {
   );
   const apply = process.argv.includes("--apply");
   const beforeBytes = fs.readFileSync(runtimeStorePath);
-  const liveStore = JSON.parse(beforeBytes);
+  const liveStore = parseOperationalJsonBytes(beforeBytes,
+    { filePath: runtimeStorePath, stage: "training_performance_reconciliation_source" });
   const service = createJuly25TrainingPerformanceReconciliationService({
     liveStore,
     persistenceService: createTrainingPerformanceEventPersistenceService({
@@ -79,7 +81,8 @@ async function main() {
     throw new Error(`Production reconciliation did not commit: ${result.outcome}`);
   }
   const afterBytes = fs.readFileSync(runtimeStorePath);
-  const after = JSON.parse(afterBytes);
+  const after = parseOperationalJsonBytes(afterBytes,
+    { filePath: runtimeStorePath, stage: "training_performance_reconciliation_post_commit" });
   console.log(JSON.stringify({
     preflight,
     backup: { path: backupPath, hash: sha(backupBytes) },

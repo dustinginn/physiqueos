@@ -23,10 +23,7 @@ export function createWeeklyBriefingScreenPresentation(narrative) {
       goalLabel: string(narrative?.context?.activeGoalSummary?.title),
       headline: string(heroSelection.headline),
       body: string(heroSelection.summary),
-      confidence: narrative?.goalConfidence ? {
-        ...narrative.goalConfidence,
-        presentationExplanation: string(heroSelection.confidenceExplanation),
-      } : null,
+      confidence: narrative?.goalConfidence ?? null,
       confidenceContext: string(selection.confidence?.alignment?.context),
       cards: array(heroSelection.cards).map(normalizeHeroCard),
       strategy: activePhase.name ? {

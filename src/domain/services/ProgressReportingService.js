@@ -1882,7 +1882,7 @@ function getCardioBreakdown(cardioSessions = []) {
   );
 }
 
-function getResistanceBreakdown(resistanceSessions = []) {
+export function getResistanceBreakdown(resistanceSessions = []) {
   const regions = new Map();
 
   resistanceSessions.forEach((session) => {
@@ -1918,8 +1918,10 @@ function getResistanceBreakdown(resistanceSessions = []) {
 
       if (!family.exercises.has(exerciseKey)) {
         family.exercises.set(exerciseKey, {
-          canonicalExerciseId:
-            exerciseIdentity.canonicalExerciseId ?? exerciseKey,
+          canonicalExerciseId: exerciseIdentity.canonicalExerciseId ?? null,
+          canonicalIdentityStatus: exerciseIdentity.canonicalExerciseId
+            ? "canonical"
+            : "historical_only",
           id: exercise.id ?? exerciseLabel,
           label: exerciseLabel,
           sets: groupedSets,

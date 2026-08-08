@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 import { reprocessConfirmedDexaEventInPlace, CONFIRMED_DEXA_INCIDENT } from "../src/domain/services/ConfirmedDexaEventRecoveryService";
 
 loadEnvConfig(process.cwd(), false, { info() {}, error() {} });
@@ -17,7 +18,8 @@ const bytes = fs.readFileSync(source);
 const beforeHash = sha(bytes);
 if (expectedHash && beforeHash !== expectedHash) throw new Error(`Runtime-store hash changed: expected ${expectedHash}, received ${beforeHash}.`);
 
-const store = JSON.parse(bytes);
+const store = parseOperationalJsonBytes(bytes,
+  { filePath: source, stage: "confirmed_dexa_recovery_source" });
 const before = fingerprint(store);
 const result = await reprocessConfirmedDexaEventInPlace({
   pdfBuffer: fs.readFileSync(pdfPath),
@@ -55,7 +57,8 @@ try {
   fs.writeFileSync(backup, bytes, { flag: "wx" });
   if (sha(fs.readFileSync(backup)) !== beforeHash) throw new Error("Backup verification failed.");
   fs.writeFileSync(candidatePath, candidateBytes, { flag: "wx" });
-  JSON.parse(fs.readFileSync(candidatePath, "utf8"));
+  parseOperationalJsonBytes(fs.readFileSync(candidatePath),
+    { filePath: candidatePath, stage: "confirmed_dexa_recovery_candidate" });
   if (sha(fs.readFileSync(source)) !== beforeHash) throw new Error("Runtime store changed while recovery candidate was built.");
   fs.writeFileSync(temp, candidateBytes, { flag: "wx" });
   fs.renameSync(temp, source);

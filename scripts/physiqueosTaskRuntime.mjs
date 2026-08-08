@@ -2,6 +2,7 @@ import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 
 export const TASK_NAME = "PhysiqueOS Production Server";
 export const MONITOR_TASK_NAME = "PhysiqueOS Runtime Monitor";
@@ -218,10 +219,9 @@ export async function ensureBuildIdExists(root = repoRoot) {
 
 export async function readMetadata(root = repoRoot) {
   try {
-    const raw = String(
-      await fs.readFile(getRuntimePaths(root).metadataFilePath, "utf8")
-    ).replace(/^\uFEFF/, "");
-    return JSON.parse(raw);
+    const raw = await fs.readFile(getRuntimePaths(root).metadataFilePath);
+    return parseOperationalJsonBytes(raw,
+      { filePath: getRuntimePaths(root).metadataFilePath, stage: "runtime_metadata" });
   } catch {
     return null;
   }

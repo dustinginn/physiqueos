@@ -4,6 +4,7 @@ import {
   createPIGoalContext,
 } from "./PIObservationGoalContextService";
 import { resolvePhotoEventFutureMilestone } from "./PhotoEventContextService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const DEXA_EVENT_CONTEXT_VERSION = "dexa_event_context_v1";
 
@@ -27,14 +28,16 @@ export async function resolveDEXAEventContext({
       ?? repositories.weightEntries?.listWeightEntries?.(userId)
       ?? [],
   ]);
-  const activeGoal = candidateGoal?.status === "active" ? candidateGoal : null;
-  const activePhase = activeGoal?.phases?.filter((phase) => phase.status === "active")[0] ?? null;
+  let activeGoal = candidateGoal?.status === "active" ? candidateGoal : null;
+  const phaseContext = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: evidenceDate }) : null;
+  activeGoal = phaseContext?.goal ?? activeGoal;
+  const activePhase = phaseContext?.activePhase ?? null;
   const completedPriorGoal = selectCompletedPriorGoal(goals, activeGoal);
   const eligibleScans = scans
     .filter((item) => item.userId === userId && dateKey(item.measuredAt ?? item.date) <= evidenceDate)
     .sort(byDate);
   const priorScan = eligibleScans.filter((item) => item.id !== scan?.id).at(-1) ?? null;
-  const phaseBaselineScan = selectBaseline(eligibleScans, activePhase?.startDate, scan?.id);
+  const phaseBaselineScan = selectBaseline(eligibleScans, activePhase?.startedAt ?? activePhase?.startDate, scan?.id);
   const goalBaselineScan = selectBaseline(
     eligibleScans,
     activeGoal?.timeline?.startDate ?? activeGoal?.startDate,
@@ -83,9 +86,15 @@ export async function resolveDEXAEventContext({
     activePhase: activePhase
       ? {
           id: activePhase.id,
+          order: activePhase.order,
           name: activePhase.name ?? activePhase.title,
           status: activePhase.status,
-          startDate: dateKey(activePhase.startDate) || null,
+          startDate: dateKey(activePhase.startedAt ?? activePhase.startDate) || null,
+          plannedReviewAt: activePhase.plannedReviewAt ?? null,
+          reviewState: activePhase.effectiveReviewState ?? activePhase.reviewState ?? null,
+          reviewMilestone: activePhase.reviewMilestone ?? null,
+          completionDecisionRequired: activePhase.completionDecisionRequired !== false,
+          revision: Number(activePhase.revision ?? 0),
           ageDays: pi.goalContext.phaseAgeDays,
           ageWeeks: pi.goalContext.phaseAgeWeeks,
         }

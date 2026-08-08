@@ -14,18 +14,7 @@ import {
 } from "./PILowerLevelConfidenceContracts";
 import {
   detectPILowerLevelConfidenceSemanticChange,
-  explainPILowerLevelSemanticChange,
 } from "./PILowerLevelConfidenceSemanticChangeService";
-import {
-  createPIGoalConfidenceAssessment,
-  resolvePIGoalConfidenceScoreBand,
-} from "./PIGoalConfidenceAssessmentModel";
-import {
-  finalizePreparedPIGoalConfidencePublication,
-  preparePIGoalConfidencePublication,
-  stagePreparedPIGoalConfidencePublication,
-  validatePreparedPIGoalConfidencePublication,
-} from "./PIGoalConfidencePersistenceService";
 
 export const PI_TRAINING_FINALIZATION_VERSION =
   "pi_training_confidence_finalization_v1";
@@ -50,6 +39,7 @@ export const PITrainingFinalizationOutcome = Object.freeze({
   COMMITTED_PUBLICATION_FAILURE: "committed_publication_failure",
   ATTEMPT_LIMIT_REACHED: "attempt_limit_reached",
   WORK_NOT_FOUND: "work_not_found",
+  BRIEFING_INPUT_READY: "briefing_input_ready",
 });
 
 export function createPITrainingConfidenceWork(input = {}) {
@@ -376,11 +366,6 @@ export function createPITrainingConfidenceFinalizationService(options = {}) {
           const item = candidate.piTrainingConfidenceWorkItems
             .find((entry) => entry.id === work.id);
           if (!item) throw new Error("Training work is missing.");
-          if (prepared.publication) {
-            stagePreparedPIGoalConfidencePublication(
-              candidate, prepared.publication
-            );
-          }
           candidate.piTrainingFinalizationReceipts.push(prepared.receipt);
           Object.assign(item, {
             status: prepared.terminalStatus,
@@ -395,30 +380,13 @@ export function createPITrainingConfidenceFinalizationService(options = {}) {
             updatedAt: prepared.receipt.completedAt,
           });
         },
-        finalizeCandidate({ stagedState, commitId }) {
-          if (prepared.publication) {
-            finalizePreparedPIGoalConfidencePublication(
-              stagedState, prepared.publication, commitId
-            );
-          }
-        },
         validate(candidate) {
           const receipt = candidate.piTrainingFinalizationReceipts
             .filter((item) => item.id === prepared.receipt.id);
           const item = candidate.piTrainingConfidenceWorkItems
             .find((entry) => entry.id === work.id);
           return receipt.length === 1 &&
-            item?.completionReceiptId === prepared.receipt.id &&
-            (!prepared.publication ||
-              validatePreparedPIGoalConfidencePublication(
-                candidate, prepared.publication
-              ).valid);
-        },
-        validateFinalized(candidate, context) {
-          return !prepared.publication ||
-            validatePreparedPIGoalConfidencePublication(
-              candidate, prepared.publication, context
-            ).valid;
+            item?.completionReceiptId === prepared.receipt.id;
         },
         success: (value) => outcome(prepared.outcome, {
           committed: true, receipt: prepared.receipt,
@@ -537,11 +505,15 @@ function prepare(store, work, before, completedAt) {
       ) ?? [],
     ownership,
   });
-  const finalOutcome = represented
+  const candidateOutcome = represented
     ? representedOutcome(contextType)
     : change.outcome === "already_represented" && priorReceipt
       ? PITrainingFinalizationOutcome.NOT_MATERIAL
       : mapOutcome(change.outcome);
+  const finalOutcome = candidateOutcome ===
+      PITrainingFinalizationOutcome.PUBLISHED_SUCCESSOR
+    ? PITrainingFinalizationOutcome.BRIEFING_INPUT_READY
+    : candidateOutcome;
   const trigger = createPILowerLevelTriggerCandidate({
     triggerType: PILowerLevelTriggerType.TRAINING,
     goalId: goal.id,
@@ -571,32 +543,7 @@ function prepare(store, work, before, completedAt) {
   const matchedReceipt = (store.piTrainingFinalizationReceipts ?? [])
     .find((item) => item.id === receiptIdentity);
   if (matchedReceipt) return { matchedReceipt };
-  let publication = null;
-  let assessmentId = null;
-  if (finalOutcome === PITrainingFinalizationOutcome.PUBLISHED_SUCCESSOR) {
-    if (!current?.assessment || !current.snapshot) {
-      throw new Error("canonical_confidence_predecessor_missing");
-    }
-    const assessment = trainingAssessment({
-      prior: current.assessment,
-      priorTrainingState: priorState?.state ?? null,
-      interpretation,
-      consumption,
-      completedAt: completedAt.toISOString(),
-    });
-    publication = preparePIGoalConfidencePublication(store, {
-      operation: "publish_successor",
-      assessment,
-      expectedRevision: before.revision,
-      expectedSemanticDigest: before.semanticDigest,
-      expectedCurrentSnapshot: current.snapshot,
-      publicationReason:
-        `lower-level Training interpretation ${trigger.id} [${consumption.id}]`,
-      replacementAuthorized: true,
-    });
-    if (publication.result) throw new Error(publication.result.status);
-    assessmentId = assessment.id;
-  }
+  const assessmentId = null;
   const receipt = createPITrainingFinalizationReceipt({
     workId: work.id,
     triggerId: trigger.id,
@@ -632,143 +579,7 @@ function prepare(store, work, before, completedAt) {
       finalOutcome === PITrainingFinalizationOutcome.ALREADY_CONSUMED
         ? "cadence_owned" : finalOutcome,
     receipt,
-    publication,
   };
-}
-
-function trainingAssessment({
-  prior,
-  priorTrainingState,
-  interpretation,
-  consumption,
-  completedAt,
-}) {
-  const newContributor = trainingContributor(interpretation, consumption);
-  const contributors = prior.contributors
-    .filter((item) => item.domain !== "training")
-    .map((item) => ({
-      ...item,
-      consumptionRole: item.consumptionRole ?? "prior_context",
-    }));
-  contributors.push(newContributor);
-  const positive = interpretation.state === "broad_constructive" ||
-    (
-      priorTrainingState === "broad_regression" &&
-      interpretation.state === "stable"
-    );
-  const currentScore = Math.max(0, Math.min(
-    100, prior.score.current + (positive ? 2 : -2)
-  ));
-  const input = {
-    piVersion: prior.piVersion,
-    goalId: prior.goalId,
-    phaseId: prior.phaseId,
-    operatingState: prior.operatingState,
-    context: {
-      type: "training_interpretation",
-      cadence: null, evidenceWindowId: null, eventId: null,
-    },
-    evidenceCutoff: interpretation.evidenceCutoff,
-    score: {
-      current: currentScore,
-      prior: prior.score.current,
-      band: resolvePIGoalConfidenceScoreBand(currentScore),
-      movement: {
-        direction: currentScore > prior.score.current
-          ? "increased" : "decreased",
-        magnitude: "small",
-      },
-      priorScoreProvenance: {
-        source: "canonical_pi_assessment",
-        assessmentId: prior.id,
-        modelVersion: prior.modelVersion,
-      },
-    },
-    primaryReason: trainingReason(interpretation),
-    contributors,
-    unresolvedUncertainty: interpretation.incompleteReasons,
-    evidenceCompleteness: prior.evidenceCompleteness,
-    phaseAwareInterpretation: prior.phaseAwareInterpretation,
-    coachingImplication:
-      "Continue calibration while confirming that the broad Training direction persists.",
-    reasoning: {
-      ...prior.reasoning,
-      domainInterpretations: [
-        ...(prior.reasoning?.domainInterpretations ?? [])
-          .filter((item) => item.domain !== "training"),
-        {
-          id: interpretation.id,
-          domain: "training",
-          status: interpretation.state,
-          direction: interpretation.direction,
-          confidenceLevel: interpretation.strength,
-        },
-      ],
-    },
-    provenance: {
-      sourceObservationIds: prior.provenance.sourceObservationIds,
-      sourceClaimIds: prior.provenance.sourceClaimIds,
-      canonicalEvidenceReferences: [
-        ...prior.provenance.canonicalEvidenceReferences,
-        ...consumption.sourceEvidenceIds.map((id) => ({
-          id, type: "training",
-        })),
-      ],
-      piDecisionResultId: consumption.id,
-      generatedAt: completedAt,
-    },
-  };
-  const provisional = createPIGoalConfidenceAssessment(input);
-  input.contributors = input.contributors.map((item) =>
-    item.domain === "training"
-      ? { ...item, firstConsumedAssessmentId: provisional.id } : item
-  );
-  return createPIGoalConfidenceAssessment(input);
-}
-
-function trainingContributor(interpretation, consumption) {
-  const table = {
-    broad_constructive: ["supporting", "high"],
-    stable: ["supporting", "moderate"],
-    stagnating: ["neutral", "moderate"],
-    broad_regression: ["conflicting", "high"],
-    insufficient: ["neutral", "low"],
-  };
-  const [direction, strength] = table[interpretation.state];
-  return {
-    id: `pi_confidence_contributor|training|${hash(
-      `${interpretation.state}|${consumption.id}`
-    ).slice(0, 16)}`,
-    domain: "training",
-    label: "Training evidence",
-    direction,
-    strength,
-    confidence: { level: strength, method: "pi_v3_reasoning" },
-    evidenceCompleteness: interpretation.finalized ? "complete" : "partial",
-    reason: trainingReason(interpretation),
-    sourceObservationIds: [],
-    sourceClaimIds: [],
-    canonicalEvidenceReferences: consumption.sourceEvidenceIds
-      .map((id) => ({ id, type: "training" })),
-    affectedScoreMovement: true,
-    userFacing: true,
-    consumedTransitionIds: [consumption.id],
-    contributorSemanticFingerprint: interpretation.interpretationFingerprint,
-    firstConsumedAssessmentId: null,
-    sourceInterpretationId: interpretation.id,
-    consumptionRole: "new_effect",
-  };
-}
-function trainingReason(interpretation) {
-  if (interpretation.state === "stagnating") {
-    return "Confidence decreased because repeated Training results now show stagnation across several areas.";
-  }
-  if (interpretation.state === "broad_regression") {
-    return "Confidence decreased because Training performance has regressed across meaningful breadth.";
-  }
-  return explainPILowerLevelSemanticChange({
-    domain: "training", outcome: "material_change", nextState: interpretation,
-  });
 }
 
 function normalizeFinalization(input) {
@@ -873,7 +684,7 @@ function mapOutcome(value) {
 }
 function terminal(value) {
   return [
-    "published_successor", "matched", "not_material", "cadence_owned",
+    "briefing_input_ready", "published_successor", "matched", "not_material", "cadence_owned",
     "event_owned", "context_precedence_blocked",
   ].includes(value);
 }

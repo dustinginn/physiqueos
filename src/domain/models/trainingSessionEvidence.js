@@ -6,6 +6,9 @@ import {
   getTrainingExerciseIdentityByName,
   resolveTrainingExerciseIdentity,
 } from "./trainingExerciseIdentity";
+import {
+  suggestCanonicalTrainingMuscleGroup,
+} from "./trainingMuscleGroupIdentity";
 
 const DEFAULT_METADATA = {
   activity_type: null,
@@ -830,7 +833,7 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
 
 function parseCompactStrengthTrainingBlocks(
   text,
-  { provenanceRef = "typed_evidence_0" } = {}
+  { diagnostics = null, provenanceRef = "typed_evidence_0" } = {}
 ) {
   const blocks = [];
   let currentBlock = null;
@@ -840,13 +843,18 @@ function parseCompactStrengthTrainingBlocks(
   for (let lineIndex = 0; lineIndex < sourceLines.length; lineIndex += 1) {
     const rawLine = sourceLines[lineIndex];
     const line = rawLine.trim();
-    if (!line) continue;
+    if (!line) {
+      if (currentBlock) currentBlock.activeLoadUnit = null;
+      continue;
+    }
 
     const identity = resolveTrainingExerciseIdentity(line);
     if (identity.resolutionStatus === "resolved_high_confidence") {
       currentBlock = {
+        activeLoadUnit: null,
         identity: identity.exercise,
         entries: [],
+        parseIssues: [],
       };
       blocks.push(currentBlock);
       pendingRepeat = null;
@@ -862,12 +870,14 @@ function parseCompactStrengthTrainingBlocks(
       isStructurallyValidUnknownExerciseHeading(line, nextLine)
     ) {
       currentBlock = {
+        activeLoadUnit: null,
         identity: createProvisionalExerciseIdentity({
           line,
           lineIndex,
           provenanceRef,
         }),
         entries: [],
+        parseIssues: [],
       };
       blocks.push(currentBlock);
       pendingRepeat = null;
@@ -884,6 +894,9 @@ function parseCompactStrengthTrainingBlocks(
           currentBlock.entries.push(
             ...Array.from({ length: repeated.count }, () => ({ ...parsed }))
           );
+          currentBlock.activeLoadUnit = parsed.complete && parsed.unit === "lb"
+            ? "lb"
+            : null;
         }
         pendingRepeat = null;
       } else {
@@ -901,13 +914,29 @@ function parseCompactStrengthTrainingBlocks(
         currentBlock.entries.push(
           ...Array.from({ length: suffixRepeated.count }, () => ({ ...parsed }))
         );
+        currentBlock.activeLoadUnit = parsed.complete && parsed.unit === "lb"
+          ? "lb"
+          : null;
       }
       pendingRepeat = null;
       continue;
     }
 
-    const parsed = parseCompactSetExpression(line);
+    const parsed =
+      parseCompactSetExpression(line) ??
+      parseContextualMissingLoadUnitSet(line, {
+        activeLoadUnit: currentBlock.activeLoadUnit,
+        lineNumber: lineIndex + 1,
+        provenanceRef,
+      });
     if (!parsed) {
+      pendingRepeat = null;
+      continue;
+    }
+    if (parsed.parseIssue) {
+      currentBlock.parseIssues.push(parsed.parseIssue);
+      diagnostics?.push(parsed.parseIssue);
+      currentBlock.activeLoadUnit = null;
       pendingRepeat = null;
       continue;
     }
@@ -920,6 +949,9 @@ function parseCompactStrengthTrainingBlocks(
     currentBlock.entries.push(
       ...Array.from({ length: count }, () => ({ ...parsed }))
     );
+    currentBlock.activeLoadUnit = parsed.complete && parsed.unit === "lb"
+      ? "lb"
+      : null;
     pendingRepeat = null;
   }
 
@@ -935,15 +967,23 @@ function parseCompactStrengthTrainingBlocks(
           exerciseName: block.identity.name,
           provenanceRef,
           reps: entry.reps,
+          setMetadata: entry.unit_inference
+            ? { unit_inference: entry.unit_inference }
+            : null,
           setCount: 1,
           unit: entry.unit,
           weight: entry.weight,
         });
       }
       const parsed = exerciseMap.get(block.identity.name) ?? null;
-      if (!parsed || !block.identity.provisional) return parsed;
-      return {
+      if (!parsed) return null;
+      const parsedWithIssues = {
         ...parsed,
+        parseIssues: block.parseIssues,
+      };
+      if (!block.identity.provisional) return parsedWithIssues;
+      return {
+        ...parsedWithIssues,
         canonicalExerciseId: null,
         resolutionStatus: "unresolved_provisional",
         provisionalExercise: {
@@ -963,6 +1003,18 @@ function parseCompactStrengthTrainingBlocks(
     existing.sets.push(...exercise.sets);
   }
   return [...merged.values()];
+}
+
+export function getContextualStrengthSetParseDiagnostics(
+  text,
+  { provenanceRef = "typed_evidence_0" } = {}
+) {
+  const issues = [];
+  const exercises = parseCompactStrengthTrainingBlocks(text, {
+    diagnostics: issues,
+    provenanceRef,
+  });
+  return { exercises, issues };
 }
 
 function isStructurallyValidUnknownExerciseHeading(line, nextLine) {
@@ -1004,6 +1056,9 @@ function createProvisionalExerciseIdentity({ line, lineIndex, provenanceRef }) {
       resolutionStatus: "unresolved",
       suggestedCanonicalName: normalizedName,
       suggestedPrimaryMuscleGroup: suggestions.primaryMuscleGroup,
+      suggestedPrimaryMuscleGroupId: suggestions.primaryMuscleGroupId,
+      suggestedPrimaryMuscleGroupConfidence:
+        suggestions.primaryMuscleGroupConfidence,
       suggestedMovementPattern: suggestions.movementPattern,
       suggestedEquipment: suggestions.equipment,
       suggestedLaterality: suggestions.laterality,
@@ -1015,9 +1070,16 @@ function createProvisionalExerciseIdentity({ line, lineIndex, provenanceRef }) {
 
 function inferProvisionalExerciseSuggestions(name) {
   const text = name.toLowerCase();
+  const primaryMuscleGroupSuggestion =
+    suggestCanonicalTrainingMuscleGroup(name);
   if (/\bbiceps?\b|\bbicep\b/.test(text) && /\bcurl\b/.test(text)) {
     return {
-      primaryMuscleGroup: "Biceps",
+      primaryMuscleGroup:
+        primaryMuscleGroupSuggestion.muscleGroup?.label ?? null,
+      primaryMuscleGroupId:
+        primaryMuscleGroupSuggestion.muscleGroup?.id ?? null,
+      primaryMuscleGroupConfidence:
+        primaryMuscleGroupSuggestion.confidence,
       movementPattern: "Elbow Flexion",
       equipment: /\bmachine\b/.test(text) ? "Machine" : null,
       laterality: "Bilateral",
@@ -1027,7 +1089,12 @@ function inferProvisionalExerciseSuggestions(name) {
     };
   }
   return {
-    primaryMuscleGroup: null,
+    primaryMuscleGroup:
+      primaryMuscleGroupSuggestion.muscleGroup?.label ?? null,
+    primaryMuscleGroupId:
+      primaryMuscleGroupSuggestion.muscleGroup?.id ?? null,
+    primaryMuscleGroupConfidence:
+      primaryMuscleGroupSuggestion.confidence,
     movementPattern: null,
     equipment: /\bmachine\b/.test(text) ? "Machine" : null,
     laterality: null,
@@ -1118,6 +1185,19 @@ function parseCompactSetExpression(value) {
     .trim()
     .replace(/^\s*set\s+\d+\s*:\s*/i, "")
     .replace(/[(),]/g, " ");
+  const bodyweight = text.match(
+    /^(\d+(?:\.\d+)?)\s*(?:reps?|r)\s+(?:body\s*weight|bodyweight|body-weight|bw|own\s+body\s+weight)$/i
+  );
+  if (bodyweight) {
+    const reps = Number(bodyweight[1]);
+    if (reps <= 0) return null;
+    return {
+      complete: true,
+      reps,
+      unit: "bodyweight",
+      weight: null,
+    };
+  }
   const tokenPattern =
     /(\d+(?:\.\d+)?)\s*(reps?|r|pounds?|lbs?|lb|p|kg)\b/gi;
   const tokens = [...text.matchAll(tokenPattern)].map((match) => ({
@@ -1153,6 +1233,70 @@ function parseCompactSetExpression(value) {
     };
   }
   return null;
+}
+
+function parseContextualMissingLoadUnitSet(
+  value,
+  { activeLoadUnit, lineNumber, provenanceRef }
+) {
+  const text = String(value ?? "").trim();
+  if (!/\d/.test(text)) return null;
+  const forbidden = /\b(?:assisted|body\s*weight|bodyweight|bw|rpe|rir|tempo|seconds?|secs?|minutes?|mins?|meters?|metres?|kilometers?|kilometres?|miles?)\b|%/i;
+  const loadThenReps = text.match(
+    /^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*r(?:eps?)?$/i
+  );
+  const repsThenLoad = text.match(
+    /^(\d+(?:\.\d+)?)\s*r(?:eps?)?\s+(\d+(?:\.\d+)?)$/i
+  );
+  const match = loadThenReps ?? repsThenLoad;
+  const load = match
+    ? Number(loadThenReps ? match[1] : match[2])
+    : null;
+  const reps = match
+    ? Number(loadThenReps ? match[2] : match[1])
+    : null;
+  const plausible =
+    Number.isFinite(load) &&
+    load > 0 &&
+    load <= 2000 &&
+    Number.isInteger(reps) &&
+    reps > 0 &&
+    reps <= 100;
+
+  if (match && plausible && !forbidden.test(text) && activeLoadUnit === "lb") {
+    return {
+      complete: true,
+      reps,
+      unit: "lb",
+      weight: load,
+      unit_inference: {
+        code: "contextual_pound_unit",
+        reason: "The nearest preceding valid set in this exercise used pounds.",
+        source_line: lineNumber,
+        source_provenance_ref: provenanceRef,
+      },
+    };
+  }
+
+  const resemblesIncompleteSet =
+    match ||
+    /^\d+(?:\.\d+)?(?:\s+\d+(?:\.\d+)?)*$/i.test(text) ||
+    /\d+\s*r(?:eps?)?/i.test(text) ||
+    forbidden.test(text);
+  if (!resemblesIncompleteSet) return null;
+  return {
+    parseIssue: {
+      code: "ambiguous_or_incomplete_strength_set",
+      disposition: "incomplete_set",
+      raw_text: text,
+      reason:
+        match && plausible && activeLoadUnit !== "lb"
+          ? "An unlabeled load cannot be inferred without local pound context."
+          : "The numeric line is not a structurally unambiguous strength set.",
+      source_line: lineNumber,
+      source_provenance_ref: provenanceRef,
+    },
+  };
 }
 
 function recoverCompactDuplicateRepUnits(entries) {
@@ -1856,10 +2000,11 @@ function getNaturalExercisePatterns() {
     { canonical: "Seated Hip Adductions", pattern: /\b(?:seated\s+)?hip\s+adductions?\b|\bseated\s+adductions?\b/gi },
     { canonical: "Hack Squats", pattern: /\bhack\s+squats?\b/gi },
     { canonical: "Sissy Squats", pattern: /\bsissy\s+squats?\b/gi },
-    { canonical: "Leg Press (Feet Middle)", pattern: /\bleg\s+press\s*\(\s*feet\s+middle\s*\)|\bleg\s+press\s+feet\s+middle\b/gi },
-    { canonical: "Leg Press (Feet High)", pattern: /\bleg\s+press\s*\(\s*feet\s+high\s*\)|\bleg\s+press\s+feet\s+high\b/gi },
-    { canonical: "Leg Press (Feet Low)", pattern: /\bleg\s+press\s*\(\s*feet\s+low\s*\)|\bleg\s+press\s+feet\s+low\b/gi },
-    { canonical: "Bulgarian Split Squat (Smith Machine)", pattern: /\bbulgarian\s+split\s+squats?\s*\(\s*smith\s+machine\s*\)|\bsmith\s+machine\s+bulgarian\s+split\s+squats?\b/gi },
+    { canonical: "Leg Press (Feet Middle)", pattern: /\bleg\s+press\s*\(\s*feet\s+middle\s*\)|\bleg\s+press\s+(?:feet\s+middle|middle\s+feet)\b|\bmiddle\s+foot\s+leg\s+press\b/gi },
+    { canonical: "Leg Press (Feet High)", pattern: /\bleg\s+press\s*\(\s*feet\s+high\s*\)|\bleg\s+press\s+feet\s+high\b|\bhigh\s+(?:feet|foot)\s+leg\s+press\b/gi },
+    { canonical: "Leg Press (Feet Low)", pattern: /\bleg\s+press\s*\(\s*feet\s+low\s*\)|\bleg\s+press\s+feet\s+low\b|\blow\s+(?:feet|foot)\s+leg\s+press\b/gi },
+    { canonical: "Leg Press (Sumo Stance)", pattern: /\bleg\s+press\s*\(\s*sumo(?:\s+stance)?\s*\)|\bleg\s+press\s*,?\s+sumo\b|\bsumo\s+leg\s+press\b/gi },
+    { canonical: "Bulgarian Split Squat (Smith Machine)", pattern: /\bbulgarian\s+split\s+squats?\s*\(\s*smith\s+machine\s*\)|\bbulgarian\s+split\s+squats?\s+smith\s+machine\b|\bsmith(?:\s+machine)?\s+bulgarian\s+split\s+squats?\b/gi },
     { canonical: "Pendulum Squat Machine", pattern: /\bpendulum\s+squats?\s+machines?\b|\bpendulum\s+machines?\s+squats?\b/gi },
     { canonical: "Bulgarian Split Squat", pattern: /\bbulgarian\s+split\s+squats?\b/gi },
     { canonical: "Pendulum Squat", pattern: /\bpendulum\s+squats?\b/gi },
@@ -1876,6 +2021,7 @@ function getNaturalExercisePatterns() {
     { canonical: "Cable Crunches", pattern: /\bcable\s+crunch(?:es)?\b/gi },
     { canonical: "Pull-Ups", pattern: /\bpull[-\s]?ups?\b/gi },
     { canonical: "Bench Press", pattern: /\b(?:chest\s+)?bench\s+press\b/gi },
+    { canonical: "Lateral Raises Machine", pattern: /\b(?:lateral\s+raises?\s+machines?|machines?\s+lateral\s+raises?)\b/gi },
     { canonical: "Lateral Raise", pattern: /\blateral\s+raises?\b/gi },
     { canonical: "Leg Press", pattern: /\bleg\s+press\b/gi },
     { canonical: "Leg Raise", pattern: /\bleg\s+raises?\b/gi },
@@ -2486,15 +2632,29 @@ export function normalizeTrainingExercises(exercises) {
 
       const sets = normalizeTrainingSets(exercise.sets ?? []);
       if (sets.length === 0) return null;
+      const resolvedIdentity = resolveTrainingExerciseIdentity(name);
+      const confirmedNewDefinition =
+        exercise.resolutionStatus === "resolved_new_canonical"
+          ? exercise.provisionalExercise?.confirmedDefinition
+          : null;
+      const canonicalExerciseId =
+        resolvedIdentity.resolutionStatus === "resolved_high_confidence"
+          ? resolvedIdentity.canonicalExerciseId
+          : confirmedNewDefinition?.id === exercise.canonicalExerciseId
+            ? exercise.canonicalExerciseId
+            : null;
 
       return {
         id: exercise.id ?? exercise.exercise_id ?? createExerciseId(name),
         name,
-        canonicalExerciseId: exercise.canonicalExerciseId ?? null,
+        canonicalExerciseId,
         resolutionStatus: exercise.resolutionStatus ?? "resolved",
         provisionalExercise: exercise.provisionalExercise
           ? { ...exercise.provisionalExercise, sets }
           : null,
+        parseIssues: Array.isArray(exercise.parseIssues)
+          ? exercise.parseIssues
+          : [],
         ...normalizeExerciseMetadata(exercise, name),
         sets,
         provenance_ref: exercise.provenance_ref ?? sets[0]?.provenance_ref ?? "unknown",
@@ -2563,6 +2723,7 @@ export function normalizeTrainingSets(sets) {
             : reps * weight
             : null,
         provenance_ref: set.provenance_ref ?? "typed_evidence_0",
+        unit_inference: set.unit_inference ?? null,
       };
     })
     .filter(Boolean)
@@ -2612,14 +2773,20 @@ function appendTrainingSets({
   equipment,
   provenanceRef,
   reps,
+  setMetadata,
   setCount,
   unit,
   weight,
 }) {
   if (!exerciseMap.has(exerciseName)) {
+    const resolvedIdentity = resolveTrainingExerciseIdentity(exerciseName);
     exerciseMap.set(exerciseName, {
       id: createExerciseId(exerciseName),
       name: exerciseName,
+      canonicalExerciseId:
+        resolvedIdentity.resolutionStatus === "resolved_high_confidence"
+          ? resolvedIdentity.canonicalExerciseId
+          : null,
       ...inferExerciseMetadata(exerciseName, { equipment }),
       provenance_ref: provenanceRef,
       provenance: {
@@ -2643,6 +2810,7 @@ function appendTrainingSets({
       volume: Number.isFinite(reps) && Number.isFinite(weight) ? reps * weight : null,
       weight,
       weight_unit: normalizedWeightUnit,
+      ...(setMetadata ?? {}),
     });
   }
 }
@@ -2903,6 +3071,7 @@ function extractSpecificExerciseName(value) {
   }
   if (/\bshoulder\s+press\s+machines?\b/i.test(text)) return "Shoulder Press Machine";
   if (/\bshoulder\s+press(?:es)?\b/i.test(text)) return "Shoulder Press";
+  if (/\bmachines?\s+lateral\s+raises?\b/i.test(text)) return "Lateral Raises Machine";
   if (/\blateral\s+raises\s+machines?\b/i.test(text)) return "Lateral Raises Machine";
   if (/\blateral\s+raise\s+machines?\b/i.test(text)) return "Lateral Raise Machine";
   if (/\blateral\s+raises?\b/i.test(text)) return "Lateral Raise";
@@ -2999,16 +3168,18 @@ function normalizeExerciseMetadata(exercise, name) {
 function inferExerciseMetadata(name, overrides = {}) {
   const identity = getTrainingExerciseIdentityByName(name);
   if (identity?.body_region === "Lower Body") {
+    const primaryMuscleGroups = identity.primary_muscle_groups ?? [];
+    const secondaryMuscleGroups = identity.secondary_muscle_groups ?? [];
     return {
       equipment: overrides.equipment ?? identity.equipment,
       body_region: identity.body_region,
-      primary_muscle_groups: identity.primary_muscle_groups,
-      secondary_muscle_groups: identity.secondary_muscle_groups,
+      primary_muscle_groups: primaryMuscleGroups,
+      secondary_muscle_groups: secondaryMuscleGroups,
       movement_pattern: identity.movement_pattern,
       ontology_confidence: "high",
       muscle_groups: [
-        ...identity.primary_muscle_groups,
-        ...identity.secondary_muscle_groups,
+        ...primaryMuscleGroups,
+        ...secondaryMuscleGroups,
         identity.body_region,
       ].filter(Boolean),
     };

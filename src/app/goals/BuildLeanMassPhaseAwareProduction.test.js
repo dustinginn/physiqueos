@@ -8,7 +8,10 @@ const storePath = path.resolve(process.cwd(), "private/founder/runtime-store.jso
 describe("Build Lean Mass phase-aware production", () => {
   it("projects the approved production hierarchy without writing runtime data", async () => {
     const before = fs.readFileSync(storePath, "utf8");
-    const result = await getPhaseAwareActiveGoalPreview();
+    // Keep the production contract stable as wall-clock time advances toward review day.
+    const result = await getPhaseAwareActiveGoalPreview({
+      currentDate: new Date("2026-08-02T12:00:00.000Z"),
+    });
     const after = fs.readFileSync(storePath, "utf8");
 
     expect(after).toBe(before);
@@ -16,8 +19,8 @@ describe("Build Lean Mass phase-aware production", () => {
       title: "Build Lean Mass",
       status: "Active Goal",
       destination: "Build 10 lb of lean mass by October 31, 2026",
-      confidence: "58% confidence",
-      confidenceBand: "Moderate",
+      confidence: "59% confidence",
+      confidenceBand: "Developing",
       editHref: expect.stringMatching(/^\/goals\/.+\/edit$/),
     });
     expect(result.journey).toEqual(
@@ -26,11 +29,11 @@ describe("Build Lean Mass phase-aware production", () => {
           name: "Establish Maintenance",
           status: "Active",
           color: "orange",
-          progress: "Week 1 of 4",
+          progress: "13 days remaining",
         }),
         expect.objectContaining({
           name: "Lean Mass Build",
-          status: "Upcoming",
+          status: "Planned",
           color: "green",
           progress: "0 of 10 lb measured",
           support: "Awaiting next DEXA",
@@ -48,9 +51,9 @@ describe("Build Lean Mass phase-aware production", () => {
       weight: "167.4 lb",
     });
     expect(result.trainingProgress).toMatchObject({
-      periodStart: "2026-07-20",
-      periodEnd: "2026-08-16",
-      reviewDate: "2026-08-17",
+      periodStart: "2026-07-19",
+      periodEnd: "2026-08-15",
+      reviewDate: "2026-08-15",
       readinessState: "waiting_for_evidence",
       checkpointEligibility: false,
     });

@@ -1,47 +1,50 @@
 import { expectedPhaseReviewDate, PHASE_DATE_ARITHMETIC_CONVENTION } from "./GoalPhaseTimelineIntegrityService";
+import { isActivePhaseStatus, isPlannedPhaseStatus } from "../models/canonicalGoalPhase";
+import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = new Date(), timeZone = "UTC", evidenceSummary = {}, dexaScans = [] } = {}) {
-  const explicitPhases = Array.isArray(phases) ? phases : activeGoal?.phases;
-  if (!activeGoal || !Array.isArray(explicitPhases) || explicitPhases.length === 0) {
+  const correctedGoal = projectFounderBuildLeanMassPhaseCorrection(activeGoal);
+  const explicitPhases = Array.isArray(phases) ? phases : correctedGoal?.phases;
+  if (!correctedGoal || !Array.isArray(explicitPhases) || explicitPhases.length === 0) {
     return freeze({ hasExplicitPhases: false, legacyFallbackUsed: true, blockingReasons: [], warnings: [] });
   }
 
   const ordered = [...explicitPhases].sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
-  const active = ordered.filter((phase) => phase.status === "active");
+  const active = ordered.filter((phase) => isActivePhaseStatus(phase.status));
   const blockingReasons = active.length === 1 ? [] : [active.length ? "MULTIPLE_ACTIVE_PHASES" : "ACTIVE_PHASE_MISSING"];
   const today = localDate(currentDate, timeZone);
   const activePhase = active.length === 1 ? phaseSummary(active[0], today) : null;
-  const targetDescription = activeGoal.target?.description ?? null;
-  const journeyStartDate = validDate(activeGoal.timeline?.startDate) ? activeGoal.timeline.startDate : null;
-  const overallTargetDate = validDate(activeGoal.target?.targetDate)
-    ? activeGoal.target.targetDate
-    : validDate(activeGoal.timeline?.targetDate) ? activeGoal.timeline.targetDate : null;
+  const targetDescription = correctedGoal.target?.description ?? null;
+  const journeyStartDate = validDate(correctedGoal.timeline?.startDate) ? correctedGoal.timeline.startDate : null;
+  const overallTargetDate = validDate(correctedGoal.target?.targetDate)
+    ? correctedGoal.target.targetDate
+    : validDate(correctedGoal.timeline?.targetDate) ? correctedGoal.timeline.targetDate : null;
   const overallRange = dateRange(journeyStartDate, overallTargetDate, today);
   const confidence = confidenceSummary({
     evidenceSummary,
     timelineValid: Boolean(activePhase?.timelineValidity && journeyStartDate && overallTargetDate),
-    ambitious: isAmbitious(activeGoal),
+    ambitious: isAmbitious(correctedGoal),
     hasPhaseOutcomeEvidence: Boolean(evidenceSummary.phaseOutcomeEvidence),
   });
 
-  const phaseResults = ordered.map((phase) => phaseSummary(phase, today, outcomeProgressForPhase({ activeGoal, phase, dexaScans, journeyStartDate })));
+  const phaseResults = ordered.map((phase) => phaseSummary(phase, today, outcomeProgressForPhase({ activeGoal: correctedGoal, phase, dexaScans, journeyStartDate })));
   return freeze({
     overallGoal: {
-      goalId: activeGoal.id,
-      goalName: activeGoal.title ?? activeGoal.name ?? "Current Goal",
-      goalOutcome: activeGoal.primaryOutcome ?? null,
+      goalId: correctedGoal.id,
+      goalName: correctedGoal.title ?? correctedGoal.name ?? "Current Goal",
+      goalOutcome: correctedGoal.primaryOutcome ?? null,
       targetDescription,
       journeyStartDate,
       overallTargetDate,
-      sharedGuardrails: (activeGoal.guardrails ?? []).filter((item) => item.accepted !== false).map((item) => item.text).filter(Boolean),
+      sharedGuardrails: (correctedGoal.guardrails ?? []).filter((item) => item.accepted !== false).map((item) => item.text).filter(Boolean),
       destinationCompleteness: targetDescription && journeyStartDate && overallTargetDate ? "complete" : "incomplete",
       overallDaysElapsed: overallRange?.elapsedDays ?? null,
       overallDaysRemaining: overallRange?.remainingDays ?? null,
     },
-    activePhase: phaseResults.find((phase) => phase.status === "active") ?? activePhase,
-    upcomingPhases: phaseResults.filter((phase) => phase.status !== "active"),
+    activePhase: phaseResults.find((phase) => isActivePhaseStatus(phase.status)) ?? activePhase,
+    upcomingPhases: phaseResults.filter((phase) => isPlannedPhaseStatus(phase.status)),
     phases: phaseResults,
     confidence,
     hasExplicitPhases: true,
@@ -54,7 +57,7 @@ export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = ne
 
 function phaseSummary(phase, today, outcomeProgress = null) {
   const plannedReviewDate = expectedPhaseReviewDate(phase);
-  const timeline = phase.status === "upcoming"
+  const timeline = isPlannedPhaseStatus(phase.status)
     ? upcomingTimeline(phase, plannedReviewDate)
     : phase.status === "completed"
       ? { progressPercentage: 100, progressState: "completed", progressLabel: "Completed" }
@@ -83,7 +86,7 @@ function phaseSummary(phase, today, outcomeProgress = null) {
     friendlyTimeline: timeline.friendlyTimeline ?? null,
     progressLabel: timeline.progressLabel ?? null,
     progress: outcomeProgress ?? plannedProgress(phase, timeline),
-    sequencingNote: phase.status === "upcoming" && !phase.startDate ? "Begins after the prior phase review" : null,
+    sequencingNote: isPlannedPhaseStatus(phase.status) && !phase.startDate ? "Begins after an authorized prior-phase decision" : null,
   };
 }
 

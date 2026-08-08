@@ -1,10 +1,10 @@
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { resolveHomeGoalTrajectory } from "./HomeGoalTrajectoryService";
 import { createGoalTrainingProgress } from "./GoalTrainingProgressService";
-import { resolveOverallGoalConfidenceReadModel } from "./OverallGoalConfidenceReadService";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
 
 export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {
   const user = await repositories.users.getCurrentUser();
@@ -23,6 +23,7 @@ export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRep
 
 export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [], protocols = [], canonicalEvidence = [], checkIns = [], nutritionContext = null, progressPhotos = [], currentDate = new Date() }) {
   if (!goal || goal.status !== "active" || goal.type !== "build_lean_mass") throw new Error("The active Build Lean Mass goal is unavailable.");
+  goal = projectFounderBuildLeanMassPhaseCorrection(goal);
   const timeZone = user?.timeZone ?? "America/Los_Angeles";
   const trajectory = resolveHomeGoalTrajectory({ activeGoal: goal, phases: goal.phases, currentDate, timeZone, dexaScans });
   if (!trajectory.hasExplicitPhases || !trajectory.activePhase) throw new Error("The active goal phase trajectory is unavailable.");
@@ -32,11 +33,9 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   const protocolTypes = new Set(protocols.map((item) => String(item.protocolType ?? item.type ?? item.category ?? "").toLowerCase()));
   const strategy = ["Energy", "Nutrition", "Activity", "Training", "Coaching Updates", "Peptide", "Supplement"].map((label) => ({ label, active: [...protocolTypes].some((type) => type.includes(label.toLowerCase().replace(" updates", ""))) }));
   const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /8.?9%|body fat/i.test(item)) ?? "Maintain approximately 8–9% body fat.";
-  const legacyGoalConfidence = resolveOverallGoalConfidenceReadModel({ activeGoal: goal, activeProtocols: protocols, canonicalEvidence, checkIns, currentDate, dexaScans, nutritionContext, progressPhotos, timeZone, trainingPerformance: createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence, now: currentDate }) });
   const overallGoalConfidence = resolveActiveGoalConfidencePresentation({
     activeGoal: goal,
     store: getFounderRuntimeStore(),
-    legacyReadModel: legacyGoalConfidence,
   });
   const trainingProgress = createGoalTrainingProgress({ goal, phase: goal.phases.find((item)=>item.id===active.phaseId), canonicalObjects: canonicalEvidence, currentDate, timeZone });
   const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The final cut measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Maintenance phase activated", body: "The journey began by establishing a reliable maintenance baseline." }, { date: active.calculatedPlannedReviewDate, title: "Planned phase review", body: "Evidence will determine readiness for the Lean Mass Build phase." }, { date: upcoming.targetDate, title: "Goal destination", body: "A future DEXA will measure progress toward the 10 lb lean-mass target." }];
@@ -57,7 +56,7 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   };
 }
 
-function phaseCard(phase, color) { return { name: phase.phaseName, status: phase.status === "active" ? "Active" : "Upcoming", dates: phase.status === "active" ? `${formatShortDate(phase.startDate)}–${formatShortDate(phase.calculatedPlannedReviewDate)}` : `Target ${formatShortDate(phase.targetDate)}`, progress: phase.progress.presentationLabel, support: phase.progress.status === "awaiting_follow_up" ? "Awaiting next DEXA" : phase.friendlyTimeline, percentage: phase.progress.clampedProgressPercentage ?? phase.timelineProgressPercentage ?? 0, color }; }
+function phaseCard(phase, color) { return { name: phase.phaseName, status: phase.status === "active" ? "Active" : "Planned", dates: phase.status === "active" ? `Started ${formatShortDate(phase.startDate)} · Planned review ${formatShortDate(phase.calculatedPlannedReviewDate)}` : `Projected · Target ${formatShortDate(phase.targetDate)}`, progress: phase.progress.presentationLabel, support: phase.progress.status === "awaiting_follow_up" ? "Awaiting next DEXA" : phase.friendlyTimeline, percentage: phase.progress.clampedProgressPercentage ?? phase.timelineProgressPercentage ?? 0, color }; }
 function mass(value) { return Number.isFinite(value?.value) ? `${value.value.toFixed(1)} ${value.unit}` : "—"; }
 function metric(value, unit) { return Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—"; }
 function formatLongDate(value) { return formatDate(value, { month: "long", day: "numeric", year: "numeric" }); }

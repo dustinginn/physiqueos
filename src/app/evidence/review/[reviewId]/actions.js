@@ -56,6 +56,7 @@ import { createCanonicalExerciseWorkoutCommitService } from "../../../../domain/
 import {
   assertNoUnresolvedProvisionalExercises,
   canonicalDefinitionsPendingCreation,
+  prepareCanonicalExerciseIdentitiesForConfirmation,
 } from "../../../../domain/services/CanonicalExerciseLibraryService";
 
 function uniqueStrings(values = []) {
@@ -86,13 +87,14 @@ export async function confirmEvidenceReview(formData) {
   catch { throw new Error("The evidence selection is invalid."); }
   evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
   evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
+  evidencePackage = prepareCanonicalExerciseIdentitiesForConfirmation(evidencePackage);
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
   assertNoUnresolvedProvisionalExercises(evidencePackage);
   assertIncludedPhotoSessionsReady(evidencePackage);
   validateDexaObjectsBeforeCommit(evidencePackage);
 
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
-  await service.beginCommit(reviewId);
+  await service.beginCommit(reviewId, { evidencePackage });
   let orchestrationResult;
   try {
     const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
@@ -127,7 +129,7 @@ export async function resolveEvidenceReviewExercise(formData) {
       canonicalExerciseId: String(formData.get("canonicalExerciseId") ?? ""),
       definition: {
         canonicalName: formData.get("canonicalName"),
-        primaryMuscleGroup: formData.get("primaryMuscleGroup"),
+        primaryMuscleGroupId: formData.get("primaryMuscleGroupId"),
         movementPattern: formData.get("movementPattern"),
         equipment: formData.get("equipment"),
         laterality: formData.get("laterality"),

@@ -1,8 +1,13 @@
 export const GoalPhaseStatus = Object.freeze({
   UPCOMING: "upcoming",
+  PLANNED: "planned",
   ACTIVE: "active",
+  REVIEW_DUE: "review_due",
+  REVIEW_PENDING_DECISION: "review_pending_decision",
   COMPLETED: "completed",
   SKIPPED: "skipped",
+  SUPERSEDED: "superseded",
+  PAUSED: "paused",
 });
 
 export const GoalPhaseTimingMode = Object.freeze({
@@ -65,6 +70,18 @@ export function createGoalPhase(input = {}) {
   phase.guardrails = normalizeCollection(phase.guardrails, "guardrails");
   phase.createdAt = normalizeOptionalTimestamp(phase.createdAt, "createdAt");
   phase.updatedAt = normalizeOptionalTimestamp(phase.updatedAt, "updatedAt");
+  for (const field of ["startedAt", "plannedReviewAt", "projectedNextPhaseStart", "projectedNextReviewAt", "currentRecommendedReviewAt"]) {
+    if (field in phase) phase[field] = normalizeOptionalDate(phase[field], field);
+  }
+  for (const field of ["completedAt", "supersededAt", "lastReviewedAt"]) {
+    if (field in phase) phase[field] = normalizeOptionalDateOrTimestamp(phase[field], field);
+  }
+  for (const field of ["extensionCount", "revision"]) {
+    if (field in phase && (!Number.isSafeInteger(Number(phase[field])) || Number(phase[field]) < 0)) {
+      throw phaseError("GOAL_PHASE_REVISION_INVALID", `Goal phase ${field} must be a non-negative integer.`, { field });
+    }
+    if (field in phase) phase[field] = Number(phase[field]);
+  }
 
   if (phase.timingMode === GoalPhaseTimingMode.FIXED_DURATION && !phase.duration) {
     throw phaseError("GOAL_PHASE_DURATION_REQUIRED", "A positive duration is required for fixed-duration phases.");
@@ -112,7 +129,7 @@ export function normalizeGoalPhaseCollection(phases = [], { goalId = null } = {}
     }
     ids.add(phase.id);
     orders.add(phase.order);
-    if (phase.status === GoalPhaseStatus.ACTIVE) activeCount += 1;
+    if (isCommittedActiveStatus(phase.status)) activeCount += 1;
   }
   if (activeCount > 1) {
     throw phaseError("GOAL_PHASE_MULTIPLE_ACTIVE", "A goal can have no more than one active phase.");
@@ -221,6 +238,12 @@ function normalizeOptionalTimestamp(value, field) {
   return value;
 }
 
+function normalizeOptionalDateOrTimestamp(value, field) {
+  if (value == null || value === "") return null;
+  if (isValidDateKey(value)) return value;
+  return normalizeOptionalTimestamp(value, field);
+}
+
 function assertEnum(field, value, supported, code) {
   if (!supported.has(value)) {
     throw phaseError(code, `Unsupported goal phase ${field}: ${String(value)}.`, { field, value });
@@ -228,9 +251,13 @@ function assertEnum(field, value, supported, code) {
 }
 
 function sequenceRank(status) {
-  if (status === GoalPhaseStatus.COMPLETED || status === GoalPhaseStatus.SKIPPED) return 0;
-  if (status === GoalPhaseStatus.ACTIVE) return 1;
+  if ([GoalPhaseStatus.COMPLETED, GoalPhaseStatus.SKIPPED, GoalPhaseStatus.SUPERSEDED].includes(status)) return 0;
+  if (isCommittedActiveStatus(status) || status === GoalPhaseStatus.PAUSED) return 1;
   return 2;
+}
+
+function isCommittedActiveStatus(status) {
+  return [GoalPhaseStatus.ACTIVE, GoalPhaseStatus.REVIEW_DUE, GoalPhaseStatus.REVIEW_PENDING_DECISION].includes(status);
 }
 
 function isValidDateKey(value) {

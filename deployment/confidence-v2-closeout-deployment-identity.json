@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "bounded_deployment_identity_v1",
+  "createdAt": "2026-08-03T16:30:00-07:00",
+  "baseSourceIdentity": "sha256_f880505f352aa3ef8de737cf7cf40f22b1327db88ea8dccc1ad1c9b53521bbef",
+  "patchIdentity": "sha256_eeed3def469f1f1cff5023eddf26d25af9a7e4e10bd86652a4555764e89d31ba",
+  "candidateSourceIdentity": "sha256_0a9ade633c3239a6ae0a36467f0b21a7076b8f896d012c68c4ebe527b73f2fb2",
+  "buildIdentity": "Qms4KQSuL4LA7JH6qmzzU",
+  "buildTreeIdentity": "sha256_9cf4ac7e556b61b7761ce7d1ceabc94d3056adadfbbf768b787d9de8f1ec0921",
+  "candidatePath": "C:\\Users\\dusti\\AppData\\Local\\Temp\\physiqueos-confidence-v2-closeout-20260803-1628",
+  "overlayPaths": [
+    { "path": "docs/ACTIVE_GOAL_PHASE_AWARE_PREVIEW.md", "sha256": "F8B41EA5873D1A04E0180832E667238AC05E4F37055CD7EC03E8C60EEB83C810" },
+    { "path": "docs/CONFIDENCE_ARCHITECTURE_V2.md", "sha256": "B6D9CA82147D695BD0288A4214997214A21BFF66ED6D2AF06E6F0447A3045EFB" },
+    { "path": "docs/CONFIDENCE_PUBLICATION_ARCHITECTURE_V2.md", "sha256": "7B053690F194CF2221376E34B3734271F1E8BE71D855B577B8FD8CD162A20495" },
+    { "path": "docs/CONFIDENCE_V2_CURRENT_STATE.md", "sha256": "E03D76E89E793780C76837E725E041843DEFBFED92D6C0F84D785CC9238D014B" },
+    { "path": "docs/CONFIDENCE_V2_PHASE_REVIEW_PRODUCTION_CUTOVER.md", "sha256": "71CE0436A643A374E9F7B48347BB9A2C51327FB76289867AEE74803B79227747" },
+    { "path": "docs/CONFIDENCE_V2_PRODUCTION_INTEGRATION.md", "sha256": "2011B7B69081F21E22888B422DD9CC52B27BB8018592BE61924E24F22497CE0E" },
+    { "path": "docs/GOAL_CONTRACT_ARCHITECTURE_V2.md", "sha256": "1B9AADF5F85D41B5262ABB79EEBC455CE177B2AFD993FC9222EC9D93858A7805" },
+    { "path": "docs/INTERPRETATION_ARCHITECTURE_V2.md", "sha256": "E96F53A1B424BFF363DF045598E7C4011E62A79EA5FD1AA726609AD85B66C4D8" },
+    { "path": "docs/PHASE_REVIEW_PRODUCTION_BOUNDARY.md", "sha256": "300C7FDB1678918CEF474C793811131B1A21FD5A1F4BF9BF15608FF7AC99F4B7" },
+    { "path": "src/domain/services/ConfidenceV2CurrentStateDocumentation.test.js", "sha256": "43BB6BCCC6FF6F1DB330341A52059FFF1CAC5A939D533C25D66D06DE2FA11274" },
+    { "path": "src/domain/services/DailyBriefingService.js", "sha256": "30837A0E1BFDD136B37C8095FBE42359C24E0C4799CBE39592770EB76821F8F9" },
+    { "path": "src/domain/services/DailyCanonicalConfidenceRead.test.js", "sha256": "860C14A9DFB557C48B5B22326500189447B775DA3F7F2E322F0DB78B9E03B226" },
+    { "path": "src/domain/services/GoalConfidenceArchitectureDiagnosticService.js", "sha256": "28F8B3038A7FB63A62408DEBDF9618307FA327941D808FE84D5FFC0D62A3362C" },
+    { "path": "src/domain/services/GoalConfidenceArchitectureDiagnosticService.test.js", "sha256": "2CB061207B96C7EAA99FE1E6F1B5698FE066583C914B9FC8197B5D4168516602" },
+    { "path": "src/domain/services/HomeActiveChapterPresentationService.js", "sha256": "585B6552AC3FA452B006ED55B3AB175FB9F37B52002C90B23195C913F902B2D6" },
+    { "path": "src/screens/DailyBriefingPresentation.test.js", "sha256": "2217FE6940CAB28DC1DE4BF3BACA82E43DD6786C992EEEA16F9E33157CBA4822" },
+    { "path": "src/screens/DailyBriefingScreen.jsx", "sha256": "745159CA3DE8D574C88049A5F7EE2766D5FA8F38C76B5A311067C21AD3DDEADD" }
+  ],
+  "exclusions": [
+    "unrelated dirty-worktree paths",
+    "private/**",
+    "logs/**",
+    "screenshots/**",
+    "live .next/**"
+  ],
+  "validation": {
+    "overlayCount": 17,
+    "founderDataExcluded": true,
+    "liveNextExcluded": true,
+    "isolatedBuildPassed": true
+  }
+}

@@ -44,7 +44,8 @@ describe("GoalsHubScreen finalized goal index", () => {
   it("keeps objective-specific live states and compact confidence values", () => {
     expect(source).toContain("evaluation?.projection?.completionStageLabel");
     expect(source).toContain("summary.presentation?.status ?? summary.current");
-    expect(source).toContain("resolveOverallGoalConfidenceReadModel");
+    expect(source).toContain("resolveActiveGoalConfidencePresentation");
+    expect(source).not.toContain("resolveOverallGoalConfidenceReadModel");
     expect(source).toContain("formatConfidence(goal.confidence)");
     expect(source).toContain('"Confidence unavailable"');
     expect(source).not.toContain("summary.confidence ?? evaluation?.confidence ?? 0");

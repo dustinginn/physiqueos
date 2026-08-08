@@ -1,4 +1,12 @@
-import { createPICadenceBriefingPublicationService } from "./PICadenceBriefingPublicationService";
+import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
+import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
+import { createCanonicalConfidenceReadService } from "../confidence/CanonicalConfidenceReadService";
+import {
+  adaptBriefingArtifactToEvidenceDescriptors,
+  adaptProductionGoalToCanonicalContract,
+} from "../confidence/ProductionConfidenceContextAdapter";
+import { createBriefingGoalConfidenceBlockFromV2 } from
+  "./BriefingGoalConfidencePresentationService";
 import { createMonthlyEvidenceWindow } from "./BriefingEvidenceWindowService";
 import {
   createMonthlyBriefingPreviewService,
@@ -6,6 +14,7 @@ import {
 import {
   composeMonthlyBriefingPresentation,
 } from "./MonthlyBriefingPresentationService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const MONTHLY_BRIEFING_VERSION = "monthly_briefing_v1";
 export const MONTHLY_ARTIFACT_ID_VERSION = "monthly_artifact_id_v1";
@@ -21,7 +30,7 @@ export function getMonthlyArtifactId({ userId, window }) {
 export function createFounderMonthlyBriefingService({
   repositories,
   now = () => new Date(),
-  publicationService = createPICadenceBriefingPublicationService({ now }),
+  publicationService = createCanonicalBriefingConfidencePublicationService({ now }),
 } = {}) {
   return createMonthlyBriefingService({ repositories, now, publicationService });
 }
@@ -104,18 +113,70 @@ export function createMonthlyBriefingService({
         window,
       });
       const baseline = publicationService.captureBaseline();
-      const publication = await publicationService.publish({
-        schemaVersion: "pi_cadence_briefing_publication_v1",
-        cadence: "monthly",
-        operation: "create",
-        artifact,
-        artifactConfidenceAssessmentId: narrative.goalConfidence.assessmentId,
-        confidencePublicationCommand: null,
+      const goal = narrative.evidenceFixture.goal;
+      const activePhase = resolveCommittedPhaseContext(goal, { asOf: window.endDate }).activePhase;
+      const current = createCanonicalConfidenceReadService({ store: baseline.store })
+        .getCurrent({ goalId: goal.id, phaseId: activePhase?.id });
+      if (!current.assessment) {
+        const error = new Error("Monthly V2 requires a canonical predecessor.");
+        error.code = "canonical_predecessor_required";
+        throw error;
+      }
+      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
+        activePhase,
+      });
+      const finalized = await createBriefingForecastFinalizer({
+        publicationService, now,
+      }).finalize({
+        publisherType: "monthly_briefing", userId: resolvedUserId,
+        occurrenceId: artifact.id, artifactId: artifact.id,
+        cadenceOrEventType: "monthly", goalContract,
+        phaseId: activePhase?.id ?? null,
+        evidenceWindow: { id: window.id, start: window.startDate,
+          cutoff: window.cutoff, closed: window.closed },
+        strategyContext: goalContract.strategyHypothesis,
+        executionContext: { adequacy: "adequate",
+          elapsedTimeAdequacy: "adequate", refs: evidenceRefs(artifact) },
+        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
+        previousCanonicalAssessment: current.assessment,
+        publicationCutoff: window.cutoff, finalizedAt: generatedAt,
+        idempotencyKey: `confidence_v2|monthly|${artifact.id}`,
+        expectedPriorAssessmentId: current.assessment.id,
+        expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
         expectedSemanticDigest: baseline.semanticDigest,
-        replacementAuthorized: false,
-        publicationReason: "scheduled_monthly_cadence",
+        sourceLineage: { reason: "scheduled_monthly_cadence",
+          evidenceWindowId: window.id },
+        elapsedTimeAdequacy: "adequate",
+        phaseReviewContext: {
+          activeGoal: goal, activePhase,
+          reviewMilestone: activePhase?.reviewMilestone ?? null,
+          currentArtifact: { id: artifact.id, evidenceTypes: ["monthly"],
+            evidenceIdentities: [window.id] },
+          artifactType: "monthly", eventIdentity: artifact.id,
+          evidenceIdentity: window.id, artifactTimestamp: window.cutoff,
+          publicationTimestamp: generatedAt, currentDate: window.cutoff,
+          reviewState: activePhase?.reviewState,
+          decisionHistory: baseline.store.phaseReviewDecisions ?? [],
+          expectedStoreRevision: baseline.revision,
+        },
+        composeArtifact: (outputs) => {
+          const candidate = structuredClone(artifact);
+          const block = createBriefingGoalConfidenceBlockFromV2({
+            assessment: outputs.confidenceAssessment,
+            projection: outputs.numericConfidenceProjection,
+            narrativeAssessment: outputs.narrativeAssessment,
+            capturedAt: generatedAt,
+          });
+          candidate.briefing.monthlyNarrative.confidence = block;
+          candidate.briefing.confidenceAssessmentId = block.assessmentId;
+          if (candidate.briefing.monthlyPresentation?.hero) {
+            candidate.briefing.monthlyPresentation.hero.confidence = block;
+          }
+          return { artifact: candidate };
+        },
       });
+      const publication = finalized.commitResult;
       if (publication.committed) {
         return {
           state: "completed",
@@ -146,7 +207,11 @@ export function createMonthlyBriefingService({
   });
 }
 
-function createMonthlyArtifact({
+function evidenceRefs(artifact) {
+  return artifact?.briefing?.provenance?.evidenceRefs ?? [];
+}
+
+export function createMonthlyArtifact({
   artifactId,
   generatedAt,
   narrative,
@@ -162,7 +227,7 @@ function createMonthlyArtifact({
     selectedStories.flatMap((story) => story.evidenceRefs ?? [])
   )];
   const goal = narrative.evidenceFixture.goal;
-  const phase = goal?.phases?.find((item) => item.status === "active") ?? null;
+  const phase = goal ? resolveCommittedPhaseContext(goal, { asOf: window.endDate }).activePhase : null;
   return {
     id: artifactId,
     artifactIdVersion: MONTHLY_ARTIFACT_ID_VERSION,
@@ -211,6 +276,9 @@ function createMonthlyArtifact({
         evidenceResolution: structuredClone(
           narrative.evidenceFixture.evidenceResolution
         ),
+        semanticDiagnostics: structuredClone(
+          narrative.editorialDecision.semanticDiagnostics ?? null
+        ),
       },
     },
     createdAt: generatedAt,
@@ -222,7 +290,7 @@ function toProductionPresentation(presentation, { artifactId, window }) {
   const production = structuredClone(presentation);
   delete production.preview;
   if (production.milestone) production.milestone.href = "/goals";
-  production.hero.period = `${formatMonthRange(window)} · Delivered ${formatMonthDay(window.deliveryDate)}`;
+  production.hero.period = formatMonthlyPeriodLine(window);
   production.source = {
     ...production.source,
     narrativeId: `monthly_narrative_${window.briefingMonth.replace("-", "")}`,
@@ -277,7 +345,11 @@ function formatMonthRange(window) {
     month: "long",
     timeZone: "UTC",
   }).format(new Date(`${window.startDate}T12:00:00Z`));
-  return `${month} ${Number(window.startDate.slice(-2))}–${Number(window.endDate.slice(-2))}`;
+  return `${month} ${Number(window.startDate.slice(-2))}\u2013${Number(window.endDate.slice(-2))}`;
+}
+
+export function formatMonthlyPeriodLine(window) {
+  return `${formatMonthRange(window)} \u00b7 Delivered ${formatMonthDay(window.deliveryDate)}`;
 }
 
 function formatMonthDay(value) {

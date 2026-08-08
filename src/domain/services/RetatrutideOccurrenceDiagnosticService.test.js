@@ -84,7 +84,7 @@ describe("Retatrutide occurrence-source diagnostic", () => {
     });
   });
 
-  it("explains rich protocol routing versus the generic fallback", async () => {
+  it("explains canonical Execution routing versus the generic fallback", async () => {
     const store = read();
     const service = createPriorityDetailService({
       repositories: repositories(store),
@@ -101,14 +101,14 @@ describe("Retatrutide occurrence-source diagnostic", () => {
       sections: expect.arrayContaining([
           expect.objectContaining({ title: "Dose", items: [expect.objectContaining({
             label: "1.5 mg",
-            detail: "Effective today. Previously 2 mg.",
+            detail: "2026-07-23 – 2026-07-29",
           })] }),
         expect.objectContaining({ title: "Related Goals", items: expect.arrayContaining([
           expect.objectContaining({ label: "Primary Goal", detail: "Build Lean Mass" }),
           expect.objectContaining({ label: "Guardrail", detail: "8-9% Body Fat" }),
         ]) }),
-        expect.objectContaining({ title: "Next Protocol Change", items: [
-          expect.objectContaining({ label: "1 mg", detail: "Planned for Jul 30." }),
+        expect.objectContaining({ title: "Next Execution Change", items: [
+          expect.objectContaining({ label: "None scheduled", detail: "No upcoming Execution phase is scheduled." }),
         ] }),
       ]),
     });
@@ -165,6 +165,9 @@ function repositories(store) {
       getReminderById: async (id) => store.reminders.find((item) => item.id === id) ?? null,
     },
     protocols: { listProtocols: async () => store.protocols },
+    executionItems: {
+      listExecutionItems: async () => store.executionItems,
+    },
     operatingPlan: { getOperatingPlan: async () => store.operatingPlan },
     operatingRhythm: { getOperatingRhythm: async () => store.operatingRhythm },
   };

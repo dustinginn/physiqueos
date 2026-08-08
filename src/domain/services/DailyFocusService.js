@@ -1,7 +1,18 @@
 import { normalizeProgressPhotoCategory } from "../models/progressPhotoPoseVocabulary";
-import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
+import {
+  DEFAULT_LOCAL_TIME_ZONE,
+  getLocalDateKey,
+  getPreviousLocalDayWindow,
+} from "../utils/localDate";
 import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
 import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
+import {
+  ExecutionPriorityOperationalReason,
+  ExecutionPriorityOperationalState,
+  findExecutionForProtocol,
+  formatExecutionDose,
+  projectExecutionPriority,
+} from "./ExecutionPriorityProjectionService";
 
 const DAY_NAMES = [
   "sunday",
@@ -13,6 +24,38 @@ const DAY_NAMES = [
   "saturday",
 ];
 
+const MORNING_RECONCILIATION_REMINDER_TYPES = new Set([
+  "evidence_reminder",
+  "protocol",
+  "protocol_reminder",
+  "recovery_reminder",
+  "progress_photo",
+  "dexa",
+  "morning_weigh_in",
+  "other",
+]);
+
+const TERMINAL_PRIORITY_STATUSES = new Set([
+  "archived",
+  "cancelled",
+  "completed",
+  "dismissed",
+  "moved",
+  "rescheduled",
+  "resolved",
+  "skipped",
+  "superseded",
+]);
+
+const TERMINAL_RECONCILIATION_STATUSES = new Set([
+  "completed",
+  "dismissed",
+  "moved",
+  "note",
+  "rescheduled",
+  "skipped",
+]);
+
 export function createDailyFocusService() {
   return {
     getDailyFocus({
@@ -20,40 +63,41 @@ export function createDailyFocusService() {
       latestWeight = null,
       weightEntries = [],
       protocols = [],
+      executionItems = [],
       progressPhotos = [],
       reminders = [],
       now = new Date(),
+      timeZone = DEFAULT_LOCAL_TIME_ZONE,
     } = {}) {
-      const today = toDateKey(now);
-      const dayName = DAY_NAMES[now.getDay()];
+      const today = getLocalDateKey(now, timeZone);
+      const dayName = getDayName(today);
       const todaysCheckIn = checkIns.find((checkIn) => checkIn.date === today);
-      const protocolItems = [
-        getProtocolItem({
-          reminders,
-          protocols,
-          title: "Retatrutide",
-          today,
-          dayName,
-          now,
-        }),
-        getProtocolItem({
-          reminders,
-          protocols,
-          title: "Tesamorelin",
-          today,
-          dayName,
-          now,
-        }),
-      ].filter(Boolean);
-      const doseChangeItem = getDoseChangeItem({ protocols, today, now });
-      const mergedProtocolItems = protocolItems.map((item) =>
-        mergeDoseChangeIntoExecution(item, doseChangeItem, today)
+      const executionProtocolItems = getExecutionBackedProtocolItems({
+        dayName,
+        executionItems,
+        now,
+        protocols,
+        reminders,
+        timeZone,
+        today,
+      });
+      const executionBackedProtocolIds = new Set(
+        protocols
+          .filter((item) => ["peptide", "supplement"].includes(item.category))
+          .map((item) => item.id)
+          .filter(Boolean)
       );
+      const doseChangeItem = getLegacyReminderOnlyDoseChangeItem({
+        excludedProtocolIds: executionBackedProtocolIds,
+        protocols,
+        today,
+        now,
+      });
       const highPriorityItems = [
         getMorningWeightItem({ latestWeight, todaysCheckIn, today, now }),
         ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
-        isMergedDoseChange(doseChangeItem, mergedProtocolItems) ? null : doseChangeItem,
-        ...mergedProtocolItems,
+        doseChangeItem,
+        ...executionProtocolItems,
         ...getPersistentReminderItems({ reminders, today, dayName }),
       ].filter(Boolean);
       const sessions = getDailySessionsFromItems(highPriorityItems);
@@ -143,10 +187,210 @@ export function createDailyFocusService() {
         })
         .filter(Boolean);
     },
+    getPreviousDayIncompletePriorityItems(options = {}) {
+      return getPreviousDayIncompletePrioritySelection(options).items;
+    },
+    getPreviousDayIncompletePrioritySelection(options = {}) {
+      return getPreviousDayIncompletePrioritySelection(options);
+    },
   };
 }
 
 export const DailyFocusService = createDailyFocusService();
+
+export function getPreviousDayIncompletePriorityItems(options = {}) {
+  return getPreviousDayIncompletePrioritySelection(options).items;
+}
+
+export function getPreviousDayIncompletePrioritySelection({
+  checkIns = [],
+  dexaScans = [],
+  now = new Date(),
+  progressPhotos = [],
+  reminders = [],
+  timeZone = DEFAULT_LOCAL_TIME_ZONE,
+  weightEntries = [],
+} = {}) {
+  const window = getPreviousLocalDayWindow({ now, timeZone });
+  const dayName = getDayName(window.previousLocalDate);
+  const exclusions = [];
+  const items = [];
+
+  for (const reminder of reminders) {
+    const exclusionReason = getPreviousDayPriorityExclusionReason({
+      checkIns,
+      date: window.previousLocalDate,
+      dayName,
+      dexaScans,
+      progressPhotos,
+      reminder,
+      timeZone: window.timeZone,
+      weightEntries,
+    });
+
+    if (exclusionReason) {
+      exclusions.push({
+        priorityId: reminder?.id ?? null,
+        reason: exclusionReason,
+      });
+      continue;
+    }
+
+    items.push({
+      id: reminder.id,
+      occurrenceKey: createPriorityOccurrenceKey(
+        reminder.id,
+        window.previousLocalDate
+      ),
+      occurrenceDate: window.previousLocalDate,
+      date: window.previousLocalDate,
+      dateLabel: "Yesterday",
+      title: String(reminder.title).trim(),
+      type: reminder.type,
+      linkedEvidenceType: reminder.linkedEvidenceType ?? null,
+      context: formatReminderMetadata(reminder),
+    });
+  }
+
+  return Object.freeze({
+    window,
+    items: Object.freeze(items),
+    diagnostics: Object.freeze({
+      checkInLocalDate: window.currentLocalDate,
+      previousLocalDate: window.previousLocalDate,
+      timeZone: window.timeZone,
+      inputPriorityCount: reminders.length,
+      eligiblePriorityCount: items.length,
+      promptPriorityIds: Object.freeze(items.map((item) => item.id)),
+      exclusions: Object.freeze(exclusions),
+      existingReconciliationKeys: Object.freeze(
+        getReconciliationsForDate(checkIns, window.previousLocalDate)
+          .map((item) =>
+            createPriorityOccurrenceKey(
+              item.reminderId,
+              item.occurrenceDate ?? window.previousLocalDate
+            )
+          )
+      ),
+    }),
+  });
+}
+
+export function createPriorityOccurrenceKey(priorityId, occurrenceDate) {
+  return `${String(priorityId ?? "").trim()}:${String(occurrenceDate ?? "").trim()}`;
+}
+
+function getPreviousDayPriorityExclusionReason({
+  checkIns,
+  date,
+  dayName,
+  dexaScans,
+  progressPhotos,
+  reminder,
+  timeZone,
+  weightEntries,
+}) {
+  if (!isUserFacingMorningReconciliationReminder(reminder)) {
+    return "not_user_facing";
+  }
+  if (!isPriorityRecordOpen(reminder)) return "priority_resolved";
+  if (!reminderAppliesToday(reminder, dayName, date)) {
+    return "not_scheduled_previous_day";
+  }
+  if (hasTerminalReconciliation(checkIns, date, reminder.id)) {
+    return "dated_reconciliation";
+  }
+  if (hasDatedReminderCompletion(reminder, date, timeZone)) {
+    return "dated_completion";
+  }
+  if (
+    hasEvidenceForReminderOccurrence({
+      checkIns,
+      date,
+      dexaScans,
+      progressPhotos,
+      reminder,
+      timeZone,
+      weightEntries,
+    })
+  ) {
+    return "completion_evidence";
+  }
+
+  return null;
+}
+
+function isUserFacingMorningReconciliationReminder(reminder) {
+  if (!reminder?.id || !String(reminder.title ?? "").trim()) return false;
+  if (String(reminder.id).includes("_reminder_intent")) return false;
+  if (!MORNING_RECONCILIATION_REMINDER_TYPES.has(reminder.type)) return false;
+  if (
+    reminder.internal === true ||
+    reminder.internalOnly === true ||
+    reminder.userFacing === false ||
+    reminder.visibility === "internal"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isPriorityRecordOpen(reminder) {
+  if (reminder.active === false) return false;
+  if (
+    reminder.archived === true ||
+    reminder.archivedAt ||
+    reminder.cancelledAt ||
+    reminder.dismissedAt ||
+    reminder.supersededAt ||
+    reminder.supersededBy
+  ) {
+    return false;
+  }
+
+  return !TERMINAL_PRIORITY_STATUSES.has(
+    String(reminder.status ?? reminder.resolution ?? "").toLowerCase()
+  );
+}
+
+function hasTerminalReconciliation(checkIns, date, reminderId) {
+  return getReconciliationsForDate(checkIns, date).some(
+    (item) =>
+      item.reminderId === reminderId &&
+      TERMINAL_RECONCILIATION_STATUSES.has(String(item.status ?? "").toLowerCase())
+  );
+}
+
+function getReconciliationsForDate(checkIns, date) {
+  const checkIn = checkIns.find((item) => item.date === date);
+  return Array.isArray(checkIn?.reconciliation) ? checkIn.reconciliation : [];
+}
+
+function hasDatedReminderCompletion(reminder, date, timeZone) {
+  if (getLocalDateKey(reminder.completedAt, timeZone) === date) return true;
+
+  const history = Array.isArray(reminder.completionHistory)
+    ? reminder.completionHistory
+    : reminder.completionHistory
+      ? [reminder.completionHistory]
+      : [];
+
+  return history.some((entry) => {
+    const explicitDate =
+      entry.occurrenceDate ??
+      entry.occurrence_date ??
+      entry.evidenceDate ??
+      entry.evidence_date;
+    if (explicitDate) return String(explicitDate).slice(0, 10) === date;
+    return getLocalDateKey(entry.completedAt, timeZone) === date;
+  });
+}
+
+function getDayName(dateKey) {
+  const index = new Date(`${dateKey}T12:00:00Z`).getUTCDay();
+  return DAY_NAMES[index];
+}
 
 function getPersistentReminderItems({ reminders, today, dayName }) {
   return reminders
@@ -329,84 +573,199 @@ function mapSessionToPriority(session) {
   };
 }
 
-function getProtocolItem({ reminders, protocols, title, today, dayName, now }) {
-  const reminder = reminders.find(
-    (item) =>
-      item.title === title &&
-      item.type === "protocol_reminder" &&
-      item.active &&
-      reminderAppliesToday(item, dayName, today)
+function getExecutionBackedProtocolItems({
+  executionItems,
+  now,
+  protocols,
+  reminders,
+  timeZone,
+  today,
+}) {
+  const executionBackedProtocols = protocols.filter((protocol) =>
+    ["peptide", "supplement"].includes(protocol.category)
+  );
+  const protocolById = new Map(
+    executionBackedProtocols.map((protocol) => [protocol.id, protocol])
+  );
+  const remindersByProtocol = new Map();
+  const reminderDisabledProtocolIds = new Set(
+    reminders
+      .filter(
+        (reminder) =>
+          reminder.type === "protocol_reminder" &&
+          reminder.active === false &&
+          protocolById.has(reminder.linkedEntityId)
+      )
+      .map((reminder) => reminder.linkedEntityId)
   );
 
-  if (!reminder) return null;
+  reminders
+    .filter(
+      (reminder) =>
+        reminder.type === "protocol_reminder" &&
+        reminder.active &&
+        protocolById.has(reminder.linkedEntityId)
+    )
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .forEach((reminder) => {
+      const anchors = remindersByProtocol.get(reminder.linkedEntityId) ?? [];
+      anchors.push(reminder);
+      remindersByProtocol.set(reminder.linkedEntityId, anchors);
+    });
 
-  const completed = Boolean(isSameLocalDate(reminder.completedAt, today));
+  const candidateProtocolIds = new Set(remindersByProtocol.keys());
+  executionItems
+    .filter(
+      (item) =>
+        item.type === "peptide" &&
+        item.protocolRootId &&
+        !reminderDisabledProtocolIds.has(item.protocolRootId) &&
+        protocolById.has(item.protocolRootId)
+    )
+    .forEach((item) => candidateProtocolIds.add(item.protocolRootId));
 
-  if (completed) return null;
+  return [...candidateProtocolIds]
+    .map((protocolId, index) => {
+      const protocol = protocolById.get(protocolId);
+      const reminder = remindersByProtocol.get(protocolId)?.[0] ?? null;
+      const match = findExecutionForProtocol(executionItems, protocolId);
+      const projection = projectExecutionPriority({
+        executionItem: match.executionItem,
+        localDate: today,
+        now,
+        protocol,
+        reminder,
+        timeZone,
+      });
 
-  const protocol = protocols.find((item) => item.id === reminder.linkedEntityId);
-  const transition = resolveProtocolDoseTransition(protocol, today);
-  const doseText = formatDose(transition.effectiveDose);
-  const state = getPriorityState(reminder.schedule?.timeOfDay, now);
+      if (!projection.occurrenceEligible) return null;
+      if (
+        projection.operationalState ===
+          ExecutionPriorityOperationalState.INACTIVE ||
+        projection.operationalState ===
+          ExecutionPriorityOperationalState.NOT_SCHEDULED_TODAY
+      ) {
+        return null;
+      }
+      if (
+        reminder?.completedAt &&
+        getLocalDateKey(reminder.completedAt, timeZone) === today
+      ) {
+        return null;
+      }
 
-  return {
-    id: reminder.id,
-    label: title,
-    subtitle: state.name === "overdue" ? "Overdue" : "Tonight",
-    metadata: doseText,
-    href: `/priorities/${reminder.id}`,
-    icon: "syringe",
-    color: "effort",
-    completed,
-    completable: true,
-    completionId: reminder.id,
-    protocolId: protocol?.id,
-    occurrenceDate: today,
-    doseTransition: transition,
-    completionContext: {
-      occurrenceDate: today,
-      dose: doseText,
-      protocolId: protocol?.id,
-    },
-    state: state.name,
-    priority: state.priorityOffset + (title === "Retatrutide" ? 22 : 26),
-  };
+      const setupRequired =
+        projection.operationalState !==
+        ExecutionPriorityOperationalState.ACTIONABLE;
+      const doseText = formatExecutionDose({
+        amount: projection.currentDose,
+        unit: projection.doseUnit,
+      });
+      const state = getPriorityState(
+        projection.exactLocalTime,
+        now,
+        timeZone
+      );
+      const transitionLabel = getCanonicalTransitionLabel(
+        projection.activePhase,
+        projection.transitionEffectiveToday
+      );
+      const setupCopy = getExecutionSetupCopy(projection.operationalReason);
+
+      return {
+        id: projection.priorityId,
+        label: projection.title,
+        subtitle:
+          state.name === "overdue"
+            ? "Overdue"
+            : projection.timeOfDayLabel,
+        metadata: setupRequired
+          ? setupCopy.metadata
+          : formatDoseAction(doseText, projection.timeOfDayLabel),
+        href: setupRequired
+          ? projection.executionHref
+          : `/priorities/${projection.historyAnchorId}`,
+        icon: "syringe",
+        color: setupRequired ? "warning" : "effort",
+        completed: false,
+        completable: projection.completable,
+        completionId: projection.historyAnchorId,
+        protocolId,
+        executionId: projection.executionId,
+        occurrenceDate: today,
+        exactLocalTime: projection.exactLocalTime,
+        executionProjection: projection,
+        completionContext: projection.completable
+          ? {
+              occurrenceDate: today,
+              dose: doseText,
+              protocolId,
+            }
+          : null,
+        state: state.name,
+        priority: state.priorityOffset + 22 + index,
+        changeLabel: setupRequired
+          ? setupCopy.label
+          : transitionLabel,
+        actionLabel: setupRequired ? "Review Execution" : null,
+        alwaysShowMetadata: true,
+      };
+    })
+    .filter(Boolean);
 }
 
-function mergeDoseChangeIntoExecution(item, notice, today) {
-  if (
-    !item ||
-    !notice ||
-    item.protocolId !== notice.protocolId ||
-    item.occurrenceDate !== today ||
-    notice.occurrenceDate !== today ||
-    notice.taperStepId !== item.doseTransition?.taperStepId
-  ) {
-    return item;
+function getExecutionSetupCopy(reason) {
+  if (reason === ExecutionPriorityOperationalReason.MISSING_ACTIVE_PHASE) {
+    return {
+      metadata: "Dose schedule needs update",
+      label: "No active phase",
+    };
+  }
+  if (reason === ExecutionPriorityOperationalReason.MISSING_HISTORY_ANCHOR) {
+    return {
+      metadata: "Completion setup needs update",
+      label: "No history anchor",
+    };
   }
 
   return {
-    ...item,
-    metadata: `${formatDose(item.doseTransition.effectiveDose)} tonight`,
-    changeLabel: "Taper begins today",
+    metadata: "Execution setup required",
+    label: "Missing Execution",
   };
 }
 
-function isMergedDoseChange(notice, items) {
-  return Boolean(
-    notice &&
-      items.some(
-        (item) =>
-          item.protocolId === notice.protocolId &&
-          item.occurrenceDate === notice.occurrenceDate &&
-          item.changeLabel
-      )
-  );
+function getCanonicalTransitionLabel(activePhase, effectiveToday) {
+  if (!effectiveToday) return null;
+  if (/\btaper\b/i.test(activePhase?.notes ?? "")) {
+    return "Taper begins today";
+  }
+
+  return "New phase begins today";
 }
 
-function getDoseChangeItem({ protocols, today, now }) {
+function formatDoseAction(doseText, timeOfDayLabel) {
+  if (!doseText) return null;
+  if (timeOfDayLabel === "Tonight") return `${doseText} tonight`;
+  if (timeOfDayLabel === "Morning") return `${doseText} this morning`;
+  if (timeOfDayLabel === "Afternoon") return `${doseText} this afternoon`;
+
+  return doseText;
+}
+
+// Canonical Execution-backed protocol IDs are excluded before this legacy
+// reminder-only compatibility path can inspect protocol dose history.
+function getLegacyReminderOnlyDoseChangeItem({
+  excludedProtocolIds = new Set(),
+  protocols,
+  today,
+  now,
+}) {
   const doseChange = protocols
-    .filter((protocol) => protocol.status === "active")
+    .filter(
+      (protocol) =>
+        protocol.status === "active" &&
+        !excludedProtocolIds.has(protocol.id)
+    )
     .flatMap((protocol) =>
       (protocol.doseHistory ?? []).map((entry) => ({
         protocol,
@@ -570,12 +929,6 @@ function formatTimeOfDay(value) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
-function formatDose(dose) {
-  if (!dose?.value || !dose?.unit) return null;
-
-  return `${dose.value} ${dose.unit}`;
-}
-
 function formatExpectedViews(expectedViews) {
   if (expectedViews.length === 0) return null;
   if (expectedViews.length === 1) return expectedViews[0].replaceAll("-", " ");
@@ -601,8 +954,16 @@ function toDateKey(value) {
   return `${year}-${month}-${day}`;
 }
 
-function getPriorityState(timeOfDay, now = new Date()) {
-  const hour = now.getHours();
+function getPriorityState(timeOfDay, now = new Date(), timeZone = null) {
+  const hour = timeZone
+    ? Number(
+        new Intl.DateTimeFormat("en-US", {
+          hour: "2-digit",
+          hourCycle: "h23",
+          timeZone,
+        }).format(now)
+      )
+    : now.getHours();
   const preferredHour = getPreferredHour(timeOfDay);
 
   if (preferredHour == null) {
@@ -757,6 +1118,7 @@ function hasEvidenceForReminderOccurrence({
   dexaScans,
   progressPhotos,
   reminder,
+  timeZone = null,
   weightEntries,
 }) {
   if (hasCheckInCompletionForReminder({ checkIns, date, reminder })) {
@@ -769,7 +1131,7 @@ function hasEvidenceForReminderOccurrence({
     reminder.id === "reminder_morning_weight"
   ) {
     const hasWeight = weightEntries.some(
-      (entry) => getDateKey(entry.measuredAt) === date
+      (entry) => getOccurrenceDateKey(entry.measuredAt, timeZone) === date
     );
     const hasCheckInWeight = checkIns.some(
       (checkIn) => checkIn.date === date && Boolean(checkIn.weightEntryId)
@@ -786,6 +1148,7 @@ function hasEvidenceForReminderOccurrence({
       date,
       progressPhotos,
       reminder,
+      timeZone,
     });
   }
 
@@ -793,7 +1156,10 @@ function hasEvidenceForReminderOccurrence({
     reminder.linkedEvidenceType === "dexa" ||
     reminder.linkedEntityType === "dexa"
   ) {
-    return dexaScans.some((scan) => getDateKey(scan.measuredAt ?? scan.date) === date);
+    return dexaScans.some(
+      (scan) =>
+        getOccurrenceDateKey(scan.measuredAt ?? scan.date, timeZone) === date
+    );
   }
 
   return false;
@@ -818,10 +1184,16 @@ function hasCheckInCompletionForReminder({ checkIns, date, reminder }) {
   );
 }
 
-function hasProgressPhotoEvidenceForReminder({ date, progressPhotos, reminder }) {
-  const photosForDate = getProgressPhotoCompletionRecords(progressPhotos).filter(
-    (photo) => photo.date === date
-  );
+function hasProgressPhotoEvidenceForReminder({
+  date,
+  progressPhotos,
+  reminder,
+  timeZone,
+}) {
+  const photosForDate = getProgressPhotoCompletionRecords(
+    progressPhotos,
+    timeZone
+  ).filter((photo) => photo.date === date);
 
   if (photosForDate.length === 0) return false;
 
@@ -840,22 +1212,28 @@ function hasProgressPhotoEvidenceForReminder({ date, progressPhotos, reminder })
   );
 }
 
-function getProgressPhotoCompletionRecords(progressPhotos = []) {
+function getOccurrenceDateKey(value, timeZone) {
+  return timeZone ? getLocalDateKey(value, timeZone) : getDateKey(value);
+}
+
+function getProgressPhotoCompletionRecords(progressPhotos = [], timeZone = null) {
   return progressPhotos.flatMap((photo) => {
     const payload = photo.payload ?? photo;
 
     if (payload.evidence_type === "photo_session" || Array.isArray(payload.photos)) {
-      const sessionDate = getDateKey(
-        payload.observed_at ?? payload.date ?? payload.capturedAt
+      const sessionDate = getOccurrenceDateKey(
+        payload.observed_at ?? payload.date ?? payload.capturedAt,
+        timeZone
       );
 
       return (payload.photos ?? []).map((sessionPhoto) => ({
         ...sessionPhoto,
-        date: getDateKey(
+        date: getOccurrenceDateKey(
           sessionPhoto.date ??
             sessionPhoto.captured_at ??
             sessionPhoto.capturedAt ??
-            sessionDate
+            sessionDate,
+          timeZone
         ),
       }));
     }
@@ -863,7 +1241,10 @@ function getProgressPhotoCompletionRecords(progressPhotos = []) {
     return [
       {
         ...payload,
-        date: getDateKey(payload.date ?? payload.capturedAt ?? payload.observed_at),
+        date: getOccurrenceDateKey(
+          payload.date ?? payload.capturedAt ?? payload.observed_at,
+          timeZone
+        ),
       },
     ];
   });

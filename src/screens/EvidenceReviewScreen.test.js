@@ -125,6 +125,31 @@ describe("EvidenceReviewScreen new exercise gate", () => {
     expect(screen).toContain("Remove from workout");
     expect(screen).toContain("Canonical exercise name");
     expect(screen).toContain("unresolvedExercises.length > 0");
-    expect(screen).toContain("Resolve ${unresolvedCount} new exercise");
+    expect(screen).toContain("Resolve ${blockingCount} exercise");
+    expect(screen).toContain("New exercise");
+    expect(screen).toContain("href={`#new-exercise-${exercise.provisionalExerciseId}`}");
+    expect(screen).toContain("Optional details");
+    expect(screen).toContain("Search exercises");
+    expect(screen).toContain("matchingCanonicalExercises.map");
+  });
+
+  it("uses the shared canonical muscle-group search and select only for Add New", () => {
+    expect(screen).toContain("searchCanonicalTrainingMuscleGroups");
+    expect(screen).toContain('name="primaryMuscleGroupId"');
+    expect(screen).toContain('aria-label="Primary muscle group"');
+    expect(screen).toContain("Choose a muscle group");
+    expect(screen).toContain("No matching muscle group.");
+    expect(screen).toContain("Suggested from the exercise name.");
+    expect(screen).toContain('mode === "new"');
+    expect(screen).not.toContain('name="primaryMuscleGroup"');
+    expect(actions).toContain('formData.get("primaryMuscleGroupId")');
+    expect(actions).not.toContain('formData.get("primaryMuscleGroup")');
+  });
+
+  it("clears canonical muscle-group state when switching modes", () => {
+    expect(screen).toContain("setPrimaryMuscleGroupId(");
+    expect(screen).toContain('nextMode === "new"');
+    expect(screen).toContain('setMuscleGroupQuery("")');
+    expect(screen).toContain('setSearchQuery("")');
   });
 });

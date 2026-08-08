@@ -1,3 +1,5 @@
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+
 export const PI_DECISION_CADENCE_CONTEXT_VERSION =
   "pi_decision_cadence_context_v1";
 const CADENCES = ["daily", "midweek", "weekly"];
@@ -195,7 +197,7 @@ function validNormalizedPhase(value) {
     ("phaseId" in value || value.phaseAgeBand === "unknown");
 }
 function activePhase(goal) {
-  return (goal?.phases ?? []).find((phase) => phase.status === "active") ?? null;
+  return goal ? resolveCommittedPhaseContext(goal).activePhase : null;
 }
 function semanticGoalType(goal) {
   const text = `${goal?.type ?? ""} ${goal?.title ?? ""}`.toLowerCase();

@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { FOUNDER_ALPHA_TRAINING_EXERCISES, resolveTrainingExerciseIdentity } from "./trainingExerciseIdentity";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  FOUNDER_ALPHA_TRAINING_EXERCISES,
+  listCanonicalTrainingExerciseIdentities,
+  registerRuntimeTrainingExercises,
+  resolveTrainingExerciseIdentity,
+} from "./trainingExerciseIdentity";
+
+afterEach(() => registerRuntimeTrainingExercises([]));
 
 describe("Founder Alpha incline bench identity",()=>{
   it.each(["Incline Bench Press","incline bench press","Barbell Incline Bench Press","Incline Barbell Press"])("resolves %s to the preferred incline identity",(label)=>{expect(resolveTrainingExerciseIdentity(label)).toMatchObject({canonicalExerciseId:"incline_bench_press",canonicalExerciseName:"Incline Bench Press",resolutionStatus:"resolved_high_confidence"});});
@@ -36,5 +43,28 @@ describe("Founder Alpha incline bench identity",()=>{
     expect(resolveTrainingExerciseIdentity("Sumo Squat").resolutionStatus).toBe("unrecognized");
     expect(resolveTrainingExerciseIdentity("Squat").canonicalExerciseId).toBe("squat");
     expect(resolveTrainingExerciseIdentity("Leg Press").canonicalExerciseId).toBe("leg_press");
+  });
+
+  it("uses one app-wide runtime identity collection across independent callers", () => {
+    registerRuntimeTrainingExercises([{
+      id: "sumo_squat_machine",
+      name: "Sumo Squat Machine",
+      aliases: ["Wide Stance Squat Machine"],
+    }]);
+    expect(resolveTrainingExerciseIdentity("Sumo Squat Machine").canonicalExerciseId)
+      .toBe("sumo_squat_machine");
+    expect(resolveTrainingExerciseIdentity("Wide Stance Squat Machine").canonicalExerciseId)
+      .toBe("sumo_squat_machine");
+    expect(listCanonicalTrainingExerciseIdentities().at(-1)?.id)
+      .toBe("sumo_squat_machine");
+  });
+
+  it("does not infer canonical membership from historical workout-shaped data", () => {
+    const historicalWorkout = {
+      exercises: [{ id: "sumo_squat_machine", name: "Sumo Squat Machine" }],
+    };
+    expect(historicalWorkout.exercises).toHaveLength(1);
+    expect(resolveTrainingExerciseIdentity("Sumo Squat Machine").resolutionStatus)
+      .toBe("unrecognized");
   });
 });

@@ -192,16 +192,16 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
     {
       icon: Dumbbell,
       title: "Supplements",
-      subtitle: `${supplements.length} active protocols`,
+      subtitle: `${supplements.length} current supplement${supplements.length === 1 ? "" : "s"}`,
       tone: "success",
       supplements: true,
-      items: supplements.map((protocol) => ({
-        id: protocol.id,
-        title: protocol.name,
-        detail: formatSupplementExecutionSummary(executionItems.find((item) => item.type === "supplement" && item.protocolRootId === protocol.id)),
-        href: `/profile/protocols/${protocol.id}?from=operating-plan`,
-        status: formatPersistence(protocol.status),
-      })),
+      items: supplements.length ? [{
+        id: "supplement-strategy",
+        title: "Supplement Strategy",
+        detail: supplements.map((protocol) => protocol.name).join(", "),
+        href: `/profile/protocols/${supplements[0].id}?from=operating-plan`,
+        status: "Active",
+      }] : [],
     },
     {
       icon: Salad,
@@ -221,29 +221,29 @@ export function buildOperatingPlan({ energyStrategy, executionItems, nutritionCo
     {
       icon: Syringe,
       title: "Peptides",
-      subtitle: `${peptides.length} active protocols`,
+      subtitle: `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`,
       tone: "effort",
-      items: peptides.map((protocol)=>({
-        id:protocol.id,
-        title:protocol.name,
-        detail:"Active peptide strategy",
-        href:`/profile/protocols/${protocol.id}?from=operating-plan`,
-        status:"Active",
-      })),
+      items: peptides.length ? [{
+        id: "peptide-strategy",
+        title: "Peptide Strategy",
+        detail: peptides.map((protocol) => protocol.name).join(", "),
+        href: `/profile/protocols/${peptides[0].id}?from=operating-plan`,
+        status: "Active",
+      }] : [],
     },
     {
       icon: Activity,
       title: "Recovery",
-      subtitle: recoveryProtocols.length ? `${recoveryProtocols.length} active protocol` : "Strategy coming soon",
+      subtitle: recoveryProtocols.length ? `${recoveryProtocols.length} current method` : "Strategy coming soon",
       tone: "success",
       items: recoveryProtocols.length
-        ? recoveryProtocols.map((protocol) => ({
-            id: protocol.id,
-            title: protocol.name,
-            detail: formatProtocolSchedule(protocol),
-            href: `/profile/protocols/${protocol.id}?from=operating-plan`,
+        ? [{
+            id: "recovery-strategy",
+            title: "Recovery Strategy",
+            detail: recoveryProtocols.map((protocol) => protocol.name).join(", "),
+            href: `/profile/protocols/${recoveryProtocols[0].id}?from=operating-plan`,
             status: "Active",
-          }))
+          }]
         : [{ id:"recovery-coming-soon", title:"Recovery", detail:"A dedicated recovery strategy will complete this layer", href:null, status:"Coming Soon" }],
     },
     ...(coachingProtocol ? [{
@@ -353,13 +353,6 @@ export function buildTrainingPlanItem(version) {
     href: getOperatingPlanStrategyHref("training", version.protocolId),
     status: "Active",
   };
-}
-
-function formatProtocolSchedule(protocol) {
-  const schedule = protocol.schedule ?? {};
-  const cadence = formatPersistence(schedule.frequency ?? schedule.type ?? protocol.frequency?.unit);
-  const time = formatExecutionTime(schedule.timeOfDay);
-  return joinSummary(cadence, time) || "Schedule not specified";
 }
 
 function formatCalorieRange(nutritionContext) {

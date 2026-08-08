@@ -22,6 +22,7 @@ import Card from "../components/ui/Card";
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseIdentity,
 } from "../domain/models/trainingExerciseIdentity";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
 import {
@@ -31,6 +32,10 @@ import {
   isBodyweightSet,
   normalizeTrainingSetsForPresentation,
 } from "../presentation/trainingPresentation";
+import {
+  createTrainingExercisePresentation,
+  getCanonicalTrainingCategoryLabel,
+} from "../presentation/trainingExercisePresentation";
 
 const FLAT_TRAINING_NAV_GROUPS = [
   "Chest",
@@ -80,6 +85,7 @@ export default function TrainingKnowledgeScreen({
           <TrainingLibraryHeader
             adaptHref={trainingEvidenceContext?.adaptHref}
             description={content.summary}
+            exerciseDetail={content.navigationContext === "exercise-detail"}
             navigation={navigation}
             reportingOrigin={reportingOrigin}
             title={content.title}
@@ -165,35 +171,20 @@ function TrainingReportingHeader({
 function TrainingLibraryHeader({
   adaptHref = (href) => href,
   description,
+  exerciseDetail,
   navigation,
   reportingOrigin,
   title,
 }) {
   const breadcrumbs = navigation?.breadcrumbs ?? [];
   const currentRoute = navigation?.route;
-  const hierarchy = [
-    { href: adaptHref("/progress/training"), label: "Training" },
-    currentRoute !== "/progress/training/library"
-      ? { href: adaptHref("/progress/training/library"), label: "Training Library" }
-      : null,
-    reportingOrigin && breadcrumbs.length > 1
-      ? {
-          href: adaptHref("/progress/training/reporting/resistance"),
-          label: "Reporting",
-        }
-      : null,
-    ...breadcrumbs.filter(
-      (item) =>
-        item.href !== "/progress/training" &&
-        item.href !== "/progress/training/library" &&
-        item.href !== currentRoute
-    ),
-  ]
-    .filter(Boolean)
-    .filter(
-      (item, index, items) =>
-        items.findIndex((candidate) => candidate.href === item.href) === index
-    );
+  const hierarchy = getTrainingLibraryHeaderItems({
+    adaptHref,
+    breadcrumbs,
+    currentRoute,
+    exerciseDetail,
+    reportingOrigin,
+  });
 
   return (
     <header className="mb-4">
@@ -216,6 +207,44 @@ function TrainingLibraryHeader({
       )}
     </header>
   );
+}
+
+export function getTrainingLibraryHeaderItems({
+  adaptHref = (href) => href,
+  breadcrumbs = [],
+  currentRoute,
+  exerciseDetail = false,
+  reportingOrigin,
+} = {}) {
+  return [
+    { href: adaptHref("/progress/training"), label: "Training" },
+    currentRoute !== "/progress/training/library"
+      ? { href: adaptHref("/progress/training/library"), label: "Training Library" }
+      : null,
+    reportingOrigin && breadcrumbs.length > 1
+      ? {
+          href: adaptHref("/progress/training/reporting/resistance"),
+          label: "Reporting",
+        }
+      : null,
+    ...breadcrumbs.filter(
+      (item) =>
+        item.href !== "/progress/training" &&
+        item.href !== "/progress/training/library" &&
+        item.href !== currentRoute &&
+        (!exerciseDetail ||
+          getRoutePathname(item.href) !== getRoutePathname(currentRoute))
+    ),
+  ]
+    .filter(Boolean)
+    .filter(
+      (item, index, items) =>
+        items.findIndex((candidate) => candidate.href === item.href) === index
+    );
+}
+
+function getRoutePathname(value) {
+  return String(value ?? "").split(/[?#]/, 1)[0].replace(/\/+$/g, "");
 }
 
 function getParentLabel(navigation) {
@@ -685,7 +714,9 @@ function getLibraryContent({ exerciseRecords, report, reportingOrigin, slug = []
     showSourceWorkouts: trainingEvidenceContext?.showSourceWorkouts,
     exerciseRecords,
   });
-  const title = path.length ? toTitle(path.at(-1)) : "Training Library";
+  const title = path.length
+    ? getCanonicalTrainingCategoryLabel(path.at(-1)) ?? toTitle(path.at(-1))
+    : "Training Library";
 
   if (leafDetail) return leafDetail;
 
@@ -973,11 +1004,20 @@ function getFlatTrainingNavigationChildren({ path, report }) {
   const groupSlug = path[0];
   const exercises = getExercisesForFlatTrainingGroup({ groupSlug, report });
 
-  return exercises.map((exercise) => ({
-    detail: formatExerciseSetSummary(exercise.sets),
-    href: `/progress/training/library/${groupSlug}/${slugify(exercise.label)}`,
-    label: exercise.label,
-  }));
+  return exercises.map((exercise) => {
+    const presentation = createTrainingExercisePresentation({
+      canonicalExerciseId: exercise.canonicalExerciseId,
+      canonicalName: exercise.label,
+      historicalName: exercise.label,
+      category: groupSlug,
+    });
+
+    return {
+      detail: formatExerciseSetSummary(exercise.sets),
+      href: `/progress/training/library/${groupSlug}/${getTrainingLibraryExerciseRouteKey(exercise)}`,
+      label: presentation.displayName,
+    };
+  });
 }
 
 function getFlatTrainingExerciseCounts(report) {
@@ -1012,7 +1052,7 @@ export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
   const exercisesBySlug = new Map();
 
   matches.forEach((exercise) => {
-    const key = slugify(exercise.label);
+    const key = getTrainingLibraryExerciseAggregationKey(exercise);
     const current = exercisesBySlug.get(key);
 
     if (!current) {
@@ -1029,6 +1069,16 @@ export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
   return [...exercisesBySlug.values()].sort((a, b) =>
     a.label.localeCompare(b.label)
   );
+}
+
+export function getTrainingLibraryExerciseAggregationKey(exercise = {}) {
+  const canonicalExerciseId = String(exercise.canonicalExerciseId ?? "").trim();
+  return canonicalExerciseId || `historical_only:${slugify(exercise.label)}`;
+}
+
+export function getTrainingLibraryExerciseRouteKey(exercise = {}) {
+  const canonicalExerciseId = String(exercise.canonicalExerciseId ?? "").trim();
+  return canonicalExerciseId || slugify(exercise.label);
 }
 
 function exerciseBelongsToFlatTrainingGroup({ exercise, groupSlug }) {
@@ -1070,10 +1120,19 @@ function getExerciseDetailContent({
 }) {
   const occurrences = getExerciseOccurrences({ exerciseSlug, report });
   const latest = occurrences[0];
-  const title = latest?.exercise.name ?? toTitle(exerciseSlug);
+  const presentation = getTrainingLibraryExercisePresentation({
+    exerciseSlug,
+    report,
+  });
+  const title = presentation.displayName;
+
+  if (presentation.missingDisplayName) {
+    console.warn("Training Library exercise is missing a safe display name.");
+  }
 
   return {
     eyebrow: "Training Library",
+    navigationContext: "exercise-detail",
     navigationMode: "training-library",
     title,
     summary: null,
@@ -1098,6 +1157,17 @@ function getExerciseDetailContent({
       ),
     ].filter(Boolean),
   };
+}
+
+export function getTrainingLibraryExercisePresentation({ exerciseSlug, report }) {
+  const latest = getExerciseOccurrences({ exerciseSlug, report })[0];
+  const identity = resolveTrainingExerciseIdentity(exerciseSlug);
+
+  return createTrainingExercisePresentation({
+    canonicalExerciseId: identity.canonicalExerciseId,
+    canonicalName: latest?.exercise.name,
+    historicalName: latest?.exercise.name,
+  });
 }
 
 function ExercisePerformanceRecordsCard({ model }) {

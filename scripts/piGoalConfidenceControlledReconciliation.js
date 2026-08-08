@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 import {
   getFounderRuntimeStore,
   resolveFounderRuntimeStorePath,
@@ -27,7 +28,8 @@ export const CONTROLLED_PHASE_ID =
 export async function runControlledReconciliation(options = {}) {
   const filePath = options.filePath ?? resolveFounderRuntimeStorePath();
   const raw = fs.readFileSync(filePath, "utf8");
-  const store = JSON.parse(raw);
+  const store = parseOperationalJsonBytes(Buffer.from(raw),
+    { filePath, stage: "pi_goal_confidence_reconciliation_source" });
   const baseline = {
     hash: sha(raw),
     semanticDigest: createFounderRuntimeSemanticDigest(store),

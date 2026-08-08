@@ -13,4 +13,10 @@ describe("Daily Briefing projection presentation", () => {
     expect(source).toContain("reasons.length > 0 &&");
     expect(source).toContain("reasons.slice(0, 3)");
   });
+  it("renders canonical Confidence or the explicit unavailable state", () => {
+    expect(source).toContain("confidence={briefing.goalConfidence}");
+    expect(source).toContain("confidence?.canonicalSeries === true");
+    expect(source).toContain('data-testid="daily-confidence-unavailable"');
+    expect(source).not.toContain("value={hero.confidence}");
+  });
 });

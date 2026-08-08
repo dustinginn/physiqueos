@@ -21,12 +21,13 @@ import {
 import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePresentationService";
-import { createPICadenceBriefingPublicationService } from "./PICadenceBriefingPublicationService";
+import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
 import { createPICadenceBriefingLifecycleService } from "./PICadenceBriefingLifecycleService";
 import { createWeeklyEnergyProgressModel } from "./WeeklyBriefingPresentationService";
 import { composePIEditorialParagraph } from "./PIEditorialTranslationService";
 import { createWeeklyTrainingPresentationModel } from "./WeeklyTrainingPresentationService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 const VERSION = "weekly_narrative_v5_2";
 const DEFAULT_WEEKLY_ACTIVITY_TARGET = 7000;
@@ -328,7 +329,7 @@ function trainingEnergyWeeklyText(state){return({progress_with_positive_support:
 
 export function createFounderWeeklyNarrativeService({repositories,now=()=>new Date(),weeklyPersistence,confidenceStoreResolver,cadenceLifecycle}={}){
   const publication = cadenceLifecycle ? null :
-    createPICadenceBriefingPublicationService({ now });
+    createCanonicalBriefingConfidencePublicationService({ now });
   return createWeeklyNarrativeService({
     repositories,
     now,
@@ -377,8 +378,8 @@ export function createWeeklyNarrativeService({repositories,now=()=>new Date(),we
    const window=createWeeklyEvidenceWindow({now:now(),timeZone});
    return service.catchUpClosedWindow({userId,windowContract:{cadence:"weekly",startDate:window.startDate,endDate:window.endDate,briefingDate:window.briefingDate,timeZone,expectedArtifactId:artifactIdForWeeklyWindow(window.startDate,window.endDate),source:"latest_closed_window",reason}});
  },
- async prepareRegeneration({userId,reason,targetArtifactId=null}){if(!reason)throw new Error("Weekly regeneration requires an explicit reason.");const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const existing=targetArtifactId?await repositories.dailyBriefings.getBriefingById?.(targetArtifactId)??(await repositories.dailyBriefings.listDailyBriefings?.(userId))?.find((item)=>item.id===targetArtifactId)??null:await service.getLatest({userId});if(!existing)throw new Error("Weekly regeneration requires a persisted Weekly artifact.");if(targetArtifactId&&existing.id!==targetArtifactId)throw new Error("Weekly regeneration target identity changed.");const artifact=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason,windowOverride:existing.evidenceWindow,existingArtifactId:existing.id,ignoreExisting:true,confidenceStoreResolver});const existingAssessmentId=existing.briefing?.weeklyNarrative?.goalConfidence?.assessmentId;if(existingAssessmentId&&existingAssessmentId===artifact.briefing?.weeklyNarrative?.goalConfidence?.assessmentId&&existing.briefing?.weeklyNarrative?.goalConfidence?.source===artifact.briefing?.weeklyNarrative?.goalConfidence?.source)return{status:"matched",artifact:existing,existing,baseline,preparedCommit:null};const preparedCommit=createWeeklyPreparedCommit({operation:"regeneration",artifact,baseline,expectedExistingArtifact:existing,reason});return{status:"prepared",artifact,existing,baseline,preparedCommit};},
- async executePreparedRegeneration({prepared}){if(prepared?.status==="matched")return{status:"matched",artifact:prepared.artifact,committed:false};const result=await requireWeeklyPersistence(weeklyPersistence).commit(prepared?.preparedCommit);return result;},
+ async prepareRegeneration({userId,reason,targetArtifactId=null}){if(!reason)throw new Error("Weekly regeneration requires an explicit reason.");const persistence=requireWeeklyPersistence(weeklyPersistence);const baseline=persistence.captureBaseline();const existing=targetArtifactId?await repositories.dailyBriefings.getBriefingById?.(targetArtifactId)??(await repositories.dailyBriefings.listDailyBriefings?.(userId))?.find((item)=>item.id===targetArtifactId)??null:await service.getLatest({userId});if(!existing)throw new Error("Weekly regeneration requires a persisted Weekly artifact.");if(targetArtifactId&&existing.id!==targetArtifactId)throw new Error("Weekly regeneration target identity changed.");const artifact=await buildWeeklyArtifact({repositories,userId,now,persist:false,reason,windowOverride:existing.evidenceWindow,existingArtifactId:existing.id,ignoreExisting:true,confidenceStoreResolver});if(cadenceLifecycle)return{status:"prepared",artifact,existing,baseline,preparedCommit:null,sharedFinalizer:true,reason};const existingAssessmentId=existing.briefing?.weeklyNarrative?.goalConfidence?.assessmentId;if(existingAssessmentId&&existingAssessmentId===artifact.briefing?.weeklyNarrative?.goalConfidence?.assessmentId&&existing.briefing?.weeklyNarrative?.goalConfidence?.source===artifact.briefing?.weeklyNarrative?.goalConfidence?.source)return{status:"matched",artifact:existing,existing,baseline,preparedCommit:null};const preparedCommit=createWeeklyPreparedCommit({operation:"regeneration",artifact,baseline,expectedExistingArtifact:existing,reason});return{status:"prepared",artifact,existing,baseline,preparedCommit};},
+ async executePreparedRegeneration({prepared}){if(prepared?.status==="matched")return{status:"matched",artifact:prepared.artifact,committed:false};if(prepared?.sharedFinalizer){const result=await publishWeeklyCadence({cadenceLifecycle,artifact:prepared.artifact,reason:prepared.reason,operation:"regenerate"});if(result.committed)return{...result,status:"regenerated"};return result;}const result=await requireWeeklyPersistence(weeklyPersistence).commit(prepared?.preparedCommit);return result;},
  async regenerate({userId,reason,targetArtifactId=null}){const prepared=await service.prepareRegeneration({userId,reason,targetArtifactId});const result=await service.executePreparedRegeneration({prepared});return committedArtifactOrThrow(result);},
  async getOrCreate({userId,preview=false}){if(preview)return service.preview({userId});const existing=await service.getLatest({userId});return existing??service.generate({userId,reason:"legacy_explicit_generation"});}
 };return service;}
@@ -462,7 +463,7 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
   const trainingPerformance=createTrainingPerformanceIntelligenceReport({canonicalObjects:canonicalObjects.filter((item)=>dateKey(item.lastObservedAt)<=window.endDate),now:new Date(`${window.endDate}T12:00:00Z`),generatedAt});
   let authoritative=null;
   let weeklyEnergy=null;
-  const activePhase=(goal?.phases??[]).find((phase)=>phase.status==="active")??null;
+  const activePhase=goal?resolveCommittedPhaseContext(goal,{asOf:window.endDate}).activePhase:null;
   try {
     const comparisonWindow={startDate:shiftDate(window.startDate,-7),endDate:shiftDate(window.endDate,-7),timeZone};
     const energyInput={cadence:"weekly",timeZone,nutritionDays:canonicalObjects.filter((item)=>item.evidence_type==="nutrition"),activityDays:canonicalObjects.filter((item)=>item.evidence_type==="activity_day"),dexaScans,rmrStrategy:CADENCE_RMR_STRATEGIES.LATEST_ELIGIBLE_FOR_WINDOW};
@@ -528,4 +529,4 @@ function formatDate(value){const [y,m,d]=value.split("-").map(Number);return new
 function formatDexaAnchor(scan){const bodyFat=scan.bodyFatPercentage?.value??scan.bodyFatPercentage;return{date:dateKey(scan.measuredAt??scan.date),bodyFat:Number.isFinite(Number(bodyFat))?`${Number(bodyFat).toFixed(1)}% body fat`:"Body-composition baseline"};}
 function requireWeeklyPersistence(service){if(!service?.captureBaseline||!service?.commit){const error=new Error("Canonical Weekly persistence is unavailable.");error.code="weekly_persistence_unavailable";throw error;}return service;}
 function committedArtifactOrThrow(result){if([WeeklyPersistenceOutcome.CREATED,WeeklyPersistenceOutcome.REGENERATED,WeeklyPersistenceOutcome.MATCHED].includes(result?.status))return result.artifact;const error=new Error(result?.error?.message??"Weekly persistence failed.");error.code=result?.status??"weekly_persistence_failure";throw error;}
-function publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation}){const context=artifact.briefing.weeklyNarrative.context,goal=context.activeGoal,phase=context.activeGoal?.phases?.find((item)=>item.status==="active")??context.activePhase;return cadenceLifecycle.publish({cadence:"weekly",operation,artifact,activeGoal:goal,activePhase:phase,operatingState:context.operatingState?.value??context.operatingState,piEnvelope:context.pi,reason,replacementAuthorized:false});}
+function publishWeeklyCadence({cadenceLifecycle,artifact,reason,operation}){const context=artifact.briefing.weeklyNarrative.context,goal=context.activeGoal,phase=goal?resolveCommittedPhaseContext(goal,{asOf:artifact.evidenceWindow?.endDate??artifact.generatedAt}).activePhase:context.activePhase;return cadenceLifecycle.publish({cadence:"weekly",operation,artifact,activeGoal:goal,activePhase:phase,operatingState:context.operatingState?.value??context.operatingState,piEnvelope:context.pi,reason,replacementAuthorized:operation==="regenerate"});}

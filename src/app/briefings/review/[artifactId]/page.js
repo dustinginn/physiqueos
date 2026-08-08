@@ -10,6 +10,10 @@ import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
 import { resolveBriefingReviewArtifact } from "../../../../domain/services/BriefingReviewArtifactResolver";
 import { prepareWeeklyBriefingReviewPresentation } from "../../../../domain/services/WeeklyBriefingReviewPresentationService";
 import { prepareMidweekBriefingReviewPresentation } from "../../../../domain/services/MidweekBriefingPresentationService";
+import PhaseReviewCard from "../../../../components/goals/PhaseReviewCard";
+import { getFounderRuntimeStore } from "../../../../data/repositories/founderRuntimeStore";
+import { resolvePhaseReviewArtifactRead } from
+  "../../../../domain/services/PhaseReviewArtifactReadService";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +28,13 @@ export default async function BriefingReviewPage({ params, searchParams }) {
     ? await createDailyBriefingService({ repositories: FounderRepositories }).previewBriefingArtifact(artifact)
     : null;
   if (artifact.briefing?.photoEventNarrative) return <PhotoEventBriefingScreen narrative={artifact.briefing.photoEventNarrative}/>;
-  if (artifact.briefing?.dexaEventNarrative) return <DEXAEventBriefingScreen narrative={artifact.briefing.dexaEventNarrative}/>;
+  if (artifact.briefing?.dexaEventNarrative) {
+    const review = resolvePhaseReviewArtifactRead({ artifact,
+      decisionHistory: getFounderRuntimeStore().phaseReviewDecisions ?? [] });
+    return <DEXAEventBriefingScreen narrative={artifact.briefing.dexaEventNarrative}
+      phaseReview={review?.readOnly
+        ? <PhaseReviewCard readOnly review={review.review}/> : null}/>;
+  }
   if (artifact.briefing?.weeklyNarrative) {
     const narrative = await prepareWeeklyBriefingReviewPresentation({
       artifact,

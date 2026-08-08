@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const plan = fs.readFileSync(new URL("./OperatingPlanScreen.jsx", import.meta.url), "utf8");
 const detail = fs.readFileSync(new URL("./OperatingPlanStrategyDetailScreen.jsx", import.meta.url), "utf8");
 const executionDetail = fs.readFileSync(new URL("./ExecutionItemBuilderScreen.jsx", import.meta.url), "utf8");
-const protocolDetail = fs.readFileSync(new URL("./ProtocolDetailScreen.jsx", import.meta.url), "utf8");
+const domainDetail = fs.readFileSync(new URL("./StrategyDomainScreen.jsx", import.meta.url), "utf8");
 const route = fs.readFileSync(new URL("../app/profile/operating-plan/strategy/[strategyType]/[strategyId]/page.js", import.meta.url), "utf8");
 
 describe("Operating Plan clarity routes", () => {
@@ -23,7 +23,7 @@ describe("Operating Plan clarity routes", () => {
   });
 
   it("preserves Recovery and Execution destinations", () => {
-    expect(plan).toContain("`/profile/protocols/${protocol.id}?from=operating-plan`");
+    expect(plan).toContain("`/profile/protocols/${recoveryProtocols[0].id}?from=operating-plan`");
     expect(plan).toContain("`/profile/operating-plan/execution/${item.id}`");
   });
 
@@ -39,30 +39,23 @@ describe("Operating Plan clarity routes", () => {
     expect(executionDetail).toContain("This execution item is not available here.");
   });
 
-  it("keeps Recovery and Supplement details strategy-only", () => {
-    const strategyView = protocolDetail.slice(
-      protocolDetail.indexOf("function StrategyProtocolDetail"),
-      protocolDetail.indexOf("function ProtocolPurpose"),
-    );
-    expect(strategyView).toContain("Current Strategy");
-    expect(strategyView).toContain("Goal Supported");
-    expect(strategyView).toContain("Started");
-    expect(strategyView).toContain("Activity");
-    expect(strategyView).not.toMatch(/Current Schedule|Dose|Research|Evidence|EditEntry/);
+  it("groups Recovery and Supplements around strategy purpose and current support", () => {
+    expect(domainDetail).toContain("Recovery Strategy");
+    expect(domainDetail).toContain("Supplement Strategy");
+    expect(domainDetail).toContain("Current Recovery Methods");
+    expect(domainDetail).toContain("Current Supplements");
+    expect(domainDetail).toContain("Current support summary");
+    expect(domainDetail).toContain("Edit Support");
+    expect(domainDetail).not.toMatch(/Research Summary|Evidence Role|Edit Protocol/);
   });
 
-  it("keeps Peptide details strategy-only and separate from Execution", () => {
-    const strategyView = protocolDetail.slice(
-      protocolDetail.indexOf("function StrategyProtocolDetail"),
-      protocolDetail.indexOf("function ProtocolPurpose"),
-    );
-    expect(strategyView).toContain("Peptide Strategy");
-    expect(strategyView).toContain("Purpose");
-    expect(strategyView).toContain("Current Strategy");
-    expect(strategyView).toContain("Goal Supported");
-    expect(strategyView).toContain("Started");
-    expect(strategyView).toContain("Status");
-    expect(strategyView).not.toMatch(/Dosing Timeline|Next Dose|Reminder|Priority|Execution notes/);
+  it("groups Peptides while preserving direct links to the existing support editors", () => {
+    expect(domainDetail).toContain("Peptide Strategy");
+    expect(domainDetail).toContain("Current Peptides");
+    expect(domainDetail).toContain("Current dose");
+    expect(domainDetail).toContain("Current schedule");
+    expect(domainDetail).toContain("/execution/peptides/");
+    expect(domainDetail).not.toMatch(/Dosing Timeline|Next Dose|Reminder|Priority|Execution notes/);
   });
 
   it("moves Coaching Updates to a read-only strategy destination", () => {

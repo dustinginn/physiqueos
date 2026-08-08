@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { readOperationalJsonFile } from "./lib/operationalJson.mjs";
 
 const buildRoot = path.resolve(".next");
 const staticRoot = path.join(buildRoot, "static");
@@ -23,7 +24,8 @@ assert(fontFiles.some((file) => file.startsWith(staticRoot)), "No WOFF2 font ass
 assert(!/fonts\.(?:googleapis|gstatic)\.com/i.test(css), "Generated CSS still references Google Fonts.");
 assert(!/src:\s*local\(Arial\)[\s\S]*?(?:Plus Jakarta Sans Fallback|plus_jakarta_sans)/i.test(plusJakartaCss), "The build contains only the Arial-backed Plus Jakarta fallback.");
 
-const manifests = await Promise.all(manifestFiles.map(async (file) => ({ file, value: JSON.parse(await readFile(file, "utf8")) })));
+const manifests = await Promise.all(manifestFiles.map(async (file) => ({ file,
+  value: await readOperationalJsonFile(file, { stage: "font_build_manifest" }) })));
 assert(manifests.length > 0, "No Next.js font manifest was emitted.");
 assert(manifests.some(({ value }) => hasManifestFont(value)), "Next.js font manifests do not reference an emitted font asset.");
 

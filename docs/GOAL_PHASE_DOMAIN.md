@@ -5,11 +5,15 @@
 unchanged; the phase model is a strict, read-only normalization boundary for
 future phase-aware consumers.
 
-The contract supports phase statuses `upcoming`, `active`, `completed`, and
-`skipped`; timing modes `fixed_duration`, `target_date`, and
+The compatibility contract supports legacy `upcoming` and `skipped` plus
+canonical `planned`, `active`, `review_due`, `review_pending_decision`,
+`completed`, `superseded`, and `paused`; timing modes `fixed_duration`, `target_date`, and
 `completion_criteria`; and transition policies `manual_review`,
-`evidence_review`, and `automatic`. The automatic value records future intent
+`evidence_review`, and `automatic`. The automatic value records historical intent
 only and does not execute a transition.
+
+The strict evidence-based lifecycle and read compatibility semantics live in
+`canonicalGoalPhase.js` and `PHASE_REVIEW_PRODUCTION_ARCHITECTURE.md`.
 
 `normalizeGoalPhaseCollection` validates phase ownership, unique IDs and order
 values, deterministic sequence order, active-phase cardinality, status

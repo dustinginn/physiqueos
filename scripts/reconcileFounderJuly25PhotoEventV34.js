@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 import {
   getFounderRuntimeStore,
   resolveFounderRuntimeStorePath,
@@ -10,7 +11,8 @@ async function main(){
   const liveStore=getFounderRuntimeStore();
   const service=createJuly25PhotoEventV34ReconciliationService({
     runtimeStorePath,liveStore,
-    readPersistedStore:()=>JSON.parse(fs.readFileSync(runtimeStorePath,"utf8")),
+    readPersistedStore:()=>readOperationalJsonFileSync(runtimeStorePath,
+      {stage:"july25_photo_reconciliation_source"}),
   });
   const result=await service.execute();
   process.stdout.write(`${JSON.stringify(result,null,2)}\n`);

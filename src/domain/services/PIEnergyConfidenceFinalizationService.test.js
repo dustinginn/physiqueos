@@ -48,6 +48,12 @@ function fixture({
     if (includeActivity) canonical.push(activity(date, partial));
   }
   canonical.push(dexa());
+  const confidenceHistory = structuredClone(source.goalConfidenceHistory.slice(-1));
+  if (confidenceHistory[0]?.assessment) {
+    confidenceHistory[0].assessment.contributors =
+      (confidenceHistory[0].assessment.contributors ?? [])
+        .filter((item) => item.domain !== "energy");
+  }
   const store = {
     version: "isolated",
     revision: 28,
@@ -57,7 +63,7 @@ function fixture({
     canonicalEvidenceObjects: canonical,
     dexaScans: [],
     goalConfidenceSnapshots: structuredClone(source.goalConfidenceSnapshots),
-    goalConfidenceHistory: structuredClone(source.goalConfidenceHistory),
+    goalConfidenceHistory: confidenceHistory,
     goalConfidenceContinuitySeeds: structuredClone(
       source.goalConfidenceContinuitySeeds
     ),
@@ -161,6 +167,27 @@ function persisted(f) {
   return JSON.parse(fs.readFileSync(f.filePath, "utf8"));
 }
 
+function representEnergyInCadence(f, {
+  evidenceCutoff = workInput(f).evidenceCutoff,
+  reason = "Maintenance energy is near maintenance.",
+} = {}) {
+  const assessment = f.liveStore.goalConfidenceHistory[0].assessment;
+  assessment.evidenceCutoff = evidenceCutoff;
+  assessment.context = { type: "weekly_closed_window" };
+  assessment.contributors = [
+    ...(assessment.contributors ?? []).filter((item) => item.domain !== "energy"),
+    {
+      domain: "energy",
+      direction: "supporting",
+      strength: "high",
+      evidenceCompleteness: "complete",
+      reason,
+      consumedTransitionIds: [],
+    },
+  ];
+  fs.writeFileSync(f.filePath, `${JSON.stringify(f.liveStore, null, 2)}\n`);
+}
+
 describe("PI Energy confidence finalization", () => {
   it("creates and merges deterministic source work", () => {
     const f = fixture();
@@ -198,14 +225,8 @@ describe("PI Energy confidence finalization", () => {
     expect(persisted(f).piEnergyConfidenceWorkItems).toHaveLength(1);
   });
 
-  it.each([
-    [0, 60],
-    [-400, 56],
-    [400, 56],
-  ])("publishes a bounded reliable transition for balance %s", async (
-    balance,
-    expectedScore
-  ) => {
+  it.each([0, -400, 400])(
+  "prepares a briefing input without publishing for balance %s", async (balance) => {
     const f = fixture({ balance });
     await f.service.enqueue(workInput(f));
     const baseline = f.service.captureBaseline();
@@ -218,18 +239,17 @@ describe("PI Energy confidence finalization", () => {
     );
     const store = persisted(f);
     expect(result).toMatchObject({
-      outcome: PIEnergyFinalizationOutcome.PUBLISHED_SUCCESSOR,
+      outcome: PIEnergyFinalizationOutcome.BRIEFING_INPUT_READY,
       committed: true,
     });
-    expect(store.goalConfidenceHistory).toHaveLength(2);
+    expect(store.goalConfidenceHistory).toHaveLength(1);
     expect(store.goalConfidenceSnapshots).toHaveLength(1);
-    expect(store.goalConfidenceSnapshots[0].currentScore).toBe(expectedScore);
+    expect(store.goalConfidenceSnapshots[0].currentScore).toBe(
+      f.liveStore.goalConfidenceSnapshots[0].currentScore);
     expect(store.piEnergyFinalizationReceipts).toHaveLength(1);
     expect(store.piEnergyConfidenceWorkItems[0].completionReceiptId)
       .toBe(store.piEnergyFinalizationReceipts[0].id);
     expect(store.revision).toBe(baseline.revision + 1);
-    expect(store.goalConfidenceHistory.at(-1).commitId)
-      .toBe(store.lastCommitId);
   });
 
   it("persists awaiting-pair without confidence history", async () => {
@@ -243,6 +263,29 @@ describe("PI Energy confidence finalization", () => {
     expect(result.outcome).toBe(PIEnergyFinalizationOutcome.AWAITING_PAIR);
     expect(persisted(f).goalConfidenceHistory).toHaveLength(before);
     expect(persisted(f).piEnergyFinalizationReceipts).toHaveLength(1);
+  });
+
+  it("recognizes an explicitly represented cadence assessment", async () => {
+    const f = fixture();
+    representEnergyInCadence(f);
+    await f.service.enqueue(workInput(f));
+    const result = await f.service.finalize(
+      createPIEnergyConfidenceWork(workInput(f)).id
+    );
+    expect(result.outcome).toBe(PIEnergyFinalizationOutcome.CADENCE_OWNED);
+  });
+
+  it("lets a newer paired window supersede an older cadence representation", async () => {
+    const f = fixture();
+    representEnergyInCadence(f, {
+      evidenceCutoff: "2026-07-26T23:59:59.999Z",
+      reason: "Maintenance energy is in a persistent deficit.",
+    });
+    await f.service.enqueue(workInput(f));
+    const result = await f.service.finalize(
+      createPIEnergyConfidenceWork(workInput(f)).id
+    );
+    expect(result.outcome).toBe(PIEnergyFinalizationOutcome.BRIEFING_INPUT_READY);
   });
 
   it("treats a reliable same-state numeric correction as non-material", async () => {
@@ -298,7 +341,7 @@ describe("PI Energy confidence finalization", () => {
       }),
     ]);
     expect(outcomes.filter((item) =>
-      item.outcome === PIEnergyFinalizationOutcome.PUBLISHED_SUCCESSOR
+      item.outcome === PIEnergyFinalizationOutcome.BRIEFING_INPUT_READY
     )).toHaveLength(1);
     expect(outcomes.some((item) =>
       [
@@ -306,7 +349,7 @@ describe("PI Energy confidence finalization", () => {
         PIEnergyFinalizationOutcome.BASELINE_CONFLICT,
       ].includes(item.outcome)
     )).toBe(true);
-    expect(persisted(f).goalConfidenceHistory).toHaveLength(2);
+    expect(persisted(f).goalConfidenceHistory).toHaveLength(1);
     expect(persisted(f).piEnergyFinalizationReceipts).toHaveLength(1);
   });
 
@@ -391,7 +434,7 @@ describe("PI Energy confidence finalization", () => {
     expect(f.service.listRecoverableWork()).toHaveLength(0);
   });
 
-  it("retention preserves pending work and authoritative receipts", async () => {
+  it("retention preserves receipts without retaining non-authoritative work", async () => {
     const f = fixture();
     await f.service.enqueue(workInput(f));
     await f.service.finalize(createPIEnergyConfidenceWork(workInput(f)).id);
@@ -403,7 +446,7 @@ describe("PI Energy confidence finalization", () => {
     expect(after.piEnergyFinalizationReceipts).toEqual(
       before.piEnergyFinalizationReceipts
     );
-    expect(after.piEnergyConfidenceWorkItems).toHaveLength(1);
+    expect(after.piEnergyConfidenceWorkItems).toHaveLength(0);
   });
 
   it("requires receipt linkage fields deterministically", () => {
@@ -437,7 +480,7 @@ describe("PI Energy confidence finalization", () => {
     })).toThrow("workId is required");
   });
 
-  it("marks the current production interpretation as already represented in an isolated clone", async () => {
+  it("keeps the current Confidence V2 snapshot awaiting a pair without legacy contributor lineage", async () => {
     const source = JSON.parse(fs.readFileSync(productionPath, "utf8"));
     const goal = source.goals.find((item) => item.primary && item.status === "active");
     const phase = goal.phases.find((item) => item.status === "active");
@@ -474,8 +517,8 @@ describe("PI Energy confidence finalization", () => {
         createdAt: "2026-07-26T21:00:00.000Z",
       }).id
     );
-    expect(result.outcome).toBe(PIEnergyFinalizationOutcome.ALREADY_CONSUMED);
+    expect(result.outcome).toBe(PIEnergyFinalizationOutcome.AWAITING_PAIR);
     expect(JSON.parse(fs.readFileSync(filePath, "utf8")).goalConfidenceHistory)
-      .toHaveLength(1);
+      .toHaveLength(source.goalConfidenceHistory.length);
   });
 });

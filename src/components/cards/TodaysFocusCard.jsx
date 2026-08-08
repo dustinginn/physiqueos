@@ -13,9 +13,13 @@ export default function TodaysFocusCard({
   if (items.length === 0) return null;
 
   const hasSessions = items.some((item) => isSessionPriority(item));
-  const gridClass = items.length === 1 || hasSessions ? "grid-cols-1" : "grid-cols-2";
+  const hasSetupRequiredItem = items.some((item) => item.actionLabel);
+  const gridClass =
+    items.length === 1 || hasSessions || hasSetupRequiredItem
+      ? "grid-cols-1"
+      : "grid-cols-2";
   const density =
-    items.length === 1 || hasSessions
+    items.length === 1 || hasSessions || hasSetupRequiredItem
       ? "expanded"
       : items.length === 2
         ? "balanced"

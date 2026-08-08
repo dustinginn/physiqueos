@@ -71,60 +71,62 @@ export function createBriefingGoalConfidenceBlockFromAssessment(
   };
 }
 
+export function createBriefingGoalConfidenceBlockFromV2({
+  assessment,
+  projection,
+  narrativeAssessment,
+  capturedAt = null,
+  captureSemantics = "canonical_v2_assessment_at_atomic_publication",
+} = {}) {
+  if (assessment?.schemaVersion !== "canonical_confidence_assessment_v2" ||
+      assessment.currentPercentage !== projection?.currentPercentage) return null;
+  const movementDirection = ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[assessment.movement];
+  return {
+    score: assessment.currentPercentage,
+    band: assessment.confidenceBand,
+    priorScore: assessment.priorPercentage,
+    delta: assessment.priorPercentage == null ? null :
+      assessment.currentPercentage - assessment.priorPercentage,
+    movementDirection,
+    movementMagnitude: assessment.movementMagnitude,
+    primaryReason: narrativeAssessment?.confidenceExplanation?.text ?? null,
+    presentationExplanation: narrativeAssessment?.confidenceExplanation?.text ?? null,
+    supportingReasons: (narrativeAssessment?.primarySupportingFactors ?? [])
+      .map((item) => item.text).filter(Boolean).slice(0, 2),
+    limitingReasons: (narrativeAssessment?.primaryLimitingFactors ?? [])
+      .map((item) => item.text).filter(Boolean).slice(0, 2),
+    unresolvedUncertainty: (narrativeAssessment
+      ?.remainingUncertaintyExplanation?.items ?? []).slice(0, 3),
+    assessmentId: assessment.id,
+    assessmentContext: { goalId: assessment.goalId, phaseId: assessment.phaseId,
+      goalContractId: assessment.goalContract.id },
+    evidenceCutoff: assessment.sourceCutoff,
+    temporalCutoff: assessment.sourceCutoff,
+    assessmentTimestamp: assessment.publicationTimestamp,
+    capturedAt,
+    captureSemantics,
+    source: "canonical_confidence_v2_snapshot",
+    modelVersion: assessment.schemaVersion,
+    piVersion: "confidence_v2",
+    originatingPublisher: assessment.publisherType,
+    originatingArtifactId: assessment.briefingArtifactId,
+  };
+}
+
 export function createMonthlyBriefingGoalConfidenceBlockFromAssessment(
   assessment,
   options = {}
 ) {
   const block = createBriefingGoalConfidenceBlockFromAssessment(assessment, options);
-  if (!block) return null;
-  return {
-    ...block,
-    presentationExplanation: composeMonthlyConfidenceExplanation(assessment),
-  };
+  return block;
 }
 
 export function createMidweekConfidencePresentation(
   confidence,
-  { briefing } = {}
+  _options = {}
 ) {
-  if (!confidence) return null;
-  const direction = confidence.movementDirection === "increased"
-    ? "moved up slightly"
-    : confidence.movementDirection === "decreased"
-      ? "moved down slightly"
-      : "held steady";
-  const signals = [
-    (briefing?.training?.sessionsCompleted ?? 0) > 0 && "training",
-    (briefing?.energyBalance?.completeNutritionDays ?? 0) > 0 && "calories",
-    (briefing?.energyBalance?.completeActivityDays ?? 0) > 0 && "activity",
-    (briefing?.weightContext?.observations ?? 0) > 0 && "weight",
-  ].filter(Boolean);
-  return {
-    ...confidence,
-    presentationExplanation:
-      `Confidence ${direction} because ${naturalList(signals.length ? signals : ["the first few days"])} are telling a consistent early story, but the week still needs to finish before Sunday’s full review.`,
-  };
-}
-
-function composeMonthlyConfidenceExplanation(assessment) {
-  const contributors = assessment.contributors ?? [];
-  const hasObjectiveBaseline = contributors.some((item) =>
-    item.domain === "dexa" && item.userFacing !== false
-  );
-  const hasConstructiveTraining = contributors.some((item) =>
-    item.domain === "training" &&
-    item.direction === "supporting" &&
-    item.userFacing !== false
-  );
-  const foundation = hasObjectiveBaseline && hasConstructiveTraining
-    ? "July established an objective body-composition baseline, and training began moving in the right direction"
-    : hasObjectiveBaseline
-      ? "July established an objective body-composition baseline"
-      : "July established a clearer starting point";
-  const nextMeasure = hasObjectiveBaseline
-    ? "August and the next DEXA will show whether that progress continues"
-    : "August will show whether that early progress continues";
-  return `${foundation}. One month is still too soon to confirm muscle gain; ${nextMeasure}.`;
+  return confidence ?? null;
 }
 
 function boundedReasons(contributors = []) {
@@ -132,10 +134,4 @@ function boundedReasons(contributors = []) {
     .filter((item) => item.userFacing !== false)
     .slice(0, 2)
     .map((item) => item.reason);
-}
-
-function naturalList(values) {
-  if (values.length === 1) return values[0];
-  if (values.length === 2) return values.join(" and ");
-  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }

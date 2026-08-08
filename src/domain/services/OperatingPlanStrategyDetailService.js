@@ -47,7 +47,7 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     })
     : null;
   const common = {
-    goal: goal?.title ?? null,
+    goal: goal?.title ? `Your ${goalLabel(goal.title)}` : null,
     startedDate: formatGoalStartDate(goal?.timeline?.startDate),
     status: "Active",
     editHref: ["briefings", "nutrition", "training"].includes(strategyType)
@@ -59,24 +59,24 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     ...common,
     eyebrow: "Energy Strategy",
     title: strategy.mode ?? protocol.name,
-    purpose: "Coordinate intake and activity while maintenance is calibrated.",
+    purpose: `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
     sections: [
-      field("Current Approach", label(strategy.mode)),
-      field("Intake Approach", label(strategy.calorieStrategy)),
-      field("Activity Approach", label(strategy.activityStrategy)),
-      field("Weekly Calibration", label(strategy.evaluationCadence)),
+      field("Current Energy Phase", energyPhase(strategy.mode)),
+      field("Caloric Intake", label(strategy.calorieStrategy)),
+      field("Activity Target", label(strategy.activityStrategy)),
+      field("Calibration Approach", calibrationApproach(strategy)),
     ],
   };
   if (strategyType === "nutrition") return {
     ...common,
     eyebrow: "Nutrition Strategy",
-    title: "Maintenance Calibration Nutrition",
-    purpose: "Support the current Goal while intake is adjusted gradually.",
+    title: "Macro Strategy",
+    purpose: `Define how daily intake is composed across protein, carbohydrates, and fats to support ${goalReference(goal)}.`,
     sections: [
-      field("Daily Target", proteinRule(strategy)),
-      field("Intake Approach", label(strategy.calorieStrategy)),
+      field("Protein Target", proteinRule(strategy)),
       field("Carbohydrate Approach", label(strategy.carbohydrateStrategy)),
       field("Fat Approach", label(strategy.fatStrategy)),
+      field("Macro Philosophy", macroPhilosophy(strategy)),
     ],
   };
   if (strategyType === "briefings") return {
@@ -98,8 +98,8 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
   return {
     ...common,
     eyebrow: "Training Strategy",
-    title: protocol.name,
-    purpose: version?.intent?.summary ?? "Follow the active weekly training plan.",
+    title: goal?.title ? `${goal.title} Training` : "Current Training Strategy",
+    purpose: `Build the weekly structure, training focus, and progression needed to support ${goalReference(goal)}.`,
     sections: [
       field("Weekly Structure", weekly ? `${weekly} area sessions` : null),
       field("Training Focus", list(training.physiquePriorities)),
@@ -118,6 +118,33 @@ export function getOperatingPlanStrategyHref(strategyType, strategyId) {
 function field(labelText, value) { return value ? { label: labelText, value } : null; }
 function list(values) { return values?.length ? values.map(label).join(", ") : null; }
 function label(value) { return value ? String(value).replace(/[_-]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : null; }
+function goalLabel(title) {
+  const value = String(title ?? "").trim().replace(/\s+goal$/i, "");
+  return value ? `${value} goal` : "current goal";
+}
+function goalReference(goal) {
+  return goal?.title ? `your ${goalLabel(goal.title)}` : "your current strategy";
+}
+function energyPhase(mode) {
+  const value = String(mode ?? "").toLowerCase();
+  if (value.includes("cut")) return "Cut";
+  if (value.includes("bulk") || value.includes("gain")) return "Bulk";
+  if (value.includes("maintenance") || value.includes("maintain")) return "Maintain";
+  return label(mode);
+}
+function calibrationApproach(strategy) {
+  const cadence = label(strategy.evaluationCadence);
+  const adjustment = strategy.adjustmentSize ? `${label(strategy.adjustmentSize)} adjustments` : null;
+  return [cadence, adjustment].filter(Boolean).join(" \u00B7 ") || null;
+}
+function macroPhilosophy(strategy) {
+  if (strategy.trainingDayFlexibility && strategy.restDayFlexibility) {
+    return "Flexible across training and rest days";
+  }
+  if (strategy.trainingDayFlexibility) return "Flexible on training days";
+  if (strategy.restDayFlexibility) return "Flexible on rest days";
+  return "Consistent daily macro structure";
+}
 function proteinRule(strategy) {
   if (strategy.proteinBasis === "body_weight" && Number(strategy.proteinRatio) === 1) {
     return "1 g per lb of body weight";

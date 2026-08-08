@@ -1,3 +1,5 @@
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+
 export async function resolvePhotoEventContext({ repositories, userId, evidenceDate }) {
   const [activeGoal, goals, executionItems, dexaScans] = await Promise.all([
     repositories.goals.getActiveGoal(userId),
@@ -5,7 +7,9 @@ export async function resolvePhotoEventContext({ repositories, userId, evidenceD
     repositories.executionItems?.listExecutionItems?.(userId) ?? [],
     repositories.dexaScans?.listDEXAScans?.(userId) ?? [],
   ]);
-  const activePhase = activeGoal?.phases?.find((phase) => phase.status === "active") ?? null;
+  const phaseContext = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: evidenceDate }) : null;
+  const committedGoal = phaseContext?.goal ?? activeGoal;
+  const activePhase = phaseContext?.activePhase ?? null;
   const completedPriorGoal =
     goals.find((goal) => goal.id === activeGoal?.sourceGoalId && goal.status === "completed") ??
     goals.filter((goal) => goal.status === "completed")
@@ -13,7 +17,7 @@ export async function resolvePhotoEventContext({ repositories, userId, evidenceD
     null;
   return {
     evidenceDate: dateKey(evidenceDate),
-    activeGoal: snapshotGoal(activeGoal),
+    activeGoal: snapshotGoal(committedGoal),
     activePhase: snapshotPhase(activePhase),
     operatingState: activeGoal?.openingApproach
       ? { value: activeGoal.openingApproach.value ?? null, label: activeGoal.openingApproach.label ?? null }
@@ -79,7 +83,7 @@ function snapshotGoal(goal) {
 }
 
 function snapshotPhase(phase) {
-  return phase ? { id: phase.id, name: phase.name ?? phase.title, status: phase.status } : null;
+  return phase ? { id: phase.id, name: phase.name ?? phase.title, status: phase.status, startedAt: phase.startedAt ?? phase.startDate ?? null, plannedReviewAt: phase.plannedReviewAt ?? null, reviewState: phase.effectiveReviewState ?? phase.reviewState ?? null } : null;
 }
 
 function dateKey(value) {

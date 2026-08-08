@@ -1,6 +1,8 @@
 import { GoalPhaseStatus, createGoalPhase, normalizeGoalPhaseCollection } from "./goalPhase";
 
-export const AUTHORED_GOAL_PHASE_FIELDS = Object.freeze(["id", "goalId", "name", "purpose", "status", "order", "startDate", "targetDate", "duration", "timingMode", "successCriteria", "guardrails", "transitionPolicy", "createdAt", "updatedAt"]);
+const LEGACY_AUTHORED_GOAL_PHASE_FIELDS = ["id", "goalId", "name", "purpose", "status", "order", "startDate", "targetDate", "duration", "timingMode", "successCriteria", "guardrails", "transitionPolicy", "createdAt", "updatedAt"];
+const CANONICAL_LIFECYCLE_FIELDS = ["phaseId", "canonicalName", "startedAt", "plannedReviewAt", "completedAt", "supersededAt", "lastReviewedAt", "reviewState", "projectedNextPhaseStart", "projectedNextReviewAt", "completionCriteria", "reviewMilestone", "completionDecisionRequired", "completionDecisionId", "extensionCount", "latestExtensionDecisionId", "currentRecommendedReviewAt", "revision"];
+export const AUTHORED_GOAL_PHASE_FIELDS = Object.freeze([...LEGACY_AUTHORED_GOAL_PHASE_FIELDS, ...CANONICAL_LIFECYCLE_FIELDS]);
 const ALLOWED = new Set(AUTHORED_GOAL_PHASE_FIELDS);
 
 export class AuthoredGoalPhasePersistenceError extends Error {
@@ -22,13 +24,16 @@ export function normalizeAuthoredGoalPhases(inputs = [], { goalId, parentGoalSta
     return createGoalPhase({ ...structuredClone(raw), goalId, createdAt: raw.createdAt ?? prior?.createdAt ?? stamp, updatedAt: raw.updatedAt ?? stamp });
   });
   const normalized = normalizeGoalPhaseCollection(phases, { goalId });
-  if (parentGoalStatus === "active" && normalized.length > 0 && normalized.filter((phase) => phase.status === GoalPhaseStatus.ACTIVE).length !== 1) throw phaseError("AUTHORED_PHASE_ACTIVE_REQUIRED", "A non-empty authored phase collection on an active goal requires exactly one active phase.");
+  const activeStatuses = new Set([GoalPhaseStatus.ACTIVE, GoalPhaseStatus.REVIEW_DUE, GoalPhaseStatus.REVIEW_PENDING_DECISION]);
+  if (parentGoalStatus === "active" && normalized.length > 0 && normalized.filter((phase) => activeStatuses.has(phase.status)).length !== 1) throw phaseError("AUTHORED_PHASE_ACTIVE_REQUIRED", "A non-empty authored phase collection on an active goal requires exactly one active phase.");
   return deepFreeze(normalized.map(toPersistedGoalPhase));
 }
 
 export function toPersistedGoalPhase(input) {
   const phase = createGoalPhase(input);
-  return deepFreeze(Object.fromEntries(AUTHORED_GOAL_PHASE_FIELDS.map((field) => [field, structuredClone(phase[field] ?? null)])));
+  const fields = AUTHORED_GOAL_PHASE_FIELDS.filter((field) =>
+    LEGACY_AUTHORED_GOAL_PHASE_FIELDS.includes(field) || Object.hasOwn(input, field));
+  return deepFreeze(Object.fromEntries(fields.map((field) => [field, structuredClone(phase[field] ?? null)])));
 }
 
 function phaseError(code, message, details = {}) { return new AuthoredGoalPhasePersistenceError(code, message, details); }

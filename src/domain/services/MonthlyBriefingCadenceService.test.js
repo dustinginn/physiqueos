@@ -1,6 +1,8 @@
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
+import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
 import {
   createMonthlyEvidenceWindow,
 } from "./BriefingEvidenceWindowService";
@@ -9,6 +11,7 @@ import {
 } from "./BriefingCadenceRegistryService";
 import {
   createMonthlyBriefingService,
+  formatMonthlyPeriodLine,
   getMonthlyArtifactId,
 } from "./MonthlyBriefingService";
 
@@ -17,6 +20,35 @@ const julyDeployment = new Date("2026-07-30T05:30:00.000Z");
 const augustEligibility = new Date("2026-08-01T07:00:00.000Z");
 
 describe("Monthly production cadence", () => {
+  it("formats Monthly periods with canonical Unicode separators through UTF-8 serialization", () => {
+    const cases = [
+      ["2026-08-01", "2026-08-31", "2026-09-01", "August 1\u201331 \u00b7 Delivered September 1"],
+      ["2026-02-01", "2026-02-28", "2026-03-01", "February 1\u201328 \u00b7 Delivered March 1"],
+      ["2028-02-01", "2028-02-29", "2028-03-01", "February 1\u201329 \u00b7 Delivered March 1"],
+    ];
+
+    for (const [startDate, endDate, deliveryDate, expected] of cases) {
+      const period = formatMonthlyPeriodLine({ startDate, endDate, deliveryDate });
+      expect(period).toBe(expected);
+      expect([...period].filter((character) => character === "\u2013")).toHaveLength(1);
+      expect([...period].filter((character) => character === "\u00b7")).toHaveLength(1);
+      expect(period).not.toMatch(/[?\uFFFD]/);
+      expect(JSON.parse(Buffer.from(JSON.stringify({ period }), "utf8").toString("utf8")))
+        .toEqual({ period: expected });
+    }
+  });
+
+  it.runIf(process.platform === "win32")("preserves the separators across an explicit PowerShell UTF-8 stdout boundary", () => {
+    const result = spawnSync("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); [Console]::Write(([char]0x2013).ToString() + ([char]0x00B7).ToString())",
+    ], { encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("\u2013\u00b7");
+  });
+
   it("resolves the July calendar window and exact local cutoff", () => {
     const beforeEligibility = createMonthlyEvidenceWindow({
       now: julyDeployment,
@@ -115,7 +147,8 @@ describe("Monthly production cadence", () => {
       repositories,
       now: () => augustEligibility,
       publicationService: {
-        captureBaseline: () => ({ revision: 40, semanticDigest: "baseline" }),
+        captureBaseline: () => ({ revision: 40, semanticDigest: "baseline",
+          store: structuredClone(getFounderRuntimeStore()) }),
         publish,
       },
     });

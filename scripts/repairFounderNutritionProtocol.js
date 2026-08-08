@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 import { createNutritionProtocolStateRepairService } from "../src/domain/services/NutritionProtocolStateRepairService.js";
 
 const args = new Set(process.argv.slice(2));
@@ -14,7 +15,8 @@ if (!args.has("--apply") || !protocolId || !expectedGoalId) {
   process.exit(2);
 }
 const runtimeStorePath = path.resolve(process.cwd(), "private", "founder", "runtime-store.json");
-const liveStore = JSON.parse(fs.readFileSync(runtimeStorePath, "utf8"));
+const liveStore = readOperationalJsonFileSync(runtimeStorePath,
+  { stage: "nutrition_protocol_repair_source" });
 const result = await createNutritionProtocolStateRepairService({
   runtimeStorePath,
   liveStore,

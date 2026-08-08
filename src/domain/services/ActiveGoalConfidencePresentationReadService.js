@@ -1,131 +1,101 @@
-import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
+import {
+  createCanonicalConfidenceReadService,
+} from "../confidence/CanonicalConfidenceReadService";
+import { assertCanonicalConfidencePresentation } from "./CanonicalConfidencePresentationInvariant";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const ACTIVE_GOAL_CONFIDENCE_PRESENTATION_VERSION =
-  "active_goal_confidence_presentation_v1";
+  "active_goal_confidence_presentation_v2";
 
 export function resolveActiveGoalConfidencePresentation({
   activeGoal,
-  activePhase = activeGoal?.phases?.find((item) => item.status === "active"),
-  operatingState = activeGoal?.openingApproach?.value ??
-    activeGoal?.operatingState?.value ?? activeGoal?.operatingState,
+  activePhase = null,
   store,
-  legacyReadModel = null,
 } = {}) {
-  const fallback = (reason, status = "legacy_fallback") =>
-    legacyFallback(legacyReadModel, activeGoal, activePhase, operatingState, reason, status);
+  activePhase ??= activeGoal ? resolveCommittedPhaseContext(activeGoal).activePhase : null;
   if (!activeGoal?.id || !activePhase?.id) {
-    return fallback("active_goal_or_phase_unavailable", "unavailable");
+    return unavailable(activeGoal, activePhase, "active_goal_or_phase_unavailable");
   }
-  const series = createPIGoalConfidenceReadService({ store })
-    .getGoalConfidenceSeries({ goalId: activeGoal.id, phaseId: activePhase.id });
-  if (!series.currentSnapshot) {
-    const otherCanonicalExists = (store?.goalConfidenceSnapshots?.length ?? 0) > 0;
-    return fallback(
-      otherCanonicalExists
-        ? "canonical_boundary_mismatch" : "canonical_series_unavailable",
-      otherCanonicalExists ? "invalid_canonical" : "legacy_fallback"
-    );
+  const canonical = createCanonicalConfidenceReadService({ store }).getCurrent({
+    goalId: activeGoal.id,
+    phaseId: activePhase.id,
+  });
+  if (!canonical.assessment) {
+    return unavailable(activeGoal, activePhase, canonical.reason);
   }
-  const snapshot = series.currentSnapshot;
-  const history = series.history.find((item) => item.id === snapshot.historyRecordId);
-  const assessment = history?.assessment;
-  const mismatch = snapshot.goalId !== activeGoal.id ||
-    snapshot.phaseId !== activePhase.id ||
-    snapshot.operatingState !== operatingState;
-  if (mismatch) return fallback("canonical_boundary_mismatch", "invalid_canonical");
-  if (!history || !assessment ||
-      snapshot.currentAssessmentId !== assessment.id ||
-      history.assessmentId !== assessment.id ||
-      snapshot.currentScore !== assessment.score?.current ||
-      snapshot.scoreBand !== assessment.score?.band ||
-      assessment.goalId !== activeGoal.id ||
-      assessment.phaseId !== activePhase.id ||
-      assessment.operatingState !== operatingState) {
-    return fallback("canonical_snapshot_or_history_invalid", "invalid_canonical");
+  const assessment = canonical.assessment;
+  const v1Compatibility = assessment.compatibility?.incomplete === true;
+  const operatingState = activeGoal?.openingApproach?.value ??
+    activeGoal?.operatingState?.value ?? activeGoal?.operatingState ?? null;
+  if (v1Compatibility && (assessment.operatingState !== operatingState ||
+      canonical.snapshot.operatingState !== operatingState)) {
+    return unavailable(activeGoal, activePhase, "canonical_boundary_mismatch");
   }
-  return Object.freeze({
-    status: "canonical",
-    source: "canonical_pi_snapshot",
+  const presentationMovement = ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[assessment.movement] ?? assessment.movement;
+  const presentation = {
+    status: v1Compatibility ? "canonical" : canonical.status,
+    source: v1Compatibility ? "canonical_pi_snapshot" : canonical.source,
     canonicalSeries: true,
-    value: assessment.score.current,
-    score: assessment.score.current,
-    numericValue: assessment.score.current,
-    percentageLabel: `${assessment.score.current}%`,
-    band: assessment.score.band,
-    label: title(assessment.score.band),
+    compatibilityIncomplete: v1Compatibility,
+    value: assessment.currentPercentage,
+    score: assessment.currentPercentage,
+    numericValue: assessment.currentPercentage,
+    percentageLabel: `${assessment.currentPercentage}%`,
+    band: assessment.confidenceBand,
+    label: title(assessment.confidenceBand),
     assessmentId: assessment.id,
-    snapshotId: snapshot.id,
+    snapshotId: canonical.snapshot.id,
     goalId: assessment.goalId,
     phaseId: assessment.phaseId,
-    operatingState: assessment.operatingState,
-    movement: assessment.score.movement,
-    movementDirection: assessment.score.movement.direction,
-    movementMagnitude: assessment.score.movement.magnitude,
-    delta: assessment.score.delta,
-    priorScore: assessment.score.prior,
-    primaryReason: assessment.primaryReason,
-    explanation: assessment.primaryReason,
-    supportingContributors: assessment.contributors.filter((item) =>
-      item.direction === "supporting"),
-    limitingContributors: assessment.contributors.filter((item) =>
-      item.direction === "limiting"),
-    unresolvedUncertainty: assessment.unresolvedUncertainty,
-    evidenceCutoff: assessment.evidenceCutoff,
-    assessmentTimestamp: assessment.provenance.generatedAt,
-    modelVersion: assessment.modelVersion,
-    piVersion: assessment.piVersion,
-    fallbackReason: null,
-    provenance: assessment.score.priorScoreProvenance,
-  });
-}
-
-function legacyFallback(legacy, goal, phase, operatingState, reason, status) {
-  if (!legacy || !Number.isFinite(legacy.value)) {
-    return Object.freeze({
-      status: "unavailable", source: "unavailable", canonicalSeries: false,
-      value: null, score: null, numericValue: null, percentageLabel: null,
-      band: null, label: "Unavailable", assessmentId: null, snapshotId: null,
-      goalId: goal?.id ?? null, phaseId: phase?.id ?? null,
-      operatingState: operatingState ?? null, movement: null,
-      movementDirection: null, movementMagnitude: null, delta: null,
-      priorScore: null, primaryReason: null, explanation: null,
-      supportingContributors: [], limitingContributors: [],
-      unresolvedUncertainty: [], evidenceCutoff: null,
-      assessmentTimestamp: null, modelVersion: null, piVersion: null,
-      fallbackReason: reason, provenance: null,
-    });
-  }
-  return Object.freeze({
-    ...legacy,
-    status,
-    source: "legacy_overall_goal_confidence",
-    canonicalSeries: false,
-    score: legacy.value,
-    numericValue: legacy.value,
-    percentageLabel: `${legacy.value}%`,
-    assessmentId: null,
-    snapshotId: null,
-    goalId: goal?.id ?? null,
-    phaseId: phase?.id ?? null,
-    operatingState: operatingState ?? null,
-    movement: null,
-    movementDirection: null,
-    movementMagnitude: null,
-    delta: null,
-    priorScore: null,
-    primaryReason: legacy.explanation ?? null,
+    operatingState,
+    movement: presentationMovement,
+    movementDirection: presentationMovement,
+    movementMagnitude: assessment.movementMagnitude,
+    delta: assessment.priorPercentage == null ? null :
+      assessment.currentPercentage - assessment.priorPercentage,
+    priorScore: assessment.priorPercentage,
+    primaryReason: assessment.narrativeExplanation?.text ?? null,
+    explanation: assessment.narrativeExplanation?.text ?? null,
     supportingContributors: [],
     limitingContributors: [],
-    unresolvedUncertainty: [],
-    evidenceCutoff: null,
-    assessmentTimestamp: null,
-    modelVersion: "overall_goal_confidence_v1",
-    piVersion: null,
-    fallbackReason: reason,
-    provenance: { source: "temporary_legacy_fallback", piDerived: false },
+    unresolvedUncertainty: assessment.remainingUncertainty?.items ?? [],
+    evidenceCutoff: assessment.sourceCutoff,
+    assessmentTimestamp: assessment.publicationTimestamp,
+    publicationTimestamp: assessment.publicationTimestamp,
+    originatingPublisher: assessment.publisherType,
+    originatingArtifactId: assessment.briefingArtifactId,
+    goalContractId: assessment.goalContract?.id ?? null,
+    goalContractVersion: assessment.goalContract?.version ?? null,
+    modelVersion: assessment.schemaVersion,
+    piVersion: v1Compatibility ? "pi_v1_compatibility" : "confidence_v2",
+    fallbackReason: null,
+    provenance: assessment.reproducibility ?? assessment.compatibility ?? null,
+  };
+  assertCanonicalConfidencePresentation(presentation);
+  return Object.freeze(presentation);
+}
+
+function unavailable(goal, phase, reason) {
+  return Object.freeze({
+    status: "unavailable", source: "canonical_confidence_unavailable",
+    canonicalSeries: false, compatibilityIncomplete: false,
+    value: null, score: null, numericValue: null, percentageLabel: null,
+    band: null, label: "Unavailable", assessmentId: null, snapshotId: null,
+    goalId: goal?.id ?? null, phaseId: phase?.id ?? null,
+    operatingState: goal?.openingApproach?.value ?? null,
+    movement: null, movementDirection: null, movementMagnitude: null,
+    delta: null, priorScore: null, primaryReason: null, explanation: null,
+    supportingContributors: [], limitingContributors: [],
+    unresolvedUncertainty: [], evidenceCutoff: null,
+    assessmentTimestamp: null, publicationTimestamp: null,
+    originatingPublisher: null, originatingArtifactId: null,
+    goalContractId: null, goalContractVersion: null,
+    modelVersion: null, piVersion: null, fallbackReason: reason,
+    provenance: null,
   });
 }
 function title(value) {
-  return String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) =>
-    letter.toUpperCase());
+  return String(value ?? "unknown").replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

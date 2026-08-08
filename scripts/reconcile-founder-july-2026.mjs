@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 
 const runtimePath = path.join(process.cwd(), "private", "founder", "runtime-store.json");
-const store = JSON.parse(fs.readFileSync(runtimePath, "utf8"));
+const store = readOperationalJsonFileSync(runtimePath,
+  { stage: "founder_july_reconciliation_source" });
 const reconciledAt = new Date().toISOString();
 const reconciliationId = `founder_reconciliation_2026_07_11_${reconciledAt.replace(/\D/g, "")}`;
 const photos = store.progressPhotos.filter((photo) => photo.date === "2026-07-11");

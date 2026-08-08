@@ -49,6 +49,7 @@ export default function DailyBriefingScreen({
 
         <div className="space-y-4">
           <HeroConfidenceSection
+            confidence={briefing.goalConfidence}
             hero={briefing.hero}
             reasons={briefing.confidenceReasons ?? []}
           />
@@ -218,7 +219,9 @@ function formatBriefingDate(value) {
     : date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function HeroConfidenceSection({ hero, reasons }) {
+function HeroConfidenceSection({ confidence, hero, reasons }) {
+  const available = confidence?.canonicalSeries === true &&
+    Number.isFinite(confidence.value);
   return (
     <Card className="overflow-hidden border-[var(--divider)] bg-gradient-to-br from-[color-mix(in_srgb,var(--primary)_10%,var(--surface-elevated))] via-[var(--surface-elevated)] to-[var(--surface-muted)] motion-safe:animate-[briefing-card-enter_420ms_ease-out]">
       <div className="flex items-start justify-between gap-4">
@@ -236,11 +239,21 @@ function HeroConfidenceSection({ hero, reasons }) {
             {hero.summary}
           </p>
         </div>
-        <ConfidenceRing
-          label={hero.confidenceLabel}
-          size={88}
-          value={hero.confidence}
-        />
+        {available ? <div className="shrink-0 text-center">
+          <ConfidenceRing
+            label={`Goal confidence ${confidence.value} percent, ${hero.confidenceLabel}. ${formatConfidenceMovement(confidence)}`}
+            size={88}
+            value={confidence.value}
+          />
+          <p className="mt-1 text-[10px] font-extrabold text-[var(--text-secondary)]">
+            {formatConfidenceMovement(confidence)}
+          </p>
+        </div> : <div
+          className="grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full border-2 border-[var(--divider)] bg-[var(--surface-muted)] px-2 text-center text-[10px] font-extrabold text-[var(--text-muted)]"
+          data-testid="daily-confidence-unavailable"
+        >
+          Confidence unavailable
+        </div>}
       </div>
 
       {reasons.length > 0 && <div className="mt-4 grid gap-2">
@@ -259,6 +272,18 @@ function HeroConfidenceSection({ hero, reasons }) {
       </div>}
     </Card>
   );
+}
+
+function formatConfidenceMovement(confidence) {
+  if (confidence.movementDirection === "increased") {
+    return `Increased +${Math.abs(confidence.delta)}`;
+  }
+  if (confidence.movementDirection === "decreased") {
+    return `Decreased -${Math.abs(confidence.delta)}`;
+  }
+  if (confidence.movementDirection === "held") return "No change";
+  if (confidence.movementDirection === "initial") return "Initial assessment";
+  return "Movement unavailable";
 }
 
 function CalloutSection({ icon, title, heading, detail, tone = "effort" }) {

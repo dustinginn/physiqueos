@@ -16,13 +16,13 @@ import {
   deriveHomeActiveChapterPresentation,
   filterHomeRemindersForActiveGoal,
 } from "./HomeActiveChapterPresentationService";
-import { resolveOverallGoalConfidenceReadModel } from "./OverallGoalConfidenceReadService";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
 import {
   resolveCoachingUpdatesReadModel,
   resolveNextEligibleCoachingUpdates,
 } from "./CoachingUpdatesReadService";
+import { resolveLocalTimeZone } from "../utils/localDate";
 
 const placeholderHeader = {
   greeting: "Good morning,",
@@ -166,13 +166,19 @@ export function createHomeBriefingService({
       const homeReminders = activeGoal?.type === "build_lean_mass"
         ? filterHomeRemindersForActiveGoal(reminders, activeGoal.id)
         : reminders;
+      const homeTimeZone = resolveLocalTimeZone(
+        user?.timeZone ?? user?.timezone
+      );
       const todaysFocus = DailyFocusService.getDailyFocus({
         checkIns,
+        executionItems,
         latestWeight,
         weightEntries,
         protocols: activeProtocols,
         progressPhotos,
         reminders: homeReminders,
+        now: now(),
+        timeZone: homeTimeZone,
       });
       const actionPlan = reconcileDailyBriefingAction(
         ActionEngineService.getActionPlan({
@@ -220,15 +226,10 @@ export function createHomeBriefingService({
         generationArtifact: expectedDailyRecord,
         historicalDailyBriefing: latestDailyBriefing,
       });
-      const legacyGoalConfidence = activeGoal?.type === "build_lean_mass" ? resolveOverallGoalConfidenceReadModel({
-        activeGoal, activeProtocols, canonicalEvidence, checkIns, currentDate: now(), dexaScans,
-        nutritionContext, progressPhotos, timeZone: user?.timeZone ?? "America/Los_Angeles", trainingPerformance,
-      }) : null;
       const overallGoalConfidence = activeGoal?.type === "build_lean_mass"
         ? resolveActiveGoalConfidencePresentation({
             activeGoal,
             store: getFounderRuntimeStore(),
-            legacyReadModel: legacyGoalConfidence,
           })
         : null;
       const activeChapter = deriveHomeActiveChapterPresentation({

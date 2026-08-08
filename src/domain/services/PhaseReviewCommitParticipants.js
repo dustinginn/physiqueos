@@ -1,0 +1,551 @@
+import {
+  CanonicalGoalPhaseStatus,
+  PhaseReviewState,
+  addLocalDays,
+  canonicalPhaseRevision,
+  isActivePhaseStatus,
+} from "../models/canonicalGoalPhase";
+import { PhaseReviewUserDecision } from "../models/phaseReviewDecision";
+import { createPhaseReviewMilestone } from "../models/phaseReviewMilestone";
+import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
+import { validatePhaseStrategy } from "../models/phaseStrategy";
+import { validatePhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
+import { createPhase2StartingForecastInputPackage } from
+  "./Phase2StartingForecastInputPackageService";
+
+export const PhaseReviewParticipantName = Object.freeze({
+  PHASE_REVIEW: "phase_review",
+  GOAL: "goal",
+  CURRENT_PHASE: "current_phase",
+  NEXT_PHASE: "next_phase",
+  STRATEGY: "strategy",
+  EXPECTED_TRAJECTORY: "expected_trajectory",
+  STARTING_FORECAST: "starting_forecast",
+  READ_MODELS: "read_models",
+});
+
+export const PHASE_REVIEW_PARTICIPANT_ORDER = Object.freeze([
+  PhaseReviewParticipantName.PHASE_REVIEW,
+  PhaseReviewParticipantName.GOAL,
+  PhaseReviewParticipantName.CURRENT_PHASE,
+  PhaseReviewParticipantName.NEXT_PHASE,
+  PhaseReviewParticipantName.STRATEGY,
+  PhaseReviewParticipantName.EXPECTED_TRAJECTORY,
+  PhaseReviewParticipantName.STARTING_FORECAST,
+  PhaseReviewParticipantName.READ_MODELS,
+]);
+
+export function createCanonicalPhaseReviewParticipants({
+  forecastFinalizer = createBriefingForecastFinalizer({ publicationService: null }),
+  acceptanceService = null,
+} = {}) {
+  return Object.freeze([
+    participant(PhaseReviewParticipantName.PHASE_REVIEW, {
+      prepare: ({ decision }) => structuredClone(decision),
+      validate: ({ prepared }) => Boolean(prepared.decisionId && prepared.idempotencyKey),
+      commit: ({ stagedState, prepared }) => {
+        stagedState.phaseReviewDecisions ??= [];
+        stagedState.phaseReviewDecisions.push(structuredClone(prepared));
+      },
+    }),
+    participant(PhaseReviewParticipantName.GOAL, {
+      prepare: ({ baseline, decision }) => {
+        const goal = activeGoal(baseline, decision.goalId);
+        return { goalId: goal.id, before: structuredClone(goal) };
+      },
+      validate: ({ prepared, decision }) => prepared.goalId === decision.goalId,
+      commit: ({ stagedState, decision, preparedByName }) => {
+        const goal = activeGoal(stagedState, decision.goalId);
+        if (isBegin(decision)) {
+          goal.currentPhaseId = decision.nextPhaseId;
+          goal.projectedNextPhaseId = null;
+          goal.timeline = {
+            ...goal.timeline,
+            currentPhaseId: decision.nextPhaseId,
+            currentPhaseStartedAt: effectiveStart(decision),
+            projectedNextPhaseStart: null,
+          };
+        } else {
+          const next = preparedByName.get(PhaseReviewParticipantName.NEXT_PHASE);
+          goal.currentPhaseId = decision.currentPhaseId;
+          goal.projectedNextPhaseId = next.phaseId;
+          goal.timeline = {
+            ...goal.timeline,
+            currentPhaseId: decision.currentPhaseId,
+            plannedReviewAt: decision.selectedReviewAt,
+            projectedNextPhaseStart: decision.selectedReviewAt,
+          };
+        }
+        goal.updatedAt = decision.decidedAt;
+      },
+    }),
+    participant(PhaseReviewParticipantName.CURRENT_PHASE, {
+      prepare: ({ baseline, decision }) => {
+        const phase = phaseById(activeGoal(baseline, decision.goalId), decision.currentPhaseId);
+        if (!isActivePhaseStatus(phase.status)) fail("CURRENT_PHASE_INACTIVE", "The reviewed phase is not active.");
+        if (phase.status !== decision.expectedCurrentPhaseStatus ||
+            canonicalPhaseRevision(phase) !== decision.expectedCurrentPhaseRevision) {
+          fail("EXPECTED_PHASE_MISMATCH", "The reviewed phase revision or status changed.");
+        }
+        const originalReview = phase.originalPlannedReviewAt ??
+          phase.reviewMilestone?.originatingMilestoneAt ??
+          phase.reviewMilestone?.plannedAt ?? phase.plannedReviewAt;
+        if (originalReview !== decision.originalPlannedReviewAt) {
+          fail("PLANNED_REVIEW_MISMATCH", "The original planned review changed.");
+        }
+        if (!isBegin(decision) && decision.selectedReviewAt <= phase.plannedReviewAt) {
+          fail("EXTENSION_REVIEW_NOT_LATER", "An extension must move the current planned review forward.");
+        }
+        return { phaseId: phase.id, before: structuredClone(phase) };
+      },
+      validate: ({ prepared, decision }) => prepared.phaseId === decision.currentPhaseId,
+      commit: ({ stagedState, decision }) => {
+        const phase = phaseById(activeGoal(stagedState, decision.goalId), decision.currentPhaseId);
+        if (isBegin(decision)) {
+          phase.status = CanonicalGoalPhaseStatus.COMPLETED;
+          phase.completedAt = decision.decidedAt;
+          phase.lastReviewedAt = decision.decidedAt;
+          phase.reviewState = PhaseReviewState.DECISION_COMMITTED;
+          phase.completionDecisionId = decision.decisionId;
+          if (phase.reviewMilestone) phase.reviewMilestone = {
+            ...phase.reviewMilestone, consumed: true,
+            resolvedReviewId: decision.decisionId,
+            revision: Number(phase.reviewMilestone.revision ?? 0) + 1,
+          };
+        } else {
+          phase.status = CanonicalGoalPhaseStatus.ACTIVE;
+          phase.originalPlannedReviewAt ??= decision.originalPlannedReviewAt;
+          const priorMilestone = phase.reviewMilestone ?? legacyMilestone(phase, decision);
+          phase.reviewMilestoneHistory ??= [];
+          phase.reviewMilestoneHistory.push({ ...structuredClone(priorMilestone),
+            consumed: true, resolvedReviewId: decision.decisionId,
+            revision: Number(priorMilestone.revision ?? 0) + 1 });
+          phase.reviewMilestone = createPhaseReviewMilestone({
+            ...priorMilestone,
+            milestoneId: `${priorMilestone.milestoneId}|extension|${decision.decisionId}`,
+            earliestEligibleDate: decision.selectedReviewAt,
+            unresolvedReviewId: `${priorMilestone.unresolvedReviewId}|extension|${decision.decisionId}`,
+            designatedArtifactIdentity: null,
+            designatedEvidenceIdentity: null,
+            resolvedReviewId: null, consumed: false,
+            lineage: [...priorMilestone.lineage,
+              { type: "phase_review_extension", id: decision.decisionId }],
+            revision: Number(priorMilestone.revision ?? 0) + 1,
+          });
+          phase.plannedReviewAt = decision.selectedReviewAt;
+          phase.lastReviewedAt = decision.decidedAt;
+          phase.reviewState = PhaseReviewState.EXTENDED;
+          phase.extensionCount = Number(phase.extensionCount ?? 0) + 1;
+          phase.latestExtensionDecisionId = decision.decisionId;
+          phase.currentRecommendedReviewAt = decision.recommendedReviewAt ?? null;
+          phase.projectedNextReviewAt = decision.selectedReviewAt;
+        }
+        phase.revision = canonicalPhaseRevision(phase) + 1;
+        phase.updatedAt = decision.decidedAt;
+      },
+    }),
+    participant(PhaseReviewParticipantName.NEXT_PHASE, {
+      prepare: ({ baseline, decision }) => {
+        const goal = activeGoal(baseline, decision.goalId);
+        const current = phaseById(goal, decision.currentPhaseId);
+        const phase = decision.nextPhaseId ? phaseById(goal, decision.nextPhaseId) :
+          goal.phases.find((item) => Number(item.order) === Number(current.order) + 1);
+        if (!phase) fail("NEXT_PHASE_MISSING", "The projected next phase is missing.");
+        if (isBegin(decision) && (phase.status !== CanonicalGoalPhaseStatus.PLANNED ||
+            phase.startedAt || phase.startDate)) {
+          fail("NEXT_PHASE_INELIGIBLE", "The next phase is not eligible for activation.");
+        }
+        return { phaseId: phase.id, before: structuredClone(phase) };
+      },
+      validate: ({ prepared }) => Boolean(prepared.phaseId),
+      commit: ({ stagedState, decision, prepared }) => {
+        const phase = phaseById(activeGoal(stagedState, decision.goalId), prepared.phaseId);
+        if (isBegin(decision)) {
+          const start = effectiveStart(decision);
+          phase.status = CanonicalGoalPhaseStatus.ACTIVE;
+          phase.startedAt = start;
+          phase.startDate = start;
+          phase.projectedNextPhaseStart = null;
+          phase.reviewState = phase.plannedReviewAt ?
+            PhaseReviewState.SCHEDULED : PhaseReviewState.NOT_REQUIRED;
+        } else {
+          phase.status = CanonicalGoalPhaseStatus.PLANNED;
+          phase.startedAt = null;
+          phase.startDate = null;
+          phase.projectedNextPhaseStart = decision.selectedReviewAt;
+        }
+        phase.revision = canonicalPhaseRevision(phase) + 1;
+        phase.updatedAt = decision.decidedAt;
+      },
+    }),
+    participant(PhaseReviewParticipantName.STRATEGY, {
+      prepare: ({ baseline, decision }) => {
+        const records = baseline.phaseStrategies ?? [];
+        if (!isBegin(decision)) return { mode: "retain", fingerprint: JSON.stringify(records) };
+        const accepted = records.filter((item) => item.goalId === decision.goalId &&
+          item.phaseId === decision.nextPhaseId && item.status === "accepted");
+        if (accepted.length !== 1) {
+          fail("ACCEPTED_STRATEGY_REQUIRED", "Exactly one accepted Phase Strategy is required.");
+        }
+        try { validatePhaseStrategy(accepted[0], { expectedGoalId: decision.goalId,
+          expectedPhaseId: decision.nextPhaseId }); }
+        catch (error) { fail("ACCEPTED_STRATEGY_INVALID", error.message); }
+        try { acceptanceService?.assertAcceptedStrategyUnchanged(accepted[0]); }
+        catch (error) { fail("ACCEPTED_STRATEGY_INVALID", error.message); }
+        if (accepted[0].revision !== decision.expectedStrategyRevision) {
+          fail("STRATEGY_REVISION_MISMATCH", "The accepted Phase Strategy revision changed.");
+        }
+        return { mode: "activate", accepted: structuredClone(accepted[0]) };
+      },
+      validate: ({ prepared }) => prepared.mode === "retain" ||
+        prepared.accepted?.status === "accepted",
+      commit: ({ stagedState, decision, prepared }) => {
+        if (prepared.mode === "retain") return;
+        const records = stagedState.phaseStrategies ??= [];
+        const accepted = requiredRecord(records, prepared.accepted.id, "Accepted Strategy");
+        if (JSON.stringify(accepted) !== JSON.stringify(prepared.accepted)) {
+          fail("ACCEPTED_STRATEGY_MUTATED", "Accepted Strategy content changed during activation.");
+        }
+        const goal = activeGoal(stagedState, decision.goalId);
+        goal.activePhaseStrategyId = accepted.id;
+        goal.timeline = { ...goal.timeline, activePhaseStrategyId: accepted.id };
+      },
+    }),
+    participant(PhaseReviewParticipantName.EXPECTED_TRAJECTORY, {
+      prepare: ({ baseline, decision }) => {
+        const records = baseline.phaseExpectedTrajectories ?? [];
+        if (!isBegin(decision)) return { mode: "retain", fingerprint: JSON.stringify(records) };
+        const accepted = records.filter((item) => item.goalId === decision.goalId &&
+          item.phaseId === decision.nextPhaseId && item.status === "accepted");
+        if (accepted.length !== 1) {
+          fail("ACCEPTED_TRAJECTORY_REQUIRED", "Exactly one accepted Phase Expected Trajectory is required.");
+        }
+        try { validatePhaseExpectedTrajectory(accepted[0], { expectedGoalId: decision.goalId,
+          expectedPhaseId: decision.nextPhaseId }); }
+        catch (error) { fail("ACCEPTED_TRAJECTORY_INVALID", error.message); }
+        try { acceptanceService?.assertAcceptedTrajectoryUnchanged(accepted[0]); }
+        catch (error) { fail("ACCEPTED_TRAJECTORY_INVALID", error.message); }
+        if (accepted[0].revision !== decision.expectedTrajectoryRevision) {
+          fail("TRAJECTORY_REVISION_MISMATCH", "The accepted Phase Expected Trajectory revision changed.");
+        }
+        return { mode: "activate", accepted: structuredClone(accepted[0]) };
+      },
+      validate: ({ prepared }) => prepared.mode === "retain" ||
+        prepared.accepted?.status === "accepted",
+      commit: ({ stagedState, decision, prepared }) => {
+        if (prepared.mode === "retain") return;
+        const records = stagedState.phaseExpectedTrajectories ??= [];
+        const accepted = requiredRecord(records, prepared.accepted.id, "Accepted Expected Trajectory");
+        if (JSON.stringify(accepted) !== JSON.stringify(prepared.accepted)) {
+          fail("ACCEPTED_TRAJECTORY_MUTATED", "Accepted Expected Trajectory content changed during activation.");
+        }
+        const goal = activeGoal(stagedState, decision.goalId);
+        goal.activeExpectedTrajectoryId = accepted.id;
+        goal.timeline = {
+          ...goal.timeline,
+          activeExpectedTrajectoryId: accepted.id,
+          plannedReviewAt: accepted.plannedReviewAt ?? goal.timeline?.plannedReviewAt ?? null,
+          nextMilestoneAt: accepted.nextMilestoneAt ?? null,
+        };
+      },
+    }),
+    participant(PhaseReviewParticipantName.STARTING_FORECAST, {
+      prepare: async ({ baseline, decision, preparedByName }) => {
+        if (!isBegin(decision)) {
+          return { mode: "timing_only", selectedReviewAt: decision.selectedReviewAt };
+        }
+        const strategy = preparedByName.get(PhaseReviewParticipantName.STRATEGY).accepted;
+        const trajectory = preparedByName.get(PhaseReviewParticipantName.EXPECTED_TRAJECTORY).accepted;
+        const prospectiveGoal = prospectiveActivatedGoal(baseline, decision);
+        const nextPhase = phaseById(prospectiveGoal, decision.nextPhaseId);
+        const inputPackage = createPhase2StartingForecastInputPackage({ store: baseline,
+          goal: prospectiveGoal, activePhase: nextPhase, acceptedStrategy: strategy,
+          acceptedTrajectory: trajectory, decision });
+        const context = inputPackage.startingForecastContext;
+        const goalContract = inputPackage.goalContract;
+        const artifactId = `phase_starting_forecast|${decision.decisionId}`;
+        const prepared = await forecastFinalizer.finalize({
+          publisherType: "goal_initialization",
+          userId: prospectiveGoal.userId,
+          occurrenceId: decision.decisionId,
+          artifactId,
+          cadenceOrEventType: "goal_initialization",
+          goalContract,
+          phaseId: nextPhase.id,
+          evidenceWindow: {
+            id: `phase_initialization_window|${decision.decisionId}`,
+            start: decision.decidedAt,
+            cutoff: decision.decidedAt,
+            closed: true,
+          },
+          strategyContext: strategy.strategyHypothesis,
+          executionContext: {
+            adequacy: context.historicalExecution,
+            elapsedTimeAdequacy: "not_started",
+            refs: context.historyRefs,
+          },
+          evidenceDescriptors: [],
+          previousCanonicalAssessment: null,
+          publicationCutoff: decision.decidedAt,
+          finalizedAt: decision.decidedAt,
+          idempotencyKey: `confidence_v2|phase_initialization|${decision.idempotencyKey}`,
+          expectedPriorAssessmentId: null,
+          expectedPriorArtifactId: null,
+          startingForecastContext: context,
+          sourceLineage: {
+            phaseReviewDecisionId: decision.decisionId,
+            recommendationLineage: structuredClone(decision.reasoningLineage),
+            strategyId: strategy.id,
+            expectedTrajectoryId: trajectory.id,
+            previousGoalRefs: context.priorGoalRefs,
+            historicalExecutionRefs: context.historyRefs,
+            currentBaselineRef: inputPackage.goalBaseline?.baselineId ?? null,
+            latestConfidenceAssessmentId: inputPackage.latestConfidenceContext?.assessmentId ?? null,
+            inputPackageFingerprint: inputPackage.inputFingerprint,
+          },
+          elapsedTimeAdequacy: "not_started",
+          composeArtifact: ({ forecastAssessment, confidenceAssessment }) => ({
+            artifact: {
+              id: artifactId,
+              artifactType: "phase_starting_forecast",
+              schemaVersion: "phase_starting_forecast_v1",
+              userId: prospectiveGoal.userId,
+              goalId: prospectiveGoal.id,
+              phaseId: nextPhase.id,
+              occurrenceId: decision.decisionId,
+              activatedAt: decision.decidedAt,
+              forecastAssessment,
+              confidenceAssessmentId: confidenceAssessment.id,
+              inputSummary: context,
+              inputPackageFingerprint: inputPackage.inputFingerprint,
+              inputPackageSchemaVersion: inputPackage.schemaVersion,
+            },
+          }),
+        });
+        if (prepared.status !== "prepared" || !prepared.confidenceAssessment ||
+            prepared.confidenceAssessment.priorAssessmentId != null) {
+          fail("STARTING_FORECAST_PREPARATION_FAILED", "A canonical first Starting Forecast could not be prepared.");
+        }
+        return { mode: "create", inputPackage, ...prepared };
+      },
+      validate: ({ prepared, decision }) => prepared.mode === "timing_only" ||
+        prepared.confidenceAssessment?.phaseId === decision.nextPhaseId,
+      commit: ({ stagedState, prepared }) => {
+        if (prepared.mode === "timing_only") return;
+        stageStartingForecast(stagedState, prepared);
+      },
+    }),
+    participant(PhaseReviewParticipantName.READ_MODELS, {
+      prepare: ({ decision, preparedByName }) => ({
+        decisionId: decision.decisionId,
+        strategyId: preparedByName.get(PhaseReviewParticipantName.STRATEGY).accepted?.id ?? null,
+        expectedTrajectoryId: preparedByName.get(PhaseReviewParticipantName.EXPECTED_TRAJECTORY).accepted?.id ?? null,
+        startingForecastAssessmentId: preparedByName.get(PhaseReviewParticipantName.STARTING_FORECAST)
+          .confidenceAssessment?.id ?? null,
+      }),
+      validate: ({ prepared, decision }) => prepared.decisionId === decision.decisionId,
+      commit: ({ stagedState, decision, prepared, preparedByName }) => {
+        stagedState.phaseLifecycleReadModels ??= [];
+        const goal = activeGoal(stagedState, decision.goalId);
+        const activePhase = goal.phases.find((item) => isActivePhaseStatus(item.status)) ?? null;
+        const nextPhase = goal.phases.find((item) => item.status === CanonicalGoalPhaseStatus.PLANNED) ?? null;
+        const record = {
+          id: `phase_lifecycle_read_model|${decision.goalId}`,
+          schemaVersion: "phase_lifecycle_read_model_v1",
+          goalId: decision.goalId,
+          decisionId: decision.decisionId,
+          activePhaseId: activePhase?.id ?? null,
+          activePhaseStatus: activePhase?.status ?? null,
+          activePhaseStartedAt: activePhase?.startedAt ?? activePhase?.startDate ?? null,
+          plannedReviewAt: activePhase?.plannedReviewAt ?? null,
+          reviewState: activePhase?.reviewState ?? null,
+          projectedNextPhaseId: nextPhase?.id ?? null,
+          projectedNextPhaseStart: nextPhase?.projectedNextPhaseStart ?? null,
+          strategyId: prepared.strategyId ?? goal.activePhaseStrategyId ?? null,
+          expectedTrajectoryId: prepared.expectedTrajectoryId ?? goal.activeExpectedTrajectoryId ?? null,
+          startingForecastAssessmentId: prepared.startingForecastAssessmentId,
+          forecastTiming: {
+            phaseId: activePhase?.id ?? null,
+            reviewAt: activePhase?.plannedReviewAt ?? null,
+            mode: isBegin(decision) ? "starting_forecast" : "extension_timing_update",
+          },
+          confidenceGoalContext: {
+            goalId: goal.id,
+            phaseId: activePhase?.id ?? null,
+            assessmentId: prepared.startingForecastAssessmentId,
+          },
+          briefingContext: { goalId: goal.id, phaseId: activePhase?.id ?? null },
+          notificationProjection: {
+            reviewAt: activePhase?.plannedReviewAt ?? null,
+            unresolvedDecision: false,
+          },
+          protocolScheduling: {
+            phaseId: activePhase?.id ?? null,
+            definitionsChanged: false,
+            mode: isBegin(decision) ? "phase_activation" : "retain_current",
+          },
+          strategyScheduling: {
+            strategyId: prepared.strategyId ?? goal.activePhaseStrategyId ?? null,
+            mode: isBegin(decision) ? "activated_accepted" : "retain_current",
+          },
+          consumerContexts: ["home", "goal_page", "goal_timeline", "phase_timeline",
+            "forecast", "confidence", "briefing", "notification", "protocol", "strategy"],
+          updatedAt: decision.decidedAt,
+          revision: Number((stagedState.phaseLifecycleReadModels.find((item) =>
+            item.goalId === decision.goalId)?.revision) ?? 0) + 1,
+        };
+        const index = stagedState.phaseLifecycleReadModels.findIndex((item) =>
+          item.goalId === decision.goalId);
+        if (index < 0) stagedState.phaseLifecycleReadModels.push(record);
+        else stagedState.phaseLifecycleReadModels.splice(index, 1, record);
+        preparedByName.set(PhaseReviewParticipantName.READ_MODELS, record);
+      },
+    }),
+  ]);
+}
+
+function participant(name, methods) {
+  return Object.freeze({
+    name,
+    async prepare(context) { return methods.prepare(context); },
+    async validate(context) { return methods.validate(context); },
+    async commit(context) { return methods.commit(context); },
+    async rollback(context) { context.rollbackEvents.push(name); },
+  });
+}
+
+function prospectiveActivatedGoal(store, decision) {
+  const goal = structuredClone(activeGoal(store, decision.goalId));
+  const current = phaseById(goal, decision.currentPhaseId);
+  const next = phaseById(goal, decision.nextPhaseId);
+  current.status = CanonicalGoalPhaseStatus.COMPLETED;
+  current.completedAt = decision.decidedAt;
+  current.completionDecisionId = decision.decisionId;
+  next.status = CanonicalGoalPhaseStatus.ACTIVE;
+  next.startedAt = effectiveStart(decision);
+  next.startDate = next.startedAt;
+  next.projectedNextPhaseStart = null;
+  goal.currentPhaseId = next.id;
+  goal.projectedNextPhaseId = null;
+  goal.updatedAt = decision.decidedAt;
+  goal.timeline = { ...goal.timeline, currentPhaseId: next.id,
+    currentPhaseStartedAt: next.startedAt, projectedNextPhaseStart: null };
+  return goal;
+}
+
+function stageStartingForecast(store, prepared) {
+  store.goalConfidenceSnapshots ??= [];
+  store.goalConfidenceHistory ??= [];
+  store.confidenceInitializationArtifacts ??= [];
+  const assessment = prepared.confidenceAssessment;
+  if (store.goalConfidenceSnapshots.some((item) => item.goalId === assessment.goalId &&
+      item.phaseId === assessment.phaseId) || store.goalConfidenceHistory.some((item) =>
+      item.assessmentId === assessment.id || item.assessment?.idempotencyKey === assessment.idempotencyKey)) {
+    fail("STARTING_FORECAST_ALREADY_EXISTS", "The Phase confidence series is already initialized.");
+  }
+  const historyId = `goal_confidence_history_v2|${assessment.id}`;
+  store.goalConfidenceHistory.push({
+    id: historyId,
+    schemaVersion: "goal_confidence_history_record_v2",
+    assessmentId: assessment.id,
+    goalId: assessment.goalId,
+    phaseId: assessment.phaseId,
+    predecessorAssessmentId: null,
+    originatingArtifactId: assessment.briefingArtifactId,
+    publisherType: "goal_initialization",
+    persistedAt: null,
+    commitId: null,
+    assessment: structuredClone(assessment),
+  });
+  store.goalConfidenceSnapshots.push({
+    id: `goal_confidence_snapshot_v2|${assessment.goalId}|${assessment.phaseId}`,
+    schemaVersion: "goal_confidence_snapshot_v2",
+    goalId: assessment.goalId,
+    phaseId: assessment.phaseId,
+    goalContractId: assessment.goalContract.id,
+    goalContractVersion: assessment.goalContract.version,
+    currentAssessmentId: assessment.id,
+    currentScore: assessment.currentPercentage,
+    scoreBand: assessment.confidenceBand,
+    previousCanonicalAssessmentId: null,
+    historyRecordId: historyId,
+    originatingArtifactId: assessment.briefingArtifactId,
+    publisherType: "goal_initialization",
+    evidenceCutoff: assessment.sourceCutoff,
+    createdAt: null,
+    updatedAt: null,
+    commitId: null,
+  });
+  store.confidenceInitializationArtifacts.push(structuredClone(prepared.briefingArtifact));
+}
+
+export function finalizePhaseReviewCandidate({ stagedState, decisionId, commitId,
+  candidateRevision }) {
+  const transaction = (stagedState.phaseReviewTransactions ?? []).find((item) =>
+    item.decisionId === decisionId);
+  if (!transaction) fail("TRANSACTION_LOG_MISSING", "The Phase Review transaction log is missing.");
+  transaction.status = "committed";
+  transaction.commitId = commitId;
+  transaction.committedRevision = candidateRevision;
+  transaction.committedAt = stagedState.updatedAt;
+  const artifact = (stagedState.confidenceInitializationArtifacts ?? []).find((item) =>
+    item.occurrenceId === decisionId);
+  if (!artifact) return;
+  artifact.commitId = commitId;
+  artifact.committedAt = stagedState.updatedAt;
+  const assessmentId = artifact.confidencePublication?.assessmentId;
+  const history = (stagedState.goalConfidenceHistory ?? []).find((item) =>
+    item.assessmentId === assessmentId);
+  const snapshot = (stagedState.goalConfidenceSnapshots ?? []).find((item) =>
+    item.currentAssessmentId === assessmentId);
+  if (!history || !snapshot) fail("STARTING_FORECAST_RECORD_MISSING",
+    "The staged Starting Forecast records are incomplete.");
+  history.persistedAt = stagedState.updatedAt;
+  history.commitId = commitId;
+  snapshot.createdAt = stagedState.updatedAt;
+  snapshot.updatedAt = stagedState.updatedAt;
+  snapshot.commitId = commitId;
+}
+
+function activeGoal(store, goalId) {
+  const goal = (store.goals ?? []).find((item) => item.id === goalId);
+  if (!goal || goal.status !== "active" || goal.primary !== true) {
+    fail("ACTIVE_GOAL_MISMATCH", "The active primary Goal does not match the decision.");
+  }
+  return goal;
+}
+function phaseById(goal, phaseId) {
+  const phase = goal.phases?.find((item) => item.id === phaseId);
+  if (!phase) fail("PHASE_MISSING", `Phase ${String(phaseId)} is missing.`);
+  return phase;
+}
+function requiredRecord(records, id, label) {
+  const record = records.find((item) => item.id === id);
+  if (!record) fail("PARTICIPANT_RECORD_MISSING", `${label} disappeared during staging.`);
+  return record;
+}
+function effectiveStart(decision) {
+  return decision.projectedNextPhaseStart ?? addLocalDays(decision.decidedAt.slice(0, 10), 1);
+}
+function isBegin(decision) {
+  return decision.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE;
+}
+function legacyMilestone(phase, decision) {
+  return createPhaseReviewMilestone({
+    milestoneId: decision.milestoneId ?? `phase_review_milestone|${phase.goalId}|${phase.id}|${decision.originalPlannedReviewAt}`,
+    goalId: phase.goalId, phaseId: phase.id, milestoneType: "planned_phase_review",
+    reviewType: "phase_completion_review", requiredEvidence: [],
+    eligibleArtifactTypes: ["legacy_artifact"], designatedArtifactIdentity: null,
+    designatedEvidenceIdentity: null, earliestEligibleDate: decision.originalPlannedReviewAt,
+    latestEligibleDate: null, earlyReviewPolicy: "prohibited", reviewRequired: true,
+    unresolvedReviewId: decision.unresolvedReviewId ?? `phase_review|${phase.goalId}|${phase.id}|${decision.originalPlannedReviewAt}`,
+    resolvedReviewId: null, decisionRequired: true, recommendationRequired: true,
+    consumed: false, lineage: [{ type: "legacy_coordinator_compatibility", id: decision.decisionId }],
+    revision: 0,
+  });
+}
+function fail(code, message) {
+  const error = new Error(message);
+  error.code = `PHASE_REVIEW_PARTICIPANT_${code}`;
+  throw error;
+}

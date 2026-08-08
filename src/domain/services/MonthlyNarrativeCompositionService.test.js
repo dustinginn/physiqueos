@@ -61,7 +61,8 @@ describe("canonical Monthly coaching narrative", () => {
     const ordinary = compose("ordinaryMonth").monthlyNarrative.energy.summary;
     expect(july).toMatch(/^Your intake is moving closer/i);
     expect(july).toMatch(/nutrition logs are still too incomplete/i);
-    expect(ordinary).toMatch(/^Your intake is moving closer/i);
+    expect(ordinary).toMatch(/^Logged days averaged a \d+ calorie deficit/i);
+    expect(ordinary).toMatch(/repeatable level for the current workload/i);
     expect(ordinary).not.toMatch(/missing|incomplete|coverage|observed/i);
   });
 
@@ -70,6 +71,15 @@ describe("canonical Monthly coaching narrative", () => {
     expect(strategy.title).toMatch(/nothing currently warrants changing course/i);
     expect(strategy.thesis).toMatch(/training is responding well enough.*calories are moving closer/i);
     expect(JSON.stringify(strategy)).not.toMatch(/\bPI\b|verdict|confirm the range|baseline only/i);
+  });
+
+  it("teaches a coaching mental model in What Changed instead of cataloging metric roles", () => {
+    const training = compose("julyContinuation").monthlyNarrative.changes.themes
+      .find((theme) => theme.label === "Training");
+    expect(training.body).toMatch(/training is telling us more than the scale.*getting stronger matters more/i);
+    expect(training.body).toMatch(/scale and calorie pattern still add useful context/i);
+    expect(training.body).toMatch(/no single signal tells the whole story.*next DEXA.*becoming muscle/i);
+    expect(training.body).not.toMatch(/scoreboard|judge execution|judge sustainability|monitor pace|movement records.*calorie balance.*scale weight.*DEXA/i);
   });
 
   it("keeps editorial composition separate from ranking, confidence, and evidence counts", () => {

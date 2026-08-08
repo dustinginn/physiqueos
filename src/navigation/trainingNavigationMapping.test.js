@@ -85,6 +85,28 @@ describe("Training Library primary browse taxonomy", () => {
     });
   });
 
+  it.each([
+    ["sumo_squat_machine", "Sumo Squat Machine", "glutes"],
+    [
+      "leg_press_high_narrow",
+      "Leg Press High And Narrow Feet",
+      "hamstrings",
+    ],
+  ])("maps precise runtime identity %s without using a generic movement", (id, label, category) => {
+    expect(
+      resolvePrimaryTrainingNavigationCategory({
+        canonicalExerciseId: id,
+        label,
+        primaryMuscleGroups: [],
+        regionLabel: "Lower Body",
+      })
+    ).toEqual({
+      confidence: "high",
+      primaryNavigationCategory: category,
+      source: "explicit_canonical_exercise_mapping",
+    });
+  });
+
   it("keeps the exact preferred-label fallback when the UI projection drops canonical ID", () => {
     expect(
       resolvePrimaryTrainingNavigationCategory({

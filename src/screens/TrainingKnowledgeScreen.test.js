@@ -1,10 +1,17 @@
 import fs from "node:fs";
-import { describe, expect, it } from "vitest";
-import {
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, describe, expect, it } from "vitest";
+import TrainingKnowledgeScreen, {
   getCurrentExerciseBenchmark,
   getExercisesForFlatTrainingGroup,
   getExerciseStatusGroups,
+  getTrainingLibraryHeaderItems,
+  getTrainingLibraryExerciseAggregationKey,
+  getTrainingLibraryExerciseRouteKey,
 } from "./TrainingKnowledgeScreen";
+import { buildTrainingLibraryNavigation } from "../navigation/navigationRegistry";
+import { registerRuntimeTrainingExercises } from "../domain/models/trainingExerciseIdentity";
 import { getTrainingDaySummary } from "../presentation/trainingPresentation";
 
 const source = fs.readFileSync(new URL("./TrainingKnowledgeScreen.jsx", import.meta.url), "utf8");
@@ -31,6 +38,8 @@ const occurrence = ({ date, sets }) => ({
   exercise: { name: "Bench Press", sets },
   session: { date, id: `session-${date}` },
 });
+
+afterEach(() => registerRuntimeTrainingExercises([]));
 
 const taxonomyReport = {
   trainingBreakdowns: {
@@ -80,9 +89,52 @@ describe("Training Library corrected taxonomy", () => {
     ).toEqual(["Glute Squats", "Romanian Deadlifts", "Seated Hip Adductions"]);
     expect(source).not.toContain('"Adductors"');
   });
+
+  it("uses canonical IDs for canonical aggregation and routes without fabricating historical IDs", () => {
+    const canonical = {
+      canonicalExerciseId: "sumo_squat_machine",
+      label: "Sumo Squat Machine",
+    };
+    const historical = {
+      canonicalExerciseId: null,
+      label: "Historical Machine Squat",
+    };
+    expect(getTrainingLibraryExerciseAggregationKey(canonical))
+      .toBe("sumo_squat_machine");
+    expect(getTrainingLibraryExerciseRouteKey(canonical))
+      .toBe("sumo_squat_machine");
+    expect(getTrainingLibraryExerciseAggregationKey(historical))
+      .toBe("historical_only:historical-machine-squat");
+    expect(getTrainingLibraryExerciseRouteKey(historical))
+      .toBe("historical-machine-squat");
+  });
 });
 
 describe("Exercise Detail mobile workflow", () => {
+  it("omits the current route crumb after timeline query adaptation", () => {
+    const items = getTrainingLibraryHeaderItems({
+      adaptHref: (href) => `${href}?context=all`,
+      breadcrumbs: [
+        { href: "/progress/training?context=all", label: "Training" },
+        { href: "/progress/training/library/chest?context=all", label: "Chest" },
+        {
+          href: "/progress/training/library/chest/chest_fly_machine?context=all",
+          label: "chest_fly_machine",
+        },
+      ],
+      currentRoute: "/progress/training/library/chest/chest_fly_machine",
+      exerciseDetail: true,
+    });
+
+    expect(items.map((item) => item.label)).toEqual([
+      "Training",
+      "Training Library",
+      "Chest",
+    ]);
+    expect(items.map((item) => item.label).join(" "))
+      .not.toContain("chest_fly_machine");
+  });
+
   it("renders Current Benchmark before the detailed Last Session", () => {
     const detail = source.indexOf("function getExerciseDetailContent");
     const benchmark = source.indexOf('key="benchmark"', detail);
@@ -143,8 +195,98 @@ describe("Exercise Detail mobile workflow", () => {
     expect(training).toBeGreaterThan(header);
     expect(library).toBeGreaterThan(training);
     expect(source).toContain('adaptHref("/progress/training/library")');
-    expect(source).toContain("item.href !== currentRoute");
+    expect(source).toContain("getRoutePathname(item.href) !== getRoutePathname(currentRoute)");
     expect(source).toContain('navigationMode: "training-library"');
+  });
+
+  it.each([
+    ["chest", "chest_fly_machine", "Chest Fly Machine"],
+    ["quads", "single_leg_leg_press", "Single-Leg Leg Press"],
+  ])("renders %s/%s without a user-facing internal identifier", (category, id, name) => {
+    const baseNavigation = buildTrainingLibraryNavigation([category, id]);
+    const adaptHref = (href) => `${href}?context=all`;
+    const markup = renderToStaticMarkup(React.createElement(TrainingKnowledgeScreen, {
+      mode: "library",
+      navigation: {
+        ...baseNavigation,
+        breadcrumbs: baseNavigation.breadcrumbs.map((item) => ({
+          ...item,
+          href: adaptHref(item.href),
+        })),
+      },
+      report: {
+        trainingDays: [{
+          sessions: [{
+            date: "2026-07-31",
+            href: "/progress/training/session/test",
+            id: "session-test",
+            exercises: [{ name, sets: [] }],
+          }],
+        }],
+      },
+      slug: [category, id],
+      trainingEvidenceContext: { adaptHref, showSourceWorkouts: false },
+    }));
+    const userFacingMarkup = markup.replace(/\s(?:href|data-[\w-]+)="[^"]*"/g, "");
+
+    expect(userFacingMarkup).toContain(name);
+    expect(userFacingMarkup).not.toContain(id);
+    expect(userFacingMarkup).toContain(`>${category[0].toUpperCase()}${category.slice(1)}<`);
+  });
+
+  it.each([
+    ["biceps", "bicep_curl_machine", "Bicep Curl Machine"],
+    ["glutes", "sumo_squat_machine", "Sumo Squat Machine"],
+    ["hamstrings", "leg_press_high_narrow", "Leg Press High And Narrow Feet"],
+  ])("renders runtime-created %s without leaking its repository key", (category, id, name) => {
+    registerRuntimeTrainingExercises([{ id, name }]);
+    const baseNavigation = buildTrainingLibraryNavigation([category, id]);
+    const markup = renderToStaticMarkup(React.createElement(TrainingKnowledgeScreen, {
+      mode: "library",
+      navigation: baseNavigation,
+      report: {
+        trainingDays: [{
+          sessions: [{
+            date: "2026-07-31",
+            href: "/progress/training/session/runtime",
+            id: "session-runtime",
+            exercises: [{ name, sets: [] }],
+          }],
+        }],
+      },
+      slug: [category, id],
+      trainingEvidenceContext: { showSourceWorkouts: false },
+    }));
+    const userFacingMarkup = markup.replace(/\s(?:href|data-[\w-]+)="[^"]*"/g, "");
+
+    expect(userFacingMarkup).toContain(name);
+    expect(userFacingMarkup).not.toContain(id);
+  });
+
+  it("preserves a historical-only name while hiding its generated route slug", () => {
+    const id = "historical-machine-squat";
+    const name = "Historical Machine Squat";
+    const navigation = buildTrainingLibraryNavigation(["glutes", id]);
+    const markup = renderToStaticMarkup(React.createElement(TrainingKnowledgeScreen, {
+      mode: "library",
+      navigation,
+      report: {
+        trainingDays: [{
+          sessions: [{
+            date: "2025-01-01",
+            href: "/progress/training/session/historical",
+            id: "session-historical",
+            exercises: [{ canonicalExerciseId: null, name, sets: [] }],
+          }],
+        }],
+      },
+      slug: ["glutes", id],
+      trainingEvidenceContext: { showSourceWorkouts: false },
+    }));
+    const userFacingMarkup = markup.replace(/\s(?:href|data-[\w-]+)="[^"]*"/g, "");
+
+    expect(userFacingMarkup).toContain(name);
+    expect(userFacingMarkup).not.toContain(id);
   });
 
   it("removes the obsolete last-trained lifetime-session summary", () => {

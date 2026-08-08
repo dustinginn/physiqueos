@@ -22,6 +22,14 @@ import {
 } from "./DailyPINarrativeCandidateService";
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import {
+  resolveActiveGoalConfidencePresentation,
+} from "./ActiveGoalConfidencePresentationReadService";
+import {
+  canonicalConfidenceExplanation,
+} from "./CanonicalConfidencePresentationInvariant";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 const DAILY_BRIEFING_VERSION = "daily-briefing-v29-voice-calibration";
@@ -33,7 +41,12 @@ export function createDailyBriefingPIShadowDiagnostic(input) {
   return createDailyPIShadowResult(input);
 }
 
-export function createDailyBriefingService({ repositories, now = () => new Date(), scheduledComposer = null }) {
+export function createDailyBriefingService({
+  repositories,
+  now = () => new Date(),
+  scheduledComposer = null,
+  confidenceStoreResolver = () => getFounderRuntimeStore(),
+}) {
   async function composeDailyBriefing(userId, trigger = {}, options = {}) {
     const user = userId
       ? await repositories.users.getUserById(userId)
@@ -244,9 +257,9 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       weightStats,
       todayPriorities,
     });
-    const activePhase = activeGoal?.phases?.find(
-      (phase) => phase.status === "active"
-    ) ?? null;
+    const activePhase = activeGoal ? resolveCommittedPhaseContext(activeGoal, {
+      asOf: evidenceWindow?.briefingDate ?? evidenceWindow?.endDate,
+    }).activePhase : null;
     if (
       dailyPIDecisionSource &&
       (
@@ -489,7 +502,15 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       const evidenceWindow = createPreviousDayEvidenceWindow({ now: now(), timeZone: user?.timeZone ?? "America/Los_Angeles" });
       const scheduled = await repositories.dailyBriefings?.getBriefingByEvidenceWindow?.(resolvedUserId, evidenceWindow.id);
       if (scheduled?.briefing?.version === DAILY_BRIEFING_VERSION) {
-        return { ...normalizeDailyBriefingForPresentation(scheduled.briefing), artifactId: scheduled.id };
+        const confidence = await resolveDailyCanonicalConfidence({
+          repositories,
+          userId: resolvedUserId,
+          store: confidenceStoreResolver(),
+        });
+        return {
+          ...normalizeDailyBriefingForPresentation(scheduled.briefing, confidence),
+          artifactId: scheduled.id,
+        };
       }
 
       return null;
@@ -502,9 +523,17 @@ export function createDailyBriefingService({ repositories, now = () => new Date(
       const resolvedUserId = user?.id ?? userId;
       if (!resolvedUserId) return null;
       const artifact = await repositories.dailyBriefings?.getLatestScheduledDailyBriefing(resolvedUserId);
-      return artifact?.briefing
-        ? { ...normalizeDailyBriefingForPresentation(artifact.briefing), artifactId: artifact.id, artifactType: "scheduled" }
-        : null;
+      if (!artifact?.briefing) return null;
+      const confidence = await resolveDailyCanonicalConfidence({
+        repositories,
+        userId: resolvedUserId,
+        store: confidenceStoreResolver(),
+      });
+      return {
+        ...normalizeDailyBriefingForPresentation(artifact.briefing, confidence),
+        artifactId: artifact.id,
+        artifactType: "scheduled",
+      };
     },
 
     async getDailyBriefing(userId) {
@@ -713,10 +742,8 @@ function getEventNarrative({ trigger, hero, editorial, latestDEXA, latestPhotoIn
   return null;
 }
 
-function normalizeDailyBriefingForPresentation(briefing) {
-  if (!hasStaticBriefingHero(briefing)) return briefing;
-
-  return {
+function normalizeDailyBriefingForPresentation(briefing, confidence) {
+  const normalized = !hasStaticBriefingHero(briefing) ? briefing : {
     ...briefing,
     event: {
       ...(briefing.event ?? {}),
@@ -751,6 +778,32 @@ function normalizeDailyBriefingForPresentation(briefing) {
           : briefing.hero?.title,
     },
   };
+  return applyCanonicalDailyConfidencePresentation(normalized, confidence);
+}
+
+export function applyCanonicalDailyConfidencePresentation(briefing, confidence) {
+  const available = confidence?.canonicalSeries === true &&
+    Number.isFinite(confidence.value) && confidence.assessmentId;
+  const explanation = available
+    ? canonicalConfidenceExplanation(confidence)
+    : null;
+  return {
+    ...briefing,
+    goalConfidence: structuredClone(confidence),
+    hero: {
+      ...(briefing.hero ?? {}),
+      confidence: available ? confidence.value : null,
+      confidenceLabel: available ? confidence.label : "Unavailable",
+    },
+    confidenceReasons: explanation
+      ? [{ label: explanation, tone: "primary", source: confidence.source }]
+      : [],
+  };
+}
+
+async function resolveDailyCanonicalConfidence({ repositories, userId, store }) {
+  const activeGoal = await repositories.goals?.getActiveGoal?.(userId) ?? null;
+  return resolveActiveGoalConfidencePresentation({ activeGoal, store });
 }
 
 function hasStaticBriefingHero(briefing) {
@@ -2303,9 +2356,9 @@ export function resolveAuthoritativeDailyPISelection({
         ? { dailyEnergyAssessment }
         : {}),
       activeGoal,
-      activePhase: activeGoal?.phases?.find(
-        (phase) => phase.status === "active"
-      ) ?? null,
+      activePhase: activeGoal ? resolveCommittedPhaseContext(activeGoal, {
+        asOf: exactEvidenceWindow.briefingDate ?? exactEvidenceWindow.endDate,
+      }).activePhase : null,
       relatedGoals: [],
       protocols,
       dexaScans,

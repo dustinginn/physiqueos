@@ -22,18 +22,7 @@ import {
 } from "./PILowerLevelConfidenceContracts";
 import {
   detectPILowerLevelConfidenceSemanticChange,
-  explainPILowerLevelSemanticChange,
 } from "./PILowerLevelConfidenceSemanticChangeService";
-import {
-  createPIGoalConfidenceAssessment,
-  resolvePIGoalConfidenceScoreBand,
-} from "./PIGoalConfidenceAssessmentModel";
-import {
-  finalizePreparedPIGoalConfidencePublication,
-  preparePIGoalConfidencePublication,
-  stagePreparedPIGoalConfidencePublication,
-  validatePreparedPIGoalConfidencePublication,
-} from "./PIGoalConfidencePersistenceService";
 
 export const PI_ENERGY_FINALIZATION_VERSION =
   "pi_energy_confidence_finalization_v1";
@@ -59,6 +48,7 @@ export const PIEnergyFinalizationOutcome = Object.freeze({
   COMMITTED_PUBLICATION_FAILURE: "committed_publication_failure",
   ATTEMPT_LIMIT_REACHED: "attempt_limit_reached",
   WORK_NOT_FOUND: "work_not_found",
+  BRIEFING_INPUT_READY: "briefing_input_ready",
 });
 
 export function createPIEnergyConfidenceWork(input = {}) {
@@ -397,12 +387,6 @@ export function createPIEnergyConfidenceFinalizationService(options = {}) {
           const target = candidate.piEnergyConfidenceWorkItems
             .find((item) => item.id === work.id);
           if (!target) throw new Error("Energy work disappeared before finalization.");
-          if (prepared.publicationPrepared) {
-            stagePreparedPIGoalConfidencePublication(
-              candidate,
-              prepared.publicationPrepared
-            );
-          }
           candidate.piEnergyFinalizationReceipts.push(prepared.receipt);
           Object.assign(target, {
             status: prepared.terminalStatus,
@@ -415,44 +399,14 @@ export function createPIEnergyConfidenceFinalizationService(options = {}) {
             updatedAt: prepared.receipt.completedAt,
           });
         },
-        finalizeCandidate: ({ stagedState, commitId }) => {
-          if (prepared.publicationPrepared) {
-            finalizePreparedPIGoalConfidencePublication(
-              stagedState,
-              prepared.publicationPrepared,
-              commitId
-            );
-          }
-          const receipt = stagedState.piEnergyFinalizationReceipts
-            .find((item) => item.id === prepared.receipt.id);
-          if (
-            prepared.publicationPrepared &&
-            receipt.publishedAssessmentId !==
-              prepared.publicationPrepared.assessment.id
-          ) throw new Error("Energy receipt does not link the staged assessment.");
-        },
         validate: (candidate) => {
           const receiptCount = candidate.piEnergyFinalizationReceipts
             .filter((item) => item.id === prepared.receipt.id).length;
           const target = candidate.piEnergyConfidenceWorkItems
             .find((item) => item.id === work.id);
           return receiptCount === 1 &&
-            target?.completionReceiptId === prepared.receipt.id &&
-            (
-              !prepared.publicationPrepared ||
-              validatePreparedPIGoalConfidencePublication(
-                candidate,
-                prepared.publicationPrepared
-              ).valid
-            );
+            target?.completionReceiptId === prepared.receipt.id;
         },
-        validateFinalized: (candidate, commitContext) =>
-          !prepared.publicationPrepared ||
-          validatePreparedPIGoalConfidencePublication(
-            candidate,
-            prepared.publicationPrepared,
-            commitContext
-          ).valid,
         success: (commit) => result(prepared.outcome, {
           committed: true,
           workId: work.id,
@@ -582,11 +536,14 @@ function prepareFinalization(store, work, baseline, completedAt) {
       ) ?? [],
     ownership,
   });
-  const terminal = represented
+  const candidateOutcome = represented
     ? representedOutcome(contextType)
     : change.outcome === "already_represented" && priorReceipt
       ? PIEnergyFinalizationOutcome.NOT_MATERIAL
       : outcomeFor(change, represented);
+  const terminal = candidateOutcome === PIEnergyFinalizationOutcome.PUBLISHED_SUCCESSOR
+    ? PIEnergyFinalizationOutcome.BRIEFING_INPUT_READY
+    : candidateOutcome;
   const trigger = createPILowerLevelTriggerCandidate({
     triggerType: PILowerLevelTriggerType.ENERGY,
     goalId: goal.id,
@@ -618,37 +575,7 @@ function prepareFinalization(store, work, baseline, completedAt) {
     .find((item) => item.id === receiptId);
   if (matchedReceipt) return { matchedReceipt };
 
-  let publicationPrepared = null;
-  let publishedAssessmentId = null;
-  if (terminal === PIEnergyFinalizationOutcome.PUBLISHED_SUCCESSOR) {
-    if (!currentHistory?.snapshot || !currentHistory?.assessment) {
-      throw new Error("canonical_confidence_predecessor_missing");
-    }
-    const successor = createEnergySuccessorAssessment({
-      prior: currentHistory.assessment,
-      interpretation,
-      consumption,
-      completedAt: completedAt.toISOString(),
-    });
-    const command = {
-      operation: "publish_successor",
-      assessment: successor,
-      expectedRevision: baseline.revision,
-      expectedSemanticDigest: baseline.semanticDigest,
-      expectedCurrentSnapshot: currentHistory.snapshot,
-      publicationReason:
-        `lower-level Energy interpretation ${trigger.id} [${consumption.id}]`,
-      replacementAuthorized: true,
-    };
-    publicationPrepared = preparePIGoalConfidencePublication(store, command);
-    if (publicationPrepared.result) {
-      throw Object.assign(
-        new Error(publicationPrepared.result.status),
-        { publicationOutcome: publicationPrepared.result.status }
-      );
-    }
-    publishedAssessmentId = successor.id;
-  }
+  const publishedAssessmentId = null;
   const receipt = createPIEnergyFinalizationReceipt({
     workId: work.id,
     triggerId: trigger.id,
@@ -681,140 +608,6 @@ function prepareFinalization(store, work, baseline, completedAt) {
     trigger,
     consumption,
     receipt,
-    publicationPrepared,
-  };
-}
-
-function createEnergySuccessorAssessment({
-  prior, interpretation, consumption, completedAt,
-}) {
-  const energy = energyContributor(interpretation, consumption);
-  const contributors = prior.contributors
-    .filter((item) => item.domain !== "energy")
-    .map((item) => ({
-      ...item,
-      consumptionRole: item.consumptionRole ?? "prior_context",
-    }));
-  contributors.push(energy);
-  const direction = interpretation.state === "near_maintenance" ? 1 : -1;
-  const current = Math.max(0, Math.min(100, prior.score.current + direction * 2));
-  const movementDirection = current > prior.score.current
-    ? "increased"
-    : current < prior.score.current
-      ? "decreased"
-      : "held";
-  const assessmentInput = {
-    piVersion: prior.piVersion,
-    goalId: prior.goalId,
-    phaseId: prior.phaseId,
-    operatingState: prior.operatingState,
-    context: {
-      type: "energy_interpretation",
-      cadence: null,
-      evidenceWindowId: null,
-      eventId: null,
-    },
-    evidenceCutoff: interpretation.evidenceCutoff,
-    score: {
-      current,
-      prior: prior.score.current,
-      band: resolvePIGoalConfidenceScoreBand(current),
-      movement: { direction: movementDirection, magnitude: "small" },
-      priorScoreProvenance: {
-        source: "canonical_pi_assessment",
-        assessmentId: prior.id,
-        modelVersion: prior.modelVersion,
-      },
-    },
-    primaryReason: explainPILowerLevelSemanticChange({
-      domain: "energy",
-      outcome: "material_change",
-      nextState: interpretation,
-    }),
-    contributors,
-    unresolvedUncertainty: interpretation.limitingReasons,
-    evidenceCompleteness: prior.evidenceCompleteness,
-    phaseAwareInterpretation: prior.phaseAwareInterpretation,
-    coachingImplication: interpretation.state === "near_maintenance"
-      ? "Continue calibration while confirming that the Energy direction persists."
-      : "Review the Energy direction before changing the active plan.",
-    reasoning: {
-      ...prior.reasoning,
-      domainInterpretations: [
-        ...(prior.reasoning?.domainInterpretations ?? [])
-          .filter((item) => item.domain !== "energy"),
-        {
-          id: interpretation.id,
-          domain: "energy",
-          status: interpretation.state,
-          direction: interpretation.direction,
-          confidenceLevel: interpretation.reliabilityStatus,
-        },
-      ],
-    },
-    provenance: {
-      sourceObservationIds: prior.provenance.sourceObservationIds,
-      sourceClaimIds: prior.provenance.sourceClaimIds,
-      canonicalEvidenceReferences: [
-        ...prior.provenance.canonicalEvidenceReferences,
-        ...consumption.sourceEvidenceIds.map((id) => ({
-          id,
-          type: id.startsWith("activity") ? "activity_day" : "nutrition",
-        })),
-      ],
-      piDecisionResultId: consumption.id,
-      generatedAt: completedAt,
-    },
-  };
-  const provisional = createPIGoalConfidenceAssessment(assessmentInput);
-  assessmentInput.contributors = assessmentInput.contributors.map((item) =>
-    item.domain === "energy"
-      ? { ...item, firstConsumedAssessmentId: provisional.id }
-      : item
-  );
-  return createPIGoalConfidenceAssessment(assessmentInput);
-}
-
-function energyContributor(interpretation, consumption) {
-  const table = {
-    near_maintenance: ["supporting", "high"],
-    persistent_deficit: ["conflicting", "high"],
-    large_surplus: ["conflicting", "high"],
-    insufficient_or_incomplete: ["limiting", "moderate"],
-  };
-  const [direction, strength] = table[interpretation.state];
-  return {
-    id: `pi_confidence_contributor|energy|${digest(
-      `${interpretation.state}|${consumption.id}`
-    ).slice(0, 16)}`,
-    domain: "energy",
-    label: "Energy evidence",
-    direction,
-    strength,
-    confidence: {
-      level: strength,
-      method: "pi_v3_reasoning",
-    },
-    evidenceCompleteness:
-      interpretation.reliabilityStatus === "reliable" ? "complete" : "partial",
-    reason: explainPILowerLevelSemanticChange({
-      domain: "energy",
-      outcome: "material_change",
-      nextState: interpretation,
-    }),
-    sourceObservationIds: [],
-    sourceClaimIds: [],
-    canonicalEvidenceReferences: consumption.sourceEvidenceIds.map((id) => ({
-      id,
-      type: id.startsWith("activity") ? "activity_day" : "nutrition",
-    })),
-    affectedScoreMovement: true,
-    userFacing: true,
-    consumedTransitionIds: [consumption.id],
-    contributorSemanticFingerprint: interpretation.interpretationFingerprint,
-    firstConsumedAssessmentId: null,
-    sourceInterpretationId: interpretation.id,
-    consumptionRole: "new_effect",
   };
 }
 
@@ -1042,7 +835,7 @@ function normalizeWorkSource(input) {
   };
 }
 function isTerminal(status) {
-  return ["published_successor", "matched", "not_material", "cadence_owned",
+  return ["briefing_input_ready", "published_successor", "matched", "not_material", "cadence_owned",
     "event_owned", "context_precedence_blocked"].includes(status);
 }
 function required(value, field) {

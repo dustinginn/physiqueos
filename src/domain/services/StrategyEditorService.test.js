@@ -30,11 +30,13 @@ describe("direct strategy editor models", () => {
       fixedProtein: 180,
     });
     expect(model.proteinRatio).not.toBe(167);
+    expect(model).not.toHaveProperty("calorieStrategy");
+    expect(model.options).not.toHaveProperty("calorieStrategy");
   });
 
   it("builds valid Nutrition successors for ratio and fixed modes", () => {
     const ratio = buildStrategySuccessorPayload({
-      form: nutritionForm({ proteinRatio: "1.1", calorieStrategy: "hold_steady" }),
+      form: nutritionForm({ proteinRatio: "1.1", carbohydrateStrategy: "balanced" }),
       protocol: nutritionProtocol(),
       strategyType: "nutrition",
       version: nutritionVersion(),
@@ -45,8 +47,8 @@ describe("direct strategy editor models", () => {
         effectiveStrategy: {
           proteinBasis: "body_weight",
           proteinRatio: 1.1,
-          calorieStrategy: "hold_steady",
-          carbohydrateStrategy: "performance",
+          calorieStrategy: "increase_gradually",
+          carbohydrateStrategy: "balanced",
           fatStrategy: "sustainable_minimum",
         },
       },
@@ -65,6 +67,34 @@ describe("direct strategy editor models", () => {
           proteinRatio: null,
           proteinTarget: 190,
           fixedProtein: 190,
+        },
+      },
+    });
+  });
+
+  it("preserves hidden intake strategy and unrelated Nutrition data", () => {
+    const version = nutritionVersion();
+    version.change.reviewedChanges.calorieStrategy = "hold_steady";
+    version.change.reviewedChanges.trainingDayFlexibility = true;
+    const built = buildStrategySuccessorPayload({
+      form: nutritionForm({
+        calorieStrategy: "reduce_gradually",
+        carbohydrateStrategy: "lower_carbohydrate",
+        fatStrategy: "higher_fat",
+      }),
+      protocol: nutritionProtocol(),
+      strategyType: "nutrition",
+      version,
+    });
+
+    expect(built).toMatchObject({
+      valid: true,
+      successorVersion: {
+        effectiveStrategy: {
+          calorieStrategy: "hold_steady",
+          carbohydrateStrategy: "lower_carbohydrate",
+          fatStrategy: "higher_fat",
+          trainingDayFlexibility: true,
         },
       },
     });
@@ -95,10 +125,16 @@ describe("direct strategy editor models", () => {
       weeklySessionTarget: 9,
       priorities: ["arms", "core", "lower_body"],
       progression: "moderate",
-      phase: "maintenance",
     });
+    expect(model).not.toHaveProperty("phase");
+    expect(model.options).not.toHaveProperty("phases");
     const built = buildStrategySuccessorPayload({
-      form: trainingForm({ frequency_arms: "3", progression: "conservative" }),
+      form: trainingForm({
+        frequency_arms: "3",
+        phase: "cut",
+        priorities: ["back", "chest"],
+        progression: "conservative",
+      }),
       protocol: trainingProtocol(),
       strategyType: "training",
       version: trainingVersion(),
@@ -108,9 +144,32 @@ describe("direct strategy editor models", () => {
       successorVersion: {
         trainingStrategy: {
           weeklyFrequencies: { arms: 3, core: 2, lower_body: 2, back: 1, chest: 1, shoulders: 1 },
-          physiquePriorities: ["arms", "core", "lower_body"],
+          physiquePriorities: ["back", "chest"],
           progression: { pace: "conservative" },
           nutritionPhase: "maintenance",
+        },
+      },
+    });
+  });
+
+  it("preserves hidden phase context and unrelated Training data", () => {
+    const version = trainingVersion();
+    version.trainingStrategy.nutritionPhase = "lean_mass_build";
+    version.trainingStrategy.recoveryGates = ["sleep", "performance"];
+    const built = buildStrategySuccessorPayload({
+      form: trainingForm({ phase: "cut", progression: "aggressive" }),
+      protocol: trainingProtocol(),
+      strategyType: "training",
+      version,
+    });
+
+    expect(built).toMatchObject({
+      valid: true,
+      successorVersion: {
+        trainingStrategy: {
+          nutritionPhase: "lean_mass_build",
+          progression: { pace: "aggressive" },
+          recoveryGates: ["sleep", "performance"],
         },
       },
     });
@@ -161,6 +220,50 @@ describe("direct strategy editor models", () => {
     expect(fixture.store.protocols[0]).toMatchObject({
       currentGoalIds: ["goal-build"],
       activationProvenance: { sourceProtocolId: "historical-training" },
+    });
+  });
+
+  it("creates a Nutrition successor while preserving hidden intake ownership", async () => {
+    const fixture = isolatedStore({
+      protocol: nutritionProtocol(),
+      version: nutritionVersion(),
+    });
+    const built = buildStrategySuccessorPayload({
+      form: nutritionForm({
+        calorieStrategy: "reduce_gradually",
+        carbohydrateStrategy: "balanced",
+        fatStrategy: "balanced",
+        proteinBasis: "fixed_grams",
+        fixedProtein: "190",
+      }),
+      protocol: fixture.store.protocols[0],
+      strategyType: "nutrition",
+      version: fixture.store.protocolVersions[0],
+    });
+    const result = await fixture.service.createSuccessor({
+      protocolId: "nutrition",
+      expectedCurrentVersionId: "nutrition-v1",
+      effectiveDate: "2026-07-26",
+      successorVersion: built.successorVersion,
+      goalAssociation: { goalId: "goal-build", relationship: "supports" },
+      provenance: {
+        author: { id: "user", displayName: "Founder", type: "user" },
+        reason: "Update active Nutrition strategy.",
+        confirmation: { confirmedByUser: true },
+        details: { source: "test" },
+      },
+    });
+
+    expect(result.outcome).toBe(ActiveProtocolSuccessorOutcome.SUCCESS);
+    const successor = fixture.store.protocolVersions.find(
+      (item) => item.id === result.successorVersionId
+    );
+    expect(successor.effectiveStrategy).toMatchObject({
+      calorieStrategy: "increase_gradually",
+      carbohydrateStrategy: "balanced",
+      fatStrategy: "balanced",
+      fixedProtein: 190,
+      proteinBasis: "fixed_grams",
     });
   });
 
@@ -246,7 +349,6 @@ function nutritionForm(overrides = {}) {
     proteinBasis: "body_weight",
     proteinRatio: "1",
     fixedProtein: "180",
-    calorieStrategy: "increase_gradually",
     carbohydrateStrategy: "performance",
     fatStrategy: "sustainable_minimum",
     ...overrides,
@@ -258,7 +360,6 @@ function trainingForm(overrides = {}) {
     frequency_back: "1", frequency_chest: "1", frequency_shoulders: "1",
     priorities: ["arms", "core", "lower_body"],
     progression: "moderate",
-    phase: "maintenance",
     ...overrides,
   });
 }
@@ -269,14 +370,17 @@ function form(values) {
   }
   return result;
 }
-function isolatedStore() {
+function isolatedStore({
+  protocol = trainingProtocol(),
+  version = trainingVersion(),
+} = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "strategy-editor-"));
   directories.push(directory);
   const filePath = path.join(directory, "runtime-store.json");
   const store = {
     revision: 2,
-    protocols: [trainingProtocol()],
-    protocolVersions: [trainingVersion()],
+    protocols: [protocol],
+    protocolVersions: [version],
     goals: [{ id: "goal-build" }],
     executionItems: [{ id: "execution", preferredSchedule: { timeOfDay: "17:00" } }],
     dailyBriefings: [{ id: "briefing" }],

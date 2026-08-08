@@ -1,3 +1,5 @@
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+
 const roleCandidate = (decision, storyType) => decision.candidates
   .find((candidate) => candidate.storyType === storyType && candidate.included);
 
@@ -19,7 +21,7 @@ function formatShortDate(value) {
 
 function activeGoalWindow(fixture) {
   const completionDate = fixture.goal?.completionEvent?.completedAt;
-  const activePhase = fixture.goal?.phases?.find((phase) => phase.status === "active");
+  const activePhase = fixture.goal ? resolveCommittedPhaseContext(fixture.goal, { asOf: fixture.previewWindow.endDate }).activePhase : null;
   const startDate = completionDate
     ? addDays(String(completionDate).slice(0, 10), 1)
     : String(activePhase?.startDate ?? fixture.previewWindow.startDate).slice(0, 10);
@@ -171,7 +173,7 @@ function buildHero(fixture, coaching, confidence) {
   return {
     eyebrow: "Monthly Briefing",
     period: "July 1–31 · Delivered August 1",
-    goal: fixture.goal?.phases?.find((phase) => phase.status === "active")?.name ?? "Build Lean Mass",
+    goal: fixture.goal ? resolveCommittedPhaseContext(fixture.goal, { asOf: fixture.previewWindow.endDate }).activePhase?.name ?? "Build Lean Mass" : "Build Lean Mass",
     title: coaching.title,
     thesis: coaching.thesis,
     confidence: buildConfidence(confidence),

@@ -2,7 +2,40 @@ import { describe, expect, it } from "vitest";
 import { createEvidenceReviewPresentation } from "../services/EvidenceReviewPresentationService";
 import { assessTypedStrengthParseCompleteness, mergeTypedEvidenceIntoTrainingObjects } from "./ScreenshotInterpreterService";
 import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
+import {
+  FOUNDER_ALPHA_TRAINING_EXERCISES,
+  resolveTrainingExerciseIdentity,
+} from "../models/trainingExerciseIdentity";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
+
+const MACHINE_LATERAL_RAISE_WORKOUT = [
+  "Shoulder press machine",
+  "11r 150p",
+  "11r 150p",
+  "10r 150p",
+  "10r 150p",
+  "",
+  "Lateral raises machine",
+  "12r 80p x4",
+  "",
+  "Cable machine front raises",
+  "12r 130p x4",
+].join("\n");
+
+const SPECIALIZED_LEG_PRESS_IDS = [
+  "leg_press_feet_middle",
+  "leg_press_feet_high",
+  "leg_press_feet_low",
+  "leg_press_sumo_stance",
+];
+const SPECIALIZED_LEG_PRESS_CASES = FOUNDER_ALPHA_TRAINING_EXERCISES
+  .filter((exercise) => SPECIALIZED_LEG_PRESS_IDS.includes(exercise.id))
+  .flatMap((exercise) =>
+    [exercise.name, ...exercise.aliases].map((heading) => [
+      heading,
+      exercise.id,
+    ])
+  );
 
 function strengthObject(exercises = parseStrengthTrainingText(JUL_14_STRENGTH_NOTE)) {
   return {
@@ -17,6 +50,266 @@ function strengthObject(exercises = parseStrengthTrainingText(JUL_14_STRENGTH_NO
 }
 
 describe("typed strength reconciliation completeness", () => {
+  it("merges the exact machine lateral-raise workout into an empty screenshot session", () => {
+    const emptyScreenshotSession = strengthObject([]);
+    const parsedExercises = parseStrengthTrainingText(MACHINE_LATERAL_RAISE_WORKOUT);
+    const completeness = assessTypedStrengthParseCompleteness({
+      existingExercises: [],
+      parsedExercises,
+      typedEvidence: MACHINE_LATERAL_RAISE_WORKOUT,
+    });
+    const [result] = mergeTypedEvidenceIntoTrainingObjects({
+      evidenceObjects: [emptyScreenshotSession],
+      typedEvidence: MACHINE_LATERAL_RAISE_WORKOUT,
+    });
+
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      recognizedIdentities: [
+        "shoulder_press_machine",
+        "lateral_raise_machine",
+      ],
+      status: "complete",
+    });
+    expect(result.exercises.map((exercise) => exercise.name)).toEqual([
+      "Shoulder Press Machine",
+      "Lateral Raises Machine",
+      "Cable Machine Front Raises",
+    ]);
+    expect(result.exercises.map((exercise) => exercise.sets.length)).toEqual([
+      4, 4, 4,
+    ]);
+    expect(
+      result.exercises.map((exercise) =>
+        exercise.sets.map(({ reps, weight }) => [reps, weight])
+      )
+    ).toEqual([
+      [[11, 150], [11, 150], [10, 150], [10, 150]],
+      Array(4).fill([12, 80]),
+      Array(4).fill([12, 130]),
+    ]);
+    expect(result.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(12);
+    expect(result.reconciliation.typed_parse).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      status: "complete",
+    });
+    expect(result.reconciliation).toMatchObject({
+      match_confidence: "high",
+      matched_sources: ["IMG_1475.png", "typed_evidence_0"],
+    });
+  });
+
+  it.each([
+    "Lateral raise machine",
+    "Lateral raises machine",
+    "Machine lateral raise",
+    "Machine lateral raises",
+  ])("recognizes the machine-specific identity for %s", (heading) => {
+    const typedEvidence = `${heading}\n12r 80p x4`;
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(parsedExercises).toHaveLength(1);
+    expect(parsedExercises[0]).toMatchObject({
+      canonicalExerciseId: "lateral_raise_machine",
+      name: "Lateral Raises Machine",
+    });
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      recognizedIdentities: ["lateral_raise_machine"],
+      status: "complete",
+    });
+  });
+
+  it.each([
+    "Machine lateral raise",
+    "Machine lateral raises",
+  ])("preserves the machine-specific identity for one-set %s", (heading) => {
+    const typedEvidence = `${heading}\n12r 80p`;
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(resolveTrainingExerciseIdentity(heading).canonicalExerciseId)
+      .toBe("lateral_raise_machine");
+    expect(parsedExercises).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "lateral_raise_machine",
+        name: "Lateral Raises Machine",
+        sets: [expect.objectContaining({ reps: 12, weight: 80 })],
+      }),
+    ]);
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      parsedIdentities: ["lateral_raise_machine"],
+      recognizedIdentities: ["lateral_raise_machine"],
+      status: "complete",
+    });
+  });
+
+  it("keeps non-machine lateral raises on the existing lateral_raise identity", () => {
+    const typedEvidence = "Lateral raises\n12r 80p x4";
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(parsedExercises).toHaveLength(1);
+    expect(parsedExercises[0]).toMatchObject({
+      canonicalExerciseId: "lateral_raise",
+      name: "Lateral Raise",
+    });
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      recognizedIdentities: ["lateral_raise"],
+      status: "complete",
+    });
+  });
+
+  it("keeps a one-set ordinary lateral raise on the broad identity", () => {
+    const typedEvidence = "Lateral raise\n12r 80p";
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(resolveTrainingExerciseIdentity("Lateral raise").canonicalExerciseId)
+      .toBe("lateral_raise");
+    expect(parsedExercises).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "lateral_raise",
+        name: "Lateral Raise",
+        sets: [expect.objectContaining({ reps: 12, weight: 80 })],
+      }),
+    ]);
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      recognizedIdentities: ["lateral_raise"],
+      status: "complete",
+    });
+  });
+
+  it.each(SPECIALIZED_LEG_PRESS_CASES)(
+    "aligns resolver, parser, and diagnostics for registered leg-press form %s",
+    (heading, canonicalExerciseId) => {
+      const typedEvidence = `${heading}\n12r 180p`;
+      const parsedExercises = parseStrengthTrainingText(typedEvidence);
+      const completeness = assessTypedStrengthParseCompleteness({
+        parsedExercises,
+        typedEvidence,
+      });
+
+      expect(resolveTrainingExerciseIdentity(heading).canonicalExerciseId)
+        .toBe(canonicalExerciseId);
+      expect(parsedExercises).toEqual([
+        expect.objectContaining({
+          canonicalExerciseId,
+          sets: [expect.objectContaining({ reps: 12, weight: 180 })],
+        }),
+      ]);
+      expect(completeness).toMatchObject({
+        complete: true,
+        missingIdentities: [],
+        parsedIdentities: [canonicalExerciseId],
+        recognizedIdentities: [canonicalExerciseId],
+        status: "complete",
+      });
+    }
+  );
+
+  it("keeps ordinary Leg Press on the generic identity", () => {
+    const typedEvidence = "Leg Press\n12r 180p";
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(resolveTrainingExerciseIdentity("Leg Press").canonicalExerciseId)
+      .toBe("leg_press");
+    expect(parsedExercises).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "leg_press",
+        sets: [expect.objectContaining({ reps: 12, weight: 180 })],
+      }),
+    ]);
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      parsedIdentities: ["leg_press"],
+      recognizedIdentities: ["leg_press"],
+      status: "complete",
+    });
+  });
+
+  it.each([
+    "Bulgarian split squat smith machine",
+    "Bulgarian split squat (smith machine)",
+    "Smith machine Bulgarian split squat",
+    "Smith Bulgarian split squat",
+  ])("keeps Smith-machine Bulgarian split squat diagnostics aligned for %s", (
+    heading
+  ) => {
+    const typedEvidence = `${heading}\n10r 40p x4`;
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(parsedExercises).toHaveLength(1);
+    expect(parsedExercises[0]).toMatchObject({
+      canonicalExerciseId: "bulgarian_split_squat_smith_machine",
+      name: "Bulgarian Split Squat (Smith Machine)",
+    });
+    expect(parsedExercises[0].sets).toHaveLength(4);
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      parsedIdentities: ["bulgarian_split_squat_smith_machine"],
+      recognizedIdentities: ["bulgarian_split_squat_smith_machine"],
+      status: "complete",
+    });
+    expect(completeness.missingIdentities).not.toContain(
+      "bulgarian_split_squat"
+    );
+  });
+
+  it("keeps ordinary Bulgarian split squats on the non-machine identity", () => {
+    const typedEvidence = "Bulgarian split squat\n10r 40p x4";
+    const parsedExercises = parseStrengthTrainingText(typedEvidence);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence,
+    });
+
+    expect(parsedExercises).toHaveLength(1);
+    expect(parsedExercises[0]).toMatchObject({
+      canonicalExerciseId: "bulgarian_split_squat",
+      name: "Bulgarian Split Squat",
+    });
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      parsedIdentities: ["bulgarian_split_squat"],
+      recognizedIdentities: ["bulgarian_split_squat"],
+      status: "complete",
+    });
+  });
+
   it("normally reconciles a complete four-exercise parse without duplicates", () => {
     const sourceArtifacts = [{ id: "typed_evidence_0", kind: "typed_evidence", text: JUL_14_STRENGTH_NOTE }];
     const before = JSON.stringify(sourceArtifacts);

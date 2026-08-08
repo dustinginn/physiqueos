@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
+import { projectPersistedMonthlyPresentationForRendering } from "../../../../domain/services/MonthlyPersistedArtifactCompatibilityService";
 import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,10 @@ export default async function MonthlyBriefingArtifactPage({ params }) {
   if (!isReadableMonthlyArtifact(artifact, user?.id)) {
     return <MonthlyUnavailableState />;
   }
-  return <MonthlyBriefingScreen presentation={artifact.briefing.monthlyPresentation} />;
+  const presentation = projectPersistedMonthlyPresentationForRendering(
+    artifact.briefing.monthlyPresentation
+  );
+  return <MonthlyBriefingScreen presentation={presentation} />;
 }
 
 function isReadableMonthlyArtifact(artifact, userId) {

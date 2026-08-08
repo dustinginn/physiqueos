@@ -103,6 +103,7 @@ function comparableDefinition(item) {
     aliases: item.aliases ?? [],
     equipment: item.equipment,
     body_region: item.body_region,
+    primary_muscle_group_id: item.primary_muscle_group_id ?? null,
     primary_muscle_groups: item.primary_muscle_groups ?? [],
     movement_pattern: item.movement_pattern,
     laterality: item.laterality,

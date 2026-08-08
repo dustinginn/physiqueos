@@ -99,7 +99,8 @@ describe("Operating Plan execution presentation", () => {
     const sections=buildOperatingPlan({energyStrategy:null,executionItems:[recurringItems[0]],nutritionContext:null,protocols,trainingProtocol:null});
     expect(sections.map((section)=>section.title)).toEqual(["Execution","Coaching Updates","Energy Strategy","Nutrition","Peptides","Recovery","Supplements","Training"]);
     const peptides=sections.find((section)=>section.title==="Peptides");
-    expect(peptides.items.map((item)=>item.title)).toEqual(["Retatrutide","Tesamorelin"]);
+    expect(peptides.items.map((item)=>item.title)).toEqual(["Peptide Strategy"]);
+    expect(peptides.items[0].detail).toBe("Retatrutide, Tesamorelin");
     expect(peptides.items.every((item)=>item.href.startsWith("/profile/protocols/")&&!item.href.includes("/execution/"))).toBe(true);
     const execution=sections[0];
     expect(execution.items.map((item)=>item.id)).toEqual(["execution_morning_weigh_in"]);

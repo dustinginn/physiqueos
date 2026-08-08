@@ -92,7 +92,7 @@ describe("Monthly briefing presentation composition", () => {
       source: "canonical_pi_snapshot",
     });
     expect(result.milestone).toMatchObject({ goalName: "Visible Abs", date: "2026-07-18", result: "7.7%" });
-    expect(result.training.stats.map((stat) => stat.label)).toEqual(["Pattern", "Context", "Next test"]);
+    expect(result.training.stats.map((stat) => stat.label)).toEqual(["Signal", "Limit", "Next test"]);
     expect(result.energy.summaryMetrics.map((metric) => metric.label)).toEqual([
       "Avg intake",
       "Avg expenditure",
@@ -101,6 +101,9 @@ describe("Monthly briefing presentation composition", () => {
     ]);
     expect(result.newBaseline.facts.map((fact) => fact.value)).toEqual(expect.arrayContaining(["7.7%", "147.5 lb", "12.8 lb"]));
     expect(result.changes.themes.map((theme) => theme.label)).toEqual(["Training", "Calories", "Weight"]);
+    const trainingChange = result.changes.themes.find((theme) => theme.label === "Training");
+    expect(trainingChange.body).toMatch(/getting stronger matters more.*no single signal tells the whole story/i);
+    expect(trainingChange.body).not.toMatch(/scoreboard|judge execution|judge sustainability|monitor pace/i);
     expect(result.moments.moments).toHaveLength(5);
     expect(result.source).toMatchObject({
       boundedMilestoneIds: [expect.any(String)],

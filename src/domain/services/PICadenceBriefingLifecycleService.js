@@ -1,113 +1,106 @@
-import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
+import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
+import { createCanonicalConfidenceReadService } from
+  "../confidence/CanonicalConfidenceReadService";
 import {
-  createPICadenceGoalConfidencePreparationService,
-} from "./PICadenceGoalConfidencePreparationService";
-import {
-  createBriefingGoalConfidenceBlockFromAssessment,
-} from "./BriefingGoalConfidencePresentationService";
-import {
-  createPICadenceConfidenceReasoning,
-} from "./PICadenceConfidenceReasoningService";
+  adaptBriefingArtifactToEvidenceDescriptors,
+  adaptProductionGoalToCanonicalContract,
+} from "../confidence/ProductionConfidenceContextAdapter";
+import { createBriefingGoalConfidenceBlockFromV2 } from
+  "./BriefingGoalConfidencePresentationService";
 
 export function createPICadenceBriefingLifecycleService({
   publicationService,
   now = () => new Date(),
 } = {}) {
   if (!publicationService) throw new Error("Cadence publication service is required.");
+  const finalizer = createBriefingForecastFinalizer({ publicationService, now });
   return Object.freeze({
-    async publish({
-      cadence,
-      operation,
-      artifact,
-      activeGoal,
-      activePhase,
-      operatingState,
-      piEnvelope = null,
-      reason,
-      replacementAuthorized = false,
-    } = {}) {
+    async publish({ cadence, operation, artifact, activeGoal, activePhase,
+      operatingState, piEnvelope = null, reason,
+      replacementAuthorized = false } = {}) {
       if (!activeGoal?.id || !activePhase?.id || !artifact?.evidenceWindow?.id) {
-        return {
-          status: "unsupported_context",
-          committed: false,
-          error: {
-            code: "unsupported_context",
-            message: "Cadence confidence requires an active Goal, phase, and evidence window.",
-          },
-        };
+        return typed("unsupported_context",
+          "Cadence Confidence requires an active Goal, phase, and evidence window.");
       }
       const baseline = publicationService.captureBaseline();
-      const readService = createPIGoalConfidenceReadService({
-        store: baseline.store,
+      const replacementTarget = operation === "regenerate"
+        ? baseline.store.dailyBriefings?.find((item) => item.id === artifact.id) ?? null
+        : null;
+      const current = createCanonicalConfidenceReadService({ store: baseline.store })
+        .getCurrent({ goalId: activeGoal.id, phaseId: activePhase.id });
+      if (!current.assessment) return typed("canonical_predecessor_required",
+        "Cadence Confidence requires a canonical predecessor.");
+      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
+        activePhase,
       });
-      const preparationService =
-        createPICadenceGoalConfidencePreparationService({ readService, now });
-      const triggerType = cadence === "midweek"
-        ? "midweek_assessment" : "weekly_assessment";
-      const evidenceCutoff = cadence === "midweek"
-        ? `${artifact.evidenceWindow.endDate}T23:59:59.999Z`
-        : `${artifact.evidenceWindow.endDate}T23:59:59.999Z`;
-      const preparedPIReasoning = createPICadenceConfidenceReasoning({
-        cadence, artifact, authoritative: piEnvelope,
-      });
-      const confidence = await preparationService.prepare({
-        triggerType,
+      const cutoff = artifact.evidenceCutoff ??
+        `${artifact.evidenceWindow.endDate}T23:59:59.999Z`;
+      const result = await finalizer.finalize({
+        publisherType: `${cadence}_briefing`,
+        userId: artifact.userId,
         occurrenceId: artifact.id,
-        goalContext: {
-          goalId: activeGoal.id,
-          semanticGoalType: activeGoal.type ?? "build_lean_mass",
+        artifactId: artifact.id,
+        cadenceOrEventType: cadence,
+        goalContract,
+        phaseId: activePhase.id,
+        evidenceWindow: { id: artifact.evidenceWindow.id,
+          start: artifact.evidenceWindow.startDate ?? null,
+          cutoff, closed: artifact.evidenceWindow.closed !== false },
+        strategyContext: goalContract.strategyHypothesis,
+        executionContext: {
+          adequacy: piEnvelope?.evidenceCompleteness === "complete"
+            ? "adequate" : "unknown",
+          elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
+          refs: piEnvelope?.sourceObservationIds ?? [],
+          operatingState,
         },
-        phaseContext: {
-          phaseId: activePhase.id,
-          semanticPhaseType: activePhase.semanticType ??
-            activePhase.name ?? "establish_maintenance",
-        },
-        operatingState,
-        evidenceWindow: artifact.evidenceWindow,
-        evidenceCutoff,
-        assessmentContext: {
-          cadence,
-          evidenceWindowId: artifact.evidenceWindow.id,
-        },
-        preparedPIReasoning,
-        piVersion: "pi_v3",
-        generatedAt: now().toISOString(),
+        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
+        previousCanonicalAssessment: current.assessment,
+        publicationCutoff: cutoff,
+        finalizedAt: now().toISOString(),
+        idempotencyKey: `confidence_v2|${cadence}|${artifact.id}`,
+        expectedPriorAssessmentId: current.assessment.id,
+        expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
         expectedSemanticDigest: baseline.semanticDigest,
-        expectedCurrentSnapshot:
-          readService.getGoalConfidenceSeries({
-            goalId: activeGoal.id,
-            phaseId: activePhase.id,
-          }).currentSnapshot,
-        publicationReason: reason,
-      });
-      if (!["prepared_successor", "matched"].includes(confidence.status)) {
-        return {
-          status: confidence.status,
-          committed: false,
-          confidence,
-        };
-      }
-      const assessment = confidence.assessment;
-      const block = createBriefingGoalConfidenceBlockFromAssessment(
-        assessment, { capturedAt: now().toISOString() });
-      const candidate = structuredClone(artifact);
-      if (cadence === "midweek") candidate.briefing.goalConfidence = block;
-      else candidate.briefing.weeklyNarrative.goalConfidence = block;
-      return publicationService.publish({
-        schemaVersion: "pi_cadence_briefing_publication_v1",
-        cadence,
-        operation,
-        artifact: candidate,
-        artifactConfidenceAssessmentId: assessment.id,
-        confidencePublicationCommand: confidence.publicationCommand,
-        expectedRevision: baseline.revision,
-        expectedSemanticDigest: baseline.semanticDigest,
-        expectedCurrentSnapshot: confidence.publicationCommand?.expectedCurrentSnapshot,
         replacementAuthorized,
-        publicationReason: reason,
-        triggerReceipt: confidence.receipt,
+        replacesArtifactId: replacementTarget?.id ?? null,
+        replacesAssessmentId:
+          replacementTarget?.confidencePublication?.assessmentId ?? null,
+        sourceLineage: { reason, artifactVersion: artifact.version,
+          evidenceWindowId: artifact.evidenceWindow.id },
+        elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
+        phaseReviewContext: {
+          activeGoal, activePhase,
+          reviewMilestone: activePhase.reviewMilestone ?? null,
+          currentArtifact: { id: artifact.id, evidenceTypes: [cadence],
+            evidenceIdentities: [artifact.evidenceWindow.id] },
+          artifactType: cadence, eventIdentity: artifact.id,
+          evidenceIdentity: artifact.evidenceWindow.id,
+          artifactTimestamp: cutoff, publicationTimestamp: now().toISOString(),
+          currentDate: cutoff, reviewState: activePhase.reviewState,
+          decisionHistory: baseline.store.phaseReviewDecisions ?? [],
+          expectedStoreRevision: baseline.revision,
+        },
+        composeArtifact: (outputs) => {
+          const candidate = structuredClone(artifact);
+          const block = createBriefingGoalConfidenceBlockFromV2({
+            assessment: outputs.confidenceAssessment,
+            projection: outputs.numericConfidenceProjection,
+            narrativeAssessment: outputs.narrativeAssessment,
+            capturedAt: now().toISOString(),
+          });
+          if (cadence === "midweek") candidate.briefing.goalConfidence = block;
+          else candidate.briefing.weeklyNarrative.goalConfidence = block;
+          return { artifact: candidate };
+        },
       });
+      return result.commitResult ?? typed(result.status, "Cadence finalization did not commit.");
     },
   });
+}
+
+function typed(status, message) {
+  return { status, committed: false,
+    error: message ? { code: status, message } : null };
 }

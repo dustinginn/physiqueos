@@ -11,24 +11,38 @@ describe("Operating Plan strategy detail", () => {
   it("presents authoritative Energy fields", () => {
     const result = composeOperatingPlanStrategyDetail({
       goals: [goal], strategyType: "energy",
-      protocol: { ...base, name: "Calibration", effectiveStrategy: { mode: "Maintenance Calibration", calorieStrategy: "increase_gradually", activityStrategy: "reduce_slightly", evaluationCadence: "Weekly" } },
+      protocol: { ...base, name: "Calibration", effectiveStrategy: { mode: "Maintenance Calibration", calorieStrategy: "increase_gradually", activityStrategy: "reduce_slightly", evaluationCadence: "Weekly", adjustmentSize: "small" } },
     });
     expect(result).toMatchObject({
       title: "Maintenance Calibration",
-      goal: "Build Lean Mass",
+      goal: "Your Build Lean Mass goal",
       startedDate: "July 19, 2026",
       status: "Active",
     });
-    expect(result.sections).toEqual(expect.arrayContaining([{ label: "Weekly Calibration", value: "Weekly" }]));
+    expect(result.sections).toEqual([
+      { label: "Current Energy Phase", value: "Maintain" },
+      { label: "Caloric Intake", value: "Increase Gradually" },
+      { label: "Activity Target", value: "Reduce Slightly" },
+      { label: "Calibration Approach", value: "Weekly \u00B7 Small adjustments" },
+    ]);
+    expect(result.purpose).toContain("your Build Lean Mass goal");
   });
 
-  it("presents authoritative Nutrition fields without dose labels", () => {
+  it("presents authoritative macro fields without calorie ownership or dose labels", () => {
     const result = composeOperatingPlanStrategyDetail({
       goals: [goal], strategyType: "nutrition",
-      protocol: { ...base, effectiveStrategy: { proteinBasis: "body_weight", proteinRatio: 1, proteinTarget: 167, calorieStrategy: "increase_gradually" } },
+      protocol: { ...base, effectiveStrategy: { proteinBasis: "body_weight", proteinRatio: 1, proteinTarget: 167, calorieStrategy: "increase_gradually", carbohydrateStrategy: "performance", fatStrategy: "sustainable_minimum", trainingDayFlexibility: true, restDayFlexibility: true } },
     });
-    expect(result.sections).toEqual(expect.arrayContaining([{ label: "Daily Target", value: "1 g per lb of body weight" }]));
+    expect(result.title).toBe("Macro Strategy");
+    expect(result.sections).toEqual([
+      { label: "Protein Target", value: "1 g per lb of body weight" },
+      { label: "Carbohydrate Approach", value: "Performance" },
+      { label: "Fat Approach", value: "Sustainable Minimum" },
+      { label: "Macro Philosophy", value: "Flexible across training and rest days" },
+    ]);
+    expect(result.purpose).toContain("how daily intake is composed");
     expect(JSON.stringify(result)).not.toContain("167 g protein");
+    expect(result.sections.map((item) => item.label).join(" ")).not.toMatch(/calorie|caloric|intake/i);
     expect(JSON.stringify(result)).not.toMatch(/dose|provenance|canonical|runtime/i);
   });
 
@@ -50,12 +64,17 @@ describe("Operating Plan strategy detail", () => {
   it("presents authoritative Training structure and priorities", () => {
     const result = composeOperatingPlanStrategyDetail({
       goals: [goal], strategyType: "training", protocol: { ...base, name: "Maintenance Training Strategy" },
-      version: { effectiveAt: "2026-07-11", goalLinks: [{ goalId: "goal" }], intent: { summary: "Preserve performance." }, trainingStrategy: { weeklyFrequencies: { arms: 2, back: 1 }, physiquePriorities: ["arms", "core"], progression: { pace: "moderate" }, nutritionPhase: "maintenance" } },
+      version: { effectiveAt: "2026-07-11", goalLinks: [{ goalId: "goal" }], intent: { summary: "Preserve lean mass through the end of the cut." }, trainingStrategy: { weeklyFrequencies: { arms: 2, back: 1 }, physiquePriorities: ["arms", "core"], progression: { pace: "moderate" }, nutritionPhase: "maintenance" } },
     });
-    expect(result.sections).toEqual(expect.arrayContaining([
+    expect(result.title).toBe("Build Lean Mass Training");
+    expect(result.sections).toEqual([
       { label: "Weekly Structure", value: "3 area sessions" },
       { label: "Training Focus", value: "Arms, Core" },
-    ]));
+      { label: "Progression", value: "Moderate" },
+      { label: "Current Phase", value: "Maintenance" },
+    ]);
+    expect(result.purpose).toContain("your Build Lean Mass goal");
+    expect(result.purpose).not.toMatch(/cut|preserve lean mass/i);
   });
 
   it("uses stable IDs and returns no fabricated detail when unavailable", () => {

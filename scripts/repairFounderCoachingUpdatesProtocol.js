@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 import {
   createCoachingUpdatesProtocolStateRepairService,
 } from "../src/domain/services/CoachingUpdatesProtocolStateRepairService.js";
@@ -21,7 +22,8 @@ if (!args.has("--apply") || !protocolId || !expectedVersionId || !expectedGoalId
 }
 
 const runtimeStorePath = path.resolve(process.cwd(), "private", "founder", "runtime-store.json");
-const liveStore = JSON.parse(fs.readFileSync(runtimeStorePath, "utf8"));
+const liveStore = readOperationalJsonFileSync(runtimeStorePath,
+  { stage: "coaching_updates_protocol_repair_source" });
 const result = await createCoachingUpdatesProtocolStateRepairService({
   runtimeStorePath,
   liveStore,

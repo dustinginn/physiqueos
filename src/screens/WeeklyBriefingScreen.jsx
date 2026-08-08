@@ -40,9 +40,6 @@ export default function WeeklyBriefingScreen({ narrative }) {
           confidence={presentation.hero.confidence}
           testId="weekly-confidence"
         />}
-        context={presentation.hero.goalLabel && <p className="mt-5 text-xs font-extrabold text-[var(--primary)]">
-          {presentation.hero.goalLabel}
-        </p>}
         icon={Sparkles}
         label={presentation.hero.eyebrow}
         meta={<p className="whitespace-pre-line text-right text-[10px] font-bold text-[var(--text-secondary)]">
@@ -67,7 +64,7 @@ export default function WeeklyBriefingScreen({ narrative }) {
 }
 
 function WeeklyStrategyContext({ hero }) {
-  if (!hero.goalLabel && !hero.strategy) return null;
+  if (!hero.strategy) return null;
   return <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--divider)] pt-3 text-[10px] font-bold text-[var(--text-secondary)]">
     {hero.strategy?.name && <span>Current strategy: {hero.strategy.name}</span>}
     {hero.strategy?.weekLabel && <span>{hero.strategy.weekLabel}</span>}

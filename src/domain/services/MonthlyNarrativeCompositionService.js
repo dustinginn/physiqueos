@@ -4,6 +4,7 @@ import {
   composePIEditorialParagraph,
   describeMissingInformationNaturally,
 } from "./PIEditorialTranslationService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 const PROHIBITED_MONTHLY_ANALYST_LANGUAGE = [
   /\blatest session\b/i,
@@ -77,6 +78,146 @@ function energyContext(evidence, phaseStartDate) {
   };
 }
 
+function positiveNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function performanceImprovementRatio(event) {
+  const improvement = positiveNumber(event?.improvement);
+  const baseline = positiveNumber(event?.previousBaselineValue);
+  return improvement && baseline ? improvement / baseline : 0;
+}
+
+function trainingMovementArea(event) {
+  const key = `${event?.canonicalExerciseId ?? ""} ${event?.canonicalExerciseName ?? ""}`.toLowerCase();
+  if (/shoulder|front raise/.test(key)) return "shoulders";
+  if (/bench|chest|fly/.test(key)) return "chest";
+  if (/leg|squat|hip/.test(key)) return "lower_body";
+  if (/row|pulldown|pullup|pull-up/.test(key)) return "back";
+  if (/curl|pushdown|triceps|biceps|forearm/.test(key)) return "arms";
+  if (/crunch|abdominal|hanging/.test(key)) return "core";
+  return "other";
+}
+
+function strongestEvent(events, eventType) {
+  return events
+    .filter((event) => event.eventType === eventType)
+    .sort((left, right) =>
+      performanceImprovementRatio(right) - performanceImprovementRatio(left) ||
+      String(right.workoutDate).localeCompare(String(left.workoutDate)) ||
+      String(left.id).localeCompare(String(right.id))
+    )[0] ?? null;
+}
+
+export function selectMonthlyTrainingPerformanceStories(events = []) {
+  const byExercise = new Map();
+  events
+    .filter((event) =>
+      ["session_volume_pr", "reps_at_load_pr"].includes(event?.eventType) &&
+      positiveNumber(event?.improvement) &&
+      event?.canonicalExerciseId &&
+      event?.canonicalExerciseName
+    )
+    .forEach((event) => {
+      const records = byExercise.get(event.canonicalExerciseId) ?? [];
+      records.push(event);
+      byExercise.set(event.canonicalExerciseId, records);
+    });
+  const exercises = [...byExercise.entries()].map(([exerciseId, records]) => {
+    const volume = strongestEvent(records, "session_volume_pr");
+    const repsAtLoad = strongestEvent(records, "reps_at_load_pr");
+    return {
+      id: `monthly_training_story_${exerciseId}`,
+      area: trainingMovementArea(records[0]),
+      date: records.map((event) => event.workoutDate).sort().at(-1),
+      exerciseId,
+      exerciseName: records[0].canonicalExerciseName,
+      eventIds: [volume?.id, repsAtLoad?.id].filter(Boolean),
+      volume: volume ? {
+        currentValue: volume.currentValue,
+        previousBaselineValue: volume.previousBaselineValue,
+        improvement: volume.improvement,
+        unit: volume.unit,
+      } : null,
+      repsAtLoad: repsAtLoad ? {
+        reps: repsAtLoad.reps,
+        load: repsAtLoad.load,
+        loadUnit: repsAtLoad.loadUnit,
+        previousReps: repsAtLoad.previousBaselineValue,
+        improvement: repsAtLoad.improvement,
+      } : null,
+      strength: Math.max(
+        performanceImprovementRatio(volume),
+        performanceImprovementRatio(repsAtLoad),
+      ),
+    };
+  });
+  const strongestByArea = new Map();
+  exercises
+    .sort((left, right) =>
+      right.strength - left.strength ||
+      String(right.date).localeCompare(String(left.date)) ||
+      left.exerciseName.localeCompare(right.exerciseName)
+    )
+    .forEach((story) => {
+      if (!strongestByArea.has(story.area)) strongestByArea.set(story.area, story);
+    });
+  return Object.freeze([...strongestByArea.values()]
+    .sort((left, right) =>
+      right.strength - left.strength ||
+      String(right.date).localeCompare(String(left.date)) ||
+      left.exerciseName.localeCompare(right.exerciseName)
+    )
+    .slice(0, 3)
+    .map((story) => Object.freeze(story)));
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatList(values) {
+  if (values.length < 2) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
+}
+
+function performanceStat(story) {
+  const volumePercent = story.volume?.previousBaselineValue
+    ? Math.round((story.volume.improvement / story.volume.previousBaselineValue) * 100)
+    : null;
+  const repsPercent = story.repsAtLoad?.previousReps
+    ? Math.round((story.repsAtLoad.improvement / story.repsAtLoad.previousReps) * 100)
+    : null;
+  if (volumePercent != null && story.repsAtLoad) {
+    if (repsPercent > volumePercent) {
+      return {
+        label: story.exerciseName,
+        value: `${story.repsAtLoad.reps} reps at ${formatNumber(story.repsAtLoad.load)} ${story.repsAtLoad.loadUnit}`,
+        detail: `up from ${story.repsAtLoad.previousReps} reps; volume reached ${formatNumber(story.volume.currentValue)} ${story.volume.unit}`,
+      };
+    }
+    return {
+      label: story.exerciseName,
+      value: `Volume +${volumePercent}%`,
+      detail: `${formatNumber(story.volume.currentValue)} ${story.volume.unit} total; ${story.repsAtLoad.reps} reps at ${formatNumber(story.repsAtLoad.load)} ${story.repsAtLoad.loadUnit}, up from ${story.repsAtLoad.previousReps}`,
+    };
+  }
+  if (story.repsAtLoad) {
+    return {
+      label: story.exerciseName,
+      value: `${story.repsAtLoad.reps} reps at ${formatNumber(story.repsAtLoad.load)} ${story.repsAtLoad.loadUnit}`,
+      detail: `up from ${story.repsAtLoad.previousReps} reps at the same load`,
+    };
+  }
+  return {
+    label: story.exerciseName,
+    value: `Volume +${volumePercent}%`,
+    detail: `${formatNumber(story.volume.currentValue)} ${story.volume.unit} of session volume`,
+  };
+}
+
 function buildHero({ baseline, energy, training }) {
   return {
     title: baseline
@@ -84,10 +225,10 @@ function buildHero({ baseline, energy, training }) {
       : sentence({ observation: "July clarified what should carry forward" }),
     thesis: baseline && energy && training
       ? sentence({
-          observation: "You finished the cut, established a DEXA baseline, and began seeing progressive overload across your training",
+          observation: "You finished the cut, established a DEXA baseline, and created early training momentum",
           interpretation: "Those are encouraging first steps toward building muscle, but they are too early to confirm a body-composition change",
           whyItMatters: "Your calorie intake is also moving closer to supporting stronger training",
-          forwardImplication: "August needs to show that both training progress and calorie consistency can hold across a full month",
+          forwardImplication: "August needs to show that performance and calorie consistency can hold across a full month",
         })
       : sentence({
           observation: "July produced enough useful evidence to keep the current plan steady",
@@ -106,8 +247,8 @@ function buildHero({ baseline, energy, training }) {
     highlights: [
       training && {
         label: "Training",
-        value: "Progressive overload",
-        detail: "Progress is appearing across the body, the most encouraging early sign after the cut",
+        value: "Early momentum",
+        detail: "Several key lifts moved forward after the cut",
       },
       baseline && {
         label: "New baseline",
@@ -123,26 +264,53 @@ function buildHero({ baseline, energy, training }) {
   };
 }
 
-function buildTraining(training) {
+function buildTraining(training, stories) {
   if (!training) return null;
+  if (stories.length) {
+    const stats = stories.map(performanceStat);
+    const improvingCount = training.provenance?.improvingCount ?? stories.length;
+    const broadProgress = improvingCount > stories.length;
+    return {
+      title: sentence({ observation: broadProgress
+        ? "Training progressed across the program, with a few lifts standing out"
+        : "Training moved forward, with a few lifts standing out" }),
+      summary: sentence({
+        observation: broadProgress
+          ? "Progressive overload appeared across upper- and lower-body work, though some lifts advanced more than others"
+          : "Progressive overload appeared in several parts of the program, though it was not perfectly even",
+        interpretation: "That breadth is encouraging after finishing the cut, and the standout lifts below provide the clearest examples while other areas may need more time",
+      }),
+      interpretation: sentence({
+        observation: "Progress appeared across the training program rather than in one isolated session",
+        interpretation: "The three standout lifts provide the clearest proof of that broader pattern",
+        whyItMatters: "Broad progression is encouraging for the muscle-building goal, but it does not yet prove muscle gain",
+        forwardImplication: "August should show whether the pattern can continue across the program",
+      }),
+      stats,
+      next: sentence({
+        forwardImplication: "August should keep progressive overload moving across the program while the standout lifts remain strong across multiple sessions",
+      }),
+      selectedPerformanceStories: stories,
+    };
+  }
   return {
-    title: sentence({ observation: "Training is giving you something useful to build on" }),
+    title: sentence({ observation: "July established the first performance markers for the new phase" }),
     summary: sentence({
-      observation: "Progressive overload is appearing across muscle groups, even though progress is not perfectly even",
-      interpretation: "That unevenness is normal and this is an encouraging place to begin after finishing a cut",
+      observation: "The available sessions show forward movement, but no canonical movement record was available for a more specific summary",
+      interpretation: "Use the next complete performance record to establish a movement-level comparison",
     }),
     interpretation: sentence({
-      observation: "Stronger training is the first useful sign that the muscle-building plan may be working",
-      interpretation: "July did not prove that you gained muscle",
-      whyItMatters: "The early performance response is strong enough to keep the plan steady",
+      observation: "Performance is the earliest useful signal in this phase",
+      interpretation: "It remains separate from proof of muscle gain",
+      whyItMatters: "Specific repeated records will make the next Monthly more decisive",
     }),
     stats: [
-      { label: "Pattern", value: "Progressive overload", detail: "appearing across muscle groups" },
-      { label: "Context", value: "Early response", detail: "encouraging after the cut" },
-      { label: "Next test", value: "Full month", detail: "consistent progress in August" },
+      { label: "Signal", value: "Performance", detail: "the first phase indicator" },
+      { label: "Limit", value: "No selected record", detail: "movement detail is not yet canonical" },
+      { label: "Next test", value: "Repeatable records", detail: "specific progress in August" },
     ],
     next: sentence({
-      forwardImplication: "August should show whether you can keep progressing consistently across a full month",
+      forwardImplication: "August should produce specific records that can be repeated across a full month",
     }),
   };
 }
@@ -151,25 +319,25 @@ function buildEnergy(energy, context) {
   if (!energy) return null;
   const balance = context.averageBalance;
   const trend = balance == null
-    ? "Your intake is moving closer to the amount needed to support stronger training"
-    : `Your intake is moving closer to supporting stronger training, with logged days averaging a ${Math.abs(balance)} calorie deficit`;
+    ? "Your intake is moving closer to a repeatable level for the current workload"
+    : `Logged days averaged a ${Math.abs(balance)} calorie deficit, moving intake closer to a repeatable level for the current workload`;
   return {
     title: sentence({ observation: "Are calories supporting the work?" }),
     summary: context.hasMaterialCoverageGap
       ? describeMissingInformationNaturally({
           known: trend,
           missing: "Nutrition logs are still too incomplete to judge that pattern with confidence",
-          consequence: "The direction is appropriate for this early stage, but the plan needs a more consistent record before calories should change",
+          consequence: "The direction is appropriate, but sustainability cannot be judged from an incomplete record",
           nextStep: "Keep intake and nutrition logging consistent through August so the next recommendation rests on a full month",
         })
       : sentence({
           observation: trend,
-          interpretation: "That is appropriate at this early point because training is improving without evidence that weight is rising too quickly",
-          forwardImplication: "August should confirm that the same calorie pattern can support continued progress",
+          interpretation: "That balance leaves room to support repeated high-quality sessions without forcing a conclusion from scale weight",
+          forwardImplication: "August should confirm that the same calorie pattern is consistent enough to sustain the workload",
         }),
     whyItMatters: sentence({
-      observation: "Calories are moving closer to matching the demands of training",
-      whyItMatters: "Enough fuel helps progressive overload continue while patient weight gain keeps body fat controlled",
+      observation: "Calories are moving closer to matching the month's workload",
+      whyItMatters: "A repeatable intake pattern makes workload and recovery more sustainable while weight remains a pacing signal",
       forwardImplication: "Keep intake consistent until a full month shows whether the plan needs adjustment",
     }),
   };
@@ -195,37 +363,39 @@ function buildChanges({ training, energy, weight, energyContextValue }) {
     training && {
       tone: "training",
       label: "Training",
-      title: sentence({ observation: "Progressive overload is appearing across muscle groups" }),
+      title: sentence({ observation: "Performance became the lead early indicator" }),
       body: sentence({
-        interpretation: "Progress is moving at different rates, which is normal after a cut",
-        whyItMatters: "Stronger training is the first useful sign that the muscle-building plan may be working, but it does not yet prove muscle gain",
+        observation: "Training is telling us more than the scale right now",
+        interpretation: "Getting stronger matters more than reacting to day-to-day weight changes, while the scale and calorie pattern still add useful context",
+        whyItMatters: "No single signal tells the whole story",
+        forwardImplication: "Let them work together until the next DEXA shows whether stronger training is becoming muscle",
       }),
     },
     energy && {
       tone: "energy",
       label: "Calories",
-      title: sentence({ observation: "Calorie intake is becoming more supportive of training" }),
+      title: sentence({ observation: "Calorie balance became a sustainability check" }),
       body: energyContextValue.hasMaterialCoverageGap
         ? describeMissingInformationNaturally({
-            known: "The available calorie data is moving closer to supporting stronger training",
+            known: "The available calorie data is moving closer to the intended range",
             missing: "Several nutrition logs are still missing",
             consequence: "That limits how confidently we can judge whether the calorie level is repeatable",
             nextStep: "Keep intake and logging consistent through August before changing the target",
           })
         : sentence({
             observation: `Logged days averaged a ${Math.abs(energyContextValue.averageBalance)} calorie deficit`,
-            interpretation: "Intake is moving closer to supporting training",
+            interpretation: "Use that balance to judge whether the workload can be repeated",
             forwardImplication: "Keep that pattern consistent through August before deciding whether calories should change",
           }),
     },
     weight && {
       tone: "weight",
       label: "Weight",
-      title: sentence({ observation: "Body weight stayed controlled while training improved" }),
+      title: sentence({ observation: "Scale weight became context, not a verdict" }),
       body: sentence({
         observation: `Weight moved from ${round(weight.provenance.startWeight)} to ${round(weight.provenance.endWeight)} pounds`,
         interpretation: "That is a reason to stay patient, not to force faster gain",
-        forwardImplication: "Use the scale as context while training and the next DEXA provide the stronger evidence",
+        forwardImplication: "Use the scale to monitor pace while the next DEXA owns the body-composition judgment",
       }),
     },
   ].filter(Boolean);
@@ -235,7 +405,7 @@ function buildChanges({ training, energy, weight, energyContextValue }) {
   } : null;
 }
 
-function buildMoments({ completion, baseline, training, energy, photos }) {
+function buildMoments({ completion, baseline, training, energy, photos }, trainingStories) {
   const moments = [
     completion && {
       tone: "completion",
@@ -257,20 +427,23 @@ function buildMoments({ completion, baseline, training, energy, photos }) {
     },
     training && {
       tone: "training",
-      date: training.storyWindow.endDate,
-      label: "Progressive overload began appearing",
-      body: sentence({
-        observation: "Training progress is appearing across muscle groups",
-        interpretation: "That is the most encouraging early sign that your body is responding well after the cut",
+      date: trainingStories[0]?.date ?? training.storyWindow.endDate,
+      label: trainingStories.length ? "Broad progression created useful benchmarks" : "Performance gained a concrete reference point",
+      body: trainingStories.length ? sentence({
+        observation: "Progressive overload became visible across the program, with a few lifts standing out",
+        whyItMatters: "Those standout results created concrete benchmarks that will make August's progress easier to compare",
+      }) : sentence({
+        observation: "July established an early performance reference",
+        forwardImplication: "August should replace it with specific repeatable movement records",
       }),
     },
     energy && {
       tone: "energy",
       date: energy.storyWindow.endDate,
-      label: "Calories moved closer to supporting training",
+      label: "The calorie pattern became sustainable enough to test",
       body: sentence({
-        observation: "Intake moved closer to the amount needed for stronger training",
-        forwardImplication: "August should show whether that calorie level can stay consistent",
+        observation: "Intake moved closer to a repeatable level for the current workload",
+        forwardImplication: "August should show whether that calorie level can stay consistent across a full month",
       }),
     },
     photos && {
@@ -328,25 +501,27 @@ function buildStrategy({ training, energy }) {
   };
 }
 
-function buildMonthAhead({ training, energy, weight, photos, baseline }) {
+function buildMonthAhead({ training, energy, weight, photos, baseline }, trainingStories) {
   return {
-    title: sentence({ observation: "Build on July's early response" }),
+    title: sentence({ observation: "Turn July's signals into repeatable evidence" }),
     thesis: sentence({
       observation: "July established the baseline",
-      forwardImplication: "Keep training and calorie intake consistent through August so the early progress has time to become a reliable pattern",
+      forwardImplication: "August must turn July's movement records and calorie pattern into results that repeat across the month",
     }),
     guidance: [
       training && {
         tone: "training",
         label: "Training",
-        value: "Keep progressing",
-        detail: sentence({ forwardImplication: "Build on the early response with progressive overload across the month" }),
+        value: "Make progression repeatable",
+        detail: sentence({ forwardImplication: trainingStories.length
+          ? "Keep progressive overload moving across the program, maintain the standout lifts, and judge the pattern across the month rather than one session"
+          : "Establish specific movement records across more than one August session" }),
       },
       energy && {
         tone: "energy",
         label: "Calories",
-        value: "Fuel training consistently",
-        detail: sentence({ forwardImplication: "Keep intake consistent enough to support stronger training" }),
+        value: "Make intake repeatable",
+        detail: sentence({ forwardImplication: "Hold calorie intake consistent across logged days so workload and recovery can be judged cleanly" }),
       },
       weight && {
         tone: "weight",
@@ -370,6 +545,54 @@ function buildMonthAhead({ training, energy, weight, photos, baseline }) {
   };
 }
 
+const MONTHLY_SECTION_PURPOSES = Object.freeze([
+  { role: "hero", question: "What did this month establish?", uniqueUnderstanding: "The month established a measured starting line and early operating momentum." },
+  { role: "training", question: "What specifically improved?", uniqueUnderstanding: "Program-wide progression is the conclusion, and the standout lifts are its clearest examples." },
+  { role: "energy", question: "Why can those improvements continue?", uniqueUnderstanding: "Calorie consistency determines whether the workload is sustainable." },
+  { role: "newBaseline", question: "How will future success be judged?", uniqueUnderstanding: "Future DEXAs can be compared with the July 18 reference point." },
+  { role: "changes", question: "How should progress now be interpreted differently?", uniqueUnderstanding: "Movement, calorie, weight, and DEXA signals now have separate jobs." },
+  { role: "moments", question: "Which events will still matter months from now?", uniqueUnderstanding: "Broad progression created durable performance benchmarks for comparison." },
+  { role: "monthAhead", question: "What specifically needs to happen next?", uniqueUnderstanding: "Program-wide progression and the calorie pattern must become repeatable in August." },
+]);
+
+export function auditMonthlyEditorialUniqueness(model, trainingStories = []) {
+  const heroText = JSON.stringify(model.hero ?? {});
+  const energyText = JSON.stringify(model.energy ?? {});
+  const changesText = JSON.stringify(model.changes ?? {});
+  const monthAheadText = JSON.stringify(model.monthAhead ?? {});
+  const renderedText = JSON.stringify({
+    hero: model.hero,
+    training: model.training,
+    energy: model.energy,
+    newBaseline: model.newBaseline,
+    changes: model.changes,
+    moments: model.moments,
+    monthAhead: model.monthAhead,
+  });
+  const issues = [
+    ...trainingStories
+      .filter((story) => heroText.includes(story.exerciseName))
+      .map((story) => `hero_consumes_training_detail:${story.exerciseId}`),
+    ...(/training (?:is improving|is responding|improved)/i.test(renderedText)
+      ? ["repeated_generic_training_conclusion"] : []),
+    ...(/progressive overload|training (?:is improving|is responding)/i.test(energyText)
+      ? ["energy_repeats_training_conclusion"] : []),
+    ...(/progressive overload|training (?:is improving|is responding)/i.test(changesText)
+      ? ["changes_repeats_training_conclusion"] : []),
+    ...(model.training && trainingStories.length > 0 &&
+      model.training.selectedPerformanceStories?.length !== trainingStories.length
+      ? ["training_selection_not_preserved"] : []),
+    ...(model.training && !/repeat|across more than one/i.test(monthAheadText)
+      ? ["month_ahead_not_forward_specific"] : []),
+  ];
+  return Object.freeze({
+    passes: issues.length === 0,
+    issues,
+    sections: MONTHLY_SECTION_PURPOSES,
+    selectedTrainingStoryIds: trainingStories.map((story) => story.id),
+  });
+}
+
 export function composeMonthlyNarrativeModel({
   confidence = null,
   decision,
@@ -386,25 +609,33 @@ export function composeMonthlyNarrativeModel({
   const completionDate = evidence.goal?.completionEvent?.completedAt;
   const phaseStartDate = completionDate
     ? addCalendarDays(String(completionDate).slice(0, 10), 1)
-    : String(evidence.goal?.phases?.find((phase) => phase.status === "active")?.startDate ?? evidence.previewWindow.startDate).slice(0, 10);
+    : String((evidence.goal ? resolveCommittedPhaseContext(evidence.goal, { asOf: evidence.previewWindow.endDate }).activePhase?.startedAt : null) ?? evidence.previewWindow.startDate).slice(0, 10);
   const energyContextValue = energyContext(evidence, phaseStartDate);
+  const trainingStories = selectMonthlyTrainingPerformanceStories(
+    evidence.trainingPerformanceEvents,
+  );
   const model = {
     translationVersion: PI_EDITORIAL_TRANSLATION_VERSION,
     confidence,
     hero: buildHero(candidates),
-    training: buildTraining(candidates.training),
+    training: buildTraining(candidates.training, trainingStories),
     energy: buildEnergy(candidates.energy, energyContextValue),
     newBaseline: buildBaseline(candidates.baseline),
     changes: buildChanges({ ...candidates, energyContextValue }),
-    moments: buildMoments(candidates),
+    moments: buildMoments(candidates, trainingStories),
     strategy: buildStrategy(candidates),
-    monthAhead: buildMonthAhead(candidates),
+    monthAhead: buildMonthAhead(candidates, trainingStories),
   };
-  const audit = auditMonthlyNarrativeModel(model);
+  const uniquenessAudit = auditMonthlyEditorialUniqueness(model, trainingStories);
+  if (!uniquenessAudit.passes) {
+    throw new Error(`Monthly narrative rejected by uniqueness audit: ${uniquenessAudit.issues.join(" | ")}`);
+  }
+  const auditedModel = { ...model, editorialUniquenessAudit: uniquenessAudit };
+  const audit = auditMonthlyNarrativeModel(auditedModel);
   if (!audit.passes) {
     throw new Error(`Monthly narrative rejected by editorial audit: ${audit.issues.map((issue) => `${issue.path}: ${issue.text}`).join(" | ")}`);
   }
-  return Object.freeze({ ...model, editorialAudit: audit });
+  return Object.freeze({ ...auditedModel, editorialAudit: audit });
 }
 
 export function auditMonthlyNarrativeModel(model) {

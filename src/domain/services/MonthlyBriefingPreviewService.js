@@ -1,8 +1,13 @@
 import { composeMonthlyNarrativeModel } from "./MonthlyNarrativeCompositionService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
 import {
   createMonthlyBriefingGoalConfidenceBlockFromAssessment,
 } from "./BriefingGoalConfidencePresentationService";
+import {
+  resolveCanonicalGoalCompletion,
+  resolveMonthlyDexaBaselineRoles,
+} from "./MonthlyBaselineRoleResolver";
 
 const PREVIEW_ID = "monthly_briefing_preview_2026_07_01";
 const PREVIEW_WINDOW = {
@@ -772,7 +777,7 @@ function makePhaseTransitionCandidate(goal, monthWindow) {
 
 function pickDexaCandidates(dexaScans) {
   const sorted = [...dexaScans].sort(byDate("measuredAt"));
-  const baseline = sorted.find((item) => item?.isNewBaseline || item?.baselineRole || item?.dexaRole === "new_baseline");
+  const baseline = sorted.find((item) => item?.monthlyBaselineRole?.role === "new_baseline");
   const latest = sorted.at(-1) || null;
   const previous = sorted.at(-2) || null;
   return { baseline, latest, previous };
@@ -820,7 +825,13 @@ function makeNewBaselineCandidate(dexaScans, monthWindow) {
       bodyFat,
       leanMass,
       fatMass,
-      role: selected.baselineRole || "new_baseline",
+      role: selected.monthlyBaselineRole.role,
+      associatedGoalId: selected.monthlyBaselineRole.associatedGoalId,
+      associatedPhaseId: selected.monthlyBaselineRole.associatedPhaseId,
+      effectiveDate: selected.monthlyBaselineRole.effectiveDate,
+      inferenceReason: selected.monthlyBaselineRole.inferenceReason,
+      lifecycleRefs: selected.monthlyBaselineRole.lifecycleRefs,
+      semanticProvenance: selected.monthlyBaselineRole.provenance,
     },
   });
 }
@@ -1497,6 +1508,17 @@ function createEditorialDecision({ evidence, goal, monthWindow, generatedAt }) {
     toDateKey(syntheticContinuation.at(0)?.generatedAt ?? syntheticContinuation.at(0)?.measuredAt ?? syntheticContinuation.at(0)?.date),
     toDateKey(syntheticContinuation.at(-1)?.generatedAt ?? syntheticContinuation.at(-1)?.measuredAt ?? syntheticContinuation.at(-1)?.date),
   ] : null;
+  const newBaselineCandidate = candidates.find((candidate) => candidate.storyType === "new_baseline");
+  const baselineResolution = evidence?.baselineRoleResolution ?? null;
+  const newBaselineOutcome = newBaselineCandidate
+    ? newBaselineCandidate.included
+      ? newBaselineCandidate.mergeMetadata?.mergedCandidateIds?.length
+        ? "candidate_generated_selected_and_merge_owner"
+        : "candidate_generated_and_selected"
+      : newBaselineCandidate.exclusionReason?.startsWith("merged_into_")
+        ? "candidate_generated_and_merged"
+        : "candidate_generated_and_excluded"
+    : baselineResolution?.status ?? "semantic_role_not_applicable";
 
   return freeze({
     id: `${PREVIEW_ID}_editorial_decision`,
@@ -1536,6 +1558,19 @@ function createEditorialDecision({ evidence, goal, monthWindow, generatedAt }) {
       selectedThesis: sortedRendered.map((candidate) => thesisFrom(candidate.storyType, candidate.narrativeIntent)),
       primaryThesis: sortedRendered.at(0)?.storyType ?? null,
       syntheticOnly: mergeMeta?.syntheticOnly ?? false,
+    },
+    semanticDiagnostics: {
+      newBaseline: {
+        ...baselineResolution,
+        candidateOutcome: newBaselineOutcome,
+        candidateStoryId: newBaselineCandidate?.storyId ?? null,
+        candidateScore: newBaselineCandidate?.score ?? null,
+        candidateRank: newBaselineCandidate?.scoreRank ?? null,
+        exclusionReason: newBaselineCandidate?.exclusionReason ?? null,
+        mergeOwnerId: newBaselineCandidate?.included
+          ? newBaselineCandidate.storyId
+          : newBaselineCandidate?.mergeMetadata?.mergeTargetId ?? null,
+      },
     },
   });
 }
@@ -1734,6 +1769,7 @@ function mergeContinuationEvidence(baseEvidence, continuation, monthWindow) {
     dailyBriefings: [...baseEvidence.dailyBriefings, ...accepted.dailyBriefings],
     energyContinuations: [...baseEvidence.energyContinuations, ...accepted.energyContinuations],
     trainingObservations: [...baseEvidence.trainingObservations, ...accepted.trainingObservations],
+    baselineRoleResolution: baseEvidence.baselineRoleResolution ?? null,
     syntheticContinuations,
     syntheticFixtureId: continuation.fixtureId,
     syntheticFixtureVersion: continuation.fixtureVersion,
@@ -1765,6 +1801,7 @@ export function composeMonthlyBriefingPreview({
   dailyBriefings = [],
   energyContinuations = [],
   trainingObservations = [],
+  trainingPerformanceEvents = [],
   goal = null,
   goalConfidence = null,
   syntheticContinuation = null,
@@ -1777,14 +1814,21 @@ export function composeMonthlyBriefingPreview({
     deliveryDate: toDateKey(previewWindow.deliveryDate ?? previewWindow.startDate),
     storyWindowStart: toDateKey(previewWindow.storyWindowStart ?? previewWindow.deliveryDate ?? previewWindow.startDate),
   };
+  const baselineRoleResolution = resolveMonthlyDexaBaselineRoles({ dexaScans, goal });
+  const canonicalDexaScans = baselineRoleResolution.annotatedDexaScans;
   const baseEvidence = {
     weights: listInWindow(weights, "measuredAt", monthWindow),
-    dexaScans: filterByWindow(dexaScans, "measuredAt", monthWindow),
+    dexaScans: filterByWindow(canonicalDexaScans, "measuredAt", monthWindow),
     progressPhotos: filterByWindow(progressPhotos, "capturedAt", monthWindow),
     dailyBriefings: filterByWindow(normalizeBriefingEntries(dailyBriefings), "generatedAt", monthWindow),
     energyContinuations: filterByWindow(energyContinuations, "date", monthWindow),
     trainingObservations: filterByWindow(trainingObservations, "date", monthWindow),
+    trainingPerformanceEvents: (trainingPerformanceEvents ?? []).filter((event) =>
+      toDateKey(event.workoutDate) >= monthWindow.startDate &&
+      toDateKey(event.workoutDate) <= monthWindow.endDate
+    ),
     syntheticContinuations: [],
+    baselineRoleResolution: baselineRoleResolution.summary,
   };
 
   const continuation = normalizeSyntheticContinuation(syntheticContinuation);
@@ -1885,13 +1929,19 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
       const monthlyGoal = orchestration.goal ?? resolveMonthlyGoalContext({
         activeGoal,
         goals,
+        dexaScans,
         monthWindow: previewWindow,
         timeZone: orchestration.timeZone ?? "America/Los_Angeles",
       });
-      const resolvedDexaScans = applyDexaScenarioAnnotations(
+      const scenarioAnnotatedDexaScans = applyDexaScenarioAnnotations(
         dexaScans,
         orchestration.dexaScans,
       );
+      const baselineRoleResolution = resolveMonthlyDexaBaselineRoles({
+        dexaScans: scenarioAnnotatedDexaScans,
+        goal: monthlyGoal,
+      });
+      const resolvedDexaScans = baselineRoleResolution.annotatedDexaScans;
       const evidenceWindow = resolveMonthlyGoalEvidenceWindow({
         activeGoal,
         orchestration,
@@ -1934,6 +1984,7 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         goal: monthlyGoal,
         energyContinuations: canonical.energyContinuations,
         trainingObservations: canonical.trainingObservations,
+        trainingPerformanceEvents: canonical.trainingPerformanceEvents,
         syntheticContinuation: acceptedSyntheticContinuation,
         evidenceResolution: {
           goalId: activeGoal?.id ?? null,
@@ -1948,6 +1999,7 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
           activityRecordCount: canonical.activityRecords.length,
           activityDates: uniqueDates(canonical.activityRecords),
           completeEnergyDates: canonical.energyContinuations.map((record) => record.date),
+          baselineRole: baselineRoleResolution.summary,
         },
       };
       const narrative = composeMonthlyBriefingPreview({
@@ -1957,6 +2009,7 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         dailyBriefings,
         energyContinuations: canonical.energyContinuations,
         trainingObservations: canonical.trainingObservations,
+        trainingPerformanceEvents: canonical.trainingPerformanceEvents,
         goal: evidenceFixture.goal,
         goalConfidence,
         syntheticContinuation: acceptedSyntheticContinuation,
@@ -1975,7 +2028,7 @@ export function resolveMonthlyGoalConfidenceAssessment({
   generatedAt,
   repository,
 } = {}) {
-  const activePhase = activeGoal?.phases?.find((phase) => phase.status === "active");
+  const activePhase = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: cutoff }).activePhase : null;
   if (!repository || !activeGoal?.id || !activePhase?.id || !cutoff) return null;
   const selected = createPIGoalConfidenceReadService({ repository })
     .getGoalConfidenceAssessmentAtOrBefore({
@@ -2019,6 +2072,7 @@ function resolveMonthlyGoalEvidenceWindow({ activeGoal, orchestration, previewWi
 function resolveMonthlyGoalContext({
   activeGoal,
   goals,
+  dexaScans,
   monthWindow,
   timeZone,
 }) {
@@ -2030,7 +2084,13 @@ function resolveMonthlyGoalContext({
       completedDate <= toDateKey(monthWindow.endDate);
   });
   if (!completedGoal) return activeGoal;
-  const completionDate = dateInTimeZone(completedGoal.completedAt, timeZone);
+  const completionResolution = resolveCanonicalGoalCompletion({
+    completedGoal,
+    nextGoal: activeGoal,
+    dexaScans,
+    timeZone,
+  });
+  const completionDate = completionResolution.effectiveDate;
   return {
     ...activeGoal,
     title: completedGoal.title,
@@ -2057,6 +2117,9 @@ function resolveMonthlyGoalContext({
       outcome: "completed",
       displayName: completedGoal.title,
       goalId: completedGoal.id,
+      sourceDexaId: completionResolution.sourceDexaId,
+      inferenceReason: completionResolution.reason,
+      lifecycleRefs: completionResolution.lifecycleRefs,
     },
   };
 }
@@ -2077,6 +2140,11 @@ function applyDexaScenarioAnnotations(realScans, scenarioScans = []) {
   return realScans.map((scan) => {
     const annotation = annotations.get(toDateKey(scan.measuredAt ?? scan.date));
     if (!annotation) return scan;
+    const canonicalRoleOwned = scan.monthlyBaselineRole != null || scan.canonicalBaselineRole != null;
+    const explicitContradiction = scan.isNewBaseline === false ||
+      ["comparison_only", "prior_goal_only", "not_new_baseline"].includes(scan.baselineRole) ||
+      scan.dexaRole === "not_new_baseline";
+    if (canonicalRoleOwned || explicitContradiction) return scan;
     return {
       ...scan,
       isNewBaseline: annotation.isNewBaseline ?? scan.isNewBaseline,
@@ -2135,6 +2203,7 @@ function composeCanonicalMonthlyEvidence({
     trainingRecords,
     nutritionRecords,
     activityRecords,
+    trainingPerformanceEvents: performanceEvents,
     energyContinuations: energyDays
       .filter((day) => day.completeness === "complete")
       .map((day) => ({

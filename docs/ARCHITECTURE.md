@@ -1,5 +1,10 @@
 # PhysiqueOS Architecture
 
+The Phase 2 Strategy, Expected Trajectory, immutable acceptance lifecycle,
+Strategy/Execution boundary, deterministic Starting Forecast input, and Founder
+seeding plan are specified in
+[PHASE_2_ACTIVATION_PACKAGE.md](./PHASE_2_ACTIVATION_PACKAGE.md).
+
 ## Purpose
 
 PhysiqueOS is built around a single Intelligence Engine.
@@ -293,6 +298,16 @@ Examples:
 
 Every prediction is evaluated relative to the active goal.
 
+Goal phases use an evidence-based Phase Review lifecycle. `plannedReviewAt` is a
+review milestone, not an end date; a phase remains committed and active until a
+user-authorized atomic decision begins its successor or extends the review.
+Projected phase dates never own evidence or activate Strategy/protocol state.
+See `docs/PHASE_REVIEW_PRODUCTION_ARCHITECTURE.md` for the canonical contract,
+dependency audit, compatibility model, mutation boundary, and deployment gates.
+See `docs/PHASE_REVIEW_COMMIT_COORDINATOR.md` for the atomic participant
+lifecycle, accepted Strategy/trajectory prerequisites, Starting Forecast
+staging, rollback invariants, and mutation-path audit.
+
 Only one primary goal is active at a time.
 
 Narrative Intelligence sits downstream of goal-relative truth and persistent physiological assessment. It selects what should be communicated without reinterpreting evidence or changing the Goal Engine's conclusions. See `docs/NARRATIVE_INTELLIGENCE.md` for the canonical system boundary, Conversation State, story selection, cadence, and transition-conversation contract.
@@ -328,6 +343,22 @@ Calibration events such as DEXA, VO2 Max, blood work, and RMR should carry speci
 ---
 
 # Confidence Engine
+
+> **Canonical V2 direction:** Confidence is being redefined as the forecast that
+> the active Goal will be achieved within its planned timeline and guardrails if
+> the current strategy continues. The current runtime remains V1. See
+> `docs/CONFIDENCE_ARCHITECTURE_V2.md` for the target ownership, contracts,
+> invariants, audit, and implementation sequence. That specification does not
+> authorize calculation, persistence, publication, or UI changes.
+> The score-free Goal-aware Interpretation boundary is defined separately in
+> `docs/INTERPRETATION_ARCHITECTURE_V2.md`, including its PI V1 compatibility
+> fixtures and migration constraints.
+> The declarative source of Goal identity, Objectives, Guardrails, trajectory,
+> evidence relevance, milestones, and success is defined in
+> `docs/GOAL_CONTRACT_ARCHITECTURE_V2.md`.
+> Confidence becomes canonical only through the authorized Briefing/Goal
+> initialization finalization boundary defined in
+> `docs/CONFIDENCE_PUBLICATION_ARCHITECTURE_V2.md`.
 
 ## Responsibility
 
@@ -617,3 +648,25 @@ Data Sources / Integrations
 ```
 
 The floating bottom navigation is global app chrome. Long pages must include enough bottom padding for it, and modals must appear above it.
+
+---
+
+# Founder Store Write Ownership
+
+The Founder runtime database is a whole-file store. Canonical mutations use one
+cross-process namespace rather than per-Goal locks: atomic file ownership is
+acquired before the final fresh read and held through revision validation,
+candidate construction, atomic replacement and required verification. The
+unit-of-work and legacy Founder persistence paths share that boundary.
+
+Phase Review adds a no-injection production coordinator factory and an
+explicitly authorized server-only action. The action is deliberately
+disconnected from every UI, route, briefing, scheduler and API client. See
+[`PHASE_REVIEW_PRODUCTION_BOUNDARY.md`](./PHASE_REVIEW_PRODUCTION_BOUNDARY.md)
+for process ownership, lock metadata, stale recovery, dry-run behavior,
+incident recovery and deployment gates.
+
+The human-operated production cutover must follow
+[`CONFIDENCE_V2_PHASE_REVIEW_PRODUCTION_CUTOVER.md`](./CONFIDENCE_V2_PHASE_REVIEW_PRODUCTION_CUTOVER.md).
+It prohibits an all-in-one deployment and requires independent backup, runtime,
+Founder transaction, dry-run, publication and rollback approvals.

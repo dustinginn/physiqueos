@@ -49,7 +49,7 @@ describe("Midweek canonical confidence integration", () => {
       "src/components/briefings/BriefingConfidenceAnchor.jsx", "utf8");
     expect(source).toContain("ConfidenceRing");
     expect(source).toContain("animate={false}");
-    expect(source).toContain("Goal confidence ${confidence.score} percent");
+    expect(source).toContain("Goal confidence ${canonicalConfidence.score} percent");
     expect(source).toContain("▲ +");
     expect(source).toContain("— No change");
     expect(source).toContain("▼ −");

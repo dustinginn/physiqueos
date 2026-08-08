@@ -23,7 +23,7 @@ describe("EvidenceReviewService provisional exercise safety", () => {
       mode: "new",
       definition: {
         canonicalName: "Bicep Curl Machine",
-        primaryMuscleGroup: "Biceps",
+        primaryMuscleGroupId: "biceps",
         movementPattern: "Elbow Flexion",
         equipment: "Machine",
         laterality: "Bilateral",
@@ -34,11 +34,61 @@ describe("EvidenceReviewService provisional exercise safety", () => {
     expect(state.review.interpretedEvidence.evidence_objects[0].exercises[0])
       .toMatchObject({
         canonicalExerciseId: "bicep_curl_machine",
+        primary_muscle_group_id: "biceps",
+        primary_muscle_groups: ["Biceps"],
         resolutionStatus: "resolved_new_canonical",
       });
     await expect(service.beginCommit(state.review.id)).resolves.toMatchObject({
       status: "committing",
     });
+  });
+
+  it.each(["", "Glute Muscles", "removed_group"])(
+    "rejects invalid canonical muscle-group selection %j without updating the review",
+    async (primaryMuscleGroupId) => {
+      const state = reviewFixture();
+      const before = structuredClone(state.review);
+      const service = createEvidenceReviewService({
+        repositories: repositories(state),
+      });
+      await expect(service.resolveProvisionalExercise(state.review.id, {
+        expectedUpdatedAt: state.review.updatedAt,
+        provisionalExerciseId: "provisional_1",
+        mode: "new",
+        definition: {
+          canonicalName: "Bicep Curl Machine",
+          primaryMuscleGroupId,
+        },
+        updatedBy: "founder",
+      })).rejects.toMatchObject({
+        code: "CANONICAL_EXERCISE_MUSCLE_GROUP_INVALID",
+      });
+      expect(state.review).toEqual(before);
+    }
+  );
+
+  it("validates the authoritative prepared package without rewriting the pending review", async () => {
+    const state = reviewFixture();
+    const originalEvidence = structuredClone(state.review.interpretedEvidence);
+    const service = createEvidenceReviewService({ repositories: repositories(state) });
+    const preparedEvidence = {
+      evidence_objects: [{
+        id: "training_1",
+        evidence_type: "training",
+        exercises: [{
+          id: "bench_press",
+          name: "Bench Press",
+          canonicalExerciseId: "bench_press",
+          resolutionStatus: "resolved",
+          provisionalExercise: null,
+          sets: [{ reps: 10, weight: 135 }],
+        }],
+      }],
+    };
+    await expect(service.beginCommit(state.review.id, {
+      evidencePackage: preparedEvidence,
+    })).resolves.toMatchObject({ status: "committing" });
+    expect(state.review.interpretedEvidence).toEqual(originalEvidence);
   });
 });
 

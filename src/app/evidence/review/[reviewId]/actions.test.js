@@ -177,13 +177,30 @@ function createIsolatedReviewState(store) {
         String(item.canonicalId) === "training|authoritative|IMG_1686.png"
     )
   );
-  const confirmedStrengthSession = structuredClone(
+  const persistedConfirmedStrengthSession = structuredClone(
     store.canonicalEvidenceObjects.find(
       (item) =>
         item.evidence_type === "training" &&
         String(item.canonicalId) === "training|authoritative|IMG_1688.png|typed_evidence_0"
     )
   );
+  const strengthEvidence = structuredClone(
+    review.interpretedEvidence.evidence_objects.find(
+      (item) => item.id === "training_2026-07-27_07-09_StrengthTraining"
+    )
+  );
+  const confirmedStrengthSession =
+    persistedConfirmedStrengthSession ??
+    {
+      canonicalId: "training|authoritative|IMG_1688.png|typed_evidence_0",
+      evidence_type: "training",
+      payload: strengthEvidence,
+      provenance: {
+        contributing_evidence_object_ids: [strengthEvidence.id],
+        source_artifact_refs: ["IMG_1688.png", "typed_evidence_0"],
+      },
+      quality: { status: "active" },
+    };
 
   return {
     user: structuredClone(store.user),

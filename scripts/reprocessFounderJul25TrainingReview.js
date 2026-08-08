@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 import { FounderRepositories } from "../src/data/repositories/FounderRepositories.js";
 import { parseStrengthTrainingText } from "../src/domain/models/trainingSessionEvidence.js";
 import {
@@ -15,7 +16,8 @@ const RUNTIME_PATH = path.resolve(process.cwd(), "private", "founder", "runtime-
 const apply = process.argv.includes("--apply");
 
 const beforeBytes = fs.readFileSync(RUNTIME_PATH);
-const before = JSON.parse(beforeBytes);
+const before = parseOperationalJsonBytes(beforeBytes,
+  { filePath: RUNTIME_PATH, stage: "training_review_reprocessing_source" });
 const review = before.evidenceReviews?.find((item) => item.id === REVIEW_ID);
 const evidencePackage = before.evidencePackages?.find((item) => item.package_id === PACKAGE_ID);
 assert(review, "The characterized pending review was not found.");
@@ -77,7 +79,8 @@ run().catch((error) => {
 async function run() {
   const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
   const afterBytes = fs.readFileSync(RUNTIME_PATH);
-  const after = JSON.parse(afterBytes);
+  const after = parseOperationalJsonBytes(afterBytes,
+    { filePath: RUNTIME_PATH, stage: "training_review_reprocessing_post_commit" });
   const updated = after.evidenceReviews.find((item) => item.id === REVIEW_ID);
   const updatedPackage = after.evidencePackages.find((item) => item.package_id === PACKAGE_ID);
   const updatedStrength = updated.interpretedEvidence.evidence_objects.find(

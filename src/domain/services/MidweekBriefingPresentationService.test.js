@@ -36,6 +36,7 @@ function presentation() {
     priorScore: 58,
     delta: 1,
     movementDirection: "increased",
+    primaryReason: "Confidence increased because the published evidence strengthened the outlook.",
     supportingReasons: ["Evidence is sufficiently complete across interpreted domains."],
     limitingReasons: ["Energy coverage prevents a calibration conclusion."],
   };
@@ -45,7 +46,7 @@ function presentation() {
 }
 
 describe("Midweek briefing presentation", () => {
-  it("keeps confidence identity while translating the explanation upstream", () => {
+  it("preserves canonical published confidence without editorial translation", () => {
     const result = presentation();
     expect(result.goalConfidence).toMatchObject({
       score: 59,
@@ -53,12 +54,10 @@ describe("Midweek briefing presentation", () => {
       delta: 1,
       movementDirection: "increased",
     });
-    expect(result.goalConfidence.presentationExplanation).toBe(
-      "Confidence moved up slightly because training, calories, activity, and weight are telling a consistent early story, but the week still needs to finish before Sunday’s full review."
+    expect(result.goalConfidence.primaryReason).toBe(
+      "Confidence increased because the published evidence strengthened the outlook."
     );
-    expect(result.goalConfidence.presentationExplanation).not.toMatch(
-      /evidence|domain|coverage|calibration|engine|observation window/i
-    );
+    expect(result.goalConfidence).not.toHaveProperty("presentationExplanation");
   });
 
   it("uses a concise headline and keeps the supporting coaching detail", () => {

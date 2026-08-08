@@ -2,6 +2,26 @@ import { describe, expect, it } from "vitest";
 import { createWeeklyBriefingScreenPresentation } from "./WeeklyBriefingScreenPresentationService";
 
 describe("WeeklyBriefingScreenPresentationService", () => {
+  it("passes the exact published confidence object through without mutation", () => {
+    const confidence = Object.freeze({
+      score: 59,
+      band: "developing",
+      priorScore: 59,
+      delta: 0,
+      movementDirection: "held",
+      primaryReason: "Confidence remained stable because the outlook did not materially change.",
+      presentationExplanation: "Confidence remained stable because the outlook did not materially change.",
+    });
+    const result = createWeeklyBriefingScreenPresentation({
+      goalConfidence: confidence,
+      narrativePresentationSelection: {
+        hero: { confidenceExplanation: "Confidence improved this week." },
+      },
+    });
+    expect(result.hero.confidence).toBe(confidence);
+    expect(result.hero.confidence.presentationExplanation).toBe(confidence.primaryReason);
+  });
+
   it.each([
     undefined,
     {},

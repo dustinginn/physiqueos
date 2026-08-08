@@ -326,7 +326,9 @@ function normalizeCanonicalPayload(evidenceObject) {
   const normalizedEvidenceObject = isTrainingSession(enrichedEvidenceObject)
     ? {
         ...enrichedEvidenceObject,
-        exercises: mergeExercises([], enrichedEvidenceObject.exercises ?? []),
+        exercises: mergeExercises([], enrichedEvidenceObject.exercises ?? [], {
+          preserveInputOrder: true,
+        }),
       }
     : enrichedEvidenceObject;
 
@@ -753,7 +755,11 @@ function mergeDefinedFields(left = {}, right = {}) {
   }, {});
 }
 
-function mergeExercises(left = [], right = []) {
+function mergeExercises(
+  left = [],
+  right = [],
+  { preserveInputOrder = false } = {}
+) {
   const exercisesByName = new Map();
 
   [...left, ...right].forEach((exercise) => {
@@ -806,7 +812,8 @@ function mergeExercises(left = [], right = []) {
     });
   });
 
-  return orderTrainingExercises([...exercisesByName.values()]);
+  const exercises = [...exercisesByName.values()];
+  return preserveInputOrder ? exercises : orderTrainingExercises(exercises);
 }
 
 function normalizeMorphologicalExerciseIdentity(value) {

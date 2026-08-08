@@ -10,7 +10,7 @@ const assessment = {
   id: "assessment", goalId: "goal", phaseId: "phase",
   operatingState: "calibration", modelVersion: "pi_goal_confidence_assessment_v1",
   piVersion: "pi_v3", evidenceCutoff: "2026-07-26T06:59:59.999Z",
-  primaryReason: "Training remained constructive.",
+  primaryReason: "Confidence increased because training remained constructive.",
   score: {
     current: 58, band: "moderate", prior: 44, delta: 14,
     movement: { direction: "increased", magnitude: "material" },
@@ -52,17 +52,16 @@ describe("active Goal confidence presentation", () => {
       delta: 14, priorScore: 44, movementDirection: "increased",
       movementMagnitude: "material",
     });
-    expect(result.supportingContributors).toHaveLength(1);
-    expect(result.limitingContributors).toHaveLength(1);
+    expect(result.compatibilityIncomplete).toBe(true);
   });
 
-  it("uses an explicitly non-PI fallback for absent older collections", () => {
+  it("returns an explicit unavailable state instead of calculating a fallback", () => {
     expect(resolveActiveGoalConfidencePresentation({
       activeGoal: goal, store: {}, legacyReadModel: legacy,
     })).toMatchObject({
-      status: "legacy_fallback", source: "legacy_overall_goal_confidence",
-      canonicalSeries: false, value: 44,
-      modelVersion: "overall_goal_confidence_v1",
+      status: "unavailable", source: "canonical_confidence_unavailable",
+      canonicalSeries: false, value: null,
+      modelVersion: null,
       movement: null, delta: null,
     });
   });
@@ -76,16 +75,16 @@ describe("active Goal confidence presentation", () => {
       ...canonical.goalConfidenceHistory[0], assessmentId: "other",
     }] }],
     ["score-band mismatch", { snapshot: { scoreBand: "high" } }],
-  ])("rejects %s and safely falls back", (_label, change) => {
+  ])("rejects %s without calculating a fallback", (_label, change) => {
     const store = structuredClone(canonical);
     if (change.snapshot) Object.assign(store.goalConfidenceSnapshots[0], change.snapshot);
     if (change.history) store.goalConfidenceHistory = change.history;
     expect(resolveActiveGoalConfidencePresentation({
       activeGoal: goal, store, legacyReadModel: legacy,
     })).toMatchObject({
-      status: "invalid_canonical",
-      source: "legacy_overall_goal_confidence",
-      value: 44,
+      status: "unavailable",
+      source: "canonical_confidence_unavailable",
+      value: null,
     });
   });
 

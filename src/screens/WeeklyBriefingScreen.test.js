@@ -7,6 +7,10 @@ const source = fs.readFileSync(
 );
 
 describe("WeeklyBriefingScreen canonical presentation boundary", () => {
+  it("does not repeat the Goal label below confidence", () => {
+    expect(source).not.toContain("context={presentation.hero.goalLabel");
+  });
+
   it("renders only the complete screen presentation model", () => {
     expect(source).toContain("createWeeklyBriefingScreenPresentation");
     for (const value of [

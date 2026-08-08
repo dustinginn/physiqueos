@@ -106,6 +106,7 @@ function read(f) {
 describe("lower-level confidence production integration", () => {
   it("atomically stages Nutrition-first and enriches the same Energy chain", async () => {
     const f = fixture();
+    const confidenceHistoryLength = read(f).goalConfidenceHistory.length;
     const first = await f.source.commitConfirmedEvidencePackage(
       nutrition(), "founder"
     );
@@ -127,7 +128,7 @@ describe("lower-level confidence production integration", () => {
       status: "pending",
     });
     expect(state.piEnergyFinalizationReceipts ?? []).toHaveLength(0);
-    expect(state.goalConfidenceHistory).toHaveLength(1);
+    expect(state.goalConfidenceHistory).toHaveLength(confidenceHistoryLength);
   });
 
   it("is symmetric, replay-safe, and reactivates corrections", async () => {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { parseOperationalJsonBytes, readOperationalJsonFileSync } from "./lib/operationalJson.mjs";
 import {
   createJuly27StrengthTypedReferenceCanonicalRepairService,
   JULY_27_CORRECTED_CANONICAL_ID,
@@ -28,9 +29,11 @@ async function main() {
     process.cwd(),
     "private/founder/backups/PhysiqueOS_Backup_2026-07-25_19-27-05/optional-safe-runtime-export/runtime-store.json"
   );
-  const liveStore = JSON.parse(fs.readFileSync(runtimeStorePath, "utf8"));
+  const liveStore = readOperationalJsonFileSync(runtimeStorePath,
+    { stage: "july27_strength_repair_source" });
   const backupBytes = fs.readFileSync(backupPath);
-  const backupStore = JSON.parse(backupBytes);
+  const backupStore = parseOperationalJsonBytes(backupBytes,
+    { filePath: backupPath, stage: "july27_strength_repair_backup" });
   const service = createJuly27StrengthTypedReferenceCanonicalRepairService({
     runtimeStorePath,
     liveStore,

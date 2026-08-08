@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { createFounderStoreMutationLockService } from "./FounderStoreMutationLock";
 
 export const LEGACY_FOUNDER_STORE_REVISION = 0;
 
@@ -41,7 +42,7 @@ export function getFounderStoreUnitOfWorkCapabilities() {
     persistenceErrorPropagation: true,
     scope: "founder_store_unit_of_work",
     repositoryParticipation: false,
-    crossProcessLocking: false,
+    crossProcessLocking: true,
   });
 }
 
@@ -63,12 +64,18 @@ export function createFounderStoreUnitOfWork({
   publish = publishFounderStoreInPlace,
   stageFrom = liveStore,
   validatePersistedBaseline = null,
+  mutationLock = null,
+  lockOwnership = null,
+  lockContext = {},
 } = {}) {
   if (!filePath) throw new Error("Founder-store unit of work requires a file path.");
   if (!liveStore || typeof liveStore !== "object") {
     throw new Error("Founder-store unit of work requires a live store.");
   }
 
+  const effectiveMutationLock = mutationLock ??
+    (fileSystem.kind === "node_founder_store_file_system"
+      ? createFounderStoreMutationLockService({ storePath: filePath }) : null);
   return {
     binding: Object.freeze({
       storeIdentity: binding.storeIdentity ?? null,
@@ -139,7 +146,9 @@ export function createFounderStoreUnitOfWork({
           status = "committing";
           const commitId = createCommitId();
           try {
-            return await withFounderStoreCommitMutex(filePath, async () => {
+            return await withFounderStoreCommitMutex(filePath, () =>
+              withFounderStoreMutationLock({ lockService: effectiveMutationLock,
+                lockOwnership, expectedRevision, lockContext }, async () => {
               if (typeof validate === "function") {
                 let validation;
                 try {
@@ -270,7 +279,7 @@ export function createFounderStoreUnitOfWork({
                 result: callbackResult,
                 warnings: Object.freeze(persistence.warnings),
               });
-            });
+              }));
           } catch (error) {
             if (status !== "committed") status = "aborted";
             throw normalizeUnitOfWorkError(error, { expectedRevision, commitId });
@@ -392,6 +401,7 @@ function persistCandidate({
 
 export function createNodeFounderStoreFileSystem() {
   return {
+    kind: "node_founder_store_file_system",
     read(filePath) {
       return fs.readFileSync(filePath, "utf8");
     },
@@ -501,6 +511,38 @@ async function withFounderStoreCommitMutex(filePath, operation) {
   } finally {
     release();
     if (commitMutexes.get(filePath) === tail) commitMutexes.delete(filePath);
+  }
+}
+
+async function withFounderStoreMutationLock({ lockService, lockOwnership,
+  expectedRevision, lockContext }, operation) {
+  if (!lockService) return operation();
+  if (lockOwnership) {
+    lockService.assertOwnership(lockOwnership);
+    return operation();
+  }
+  const ownership = await lockService.acquire({
+    operation: lockContext.operation ?? "founder_store_unit_of_work",
+    goalId: lockContext.goalId ?? null,
+    decisionId: lockContext.decisionId ?? null,
+    requestId: lockContext.requestId ?? null,
+    timeoutMs: lockContext.timeoutMs ?? 750,
+    maxHoldMs: lockContext.maxHoldMs ?? 120_000,
+  });
+  let outcome = "failed";
+  let endingStoreRevision = expectedRevision;
+  let errorCode = null;
+  try {
+    const result = await operation();
+    outcome = "committed";
+    endingStoreRevision = result?.revision ?? expectedRevision;
+    return result;
+  } catch (error) {
+    errorCode = error?.code ?? "FOUNDER_STORE_TRANSACTION_FAILED";
+    throw error;
+  } finally {
+    await lockService.release(ownership, { outcome,
+      startingStoreRevision: expectedRevision, endingStoreRevision, errorCode });
   }
 }
 

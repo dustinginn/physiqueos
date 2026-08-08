@@ -6,7 +6,10 @@ import {
   replaceTrainingHierarchyValue,
   getStrengthTrainingBlockParseDiagnostics,
 } from "../models/trainingSessionEvidence";
-import { getCanonicalTrainingExerciseSlug } from "../models/trainingExerciseIdentity";
+import {
+  getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseIdentity,
+} from "../models/trainingExerciseIdentity";
 import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
 import { createNutritionDayEvidenceObject } from "../models/nutritionDayEvidence";
 
@@ -1402,6 +1405,7 @@ export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEv
       exercises: mergedExercises,
       reconciliation: {
         ...(evidenceObject.reconciliation ?? {}),
+        typed_parse: completeness,
         match_confidence: "high",
         matched_sources: mergedProvenanceRefs,
         reason:
@@ -2668,11 +2672,11 @@ function mergeStrengthExercises(existingExercises, newExercises) {
   const exerciseMap = new Map();
 
   normalizeStrengthExercises(existingExercises).forEach((exercise) => {
-    exerciseMap.set(createExerciseId(exercise.name), exercise);
+    exerciseMap.set(getStrengthExerciseMergeKey(exercise), exercise);
   });
 
   normalizeStrengthExercises(newExercises).forEach((exercise) => {
-    const key = createExerciseId(exercise.name);
+    const key = getStrengthExerciseMergeKey(exercise);
     const existing = exerciseMap.get(key);
 
     if (!existing) {
@@ -2680,8 +2684,22 @@ function mergeStrengthExercises(existingExercises, newExercises) {
       return;
     }
 
+    const existingHasValidatedCanonicalIdentity =
+      hasValidatedCanonicalExerciseIdentity(existing);
+    const incomingHasValidatedCanonicalIdentity =
+      hasValidatedCanonicalExerciseIdentity(exercise);
+    const identitySource = incomingHasValidatedCanonicalIdentity &&
+      !existingHasValidatedCanonicalIdentity
+      ? exercise
+      : existingHasValidatedCanonicalIdentity
+        ? existing
+        : exercise.provisionalExercise
+          ? exercise
+          : existing;
+
     exerciseMap.set(key, {
       ...existing,
+      ...identitySource,
       sets: reconcileStrengthExerciseSets(existing.sets, exercise.sets),
       provenance_ref: [
         ...new Set([existing.provenance_ref, exercise.provenance_ref].filter(Boolean)),
@@ -2690,6 +2708,19 @@ function mergeStrengthExercises(existingExercises, newExercises) {
   });
 
   return [...exerciseMap.values()];
+}
+
+function hasValidatedCanonicalExerciseIdentity(exercise = {}) {
+  if (!exercise.canonicalExerciseId) return false;
+  const resolved = resolveTrainingExerciseIdentity(exercise.name);
+  return resolved.resolutionStatus === "resolved_high_confidence" &&
+    resolved.canonicalExerciseId === exercise.canonicalExerciseId;
+}
+
+function getStrengthExerciseMergeKey(exercise = {}) {
+  return hasValidatedCanonicalExerciseIdentity(exercise)
+    ? `canonical:${exercise.canonicalExerciseId}`
+    : `unresolved:${createExerciseId(exercise.name)}`;
 }
 
 function reconcileStrengthExerciseSets(existingSets, newSets) {

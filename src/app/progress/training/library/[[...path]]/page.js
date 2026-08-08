@@ -3,12 +3,33 @@ import { getTrainingTimelineReport } from "../../../../../domain/services/Traini
 import { buildTrainingLibraryNavigation } from "../../../../../navigation/navigationRegistry";
 import { withTrainingTimelineContext } from "../../../../../navigation/trainingTimelineNavigation";
 import TrainingTimelineSelector from "../../../../../components/training/TrainingTimelineSelector";
-import TrainingKnowledgeScreen from "../../../../../screens/TrainingKnowledgeScreen";
+import TrainingKnowledgeScreen, {
+  getTrainingLibraryExercisePresentation,
+} from "../../../../../screens/TrainingKnowledgeScreen";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
 import { resolveTrainingExerciseIdentity } from "../../../../../domain/models/trainingExerciseIdentity";
 import { createTrainingLibraryExerciseRecordsReadModel } from "../../../../../domain/services/TrainingLibraryExerciseRecordsService";
+import { createTrainingLibraryMetadata } from "../../../../../presentation/trainingExercisePresentation";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params, searchParams }) {
+  const { path = [] } = await params;
+  const { context } = await searchParams;
+  const exerciseSlug = path.length >= 2 && path[0] !== "cardio"
+    ? path.at(-1)
+    : null;
+
+  if (!exerciseSlug) return { title: "Training Library | PhysiqueOS" };
+
+  const { report } = await getTrainingTimelineReport({ context });
+  const presentation = getTrainingLibraryExercisePresentation({
+    exerciseSlug,
+    report,
+  });
+
+  return createTrainingLibraryMetadata(presentation);
+}
 
 export default async function TrainingLibraryPage({ params, searchParams }) {
   const { path = [] } = await params;

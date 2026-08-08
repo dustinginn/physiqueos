@@ -1,5 +1,17 @@
 import { resolveProtocolDoseTransition } from "./ProtocolDoseTransitionService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
+import {
+  ExecutionPriorityOperationalReason,
+  ExecutionPriorityOperationalState,
+  findExecutionForProtocol,
+  formatExecutionDose,
+  formatExecutionSchedule,
+  projectExecutionPriority,
+} from "./ExecutionPriorityProjectionService";
+import {
+  getLocalDateKey,
+  resolveLocalTimeZone,
+} from "../utils/localDate";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -13,21 +25,58 @@ export function createPriorityDetailService({ repositories, now = () => new Date
 
       if (!resolvedUserId) return null;
 
-      const [goals, reminder, protocols, operatingPlan, operatingRhythm] =
+      const [
+        goals,
+        reminder,
+        protocols,
+        operatingPlan,
+        operatingRhythm,
+        executionItems,
+      ] =
         await Promise.all([
           repositories.goals.listGoals(resolvedUserId),
           repositories.reminders?.getReminderById(priorityId) ?? null,
           repositories.protocols.listProtocols(resolvedUserId),
           repositories.operatingPlan?.getOperatingPlan(resolvedUserId) ?? null,
           repositories.operatingRhythm?.getOperatingRhythm(resolvedUserId) ?? null,
+          repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
         ]);
 
       if (reminder?.type === "protocol_reminder") {
         const protocol = protocols.find(
           (item) => item.id === reminder.linkedEntityId
         );
+        if (
+          protocol &&
+          ["peptide", "supplement"].includes(protocol.category)
+        ) {
+          const match = findExecutionForProtocol(
+            executionItems,
+            protocol.id
+          );
+          const timeZone = resolveLocalTimeZone(
+            user?.timeZone ?? user?.timezone
+          );
+          const currentInstant = now();
+          const projection = projectExecutionPriority({
+            executionItem: match.executionItem,
+            localDate: getLocalDateKey(currentInstant, timeZone),
+            now: currentInstant,
+            protocol,
+            reminder,
+            timeZone,
+          });
 
-        return createProtocolPriorityDetail({
+          return createExecutionPriorityDetail({
+            executionItem: match.executionItem,
+            goals,
+            operatingPlan,
+            projection,
+            protocol,
+          });
+        }
+
+        return createLegacyReminderOnlyProtocolPriorityDetail({
           reminder,
           protocol,
           goals,
@@ -58,7 +107,157 @@ export function createPriorityDetailService({ repositories, now = () => new Date
   };
 }
 
-function createProtocolPriorityDetail({
+function createExecutionPriorityDetail({
+  executionItem,
+  goals,
+  operatingPlan,
+  projection,
+  protocol,
+}) {
+  if (!protocol || !projection) return null;
+  const actionable =
+    projection.operationalState ===
+    ExecutionPriorityOperationalState.ACTIONABLE;
+  const setupRequired = [
+    ExecutionPriorityOperationalState.MISSING_EXECUTION,
+    ExecutionPriorityOperationalState.SETUP_REQUIRED,
+  ].includes(projection.operationalState);
+  const currentDose = formatExecutionDose({
+    amount: projection.currentDose,
+    unit: projection.doseUnit,
+  });
+  const nextDose = formatExecutionDose(projection.nextPhase?.dose);
+  const phaseLabel = projection.activePhase
+    ? `${projection.activePhase.startDate} – ${projection.activePhase.endDate ?? "Until changed"}`
+    : "No active phase";
+  const setupCopy =
+    projection.operationalReason ===
+    ExecutionPriorityOperationalReason.MISSING_ACTIVE_PHASE
+      ? "Dose schedule needs update"
+      : projection.operationalReason ===
+          ExecutionPriorityOperationalReason.MISSING_HISTORY_ANCHOR
+        ? "Completion setup needs update"
+        : "Execution setup required";
+
+  return {
+    id: projection.priorityId,
+    title: projection.title,
+    eyebrow: "Priority Detail",
+    subtitle: projection.timeOfDayLabel,
+    status: actionable
+      ? "Open"
+      : setupRequired
+        ? "Setup required"
+        : "Inactive",
+    completable: actionable && projection.completable,
+    completionContext:
+      actionable && projection.completable
+        ? {
+            occurrenceDate: projection.localDate,
+            dose: currentDose,
+            protocolId: projection.protocolRootId,
+          }
+        : null,
+    action: {
+      label: setupRequired ? "Review Execution" : "View Execution",
+      href: projection.executionHref,
+    },
+    executionProjection: projection,
+    provenance: projection.provenance,
+    sections: [
+      {
+        title: "What",
+        items: [
+          {
+            label: actionable ? projection.title : setupCopy,
+            detail: actionable
+              ? "Complete the scheduled Execution action."
+              : "Review the canonical Execution plan before recording a dose.",
+          },
+        ],
+      },
+      {
+        title: "When",
+        items: [
+          {
+            label: formatExecutionSchedule(
+              executionItem?.preferredSchedule
+            ),
+            detail: projection.timingContext
+              ? projection.timingContext.replaceAll("_", " ")
+              : "Timing comes from the canonical Execution plan.",
+          },
+        ],
+      },
+      {
+        title: "Dose",
+        items: [
+          {
+            label: currentDose ?? "No dose scheduled",
+            detail: phaseLabel,
+          },
+        ],
+      },
+      {
+        title: "Preparation",
+        items: getExecutionPreparationItems(executionItem),
+      },
+      ...(executionItem?.notes
+        ? [{
+            title: "Execution Notes",
+            items: [{
+              label: "Saved Support note",
+              detail: executionItem.notes,
+            }],
+          }]
+        : []),
+      {
+        title: "Why it matters",
+        items: [
+          {
+            label: "Supports the current operating plan",
+            detail:
+              protocol.purpose ??
+              "This Execution action supports the current operating plan.",
+          },
+        ],
+      },
+      {
+        title: "Related Goals",
+        items: getRelatedGoalItems({ protocol, goals, operatingPlan }),
+      },
+      {
+        title: "Next Execution Change",
+        items: [
+          {
+            label: nextDose ?? "None scheduled",
+            detail: projection.nextPhase
+              ? `Begins ${formatDate(projection.nextPhase.startDate)}.`
+              : "No upcoming Execution phase is scheduled.",
+          },
+        ],
+      },
+      ...(actionable
+        ? [
+            {
+              title: "Completion",
+              items: [
+                {
+                  label: "Mark Complete",
+                  detail:
+                    "Completion is recorded against the existing reminder history anchor.",
+                },
+              ],
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+// Reminder-only protocols retain their existing detail until they gain a
+// canonical Execution record. Peptides and supplements never enter this path.
+function createLegacyReminderOnlyProtocolPriorityDetail({
   reminder,
   protocol,
   goals,
@@ -318,6 +517,30 @@ function createFallbackPriorityDetail(priorityId, goals) {
       },
     ],
   };
+}
+
+function getExecutionPreparationItems(executionItem) {
+  if (executionItem?.timingContext === "fasted_before_bed") {
+    return [
+      {
+        label: "Finish eating approximately 2–3 hours before injection",
+        detail: "Preserve the normal fasted-before-bed timing window.",
+      },
+      {
+        label: "Take fasted before bed",
+        detail: executionItem.notes || "Use the saved Execution conditions.",
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Use the saved Execution conditions",
+      detail:
+        executionItem?.notes ||
+        "Preparation details are owned by the canonical Execution plan.",
+    },
+  ];
 }
 
 function getPreparationItems(protocol) {

@@ -3,6 +3,7 @@ import {
   createPIEnergyRollingWindow,
   mergePIEnergyConfidenceWork,
 } from "./PIEnergyConfidenceFinalizationService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import {
   createPITrainingConfidenceWork,
   mergePITrainingConfidenceWork,
@@ -173,7 +174,7 @@ function resolveContext(store, input) {
   const goal = (store.goals ?? []).find(
     (item) => item.primary && item.status === "active"
   );
-  const phase = goal?.phases?.find((item) => item.status === "active");
+  const phase = goal ? resolveCommittedPhaseContext(goal, { asOf: input.evidenceCutoff ?? new Date() }).activePhase : null;
   const operatingState = goal?.openingApproach?.value ??
     goal?.operatingState?.value ?? goal?.operatingState;
   if (!goal || !phase || !operatingState) {

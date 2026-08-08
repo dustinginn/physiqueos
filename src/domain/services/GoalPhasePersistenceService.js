@@ -42,6 +42,10 @@ export function createGoalPhasePersistenceService({
       try { proposed = normalizeAuthoredGoalPhases(proposedAuthoredPhases, { goalId: sourceGoalId, parentGoalStatus: goal.status, now: now(), existingPhases: explicitPhases(goal) }); } catch (cause) { return rejected(cause.code ?? "PHASE_VALIDATION_FAILED", cause.message, cause.details); }
       const diff = diffGoalPhases(explicitPhases(goal), proposed, { goalId: sourceGoalId });
       if (diff.empty) return deepFreeze({ status: "no_changes", goalId: sourceGoalId, token: null, diff, draftPreserved: true });
+      if (requiresPhaseReviewCoordinator(goal, diff)) {
+        return rejected("PHASE_REVIEW_COORDINATOR_REQUIRED",
+          "Operational phase lifecycle and timing changes require the Phase Review Commit Coordinator.");
+      }
       const issued = now(); const token = deepFreeze({ id: createTokenId(), version: reviewTokenVersion, sourceGoalId, sourceRevision: expectedSourceRevision, originalPhaseFingerprint, proposedPhaseFingerprint: phaseFingerprint(proposed), diffFingerprint: phaseFingerprint(diff), draftId, issuedAt: issued.toISOString(), expiresAt: new Date(issued.getTime() + TOKEN_TTL_MS).toISOString() });
       tokens.set(token.id, { token, consumed: false, result: null });
       return deepFreeze({ status: "ready", goalId: sourceGoalId, token, diff, proposedAuthoredPhases: proposed, commitAvailable: true });
@@ -58,6 +62,10 @@ export function createGoalPhasePersistenceService({
         let proposed; try { proposed = normalizeAuthoredGoalPhases(command.proposedAuthoredPhases, { goalId: goal.id, parentGoalStatus: goal.status, now: now(), existingPhases: explicitPhases(goal) }); } catch (cause) { return rejected(cause.code ?? "PHASE_VALIDATION_FAILED", cause.message, cause.details); }
         const actualDiff = diffGoalPhases(explicitPhases(goal), proposed, { goalId: goal.id });
         if (actualDiff.empty) return rejected("EMPTY_DIFF", "No authored phase changes need to be saved.");
+        if (requiresPhaseReviewCoordinator(goal, actualDiff)) {
+          return rejected("PHASE_REVIEW_COORDINATOR_REQUIRED",
+            "Operational phase lifecycle and timing changes require the Phase Review Commit Coordinator.");
+        }
         if (!equal(actualDiff, command.approvedPhaseDiff)) return rejected("APPROVED_PHASE_DIFF_MISMATCH", "Approved phase diff does not match the proposed collection.");
         const baseline = structuredClone(persisted); const unit = createUnitOfWork({ filePath: runtimeStorePath, liveStore, stageFrom: persisted, binding: { storeIdentity: "founder_runtime_store", storeKind: "production", isolated: false, productionAllowed: true }, now });
         const transaction = unit.begin(); await transaction.mutate((staged) => { const index = staged.goals.findIndex((item) => item.id === goal.id); if (index < 0) throw new Error("Goal disappeared from candidate state."); staged.goals[index] = { ...staged.goals[index], phases: structuredClone(proposed) }; });
@@ -94,6 +102,9 @@ function validateCandidate({ baseline, candidate, goalId, proposed, allowUpdated
   return true;
 }
 function explicitPhases(goal) { return Array.isArray(goal?.phases) ? goal.phases : []; }
+function requiresPhaseReviewCoordinator(goal, diff) {
+  return explicitPhases(goal).length > 0 && diff.altersCurrentOperationalPhase === true;
+}
 function findGoal(store, id) { return (store?.goals ?? []).find((goal) => goal.id === id) ?? null; }
 function rejected(reasonCode, message, details = {}) { return deepFreeze({ status: "rejected", reasonCode, errors: [{ message, details }], draftPreserved: true }); }
 function failed(cause) { return deepFreeze({ status: "failed", reasonCode: cause?.code ?? "PERSISTENCE_FAILED", operation: cause?.stage ?? "founder_store_commit", error: { name: cause?.name ?? "Error", code: cause?.code ?? null, message: cause?.message ?? String(cause), stage: cause?.stage ?? null, committed: cause?.committed === true }, draftPreserved: true, automaticRetry: false }); }

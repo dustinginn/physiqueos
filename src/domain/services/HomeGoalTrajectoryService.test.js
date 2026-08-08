@@ -17,8 +17,8 @@ describe("HomeGoalTrajectoryService", () => {
     const result = resolveHomeGoalTrajectory({ activeGoal: goal, currentDate: "2026-07-21T12:00:00Z", timeZone: "America/Los_Angeles" });
     expect(result.overallGoal).toMatchObject({ targetDescription: "Build 10 lb of lean mass", journeyStartDate: "2026-07-20", overallTargetDate: "2026-10-31", destinationCompleteness: "complete" });
     expect(result.activePhase).toMatchObject({ phaseName: "Establish Maintenance", calculatedPlannedReviewDate: "2026-08-17", totalPlannedDays: 28, elapsedDays: 1, remainingDays: 27, friendlyTimeline: "About 4 weeks remaining" });
-    expect(result.dateConvention).toBe("start_plus_duration_calendar_days");
-    expect(result.upcomingPhases[0]).toMatchObject({ phaseName: "Lean Mass Build", timelineProgressPercentage: 0, sequencingNote: "Begins after the prior phase review" });
+    expect(result.dateConvention).toBe("explicit_planned_review_then_legacy_timing_fallback");
+    expect(result.upcomingPhases[0]).toMatchObject({ phaseName: "Lean Mass Build", timelineProgressPercentage: 0, sequencingNote: "Begins after an authorized prior-phase decision" });
     expect(Object.isFrozen(result)).toBe(true);
   });
 
@@ -38,6 +38,63 @@ describe("HomeGoalTrajectoryService", () => {
     const result = resolveHomeGoalTrajectory({ activeGoal: invalid, currentDate: "2026-07-21T12:00:00Z" });
     expect(result.activePhase).toMatchObject({ timelineValidity: false, timelineProgressPercentage: null, friendlyTimeline: "Timeline not established" });
     expect(result.confidence.confidenceValidity).toBe("limited_by_timeline");
+  });
+
+  it("uses an explicit planned review without completing or activating from time", () => {
+    const canonical = structuredClone(goal);
+    canonical.timeline.startDate = "2026-07-19";
+    canonical.phases = [
+      { ...canonical.phases[0], startDate: "2026-07-19", startedAt: "2026-07-19", plannedReviewAt: "2026-08-15", timingMode: "completion_criteria", duration: null },
+      { ...canonical.phases[1], status: "planned", projectedNextPhaseStart: "2026-08-16" },
+    ];
+    const before = resolveHomeGoalTrajectory({ activeGoal: canonical, currentDate: "2026-08-02T12:00:00Z" });
+    expect(before.activePhase).toMatchObject({ status: "active", remainingDays: 13, timelineProgressState: "active", calculatedPlannedReviewDate: "2026-08-15" });
+    const after = resolveHomeGoalTrajectory({ activeGoal: canonical, currentDate: "2026-08-20T12:00:00Z" });
+    expect(after.activePhase).toMatchObject({ status: "active", timelineProgressState: "review_due", remainingDays: 0 });
+    expect(after.upcomingPhases[0]).toMatchObject({ status: "planned", startDate: null });
+  });
+
+  it.each([
+    ["2026-08-15T06:59:59.999Z", 1, "active"],
+    ["2026-08-15T07:00:00.000Z", 0, "review_due"],
+    ["2026-08-16T19:00:00.000Z", 0, "review_due"],
+  ])("uses Pacific calendar days at the review boundary for %s", (currentDate, remainingDays, timelineProgressState) => {
+    const canonical = structuredClone(goal);
+    canonical.phases[0] = {
+      ...canonical.phases[0],
+      plannedReviewAt: "2026-08-15",
+      timingMode: "completion_criteria",
+      duration: null,
+    };
+    const activePhase = resolveHomeGoalTrajectory({
+      activeGoal: canonical,
+      currentDate,
+      timeZone: "America/Los_Angeles",
+    }).activePhase;
+    expect(activePhase).toMatchObject({ remainingDays, timelineProgressState });
+  });
+
+  it("counts calendar days across the Pacific fall DST boundary", () => {
+    const canonical = structuredClone(goal);
+    canonical.phases[0] = {
+      ...canonical.phases[0],
+      startDate: "2026-10-31",
+      plannedReviewAt: "2026-11-02",
+      timingMode: "completion_criteria",
+      duration: null,
+    };
+    const beforeFallback = resolveHomeGoalTrajectory({
+      activeGoal: canonical,
+      currentDate: "2026-11-01T06:59:59.999Z",
+      timeZone: "America/Los_Angeles",
+    }).activePhase;
+    const afterFallback = resolveHomeGoalTrajectory({
+      activeGoal: canonical,
+      currentDate: "2026-11-02T08:00:00.000Z",
+      timeZone: "America/Los_Angeles",
+    }).activePhase;
+    expect(beforeFallback.remainingDays).toBe(2);
+    expect(afterFallback).toMatchObject({ remainingDays: 0, timelineProgressState: "review_due" });
   });
 
   it("handles target-date active phases only when a start date exists", () => {

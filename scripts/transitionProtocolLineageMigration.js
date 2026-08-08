@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parseOperationalJsonBytes } from "./lib/operationalJson.mjs";
 import {
   createTransitionProtocolLineageMigrationService,
 } from "../src/domain/services/TransitionProtocolLineageMigrationService.js";
@@ -16,7 +17,8 @@ const mode = options.mode ?? "audit";
 const runtimeStorePath = path.resolve(options.store
   ?? "private/founder/runtime-store.json");
 const raw = fs.readFileSync(runtimeStorePath);
-const liveStore = JSON.parse(raw);
+const liveStore = parseOperationalJsonBytes(raw,
+  { filePath: runtimeStorePath, stage: "transition_protocol_lineage_source" });
 const baseline = {
   fileHash: createFounderRuntimeFileHash(raw),
   semanticDigest: createFounderRuntimeSemanticDigest(liveStore),

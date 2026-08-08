@@ -17,9 +17,11 @@ describe("peptide Execution save and hydration boundary",()=>{
   });
   it("preserves drafts on failures and performs one success redirect",()=>{
     const action=fs.readFileSync(path.join(process.cwd(),"src/app/profile/operating-plan/execution/peptides/[protocolId]/actions.js"),"utf8");
-    expect(action).toContain("values:draft");
+    expect(action).toMatch(/values:\s*draft/);
     expect(action.match(/redirect\(path\)/g)).toHaveLength(1);
-    expect(action).toContain('revalidatePath("/profile/operating-plan","page")');
+    expect(action).toContain('revalidatePath("/profile/operating-plan", "page")');
+    expect(action).toContain('revalidatePath("/", "page")');
+    expect(action).toContain("/priorities/${encodeURIComponent(reminder.id)}");
     expect(action).not.toMatch(/router\.(push|replace|refresh)/);
   });
   it("contains no peptide-name or protocol-ID save branches",()=>{

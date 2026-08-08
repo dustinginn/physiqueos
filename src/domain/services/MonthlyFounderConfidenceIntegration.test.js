@@ -28,10 +28,8 @@ describe("Monthly Founder repository integration", () => {
     if (presentation.hero.confidence.limitingReasons.join(" ").match(/\bcalibration\b/i)) {
       throw new Error("Expected a natural canonical confidence reason.");
     }
-    expect(presentation.hero.confidence.presentationExplanation).toMatch(
-      /objective body-composition baseline.*training began moving.*one month.*next DEXA/i
-    );
-    expect(presentation.hero.confidence.presentationExplanation).not.toMatch(
+    expect(presentation.hero.confidence.primaryReason).toMatch(/stronger support/i);
+    expect(presentation.hero.confidence.primaryReason).not.toMatch(
       /photos|contributors|guardrails|partial evidence|confidence engine|cadence/i
     );
   });

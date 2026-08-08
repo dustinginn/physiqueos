@@ -1,6 +1,5 @@
 export const STRATEGY_EDITOR_TYPES = Object.freeze(["briefings", "nutrition", "training"]);
 export const NUTRITION_APPROACH_OPTIONS = Object.freeze({
-  calorieStrategy: ["increase_gradually", "hold_steady", "reduce_gradually"],
   carbohydrateStrategy: ["performance", "balanced", "lower_carbohydrate"],
   fatStrategy: ["sustainable_minimum", "balanced", "higher_fat"],
 });
@@ -8,7 +7,6 @@ export const TRAINING_AREAS = Object.freeze([
   "arms", "core", "lower_body", "back", "chest", "shoulders",
 ]);
 export const TRAINING_PROGRESSION_OPTIONS = Object.freeze(["conservative", "moderate", "aggressive"]);
-export const TRAINING_PHASE_OPTIONS = Object.freeze(["maintenance", "lean_mass_build", "cut"]);
 
 export function createStrategyEditorModel({ protocol, strategyType, version }) {
   if (!protocol || !version || !["nutrition", "training"].includes(strategyType)) return null;
@@ -21,7 +19,6 @@ export function createStrategyEditorModel({ protocol, strategyType, version }) {
       proteinBasis: strategy.proteinBasis === "fixed_grams" ? "fixed_grams" : "body_weight",
       proteinRatio: positive(strategy.proteinRatio) ?? 1,
       fixedProtein: positive(strategy.fixedProtein ?? strategy.proteinTarget) ?? null,
-      calorieStrategy: strategy.calorieStrategy ?? "increase_gradually",
       carbohydrateStrategy: strategy.carbohydrateStrategy ?? "performance",
       fatStrategy: strategy.fatStrategy ?? "sustainable_minimum",
       options: NUTRITION_APPROACH_OPTIONS,
@@ -40,11 +37,9 @@ export function createStrategyEditorModel({ protocol, strategyType, version }) {
     weeklySessionTarget: Object.values(frequencies).reduce((sum, value) => sum + value, 0),
     priorities: strategy.physiquePriorities ?? [],
     progression: strategy.progression?.pace ?? "moderate",
-    phase: strategy.nutritionPhase ?? "maintenance",
     options: {
       areas: TRAINING_AREAS,
       progression: TRAINING_PROGRESSION_OPTIONS,
-      phases: TRAINING_PHASE_OPTIONS,
     },
   };
 }
@@ -150,9 +145,8 @@ function buildTraining({ form, version }) {
   const priorities = values(form, "priorities").filter((item) => TRAINING_AREAS.includes(item));
   if (!priorities.length) return invalid("Choose at least one prioritized muscle group.");
   const progression = text(form, "progression");
-  const phase = text(form, "phase");
-  if (!TRAINING_PROGRESSION_OPTIONS.includes(progression) || !TRAINING_PHASE_OPTIONS.includes(phase)) {
-    return invalid("Choose supported progression and phase values.");
+  if (!TRAINING_PROGRESSION_OPTIONS.includes(progression)) {
+    return invalid("Choose a supported progression value.");
   }
   const current = version.trainingStrategy ?? {};
   const nextStrategy = {
@@ -160,7 +154,6 @@ function buildTraining({ form, version }) {
     weeklyFrequencies,
     physiquePriorities: priorities,
     progression: { ...(current.progression ?? {}), pace: progression },
-    nutritionPhase: phase,
   };
   if (JSON.stringify(current) === JSON.stringify(nextStrategy)) {
     return { valid: false, outcome: "unchanged_successor", error: "No changes to save." };

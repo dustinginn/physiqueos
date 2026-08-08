@@ -48,6 +48,9 @@ try {
   Write-Host "Staging tracked and untracked changes..." -ForegroundColor Cyan
   Invoke-CheckedGit -Arguments @("add", "-A")
 
+  & (Join-Path $PSScriptRoot "assertSafeStagedFiles.ps1") `
+    -RepositoryRoot $repositoryRoot
+
   & git diff --cached --quiet
   $stagedDiffExitCode = $LASTEXITCODE
   if ($stagedDiffExitCode -eq 0) {

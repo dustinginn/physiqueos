@@ -1,6 +1,17 @@
+[CmdletBinding()]
+param(
+    [string]$SourceRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
+)
+
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
+$ResolvedSourceRoot = if (Test-Path -LiteralPath $SourceRoot) {
+    (Resolve-Path -LiteralPath $SourceRoot).Path
+} else {
+    $SourceRoot
+}
+$UsesIsolatedSource = $ResolvedSourceRoot -ne $RepoRoot
 $LocalUrl = "http://localhost:3000"
 $HealthUrl = "$LocalUrl/api/health"
 $PublicUrl = "https://float-departed-symphony.ngrok-free.dev"
@@ -8,6 +19,11 @@ $PublicUrl = "https://float-departed-symphony.ngrok-free.dev"
 $StopScript = Join-Path $RepoRoot "scripts\stopPhysiqueOS.ps1"
 $StartScript = Join-Path $RepoRoot "scripts\startPhysiqueOS.ps1"
 $StatusScript = Join-Path $RepoRoot "scripts\statusPhysiqueOS.ps1"
+$StagedBuildPath = Join-Path $RepoRoot ".next.release-$PID"
+$RollbackBuildPath = Join-Path $RepoRoot ".next.rollback-$PID"
+$FailedBuildPath = Join-Path $RepoRoot ".next.failed-$PID"
+$ReplacementPromoted = $false
+$RuntimeStopped = $false
 
 function Write-Step {
     param([string]$Message)
@@ -91,34 +107,7 @@ reopen the PhysiqueOS project, and run the deployment again.
     }
 }
 
-try {
-    Write-Step "PhysiqueOS Production Deployment"
-
-    Assert-Administrator
-
-    if (-not (Test-Path $RepoRoot)) {
-        throw "Repository not found: $RepoRoot"
-    }
-
-    if (-not (Test-Path $StopScript)) {
-        throw "Canonical stop script not found: $StopScript"
-    }
-
-    if (-not (Test-Path $StartScript)) {
-        throw "Canonical start script not found: $StartScript"
-    }
-
-    if (-not (Test-Path $StatusScript)) {
-        throw "Runtime status script not found: $StatusScript"
-    }
-
-    Set-Location $RepoRoot
-
-    Write-Host "Repository: $RepoRoot"
-    Write-Host "Started:    $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
-
-    Write-Step "1. Stopping the current production runtime"
-
+function Invoke-ProductionStop {
     & powershell.exe `
         -NoProfile `
         -ExecutionPolicy Bypass `
@@ -137,17 +126,118 @@ try {
         throw "Port 3000 is still listening after the canonical stop."
     }
 
+    $script:RuntimeStopped = $true
     Write-Host "Production runtime stopped successfully."
+}
 
-    Write-Step "2. Building the current source"
-
+function Invoke-SourceBuild {
+    Set-Location $ResolvedSourceRoot
     & npm.cmd run build
 
     if ($LASTEXITCODE -ne 0) {
-        throw "npm run build failed with exit code $LASTEXITCODE. Production was not restarted."
+        throw "npm run build failed with exit code $LASTEXITCODE."
+    }
+
+    $BuildIdPath = Join-Path $ResolvedSourceRoot ".next\BUILD_ID"
+    if (-not (Test-Path -LiteralPath $BuildIdPath -PathType Leaf)) {
+        throw "The supplied source did not produce a Next.js build identity."
     }
 
     Write-Host "Production build completed successfully."
+    Write-Host "Build ID: $((Get-Content -LiteralPath $BuildIdPath -Raw).Trim())"
+}
+
+function Stage-IsolatedBuild {
+    if (Test-Path -LiteralPath $StagedBuildPath) {
+        throw "Deployment staging path already exists: $StagedBuildPath"
+    }
+    Copy-Item `
+        -LiteralPath (Join-Path $ResolvedSourceRoot ".next") `
+        -Destination $StagedBuildPath `
+        -Recurse `
+        -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $StagedBuildPath "BUILD_ID"))) {
+        throw "The isolated build was not copied into the production staging path."
+    }
+    Write-Host "Isolated build staged for promotion: $StagedBuildPath"
+}
+
+function Promote-IsolatedBuild {
+    $CurrentBuildPath = Join-Path $RepoRoot ".next"
+    if (-not (Test-Path -LiteralPath $CurrentBuildPath -PathType Container)) {
+        throw "The current production build is missing: $CurrentBuildPath"
+    }
+    if (Test-Path -LiteralPath $RollbackBuildPath) {
+        throw "Deployment rollback path already exists: $RollbackBuildPath"
+    }
+    Move-Item -LiteralPath $CurrentBuildPath -Destination $RollbackBuildPath
+    try {
+        Move-Item -LiteralPath $StagedBuildPath -Destination $CurrentBuildPath
+        $script:ReplacementPromoted = $true
+    }
+    catch {
+        Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath
+        throw
+    }
+    Write-Host "Isolated build promoted to the canonical production destination."
+    Write-Host "Previous build retained at: $RollbackBuildPath"
+}
+
+try {
+    Write-Step "PhysiqueOS Production Deployment"
+
+    Assert-Administrator
+
+    if (-not (Test-Path $RepoRoot)) {
+        throw "Repository not found: $RepoRoot"
+    }
+
+    if (-not (Test-Path -LiteralPath $ResolvedSourceRoot -PathType Container)) {
+        throw "Deployment source not found: $ResolvedSourceRoot"
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $ResolvedSourceRoot "package.json") -PathType Leaf)) {
+        throw "Deployment source is not a PhysiqueOS source root: $ResolvedSourceRoot"
+    }
+
+    if (-not (Test-Path $StopScript)) {
+        throw "Canonical stop script not found: $StopScript"
+    }
+
+    if (-not (Test-Path $StartScript)) {
+        throw "Canonical start script not found: $StartScript"
+    }
+
+    if (-not (Test-Path $StatusScript)) {
+        throw "Runtime status script not found: $StatusScript"
+    }
+
+    Write-Host "Production repository: $RepoRoot"
+    Write-Host "Deployment source:    $ResolvedSourceRoot"
+    Write-Host "Source mode:          $(if ($UsesIsolatedSource) { 'isolated' } else { 'default' })"
+    $SourceCommit = (& git -C $ResolvedSourceRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Unable to identify the deployment source commit." }
+    Write-Host "Source commit:        $SourceCommit"
+    Write-Host "Started:    $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
+
+    if ($UsesIsolatedSource) {
+        Write-Step "1. Building the explicitly supplied isolated source"
+        Invoke-SourceBuild
+        Stage-IsolatedBuild
+
+        Write-Step "2. Stopping the current production runtime"
+        Set-Location $RepoRoot
+        Invoke-ProductionStop
+        Promote-IsolatedBuild
+    }
+    else {
+        Write-Step "1. Stopping the current production runtime"
+        Set-Location $RepoRoot
+        Invoke-ProductionStop
+
+        Write-Step "2. Building the current source"
+        Invoke-SourceBuild
+    }
 
     Write-Step "3. Starting the canonical production runtime"
 
@@ -159,6 +249,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "The canonical start script failed with exit code $LASTEXITCODE."
     }
+    $RuntimeStopped = $false
 
     Write-Step "4. Waiting for the health endpoint"
 
@@ -250,14 +341,45 @@ try {
 
     Write-Host "Local URL:  $LocalUrl"
     Write-Host "Public URL: $PublicUrl"
+    Write-Host "Source:     $ResolvedSourceRoot"
+    Write-Host "Build ID:   $((Get-Content -LiteralPath (Join-Path $RepoRoot '.next\BUILD_ID') -Raw).Trim())"
     Write-Host "Completed:  $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
     Write-Host ""
     Write-Host "The running application now uses the latest production build."
 }
 catch {
+    $DeploymentError = $_
+    if ($UsesIsolatedSource -and $ReplacementPromoted -and (Test-Path -LiteralPath $RollbackBuildPath)) {
+        Write-Host "Attempting automatic rollback to the previous production build."
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
+            $CurrentBuildPath = Join-Path $RepoRoot ".next"
+            if (Test-Path -LiteralPath $CurrentBuildPath) {
+                Move-Item -LiteralPath $CurrentBuildPath -Destination $FailedBuildPath
+            }
+            Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "The rollback runtime did not start." }
+            Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60 | Out-Null
+            Write-Host "Previous production build restored successfully."
+        }
+        catch {
+            Write-Host "Automatic rollback failed: $($_.Exception.Message)"
+        }
+    }
+    elseif ($UsesIsolatedSource -and $RuntimeStopped) {
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript | Out-Null
+            Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60 | Out-Null
+            Write-Host "Previous production runtime restarted successfully."
+        }
+        catch {
+            Write-Host "Previous production runtime restart failed: $($_.Exception.Message)"
+        }
+    }
     Write-Host ""
     Write-Host "DEPLOYMENT FAILED"
-    Write-Host "Reason: $($_.Exception.Message)"
+    Write-Host "Reason: $($DeploymentError.Exception.Message)"
     Write-Host ""
     Write-Host "Do not manually kill node.exe."
     Write-Host "Review the failure before attempting another deployment."

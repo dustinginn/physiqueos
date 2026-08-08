@@ -8,13 +8,20 @@ import { createWeightEntry } from "../../../domain/models/weightEntry";
 import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
 import { extractManualNoteEvidence } from "../../../domain/services/DailyEventService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { getLocalDateKey } from "../../../domain/utils/localDate";
+import {
+  getLocalDateKey,
+  resolveLocalTimeZone,
+} from "../../../domain/utils/localDate";
 import {
   getFounderRuntimeStore,
   resolveFounderRuntimeStorePath,
 } from "../../../data/repositories/founderRuntimeStore";
 import { createFounderStoreUnitOfWork } from "../../../data/repositories/FounderStoreUnitOfWork";
 import { createRecoveryCheckInIngestionService } from "../../../domain/services/RecoveryCheckInIngestionService";
+import {
+  createMorningPriorityReconciliationService,
+  parseMorningPriorityReconciliationFormData,
+} from "../../../domain/services/MorningPriorityReconciliationService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -37,11 +44,12 @@ export async function saveStructuredRecoveryCheckIn(formData) {
       },
     }),
   });
+  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
   await service.save({
     userId: user.id,
-    date: getLocalDateKey(now, user.timeZone),
+    date: getLocalDateKey(now, timeZone),
     recordedAt: now.toISOString(),
-    timezone: user.timeZone,
+    timezone: timeZone,
     sleepDuration: normalizeOptionalNumber(formData.get("sleepDuration")),
     subjectiveRecovery:
       normalizeOptionalText(formData.get("subjectiveRecovery")) || null,
@@ -69,7 +77,8 @@ export async function saveMorningCheckIn(formData) {
   if (weightValue < 50 || weightValue > 1000) throw new Error("Morning weight must be between 50 and 1,000 lb.");
 
   const now = new Date();
-  const today = getLocalDateKey(now, user.timeZone);
+  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
+  const today = getLocalDateKey(now, timeZone);
   const createdAt = now.toISOString();
   const notes = normalizeOptionalText(formData.get("notes"));
   const noteEvidence = extractManualNoteEvidence(notes);
@@ -87,7 +96,6 @@ export async function saveMorningCheckIn(formData) {
     user.preferences?.defaultWeighInContext
   );
   const existingSameDayWeight = weights.find((item)=>String(item.measuredAt).slice(0,10)===today)??null;
-  if (existingSameDayWeight?.weight?.value === weightValue) redirect("/?weight=unchanged");
 
   const contextAdjusted = !weighInContext.isDefault;
   const evidenceConfidence = contextAdjusted ? "medium" : "high";
@@ -95,7 +103,20 @@ export async function saveMorningCheckIn(formData) {
     hasPreviousWeight: Boolean(previousWeight),
     contextAdjusted,
   });
-  await saveReconciliationEvidence({ formData, userId: user.id });
+  const reconciliationService = createMorningPriorityReconciliationService({
+    repositories: FounderRepositories,
+    now: () => now,
+  });
+  await reconciliationService.save({
+    userId: user.id,
+    timeZone,
+    submissions: parseMorningPriorityReconciliationFormData(formData),
+    at: now,
+  });
+
+  if (existingSameDayWeight?.weight?.value === weightValue) {
+    redirect("/?weight=unchanged");
+  }
 
   const weightEntry = createWeightEntry({
     id: `weight_${today.replaceAll("-", "_")}`,
@@ -319,83 +340,4 @@ function getTargetHit(achieved, target) {
   if (achieved == null || target == null) return null;
 
   return achieved >= target;
-}
-
-async function saveReconciliationEvidence({ formData, userId }) {
-  const ids = formData.getAll("reconciliationIds").map(String).filter(Boolean);
-
-  await Promise.all(
-    ids.map(async (id) => {
-      const status = String(formData.get(`${id}_status`) ?? "");
-      const date = String(formData.get(`${id}_date`) ?? "");
-      const note = normalizeOptionalText(formData.get(`${id}_note`));
-
-      if (!status || !date) return null;
-
-      if (status === "completed") {
-        await FounderRepositories.reminders.completeReminder(
-          id,
-          `${date}T20:00:00`
-        );
-      }
-
-      const checkIn = await getOrCreateCheckInForDate(userId, date);
-      const reconciliation = [
-        ...(checkIn.reconciliation ?? []),
-        {
-          reminderId: id,
-          status,
-          note,
-          recordedAt: new Date().toISOString(),
-        },
-      ];
-
-      await FounderRepositories.dailyCheckIns.saveCheckIn({
-        ...checkIn,
-        reconciliation,
-        notes: appendNote(
-          checkIn.notes,
-          note ? `Reconciliation ${id}: ${status} - ${note}` : null
-        ),
-        updatedAt: new Date().toISOString(),
-      });
-
-      return null;
-    })
-  );
-}
-
-async function getOrCreateCheckInForDate(userId, date) {
-  const existing = await FounderRepositories.dailyCheckIns.getCheckInForDate(
-    userId,
-    date
-  );
-
-  if (existing) return existing;
-
-  const now = new Date().toISOString();
-
-  return createDailyCheckIn({
-    id: `daily_check_in_${date.replaceAll("-", "_")}`,
-    userId,
-    date,
-    source: {
-      type: "manual",
-      name: "Morning Reconciliation",
-      externalId: null,
-      importedAt: null,
-      confidence: "medium",
-      notes: "Founder Alpha morning reconciliation.",
-    },
-    fieldProvenance: {
-      imported: ["reconciliation"],
-      computed: [],
-    },
-    createdAt: now,
-    updatedAt: now,
-  });
-}
-
-function appendNote(existing, note) {
-  return [existing, note].filter(Boolean).join("\n");
 }

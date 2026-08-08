@@ -3,6 +3,7 @@ import {
   sortPIObservations,
   validatePIObservation,
 } from "./PIObservationService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const PI_GOAL_CONTEXT_RESOLVER_VERSION = "pi_goal_context_v1";
 
@@ -69,7 +70,7 @@ export function createPIGoalContext({
   const currentDateKey = toLocalDateKey(currentDate, timeZone);
   const phaseAge = resolvePIPhaseAge({
     currentDate: currentDateKey,
-    phaseStartDate: phase?.startDate ?? null,
+    phaseStartDate: phase?.startedAt ?? phase?.startDate ?? null,
   });
   limitations.push(...phaseAge.limitations);
 
@@ -479,11 +480,9 @@ function classifySemanticGoalType(goal) {
 
 function resolveActivePhase(goal, suppliedPhase, limitations) {
   if (suppliedPhase && isObject(suppliedPhase)) return suppliedPhase;
-  const phases = Array.isArray(goal?.phases) ? goal.phases : [];
-  const active = phases.filter((phase) => phase?.status === "active");
-  if (active.length > 1) limitations.push("multiple_active_phases");
-  if (active.length === 0) limitations.push("active_phase_unavailable");
-  return active.length === 1 ? active[0] : null;
+  const active = goal ? resolveCommittedPhaseContext(goal).activePhase : null;
+  if (!active) limitations.push("active_phase_unavailable");
+  return active;
 }
 
 function resolveActiveGoals({ activeGoal, activeGoals }) {

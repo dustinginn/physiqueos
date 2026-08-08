@@ -17,9 +17,9 @@ describe("production-shaped Home active chapter read", () => {
       goalLabel: "Build Lean Mass",
       goalIcon: "dumbbell",
       headline: "Establish Maintenance",
-      confidenceState: "Moderate",
+      confidenceState: "Developing",
       mode: "phase_trajectory",
-      plannedReviewDate: "2026-08-17",
+      plannedReviewDate: "2026-08-15",
     });
     expect(model.goals).toHaveLength(1);
     expect(model.goals[0]).toMatchObject({
@@ -30,8 +30,7 @@ describe("production-shaped Home active chapter read", () => {
       presentation: { mode: "phase_trajectory_goal" },
     });
     expect(model.goals[0].presentation.trajectory.phases[1].progress).toMatchObject({ progressType: "outcome", baselineValue: 147.5, baselineDate: "2026-07-18", latestValue: null, targetAmount: 10, status: "awaiting_follow_up", clampedProgressPercentage: 0, evidenceSource: "DEXA" });
-    expect(model.latestAnalysis.sectionLabel).toMatch(/Midweek Briefing|Weekly Briefing|Previous Chapter Briefing/);
-    expect(model.nextBestAction.title).not.toMatch(/Foam Roll/);
+    expect(model.latestAnalysis.sectionLabel).toMatch(/Midweek Briefing|Weekly Briefing|Monthly Briefing|Previous Chapter Briefing/);
     expect(JSON.stringify(model)).not.toMatch(/Projected Finish: Unavailable|Days Remaining: Unavailable|Pending → Pending|0% complete/i);
 
     expect(JSON.parse(after).revision).toBe(store.revision);

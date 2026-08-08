@@ -51,7 +51,8 @@ function setup({ now = "2026-07-27T18:00:00Z", createError = null } = {}) {
       }
     }),
   };
-  return { records, create, repositories, weeklyPersistence, service: createWeeklyNarrativeService({ repositories, weeklyPersistence, now: () => new Date(now) }) };
+  const confidenceStoreResolver = () => confidenceStore();
+  return { records, create, repositories, weeklyPersistence, service: createWeeklyNarrativeService({ repositories, weeklyPersistence, confidenceStoreResolver, now: () => new Date(now) }) };
 }
 
 describe("explicit Weekly closed-window catch-up", () => {
@@ -104,6 +105,7 @@ describe("explicit Weekly closed-window catch-up", () => {
     fixture.service = createWeeklyNarrativeService({
       repositories: fixture.repositories,
       weeklyPersistence: fixture.weeklyPersistence,
+      confidenceStoreResolver: () => confidenceStore(),
       now: () => new Date("2026-07-27T18:00:00Z"),
     });
     expect(await fixture.service.catchUpClosedWindow({ userId: "u", windowContract: contract })).toMatchObject({
@@ -136,3 +138,22 @@ describe("explicit Weekly closed-window catch-up", () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+function confidenceStore() {
+  const assessment = {
+    schemaVersion: "pi_goal_confidence_assessment_v1", id: "assessment-prior",
+    goalId: "build", phaseId: "phase", operatingState: "calibration",
+    evidenceCutoff: "2026-07-18T23:59:59.999Z",
+    score: { current: 58, prior: 58, band: "moderate",
+      movement: { direction: "held", magnitude: "none" } },
+    contributors: [], unresolvedUncertainty: [],
+    primaryReason: "Persisted canonical context.",
+    provenance: { generatedAt: "2026-07-19T12:00:00.000Z" },
+  };
+  return { goalConfidenceSnapshots: [{ id: "snapshot-prior", goalId: "build",
+    phaseId: "phase", operatingState: "calibration",
+    currentAssessmentId: assessment.id, currentScore: 58, scoreBand: "moderate" }],
+  goalConfidenceHistory: [{ id: "history-prior", assessmentId: assessment.id,
+    goalId: "build", phaseId: "phase", persistedAt:
+      "2026-07-19T12:00:00.000Z", assessment }] };
+}

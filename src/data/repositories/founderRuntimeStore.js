@@ -7,6 +7,7 @@ import {
   normalizeProgressPhotoView,
 } from "../../domain/models/progressPhotoPoseVocabulary";
 import { normalizeDailyBriefingRecords } from "./DailyBriefingHistory";
+import { createFounderStoreMutationLockService } from "./FounderStoreMutationLock";
 
 const STORE_KEY = "__PHYSIQUEOS_FOUNDER_RUNTIME_STORE__";
 const STORE_WRITE_ATTEMPTS = 6;
@@ -28,6 +29,7 @@ const PERSISTED_COLLECTIONS = [
   "reminders",
   "dailyCheckIns",
   "dailyBriefings",
+  "confidenceInitializationArtifacts",
   "analyses",
   "evidencePackages",
   "canonicalEvidenceObjects",
@@ -43,7 +45,13 @@ const PERSISTED_COLLECTIONS = [
   "migrationMarkers",
   "goalConfidenceSnapshots",
   "goalConfidenceHistory",
+  "confidenceInitializationArtifacts",
   "goalConfidenceContinuitySeeds",
+  "phaseReviewDecisions",
+  "phaseReviewTransactions",
+  "phaseStrategies",
+  "phaseExpectedTrajectories",
+  "phaseLifecycleReadModels",
 ];
 const APPEND_ONLY_COLLECTIONS = [
   "evidencePackages",
@@ -57,7 +65,10 @@ const APPEND_ONLY_COLLECTIONS = [
   "piTrainingFinalizationReceipts",
   "piLowerLevelConfidenceWorkerRuns",
   "goalConfidenceHistory",
+  "confidenceInitializationArtifacts",
   "goalConfidenceContinuitySeeds",
+  "phaseReviewDecisions",
+  "phaseReviewTransactions",
 ];
 const AUTHORITATIVE_FOUNDER_WEIGHT_DATES = new Set([
   "2026-05-21",
@@ -97,6 +108,11 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     goals: mergeSeedWithPersisted(founderSeedPack.goals, persisted.goals, {
       fillMissingSeedFields: true,
     }),
+    phaseReviewDecisions: persisted.phaseReviewDecisions ?? [],
+    phaseReviewTransactions: persisted.phaseReviewTransactions ?? [],
+    phaseStrategies: persisted.phaseStrategies ?? [],
+    phaseExpectedTrajectories: persisted.phaseExpectedTrajectories ?? [],
+    phaseLifecycleReadModels: persisted.phaseLifecycleReadModels ?? [],
     goalTransitionDrafts: mergeSeedWithPersisted([], persisted.goalTransitionDrafts),
     goalProtocolTransitionDrafts: mergeSeedWithPersisted([], persisted.goalProtocolTransitionDrafts),
     weightEntries: mergeSeedWithPersisted(
@@ -130,6 +146,10 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     dailyBriefings: mergeSeedWithPersisted(
       founderSeedPack.dailyBriefings,
       persisted.dailyBriefings
+    ),
+    confidenceInitializationArtifacts: mergeSeedWithPersisted(
+      [],
+      persisted.confidenceInitializationArtifacts
     ),
     analyses: mergeSeedWithPersisted(founderSeedPack.analyses, persisted.analyses),
     evidencePackages: mergeSeedWithPersisted([], persisted.evidencePackages),
@@ -200,8 +220,23 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
   if (typeof window !== "undefined") return;
 
   const filePath = options.filePath ?? getRuntimeStorePath();
+  const mutationLock = options.mutationLock ??
+    createFounderStoreMutationLockService({ storePath: filePath });
+  const externallyOwned = Boolean(options.lockOwnership);
+  const ownership = options.lockOwnership ?? mutationLock.acquireSync({
+    operation: options.operation ?? `founder_repository_persist:${options.mutatedCollection ?? "store"}`,
+    goalId: options.goalId ?? null,
+    requestId: options.requestId ?? null,
+    maxHoldMs: 120_000,
+  });
+  if (externallyOwned) mutationLock.assertOwnership(ownership);
   const tempPath = createRuntimeStoreTempPath(filePath);
-  const latestPersisted = readPersistedRuntimeStore(filePath);
+  let latestPersisted = null;
+  let endingRevision = null;
+  let errorCode = null;
+  let outcome = "failed";
+  try {
+  latestPersisted = readPersistedRuntimeStore(filePath);
   const incomingPayload = PERSISTED_COLLECTIONS.reduce(
     (snapshot, collection) => ({
       ...snapshot,
@@ -235,7 +270,6 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
   });
   const writeReason = getRuntimeStoreWriteReason(options.reason);
 
-  try {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     cleanupRuntimeStoreTempFile(`${filePath}.tmp`);
     logRuntimeStorePersistCounts({
@@ -246,10 +280,18 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
     fs.writeFileSync(tempPath, `${JSON.stringify(payload)}\n`);
     replaceRuntimeStoreFile({ filePath, tempPath });
     mergeRuntimeStoreInPlace(store, normalizeFounderRuntimeStore(payload));
+    endingRevision = Number.isSafeInteger(payload.revision) ? payload.revision : 0;
+    outcome = "committed";
   } catch (error) {
+    errorCode = error?.code ?? "FOUNDER_RUNTIME_STORE_PERSISTENCE_FAILED";
     warnRuntimeStorePersistenceFailure(error);
     cleanupRuntimeStoreTempFile(tempPath);
     if (options.throwOnError === true) throw error;
+  } finally {
+    if (!externallyOwned) mutationLock.releaseSync(ownership, { outcome,
+      startingStoreRevision: Number.isSafeInteger(latestPersisted?.revision)
+        ? latestPersisted.revision : 0,
+      endingStoreRevision: endingRevision, errorCode });
   }
 }
 
@@ -512,6 +554,11 @@ function normalizeFounderRuntimeStore(store) {
     goals: mergeSeedWithPersisted(founderSeedPack.goals, store.goals, {
       fillMissingSeedFields: true,
     }),
+    phaseReviewDecisions: store.phaseReviewDecisions ?? [],
+    phaseReviewTransactions: store.phaseReviewTransactions ?? [],
+    phaseStrategies: store.phaseStrategies ?? [],
+    phaseExpectedTrajectories: store.phaseExpectedTrajectories ?? [],
+    phaseLifecycleReadModels: store.phaseLifecycleReadModels ?? [],
     goalTransitionDrafts: store.goalTransitionDrafts ?? [],
     goalProtocolTransitionDrafts: store.goalProtocolTransitionDrafts ?? [],
     weightEntries,

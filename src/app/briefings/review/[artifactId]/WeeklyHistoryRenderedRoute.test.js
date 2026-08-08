@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -9,10 +10,9 @@ const artifactId = "weekly_briefing_2026-07-19_2026-07-25";
 
 describe("Weekly Briefing History visible route", () => {
   it("adapts the persisted artifact before rendering every visible Midweek-derived binding", async () => {
-    const runtimePath = new URL(
-      "../../../../../private/founder/runtime-store.json",
-      import.meta.url
-    );
+    const runtimePath = process.env.PHYSIQUEOS_RUNTIME_STORE_PATH
+      ? path.resolve(process.env.PHYSIQUEOS_RUNTIME_STORE_PATH)
+      : new URL("../../../../../private/founder/runtime-store.json", import.meta.url);
     const runtime = JSON.parse(fs.readFileSync(runtimePath, "utf8"));
     const artifact = runtime.dailyBriefings.find((item) => item.id === artifactId);
     const repositories = {
@@ -67,8 +67,10 @@ describe("Weekly Briefing History visible route", () => {
     expect(html).not.toContain("energy coverage");
     expect(html).not.toContain("Confidence increased because");
     expect(sectionText(html, "weekly-confidence")).toContain(
-      "Confidence improved this week"
+      artifact.briefing.weeklyNarrative.goalConfidence.primaryReason
     );
+    expect(sectionText(html, "weekly-confidence"))
+      .not.toContain("Confidence improved this week");
     expect(sectionText(html, "weekly-training-response")).toContain(
       "6 training days"
     );

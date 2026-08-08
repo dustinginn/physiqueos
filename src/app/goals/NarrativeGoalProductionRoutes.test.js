@@ -37,7 +37,9 @@ describe("Narrative Goal production routes", () => {
     expect(buildLeanMassRoute).not.toContain("NarrativeGoalPreviewScreen");
     expect(buildLeanMassRoute).not.toMatch(/redirect|action|save|update|persist/i);
     expect(buildLeanMassPresentation).toContain('goal.type !== "build_lean_mass"');
-    expect(buildLeanMassPresentation).toContain("resolveOverallGoalConfidenceReadModel");
+    expect(buildLeanMassPresentation).toContain("resolveActiveGoalConfidencePresentation");
+    expect(buildLeanMassPresentation)
+      .not.toContain("resolveOverallGoalConfidenceReadModel");
     expect(buildLeanMassPresentation).not.toMatch(/ProductionGoalTransitionActivationService|GoalTransitionActivationCoordinator|FounderStoreUnitOfWork|\.save\(|\.update\(|\.create\(/);
   });
 

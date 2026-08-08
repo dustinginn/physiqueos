@@ -18,10 +18,11 @@ export function createGoalTrainingProgress({ goal, phase, canonicalObjects = [],
 }
 
 export function resolveGoalTrainingReviewPeriod({ phase } = {}) {
-  if (!phase?.id || !validDate(phase.startDate)) throw new Error("A phase with a valid start date is required.");
+  const start = phase?.startedAt ?? phase?.startDate;
+  if (!phase?.id || !validDate(start)) throw new Error("A phase with a valid start date is required.");
   const reviewDate = expectedPhaseReviewDate(phase);
   if (!validDate(reviewDate)) throw new Error("A phase review date is required.");
-  return Object.freeze({ start: phase.startDate, end: addDays(reviewDate, -1), reviewDate, comparisonMode: "phase_aligned_four_week_review" });
+  return Object.freeze({ start, end: reviewDate, reviewDate, comparisonMode: "evidence_based_phase_review" });
 }
 
 export function composeGoalTrainingProgress({ goal, phase, period = resolveGoalTrainingReviewPeriod({ phase }), report, today, comparabilityBlocks = new Set() } = {}) {

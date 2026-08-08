@@ -1,16 +1,10 @@
-export const TRAINING_NAVIGATION_CATEGORIES = [
-  "chest",
-  "back",
-  "shoulders",
-  "biceps",
-  "triceps",
-  "core",
-  "quads",
-  "hamstrings",
-  "glutes",
-  "calves",
-  "adductors",
-];
+import {
+  CANONICAL_TRAINING_MUSCLE_GROUPS,
+} from "../domain/models/trainingMuscleGroupIdentity";
+
+export const TRAINING_NAVIGATION_CATEGORIES = Object.freeze(
+  CANONICAL_TRAINING_MUSCLE_GROUPS.map((muscleGroup) => muscleGroup.id)
+);
 
 const EXPLICIT_EXERCISE_NAVIGATION_CATEGORIES = {
   "barbell-front-raises": "shoulders",
@@ -87,6 +81,7 @@ const EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES = {
   glute_squat: "glutes",
   hyperextension_machine: "glutes",
   hack_squat: "quads",
+  leg_press_high_narrow: "hamstrings",
   leg_extension: "quads",
   lying_leg_curl: "hamstrings",
   romanian_deadlift: "glutes",
@@ -95,6 +90,7 @@ const EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES = {
   seated_hip_abductions: "quads",
   single_leg_leg_press: "quads",
   sissy_squat: "quads",
+  sumo_squat_machine: "glutes",
 };
 
 const REGION_NAVIGATION_CATEGORIES = {

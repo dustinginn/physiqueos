@@ -1,6 +1,7 @@
 import { resolveBodyFatGuardrail } from "./DEXAEventContextService";
 import { createPIGoalContext } from "./PIObservationGoalContextService";
 import { resolvePhotoEventFutureMilestone } from "./PhotoEventContextService";
+import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 
 export const WEEKLY_BRIEFING_CONTEXT_VERSION = "weekly_briefing_context_v1";
 
@@ -15,8 +16,10 @@ export async function resolveWeeklyBriefingContext({
       ?? repositories.protocols?.listProtocols?.(userId) ?? [],
     repositories.executionItems?.listExecutionItems?.(userId) ?? [],
   ]);
-  const activeGoal = candidateGoal?.status === "active" ? candidateGoal : null;
-  const activePhase = activeGoal?.phases?.find((phase) => phase.status === "active") ?? null;
+  let activeGoal = candidateGoal?.status === "active" ? candidateGoal : null;
+  const phaseContext = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: window.endDate }) : null;
+  activeGoal = phaseContext?.goal ?? activeGoal;
+  const activePhase = phaseContext?.activePhase ?? null;
   const relevantProtocols = protocols.filter((protocol) =>
     protocol?.status === "active" && (!protocol.goalIds?.length
       || protocol.goalIds.includes(activeGoal?.id)
@@ -43,7 +46,8 @@ export async function resolveWeeklyBriefingContext({
     semanticGoalType: normalizeSemanticType(goalContext.semanticGoalType),
     activePhase: activePhase ? {
       id: activePhase.id, name: activePhase.name ?? activePhase.title, status: activePhase.status,
-      startDate: dateKey(activePhase.startDate) || null, ageDays: goalContext.phaseAgeDays,
+      startDate: dateKey(activePhase.startedAt ?? activePhase.startDate) || null, plannedReviewAt: activePhase.plannedReviewAt ?? null,
+      reviewState: activePhase.effectiveReviewState ?? activePhase.reviewState ?? null, ageDays: goalContext.phaseAgeDays,
       ageWeeks: goalContext.phaseAgeWeeks, ageBand: goalContext.phaseAgeBand,
     } : null,
     operatingState: activeGoal?.openingApproach ? {

@@ -7,7 +7,7 @@ const canonical = {
   canonicalSeries: true, source: "canonical_pi_snapshot",
   value: 58, band: "moderate", priorScore: 44, delta: 14,
   movementDirection: "increased", movementMagnitude: "material",
-  primaryReason: "Training remained constructive while Energy remains incomplete.",
+  primaryReason: "Confidence increased because training remained constructive while energy remains incomplete.",
   supportingContributors: [
     { reason: "Training remained constructive.", userFacing: true },
     { reason: "Photos supported stable condition.", userFacing: true },
@@ -68,7 +68,7 @@ describe("Weekly canonical confidence integration", () => {
       ...canonical,
       supportingReasons: ["Training stayed constructive."],
       limitingReasons: ["Energy remains incomplete."],
-    })).toBe("Confidence increased because training stayed constructive, while energy remains incomplete.");
+    })).toBe(canonical.primaryReason);
   });
 
   it("keeps Weekly generation consumption-only and historical confidence optional", () => {
@@ -77,7 +77,7 @@ describe("Weekly canonical confidence integration", () => {
     expect(service).toContain("resolveActiveGoalConfidencePresentation");
     expect(service).toContain("createBriefingGoalConfidenceBlock");
     expect(service).not.toMatch(/PIGoalConfidenceRefreshService|PIGoalConfidencePersistenceService/);
-    expect(screen).toContain("presentation.hero.confidence&&");
+    expect(screen).toMatch(/presentation\.hero\.confidence\s*&&/);
     expect(screen).not.toMatch(/44%|overall_goal_confidence_v1/);
   });
 
@@ -87,7 +87,7 @@ describe("Weekly canonical confidence integration", () => {
     const weekly = fs.readFileSync("src/screens/WeeklyBriefingScreen.jsx", "utf8");
     expect(anchor).toContain("ConfidenceRing");
     expect(anchor).toContain("animate={false}");
-    expect(anchor).toContain("Goal confidence ${confidence.score} percent");
+    expect(anchor).toContain("Goal confidence ${canonicalConfidence.score} percent");
     expect(midweek).toContain("BriefingConfidenceAnchor");
     expect(weekly).toContain("BriefingConfidenceAnchor");
   });

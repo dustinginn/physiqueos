@@ -126,13 +126,20 @@ function presentTraining(object, common) {
       metric("Average heart rate", unit(metadata.average_heart_rate, "bpm")),
       metric("Source", common.sourceLabel),
     ]),
-    exercises: (object.exercises ?? []).filter((exercise) => !exercise.removed).map((exercise) => ({
-      name: getCanonicalTrainingExerciseLabel(exercise.name),
-      sets: (exercise.sets ?? []).map((set) => formatExerciseSet({
-        ...set,
-        load_type: exercise.equipment === "bodyweight" && Number(set.weight) === 0 ? "bodyweight" : set.load_type,
-      })).filter(Boolean),
-    })),
+    exercises: (object.exercises ?? []).filter((exercise) => !exercise.removed).map((exercise) => {
+      const provisionalExerciseId =
+        exercise.provisionalExercise?.resolutionStatus === "unresolved"
+          ? exercise.provisionalExercise.provisionalExerciseId
+          : null;
+      return {
+        name: getCanonicalTrainingExerciseLabel(exercise.name),
+        ...(provisionalExerciseId ? { provisionalExerciseId } : {}),
+        sets: (exercise.sets ?? []).map((set) => formatExerciseSet({
+          ...set,
+          load_type: exercise.equipment === "bodyweight" && Number(set.weight) === 0 ? "bodyweight" : set.load_type,
+        })).filter(Boolean),
+      };
+    }),
   };
 }
 

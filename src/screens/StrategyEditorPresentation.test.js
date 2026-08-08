@@ -10,7 +10,26 @@ describe("strategy editing presentation", () => {
     expect(detail).toContain("Edit Strategy");
     expect(editor).toContain("useFormStatus");
     expect(editor).toContain("disabled={pending}");
-    expect(editor).toContain("Days, times, and reminders remain in Execution.");
+    expect(editor).toContain("Update the macro strategy supporting your current goal.");
+    expect(editor).toContain("Update the training strategy supporting your current goal.");
+    expect(editor).not.toContain("Days, times, and reminders remain in Execution.");
+  });
+
+  it("keeps Nutrition focused on macro composition", () => {
+    expect(editor).toContain('title="Macro approach"');
+    expect(editor).toContain('name="proteinBasis"');
+    expect(editor).toContain('name="carbohydrateStrategy"');
+    expect(editor).toContain('name="fatStrategy"');
+    expect(editor).not.toContain('name="calorieStrategy"');
+    expect(editor).not.toContain('label="Intake approach"');
+  });
+
+  it("keeps system-owned phase context out of Training configuration", () => {
+    expect(editor).toContain('name="progression"');
+    expect(editor).toContain('name={`frequency_${area}`}');
+    expect(editor).toContain('name="priorities"');
+    expect(editor).not.toContain('name="phase"');
+    expect(editor).not.toContain('label="Current phase"');
   });
 
   it("uses the atomic successor service without exposing internals", () => {

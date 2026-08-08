@@ -53,6 +53,12 @@ function fixture({ statuses, omitAnalysis = false, fault } = {}) {
   const phase = goal.phases.find((item) => item.status === "active");
   const sessionId = "training_session_isolated";
   const analysisId = "training_analysis_isolated";
+  const confidenceHistory = structuredClone(source.goalConfidenceHistory.slice(-1));
+  if (confidenceHistory[0]?.assessment) {
+    confidenceHistory[0].assessment.contributors =
+      (confidenceHistory[0].assessment.contributors ?? [])
+        .filter((item) => item.domain !== "training");
+  }
   const store = {
     version: "isolated",
     revision: 28,
@@ -70,7 +76,7 @@ function fixture({ statuses, omitAnalysis = false, fault } = {}) {
       metadata: { trainingPerformance: report(statuses) },
     }],
     goalConfidenceSnapshots: structuredClone(source.goalConfidenceSnapshots),
-    goalConfidenceHistory: structuredClone(source.goalConfidenceHistory),
+    goalConfidenceHistory: confidenceHistory,
     goalConfidenceContinuitySeeds: structuredClone(
       source.goalConfidenceContinuitySeeds
     ),
@@ -156,23 +162,21 @@ describe("PI Training confidence finalization", () => {
     expect(persisted(f).piTrainingConfidenceWorkItems).toHaveLength(1);
   });
 
-  it("publishes one atomic successor and receipt for a broad regression", async () => {
+  it("prepares one durable briefing input without publishing confidence", async () => {
     const f = fixture();
-    const beforeScore = f.store.goalConfidenceHistory.at(-1).assessment.score.current;
+    const beforeHistory = f.store.goalConfidenceHistory.length;
     const work = await enqueue(f);
     const result = await f.service.finalize(work.id);
     const state = persisted(f);
     expect(result).toMatchObject({
-      outcome: PITrainingFinalizationOutcome.PUBLISHED_SUCCESSOR,
+      outcome: PITrainingFinalizationOutcome.BRIEFING_INPUT_READY,
       committed: true,
     });
     expect(state.piTrainingFinalizationReceipts).toHaveLength(1);
     expect(state.goalConfidenceHistory).toHaveLength(
-      f.store.goalConfidenceHistory.length
+      beforeHistory
     );
-    const assessment = state.goalConfidenceHistory.at(-1).assessment;
-    expect(assessment.score.current).toBe(beforeScore - 2);
-    expect(assessment.context.type).toBe("training_interpretation");
+    expect(state.piTrainingFinalizationReceipts[0].publishedAssessmentId).toBeNull();
     expect(state.piTrainingConfidenceWorkItems[0].completionReceiptId)
       .toBe(state.piTrainingFinalizationReceipts[0].id);
   });
@@ -234,14 +238,14 @@ describe("PI Training confidence finalization", () => {
       .toBe(PITrainingFinalizationOutcome.ATTEMPT_LIMIT_REACHED);
   });
 
-  it("keeps transient cleanup bounded and retains confidence-linked work", async () => {
+  it("keeps transient cleanup bounded without confidence-linked work", async () => {
     const f = fixture();
     const work = await enqueue(f);
     await f.service.finalize(work.id);
     const result = await f.service.pruneTransient({
       at: new Date("2027-01-01T00:00:00.000Z"),
     });
-    expect(result.outcome).toBe(PITrainingFinalizationOutcome.MATCHED);
-    expect(persisted(f).piTrainingConfidenceWorkItems).toHaveLength(1);
+    expect(result.outcome).toBe("pruned");
+    expect(persisted(f).piTrainingConfidenceWorkItems).toHaveLength(0);
   });
 });

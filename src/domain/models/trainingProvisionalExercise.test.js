@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { createTrainingSessionEvidenceFromText } from "./trainingSessionEvidence";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  createTrainingSessionEvidenceFromText,
+  getContextualStrengthSetParseDiagnostics,
+} from "./trainingSessionEvidence";
 import { mergeTypedEvidenceIntoTrainingObjects } from "../interpreters/ScreenshotInterpreterService";
+import { registerRuntimeTrainingExercises } from "./trainingExerciseIdentity";
+
+afterEach(() => registerRuntimeTrainingExercises([]));
 
 const incident = `Spider curls
 4 sets of
@@ -19,6 +25,81 @@ Straight bar cable pushdowns
 14r 120p x4`;
 
 describe("provisional typed training exercises", () => {
+  it("preserves all 21 explicit sets in the exact lower-body incident", () => {
+    const exercises = parse(`Seated hip adductions
+15r 80p
+15r 90p
+15r 100p
+15r 100p
+
+Sumo squat machine
+12r 135p
+180p 12r
+225p 10r
+225p 15r
+
+Smith machine hip thrusts
+15r 90p
+12r 140p
+15r 160p
+12r 160p
+12r 90p
+
+Leg press high and narrow feet
+180p 15r
+225p 12r
+270p 10r
+270 10r
+
+Lying leg curls
+4 sets of
+12r 75p`);
+    expect(exercises.map((exercise) => [exercise.name, exercise.sets.length]))
+      .toEqual([
+        ["Seated Hip Adductions", 4],
+        ["Sumo Squat Machine", 4],
+        ["Smith Machine Hip Thrusts", 5],
+        ["Leg Press High And Narrow Feet", 4],
+        ["Lying Leg Curls", 4],
+      ]);
+    expect(exercises.reduce((total, exercise) => total + exercise.sets.length, 0))
+      .toBe(21);
+    expect(exercises[3].sets[3]).toMatchObject({
+      reps: 10,
+      weight: 270,
+      weight_unit: "lb",
+      unit_inference: {
+        code: "contextual_pound_unit",
+        source_line: 24,
+      },
+    });
+    expect(exercises.filter((exercise) => exercise.provisionalExercise))
+      .toHaveLength(3);
+    expect(exercises[0].canonicalExerciseId).toBe("seated_hip_adductions");
+    expect(exercises[4].canonicalExerciseId).toBe("lying_leg_curl");
+  });
+
+  it.each([
+    ["Sumo Squat Machine", "sumo_squat_machine"],
+    ["Leg Press High And Narrow Feet", "leg_press_high_narrow"],
+  ])("retains the true canonical ID when %s exists app-wide", (name, id) => {
+    registerRuntimeTrainingExercises([{
+      id,
+      name,
+      aliases: [],
+      equipment: "machine",
+      body_region: "Lower Body",
+      primary_muscle_groups: ["Glutes"],
+      secondary_muscle_groups: [],
+      movement_pattern: "Squat / Press",
+    }]);
+    const [exercise] = parse(`${name}\n10r 100p`);
+    expect(exercise).toMatchObject({
+      canonicalExerciseId: id,
+      provisionalExercise: null,
+    });
+  });
+
   it("preserves the exact incident as four independent blocks", () => {
     const exercises = parse(incident);
     expect(exercises.map((item) => item.name)).toEqual([
@@ -41,10 +122,34 @@ describe("provisional typed training exercises", () => {
         normalizedDisplayName: "Bicep Curl Machine",
         resolutionStatus: "unresolved",
         suggestedPrimaryMuscleGroup: "Biceps",
+        suggestedPrimaryMuscleGroupId: "biceps",
+        suggestedPrimaryMuscleGroupConfidence: "high",
         suggestedMovementPattern: "Elbow Flexion",
         suggestedEquipment: "Machine",
         suggestedLaterality: "Bilateral",
       },
+    });
+  });
+
+  it("suggests canonical Glutes for Smith Machine Hip Thrusts without resolving it", () => {
+    const [exercise] = parse("Smith Machine Hip Thrusts\n10r 100p");
+    expect(exercise).toMatchObject({
+      canonicalExerciseId: null,
+      provisionalExercise: {
+        suggestedPrimaryMuscleGroup: "Glutes",
+        suggestedPrimaryMuscleGroupId: "glutes",
+        suggestedPrimaryMuscleGroupConfidence: "high",
+        resolutionStatus: "unresolved",
+      },
+    });
+  });
+
+  it("does not preselect a low-confidence muscle group", () => {
+    const [exercise] = parse("Unknown Rotation Machine\n10r 100p");
+    expect(exercise.provisionalExercise).toMatchObject({
+      suggestedPrimaryMuscleGroup: null,
+      suggestedPrimaryMuscleGroupId: null,
+      suggestedPrimaryMuscleGroupConfidence: "low",
     });
   });
 
@@ -80,6 +185,44 @@ describe("provisional typed training exercises", () => {
     expect(exercises[0].name).toBe("Spider Curls");
   });
 
+  it("reports a missing unit without pound context instead of fabricating a set", () => {
+    const result = getContextualStrengthSetParseDiagnostics(
+      "Leg press\n270 10r"
+    );
+    expect(result.exercises).toEqual([]);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: "ambiguous_or_incomplete_strength_set",
+        disposition: "incomplete_set",
+      }),
+    ]);
+  });
+
+  it.each([
+    ["single number", "270"],
+    ["two unlabeled numbers", "270 10"],
+    ["multiple numeric roles", "10r 270 30"],
+    ["duration suffix", "270s 10r"],
+    ["distance suffix", "270m 10r"],
+    ["bodyweight", "bodyweight 10r"],
+    ["rep only", "10r only"],
+  ])("does not infer pounds for %s", (_label, line) => {
+    const result = getContextualStrengthSetParseDiagnostics(
+      `Leg press\n270p 10r\n\nPlank\n${line}`
+    );
+    expect(result.exercises.flatMap((exercise) => exercise.sets))
+      .not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ unit_inference: expect.anything() }),
+      ]));
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "ambiguous_or_incomplete_strength_set",
+        }),
+      ])
+    );
+  });
+
   it("survives screenshot-plus-typed reconciliation without duplicating matching sets", () => {
     const typedExercises = parse(incident);
     const screenshotObject = {
@@ -105,6 +248,37 @@ describe("provisional typed training exercises", () => {
       });
     expect(merged.exercises.find((exercise) => exercise.name === "Spider Curls")?.sets)
       .toHaveLength(4);
+  });
+
+  it("rejects an unvalidated screenshot canonical ID in favor of typed provisional identity", () => {
+    const typedEvidence = "Smith Machine Hip Thrusts\n10r 100p";
+    const screenshotObject = {
+      id: "training_screenshot",
+      evidence_type: "training",
+      metadata: { activity_type: "Traditional Strength Training" },
+      source: { modality: "screenshot", source_artifact_refs: ["workout.png"] },
+      provenance: { source_artifact_refs: ["workout.png"] },
+      exercises: [{
+        id: "stale_hip_thrust",
+        name: "Smith Machine Hip Thrusts",
+        canonicalExerciseId: "stale_hip_thrust",
+        resolutionStatus: "resolved",
+        sets: [{ reps: 10, weight: 100, weight_unit: "lb", provenance_ref: "workout.png" }],
+      }],
+    };
+    const [merged] = mergeTypedEvidenceIntoTrainingObjects({
+      evidenceObjects: [screenshotObject],
+      typedEvidence,
+    });
+    expect(merged.exercises).toHaveLength(1);
+    expect(merged.exercises[0]).toMatchObject({
+      canonicalExerciseId: null,
+      resolutionStatus: "unresolved_provisional",
+      provisionalExercise: {
+        resolutionStatus: "unresolved",
+      },
+    });
+    expect(merged.exercises[0].sets).toHaveLength(1);
   });
 });
 

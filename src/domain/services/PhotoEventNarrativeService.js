@@ -3,9 +3,8 @@ import { semanticDeduplicate } from "./GalleryInterpretationService";
 import { evaluatePhotoGoalConfirmation, selectVisibleAbsCompletionComparisons } from "./PhotoGoalConfirmationService";
 import { getProgressPhotoDisplayLabel, getProgressPhotoProseLabel } from "../models/progressPhotoPoseVocabulary";
 import { resolvePhotoEventContext } from "./PhotoEventContextService";
-import {
-  createPIPhotoEventPublicationService,
-} from "./PIPhotoEventPublicationService";
+import { createCanonicalBriefingConfidencePublicationService } from
+  "./CanonicalBriefingConfidencePublicationService";
 import {
   createPIPhotoEventLifecycleService,
 } from "./PIPhotoEventLifecycleService";
@@ -129,7 +128,7 @@ export function createFounderPhotoEventNarrativeService({
   eventLifecycle,
 } = {}) {
   const publication = eventLifecycle ? null :
-    createPIPhotoEventPublicationService({ now });
+    createCanonicalBriefingConfidencePublicationService({ now });
   return createPhotoEventNarrativeService({
     repositories,
     now,
@@ -251,7 +250,7 @@ export function createPhotoEventNarrativeService({
         userId,
         sessionId,
         operation: "regenerate",
-        confidenceMode: "matched-only",
+        confidenceMode: "publish-successor",
         replacementAuthorized: true,
         reason,
         ignoreExisting: true,
