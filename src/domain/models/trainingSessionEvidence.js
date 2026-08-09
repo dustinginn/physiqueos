@@ -2993,6 +2993,10 @@ function cleanExerciseName(value) {
     (
       resolved.exercise?.body_region === "Lower Body" ||
       resolved.canonicalExerciseId === "hanging_leg_raise" ||
+      (
+        /\bmachine\b/i.test(text) &&
+        /machine/i.test(String(resolved.exercise?.equipment ?? ""))
+      ) ||
       /\([^)]*\)/.test(text)
     )
   ) {

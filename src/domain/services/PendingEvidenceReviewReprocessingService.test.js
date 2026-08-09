@@ -1,13 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEvidenceReviewRepository } from "../../data/repositories/EvidenceReviewRepository";
 import { createEvidencePackageRepository } from "../../data/repositories/EvidencePackageRepository";
 import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
 import { JUL_25_STRENGTH_NOTE } from "../../fixtures/jul25TrainingEvidenceFixture";
 import { createPendingEvidenceReviewReprocessingService } from "./PendingEvidenceReviewReprocessingService";
+import { registerRuntimeTrainingExercises } from "../models/trainingExerciseIdentity";
 
 const REVIEW_ID = "evidence_review_20260715011556399";
 const PACKAGE_ID = "evidence_submission_20260715011517048_images";
+
+afterEach(() => registerRuntimeTrainingExercises([]));
 
 function fixture({ status = "pending", sources, canonical = [] } = {}) {
   const sourceArtifacts = sources ?? [
@@ -48,6 +51,79 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("reprocesses the current four-exercise workout with machine identity and sets intact", async () => {
+    registerRuntimeTrainingExercises([
+      {
+        id: "bicep_curl_machine",
+        name: "Bicep Curl Machine",
+        aliases: ["Machine Bicep Curl", "Biceps Curl Machine"],
+        equipment: "Machine",
+        body_region: "upper_body",
+        primary_muscle_groups: ["Biceps"],
+        movement_pattern: "Elbow Flexion",
+      },
+      {
+        id: "skull_crushers",
+        name: "Skull Crushers",
+        aliases: [],
+        equipment: null,
+        body_region: "upper_body",
+        primary_muscle_groups: ["Triceps"],
+        movement_pattern: null,
+      },
+    ]);
+    const typedText = `Spider Curls (Static Hold)
+35p 13r
+35p 10r
+35p 10r
+35p 10r
+
+Bicep curl machine
+15r 105p
+14r 105p
+12r 105p
+14r 105p
+
+Cable rope pushdowns
+15r 110p
+15r 110p
+14r 110p
+15r 110p
+
+Skull crushers
+17r 60p
+13r 60p
+13r 60p
+14r 60p`;
+    const state = fixture({
+      sources: [{ id: "typed_evidence_0", kind: "typed_evidence", text: typedText }],
+    });
+    const parsed = parseStrengthTrainingText(typedText);
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret: async (sourcePackage) => ({
+        ...structuredClone(sourcePackage),
+        quality: { status: "complete" },
+        evidence_objects: [trainingObject(parsed)],
+      }),
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+    const exercises = result.review.interpretedEvidence.evidence_objects[0].exercises;
+    expect(exercises.map((exercise) => [
+      exercise.name,
+      exercise.canonicalExerciseId,
+      exercise.executionVariant?.key ?? null,
+      exercise.sets.map((set) => [set.reps, set.weight]),
+    ])).toEqual([
+      ["Spider Curls", "spider_curl", "static_hold", [[13, 35], [10, 35], [10, 35], [10, 35]]],
+      ["Bicep Curl Machine", "bicep_curl_machine", null, [[15, 105], [14, 105], [12, 105], [14, 105]]],
+      ["Cable Rope Pushdowns", "cable_pushdown", null, [[15, 110], [15, 110], [14, 110], [15, 110]]],
+      ["Skull Crushers", "skull_crushers", null, [[17, 60], [13, 60], [13, 60], [14, 60]]],
+    ]);
+    expect(result.review).toMatchObject({ status: "pending", confirmation: null });
+  });
+
   it("reparses Static Hold into the pending review without changing its sets or committing canonical evidence", async () => {
     const typedText = [
       "Spider Curls (Static Hold)",

@@ -100,6 +100,76 @@ Lying leg curls
     });
   });
 
+  it.each([
+    "Bicep curl machine",
+    "Bicep curls machine",
+    "Machine bicep curl",
+    "Machine bicep curls",
+  ])("preserves the registered Bicep Curl Machine identity for %s", (heading) => {
+    registerBicepCurlMachine();
+    const [exercise] = parse(`${heading}\n15r 105p`);
+    expect(exercise).toMatchObject({
+      id: "bicep_curl_machine",
+      name: "Bicep Curl Machine",
+      canonicalExerciseId: "bicep_curl_machine",
+      resolutionStatus: "resolved",
+      provisionalExercise: null,
+      sets: [expect.objectContaining({ reps: 15, weight: 105 })],
+    });
+  });
+
+  it("does not promote ordinary curl headings to the machine identity", () => {
+    registerBicepCurlMachine();
+    expect(parse("Bicep curl\n15r 35p")[0]).toMatchObject({
+      name: "Bicep Curl",
+      canonicalExerciseId: null,
+      resolutionStatus: "unresolved_provisional",
+    });
+    expect(parse("curl\n15r 35p")[0]).toMatchObject({
+      name: "curl",
+      canonicalExerciseId: null,
+    });
+  });
+
+  it("preserves every identity and set in the current four-exercise workout", () => {
+    registerBicepCurlMachine();
+    const exercises = parse(`Spider Curls (Static Hold)
+35p 13r
+35p 10r
+35p 10r
+35p 10r
+
+Bicep curl machine
+15r 105p
+14r 105p
+12r 105p
+14r 105p
+
+Cable rope pushdowns
+15r 110p
+15r 110p
+14r 110p
+15r 110p
+
+Skull crushers
+17r 60p
+13r 60p
+13r 60p
+14r 60p`);
+
+    expect(exercises.map((exercise) => ({
+      name: exercise.name,
+      canonicalExerciseId: exercise.canonicalExerciseId,
+      variant: exercise.executionVariant?.key ?? null,
+      sets: exercise.sets.map((set) => [set.reps, set.weight]),
+    }))).toEqual([
+      { name: "Spider Curls", canonicalExerciseId: "spider_curl", variant: "static_hold", sets: [[13, 35], [10, 35], [10, 35], [10, 35]] },
+      { name: "Bicep Curl Machine", canonicalExerciseId: "bicep_curl_machine", variant: null, sets: [[15, 105], [14, 105], [12, 105], [14, 105]] },
+      { name: "Cable Rope Pushdowns", canonicalExerciseId: "cable_pushdown", variant: null, sets: [[15, 110], [15, 110], [14, 110], [15, 110]] },
+      { name: "Skull Crushers", canonicalExerciseId: "skull_crushers", variant: null, sets: [[17, 60], [13, 60], [13, 60], [14, 60]] },
+    ]);
+  });
+
   it("preserves the exact incident as four independent blocks", () => {
     const exercises = parse(incident);
     expect(exercises.map((item) => item.name)).toEqual([
@@ -289,4 +359,27 @@ function parse(text) {
     provenanceRef: "typed_fixture",
     text,
   }).exercises;
+}
+
+function registerBicepCurlMachine() {
+  registerRuntimeTrainingExercises([
+    {
+      id: "bicep_curl_machine",
+      name: "Bicep Curl Machine",
+      aliases: ["Machine Bicep Curl", "Biceps Curl Machine"],
+      equipment: "Machine",
+      body_region: "upper_body",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: "Elbow Flexion",
+    },
+    {
+      id: "skull_crushers",
+      name: "Skull Crushers",
+      aliases: [],
+      equipment: null,
+      body_region: "upper_body",
+      primary_muscle_groups: ["Triceps"],
+      movement_pattern: null,
+    },
+  ]);
 }

@@ -60,6 +60,24 @@ describe("Evidence Review presentation", () => {
     });
   });
 
+  it("presents a canonical Bicep Curl Machine occurrence without collapsing its label", () => {
+    const result = createEvidenceReviewPresentation({
+      evidencePackage: evidencePackage([training({
+        exercises: [{
+          id: "bicep_curl_machine",
+          name: "Bicep Curl Machine",
+          canonicalExerciseId: "bicep_curl_machine",
+          sets: [{ reps: 15, weight: 105 }],
+        }],
+      })]),
+    });
+    expect(result.items[0].exercises[0]).toMatchObject({
+      name: "Bicep Curl Machine",
+      canonicalExerciseId: "bicep_curl_machine",
+      sets: ["15 reps @ 105 lb"],
+    });
+  });
+
   it("renders a human-readable training review with modality-aware sets and source details", () => {
     const result = createEvidenceReviewPresentation({ evidencePackage: evidencePackage() });
     const card = result.items[0];
