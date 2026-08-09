@@ -3,7 +3,9 @@ import { recoverEvidenceIntakeSubmissionFromArtifacts } from "./EvidenceIntakeSe
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
 import { resolveExecutionVariantHeading } from "../models/trainingSessionEvidence";
 
-export const PENDING_REVIEW_REPROCESS_VERSION = "training-execution-variants-v1";
+// Increment intentionally when a parser correction should make retained pending
+// evidence eligible for one new bounded interpretation.
+export const PENDING_REVIEW_REPROCESS_VERSION = "training-pending-review-parser-v2";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {

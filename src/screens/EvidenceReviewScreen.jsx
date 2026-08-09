@@ -31,7 +31,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
@@ -111,9 +111,6 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           </Card>
         )}
 
-        {review.reprocessing?.status === "complete" && <Card className="mt-6" variant="soft"><p className="text-sm font-bold text-[var(--text-primary)]">Review refreshed from the original evidence.</p></Card>}
-        {review.reprocessing?.status === "failed" && <Card className="mt-6" variant="warning"><p className="text-sm font-bold text-[var(--text-primary)]">The review could not be refreshed. Your previous review is still intact.</p></Card>}
-
         <Card className="mt-6 space-y-3" variant={presentation.summary.included ? "accent" : "soft"}>
           <h2 className="text-lg font-extrabold text-[var(--text-primary)]">Ready to add</h2>
           <p className="font-bold text-[var(--text-primary)]">
@@ -139,6 +136,9 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
+        {reprocessOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">Review updated from the original evidence.</p></Card>}
+        {reprocessOutcome === "current" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">No newer interpretation is available.</p></Card>}
+        {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Re-read failed. Your previous review is still intact.</p></Card>}
         {canEdit && <div className="mt-3 grid grid-cols-2 gap-3">
           <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] px-3 text-center text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={recoveryContext?.returnTo ?? "/log"}>Save and return later</Link>
           <DiscardReviewControl action={discardAction} recoveryContext={recoveryContext} reviewId={review.id} />

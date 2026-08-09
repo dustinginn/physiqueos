@@ -4,7 +4,10 @@ import { createEvidencePackageRepository } from "../../data/repositories/Evidenc
 import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
 import { JUL_25_STRENGTH_NOTE } from "../../fixtures/jul25TrainingEvidenceFixture";
-import { createPendingEvidenceReviewReprocessingService } from "./PendingEvidenceReviewReprocessingService";
+import {
+  createPendingEvidenceReviewReprocessingService,
+  PENDING_REVIEW_REPROCESS_VERSION,
+} from "./PendingEvidenceReviewReprocessingService";
 import { registerRuntimeTrainingExercises } from "../models/trainingExerciseIdentity";
 
 const REVIEW_ID = "evidence_review_20260715011556399";
@@ -51,6 +54,31 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("runs once when an earlier completed parser version has the same source fingerprint", async () => {
+    const state = fixture();
+    const reinterpret = vi.fn(async () => correctedPackage(state.evidencePackage));
+    const previousService = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret,
+      version: "training-execution-variants-v1",
+    });
+    const previousResult = await previousService.reprocessPendingReviewInPlace(REVIEW_ID);
+    const previousSourceFingerprint = previousResult.review.reprocessing.sourceArtifactFingerprint;
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret,
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+
+    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("training-pending-review-parser-v2");
+    expect(result).toMatchObject({ changed: true, idempotent: false });
+    expect(result.review.reprocessing.version).toBe(PENDING_REVIEW_REPROCESS_VERSION);
+    expect(result.review.reprocessing.sourceArtifactFingerprint).toBe(previousSourceFingerprint);
+    expect(reinterpret).toHaveBeenCalledTimes(2);
+    expect(result.review.status).toBe("pending");
+  });
+
   it("reprocesses the current four-exercise workout with machine identity and sets intact", async () => {
     registerRuntimeTrainingExercises([
       {

@@ -31,6 +31,9 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     review,
     requestedRecoveryContext
   ) ? requestedRecoveryContext : null;
+  const reprocessOutcome = ["updated", "current", "failed"].includes(query?.reprocess)
+    ? query.reprocess
+    : null;
   const presentedReview = { ...review, interpretedEvidence: repairPendingReviewExerciseIdentities(review.interpretedEvidence) };
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
+  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
 }

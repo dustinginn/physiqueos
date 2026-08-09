@@ -110,7 +110,8 @@ vi.mock("../../../../domain/services/PILowerLevelConfidenceWorkEnqueueService", 
 vi.mock("../../../../domain/services/PendingEvidenceReviewReprocessingService", () => ({
   createPendingEvidenceReviewReprocessingService: () => ({
     async reprocessPendingReviewInPlace() {
-      return null;
+      if (mockState.value.reprocessError) throw mockState.value.reprocessError;
+      return mockState.value.reprocessResult ?? { changed: false, idempotent: true };
     },
   }),
 }));
@@ -156,7 +157,7 @@ vi.mock("../../../../domain/services/TrainingPerformanceIntelligenceService", ()
   createTrainingPerformanceIntelligenceReport: () => ({ summary: "ok", exerciseObservations: [] }),
 }));
 
-const { confirmEvidenceReview } = await import("./actions.js");
+const { confirmEvidenceReview, reprocessEvidenceReview } = await import("./actions.js");
 
 function createIsolatedReviewState(store) {
   const review = structuredClone(
@@ -392,5 +393,46 @@ describe("confirmEvidenceReview", () => {
         (step) => step.status === "completed"
       )
     ).toBe(true);
+  });
+});
+
+describe("reprocessEvidenceReview", () => {
+  beforeEach(() => {
+    revalidatePath.mockReset();
+    redirect.mockReset();
+    mockState.value = createIsolatedReviewState(runtimeStore);
+    mockState.value.evidenceReviews[0].status = "pending";
+    mockState.value.evidenceReviews[0].confirmation = null;
+    mockState.value.evidenceReviews[0].commitProgress = {};
+  });
+
+  it.each([
+    ["updated", { changed: true, idempotent: false }],
+    ["current", { changed: false, idempotent: true }],
+  ])("redirects a %s result to explicit feedback and revalidates the review", async (outcome, result) => {
+    mockState.value.reprocessResult = result;
+    const review = mockState.value.evidenceReviews[0];
+    const formData = { get: (key) => key === "reviewId" ? review.id : null };
+
+    await expect(reprocessEvidenceReview(formData)).resolves.toBeUndefined();
+
+    expect(revalidatePath).toHaveBeenCalledWith(`/evidence/review/${review.id}`);
+    expect(redirect).toHaveBeenCalledWith(`/evidence/review/${review.id}?reprocess=${outcome}`);
+    expect(review.status).toBe("pending");
+  });
+
+  it("redirects a failed re-read to visible feedback without changing the review", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    const before = structuredClone(review);
+    mockState.value.reprocessError = Object.assign(new Error("provider unavailable"), {
+      code: "PROVIDER_UNAVAILABLE",
+    });
+    const formData = { get: (key) => key === "reviewId" ? review.id : null };
+
+    await expect(reprocessEvidenceReview(formData)).resolves.toBeUndefined();
+
+    expect(mockState.value.evidenceReviews[0]).toEqual(before);
+    expect(revalidatePath).toHaveBeenCalledWith(`/evidence/review/${review.id}`);
+    expect(redirect).toHaveBeenCalledWith(`/evidence/review/${review.id}?reprocess=failed`);
   });
 });

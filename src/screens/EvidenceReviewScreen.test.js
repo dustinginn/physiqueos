@@ -110,6 +110,26 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("Read upload again");
   });
 
+  it("shows explicit updated, current, and failed outcomes after a re-read", () => {
+    expect(page).toContain('query?.reprocess');
+    expect(page).toContain('reprocessOutcome={reprocessOutcome}');
+    expect(screen).toContain('reprocessOutcome === "updated"');
+    expect(screen).toContain("Review updated from the original evidence.");
+    expect(screen).toContain('reprocessOutcome === "current"');
+    expect(screen).toContain("No newer interpretation is available.");
+    expect(screen).toContain('reprocessOutcome === "failed"');
+    expect(screen).toContain("Re-read failed. Your previous review is still intact.");
+    expect(screen).toContain('aria-live="polite"');
+    expect(screen).toContain('aria-live="assertive"');
+  });
+
+  it("routes every action outcome through revalidation and a visible query result", () => {
+    expect(actions).toContain('outcome = result.changed ? "updated" : "current"');
+    expect(actions).toContain('let outcome = "failed"');
+    expect(actions).toContain('revalidatePath(`/evidence/review/${reviewId}`)');
+    expect(actions).toContain('`/evidence/review/${reviewId}?reprocess=${outcome}`');
+  });
+
   it("keeps the discard confirmation human and free of storage details", () => {
     expect(screen).toContain("Discard this review?");
     expect(screen).toContain("This review will not be added to your history.");

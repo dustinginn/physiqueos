@@ -80,11 +80,20 @@ export async function reprocessEvidenceReview(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
-  await createPendingEvidenceReviewReprocessingService({ repositories: FounderRepositories })
-    .reprocessPendingReviewInPlace(reviewId);
+  let outcome = "failed";
+  try {
+    const result = await createPendingEvidenceReviewReprocessingService({ repositories: FounderRepositories })
+      .reprocessPendingReviewInPlace(reviewId);
+    outcome = result.changed ? "updated" : "current";
+  } catch (error) {
+    console.warn("[EvidenceReview] Pending review re-read failed.", {
+      code: error?.code ?? "REPROCESS_FAILED",
+      reviewId,
+    });
+  }
   revalidatePath(`/evidence/review/${reviewId}`);
   redirect(appendEvidenceRecoveryContext(
-    `/evidence/review/${reviewId}?reprocessed=1`,
+    `/evidence/review/${reviewId}?reprocess=${outcome}`,
     recoveryContext
   ));
 }
