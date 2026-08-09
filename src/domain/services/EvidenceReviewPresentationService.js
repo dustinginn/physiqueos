@@ -126,13 +126,21 @@ function presentTraining(object, common) {
       metric("Average heart rate", unit(metadata.average_heart_rate, "bpm")),
       metric("Source", common.sourceLabel),
     ]),
-    exercises: (object.exercises ?? []).filter((exercise) => !exercise.removed).map((exercise) => {
+    exercises: (object.exercises ?? []).map((exercise, exerciseIndex) => ({ exercise, exerciseIndex })).filter(({ exercise }) => !exercise.removed).map(({ exercise, exerciseIndex }) => {
       const provisionalExerciseId =
         exercise.provisionalExercise?.resolutionStatus === "unresolved"
           ? exercise.provisionalExercise.provisionalExerciseId
           : null;
       return {
         name: getCanonicalTrainingExerciseLabel(exercise.name),
+        ...(exercise.id ? { id: exercise.id } : {}),
+        ...(exercise.canonicalExerciseId
+          ? { canonicalExerciseId: exercise.canonicalExerciseId }
+          : {}),
+        ...(exercise.executionVariant
+          ? { executionVariant: exercise.executionVariant }
+          : {}),
+        ...(exercise.id && exercise.canonicalExerciseId ? { exerciseIndex } : {}),
         ...(provisionalExerciseId ? { provisionalExerciseId } : {}),
         sets: (exercise.sets ?? []).map((set) => formatExerciseSet({
           ...set,

@@ -10,6 +10,10 @@ import {
   getCanonicalTrainingExerciseSlug,
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
+import {
+  formatTrainingExerciseOccurrenceLabel,
+  normalizeTrainingExecutionVariant,
+} from "../models/trainingExecutionVariant";
 import { interpretProgressPhotos } from "../interpreters";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import {
@@ -1919,6 +1923,15 @@ export function getResistanceBreakdown(resistanceSessions = []) {
       );
       const family = region.movementFamilies.get(familyKey);
       const groupedSets = groupExerciseSets(exercise.sets ?? []);
+      const executionVariant = normalizeTrainingExecutionVariant(
+        exercise.executionVariant
+      );
+      const occurrence = {
+        sessionId: session.id ?? null,
+        observedAt: session.observed_at ?? session.date ?? null,
+        executionVariant,
+        sets: groupedSets,
+      };
 
       if (!family.exercises.has(exerciseKey)) {
         family.exercises.set(exerciseKey, {
@@ -1928,6 +1941,8 @@ export function getResistanceBreakdown(resistanceSessions = []) {
             : "historical_only",
           id: exercise.id ?? exerciseLabel,
           label: exerciseLabel,
+          occurrences: [occurrence],
+          executionVariants: executionVariant ? [executionVariant] : [],
           primaryMuscleGroups,
           sets: groupedSets,
         });
@@ -1938,6 +1953,11 @@ export function getResistanceBreakdown(resistanceSessions = []) {
 
       family.exercises.set(exerciseKey, {
         ...existingExercise,
+        occurrences: [...(existingExercise.occurrences ?? []), occurrence],
+        executionVariants: uniqueExecutionVariants([
+          ...(existingExercise.executionVariants ?? []),
+          executionVariant,
+        ]),
         sets: [...(existingExercise.sets ?? []), ...groupedSets],
       });
     });
@@ -2149,10 +2169,17 @@ function formatExerciseSummary(exercises = []) {
 
 function formatExerciseLine(exercise) {
   const groupedSets = groupExerciseSets(exercise.sets ?? []);
+  const occurrenceLabel = formatTrainingExerciseOccurrenceLabel(exercise);
 
-  if (groupedSets.length === 0) return exercise.name;
+  if (groupedSets.length === 0) return occurrenceLabel;
 
-  return `${exercise.name}: ${groupedSets.join(", ")}`;
+  return `${occurrenceLabel}: ${groupedSets.join(", ")}`;
+}
+
+function uniqueExecutionVariants(values = []) {
+  const variants = new Map();
+  values.filter(Boolean).forEach((variant) => variants.set(variant.key, variant));
+  return [...variants.values()];
 }
 
 function groupExerciseSets(sets = []) {

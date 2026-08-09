@@ -34,8 +34,8 @@ const navigationRowSource = fs.readFileSync(
   "utf8"
 );
 
-const occurrence = ({ date, sets }) => ({
-  exercise: { name: "Bench Press", sets },
+const occurrence = ({ date, executionVariant, sets }) => ({
+  exercise: { name: "Bench Press", ...(executionVariant ? { executionVariant } : {}), sets },
   session: { date, id: `session-${date}` },
 });
 
@@ -175,6 +175,19 @@ describe("Exercise Detail mobile workflow", () => {
     ]);
     expect(result.comparison).toBe("Last session established a new best.");
     expect(result.bestSet).toBe("8 x 155 lb");
+  });
+
+  it("does not compare a variant benchmark with ordinary history", () => {
+    const result = getCurrentExerciseBenchmark([
+      occurrence({
+        date: "2026-07-16",
+        executionVariant: { key: "static_hold", label: "Static Hold", rawLabel: "Static Hold" },
+        sets: [{ reps: 10, weight: 140, weight_unit: "lb" }],
+      }),
+      occurrence({ date: "2026-07-09", sets: [{ reps: 8, weight: 150, weight_unit: "lb" }] }),
+    ]);
+    expect(result.bestSet).toBe("10 x 140 lb");
+    expect(result.comparison).toBe("No comparable prior variant session.");
   });
 
   it("keeps the existing volume, sets, set table, and history with optional source workouts", () => {

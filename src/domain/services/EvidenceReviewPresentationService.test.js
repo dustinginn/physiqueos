@@ -40,6 +40,26 @@ const evidencePackage = (objects = [training()]) => ({
 });
 
 describe("Evidence Review presentation", () => {
+  it("presents execution variants separately from canonical exercise names", () => {
+    const result = createEvidenceReviewPresentation({
+      evidencePackage: evidencePackage([training({
+        exercises: [{
+          id: "spider_curls_variant_static_hold",
+          name: "Spider Curls",
+          canonicalExerciseId: "spider_curl",
+          executionVariant: { key: "static_hold", label: "Static Hold", rawLabel: "Static Hold" },
+          sets: [{ reps: 13, weight: 35 }],
+        }],
+      })]),
+    });
+    expect(result.items[0].exercises[0]).toMatchObject({
+      name: "Spider Curls",
+      canonicalExerciseId: "spider_curl",
+      executionVariant: { key: "static_hold", label: "Static Hold" },
+      exerciseIndex: 0,
+    });
+  });
+
   it("renders a human-readable training review with modality-aware sets and source details", () => {
     const result = createEvidenceReviewPresentation({ evidencePackage: evidencePackage() });
     const card = result.items[0];

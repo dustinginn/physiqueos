@@ -6,6 +6,10 @@ import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
 } from "../models/trainingExerciseIdentity";
+import {
+  getTrainingExecutionVariantKey,
+  normalizeTrainingExecutionVariant,
+} from "../models/trainingExecutionVariant";
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
 
 const OBSERVATION_TYPE = "training_performance";
@@ -140,11 +144,15 @@ function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
   const sets = normalizeSets(exercise.sets);
   const totalVolume = sumKnownVolume(sets);
   const bestSet = getBestSet(sets);
+  const executionVariant = normalizeTrainingExecutionVariant(
+    exercise.executionVariant
+  );
 
   return {
     date: getDateKey(session.observed_at),
     exerciseKey: getCanonicalTrainingExerciseSlug(exercise.name),
     exerciseName: getCanonicalTrainingExerciseLabel(exercise.name),
+    ...(executionVariant ? { executionVariant } : {}),
     primaryNavigationCategory: navigationExercise.primaryNavigationCategory,
     sessionId: session.id,
     setCount: sets.length,
@@ -212,21 +220,29 @@ function normalizeWeight(value) {
 function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDateKey }) {
   const sortedEntries = entries.sort(compareEntries);
   const lastSession = sortedEntries.at(-1);
-  const previousComparableSession = sortedEntries.at(-2) ?? null;
-  const priorEntries = sortedEntries.slice(0, -1);
+  const comparisonVariantKey = getTrainingExecutionVariantKey(
+    lastSession?.executionVariant
+  );
+  const comparableEntries = sortedEntries.filter(
+    (entry) =>
+      getTrainingExecutionVariantKey(entry.executionVariant) ===
+      comparisonVariantKey
+  );
+  const previousComparableSession = comparableEntries.at(-2) ?? null;
+  const priorEntries = comparableEntries.slice(0, -1);
   const prDetection = detectPrs({ lastSession, priorEntries });
   const volumeTrend = getVolumeTrend({
     lastSession,
     previousComparableSession,
-    recentEntries: sortedEntries.slice(-4),
+    recentEntries: comparableEntries.slice(-4),
   });
   const progressiveOverloadStatus = getProgressiveOverloadStatus({
     prDetection,
-    sortedEntries,
+    sortedEntries: comparableEntries,
     volumeTrend,
   });
   const frequency = getExerciseFrequency({ entries: sortedEntries, nowDateKey });
-  const confidence = getExerciseObservationConfidence(sortedEntries);
+  const confidence = getExerciseObservationConfidence(comparableEntries);
 
   return {
     id: `performance|exercise|${exerciseKey}`,
@@ -235,6 +251,9 @@ function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDa
     exercise: {
       key: exerciseKey,
       name: lastSession.exerciseName,
+      ...(lastSession.executionVariant
+        ? { executionVariant: lastSession.executionVariant }
+        : {}),
       primaryNavigationCategory:
         lastSession.primaryNavigationCategory ?? "unmapped",
     },
@@ -253,12 +272,21 @@ function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDa
         status: progressiveOverloadStatus,
         reason: getProgressiveOverloadReason({
           prDetection,
-          sortedEntries,
+          sortedEntries: comparableEntries,
           volumeTrend,
         }),
       },
       volume_trend: volumeTrend,
       frequency,
+      ...(lastSession.executionVariant
+        ? {
+            comparison_context: {
+              execution_variant: lastSession.executionVariant,
+              comparable_session_count: comparableEntries.length,
+              variant_key: comparisonVariantKey,
+            },
+          }
+        : {}),
     },
     provenance: {
       source: "TrainingPerformanceIntelligenceService",
@@ -585,6 +613,9 @@ function serializeSessionEntry(entry) {
 
   return {
     date: entry.date,
+    ...(entry.executionVariant
+      ? { execution_variant: entry.executionVariant }
+      : {}),
     session_id: entry.sessionId,
     set_count: entry.setCount,
     best_set: entry.bestSet,

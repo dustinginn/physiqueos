@@ -92,6 +92,63 @@ describe("EvidenceReviewService provisional exercise safety", () => {
   });
 });
 
+describe("EvidenceReviewService execution variant editing", () => {
+  it("adds and removes a normalized variant with optimistic concurrency", async () => {
+    const state = reviewFixture();
+    state.review.interpretedEvidence.evidence_objects[0].exercises[0] = {
+      id: "spider_curls",
+      name: "Spider Curls",
+      canonicalExerciseId: "spider_curl",
+      sets: [{ reps: 13, weight: 35 }],
+    };
+    const service = createEvidenceReviewService({
+      repositories: repositories(state),
+      now: () => new Date("2026-07-29T20:00:00.000Z"),
+    });
+
+    await service.updateTrainingExecutionVariant(state.review.id, {
+      evidenceObjectId: "training_1",
+      exerciseIndex: 0,
+      expectedUpdatedAt: state.review.updatedAt,
+      mode: "save",
+      rawLabel: " static-holds ",
+      updatedBy: "founder",
+    });
+    expect(state.review.interpretedEvidence.evidence_objects[0].exercises[0]
+      .executionVariant).toEqual({
+        key: "static_hold",
+        label: "Static Hold",
+        rawLabel: "static-holds",
+      });
+
+    await service.updateTrainingExecutionVariant(state.review.id, {
+      evidenceObjectId: "training_1",
+      exerciseIndex: 0,
+      expectedUpdatedAt: state.review.updatedAt,
+      mode: "remove",
+      updatedBy: "founder",
+    });
+    expect(state.review.interpretedEvidence.evidence_objects[0].exercises[0]
+      .executionVariant).toBeUndefined();
+  });
+
+  it("rejects a stale variant edit without mutation", async () => {
+    const state = reviewFixture();
+    state.review.interpretedEvidence.evidence_objects[0].exercises[0]
+      .canonicalExerciseId = "spider_curl";
+    const before = structuredClone(state.review);
+    await expect(createEvidenceReviewService({ repositories: repositories(state) })
+      .updateTrainingExecutionVariant(state.review.id, {
+        evidenceObjectId: "training_1",
+        exerciseIndex: 0,
+        expectedUpdatedAt: "stale",
+        mode: "save",
+        rawLabel: "Static Hold",
+      })).rejects.toMatchObject({ code: "REVIEW_STALE" });
+    expect(state.review).toEqual(before);
+  });
+});
+
 function repositories(state) {
   return {
     evidenceReviews: {

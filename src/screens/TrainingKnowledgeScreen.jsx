@@ -24,6 +24,11 @@ import {
   getCanonicalTrainingExerciseSlug,
   resolveTrainingExerciseIdentity,
 } from "../domain/models/trainingExerciseIdentity";
+import {
+  formatTrainingExerciseOccurrenceLabel,
+  getTrainingExecutionVariantKey,
+  ORDINARY_EXECUTION_VARIANT_KEY,
+} from "../domain/models/trainingExecutionVariant";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
 import {
   formatTrainingLoad,
@@ -784,7 +789,7 @@ export function getSessionContent({
               key={exercise.id ?? exercise.name}
             >
               <p className="text-sm font-extrabold text-slate-950">
-                {exercise.name}
+                {formatTrainingExerciseOccurrenceLabel(exercise)}
               </p>
               <div className="mt-2 space-y-1">
                 {normalizeTrainingSetsForPresentation(exercise.sets ?? []).map((set, index) => (
@@ -1337,6 +1342,11 @@ function LastExerciseSessionCard({ occurrence }) {
     >
       {occurrence?.session ? (
         <div className="space-y-2">
+          {occurrence.exercise?.executionVariant?.label && (
+            <p className="text-xs font-extrabold text-indigo-600">
+              {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
+            </p>
+          )}
           <MetricGroup items={getExerciseMetricItems(sets)} />
           <ExerciseSetList sets={sets} />
         </div>
@@ -1376,8 +1386,15 @@ function ExerciseHistoryCard({ occurrences = [] }) {
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
                 <span className="flex min-w-0 items-center gap-2">
                   <SessionBadge date={occurrence.session.date} />
-                  <span className="block truncate text-xs font-semibold text-slate-500">
-                    {formatExerciseHistoryMeta(occurrence.exercise.sets)}
+                  <span className="min-w-0">
+                    {occurrence.exercise.executionVariant?.label && (
+                      <span className="block truncate text-xs font-extrabold text-indigo-600">
+                        {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
+                      </span>
+                    )}
+                    <span className="block truncate text-xs font-semibold text-slate-500">
+                      {formatExerciseHistoryMeta(occurrence.exercise.sets)}
+                    </span>
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-extrabold text-indigo-600">
@@ -1385,6 +1402,9 @@ function ExerciseHistoryCard({ occurrences = [] }) {
                 </span>
               </summary>
               <div className="mt-2 border-t border-[var(--divider)] pt-2">
+                <p className="mb-2 text-xs font-extrabold text-indigo-600">
+                  {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
+                </p>
                 <ExerciseSetList sets={occurrence.exercise.sets} />
               </div>
             </details>
@@ -1565,25 +1585,35 @@ function getExerciseSetStats(sets = []) {
 export function getCurrentExerciseBenchmark(occurrences = []) {
   const latest = occurrences[0];
   if (!latest?.session) return null;
+  const latestVariantKey = getTrainingExecutionVariantKey(latest.exercise);
+  const comparableOccurrences = occurrences.filter(
+    (occurrence) =>
+      getTrainingExecutionVariantKey(occurrence.exercise) === latestVariantKey
+  );
   const latestStats = getExerciseSetStats(latest.exercise?.sets ?? []);
   const lifetimeStats = getExerciseSetStats(
-    occurrences.flatMap((occurrence) => occurrence.exercise?.sets ?? [])
+    comparableOccurrences.flatMap((occurrence) => occurrence.exercise?.sets ?? [])
   );
   const priorStats = getExerciseSetStats(
-    occurrences
+    comparableOccurrences
       .slice(1)
       .flatMap((occurrence) => occurrence.exercise?.sets ?? [])
   );
   if (!lifetimeStats.bestSet) return null;
 
-  const comparison = latestStats.bestSet
+  const comparison = latestStats.bestSet && (
+    comparableOccurrences.length > 1 ||
+    latestVariantKey === ORDINARY_EXECUTION_VARIANT_KEY
+  )
     ? priorStats.bestSet &&
       compareExerciseSets(latestStats.bestSet, priorStats.bestSet) < 0
       ? "Last session established a new best."
       : compareExerciseSets(latestStats.bestSet, lifetimeStats.bestSet) === 0
         ? "Last session matched your current best."
         : "Last session finished below your current best."
-    : null;
+    : latestStats.bestSet && latestVariantKey !== ORDINARY_EXECUTION_VARIANT_KEY
+      ? "No comparable prior variant session."
+      : null;
 
   return {
     bestSet: formatSetGlance(lifetimeStats.bestSet),
@@ -1592,6 +1622,9 @@ export function getCurrentExerciseBenchmark(occurrences = []) {
     workingWeight: latestStats.bestSet
       ? formatTrainingLoad(latestStats.bestSet)
       : "Pending",
+    ...(latest.exercise?.executionVariant
+      ? { executionVariant: latest.exercise.executionVariant }
+      : {}),
   };
 }
 

@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { recoverEvidenceIntakeSubmissionFromArtifacts } from "./EvidenceIntakeService";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import { resolveExecutionVariantHeading } from "../models/trainingSessionEvidence";
 
-export const PENDING_REVIEW_REPROCESS_VERSION = "typed-strength-reconciliation-v6-compact-upload-grammar";
+export const PENDING_REVIEW_REPROCESS_VERSION = "training-execution-variants-v1";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {
@@ -178,17 +179,24 @@ function getExerciseSourceBlock(typedEvidence, canonicalExerciseId) {
   if (!typedEvidence || !canonicalExerciseId) return "";
   const lines = String(typedEvidence).split(/\r?\n/);
   const start = lines.findIndex(
-    (line) => resolveTrainingExerciseIdentity(line.trim()).canonicalExerciseId === canonicalExerciseId
+    (line) => getSourceHeadingCanonicalExerciseId(line) === canonicalExerciseId
   );
   if (start < 0) return "";
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (resolveTrainingExerciseIdentity(lines[index].trim()).canonicalExerciseId) {
+    if (getSourceHeadingCanonicalExerciseId(lines[index])) {
       end = index;
       break;
     }
   }
   return lines.slice(start, end).join("\n");
+}
+
+function getSourceHeadingCanonicalExerciseId(line) {
+  const source = String(line ?? "").trim();
+  return resolveTrainingExerciseIdentity(source).canonicalExerciseId ??
+    resolveExecutionVariantHeading(source)?.baseIdentity?.canonicalExerciseId ??
+    null;
 }
 
 function hasWeightedOrAssistedSignal(sourceBlock) {

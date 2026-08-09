@@ -48,6 +48,49 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("reparses Static Hold into the pending review without changing its sets or committing canonical evidence", async () => {
+    const typedText = [
+      "Spider Curls (Static Hold)",
+      "35p 13r",
+      "35p 10r",
+      "35p 10r",
+      "35p 10r",
+    ].join("\n");
+    const state = fixture({
+      sources: [{ id: "typed_evidence_0", kind: "typed_evidence", text: typedText }],
+    });
+    const priorSets = parseStrengthTrainingText(typedText)[0].sets.map((set) => {
+      const { executionVariant: _unused, ...copy } = set;
+      return copy;
+    });
+    state.review.interpretedEvidence.evidence_objects = [trainingObject([{
+      id: "spider_curls",
+      name: "Spider Curls",
+      canonicalExerciseId: "spider_curl",
+      sets: structuredClone(priorSets),
+    }])];
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret: async (sourcePackage) => ({
+        ...structuredClone(sourcePackage),
+        evidence_objects: [trainingObject(parseStrengthTrainingText(typedText))],
+      }),
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+    const exercise = result.review.interpretedEvidence.evidence_objects[0].exercises[0];
+    expect(exercise).toMatchObject({
+      id: "spider_curls",
+      canonicalExerciseId: "spider_curl",
+      executionVariant: { key: "static_hold", label: "Static Hold" },
+    });
+    expect(exercise.sets.map(({ reps, weight }) => [reps, weight])).toEqual([
+      [13, 35], [10, 35], [10, 35], [10, 35],
+    ]);
+    expect(result.review.status).toBe("pending");
+    expect(state.repositories.canonicalEvidence.listCanonicalEvidenceObjects).toHaveBeenCalledTimes(1);
+  });
+
   it("reprocesses the retained July 25 Training candidate in place without changing its Activity object or source package", async () => {
     const packageId = "evidence_submission_20260726021441961_images";
     const reviewId = "evidence_review_20260726021515848";

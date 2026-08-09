@@ -9,6 +9,7 @@ import {
   resolveProvisionalExerciseInPackage,
 } from "./CanonicalExerciseLibraryService";
 import { listCanonicalTrainingExerciseIdentities } from "../models/trainingExerciseIdentity";
+import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
@@ -115,6 +116,59 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
           updatedAt: now().toISOString(),
           updatedBy,
         },
+      });
+    },
+    async updateTrainingExecutionVariant(id, {
+      evidenceObjectId,
+      exerciseIndex,
+      expectedUpdatedAt,
+      mode,
+      rawLabel,
+      updatedBy,
+    }) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("EXERCISE_REVIEW_NOT_EDITABLE", "This exercise review cannot be edited.");
+      }
+      if (!expectedUpdatedAt || review.updatedAt !== expectedUpdatedAt) {
+        throw reviewError("REVIEW_STALE", "This evidence review changed. Reload it before editing the variant.");
+      }
+      const normalizedIndex = Number(exerciseIndex);
+      const executionVariant = mode === "remove"
+        ? null
+        : normalizeTrainingExecutionVariant(rawLabel);
+      if (mode !== "remove" && !executionVariant) {
+        throw reviewError("EXECUTION_VARIANT_INVALID", "Enter a valid execution variant.");
+      }
+      let matched = 0;
+      const interpretedEvidence = {
+        ...review.interpretedEvidence,
+        evidence_objects: (review.interpretedEvidence?.evidence_objects ?? []).map((object) => {
+          if (object.id !== evidenceObjectId || object.evidence_type !== "training") return object;
+          return {
+            ...object,
+            exercises: (object.exercises ?? []).map((exercise, index) => {
+              if (index !== normalizedIndex) return exercise;
+              if (!exercise.canonicalExerciseId) {
+                throw reviewError("CANONICAL_EXERCISE_UNAVAILABLE", "Resolve the base exercise before editing its variant.");
+              }
+              matched += 1;
+              if (executionVariant) return { ...exercise, executionVariant };
+              const { executionVariant: _removed, ...ordinaryExercise } = exercise;
+              return ordinaryExercise;
+            }),
+          };
+        }),
+      };
+      if (matched !== 1) {
+        throw reviewError("EXERCISE_OCCURRENCE_UNAVAILABLE", "The selected exercise occurrence is no longer available.");
+      }
+      if (typeof repositories.evidenceReviews.updateReviewIfCurrent !== "function") {
+        throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "Exercise editing is temporarily unavailable.");
+      }
+      return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, {
+        interpretedEvidence,
+        exerciseVariantEditing: { updatedAt: now().toISOString(), updatedBy },
       });
     },
     async failCommit(id, error) {

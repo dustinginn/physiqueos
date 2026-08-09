@@ -9,6 +9,11 @@ import {
 import {
   suggestCanonicalTrainingMuscleGroup,
 } from "./trainingMuscleGroupIdentity";
+import {
+  getTrainingExerciseOccurrenceKey,
+  normalizeTrainingExecutionVariant,
+  parseTrailingExecutionVariant,
+} from "./trainingExecutionVariant";
 
 const DEFAULT_METADATA = {
   activity_type: null,
@@ -589,10 +594,9 @@ export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidenc
     if (!isSetLine(segment) && !/\d/.test(segment)) {
       currentExercise = cleanExerciseName(segment);
       if (!exerciseMap.has(currentExercise)) {
+        const seed = createTrainingExerciseSeed(currentExercise);
         exerciseMap.set(currentExercise, {
-        id: createExerciseId(currentExercise),
-        name: currentExercise,
-          ...inferExerciseMetadata(currentExercise),
+          ...seed,
           provenance_ref: provenanceRef,
           provenance: {
             source_artifact_refs: [provenanceRef],
@@ -853,6 +857,21 @@ function parseCompactStrengthTrainingBlocks(
       currentBlock = {
         activeLoadUnit: null,
         identity: identity.exercise,
+        executionVariant: null,
+        entries: [],
+        parseIssues: [],
+      };
+      blocks.push(currentBlock);
+      pendingRepeat = null;
+      continue;
+    }
+
+    const variantHeading = resolveExecutionVariantHeading(line);
+    if (variantHeading?.baseIdentity) {
+      currentBlock = {
+        activeLoadUnit: null,
+        identity: variantHeading.baseIdentity.exercise,
+        executionVariant: variantHeading.executionVariant,
         entries: [],
         parseIssues: [],
       };
@@ -867,15 +886,19 @@ function parseCompactStrengthTrainingBlocks(
     const nextLine = nextContentIndex >= 0 ? sourceLines[nextContentIndex].trim() : "";
     if (
       identity.resolutionStatus === "unrecognized" &&
-      isStructurallyValidUnknownExerciseHeading(line, nextLine)
+      isStructurallyValidUnknownExerciseHeading(
+        variantHeading?.baseLabel ?? line,
+        nextLine
+      )
     ) {
       currentBlock = {
         activeLoadUnit: null,
         identity: createProvisionalExerciseIdentity({
-          line,
+          line: variantHeading?.baseLabel ?? line,
           lineIndex,
           provenanceRef,
         }),
+        executionVariant: variantHeading?.executionVariant ?? null,
         entries: [],
         parseIssues: [],
       };
@@ -980,6 +1003,9 @@ function parseCompactStrengthTrainingBlocks(
       const parsedWithIssues = {
         ...parsed,
         parseIssues: block.parseIssues,
+        ...(block.executionVariant
+          ? { executionVariant: block.executionVariant }
+          : {}),
       };
       if (!block.identity.provisional) return parsedWithIssues;
       return {
@@ -995,9 +1021,13 @@ function parseCompactStrengthTrainingBlocks(
     .filter(Boolean);
   const merged = new Map();
   for (const exercise of parsedExercises) {
-    const existing = merged.get(exercise.name);
+    const key = getTrainingExerciseOccurrenceKey(
+      exercise,
+      exercise.canonicalExerciseId ?? exercise.name
+    );
+    const existing = merged.get(key);
     if (!existing) {
-      merged.set(exercise.name, exercise);
+      merged.set(key, exercise);
       continue;
     }
     existing.sets.push(...exercise.sets);
@@ -2648,6 +2678,13 @@ export function normalizeTrainingExercises(exercises) {
         id: exercise.id ?? exercise.exercise_id ?? createExerciseId(name),
         name,
         canonicalExerciseId,
+        ...(normalizeTrainingExecutionVariant(exercise.executionVariant)
+          ? {
+              executionVariant: normalizeTrainingExecutionVariant(
+                exercise.executionVariant
+              ),
+            }
+          : {}),
         resolutionStatus: exercise.resolutionStatus ?? "resolved",
         provisionalExercise: exercise.provisionalExercise
           ? { ...exercise.provisionalExercise, sets }
@@ -2779,15 +2816,9 @@ function appendTrainingSets({
   weight,
 }) {
   if (!exerciseMap.has(exerciseName)) {
-    const resolvedIdentity = resolveTrainingExerciseIdentity(exerciseName);
+    const seed = createTrainingExerciseSeed(exerciseName, { equipment });
     exerciseMap.set(exerciseName, {
-      id: createExerciseId(exerciseName),
-      name: exerciseName,
-      canonicalExerciseId:
-        resolvedIdentity.resolutionStatus === "resolved_high_confidence"
-          ? resolvedIdentity.canonicalExerciseId
-          : null,
-      ...inferExerciseMetadata(exerciseName, { equipment }),
+      ...seed,
       provenance_ref: provenanceRef,
       provenance: {
         source_artifact_refs: [provenanceRef],
@@ -2823,10 +2854,9 @@ function appendTimedTrainingSets({
   setCount,
 }) {
   if (!exerciseMap.has(exerciseName)) {
+    const seed = createTrainingExerciseSeed(exerciseName);
     exerciseMap.set(exerciseName, {
-      id: createExerciseId(exerciseName),
-      name: exerciseName,
-      ...inferExerciseMetadata(exerciseName),
+      ...seed,
       provenance_ref: provenanceRef,
       provenance: {
         source_artifact_refs: [provenanceRef],
@@ -2962,14 +2992,71 @@ function cleanExerciseName(value) {
     resolved.resolutionStatus === "resolved_high_confidence" &&
     (
       resolved.exercise?.body_region === "Lower Body" ||
-      resolved.canonicalExerciseId === "hanging_leg_raise"
+      resolved.canonicalExerciseId === "hanging_leg_raise" ||
+      /\([^)]*\)/.test(text)
     )
   ) {
     return resolved.canonicalExerciseName;
   }
+  const variantHeading = resolveExecutionVariantHeading(text);
+  if (variantHeading) {
+    const baseName = variantHeading.baseIdentity?.canonicalExerciseName ??
+      titleExerciseName(variantHeading.baseLabel);
+    return `${baseName} (${variantHeading.executionVariant.rawLabel})`;
+  }
   const specificExerciseName = extractSpecificExerciseName(text);
 
   return specificExerciseName ?? titleExerciseName(text);
+}
+
+export function resolveExecutionVariantHeading(value) {
+  const source = cleanText(value);
+  if (!source) return null;
+  if (
+    resolveTrainingExerciseIdentity(source).resolutionStatus ===
+    "resolved_high_confidence"
+  ) {
+    return null;
+  }
+  const trailing = parseTrailingExecutionVariant(source);
+  if (!trailing) return null;
+  const baseIdentity = resolveTrainingExerciseIdentity(trailing.baseLabel);
+  return {
+    baseLabel: trailing.baseLabel,
+    baseIdentity:
+      baseIdentity.resolutionStatus === "resolved_high_confidence"
+        ? baseIdentity
+        : null,
+    executionVariant: trailing.executionVariant,
+  };
+}
+
+function createTrainingExerciseSeed(value, { equipment } = {}) {
+  const source = cleanText(value);
+  const exactIdentity = resolveTrainingExerciseIdentity(source);
+  const variantHeading = exactIdentity.resolutionStatus === "resolved_high_confidence"
+    ? null
+    : resolveExecutionVariantHeading(source);
+  const identity = variantHeading?.baseIdentity ?? exactIdentity;
+  const name = variantHeading?.baseIdentity
+    ? variantHeading.baseIdentity.canonicalExerciseName
+    : variantHeading?.baseLabel ?? source;
+  return {
+    id: createExerciseId(
+      variantHeading?.executionVariant
+        ? `${variantHeading.baseLabel} variant ${variantHeading.executionVariant.key}`
+        : source
+    ),
+    name,
+    canonicalExerciseId:
+      identity.resolutionStatus === "resolved_high_confidence"
+        ? identity.canonicalExerciseId
+        : null,
+    ...(variantHeading?.executionVariant
+      ? { executionVariant: variantHeading.executionVariant }
+      : {}),
+    ...inferExerciseMetadata(name, { equipment }),
+  };
 }
 
 function cleanText(value) {

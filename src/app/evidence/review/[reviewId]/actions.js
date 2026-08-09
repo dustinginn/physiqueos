@@ -165,6 +165,28 @@ export async function resolveEvidenceReviewExercise(formData) {
   ));
 }
 
+export async function updateEvidenceReviewExerciseVariant(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
+  await createEvidenceReviewService({ repositories: FounderRepositories })
+    .updateTrainingExecutionVariant(reviewId, {
+      evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
+      exerciseIndex: Number(formData.get("exerciseIndex")),
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      mode: String(formData.get("variantMode") ?? "save"),
+      rawLabel: String(formData.get("variantLabel") ?? ""),
+      updatedBy: user.id,
+    });
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?variant=updated`,
+    recoveryContext
+  ));
+}
+
 export async function updateEvidenceReviewItemDecision(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
   const itemId = String(formData.get("itemId") ?? "");

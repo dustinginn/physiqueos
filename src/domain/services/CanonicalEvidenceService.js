@@ -1,6 +1,7 @@
 import { normalizeIdentityPart } from "./normalizeIdentityPart";
 import { createTrainingSessionEvidenceFromText } from "../models/trainingSessionEvidence";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
 import {
   assessWorkoutDuplicatePair,
   getWorkoutDuplicateIdentityKey,
@@ -765,8 +766,9 @@ function mergeExercises(
   [...left, ...right].forEach((exercise) => {
     const identity = resolveTrainingExerciseIdentity(exercise?.name ?? exercise?.id);
     if (identity.resolutionStatus === "unrecognized" && /^(reps|sets|weight|load|volume|notes|rest)$/i.test(String(exercise?.name ?? "").trim())) return;
-    const key = identity.canonicalExerciseId ?? normalizeMorphologicalExerciseIdentity(exercise?.name ?? exercise?.id);
-    if (!key) return;
+    const movementKey = identity.canonicalExerciseId ?? normalizeMorphologicalExerciseIdentity(exercise?.name ?? exercise?.id);
+    if (!movementKey) return;
+    const key = getTrainingExerciseOccurrenceKey(exercise, movementKey);
     const canonicalExercise = identity.canonicalExerciseId
       ? {
           ...exercise,

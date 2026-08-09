@@ -31,7 +31,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, photoPoseAction, recoveryContext = null, reprocessAction, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
@@ -76,7 +76,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -148,7 +148,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, exerciseVariantAction, item, onToggle, photoPoseAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -169,7 +169,14 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, recoveryContex
             {item.exercises.map((exercise, index) => (
               <div key={`${exercise.name}-${index}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>
+                  <div>
+                    <p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>
+                    {exercise.executionVariant?.label && (
+                      <p className="mt-0.5 text-xs font-bold text-[var(--primary)]">
+                        Variant: {exercise.executionVariant.label}
+                      </p>
+                    )}
+                  </div>
                   {exercise.provisionalExerciseId && (
                     <a
                       className="shrink-0 rounded-full bg-[var(--surface-warning)] px-2.5 py-1 text-xs font-extrabold text-[var(--text-primary)] underline decoration-transparent underline-offset-2 hover:decoration-current focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
@@ -182,6 +189,40 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, recoveryContex
                 {exercise.sets.length
                   ? <ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{exercise.sets.map((set, setIndex) => <li key={`${set}-${setIndex}`}>• {set}</li>)}</ul>
                   : <p className="mt-1 text-sm text-[var(--text-muted)]">Set details unavailable</p>}
+                {canEdit && exercise.canonicalExerciseId && exerciseVariantAction && (
+                  <details className="mt-2 rounded-xl border border-[var(--divider)] px-3 py-2">
+                    <summary className="cursor-pointer text-xs font-extrabold text-[var(--primary)]">
+                      {exercise.executionVariant ? "Edit variant" : "Add variant"}
+                    </summary>
+                    <form action={exerciseVariantAction} className="mt-3 space-y-2">
+                      <input name="reviewId" type="hidden" value={review.id} />
+                      <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+                      <input name="evidenceObjectId" type="hidden" value={item.object.id} />
+                      <input name="exerciseIndex" type="hidden" value={exercise.exerciseIndex} />
+                      <EvidenceRecoveryContextFields context={recoveryContext}/>
+                      <label className="block text-xs font-bold text-[var(--text-secondary)]" htmlFor={`variant-${item.object.id}-${exercise.exerciseIndex}`}>
+                        Execution variant
+                      </label>
+                      <input
+                        className="min-h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)]"
+                        defaultValue={exercise.executionVariant?.label ?? ""}
+                        id={`variant-${item.object.id}-${exercise.exerciseIndex}`}
+                        name="variantLabel"
+                        placeholder="Static Hold"
+                      />
+                      <div className="flex gap-2">
+                        <button className="min-h-10 flex-1 rounded-xl bg-[var(--primary)] px-3 text-xs font-extrabold text-white" name="variantMode" type="submit" value="save">
+                          Save variant
+                        </button>
+                        {exercise.executionVariant && (
+                          <button className="min-h-10 rounded-xl border border-[var(--divider)] px-3 text-xs font-extrabold text-[var(--text-primary)]" name="variantMode" type="submit" value="remove">
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </details>
+                )}
               </div>
             ))}
           </div>

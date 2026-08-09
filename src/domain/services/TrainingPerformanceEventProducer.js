@@ -4,6 +4,7 @@ import {
   TRAINING_PERFORMANCE_EVENT_TYPES,
 } from "../models/trainingPerformanceEvent";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
 
 export function produceTrainingPerformanceEvents({
   canonicalTrainingSession,
@@ -31,7 +32,9 @@ export function produceTrainingPerformanceEvents({
 
   const workoutDate = String(session.observed_at ?? "").slice(0, 10);
   const exercises = new Map(
-    (session.exercises ?? []).map((exercise) => {
+    (session.exercises ?? []).filter(
+      (exercise) => !normalizeTrainingExecutionVariant(exercise.executionVariant)
+    ).map((exercise) => {
       const identity = resolveTrainingExerciseIdentity(exercise.name);
       return [identity.canonicalExerciseId, { exercise, identity }];
     })
@@ -40,6 +43,9 @@ export function produceTrainingPerformanceEvents({
 
   for (const observation of report.exerciseObservations) {
     const lastSession = observation?.explanation_data?.last_session;
+    if (normalizeTrainingExecutionVariant(lastSession?.execution_variant)) {
+      continue;
+    }
     if (
       lastSession?.session_id !== session.id ||
       lastSession?.date !== workoutDate

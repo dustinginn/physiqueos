@@ -10,6 +10,7 @@ import {
   getCanonicalTrainingExerciseSlug,
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
+import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
 import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
 import {
   createNutritionDayEvidenceObject,
@@ -2883,8 +2884,8 @@ function hasValidatedCanonicalExerciseIdentity(exercise = {}) {
 
 function getStrengthExerciseMergeKey(exercise = {}) {
   return hasValidatedCanonicalExerciseIdentity(exercise)
-    ? `canonical:${exercise.canonicalExerciseId}`
-    : `unresolved:${createExerciseId(exercise.name)}`;
+    ? `canonical:${getTrainingExerciseOccurrenceKey(exercise, exercise.canonicalExerciseId)}`
+    : `unresolved:${getTrainingExerciseOccurrenceKey(exercise, createExerciseId(exercise.name))}`;
 }
 
 function reconcileStrengthExerciseSets(existingSets, newSets) {
