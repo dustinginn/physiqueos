@@ -64,6 +64,29 @@ Each backup contains:
 - `manifest.txt` — a concise compatibility summary; and
 - `checksums.txt` — SHA-256 values for every other backup file.
 
+## Complete a synchronized work session locally
+
+When the current branch and its recorded upstream are already synchronized,
+End Work Session can accept an existing verified local backup without pushing
+or constructing another backup on a cloud-mounted filesystem:
+
+```powershell
+.\scripts\endWorkSession.ps1 `
+  -LocalOnly `
+  -VerifiedBackupPath "C:\path\to\PhysiqueOS_Backup_yyyy-MM-dd_HH-mm-ss" `
+  -ExternalReplicationStatus pending
+```
+
+Local-only mode is explicit and fail-closed. It requires a clean worktree and
+index, runs the embedded-repository and staged-file guards, requires a
+configured upstream with exactly zero commits ahead and zero behind, and
+revalidates the backup manifest, checksums, bundle, branch, HEAD, completeness
+report, and configured preservation references. It does not push. A branch
+with unpushed or missing commits cannot be closed in this mode.
+
+External replication is separate from backup acceptance. Keep the verified
+local backup until any cloud copy has been independently checked.
+
 ## Validate a backup
 
 ```powershell

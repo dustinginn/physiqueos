@@ -1,12 +1,22 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$LocalOnly,
+
+  [string]$VerifiedBackupPath,
+
+  [ValidateSet("pending", "accepted", "not_requested")]
+  [string]$ExternalReplicationStatus = "pending",
+
+  [string]$BackupDestination = "G:\My Drive\PhysiqueOS Backups",
+
+  [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $startedAt = Get-Date
-$backupDestination = "G:\My Drive\PhysiqueOS Backups"
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 Set-Location -LiteralPath $repositoryRoot
 
 function Invoke-CheckedGit {
@@ -49,6 +59,19 @@ try {
   Write-Host ""
   Invoke-CheckedGit -Arguments @("-c", "color.status=always", "status")
 
+  if ($LocalOnly) {
+    $localOnlyChanges = @(& git status --porcelain=v1 -uall)
+    if ($LASTEXITCODE -ne 0) {
+      throw "Unable to inspect the working tree for local-only closeout."
+    }
+    if ($localOnlyChanges.Count -gt 0) {
+      throw (
+        "Local-only closeout requires a clean working tree and index; " +
+        "commit or discard changes through a separately reviewed workflow."
+      )
+    }
+  }
+
   Write-Host ""
   Write-Host "Staging tracked and untracked changes..." -ForegroundColor Cyan
   Invoke-CheckedGit -Arguments @("add", "-A")
@@ -61,6 +84,12 @@ try {
   if ($stagedDiffExitCode -eq 0) {
     Write-Host "Working tree already clean." -ForegroundColor Green
   } elseif ($stagedDiffExitCode -eq 1) {
+    if ($LocalOnly) {
+      throw (
+        "Local-only closeout cannot create an unpushed commit; " +
+        "staged changes must be resolved before closeout."
+      )
+    }
     $commitMessage = [Environment]::GetEnvironmentVariable(
       "PHYSIQUEOS_SESSION_COMMIT_MESSAGE"
     )
@@ -73,15 +102,49 @@ try {
     throw "Unable to determine whether staged changes exist."
   }
 
-  $commitHash = (& git rev-parse --short HEAD).Trim()
-  if ($LASTEXITCODE -ne 0 -or -not $commitHash) {
+  $fullCommitHash = (& git rev-parse HEAD).Trim()
+  if ($LASTEXITCODE -ne 0 -or -not $fullCommitHash) {
     throw "Unable to resolve the current commit."
   }
+  $commitHash = $fullCommitHash.Substring(0, [Math]::Min(7, $fullCommitHash.Length))
   Write-Host "Commit: $commitHash" -ForegroundColor Green
 
   $pushOccurred = $false
-  & git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>$null
-  if ($LASTEXITCODE -eq 0) {
+  $upstream = (& git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>$null).Trim()
+  $hasUpstream = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($upstream)
+  if ($LocalOnly) {
+    if (-not $hasUpstream) {
+      throw "Local-only closeout requires a configured upstream tracking branch."
+    }
+
+    $divergenceText = (& git rev-list --left-right --count "$upstream...HEAD").Trim()
+    if ($LASTEXITCODE -ne 0) {
+      throw "Unable to determine local/upstream divergence for local-only closeout."
+    }
+    $divergence = @($divergenceText -split '\s+')
+    if ($divergence.Count -ne 2) {
+      throw "Unexpected local/upstream divergence result: $divergenceText"
+    }
+    [long]$behindCount = 0
+    [long]$aheadCount = 0
+    if (
+      -not [long]::TryParse($divergence[0], [ref]$behindCount) -or
+      -not [long]::TryParse($divergence[1], [ref]$aheadCount)
+    ) {
+      throw "Unable to parse local/upstream divergence: $divergenceText"
+    }
+    if ($aheadCount -ne 0 -or $behindCount -ne 0) {
+      throw (
+        "Local-only closeout requires synchronized local/upstream refs; " +
+        "ahead=$aheadCount behind=$behindCount."
+      )
+    }
+
+    Write-Host (
+      "Remote tracking ref already synchronized with local HEAD (0 ahead / 0 behind)."
+    ) -ForegroundColor Green
+    Write-Host "Push skipped by explicit local-only mode." -ForegroundColor Green
+  } elseif ($hasUpstream) {
     Write-Host "Pushing to the current branch upstream..." -ForegroundColor Cyan
     Invoke-CheckedGit -Arguments @("push")
     $pushOccurred = $true
@@ -102,9 +165,35 @@ try {
 
   Write-Host ""
   Write-Host "========================================"
-  Write-Host "Running PhysiqueOS backup..." -ForegroundColor Cyan
-  & (Join-Path $PSScriptRoot "backupRepository.ps1") -DestinationDirectory $backupDestination
-  Write-Host "Backup verified." -ForegroundColor Green
+  $acceptedBackupPath = $null
+  $acceptedManifestHash = $null
+  $acceptedBundleHash = $null
+  if ($LocalOnly) {
+    if ([string]::IsNullOrWhiteSpace($VerifiedBackupPath)) {
+      throw "Local-only closeout requires -VerifiedBackupPath."
+    }
+    Write-Host "Validating supplied local backup..." -ForegroundColor Cyan
+    $backupVerificationOutput = @(& node `
+      (Join-Path $PSScriptRoot "verifyRepositoryBackup.mjs") `
+      --backup $VerifiedBackupPath `
+      --expected-head $fullCommitHash `
+      --expected-branch $branch)
+    if ($LASTEXITCODE -ne 0) {
+      throw "Supplied local backup failed verification."
+    }
+    $backupIdentity = ($backupVerificationOutput -join "`n") | ConvertFrom-Json
+    $acceptedBackupPath = $backupIdentity.backupPath
+    $acceptedManifestHash = $backupIdentity.manifestSha256
+    $acceptedBundleHash = $backupIdentity.bundleSha256
+    Write-Host "Verified local backup accepted: $acceptedBackupPath" -ForegroundColor Green
+    Write-Host "External replication status: $ExternalReplicationStatus" -ForegroundColor Yellow
+  } else {
+    Write-Host "Running PhysiqueOS backup..." -ForegroundColor Cyan
+    & (Join-Path $PSScriptRoot "backupRepository.ps1") `
+      -DestinationDirectory $BackupDestination
+    Write-Host "Backup verified." -ForegroundColor Green
+    $acceptedBackupPath = $BackupDestination
+  }
 
   $elapsed = (Get-Date) - $startedAt
   Write-Host ""
@@ -112,9 +201,22 @@ try {
   Write-Host "  Branch: $branch"
   Write-Host "  Commit: $commitHash"
   Write-Host "  Pushed: $(if ($pushOccurred) { 'yes' } else { 'no' })"
-  Write-Host "  Backup destination: $backupDestination"
+  Write-Host "  Local-only: $($LocalOnly.ToString().ToLowerInvariant())"
+  Write-Host "  Backup: $acceptedBackupPath"
+  if ($acceptedManifestHash) {
+    Write-Host "  Backup manifest SHA-256: $acceptedManifestHash"
+  }
+  if ($acceptedBundleHash) {
+    Write-Host "  Bundle SHA-256: $acceptedBundleHash"
+  }
+  if ($LocalOnly) {
+    Write-Host "  External replication: $ExternalReplicationStatus"
+  }
   Write-Host "  Elapsed: $($elapsed.ToString('hh\:mm\:ss'))"
   Write-Host ""
+  if ($LocalOnly) {
+    Write-Host "Local repository closeout accepted." -ForegroundColor Green
+  }
   Write-Host "End Work Session Complete" -ForegroundColor Green
 } catch {
   Write-Error $_

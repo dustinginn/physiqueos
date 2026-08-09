@@ -30,6 +30,19 @@ describe("End Work Session staged-file preflight", () => {
     expect(stagedIndex).toBeGreaterThan(addIndex);
   });
 
+  it("keeps local-only synchronization and backup verification after staged preflight", () => {
+    const script = fs.readFileSync(
+      path.resolve("scripts", "endWorkSession.ps1"),
+      "utf8",
+    );
+    const stagedIndex = script.indexOf("assertSafeStagedFiles.ps1");
+    const divergenceIndex = script.indexOf("rev-list --left-right --count");
+    const backupIndex = script.indexOf("verifyRepositoryBackup.mjs");
+
+    expect(divergenceIndex).toBeGreaterThan(stagedIndex);
+    expect(backupIndex).toBeGreaterThan(divergenceIndex);
+  });
+
   it("rejects generated Next.js rollback cache paths", () => {
     const repository = createRepository();
     writeFile(
