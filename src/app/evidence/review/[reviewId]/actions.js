@@ -63,6 +63,12 @@ import {
   canonicalDefinitionsPendingCreation,
   prepareCanonicalExerciseIdentitiesForConfirmation,
 } from "../../../../domain/services/CanonicalExerciseLibraryService";
+import {
+  appendEvidenceRecoveryContext,
+  createEvidenceRecoveryContext,
+  evidenceReviewMatchesRecoveryContext,
+  parseEvidenceRecoveryFormData,
+} from "../../../../domain/services/EvidenceRecoveryContext";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -73,10 +79,14 @@ export async function reprocessEvidenceReview(formData) {
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
   await createPendingEvidenceReviewReprocessingService({ repositories: FounderRepositories })
     .reprocessPendingReviewInPlace(reviewId);
   revalidatePath(`/evidence/review/${reviewId}`);
-  redirect(`/evidence/review/${reviewId}?reprocessed=1`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?reprocessed=1`,
+    recoveryContext
+  ));
 }
 
 export async function confirmEvidenceReview(formData) {
@@ -84,6 +94,7 @@ export async function confirmEvidenceReview(formData) {
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
   let evidencePackage;
   try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
   catch { throw new Error("The reviewed evidence contains invalid JSON."); }
@@ -111,6 +122,10 @@ export async function confirmEvidenceReview(formData) {
     throw error;
   }
   const publication = publishPostConfirmationRefreshes(orchestrationResult);
+  if (recoveryContext) {
+    revalidatePath(recoveryContext.returnTo);
+    redirect(recoveryContext.returnTo);
+  }
   const photoSessionId = orchestrationResult?.briefingResult?.photoSessionIds?.[0];
   if (photoSessionId) {
     const photoPath = `/briefings/photo/${photoSessionId}${publication?.warning ? `?refresh=${encodeURIComponent(publication.warning)}` : ""}`;
@@ -125,6 +140,7 @@ export async function resolveEvidenceReviewExercise(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
   const mode = String(formData.get("resolutionMode") ?? "new");
   await createEvidenceReviewService({ repositories: FounderRepositories })
     .resolveProvisionalExercise(reviewId, {
@@ -143,7 +159,10 @@ export async function resolveEvidenceReviewExercise(formData) {
       updatedBy: user.id,
     });
   revalidatePath(`/evidence/review/${reviewId}`);
-  redirect(`/evidence/review/${reviewId}?exercise=resolved`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?exercise=resolved`,
+    recoveryContext
+  ));
 }
 
 export async function updateEvidenceReviewItemDecision(formData) {
@@ -163,6 +182,7 @@ export async function updateEvidenceReviewPhotoPose(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
   await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoPose(reviewId, {
     expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
     photoId: String(formData.get("photoId") ?? ""),
@@ -171,7 +191,10 @@ export async function updateEvidenceReviewPhotoPose(formData) {
     updatedBy: user.id,
   });
   revalidatePath(`/evidence/review/${reviewId}`);
-  redirect(`/evidence/review/${reviewId}?pose=saved`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?pose=saved`,
+    recoveryContext
+  ));
 }
 
 function applyPersistedItemDecisions(evidencePackage, decisions = {}) {
@@ -778,6 +801,21 @@ function stablePhotoIdentity(value) {
 export async function discardEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
   const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  const recoveryContext = resolveRecoveryContext(review, formData);
   await createEvidenceReviewService({ repositories: FounderRepositories }).discard(reviewId, { confirmedBy: user?.id });
+  if (recoveryContext) {
+    revalidatePath(recoveryContext.returnTo);
+    redirect(recoveryContext.returnTo);
+  }
   redirect(`/evidence/review/${reviewId}?discarded=1`);
+}
+
+function resolveRecoveryContext(review, formData) {
+  const candidate = createEvidenceRecoveryContext(
+    review?.interpretedEvidence?.review_metadata?.recoveryContext
+  ) ?? parseEvidenceRecoveryFormData(formData);
+  return evidenceReviewMatchesRecoveryContext(review, candidate)
+    ? candidate
+    : null;
 }

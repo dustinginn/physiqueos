@@ -24,6 +24,10 @@ import {
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 import { createProvisionalPhotoSession } from "../../../domain/services/ProvisionalPhotoSessionService";
+import {
+  appendEvidenceRecoveryContext,
+  parseEvidenceRecoveryFormData,
+} from "../../../domain/services/EvidenceRecoveryContext";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -39,7 +43,8 @@ export async function saveProgressPhotoEvidence(formData) {
   }
   const capturedAt = String(formData.get("capturedAt") || getTodayKey());
   const notes = normalizeOptionalText(formData.get("notes"));
-  const returnTo = normalizeReturnTo(formData.get("returnTo"));
+  const recoveryContext = parseEvidenceRecoveryFormData(formData);
+  const returnTo = recoveryContext?.returnTo ?? normalizeReturnTo(formData.get("returnTo"));
   const confirmationPurpose = normalizeOptionalText(formData.get("confirmationPurpose"));
   const confirmationIntent = confirmationPurpose === "visible_abs_completion" ? {
     goalId: "goal_visible_abs_at_rest",
@@ -108,11 +113,15 @@ export async function saveProgressPhotoEvidence(formData) {
         photoCount: provisionalPhotos.length,
         provisionalPhotoSessionId: provisionalSession.id,
         confirmationIntent,
+        recoveryContext,
       },
       evidence_objects: [{ ...provisionalSession, provenance: { source_artifact_refs: provisionalPhotos.map((photo) => photo.storage_path) } }],
     },
   });
-  redirect(`/evidence/review/${review.id}`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${review.id}`,
+    recoveryContext
+  ));
 
   /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
   const [sameDayWeights, dexaScans] = await Promise.all([

@@ -5,6 +5,11 @@ import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidence
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
 import { listCanonicalTrainingExerciseIdentities } from "../../../../domain/models/trainingExerciseIdentity";
 import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, updateEvidenceReviewPhotoPose } from "./actions";
+import {
+  createEvidenceRecoveryContext,
+  evidenceReviewMatchesRecoveryContext,
+  parseEvidenceRecoverySearchParams,
+} from "../../../../domain/services/EvidenceRecoveryContext";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +23,14 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
       })
     : await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!review) notFound();
+  const requestedRecoveryContext = parseEvidenceRecoverySearchParams(query) ??
+    createEvidenceRecoveryContext(
+      review.interpretedEvidence?.review_metadata?.recoveryContext
+    );
+  const recoveryContext = evidenceReviewMatchesRecoveryContext(
+    review,
+    requestedRecoveryContext
+  ) ? requestedRecoveryContext : null;
   const presentedReview = { ...review, interpretedEvidence: repairPendingReviewExerciseIdentities(review.interpretedEvidence) };
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} photoPoseAction={updateEvidenceReviewPhotoPose} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
+  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} review={presentedReview} />;
 }

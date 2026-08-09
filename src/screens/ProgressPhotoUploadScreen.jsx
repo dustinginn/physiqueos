@@ -16,7 +16,7 @@ const SUGGESTIONS = [
   ["side_unspecified","relaxed","standard"], ["front","flexed","standard"],
 ];
 
-export default function ProgressPhotoUploadScreen({ action, defaultDate = "", confirmationIntent = null, returnTo = null }) {
+export default function ProgressPhotoUploadScreen({ action, defaultDate = "", confirmationIntent = null, recoveryContext = null, returnTo = null }) {
   const [items, setItems] = useState([]);
   const [preview, setPreview] = useState(null);
   const allConfirmed = items.length > 0 && items.every((item) => item.identityStatus === "confirmed" && (item.poseVariant !== "other" || item.customLabel.trim()));
@@ -61,7 +61,7 @@ export default function ProgressPhotoUploadScreen({ action, defaultDate = "", co
 
   return <main className="min-h-screen bg-[var(--background)]">
     <div className="mx-auto max-w-[393px] px-4 pt-10 pb-32">
-      <Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href="/"><ArrowLeft size={18}/>Home</Link>
+      <Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href={returnTo ?? "/"}><ArrowLeft size={18}/>{returnTo ? "Morning Check-In" : "Home"}</Link>
       <header className="mb-6 space-y-2"><IconBadge icon={Camera} color="evidence" size="md"/>
         <p className="text-sm font-semibold uppercase tracking-[.12em] text-[var(--primary)]">Progress Photos</p>
         <h1 className="text-3xl font-extrabold leading-tight text-[var(--text-primary)]">Build your photo session.</h1>
@@ -69,6 +69,11 @@ export default function ProgressPhotoUploadScreen({ action, defaultDate = "", co
       </header>
       <form className="space-y-4" onSubmit={submit}>
         {returnTo&&<input name="returnTo" type="hidden" value={returnTo}/>}
+        {recoveryContext&&<>
+          <input name="recoveryDate" type="hidden" value={recoveryContext.date}/>
+          <input name="recoveryEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
+          <input name="recoveryKey" type="hidden" value={recoveryContext.recoveryKey}/>
+        </>}
         {confirmationIntent&&Object.entries(confirmationIntent).map(([name,value])=><input key={name} name={name} type="hidden" value={String(value)}/>)}
         {confirmationIntent&&<Card variant="success"><p className="text-xs font-extrabold uppercase tracking-[.1em] text-[var(--confidence)]">Visible Abs confirmation</p><p className="mt-1 text-sm font-bold leading-6 text-[var(--text-primary)]">Front relaxed is required for the completion decision. Every other confirmed view adds supporting context.</p></Card>}
         <Card className="space-y-3">

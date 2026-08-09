@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, ClipboardList, HeartPulse, Scale } from "lucide-react";
+import { ArrowLeft, Camera, ClipboardList, Dumbbell, Footprints, HeartPulse, Scale, Utensils } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 
@@ -15,6 +15,12 @@ export default function MorningCheckInScreen({
   existingRecovery = null,
   reconciliationItems = [],
 }) {
+  const executionItems = reconciliationItems.filter(
+    (item) => item.kind !== "evidence_recovery"
+  );
+  const evidenceRecoveryItems = reconciliationItems.filter(
+    (item) => item.kind === "evidence_recovery"
+  );
   const change = previousWeight == null || existingWeight == null
     ? null
     : Number((existingWeight - previousWeight).toFixed(1));
@@ -30,7 +36,7 @@ export default function MorningCheckInScreen({
           <p className="text-sm font-semibold text-slate-500">{dateLabel}</p>
         </div>
         <form action={action} className="space-y-4">
-          {reconciliationItems.length > 0 && (
+          {executionItems.length > 0 && (
             <Card className="min-w-0 space-y-4">
               <div className="flex min-w-0 items-start gap-3">
                 <IconBadge color="primary" icon={ClipboardList} size="sm"/>
@@ -41,7 +47,7 @@ export default function MorningCheckInScreen({
               </div>
               <p className="text-xs font-semibold leading-5 text-[var(--text-secondary)]">Choose one outcome for each priority.</p>
               <div className="space-y-3">
-                {reconciliationItems.map((item) => (
+                {executionItems.map((item) => (
                   <fieldset
                     className="min-w-0 space-y-3 rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-4"
                     key={item.occurrenceKey}
@@ -89,13 +95,16 @@ export default function MorningCheckInScreen({
               </div>
             </Card>
           )}
+          {evidenceRecoveryItems.length > 0 && (
+            <EvidenceRecoveryCard items={evidenceRecoveryItems}/>
+          )}
           <Card className="space-y-4">
             <div className="flex items-center gap-3">
               <IconBadge color="primary" icon={Scale} size="sm"/>
               <p className="text-base font-bold text-slate-950">Morning weight</p>
             </div>
             <div className="flex items-end gap-3">
-              <input autoFocus={reconciliationItems.length === 0} className="min-h-20 w-full rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-4 text-4xl font-black text-[var(--text-primary)] outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" defaultValue={existingWeight?.toFixed(1) ?? ""} inputMode="decimal" max="1000" min="50" name="weight" placeholder="165.2" required step="0.1" type="number"/>
+              <input autoFocus={executionItems.length === 0} className="min-h-20 w-full rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-4 text-4xl font-black text-[var(--text-primary)] outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" defaultValue={existingWeight?.toFixed(1) ?? ""} inputMode="decimal" max="1000" min="50" name="weight" placeholder="165.2" required step="0.1" type="number"/>
               <span className="pb-5 text-lg font-bold text-slate-500">lb</span>
             </div>
             {existingWeight != null && (
@@ -147,6 +156,48 @@ export default function MorningCheckInScreen({
         </form>
       </div>
     </main>
+  );
+}
+
+const EVIDENCE_ICONS = {
+  activity_day: Footprints,
+  nutrition: Utensils,
+  photo_session: Camera,
+  training: Dumbbell,
+};
+
+function EvidenceRecoveryCard({ items }) {
+  return (
+    <Card className="min-w-0 space-y-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <IconBadge color="evidence" icon={Camera} size="sm"/>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-[var(--text-primary)]">Anything from yesterday?</h2>
+          <p className="mt-1 text-sm font-semibold leading-5 text-[var(--text-secondary)]">Finish evidence that is still missing or waiting for your review.</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {items.map((item) => {
+          const Icon = EVIDENCE_ICONS[item.evidenceType] ?? Camera;
+          return (
+            <section className="min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-4" key={item.occurrenceKey}>
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-[var(--primary)]"><Icon aria-hidden="true" size={19}/></span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="break-words text-base font-bold text-[var(--text-primary)]">{item.title}</h3>
+                  <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--text-secondary)]">{item.statusLabel}</p>
+                </div>
+              </div>
+              {item.primaryAction && (
+                <Link className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={item.primaryAction.href}>
+                  {item.primaryAction.label}
+                </Link>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

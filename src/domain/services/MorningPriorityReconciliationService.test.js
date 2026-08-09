@@ -285,4 +285,31 @@ describe("Morning priority reconciliation server boundary", () => {
       await repositories.dailyCheckIns.getCheckInForDate("user", "2026-07-29")
     ).toBeNull();
   });
+
+  it("does not require an outcome disposition for a scheduled evidence-recovery item", async () => {
+    const { checkInWrites, service } = fixture({
+      reminders: [reminder("photos", {
+        linkedEvidenceType: "progress_photo",
+        type: "progress_photo",
+      })],
+    });
+
+    const selected = await service.getSelection({
+      userId: "user",
+      timeZone: TIME_ZONE,
+    });
+    const result = await service.save({
+      userId: "user",
+      timeZone: TIME_ZONE,
+      submissions: [],
+    });
+
+    expect(selected.items[0]).toMatchObject({
+      kind: "evidence_recovery",
+      status: "missing",
+      primaryAction: { label: "Upload Photos" },
+    });
+    expect(result.persisted).toEqual([]);
+    expect(checkInWrites).not.toHaveBeenCalled();
+  });
 });

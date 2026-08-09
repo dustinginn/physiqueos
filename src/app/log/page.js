@@ -2,11 +2,15 @@ import { FounderRepositories } from "../../data/repositories/founderRepositories
 import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService";
 import { createLoggedTodayService } from "../../domain/services/LoggedTodayService";
 import LogHubScreen from "../../screens/LogHubScreen";
+import {
+  parseEvidenceRecoverySearchParams,
+} from "../../domain/services/EvidenceRecoveryContext";
 
 export const dynamic = "force-dynamic";
 
 export default async function LogPage({ searchParams }) {
   const params = await searchParams;
+  const recoveryContext = parseEvidenceRecoverySearchParams(params);
   const user = await FounderRepositories.users.getCurrentUser();
   const [evidenceReviews, loggedToday] = await Promise.all([
     FounderRepositories.evidenceReviews.listReviews(user.id),
@@ -25,6 +29,7 @@ export default async function LogPage({ searchParams }) {
       saved={params?.saved ?? null}
       uploadAnythingAction="/log/upload"
       pendingEvidenceReviews={projectPendingReviews(evidenceReviews)}
+      recoveryContext={recoveryContext}
     />
   );
 }

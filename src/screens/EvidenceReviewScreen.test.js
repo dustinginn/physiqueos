@@ -17,7 +17,8 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("Include in log");
     expect(screen).toContain("Save included evidence");
     expect(screen).toContain("Select at least one item to continue.");
-    expect(screen).not.toMatch(/check-in|Execute from check-in|Logging evidence/i);
+    expect(screen).not.toMatch(/Execute from check-in|Logging evidence/i);
+    expect(screen).toContain("Back to Morning Check-In");
   });
 
   it("uses the persisted pending review as the confirmation surface and real action pending state for Saving", () => {

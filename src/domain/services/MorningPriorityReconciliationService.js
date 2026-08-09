@@ -4,6 +4,10 @@ import {
   createPriorityOccurrenceKey,
   getPreviousDayIncompletePrioritySelection,
 } from "./DailyFocusService";
+import {
+  MORNING_RECONCILIATION_ITEM_KINDS,
+  createMorningEvidenceRecoverySelection,
+} from "./MorningEvidenceRecoveryService";
 
 export const MORNING_PRIORITY_RECONCILIATION_DISPOSITIONS = Object.freeze([
   "completed",
@@ -60,7 +64,7 @@ export function createMorningPriorityReconciliationService({
         window.previousLocalDate
       );
 
-      return getPreviousDayIncompletePrioritySelection({
+      return composeMorningSelection({
         ...inputs,
         now: at,
         timeZone,
@@ -79,7 +83,7 @@ export function createMorningPriorityReconciliationService({
         userId,
         window.previousLocalDate
       );
-      const selection = getPreviousDayIncompletePrioritySelection({
+      const selection = composeMorningSelection({
         ...inputs,
         now: at,
         timeZone,
@@ -163,7 +167,11 @@ export function createMorningPriorityReconciliationService({
 
 function validateSubmissions({ checkIns, selection, submissions }) {
   const eligibleByKey = new Map(
-    selection.items.map((item) => [item.occurrenceKey, item])
+    selection.items
+      .filter((item) =>
+        item.kind === MORNING_RECONCILIATION_ITEM_KINDS.EXECUTION
+      )
+      .map((item) => [item.occurrenceKey, item])
   );
   const submittedKeys = new Set();
   const writes = [];
@@ -205,8 +213,9 @@ function validateSubmissions({ checkIns, selection, submissions }) {
   return {
     writes,
     idempotent,
-    pendingItems: selection.items.filter(
-      (item) => !submittedKeys.has(item.occurrenceKey)
+    pendingItems: selection.items.filter((item) =>
+      item.kind === MORNING_RECONCILIATION_ITEM_KINDS.EXECUTION &&
+      !submittedKeys.has(item.occurrenceKey)
     ),
   };
 }
@@ -251,6 +260,10 @@ async function loadSelectionInputs(repositories, userId, previousLocalDate) {
     dexaScans,
     progressPhotos,
     weightEntries,
+    canonicalObjects,
+    reviews,
+    executionItems,
+    protocols,
   ] = await Promise.all([
     repositories.reminders.listReminders(userId),
     repositories.dailyCheckIns.listCheckIns(userId, {
@@ -266,15 +279,66 @@ async function loadSelectionInputs(repositories, userId, previousLocalDate) {
       from: previousLocalDate,
       to: `${previousLocalDate}T23:59:59.999`,
     }) ?? [],
+    repositories.canonicalEvidence?.listCanonicalEvidenceObjects?.(userId) ?? [],
+    repositories.evidenceReviews?.listReviews?.(userId) ?? [],
+    repositories.executionItems?.listExecutionItems?.(userId) ?? [],
+    repositories.protocols?.listActiveProtocols?.(userId) ?? [],
   ]);
+  const protocolVersions = (
+    await Promise.all(
+      protocols.map((protocol) =>
+        repositories.protocolVersions?.getCurrentVersion?.(protocol.id) ?? null
+      )
+    )
+  ).filter(Boolean);
 
   return {
+    canonicalObjects,
     reminders,
     checkIns,
     dexaScans,
+    executionItems,
     progressPhotos,
+    protocols,
+    protocolVersions,
+    reviews,
     weightEntries,
   };
+}
+
+function composeMorningSelection({
+  canonicalObjects,
+  executionItems,
+  protocolVersions,
+  protocols,
+  reviews,
+  ...dailyFocusInputs
+}) {
+  const prioritySelection = getPreviousDayIncompletePrioritySelection(
+    dailyFocusInputs
+  );
+  const recoverySelection = createMorningEvidenceRecoverySelection({
+    canonicalObjects,
+    executionItems,
+    previousDate: prioritySelection.window.previousLocalDate,
+    priorityItems: prioritySelection.items,
+    protocolVersions,
+    protocols,
+    reviews,
+  });
+  return Object.freeze({
+    ...prioritySelection,
+    items: recoverySelection.items,
+    executionReconciliationItems:
+      recoverySelection.executionReconciliationItems,
+    evidenceRecoveryItems: recoverySelection.evidenceRecoveryItems,
+    diagnostics: Object.freeze({
+      ...prioritySelection.diagnostics,
+      executionReconciliationCount:
+        recoverySelection.executionReconciliationItems.length,
+      evidenceRecoveryCount: recoverySelection.evidenceRecoveryItems.length,
+    }),
+  });
 }
 
 function createReconciliationCheckIn({ date, recordedAt, userId }) {

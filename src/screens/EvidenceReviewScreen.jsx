@@ -31,7 +31,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, photoPoseAction, reprocessAction, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, photoPoseAction, recoveryContext = null, reprocessAction, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
@@ -66,7 +66,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pb-32 pt-8 sm:py-10">
-        <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--primary)]" href="/log">← Back to Log</Link>
+        <Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--primary)]" href={recoveryContext?.returnTo ?? "/log"}>← {recoveryContext ? "Back to Morning Check-In" : "Back to Log"}</Link>
         <header aria-label={experience.reviewingTitle} aria-live="polite" className="mt-3">
           <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--primary)]">{experience.eyebrow}</p>
           <h1 className="mt-2 text-3xl font-extrabold text-[var(--text-primary)]">Does this look right?</h1>
@@ -76,7 +76,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} review={review} />
+            <EvidenceCard canEdit={canEdit} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -88,6 +88,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
                 canonicalExercises={canonicalExercises}
                 exercise={exercise}
                 key={exercise.provisionalExercise.provisionalExerciseId}
+                recoveryContext={recoveryContext}
                 review={review}
               />
             ))}
@@ -130,23 +131,24 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <form action={confirmAction} className="mt-6">
           <input name="reviewId" type="hidden" value={review.id} />
+          <EvidenceRecoveryContextFields context={recoveryContext}/>
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(evidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
             <ConfirmButton blockingCount={blockingExercises.length} disabled={blockingExercises.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
-        {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><ReprocessButton /></form>}
+        {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
         {canEdit && <div className="mt-3 grid grid-cols-2 gap-3">
-          <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] px-3 text-center text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href="/log">Save and return later</Link>
-          <DiscardReviewControl action={discardAction} reviewId={review.id} />
+          <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] px-3 text-center text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={recoveryContext?.returnTo ?? "/log"}>Save and return later</Link>
+          <DiscardReviewControl action={discardAction} recoveryContext={recoveryContext} reviewId={review.id} />
         </div>}
       </div>
     </main>
   );
 }
 
-function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
+function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -230,7 +232,7 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
         </section>
       )}
 
-      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} object={item.object} review={review} />}
+      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} object={item.object} recoveryContext={recoveryContext} review={review} />}
       <button
         aria-label={`${item.included ? "Exclude" : "Include"} ${item.title} ${item.date ?? ""}`.trim()}
         className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-extrabold text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-accent)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -244,7 +246,7 @@ function EvidenceCard({ canEdit, item, onToggle, photoPoseAction, review }) {
   );
 }
 
-function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
+function NewExerciseCard({ action, canonicalExercises, exercise, recoveryContext, review }) {
   const [mode, setMode] = useState("new");
   const [searchQuery, setSearchQuery] = useState("");
   const provisional = exercise.provisionalExercise;
@@ -307,6 +309,7 @@ function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
       </div>
       <form action={action} className="space-y-3">
         <input name="reviewId" type="hidden" value={review.id} />
+        <EvidenceRecoveryContextFields context={recoveryContext}/>
         <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
         <input name="provisionalExerciseId" type="hidden" value={provisional.provisionalExerciseId} />
         <input name="resolutionMode" type="hidden" value={mode} />
@@ -375,6 +378,7 @@ function NewExerciseCard({ action, canonicalExercises, exercise, review }) {
       </form>
       <form action={action}>
         <input name="reviewId" type="hidden" value={review.id} />
+        <EvidenceRecoveryContextFields context={recoveryContext}/>
         <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
         <input name="provisionalExerciseId" type="hidden" value={provisional.provisionalExerciseId} />
         <input name="resolutionMode" type="hidden" value="remove" />
@@ -404,7 +408,7 @@ function ReprocessButton() {
   return <button className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pending} type="submit">{pending ? "Reading upload again\u2026" : "Read upload again"}</button>;
 }
 
-function DiscardReviewControl({ action, reviewId }) {
+function DiscardReviewControl({ action, recoveryContext, reviewId }) {
   const [open, setOpen] = useState(false);
   const cancelRef = useRef(null);
   const triggerRef = useRef(null);
@@ -424,7 +428,7 @@ function DiscardReviewControl({ action, reviewId }) {
         <p className="mt-2 text-sm leading-6 text-slate-600" id="discard-review-description">This review will not be added to your history. If you change your mind, you will need to start a new upload.</p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 px-3 text-sm font-extrabold text-slate-900" onClick={close} ref={cancelRef} type="button">Cancel</button>
-          <form action={action}><input name="reviewId" type="hidden" value={reviewId} /><DiscardSubmitButton /></form>
+          <form action={action}><input name="reviewId" type="hidden" value={reviewId} /><EvidenceRecoveryContextFields context={recoveryContext}/><DiscardSubmitButton /></form>
         </div>
       </section>
     </div>}
@@ -470,7 +474,7 @@ function EvidenceSavedScreen({ experience, trainingAchievements }) {
   );
 }
 
-function PhotoPreviews({ action, canEdit, object, review }) {
+function PhotoPreviews({ action, canEdit, object, recoveryContext, review }) {
   const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
   return <section aria-label="Photo pose review" className="space-y-4">
     <div>
@@ -492,6 +496,7 @@ function PhotoPreviews({ action, canEdit, object, review }) {
           </div>
           <form action={action} className="space-y-2">
             <input name="reviewId" type="hidden" value={review.id} />
+            <EvidenceRecoveryContextFields context={recoveryContext}/>
             <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
             <input name="photoId" type="hidden" value={photo.id} />
             <input name="sourceArtifactRef" type="hidden" value={photo.source_artifact_ref ?? ""} />
@@ -508,6 +513,16 @@ function PhotoPreviews({ action, canEdit, object, review }) {
   </section>;
 }
 function PhotoPoseSaveButton({ disabled }) { const { pending } = useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? "Saving pose\u2026" : "Save pose"}</button>; }
+
+function EvidenceRecoveryContextFields({ context }) {
+  if (!context) return null;
+  return <>
+    <input name="recoveryDate" type="hidden" value={context.date}/>
+    <input name="recoveryEvidenceType" type="hidden" value={context.expectedEvidenceType}/>
+    <input name="recoveryKey" type="hidden" value={context.recoveryKey}/>
+    <input name="returnTo" type="hidden" value={context.returnTo}/>
+  </>;
+}
 function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
 function hasIncompletePhotoSet(object) { return object.evidence_type === "photo_session" && (object.photos ?? []).filter((photo) => photo.active !== false).some((photo) => !getCanonicalProgressPhotoCategory(photo)); }
 function hasCommitFailure(review) { return ["commit_failed", "partially_committed"].includes(review.status); }

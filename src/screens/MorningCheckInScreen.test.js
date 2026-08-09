@@ -84,4 +84,60 @@ describe("focused Morning Check-In", () => {
     expect(source).toContain("has-[:checked]");
     expect(source).toContain("Choose one outcome for each priority.");
   });
+
+  it("renders evidence recovery as one action without outcome radios", () => {
+    const href = "/evidence/photos?date=2026-08-08&expectedEvidenceType=photo_session";
+    const html = renderToStaticMarkup(
+      React.createElement(MorningCheckInScreen, {
+        dateLabel: "Sunday, August 9, 2026",
+        reconciliationItems: [{
+          id: "photo-recovery",
+          kind: "evidence_recovery",
+          evidenceType: "photo_session",
+          occurrenceKey: "photo:2026-08-08",
+          status: "missing",
+          statusLabel: "Yesterday’s Progress Photos are still missing",
+          title: "Progress Photos",
+          primaryAction: { href, label: "Upload Photos" },
+        }],
+      })
+    );
+    expect(html).toContain("Anything from yesterday?");
+    expect(html).toContain("Yesterday’s Progress Photos are still missing");
+    expect(html).toContain("Upload Photos");
+    expect(html).not.toContain("Choose one outcome for each priority.");
+    expect(html).not.toContain('name="photo:2026-08-08_status"');
+  });
+
+  it("renders pending review and partial workout language without technical terms", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(MorningCheckInScreen, {
+        dateLabel: "Sunday, August 9, 2026",
+        reconciliationItems: [
+          {
+            id: "nutrition-review",
+            kind: "evidence_recovery",
+            evidenceType: "nutrition",
+            occurrenceKey: "nutrition:2026-08-08",
+            statusLabel: "Nutrition awaiting confirmation",
+            title: "Nutrition",
+            primaryAction: { href: "/evidence/review/review-1", label: "Resume review" },
+          },
+          {
+            id: "training-partial",
+            kind: "evidence_recovery",
+            evidenceType: "training",
+            occurrenceKey: "training:2026-08-08",
+            statusLabel: "Workout recorded; details incomplete",
+            title: "Workout",
+            primaryAction: { href: "/log", label: "Add workout details" },
+          },
+        ],
+      })
+    );
+    expect(html).toContain("Nutrition awaiting confirmation");
+    expect(html).toContain("Resume review");
+    expect(html).toContain("Workout recorded; details incomplete");
+    expect(html).not.toMatch(/canonical|Evidence Review ID|TrainingSession|ActivityDay/);
+  });
 });

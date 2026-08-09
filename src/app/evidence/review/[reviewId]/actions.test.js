@@ -254,6 +254,32 @@ describe("confirmEvidenceReview", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/briefing/daily");
   });
 
+  it("returns a confirmed Morning recovery review to the allowlisted check-in route", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    review.interpretedEvidence.review_metadata = {
+      ...(review.interpretedEvidence.review_metadata ?? {}),
+      recoveryContext: {
+        date: "2026-07-27",
+        expectedEvidenceType: "training",
+        recoveryKey: "execution:training:2026-07-27",
+        returnTo: "/check-in/morning",
+      },
+    };
+    const formData = {
+      get(key) {
+        if (key === "reviewId") return review.id;
+        if (key === "evidenceJson") return JSON.stringify(review.interpretedEvidence);
+        if (key === "itemDecisionsJson") return JSON.stringify(review.itemDecisions ?? {});
+        return null;
+      },
+    };
+
+    await expect(confirmEvidenceReview(formData)).resolves.toBeUndefined();
+
+    expect(revalidatePath).toHaveBeenCalledWith("/check-in/morning");
+    expect(redirect).toHaveBeenCalledWith("/check-in/morning");
+  });
+
   it("completes the durable review when route invalidation reports a missing request store", async () => {
     revalidatePath.mockImplementation(() => {
       throw new Error("Invariant: static generation store missing in revalidatePath /");

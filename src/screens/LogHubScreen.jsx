@@ -8,15 +8,16 @@ export default function LogHubScreen({
   error = null,
   loggedToday = { rows: [] },
   pendingEvidenceReviews = [],
+  recoveryContext = null,
   saved = null,
   uploadAnythingAction,
 }) {
   return (
     <main className="min-h-screen bg-[#F7F8FA]">
       <div className="mx-auto max-w-[393px] px-4 pb-10 pt-10">
-        <Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href="/">
+        <Link className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500" href={recoveryContext?.returnTo ?? "/"}>
           <ArrowLeft size={18} />
-          Back to Home
+          {recoveryContext ? "Back to Morning Check-In" : "Back to Home"}
         </Link>
 
         <header className="mb-6 space-y-2">
@@ -32,7 +33,7 @@ export default function LogHubScreen({
         <div className="space-y-4">
           <LoggedTodayCard summary={loggedToday} />
           {pendingEvidenceReviews.length > 0 && <PendingEvidenceReviews reviews={pendingEvidenceReviews} />}
-          <UploadAnythingCard action={uploadAnythingAction} />
+          <UploadAnythingCard action={uploadAnythingAction} recoveryContext={recoveryContext} />
         </div>
       </div>
     </main>
@@ -93,7 +94,7 @@ function LoggedTodayRow({ row }) {
   );
 }
 
-function UploadAnythingCard({ action }) {
+function UploadAnythingCard({ action, recoveryContext }) {
   return (
     <Card className="space-y-4">
       <div className="flex items-start gap-3">
@@ -105,6 +106,13 @@ function UploadAnythingCard({ action }) {
       </div>
 
       <UploadAnythingForm action={action}>
+        {recoveryContext && <>
+          <input name="expectedEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
+          <input name="recoveryDate" type="hidden" value={recoveryContext.date}/>
+          <input name="recoveryEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
+          <input name="recoveryKey" type="hidden" value={recoveryContext.recoveryKey}/>
+          <input name="returnTo" type="hidden" value={recoveryContext.returnTo}/>
+        </>}
         <label className="block rounded-[16px] border border-dashed border-[#C7D2FE] bg-[#F8FAFC] p-4">
           <span className="flex items-center gap-2 text-sm font-extrabold text-slate-950"><FileUp size={18} />Upload files</span>
           <span className="mt-1 block text-xs font-medium leading-5 text-slate-500">Choose screenshots, photos, or PDFs. You can select more than one.</span>
@@ -120,7 +128,7 @@ function UploadAnythingCard({ action }) {
         <label className="block space-y-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
           <span className="text-sm font-extrabold text-slate-950">When did this happen?</span>
           <span className="block text-xs font-medium leading-5 text-slate-500">Use the date the workout, meal, scan, or activity happened.</span>
-          <input className="w-full rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" defaultValue={getTodayKey()} name="evidenceDate" type="date" />
+          <input className="w-full rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" defaultValue={recoveryContext?.date ?? getTodayKey()} name="evidenceDate" type="date" />
         </label>
       </UploadAnythingForm>
     </Card>

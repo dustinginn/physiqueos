@@ -11,6 +11,10 @@ import {
 import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../domain/services/CanonicalEvidenceService";
 import { processEvidenceIntakeSubmission } from "../../../domain/services/EvidenceIntakeService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
+import {
+  appendEvidenceRecoveryContext,
+  parseEvidenceRecoveryFormData,
+} from "../../../domain/services/EvidenceRecoveryContext";
 
 export const runtime = "nodejs";
 
@@ -18,9 +22,11 @@ const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export async function POST(request) {
   let evidencePackage = null;
+  let recoveryContext = null;
 
   try {
     const formData = await request.formData();
+    recoveryContext = parseEvidenceRecoveryFormData(formData);
     const user = await FounderRepositories.users.getCurrentUser();
 
     if (!user) throw new Error("Founder user is not available.");
@@ -33,23 +39,32 @@ export async function POST(request) {
     const isHistoricalEvidence = evidenceDate < getTodayKey();
 
     if (files.length === 0 && !typedEvidence) {
-      return redirectToLog({ error: "empty-intake" });
+      return redirectToLog({ error: "empty-intake" }, recoveryContext);
     }
 
     const result = await processEvidenceIntakeSubmission({
       evidenceDate,
-      expectedEvidenceType: "auto",
+      expectedEvidenceType: recoveryContext?.expectedEvidenceType ?? "auto",
       files,
       typedEvidence,
       userId: user.id,
     });
-    evidencePackage = result.evidencePackage;
+    evidencePackage = {
+      ...result.evidencePackage,
+      review_metadata: {
+        ...(result.evidencePackage.review_metadata ?? {}),
+        recoveryContext,
+      },
+    };
     await FounderRepositories.evidencePackages.saveEvidencePackage(evidencePackage);
     const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
       userId: user.id, evidencePackage,
       source: isHistoricalEvidence ? "historical_universal_intake" : "universal_intake",
     });
-    const reviewUrl = `/evidence/review/${review.id}`;
+    const reviewUrl = appendEvidenceRecoveryContext(
+      `/evidence/review/${review.id}`,
+      recoveryContext
+    );
     if (request.headers.get("accept")?.includes("application/json")) {
       return NextResponse.json({ reviewId: review.id, reviewUrl });
     }
@@ -61,7 +76,7 @@ export async function POST(request) {
       stack: error?.stack,
     });
 
-    return redirectToLog({ error: "intake-failed" });
+    return redirectToLog({ error: "intake-failed" }, recoveryContext);
   }
 }
 
@@ -227,7 +242,7 @@ function hasSupportedImageSignature(buffer) {
   return isJpeg || isPng || isWebp;
 }
 
-function redirectToLog(params = {}) {
+function redirectToLog(params = {}, recoveryContext = null) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -236,9 +251,13 @@ function redirectToLog(params = {}) {
 
   const query = searchParams.toString();
 
+  const location = appendEvidenceRecoveryContext(
+    query ? `/log?${query}` : "/log",
+    recoveryContext
+  );
   return new NextResponse(null, {
     headers: {
-      Location: query ? `/log?${query}` : "/log",
+      Location: location,
     },
     status: 303,
   });
