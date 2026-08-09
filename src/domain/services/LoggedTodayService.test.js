@@ -45,6 +45,32 @@ describe("LoggedTodayService", () => {
     );
   });
 
+  it("does not sum duplicate active same-date Nutrition revisions", () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = composeLoggedTodaySummary({
+      canonicalObjects: [
+        { ...canonical("nutrition-old", {
+          id: "nutrition-old", evidence_type: "nutrition", observed_at: dateKey,
+          metadata: { meal_count: 4 }, daily_totals: { calories: 2200 },
+          meals: [{}, {}, {}, {}],
+        }), nutritionRevision: { revision: 1 } },
+        { ...canonical("nutrition-current", {
+          id: "nutrition-current", evidence_type: "nutrition", observed_at: dateKey,
+          metadata: { meal_count: 4 }, daily_totals: { calories: 2450 },
+          meals: [{}, {}, {}, {}],
+        }), nutritionRevision: { revision: 2 } },
+      ],
+      dateKey,
+    });
+
+    expect(result.rows[1]).toMatchObject({
+      summary: "4 meals \u00B7 2,450 calories",
+      recordId: "nutrition-current",
+    });
+    expect(warning).toHaveBeenCalledOnce();
+    warning.mockRestore();
+  });
+
   it("summarizes one or multiple training types without creating a session", () => {
     const one = composeLoggedTodaySummary({
       canonicalObjects: [

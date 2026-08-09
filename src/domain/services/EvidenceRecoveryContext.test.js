@@ -20,11 +20,23 @@ describe("Evidence recovery navigation context", () => {
     expect(parseEvidenceRecoverySearchParams(query)).toEqual(input);
   });
 
+  it("round-trips the allowlisted prior-day Nutrition update intent", () => {
+    const update = { ...input, recoveryIntent: "update" };
+    const href = appendEvidenceRecoveryContext("/log", update);
+    expect(parseEvidenceRecoverySearchParams(
+      new URL(href, "https://example.test").searchParams
+    )).toEqual(update);
+  });
+
   it.each([
     ["an external URL", { ...input, returnTo: "https://example.com" }],
     ["a protocol-relative URL", { ...input, returnTo: "//example.com" }],
     ["another internal route", { ...input, returnTo: "/admin" }],
     ["an unsupported evidence type", { ...input, expectedEvidenceType: "dexa" }],
+    ["an unsupported recovery intent", { ...input, recoveryIntent: "replace" }],
+    ["an update intent for another type", {
+      ...input, expectedEvidenceType: "training", recoveryIntent: "update",
+    }],
   ])("rejects %s", (_label, candidate) => {
     expect(createEvidenceRecoveryContext(candidate)).toBeNull();
   });

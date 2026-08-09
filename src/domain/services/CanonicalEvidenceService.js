@@ -6,10 +6,17 @@ import {
   assessWorkoutDuplicatePair,
   getWorkoutDuplicateIdentityKey,
 } from "./WorkoutDuplicateIdentityService";
+import {
+  createCanonicalNutritionDayRecord,
+  getNutritionDayLogicalKey,
+  getStableNutritionDayCanonicalId,
+  selectActiveCanonicalNutritionDays,
+} from "./CanonicalNutritionDayService";
 
 export function reconcileEvidencePackageIntoCanonicalHistory({
   evidencePackage,
   existingCanonicalObjects = [],
+  requireExpectedNutritionFingerprint = false,
   userId,
 } = {}) {
   const canonicalById = new Map(
@@ -25,6 +32,36 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
   const matchedCanonicalIds = new Set();
 
   (evidencePackage?.evidence_objects ?? []).forEach((evidenceObject) => {
+    if (isNutritionDay(evidenceObject)) {
+      const selection = selectActiveCanonicalNutritionDays(
+        [...canonicalById.values()],
+        { date: getDateKey(evidenceObject.observed_at), userId }
+      );
+      if (selection.diagnostics.length > 0) {
+        throw new Error(
+          `Nutrition canonical invariant failed for ${getDateKey(evidenceObject.observed_at)}: multiple active days require explicit historical repair.`
+        );
+      }
+      const existingObject = selection.records[0] ?? null;
+      const canonicalId = existingObject?.canonicalId ??
+        getStableNutritionDayCanonicalId(evidenceObject);
+      const canonicalObject = createCanonicalNutritionDayRecord({
+        canonicalId,
+        canonicalProvenance: mergeCanonicalProvenance({
+          existingObject,
+          evidenceObject,
+          evidencePackage,
+        }),
+        evidenceObject,
+        evidencePackage,
+        existingObject,
+        requireExpectedPriorFingerprint: requireExpectedNutritionFingerprint,
+        userId,
+      });
+      canonicalById.set(canonicalId, canonicalObject);
+      matchedCanonicalIds.add(canonicalId);
+      return;
+    }
     const canonicalId = getCanonicalEvidenceIdentity(evidenceObject);
     const correctionTargetObject = getCorrectionTargetCanonicalObject({
       canonicalById,
@@ -122,6 +159,7 @@ export function reconcileConfirmedEvidencePackage({
   const reconciledById = new Map(reconcileEvidencePackageIntoCanonicalHistory({
     evidencePackage: scopedEvidencePackage,
     existingCanonicalObjects: scopedExistingObjects,
+    requireExpectedNutritionFingerprint: true,
     userId,
   }).map((candidate) => [candidate.canonicalId,
     preserveUnchangedCanonicalObject(
@@ -131,16 +169,23 @@ export function reconcileConfirmedEvidencePackage({
   ));
   scopedEvidencePackage.evidence_objects.forEach((object) => {
     const incomingId = getCanonicalEvidenceIdentity(object);
+    const resolvedIncomingId = isNutritionDay(object)
+      ? [...reconciledById.values()].find((candidate) =>
+          candidate.quality?.status !== "superseded" &&
+          isNutritionDay(candidate.payload) &&
+          getNutritionDayLogicalKey(candidate) === getNutritionDayLogicalKey(object)
+        )?.canonicalId ?? incomingId
+      : incomingId;
     uniqueStrings([
       object.reconciliation?.supersedes_canonical_id,
       object.supersedes_canonical_id,
     ]).forEach((supersededId) => {
       const prior = reconciledById.get(supersededId);
-      if (!prior || supersededId === incomingId) return;
+      if (!prior || supersededId === resolvedIncomingId) return;
       reconciledById.set(supersededId, createSupersededCanonicalObject({
         object: prior,
         reason: "Explicitly superseded by confirmed evidence.",
-        supersededBy: incomingId,
+        supersededBy: resolvedIncomingId,
       }));
     });
   });
@@ -233,6 +278,10 @@ export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
 
   if (isActivityDay(evidenceObject)) {
     return ["activity_day", getDateKey(evidenceObject.observed_at)].join("|");
+  }
+
+  if (isNutritionDay(evidenceObject)) {
+    return getStableNutritionDayCanonicalId(evidenceObject);
   }
 
   if (isTrainingSession(evidenceObject)) {
@@ -584,16 +633,29 @@ function mergeCanonicalProvenance({ existingObject, evidenceObject, evidencePack
       ...(existingObject?.provenance?.contributing_evidence_object_ids ?? []),
       evidenceObject.id,
     ]),
+    evidence_review_ids: uniqueStrings([
+      ...(existingObject?.provenance?.evidence_review_ids ?? []),
+      evidenceObject.reconciliation?.nutrition?.sourceReviewId,
+      evidencePackage?.review_metadata?.sourceReviewId,
+    ]),
   };
 }
 
 function findCompatibleCanonicalObjects(canonicalById, evidenceObject) {
-  if (!isTrainingSession(evidenceObject) && !isActivityDay(evidenceObject)) {
+  if (
+    !isTrainingSession(evidenceObject) &&
+    !isActivityDay(evidenceObject) &&
+    !isNutritionDay(evidenceObject)
+  ) {
     return [];
   }
 
   return [...canonicalById.values()].filter((canonicalObject) =>
-    isTrainingSession(evidenceObject)
+    isNutritionDay(evidenceObject)
+      ? isNutritionDay(canonicalObject.payload) &&
+        getNutritionDayLogicalKey(canonicalObject) ===
+          getNutritionDayLogicalKey(evidenceObject)
+      : isTrainingSession(evidenceObject)
       ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject)
       : isCompatibleActivityDayPayload(canonicalObject.payload, evidenceObject)
   );
@@ -1182,6 +1244,10 @@ function countSharedStrings(left = [], right = []) {
 
 function isActivityDay(evidenceObject) {
   return evidenceObject?.evidence_type === "activity_day";
+}
+
+function isNutritionDay(evidenceObject) {
+  return evidenceObject?.evidence_type === "nutrition";
 }
 
 function isTrainingSession(evidenceObject) {

@@ -8,6 +8,7 @@ import {
 import {
   createPILowerLevelCanonicalEvidenceCommitService,
 } from "./PILowerLevelCanonicalEvidenceCommitService";
+import { prepareNutritionEvidencePackageForReview } from "./CanonicalNutritionDayService";
 import {
   createPILowerLevelConfidenceWorkEnqueueService,
   isPIEnergyConfidenceEnqueueEnabled,
@@ -85,6 +86,7 @@ const nutrition = (calories = 2400) => ({
     evidence_type: "nutrition",
     observed_at: "2026-07-27",
     daily_totals: { calories, protein_g: 190 },
+    metadata: { daily_totals_scope: "full_day_summary" },
     provenance: { source_artifact_refs: ["nutrition.png"] },
   }],
 });
@@ -122,7 +124,7 @@ describe("lower-level confidence production integration", () => {
     expect(state.piEnergyConfidenceWorkItems).toHaveLength(1);
     expect(state.piEnergyConfidenceWorkItems[0]).toMatchObject({
       sourceNutritionId:
-        "nutrition|2026-07-27|nutritionday_2026-07-27_1",
+        "nutrition|2026-07-27|nutrition-day",
       sourceActivityId:
         "activity_day|2026-07-27",
       status: "pending",
@@ -143,12 +145,24 @@ describe("lower-level confidence production integration", () => {
     expect(fs.readFileSync(f.filePath, "utf8")).toBe(afterPair);
 
     const corrected = await f.source.commitConfirmedEvidencePackage(
-      nutrition(2600), "founder"
+      prepareNutritionEvidencePackageForReview({
+        canonicalObjects: f.store.canonicalEvidenceObjects,
+        evidencePackage: nutrition(2600),
+        reviewId: "review-correction",
+      }), "founder"
     );
     expect(corrected.committed).toBe(true);
     expect(read(f).piEnergyConfidenceWorkItems).toHaveLength(1);
     expect(read(f).piEnergyConfidenceWorkItems[0].sourceCommitLinks.length)
       .toBeGreaterThan(1);
+    const currentNutrition = read(f).canonicalEvidenceObjects.find(
+      (item) => item.evidence_type === "nutrition"
+    );
+    expect(currentNutrition.nutritionRevision.revision).toBe(2);
+    expect(read(f).piEnergyConfidenceWorkItems[0].sourceCommitLinks.at(-1)
+      .sourceSemanticFingerprint).toBe(
+        currentNutrition.nutritionRevision.semanticFingerprint
+      );
   });
 
   it("rolls back source and work together when staging fails", async () => {
@@ -170,6 +184,36 @@ describe("lower-level confidence production integration", () => {
     expect(result).toMatchObject({
       committed: false,
       outcome: "persistence_failure",
+    });
+    expect(fs.readFileSync(f.filePath, "utf8")).toBe(before);
+  });
+
+  it("rejects a stale Nutrition review before the atomic source/work commit", async () => {
+    const f = fixture();
+    await f.source.commitConfirmedEvidencePackage(nutrition(), "founder");
+    const stale = prepareNutritionEvidencePackageForReview({
+      canonicalObjects: f.store.canonicalEvidenceObjects,
+      evidencePackage: nutrition(2500),
+      reviewId: "review-stale",
+    });
+    const current = prepareNutritionEvidencePackageForReview({
+      canonicalObjects: f.store.canonicalEvidenceObjects,
+      evidencePackage: nutrition(2600),
+      reviewId: "review-current",
+    });
+    const advanced = await f.source.commitConfirmedEvidencePackage(
+      current, "founder"
+    );
+    expect(advanced.committed).toBe(true);
+    const before = fs.readFileSync(f.filePath, "utf8");
+
+    const rejected = await f.source.commitConfirmedEvidencePackage(
+      stale, "founder"
+    );
+
+    expect(rejected).toMatchObject({
+      committed: false,
+      outcome: "baseline_conflict",
     });
     expect(fs.readFileSync(f.filePath, "utf8")).toBe(before);
   });

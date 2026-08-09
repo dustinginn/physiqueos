@@ -10,6 +10,9 @@ import {
   evidenceReviewMatchesRecoveryContext,
   parseEvidenceRecoverySearchParams,
 } from "../../../../domain/services/EvidenceRecoveryContext";
+import {
+  prepareNutritionEvidencePackageForReview,
+} from "../../../../domain/services/CanonicalNutritionDayService";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,15 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   const reprocessOutcome = ["updated", "current", "failed"].includes(query?.reprocess)
     ? query.reprocess
     : null;
-  const presentedReview = { ...review, interpretedEvidence: repairPendingReviewExerciseIdentities(review.interpretedEvidence) };
+  const canonicalObjects = await FounderRepositories.canonicalEvidence
+    .listCanonicalEvidenceObjects(review.userId);
+  const interpretedEvidence = prepareNutritionEvidencePackageForReview({
+    canonicalObjects,
+    evidencePackage: repairPendingReviewExerciseIdentities(
+      review.interpretedEvidence
+    ),
+    reviewId,
+  });
+  const presentedReview = { ...review, interpretedEvidence };
   return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
 }

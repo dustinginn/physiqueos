@@ -1,4 +1,5 @@
 export const EVIDENCE_RECOVERY_RETURN_PATH = "/check-in/morning";
+export const EVIDENCE_RECOVERY_INTENTS = Object.freeze(["update"]);
 
 export const EVIDENCE_RECOVERY_TYPES = Object.freeze([
   "photo_session",
@@ -17,13 +18,17 @@ export function createEvidenceRecoveryContext(input = {}) {
     input.expectedEvidenceType
   );
   const recoveryKey = normalizeText(input.recoveryKey);
+  const recoveryIntent = normalizeRecoveryIntent(input.recoveryIntent);
   const returnTo = normalizeEvidenceRecoveryReturnTo(input.returnTo);
 
   if (!date || !expectedEvidenceType || !recoveryKey || !returnTo) return null;
+  if (input.recoveryIntent && !recoveryIntent) return null;
+  if (recoveryIntent && expectedEvidenceType !== "nutrition") return null;
 
   return Object.freeze({
     date,
     expectedEvidenceType,
+    ...(recoveryIntent ? { recoveryIntent } : {}),
     recoveryKey,
     returnTo,
   });
@@ -33,6 +38,7 @@ export function parseEvidenceRecoverySearchParams(params = {}) {
   return createEvidenceRecoveryContext({
     date: valueOf(params, "date"),
     expectedEvidenceType: valueOf(params, "expectedEvidenceType"),
+    recoveryIntent: valueOf(params, "recoveryIntent"),
     recoveryKey: valueOf(params, "recoveryKey"),
     returnTo: valueOf(params, "returnTo"),
   });
@@ -43,6 +49,7 @@ export function parseEvidenceRecoveryFormData(formData) {
   return createEvidenceRecoveryContext({
     date: formData.get("recoveryDate"),
     expectedEvidenceType: formData.get("recoveryEvidenceType"),
+    recoveryIntent: formData.get("recoveryIntent"),
     recoveryKey: formData.get("recoveryKey"),
     returnTo: formData.get("returnTo"),
   });
@@ -80,6 +87,11 @@ export function normalizeEvidenceRecoveryType(value) {
   };
   const resolved = aliases[normalized] ?? normalized;
   return TYPE_SET.has(resolved) ? resolved : null;
+}
+
+function normalizeRecoveryIntent(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return EVIDENCE_RECOVERY_INTENTS.includes(normalized) ? normalized : null;
 }
 
 export function evidenceReviewMatchesRecoveryContext(review, context) {

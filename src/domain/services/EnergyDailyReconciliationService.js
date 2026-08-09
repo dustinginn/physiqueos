@@ -1,3 +1,5 @@
+import { selectNutritionDayPayloads } from "./CanonicalNutritionDayService";
+
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export function reconcileEnergyDays({
@@ -15,7 +17,7 @@ export function reconcileEnergyDays({
     if (dateKey) byDate.set(dateKey, createEmptyRow(dateKey));
   });
 
-  nutritionDays.forEach((day) => {
+  selectNutritionDayPayloads(nutritionDays).forEach((day) => {
     const date = getCanonicalLocalDate(day.date ?? day.observed_at, timeZone);
     if (!date) return;
     const row = byDate.get(date) ?? createEmptyRow(date);

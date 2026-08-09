@@ -34,6 +34,14 @@ const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos:
 export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
+  const [nutritionDispositions, setNutritionDispositions] = useState(() =>
+    Object.fromEntries((evidencePackage.evidence_objects ?? [])
+      .filter((object) => object.evidence_type === "nutrition")
+      .map((object) => [
+        object.id,
+        object.reconciliation?.nutrition?.disposition ?? "",
+      ]))
+  );
   const presentation = createEvidenceReviewPresentation({ evidencePackage, itemDecisions });
   const experience = createEvidenceExperiencePresentation(review);
   const trainingAchievements = createTrainingPerformanceSuccessPresentation(review);
@@ -48,12 +56,38 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
       removed: itemDecisions[object.id]?.included === false,
     })),
   };
+  const submittedEvidencePackage = {
+    ...evidencePackage,
+    evidence_objects: (evidencePackage.evidence_objects ?? []).map((object) =>
+      object.evidence_type !== "nutrition" ? object : ({
+        ...object,
+        reconciliation: {
+          ...(object.reconciliation ?? {}),
+          nutrition: {
+            ...(object.reconciliation?.nutrition ?? {}),
+            disposition: nutritionDispositions[object.id] || null,
+          },
+        },
+      })
+    ),
+  };
   const unresolvedExercises = listUnresolvedProvisionalExercises(
     evidenceWithLocalDecisions
   );
   const blockingExercises = listExercisesWithoutCanonicalIdentity(
     evidenceWithLocalDecisions,
     { canonicalExercises }
+  );
+  const blockingNutrition = presentation.items.filter((item) =>
+    item.included &&
+    item.object.reconciliation?.nutrition?.dispositionStatus ===
+      "requires_choice" &&
+    !nutritionDispositions[item.object.id]
+  );
+  const blockedNutritionInvariant = presentation.items.filter((item) =>
+    item.included &&
+    item.object.reconciliation?.nutrition?.dispositionStatus ===
+      "blocked_duplicate_active_days"
   );
   const toggleItem = (item) => {
     setItemDecisions((current) =>
@@ -76,7 +110,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -124,15 +158,17 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
           {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
           {blockingExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{blockingExercises.length} exercise {blockingExercises.length === 1 ? "identity needs" : "identities need"} details before this workout can be saved.</p>}
+          {blockingNutrition.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose how to update the existing Nutrition Day before saving.</p>}
+          {blockedNutritionInvariant.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">This date has conflicting active Nutrition records and needs repair before another update can be saved.</p>}
         </Card>
 
         <form action={confirmAction} className="mt-6">
           <input name="reviewId" type="hidden" value={review.id} />
           <EvidenceRecoveryContextFields context={recoveryContext}/>
-          <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(evidencePackage)} />
+          <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton blockingCount={blockingExercises.length} disabled={blockingExercises.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
+            <ConfirmButton blockingCount={blockingExercises.length} disabled={blockingExercises.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
@@ -148,7 +184,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, exerciseVariantAction, item, onToggle, photoPoseAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -161,6 +197,15 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, onToggle, photoPos
       </div>
 
       {item.metrics.length > 0 && <dl className="grid grid-cols-2 gap-3">{item.metrics.map((metric) => <div className="rounded-xl bg-[var(--surface-muted)] p-3" key={metric.label}><dt className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{metric.label}</dt><dd className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{metric.value}</dd></div>)}</dl>}
+
+      {item.type === "nutrition" && item.object.reconciliation?.nutrition?.targetCanonicalId && (
+        <NutritionReplacementControl
+          canEdit={canEdit && item.included}
+          disposition={nutritionDisposition}
+          onChange={onNutritionDisposition}
+          relationship={item.object.reconciliation.nutrition}
+        />
+      )}
 
       {item.exercises?.length > 0 && (
         <section>
@@ -284,6 +329,39 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, onToggle, photoPos
         {item.included ? "Exclude from log" : "Include in log"}
       </button>
     </Card>
+  );
+}
+
+function NutritionReplacementControl({ canEdit, disposition, onChange, relationship }) {
+  const existing = relationship.existingPreview ?? {};
+  const incoming = relationship.newPreview ?? {};
+  const status = relationship.dispositionStatus;
+  const existingMeals = new Map((existing.meals ?? []).map((meal) => [meal.key, meal]));
+  const comparisons = (incoming.meals ?? [])
+    .filter((meal) => existingMeals.has(meal.key))
+    .map((meal) => ({ existing: existingMeals.get(meal.key), incoming: meal }));
+  return (
+    <section className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-accent)] p-4">
+      <h3 className="font-extrabold text-[var(--text-primary)]">Update this Nutrition Day</h3>
+      <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">This looks related to the Nutrition Day already logged for this date.</p>
+      {(existing.calories != null || incoming.calories != null) && (
+        <p className="mt-2 text-sm font-bold text-[var(--text-primary)]">Daily total: {existing.calories ?? "not available"} → {incoming.calories ?? "not available"} calories</p>
+      )}
+      {comparisons.map(({ existing: prior, incoming: next }) => (
+        <p className="mt-1 text-sm font-bold text-[var(--text-primary)]" key={next.key}>{next.label}: {prior.calories ?? "not available"} → {next.calories ?? "not available"} calories</p>
+      ))}
+      {status === "automatic" ? (
+        <p className="mt-3 text-sm font-semibold text-[var(--primary)]">The current day will be updated; its prior version will remain in history.</p>
+      ) : status === "requires_choice" ? (
+        <fieldset className="mt-3 space-y-2" disabled={!canEdit}>
+          <legend className="text-sm font-extrabold text-[var(--text-primary)]">How should this evidence be applied?</legend>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 text-sm font-bold text-[var(--text-primary)]"><input checked={disposition === "replace"} name={`nutrition-${relationship.logicalDayKey}`} onChange={() => onChange("replace")} type="radio"/>Replace existing</label>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 text-sm font-bold text-[var(--text-primary)]"><input checked={disposition === "additive"} name={`nutrition-${relationship.logicalDayKey}`} onChange={() => onChange("additive")} type="radio"/>Add as a distinct meal</label>
+        </fieldset>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">Saving is paused because this date has conflicting active Nutrition records.</p>
+      )}
+    </section>
   );
 }
 
@@ -560,6 +638,9 @@ function EvidenceRecoveryContextFields({ context }) {
   return <>
     <input name="recoveryDate" type="hidden" value={context.date}/>
     <input name="recoveryEvidenceType" type="hidden" value={context.expectedEvidenceType}/>
+    {context.recoveryIntent && (
+      <input name="recoveryIntent" type="hidden" value={context.recoveryIntent}/>
+    )}
     <input name="recoveryKey" type="hidden" value={context.recoveryKey}/>
     <input name="returnTo" type="hidden" value={context.returnTo}/>
   </>;

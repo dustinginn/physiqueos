@@ -112,6 +112,11 @@ export async function confirmEvidenceReview(formData) {
   catch { throw new Error("The evidence selection is invalid."); }
   evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
   evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
+  evidencePackage = mergeAuthoritativeNutritionDays(
+    evidencePackage,
+    review.interpretedEvidence,
+    reviewId
+  );
   evidencePackage = prepareCanonicalExerciseIdentitiesForConfirmation(evidencePackage);
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
   assertNoUnresolvedProvisionalExercises(evidencePackage);
@@ -264,6 +269,41 @@ function mergeAuthoritativeTrainingSessions(submitted = {}, authoritative = {}) 
         ? structuredClone(training.get(item.id))
         : item
     ),
+  };
+}
+
+function mergeAuthoritativeNutritionDays(
+  submitted = {},
+  authoritative = {},
+  reviewId = null
+) {
+  const nutrition = new Map(
+    (authoritative.evidence_objects ?? [])
+      .filter((item) => item.evidence_type === "nutrition")
+      .map((item) => [item.id, item])
+  );
+  return {
+    ...submitted,
+    review_metadata: {
+      ...(authoritative.review_metadata ?? {}),
+      ...(submitted.review_metadata ?? {}),
+      sourceReviewId: reviewId,
+    },
+    evidence_objects: (submitted.evidence_objects ?? []).map((item) => {
+      const source = nutrition.get(item.id);
+      if (item.evidence_type !== "nutrition" || !source) return item;
+      return {
+        ...structuredClone(source),
+        removed: item.removed,
+        reconciliation: {
+          ...(source.reconciliation ?? {}),
+          nutrition: {
+            ...(item.reconciliation?.nutrition ?? {}),
+            sourceReviewId: reviewId,
+          },
+        },
+      };
+    }),
   };
 }
 

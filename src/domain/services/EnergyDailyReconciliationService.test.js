@@ -86,6 +86,20 @@ describe("EnergyDailyReconciliationService", () => {
     expect(row).not.toHaveProperty("totalExpenditure");
   });
 
+  it("uses only the latest explicit Nutrition revision for a date", () => {
+    const [row] = reconcileEnergyDays({
+      nutritionDays: [
+        { id: "old", date: "2026-07-23", totals: { calories: 2200 },
+          _canonicalNutritionRevision: { revision: 1 } },
+        { id: "current", date: "2026-07-23", totals: { calories: 2450 },
+          _canonicalNutritionRevision: { revision: 2 } },
+      ],
+    });
+
+    expect(row.nutritionDayId).toBe("current");
+    expect(row.calorieIntake).toBe(2450);
+  });
+
   it.each([
     [
       "nutrition-only",

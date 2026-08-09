@@ -6,6 +6,7 @@ import {
   createCanonicalRecoveryEvidenceObject,
   createRecoveryEvidenceRecord,
 } from "../../domain/models/RecoveryEvidenceModel";
+import { getNutritionDayLogicalKey } from "../../domain/services/CanonicalNutritionDayService";
 
 export const RECOVERY_EVIDENCE_WINDOW_LIMIT = 64;
 
@@ -149,6 +150,10 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
   };
 
   async function upsertCanonicalEvidenceObjects(evidenceObjects = []) {
+      assertNoSecondActiveNutritionDay(
+        canonicalEvidenceObjects,
+        evidenceObjects
+      );
       let changed = false;
       evidenceObjects.forEach((evidenceObject) => {
         const existingIndex = canonicalEvidenceObjects.findIndex(
@@ -169,6 +174,31 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
       if (changed) options.onChange?.();
 
       return evidenceObjects;
+  }
+}
+
+function assertNoSecondActiveNutritionDay(existing = [], incoming = []) {
+  for (const record of incoming) {
+    const payload = record.payload ?? record;
+    if (
+      payload.evidence_type !== "nutrition" ||
+      record.quality?.status === "superseded" ||
+      record.quality?.supersededBy
+    ) continue;
+    const logicalDayKey = getNutritionDayLogicalKey(record);
+    const conflict = existing.find((candidate) =>
+      candidate.canonicalId !== record.canonicalId &&
+      (!record.userId || !candidate.userId || candidate.userId === record.userId) &&
+      (candidate.payload ?? candidate).evidence_type === "nutrition" &&
+      candidate.quality?.status !== "superseded" &&
+      !candidate.quality?.supersededBy &&
+      getNutritionDayLogicalKey(candidate) === logicalDayKey
+    );
+    if (conflict) {
+      throw new Error(
+        `Cannot persist a second active canonical NutritionDay for ${logicalDayKey}.`
+      );
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   createNutritionMealsPageModel,
@@ -115,9 +116,9 @@ describe("Nutrition Meals reporting", () => {
   });
 
   it("does not mutate runtime state", async () => {
-    const before = fs.readFileSync(storePath);
+    const before = fileHash(storePath);
     await getNutritionMealsReport({ context: "all", currentDate: new Date("2026-07-24T12:00:00Z") });
-    expect(fs.readFileSync(storePath)).toEqual(before);
+    expect(fileHash(storePath)).toBe(before);
   }, 30000);
 });
 
@@ -126,6 +127,10 @@ function fixture(days, window = {}) {
     report: { nutritionDays: days, dataSources: [] },
     timeline: { contextId: "build-lean-mass", startDate: window.startDate ?? null, endDate: window.endDate ?? null, options: [] },
   });
+}
+
+function fileHash(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 function day(id, date, meals) { return { id, date, href: `/progress/nutrition/day/${id}`, meals, sourceEvidence: [] }; }
 function meal(id, name, calories, extras = {}) { return { id, name, totals: { calories, protein_g: extras.protein ?? null, carbs_g: extras.carbs ?? null, fat_g: extras.fat ?? null }, foods: extras.foods ?? [] }; }

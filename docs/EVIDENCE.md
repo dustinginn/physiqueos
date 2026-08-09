@@ -309,6 +309,28 @@ Engines should compute interpretation from those facts.
 
 Presentation should render engine outputs.
 
+## Canonical Nutrition Day revisions
+
+Nutrition has one active canonical day per user and observed local date. New
+days use `nutrition|<date>|nutrition-day`; an existing legacy canonical ID is
+retained as the stable lineage anchor when that date is revised.
+
+An authoritative same-date full-day snapshot replaces the active payload. A
+same-name meal update replaces that normalized meal scope. A distinct meal may
+be added only with explicit additive intent, and an unclear relationship must
+remain noncanonical until Evidence Review records a choice. Confirmation checks
+the semantic fingerprint that Evidence Review observed so a stale review cannot
+overwrite a newer revision.
+
+Each active record exposes `nutritionRevision` with its logical day key,
+monotonic revision, semantic fingerprint, disposition, replacement scope, and
+source package/review identity. `nutritionRevisionHistory` retains only prior
+canonical Nutrition payloads and their provenance. Ordinary read models select
+the active revision and never sum same-date revisions. The semantic fingerprint
+is the future publication-dependency input; it excludes upload IDs and repository
+metadata while including canonical totals, meal/food structure, and replacement
+scope.
+
 ---
 
 # Diagnostics Modes

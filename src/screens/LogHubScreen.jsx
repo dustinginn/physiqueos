@@ -110,6 +110,9 @@ function UploadAnythingCard({ action, recoveryContext }) {
           <input name="expectedEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
           <input name="recoveryDate" type="hidden" value={recoveryContext.date}/>
           <input name="recoveryEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
+          {recoveryContext.recoveryIntent && (
+            <input name="recoveryIntent" type="hidden" value={recoveryContext.recoveryIntent}/>
+          )}
           <input name="recoveryKey" type="hidden" value={recoveryContext.recoveryKey}/>
           <input name="returnTo" type="hidden" value={recoveryContext.returnTo}/>
         </>}

@@ -36,6 +36,10 @@ import {
   getWorkoutDuplicateIdentityKey,
 } from "./WorkoutDuplicateIdentityService";
 import { normalizeIdentityPart } from "./normalizeIdentityPart";
+import {
+  selectActiveCanonicalNutritionDays,
+  selectNutritionDayPayloads,
+} from "./CanonicalNutritionDayService";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -1004,10 +1008,25 @@ export function getNutritionReportExtras({
   };
 }
 
-function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages = [] } = {}) {
+export function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages = [] } = {}) {
   const objectMap = new Map();
+  const legacyNutritionCandidates = [];
+  const nutritionSelection = selectActiveCanonicalNutritionDays(
+    canonicalEvidenceObjects
+  );
+  if (nutritionSelection.diagnostics.length > 0) {
+    console.warn("[ProgressReporting] Multiple active NutritionDays detected.",
+      nutritionSelection.diagnostics);
+  }
+  const selectedNutritionIds = new Set(
+    nutritionSelection.records.map((record) => record.canonicalId)
+  );
   const canonicalPayloads = canonicalEvidenceObjects
     .filter(isActiveCanonicalObject)
+    .filter((canonicalObject) =>
+      !isNutritionDay(canonicalObject.payload ?? canonicalObject) ||
+      selectedNutritionIds.has(canonicalObject.canonicalId)
+    )
     .map((canonicalObject) =>
       decorateCanonicalPayload(canonicalObject.payload ?? canonicalObject, canonicalObject)
     );
@@ -1018,6 +1037,10 @@ function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages 
 
   evidencePackages.forEach((evidencePackage) => {
     (evidencePackage.evidence_objects ?? []).forEach((evidenceObject) => {
+      if (isNutritionDay(evidenceObject)) {
+        legacyNutritionCandidates.push(evidenceObject);
+        return;
+      }
       if (
         isTrainingSession(evidenceObject) &&
         canonicalPayloads.some(isTrainingSession)
@@ -1038,6 +1061,24 @@ function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages 
 
       objectMap.set(getEvidenceObjectIdentity(evidenceObject), evidenceObject);
     });
+  });
+
+  const legacyNutritionCounts = new Map();
+  legacyNutritionCandidates.forEach((day) => {
+    const date = getDateKey(day.observed_at);
+    legacyNutritionCounts.set(date, (legacyNutritionCounts.get(date) ?? 0) + 1);
+  });
+  const duplicateLegacyDates = [...legacyNutritionCounts]
+    .filter(([, count]) => count > 1)
+    .map(([date]) => date);
+  if (duplicateLegacyDates.length > 0) {
+    console.warn("[ProgressReporting] Multiple legacy NutritionDays detected.",
+      duplicateLegacyDates);
+  }
+  selectNutritionDayPayloads(legacyNutritionCandidates).forEach((day) => {
+    if (!hasEquivalentCanonicalPayload([...objectMap.values()], day)) {
+      objectMap.set(getEvidenceObjectIdentity(day), day);
+    }
   });
 
   return [...objectMap.values()];

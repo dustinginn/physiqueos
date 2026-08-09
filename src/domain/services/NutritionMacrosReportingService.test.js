@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   aggregateNutritionMacroWeeks,
@@ -101,7 +102,7 @@ describe("Nutrition Macros reporting", () => {
   );
 
   it("keeps targets neutral, excludes energy interpretation, and does not mutate runtime", async () => {
-    const before = fs.readFileSync(storePath);
+    const before = fileHash(storePath);
     const report = await getNutritionMacrosReport({
       context: "all",
       currentDate: new Date("2026-07-24T12:00:00Z"),
@@ -112,7 +113,7 @@ describe("Nutrition Macros reporting", () => {
       label: "Targets unavailable for this period",
     });
     expect(JSON.stringify(report)).not.toMatch(/energyBalance|estimatedExpenditure|deficit|surplus|adherence/i);
-    expect(fs.readFileSync(storePath)).toEqual(before);
+    expect(fileHash(storePath)).toBe(before);
   }, 30000);
 });
 
@@ -126,6 +127,10 @@ function fixture(days, window = {}) {
       options: [],
     },
   });
+}
+
+function fileHash(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 
 function nutritionDay(id, date, totals, extras = {}) {

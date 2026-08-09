@@ -2,6 +2,9 @@ import {
   DEFAULT_LOCAL_TIME_ZONE,
   getLocalDateKey,
 } from "../utils/localDate";
+import {
+  selectActiveCanonicalNutritionDays,
+} from "./CanonicalNutritionDayService";
 
 const EMPTY_SUMMARY = "Nothing logged yet";
 
@@ -38,17 +41,29 @@ export function composeLoggedTodaySummary({
   canonicalObjects = [],
   dateKey,
 } = {}) {
-  const active = canonicalObjects
+  const activeNonNutrition = canonicalObjects
     .filter((object) => object?.quality?.status !== "superseded")
+    .filter((object) =>
+      (object.payload ?? object).evidence_type !== "nutrition"
+    )
     .map(unwrapCanonicalObject)
     .filter((record) => getEvidenceDate(record) === dateKey);
+  const nutritionSelection = selectActiveCanonicalNutritionDays(
+    canonicalObjects,
+    { date: dateKey }
+  );
+  if (nutritionSelection.diagnostics.length > 0) {
+    console.warn("[LoggedToday] Multiple active NutritionDays detected.",
+      nutritionSelection.diagnostics);
+  }
+  const nutrition = nutritionSelection.records.map(unwrapCanonicalObject);
 
   return Object.freeze({
     dateKey,
     rows: Object.freeze([
-      composeTrainingRow(active.filter((record) => record.evidence_type === "training")),
-      composeNutritionRow(active.filter((record) => record.evidence_type === "nutrition")),
-      composeActivityRow(active.filter((record) => record.evidence_type === "activity_day")),
+      composeTrainingRow(activeNonNutrition.filter((record) => record.evidence_type === "training")),
+      composeNutritionRow(nutrition),
+      composeActivityRow(activeNonNutrition.filter((record) => record.evidence_type === "activity_day")),
     ]),
   });
 }
@@ -86,30 +101,23 @@ function composeTrainingRow(sessions) {
 function composeNutritionRow(days) {
   if (!days.length) return emptyRow("nutrition", "Nutrition");
 
-  const mealCount = days.reduce(
-    (total, day) =>
-      total +
-      (Number.isFinite(Number(day.metadata?.meal_count))
-        ? Number(day.metadata.meal_count)
-        : day.meals?.length ?? 0),
-    0
-  );
-  const calories = days.reduce((total, day) => {
-    const value = Number(day.daily_totals?.calories);
-    return total + (Number.isFinite(value) ? value : 0);
-  }, 0);
+  const day = days[0];
+  const mealCount = Number.isFinite(Number(day.metadata?.meal_count))
+    ? Number(day.metadata.meal_count)
+    : day.meals?.length ?? 0;
+  const calorieValue = Number(day.daily_totals?.calories);
+  const calories = Number.isFinite(calorieValue) ? calorieValue : 0;
   const mealLabel = `${mealCount} meal${mealCount === 1 ? "" : "s"}`;
-  const single = days.length === 1 ? days[0] : null;
 
   return Object.freeze({
     id: "nutrition",
     label: "Nutrition",
     summary: calories > 0 ? `${mealLabel} · ${formatNumber(calories)} calories` : `${mealLabel} logged`,
     context: null,
-    href: single?.id
-      ? `/progress/nutrition/day/${encodeURIComponent(single.id)}`
+    href: day?.id
+      ? `/progress/nutrition/day/${encodeURIComponent(day.id)}`
       : "/progress/nutrition",
-    recordId: single?.id ?? null,
+    recordId: day?.id ?? null,
   });
 }
 

@@ -92,8 +92,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
                 canonicalEvidenceId: record.canonicalId,
                 changedLocalDate: date,
                 sourceChangeType: sourceChangeType(record),
-                sourceSemanticFingerprint:
-                  createPISemanticFingerprint(semanticRecord(record)),
+                sourceSemanticFingerprint: sourceSemanticFingerprint(record),
                 linkedCounterpartId: counterpart?.canonicalId ?? null,
                 evidenceCutoff: `${date}T23:59:59.999Z`,
                 createdAt: now().toISOString(),
@@ -206,7 +205,8 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         }
         return sourceResult(
           error?.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT ||
-          error?.code === FounderStoreUnitOfWorkErrorCode.VALIDATION_FAILED
+          error?.code === FounderStoreUnitOfWorkErrorCode.VALIDATION_FAILED ||
+          error?.cause?.code === "NUTRITION_REVISION_STALE"
             ? PILowerLevelSourceCommitOutcome.BASELINE_CONFLICT
             : PILowerLevelSourceCommitOutcome.PERSISTENCE_FAILURE,
           reconciliation,
@@ -269,9 +269,18 @@ function findCounterpart(records, record, date) {
 function sourceChangeType(record) {
   return record.quality?.status === "superseded"
     ? "supersession"
+    : record.evidence_type === "nutrition" &&
+        Number(record.nutritionRevision?.revision) > 1
+      ? "canonical_revision"
     : record.payload?.correctsEvidenceId || record.payload?.supersedesEvidenceId
       ? "correction"
       : "canonical_commit";
+}
+function sourceSemanticFingerprint(record) {
+  return record.evidence_type === "nutrition" &&
+    record.nutritionRevision?.semanticFingerprint
+    ? record.nutritionRevision.semanticFingerprint
+    : createPISemanticFingerprint(semanticRecord(record));
 }
 function semanticRecord(record) {
   const {

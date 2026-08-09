@@ -16,8 +16,10 @@ export function decorateCanonicalPayloadForReadModel(payload = {}, canonicalObje
   return {
     ...payload,
     _canonicalId: canonicalObject.canonicalId,
+    _canonicalNutritionRevision: canonicalObject.nutritionRevision ?? null,
     _canonicalProvenance: canonicalObject.provenance ?? null,
     _canonicalQuality: canonicalObject.quality ?? null,
+    _canonicalUpdatedAt: canonicalObject.updatedAt ?? null,
   };
 }
 

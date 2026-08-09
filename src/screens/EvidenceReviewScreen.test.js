@@ -104,6 +104,16 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).not.toMatch(/revalidatePath|createEvidenceReviewService/);
   });
 
+  it("presents a bounded same-date Nutrition replacement decision", () => {
+    expect(page).toContain("prepareNutritionEvidencePackageForReview");
+    expect(screen).toContain("Update this Nutrition Day");
+    expect(screen).toContain("Replace existing");
+    expect(screen).toContain("Add as a distinct meal");
+    expect(screen).toContain("blockingNutrition");
+    expect(actions).toContain("mergeAuthoritativeNutritionDays");
+    expect(actions).toContain("sourceReviewId: reviewId");
+  });
+
   it("preserves save-for-later, discard, and reprocessing controls", () => {
     expect(screen).toContain("Save and return later");
     expect(screen).toContain("Discard review");

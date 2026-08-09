@@ -4,6 +4,7 @@ import {
   buildCanonicalReconciliationScope,
   reconcileConfirmedEvidencePackage,
 } from "./CanonicalEvidenceService";
+import { prepareNutritionEvidencePackageForReview } from "./CanonicalNutritionDayService";
 
 const userId = "founder";
 const nutrition = (overrides = {}) => ({
@@ -50,7 +51,7 @@ describe("scoped canonical confirmation reconciliation", () => {
 
     const result = await repository.reconcileConfirmedEvidencePackage(evidencePackage(), userId);
 
-    expect(result.report.addedCanonicalIds).toEqual(["nutrition|2026-07-12|nutritionday_2026-07-12_1"]);
+    expect(result.report.addedCanonicalIds).toEqual(["nutrition|2026-07-12|nutrition-day"]);
     expect(JSON.stringify(records.slice(0, 6))).toBe(before);
     expect(records).toHaveLength(7);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -61,7 +62,7 @@ describe("scoped canonical confirmation reconciliation", () => {
     const second = buildCanonicalReconciliationScope({ evidencePackage: evidencePackage(), existingCanonicalObjects: historical() });
 
     expect(second).toEqual(first);
-    expect(first.incomingCanonicalIdentities).toEqual(["nutrition|2026-07-12|nutritionday_2026-07-12_1"]);
+    expect(first.incomingCanonicalIdentities).toEqual(["nutrition|2026-07-12|nutrition-day"]);
     expect(first.directlyRelatedCanonicalIdentities).toEqual([]);
   });
 
@@ -69,7 +70,13 @@ describe("scoped canonical confirmation reconciliation", () => {
     const identity = "nutrition|2026-07-12|nutritionday_2026-07-12_1";
     const unrelated = historical();
     const existing = canonical(identity, nutrition({ daily_totals: { calories: 1800, protein_g: 170 } }));
-    const result = reconcileConfirmedEvidencePackage({ evidencePackage: evidencePackage(), existingCanonicalObjects: [...unrelated, existing], userId });
+    const prepared = prepareNutritionEvidencePackageForReview({
+      canonicalObjects: [existing],
+      evidencePackage: evidencePackage(),
+      reviewId: "review-update",
+    });
+    prepared.evidence_objects[0].reconciliation.nutrition.disposition = "replace";
+    const result = reconcileConfirmedEvidencePackage({ evidencePackage: prepared, existingCanonicalObjects: [...unrelated, existing], userId });
 
     expect(result.report.updatedCanonicalIds).toEqual([identity]);
     expect(result.changedObjects).toHaveLength(1);
@@ -97,8 +104,8 @@ describe("scoped canonical confirmation reconciliation", () => {
     const result = reconcileConfirmedEvidencePackage({ evidencePackage: evidencePackage([nutrition(), second, excluded]), existingCanonicalObjects: historical(), userId });
 
     expect(result.report.addedCanonicalIds).toEqual([
-      "nutrition|2026-07-12|nutritionday_2026-07-12_1",
-      "nutrition|2026-07-13|nutritionday_2026-07-13_1",
+      "nutrition|2026-07-12|nutrition-day",
+      "nutrition|2026-07-13|nutrition-day",
     ]);
   });
 
@@ -115,6 +122,15 @@ describe("scoped canonical confirmation reconciliation", () => {
     expect(broad).not.toHaveBeenCalled();
   });
 
+  it("blocks raw persistence of a second active same-date NutritionDay", async () => {
+    const first = canonical("legacy-nutrition-a", nutrition());
+    const repository = createCanonicalEvidenceRepository([first]);
+    const second = canonical("legacy-nutrition-b", nutrition({ id: "other" }));
+
+    await expect(repository.upsertCanonicalEvidenceObjects([second]))
+      .rejects.toThrow(/second active canonical NutritionDay/i);
+  });
+
   it("exposes broad reconciliation only as an explicit maintenance command with a report", async () => {
     const records = historical();
     const repository = createCanonicalEvidenceRepository(records, {
@@ -125,7 +141,7 @@ describe("scoped canonical confirmation reconciliation", () => {
     const result = await repository.reconcileCanonicalHistory(userId);
 
     expect(result.report.mutationReason).toBe("explicit_canonical_history_maintenance");
-    expect(result.report.addedCanonicalIds).toContain("nutrition|2026-07-12|nutritionday_2026-07-12_1");
+    expect(result.report.addedCanonicalIds).toContain("nutrition|2026-07-12|nutrition-day");
   });
 
   it("limits explicit merge scope to the declared linked record", () => {
@@ -144,11 +160,11 @@ describe("scoped canonical confirmation reconciliation", () => {
     const result = reconcileConfirmedEvidencePackage({ evidencePackage: evidencePackage([incoming]), existingCanonicalObjects: [...unrelated, prior], userId });
 
     expect(result.report.changedCanonicalIds).toEqual(expect.arrayContaining([
-      "nutrition|2026-07-12|nutritionday_2026-07-12_1",
+      "nutrition|2026-07-12|nutrition-day",
       prior.canonicalId,
     ]));
     expect(result.scope.supersededCanonicalIdentities).toEqual([prior.canonicalId]);
-    expect(result.changedObjects.find((item) => item.canonicalId === prior.canonicalId)?.quality).toEqual(expect.objectContaining({ status: "superseded", supersededBy: "nutrition|2026-07-12|nutritionday_2026-07-12_1" }));
+    expect(result.changedObjects.find((item) => item.canonicalId === prior.canonicalId)?.quality).toEqual(expect.objectContaining({ status: "superseded", supersededBy: "nutrition|2026-07-12|nutrition-day" }));
     expect(JSON.stringify(unrelated)).toBe(JSON.stringify(historical()));
   });
 });

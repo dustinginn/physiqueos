@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import {
@@ -173,12 +174,12 @@ describe("Nutrition Calories reporting", () => {
   }, 30000);
 
   it("does not mutate the runtime store", async () => {
-    const before = fs.readFileSync(storePath);
+    const before = fileHash(storePath);
     await getNutritionCaloriesReport({
       context: "all",
       currentDate: new Date("2026-07-24T12:00:00Z"),
     });
-    expect(fs.readFileSync(storePath)).toEqual(before);
+    expect(fileHash(storePath)).toBe(before);
   }, 30000);
 });
 
@@ -210,4 +211,8 @@ function day(id, date, calories, extras = {}) {
 
 function calorieDay(date, calories) {
   return { id: date, date, calories };
+}
+
+function fileHash(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }

@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  getCanonicalPayloads,
   getNutritionReportExtras,
   getPlaceholderEntries,
   getValidNutritionCalorieRange,
@@ -91,10 +93,44 @@ describe("ProgressReportingService Nutrition calorie-range handling", () => {
     expect(extras.nutritionLibrary[0].detail).toBe("Logged daily totals");
   });
 
+  it("selects the explicit active Nutrition revision without input-order dependence", () => {
+    const records = [
+      canonicalNutrition("old", 2200, 1),
+      canonicalNutrition("current", 2450, 2),
+    ];
+    const first = getCanonicalPayloads({ canonicalEvidenceObjects: records });
+    const second = getCanonicalPayloads({
+      canonicalEvidenceObjects: [...records].reverse(),
+    });
+
+    expect(first.filter((item) => item.evidence_type === "nutrition"))
+      .toHaveLength(1);
+    expect(first.find((item) => item.evidence_type === "nutrition")
+      ?.daily_totals.calories).toBe(2450);
+    expect(second.find((item) => item.evidence_type === "nutrition")
+      ?.daily_totals.calories).toBe(2450);
+  });
+
+  it("keeps legacy package fallback deterministic when canonical data is absent", () => {
+    const older = legacyNutrition("nutrition-a", 2200);
+    const newer = legacyNutrition("nutrition-z", 2450);
+    const first = getCanonicalPayloads({
+      evidencePackages: [{ evidence_objects: [older] }, { evidence_objects: [newer] }],
+    });
+    const second = getCanonicalPayloads({
+      evidencePackages: [{ evidence_objects: [newer] }, { evidence_objects: [older] }],
+    });
+
+    expect(first.find((item) => item.evidence_type === "nutrition")
+      ?.daily_totals.calories).toBe(2450);
+    expect(second.find((item) => item.evidence_type === "nutrition")
+      ?.daily_totals.calories).toBe(2450);
+  });
+
   it(
     "does not mutate production state or input records",
     () => {
-      const before = fs.readFileSync(storePath);
+      const before = fileHash(storePath);
       const nutritionContext = {
         estimatedDailyCaloricIntake: null,
         proteinTarget: { unit: "g", value: 167 },
@@ -105,8 +141,37 @@ describe("ProgressReportingService Nutrition calorie-range handling", () => {
       getNutritionReportExtras({ nutritionContext });
 
       expect(nutritionContext).toEqual(snapshot);
-      expect(fs.readFileSync(storePath)).toEqual(before);
+      expect(fileHash(storePath)).toBe(before);
     },
     30000
   );
 });
+
+function canonicalNutrition(id, calories, revision) {
+  return {
+    canonicalId: id,
+    evidence_type: "nutrition",
+    nutritionRevision: { revision },
+    payload: {
+      id,
+      evidence_type: "nutrition",
+      observed_at: "2026-07-23",
+      daily_totals: { calories },
+    },
+    quality: { status: "active" },
+    updatedAt: `2026-07-23T0${revision}:00:00.000Z`,
+  };
+}
+
+function legacyNutrition(id, calories) {
+  return {
+    id,
+    evidence_type: "nutrition",
+    observed_at: "2026-07-23",
+    daily_totals: { calories },
+  };
+}
+
+function fileHash(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
