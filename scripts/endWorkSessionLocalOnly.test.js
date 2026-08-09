@@ -20,9 +20,15 @@ describe("End Work Session local-only closeout", () => {
   it("A accepts a clean synchronized repository and skips push", () => {
     const repository = createRepository();
     const backup = createBackup(repository);
+    const localBackupRoot = `${repository}-unused-local-backups`;
+    const externalBackupRoot = `${repository}-unused-external-backups`;
+    workspaces.push(localBackupRoot, externalBackupRoot);
     git(repository, "remote", "set-url", "origin", path.join(repository, "missing-remote"));
 
-    const result = runLocalOnly(repository, backup);
+    const result = runLocalOnly(repository, backup, {
+      localBackupRoot,
+      externalBackupRoot,
+    });
 
     expect(result.status).toBe(0);
     expect(result.output).toContain("0 ahead / 0 behind");
@@ -31,6 +37,8 @@ describe("End Work Session local-only closeout", () => {
     expect(result.output).toContain("External replication status: pending");
     expect(result.output).toContain("Local repository closeout accepted.");
     expect(git(repository, "status", "--porcelain=v1")).toBe("");
+    expect(fs.existsSync(localBackupRoot)).toBe(false);
+    expect(fs.existsSync(externalBackupRoot)).toBe(false);
   });
 
   it("B rejects local-only closeout when the branch is ahead", () => {
@@ -107,7 +115,8 @@ describe("End Work Session local-only closeout", () => {
     expect(script).toContain('} elseif ($hasUpstream) {');
     expect(script).toContain('Invoke-CheckedGit -Arguments @("push")');
     expect(script).toContain('(Join-Path $PSScriptRoot "backupRepository.ps1")');
-    expect(script).toContain("-DestinationDirectory $BackupDestination");
+    expect(script).toContain("-DestinationDirectory $LocalBackupDirectory");
+    expect(script).toContain('replicateRepositoryBackup.mjs');
   });
 });
 
@@ -183,7 +192,7 @@ function createBackup(repository) {
   return backup;
 }
 
-function runLocalOnly(repository, backup) {
+function runLocalOnly(repository, backup, destinations = {}) {
   const result = spawnSync(
     powershell,
     [
@@ -199,6 +208,12 @@ function runLocalOnly(repository, backup) {
       backup,
       "-ExternalReplicationStatus",
       "pending",
+      ...(destinations.localBackupRoot
+        ? ["-LocalBackupDirectory", destinations.localBackupRoot]
+        : []),
+      ...(destinations.externalBackupRoot
+        ? ["-ExternalBackupDirectory", destinations.externalBackupRoot]
+        : []),
     ],
     { encoding: "utf8", timeout: 30_000 },
   );

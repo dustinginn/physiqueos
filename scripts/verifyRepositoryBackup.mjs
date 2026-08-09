@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-function sha256(filePath) {
+export function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex").toUpperCase();
 }
 
@@ -40,6 +40,56 @@ function listFiles(root) {
   };
   visit(root);
   return result.sort();
+}
+
+export function compareRepositoryBackupReplica({ sourceBackupPath, replicaBackupPath }) {
+  if (!sourceBackupPath || !replicaBackupPath) {
+    throw new Error("Source and replica backup paths are required");
+  }
+  const source = path.resolve(sourceBackupPath);
+  const replica = path.resolve(replicaBackupPath);
+  for (const [label, directory] of [["Source backup", source], ["Backup replica", replica]]) {
+    if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
+      throw new Error(`${label} directory is missing: ${directory}`);
+    }
+  }
+
+  const sourceFiles = listFiles(source);
+  const replicaFiles = listFiles(replica);
+  const sourceKeys = new Set(sourceFiles.map((file) => file.toLowerCase()));
+  const replicaKeys = new Set(replicaFiles.map((file) => file.toLowerCase()));
+  const missing = sourceFiles.filter((file) => !replicaKeys.has(file.toLowerCase()));
+  const unexpected = replicaFiles.filter((file) => !sourceKeys.has(file.toLowerCase()));
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(
+      `Backup replica inventory mismatch: missing=${missing.join(", ") || "none"}; ` +
+      `unexpected=${unexpected.join(", ") || "none"}`,
+    );
+  }
+
+  let totalBytes = 0;
+  for (const relativePath of sourceFiles) {
+    const sourceFile = path.join(source, relativePath);
+    const replicaFile = path.join(replica, relativePath);
+    const sourceSize = fs.statSync(sourceFile).size;
+    const replicaSize = fs.statSync(replicaFile).size;
+    if (sourceSize !== replicaSize) {
+      throw new Error(`Backup replica size mismatch: ${relativePath}`);
+    }
+    if (sha256(sourceFile) !== sha256(replicaFile)) {
+      throw new Error(`Backup replica SHA-256 mismatch: ${relativePath}`);
+    }
+    totalBytes += sourceSize;
+  }
+
+  return {
+    schemaVersion: "physiqueos_backup_replica_verification_v1",
+    sourceBackupPath: source,
+    replicaBackupPath: replica,
+    fileCount: sourceFiles.length,
+    totalBytes,
+    verified: true,
+  };
 }
 
 function runGit(args) {
@@ -183,11 +233,16 @@ function parseArguments(argv) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const options = parseArguments(process.argv.slice(2));
-    const identity = verifyRepositoryBackup({
-      backupPath: options["--backup"],
-      expectedHead: options["--expected-head"],
-      expectedBranch: options["--expected-branch"],
-    });
+    const identity = options["--compare-source"]
+      ? compareRepositoryBackupReplica({
+          sourceBackupPath: options["--compare-source"],
+          replicaBackupPath: options["--compare-replica"],
+        })
+      : verifyRepositoryBackup({
+          backupPath: options["--backup"],
+          expectedHead: options["--expected-head"],
+          expectedBranch: options["--expected-branch"],
+        });
     process.stdout.write(`${JSON.stringify(identity, null, 2)}\n`);
   } catch (error) {
     process.stderr.write(`${error.stack ?? error.message}\n`);

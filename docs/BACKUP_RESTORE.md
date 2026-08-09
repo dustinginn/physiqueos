@@ -32,15 +32,44 @@ path-by-path source disposition is recorded in
 
 ## Create a backup
 
-From the repository root:
+The normal End Work Session workflow is local-first:
+
+1. create and fully verify the backup under the user's Documents folder;
+2. copy the completed backup directory to external storage with bounded,
+   restartable Robocopy settings; and
+3. compare every external file with the local source by size and SHA-256.
+
+Default destinations are:
+
+- local: `<Documents>\PhysiqueOS Backups`; and
+- external: `G:\My Drive\PhysiqueOS Backups`.
+
+Override either destination when needed:
 
 ```powershell
-.\scripts\backupRepository.ps1 -DestinationDirectory "G:\My Drive\PhysiqueOS Backups"
+.\scripts\endWorkSession.ps1 `
+  -LocalBackupDirectory "D:\Local PhysiqueOS Backups" `
+  -ExternalBackupDirectory "H:\My Drive\PhysiqueOS Backups"
 ```
 
-Choose the actual synchronized Google Drive directory on the machine. The
-script does not discover, authenticate, or configure Google Drive. It refuses
-to create a destination when the root is dirty or source completeness fails.
+`-BackupDestination` remains a compatibility alias for
+`-ExternalBackupDirectory`; even with that older name, backup construction
+still occurs at the local destination first. To accept the verified local
+backup while intentionally deferring external replication, pass
+`-SkipExternalReplication`. The output will record external replication as
+pending and will not imply off-machine protection.
+
+The destination-agnostic backup primitive can also be run directly against a
+safe local filesystem destination:
+
+```powershell
+.\scripts\backupRepository.ps1 `
+  -DestinationDirectory "$([Environment]::GetFolderPath('MyDocuments'))\PhysiqueOS Backups"
+```
+
+Do not construct the backup directly on a cloud-mounted filesystem. The
+primitive refuses to create a backup when the root is dirty or source
+completeness fails.
 
 Runtime export is explicit and off by default. Only use the following after
 reviewing the privacy implications of copying private Founder data:
@@ -86,6 +115,31 @@ with unpushed or missing commits cannot be closed in this mode.
 
 External replication is separate from backup acceptance. Keep the verified
 local backup until any cloud copy has been independently checked.
+
+## Recover pending external replication
+
+If Google Drive is unavailable, frozen, or exceeds the bounded replication
+timeout, End Work Session retains and accepts the local backup, reports
+external replication as failed or pending, and identifies off-machine backup
+as requiring follow-up. Local acceptance does not mean disaster-recovery
+replication is complete.
+
+When Drive for Desktop is healthy, replicate the already verified local
+backup without rebuilding it:
+
+```powershell
+node .\scripts\replicateRepositoryBackup.mjs `
+  --source "C:\path\to\PhysiqueOS_Backup_yyyy-MM-dd_HH-mm-ss" `
+  --external-root "G:\My Drive\PhysiqueOS Backups" `
+  --timeout-ms 900000
+```
+
+Replication uses recursive restartable copying, two retries with a two-second
+wait, normal file/date attributes, and no mirroring or destination deletion.
+Robocopy exit codes below 8 are eligible for acceptance; the replica is not
+accepted until its complete file inventory, sizes, and SHA-256 hashes match
+the retained local backup. Never delete the local backup merely because the
+external replica verifies.
 
 ## Validate a backup
 

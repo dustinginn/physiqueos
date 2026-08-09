@@ -7,7 +7,18 @@ param(
   [ValidateSet("pending", "accepted", "not_requested")]
   [string]$ExternalReplicationStatus = "pending",
 
-  [string]$BackupDestination = "G:\My Drive\PhysiqueOS Backups",
+  [string]$LocalBackupDirectory = [System.IO.Path]::Combine(
+    [Environment]::GetFolderPath("MyDocuments"),
+    "PhysiqueOS Backups"
+  ),
+
+  [Alias("BackupDestination")]
+  [string]$ExternalBackupDirectory = "G:\My Drive\PhysiqueOS Backups",
+
+  [switch]$SkipExternalReplication,
+
+  [ValidateRange(1, 86400)]
+  [int]$ExternalReplicationTimeoutSeconds = 900,
 
   [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 )
@@ -168,6 +179,12 @@ try {
   $acceptedBackupPath = $null
   $acceptedManifestHash = $null
   $acceptedBundleHash = $null
+  $externalBackupPath = $null
+  $externalReplicationResult = if ($LocalOnly) {
+    $ExternalReplicationStatus
+  } else {
+    "pending"
+  }
   if ($LocalOnly) {
     if ([string]::IsNullOrWhiteSpace($VerifiedBackupPath)) {
       throw "Local-only closeout requires -VerifiedBackupPath."
@@ -188,11 +205,76 @@ try {
     Write-Host "Verified local backup accepted: $acceptedBackupPath" -ForegroundColor Green
     Write-Host "External replication status: $ExternalReplicationStatus" -ForegroundColor Yellow
   } else {
-    Write-Host "Running PhysiqueOS backup..." -ForegroundColor Cyan
-    & (Join-Path $PSScriptRoot "backupRepository.ps1") `
-      -DestinationDirectory $BackupDestination
-    Write-Host "Backup verified." -ForegroundColor Green
-    $acceptedBackupPath = $BackupDestination
+    Write-Host "Creating verified local PhysiqueOS backup..." -ForegroundColor Cyan
+    $backupResult = & (Join-Path $PSScriptRoot "backupRepository.ps1") `
+      -DestinationDirectory $LocalBackupDirectory `
+      -RepositoryRoot $repositoryRoot `
+      -PassThru
+    if (-not $backupResult -or -not $backupResult.BackupPath) {
+      throw "Local backup did not return a completed backup path."
+    }
+
+    $localVerificationOutput = @(& node `
+      (Join-Path $PSScriptRoot "verifyRepositoryBackup.mjs") `
+      --backup $backupResult.BackupPath `
+      --expected-head $fullCommitHash `
+      --expected-branch $branch)
+    if ($LASTEXITCODE -ne 0) {
+      throw "New local backup failed independent verification."
+    }
+    $backupIdentity = ($localVerificationOutput -join "`n") | ConvertFrom-Json
+    $acceptedBackupPath = $backupIdentity.backupPath
+    $acceptedManifestHash = $backupIdentity.manifestSha256
+    $acceptedBundleHash = $backupIdentity.bundleSha256
+    Write-Host "Local backup verified: $acceptedBackupPath" -ForegroundColor Green
+
+    if ($SkipExternalReplication) {
+      Write-Warning (
+        "External replication skipped explicitly. " +
+        "The verified local backup is retained; off-machine backup remains pending."
+      )
+    } else {
+      Write-Host "Replicating verified backup to external storage..." -ForegroundColor Cyan
+      $replicationOutput = @(& node `
+        (Join-Path $PSScriptRoot "replicateRepositoryBackup.mjs") `
+        --source $acceptedBackupPath `
+        --external-root $ExternalBackupDirectory `
+        --timeout-ms ($ExternalReplicationTimeoutSeconds * 1000))
+      $replicationExitCode = $LASTEXITCODE
+      try {
+        $replication = ($replicationOutput -join "`n") | ConvertFrom-Json
+      } catch {
+        $replication = $null
+      }
+
+      if (
+        $replicationExitCode -eq 0 -and
+        $replication -and
+        $replication.status -eq "verified"
+      ) {
+        $externalReplicationResult = "verified"
+        $externalBackupPath = $replication.externalBackupPath
+        Write-Host (
+          "External backup replica verified: $externalBackupPath " +
+          "(Robocopy exit code $($replication.robocopyExitCode))."
+        ) -ForegroundColor Green
+      } else {
+        $externalReplicationResult = "failed"
+        if ($replication) {
+          $externalBackupPath = $replication.externalBackupPath
+          $replicationDetail = $replication.message
+          $robocopyExit = $replication.robocopyExitCode
+        } else {
+          $externalBackupPath = $ExternalBackupDirectory
+          $replicationDetail = "Replication did not return a valid result."
+          $robocopyExit = "unavailable"
+        }
+        Write-Warning (
+          "External replication failed (Robocopy exit code $robocopyExit): " +
+          "$replicationDetail. The verified local backup remains accepted and retained."
+        )
+      }
+    }
   }
 
   $elapsed = (Get-Date) - $startedAt
@@ -202,22 +284,31 @@ try {
   Write-Host "  Commit: $commitHash"
   Write-Host "  Pushed: $(if ($pushOccurred) { 'yes' } else { 'no' })"
   Write-Host "  Local-only: $($LocalOnly.ToString().ToLowerInvariant())"
-  Write-Host "  Backup: $acceptedBackupPath"
+  Write-Host "  Local backup: $acceptedBackupPath"
   if ($acceptedManifestHash) {
     Write-Host "  Backup manifest SHA-256: $acceptedManifestHash"
   }
   if ($acceptedBundleHash) {
     Write-Host "  Bundle SHA-256: $acceptedBundleHash"
   }
-  if ($LocalOnly) {
-    Write-Host "  External replication: $ExternalReplicationStatus"
+  Write-Host "  External replication: $externalReplicationResult"
+  if ($externalBackupPath) {
+    Write-Host "  External backup: $externalBackupPath"
   }
   Write-Host "  Elapsed: $($elapsed.ToString('hh\:mm\:ss'))"
   Write-Host ""
   if ($LocalOnly) {
     Write-Host "Local repository closeout accepted." -ForegroundColor Green
+    Write-Host "End Work Session Complete" -ForegroundColor Green
+  } elseif ($externalReplicationResult -eq "verified") {
+    Write-Host "Repository closeout accepted." -ForegroundColor Green
+    Write-Host "Off-machine backup replica accepted." -ForegroundColor Green
+    Write-Host "End Work Session Complete" -ForegroundColor Green
+  } else {
+    Write-Host "Repository closeout accepted locally." -ForegroundColor Green
+    Write-Warning "Off-machine backup requires follow-up."
+    Write-Host "End Work Session Complete (local backup only)" -ForegroundColor Yellow
   }
-  Write-Host "End Work Session Complete" -ForegroundColor Green
 } catch {
   Write-Error $_
   exit 1

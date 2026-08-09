@@ -3,13 +3,17 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$DestinationDirectory,
 
-  [switch]$IncludeRuntime
+  [switch]$IncludeRuntime,
+
+  [switch]$PassThru,
+
+  [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $policyPath = Join-Path $repositoryRoot "config\embedded-repository-policy.json"
 $completenessScript = Join-Path $PSScriptRoot "backupCompleteness.mjs"
 $completenessReportPath = [System.IO.Path]::GetTempFileName()
@@ -29,12 +33,17 @@ try {
     throw "Backup requires a clean, committed root working tree; uncommitted source cannot be represented by a Git bundle."
   }
 
-  & node $completenessScript `
+  $completenessOutput = @(& node $completenessScript `
     --repository-root $repositoryRoot `
     --policy $policyPath `
-    --output $completenessReportPath
+    --output $completenessReportPath)
   if ($LASTEXITCODE -ne 0) {
     throw "Backup completeness audit failed. No backup was created."
+  }
+  if ($PassThru) {
+    foreach ($line in $completenessOutput) { Write-Host $line }
+  } else {
+    Write-Output $completenessOutput
   }
 
   $completeness = Get-Content -LiteralPath $completenessReportPath -Raw | ConvertFrom-Json
@@ -77,7 +86,9 @@ try {
 
   $nodeVersion = (& node --version).Trim()
   $npmVersion = (& npm.cmd --version).Trim()
-  $frameworkVersion = (& node -p "require('./node_modules/next/package.json').version").Trim()
+  $frameworkPackagePath = Join-Path $PSScriptRoot "..\node_modules\next\package.json"
+  $frameworkVersion = (& node -p `
+    "require(process.argv[1]).version" $frameworkPackagePath).Trim()
   $runtimePath = Join-Path $repositoryRoot "private\founder\runtime-store.json"
   $runtimeRevision = $null
   $runtimeLastCommitId = $null
@@ -165,7 +176,20 @@ try {
       "$hash  $relativePath"
     } | Set-Content -LiteralPath $checksumPath -Encoding utf8
 
-  Write-Output "Backup created and verified: $backupDirectory"
+  $manifestHash = (Get-FileHash -LiteralPath $manifestJsonPath -Algorithm SHA256).Hash
+  $checksumsHash = (Get-FileHash -LiteralPath $checksumPath -Algorithm SHA256).Hash
+  if ($PassThru) {
+    Write-Output ([pscustomobject]@{
+      BackupPath = $backupDirectory
+      Branch = $branch
+      Head = $commit
+      ManifestSha256 = $manifestHash
+      BundleSha256 = $bundleHash
+      ChecksumsSha256 = $checksumsHash
+    })
+  } else {
+    Write-Output "Backup created and verified: $backupDirectory"
+  }
 } catch {
   if ($backupDirectory -and (Test-Path -LiteralPath $backupDirectory)) {
     Remove-Item -LiteralPath $backupDirectory -Recurse -Force
