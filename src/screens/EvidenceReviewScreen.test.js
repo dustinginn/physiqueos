@@ -114,6 +114,14 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(actions).toContain("sourceReviewId: reviewId");
   });
 
+  it("presents meal replacement against the projected whole-day total", () => {
+    expect(screen).toContain("relationship.projectedPreview ?? incoming");
+    expect(screen).toContain("Projected daily total:");
+    expect(screen).toContain("will remain unchanged.");
+    expect(screen).toContain("formatMealList(unchangedMeals)");
+    expect(screen).not.toContain(">Daily total:");
+  });
+
   it("preserves save-for-later, discard, and reprocessing controls", () => {
     expect(screen).toContain("Save and return later");
     expect(screen).toContain("Discard review");

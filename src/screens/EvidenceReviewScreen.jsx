@@ -335,21 +335,29 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDispositi
 function NutritionReplacementControl({ canEdit, disposition, onChange, relationship }) {
   const existing = relationship.existingPreview ?? {};
   const incoming = relationship.newPreview ?? {};
+  const projected = relationship.projectedPreview ?? incoming;
   const status = relationship.dispositionStatus;
   const existingMeals = new Map((existing.meals ?? []).map((meal) => [meal.key, meal]));
+  const incomingMealKeys = new Set((incoming.meals ?? []).map((meal) => meal.key));
   const comparisons = (incoming.meals ?? [])
     .filter((meal) => existingMeals.has(meal.key))
     .map((meal) => ({ existing: existingMeals.get(meal.key), incoming: meal }));
+  const unchangedMeals = (existing.meals ?? [])
+    .filter((meal) => !incomingMealKeys.has(meal.key))
+    .map((meal) => meal.label);
   return (
     <section className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-accent)] p-4">
       <h3 className="font-extrabold text-[var(--text-primary)]">Update this Nutrition Day</h3>
       <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">This looks related to the Nutrition Day already logged for this date.</p>
-      {(existing.calories != null || incoming.calories != null) && (
-        <p className="mt-2 text-sm font-bold text-[var(--text-primary)]">Daily total: {existing.calories ?? "not available"} → {incoming.calories ?? "not available"} calories</p>
+      {(existing.calories != null || projected.calories != null) && (
+        <p className="mt-2 text-sm font-bold text-[var(--text-primary)]">Projected daily total: {existing.calories ?? "not available"} → {projected.calories ?? "not available"} calories</p>
       )}
       {comparisons.map(({ existing: prior, incoming: next }) => (
         <p className="mt-1 text-sm font-bold text-[var(--text-primary)]" key={next.key}>{next.label}: {prior.calories ?? "not available"} → {next.calories ?? "not available"} calories</p>
       ))}
+      {unchangedMeals.length > 0 && (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{formatMealList(unchangedMeals)} will remain unchanged.</p>
+      )}
       {status === "automatic" ? (
         <p className="mt-3 text-sm font-semibold text-[var(--primary)]">The current day will be updated; its prior version will remain in history.</p>
       ) : status === "requires_choice" ? (
@@ -363,6 +371,12 @@ function NutritionReplacementControl({ canEdit, disposition, onChange, relations
       )}
     </section>
   );
+}
+
+function formatMealList(meals) {
+  if (meals.length < 2) return meals[0] ?? "Other meals";
+  if (meals.length === 2) return `${meals[0]} and ${meals[1]}`;
+  return `${meals.slice(0, -1).join(", ")}, and ${meals.at(-1)}`;
 }
 
 function NewExerciseCard({ action, canonicalExercises, exercise, recoveryContext, review }) {

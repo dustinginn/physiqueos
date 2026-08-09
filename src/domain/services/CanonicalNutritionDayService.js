@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { NutritionDailyTotalsScope } from "../models/nutritionDayEvidence";
+import {
+  NUTRITION_RECONCILIATION_TOLERANCE,
+  NutritionDailyTotalsScope,
+} from "../models/nutritionDayEvidence";
 
 export const NUTRITION_DAY_REVISION_SCHEMA_VERSION =
   "canonical-nutrition-day-revision-v1";
@@ -129,6 +132,14 @@ export function prepareNutritionEvidencePackageForReview({
         existingPayload: existing.payload,
         incomingPayload: object,
       });
+      const projectedPayload = assessment.disposition
+        ? projectNutritionCanonicalUpdate({
+            disposition: assessment.disposition,
+            existingPayload: existing.payload,
+            incomingPayload: object,
+            replacementScope: assessment.replacementScope,
+          })
+        : null;
       return withNutritionReconciliation(object, {
         ...assessment,
         existingPreview: createNutritionPreview(existing.payload),
@@ -136,6 +147,9 @@ export function prepareNutritionEvidencePackageForReview({
           getCanonicalNutritionSemanticFingerprint(existing),
         logicalDayKey: getNutritionDayLogicalKey(object),
         newPreview: createNutritionPreview(object),
+        projectedPreview: projectedPayload
+          ? createNutritionPreview(projectedPayload)
+          : null,
         sourceReviewId: reviewId,
         targetCanonicalId: existing.canonicalId,
       });
@@ -272,10 +286,10 @@ export function createCanonicalNutritionDayRecord({
   }
 
   const payload = existingObject
-    ? reconcileNutritionPayload({
+    ? projectNutritionCanonicalUpdate({
         disposition,
-        existing: existingObject.payload,
-        incoming: canonicalCandidate,
+        existingPayload: existingObject.payload,
+        incomingPayload: canonicalCandidate,
         replacementScope,
       })
     : canonicalCandidate;
@@ -400,16 +414,25 @@ export function selectNutritionDayPayloads(days = []) {
   );
 }
 
-function reconcileNutritionPayload({ disposition, existing, incoming, replacementScope }) {
+export function projectNutritionCanonicalUpdate({
+  disposition,
+  existingPayload: existing = {},
+  incomingPayload: incoming = {},
+  replacementScope,
+} = {}) {
   if (disposition === NutritionCanonicalDisposition.ADDITIVE) {
+    const meals = [...(existing.meals ?? []), ...(incoming.meals ?? [])];
     return {
       ...existing,
       captured_at: incoming.captured_at ?? existing.captured_at,
-      meals: [...(existing.meals ?? []), ...(incoming.meals ?? [])],
-      metadata: updateMealCounts({
-        ...(existing.metadata ?? {}),
-        source: incoming.metadata?.source ?? existing.metadata?.source,
-      }, [...(existing.meals ?? []), ...(incoming.meals ?? [])]),
+      meals,
+      metadata: updateMealCounts(
+        {
+          ...(existing.metadata ?? {}),
+          source: incoming.metadata?.source ?? existing.metadata?.source,
+        },
+        meals
+      ),
       provenance: mergePayloadProvenance(existing.provenance, incoming.provenance),
       source: mergeSource(existing.source, incoming.source),
     };
@@ -428,16 +451,68 @@ function reconcileNutritionPayload({ disposition, existing, incoming, replacemen
     ),
     ...(incoming.meals ?? []),
   ];
+  const projection = projectMealScopedDailyTotals({
+    existing,
+    projectedMeals: meals,
+  });
   return {
     ...existing,
     captured_at: incoming.captured_at ?? existing.captured_at,
+    daily_totals: projection.dailyTotals,
     meals,
-    metadata: updateMealCounts({
-      ...(existing.metadata ?? {}),
-      source: incoming.metadata?.source ?? existing.metadata?.source,
-    }, meals),
+    metadata: updateMealCounts(
+      {
+        ...(existing.metadata ?? {}),
+        source: incoming.metadata?.source ?? existing.metadata?.source,
+        canonical_projection: projection.metadata,
+      },
+      meals
+    ),
     provenance: mergePayloadProvenance(existing.provenance, incoming.provenance),
     source: mergeSource(existing.source, incoming.source),
+  };
+}
+
+function projectMealScopedDailyTotals({ existing = {}, projectedMeals = [] }) {
+  const fields = Object.keys(NUTRITION_RECONCILIATION_TOLERANCE);
+  const dailyTotals = { ...(existing.daily_totals ?? {}) };
+  const recomputedFields = [];
+  const preservedFields = [];
+
+  for (const field of fields) {
+    const existingDaily = finite(existing.daily_totals?.[field]);
+    const existingMealValues = (existing.meals ?? [])
+      .map((meal) => finite(meal.totals?.[field]));
+    const projectedMealValues = projectedMeals
+      .map((meal) => finite(meal.totals?.[field]));
+    const existingCoverageComplete =
+      existingDaily !== null &&
+      existingMealValues.length > 0 &&
+      existingMealValues.every((value) => value !== null) &&
+      Math.abs(existingDaily - sum(existingMealValues)) <=
+        (NUTRITION_RECONCILIATION_TOLERANCE[field] ?? 0);
+    const projectedCoverageComplete =
+      projectedMealValues.length > 0 &&
+      projectedMealValues.every((value) => value !== null);
+
+    if (existingCoverageComplete && projectedCoverageComplete) {
+      dailyTotals[field] = sum(projectedMealValues);
+      recomputedFields.push(field);
+    } else {
+      preservedFields.push(field);
+    }
+  }
+
+  return {
+    dailyTotals,
+    metadata: {
+      mode: "meal_scope_projection",
+      recomputedFields,
+      preservedFields,
+      basis: recomputedFields.length > 0
+        ? "existing_meals_reconciled_with_authoritative_daily_totals"
+        : "existing_daily_totals_preserved_due_to_incomplete_meal_coverage",
+    },
   };
 }
 
@@ -512,6 +587,12 @@ function inferReplacementScope(payload, overlapping) {
 function createNutritionPreview(payload = {}) {
   return {
     calories: finite(payload.daily_totals?.calories),
+    dailyTotals: Object.fromEntries(
+      Object.keys(NUTRITION_RECONCILIATION_TOLERANCE).map((field) => [
+        field,
+        finite(payload.daily_totals?.[field]),
+      ])
+    ),
     meals: (payload.meals ?? []).map((meal) => ({
       key: normalizeNutritionMealKey(meal.name ?? meal.id),
       label: meal.name ?? "Meal",
@@ -583,6 +664,10 @@ function finite(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function sum(values) {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 function finiteOrText(value) {

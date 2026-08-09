@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { reconcileConfirmedEvidencePackage } from "./CanonicalEvidenceService";
+import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
+import { composeLoggedTodaySummary } from "./LoggedTodayService";
+import { getCanonicalPayloads } from "./ProgressReportingService";
 import {
   createNutritionSemanticFingerprint,
   prepareNutritionEvidencePackageForReview,
@@ -35,7 +38,7 @@ describe("canonical NutritionDay revision semantics", () => {
     expect(current.provenance.evidence_review_ids).toEqual(["review-a", "review-b"]);
   });
 
-  it("replaces a matching meal without appending or fabricating daily totals", () => {
+  it("projects a matching meal replacement across the complete canonical day", () => {
     const first = confirm([], fullDayPackage("package-a", "nutrition-a", 400, 2200), "review-a");
     const incoming = packageFor("package-b", nutrition("nutrition-b", {
       daily_totals: {},
@@ -45,13 +48,106 @@ describe("canonical NutritionDay revision semantics", () => {
         daily_totals_scope: "partial_meal_subtotal",
       },
     }));
+    const prepared = prepare(first, incoming, "review-b");
+    const relationship = prepared.evidence_objects[0].reconciliation.nutrition;
+    const second = apply(first, reconcileConfirmedEvidencePackage({
+      evidencePackage: prepared,
+      existingCanonicalObjects: first,
+      userId,
+    }).changedObjects);
+    const current = selectActiveCanonicalNutritionDays(second, { date }).records[0];
+
+    expect(relationship.newPreview.calories).toBeNull();
+    expect(relationship.newPreview.meals[0].calories).toBe(650);
+    expect(relationship.projectedPreview.calories).toBe(2450);
+    expect(current.payload.daily_totals.calories).toBe(2450);
+    expect(current.payload.meals.filter((item) => item.name === "Snacks")).toHaveLength(1);
+    expect(current.payload.meals.find((item) => item.name === "Snacks")?.totals.calories).toBe(650);
+    expect(current.payload.meals.find((item) => item.name === "Breakfast")?.totals.calories).toBe(450);
+    expect(current.nutritionRevision.replacementScope).toBe("meal:snacks");
+    expect(current.nutritionRevisionHistory).toHaveLength(1);
+    expect(composeLoggedTodaySummary({ canonicalObjects: second, dateKey: date })
+      .rows.find((row) => row.id === "nutrition")?.summary).toContain("2,450 calories");
+    const reportingNutrition = getCanonicalPayloads({
+      canonicalEvidenceObjects: second,
+    }).filter((item) => item.evidence_type === "nutrition");
+    expect(reportingNutrition).toEqual([
+      expect.objectContaining({
+        daily_totals: expect.objectContaining({ calories: 2450 }),
+      }),
+    ]);
+    expect(reconcileEnergyDays({ nutritionDays: reportingNutrition })).toEqual([
+      expect.objectContaining({ calorieIntake: 2450, date }),
+    ]);
+  });
+
+  it("projects calories and macros from unchanged meals plus the replacement meal", () => {
+    const existing = packageFor("package-a", nutrition("nutrition-a", {
+      daily_totals: totals(2200, 150, 240, 70),
+      meals: [
+        meal("Breakfast", 450, 40, 45, 12),
+        meal("Lunch", 600, 45, 60, 18),
+        meal("Dinner", 750, 50, 80, 25),
+        meal("Snacks", 400, 15, 55, 15),
+      ],
+    }));
+    const first = confirm([], existing, "review-a");
+    const incoming = packageFor("package-b", nutrition("nutrition-b", {
+      daily_totals: totals(650, 25, 75, 20),
+      meals: [meal("Snacks", 650, 25, 75, 20)],
+      metadata: { date, daily_totals_scope: "partial_meal_subtotal" },
+    }));
+    const prepared = prepare(first, incoming, "review-b");
+    const relationship = prepared.evidence_objects[0].reconciliation.nutrition;
+    const second = apply(first, reconcileConfirmedEvidencePackage({
+      evidencePackage: prepared,
+      existingCanonicalObjects: first,
+      userId,
+    }).changedObjects);
+    const current = selectActiveCanonicalNutritionDays(second, { date }).records[0];
+
+    expect(relationship.projectedPreview.dailyTotals).toEqual({
+      calories: 2450,
+      protein_g: 160,
+      carbs_g: 260,
+      fat_g: 75,
+    });
+    expect(current.payload.daily_totals).toEqual(expect.objectContaining({
+      calories: 2450,
+      protein_g: 160,
+      carbs_g: 260,
+      fat_g: 75,
+    }));
+  });
+
+  it("preserves authoritative daily fields when existing meal coverage is incomplete", () => {
+    const first = confirm([], packageFor("package-a", nutrition("nutrition-a", {
+      daily_totals: totals(2300, 150, 240, 70),
+      meals: [
+        meal("Breakfast", 450, 40, 45, 12),
+        meal("Lunch", 600, 45, 60, 18),
+        meal("Dinner", 750, 50, 80, 25),
+        meal("Snacks", 400, 15, 55, 15),
+      ],
+    })), "review-a");
+    const incoming = packageFor("package-b", nutrition("nutrition-b", {
+      daily_totals: totals(650, 25, 75, 20),
+      meals: [meal("Snacks", 650, 25, 75, 20)],
+      metadata: { date, daily_totals_scope: "partial_meal_subtotal" },
+    }));
     const second = confirm(first, incoming, "review-b");
     const current = selectActiveCanonicalNutritionDays(second, { date }).records[0];
 
-    expect(current.payload.daily_totals.calories).toBe(2200);
-    expect(current.payload.meals.filter((item) => item.name === "Snacks")).toHaveLength(1);
-    expect(current.payload.meals.find((item) => item.name === "Snacks")?.totals.calories).toBe(650);
-    expect(current.nutritionRevision.replacementScope).toBe("meal:snacks");
+    expect(current.payload.daily_totals).toEqual(expect.objectContaining({
+      calories: 2300,
+      protein_g: 160,
+      carbs_g: 260,
+      fat_g: 75,
+    }));
+    expect(current.payload.metadata.canonical_projection).toEqual(expect.objectContaining({
+      recomputedFields: ["protein_g", "carbs_g", "fat_g"],
+      preservedFields: ["calories"],
+    }));
   });
 
   it("adds one demonstrably distinct meal only after explicit disposition", () => {
@@ -217,17 +313,17 @@ function nutrition(id, overrides = {}) {
   };
 }
 
-function meal(name, calories) {
+function meal(name, calories, protein = null, carbs = null, fat = null) {
   return {
     id: name.toLowerCase().replaceAll(" ", "-"),
     name,
-    totals: totals(calories),
+    totals: totals(calories, protein, carbs, fat),
     foods: [],
   };
 }
 
-function totals(calories) {
-  return { calories, protein_g: null, carbs_g: null, fat_g: null };
+function totals(calories, protein = null, carbs = null, fat = null) {
+  return { calories, protein_g: protein, carbs_g: carbs, fat_g: fat };
 }
 
 function legacy(canonicalId, payload) {
