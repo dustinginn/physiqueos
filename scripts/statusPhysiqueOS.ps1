@@ -81,6 +81,7 @@ $listener = if ($listenerPids.Count -eq 1) {
 } else { $null }
 $process = if ($listener) { Get-ProcessRecord -ProcessId $listener.pid } else { $null }
 $ancestors = if ($process) { @(Get-Ancestors $process) } else { @() }
+$startupTiming = Get-PhysiqueOSRuntimeStartupTiming -Process $process -TaskInfo $taskInfo
 $expectedArguments = "`"$nextPath`" start --hostname 0.0.0.0 --port 3000"
 $taskMatches = [bool]($task -and
   $task.Actions.Count -eq 1 -and
@@ -132,6 +133,7 @@ $overall = Get-PhysiqueOSRuntimeOverallState `
   -TaskState $taskState `
   -ForbiddenAncestor $forbiddenAncestor `
   -HealthOk ([bool]$health.ok) `
+  -StartupGraceActive ([bool]$startupTiming.graceActive) `
   -LastRecoveryOutcome $(if ($control) { [string]$control.lastRecoveryOutcome } else { $null }) `
   -ConsecutiveRecoveryFailures $(if ($control) { [int]$control.consecutiveRecoveryFailures } else { 0 })
 
@@ -139,7 +141,12 @@ $lanAddress = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue
   Where-Object { $_.IPAddress -match "^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)" -and $_.InterfaceAlias -notmatch "Loopback|WSL|vEthernet|Virtual|VPN" } |
   Select-Object -First 1 -ExpandProperty IPAddress
 $ngrokStatusScript = Join-Path $PSScriptRoot "statusPhysiqueOSNgrok.ps1"
-$ngrokStatus = if (Test-Path -LiteralPath $ngrokStatusScript -PathType Leaf) {
+$ngrokStatus = if ($overall -ne "healthy") {
+  [pscustomobject]@{
+    overallState = "deferred"
+    reason = "local_runtime_$overall"
+  }
+} elseif (Test-Path -LiteralPath $ngrokStatusScript -PathType Leaf) {
   try { & $ngrokStatusScript -AsJson | ConvertFrom-Json } catch {
     [pscustomobject]@{ overallState = "configuration_invalid"; error = $_.Exception.Message }
   }
@@ -171,6 +178,7 @@ $uptimeSeconds = if ($process -and $process.startedAt) { [math]::Floor(((Get-Dat
   ancestorChain = $ancestors
   uptimeSeconds = $uptimeSeconds
   health = $health
+  startup = $startupTiming
   ownership = $ownership
   localUrl = $localUrl
   lanUrl = if ($lanAddress) { "http://${lanAddress}:3000" } else { $null }

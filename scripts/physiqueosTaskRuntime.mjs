@@ -11,6 +11,7 @@ export const DEFAULT_PORT = 3000;
 export const DEFAULT_HOST = "0.0.0.0";
 export const RESTART_INTERVAL_MINUTES = 1;
 export const RESTART_COUNT = 3;
+export const STARTUP_GRACE_SECONDS = 45;
 export const LAUNCHER_VERSION = "scheduled-task-v2-direct-node";
 
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -73,6 +74,13 @@ export function decideMonitorAction({
   if (!taskValid) return { outcome: "task_invalid", action: "none" };
   if (listener && !canonicalListener) return { outcome: "foreign_listener", action: "none" };
   if (listener && canonicalListener && healthOk) return { outcome: "healthy", action: "none" };
+  if (
+    listener && canonicalListener &&
+    String(taskState).toLowerCase() === "running" &&
+    withinStartupGrace
+  ) {
+    return { outcome: "starting_http", action: "none" };
+  }
   if (listener && canonicalListener) return { outcome: "unhealthy", action: "none" };
   if (String(taskState).toLowerCase() === "running" || withinStartupGrace) {
     return { outcome: "starting", action: "none" };
@@ -101,6 +109,8 @@ export function classifyRuntimeStatus({
   metadataPresent = false,
   foreignListener = false,
   taskProcessMismatch = false,
+  canonicalListener = true,
+  withinStartupGrace = false,
 } = {}) {
   if (foreignListener) return "foreign_listener";
   if (taskProcessMismatch) return "task_process_mismatch";
@@ -108,6 +118,11 @@ export function classifyRuntimeStatus({
   if (!taskInstalled || normalizeTaskState(taskState) === "ready") return "stopped";
   if (!listener && !processAlive) return "starting";
   if (listener && localhostHealth) return "healthy";
+  if (
+    listener && canonicalListener &&
+    normalizeTaskState(taskState) === "running" &&
+    withinStartupGrace
+  ) return "starting_http";
   return "unhealthy";
 }
 

@@ -106,6 +106,7 @@ function evaluateOverall(overrides = {}) {
     taskState: "Running",
     forbiddenAncestor: false,
     healthOk: true,
+    startupGraceActive: false,
     lastRecoveryOutcome: "healthy",
     consecutiveRecoveryFailures: 0,
     ...overrides,
@@ -125,6 +126,7 @@ function evaluateOverall(overrides = {}) {
     "  -TaskState $fixture.taskState `",
     "  -ForbiddenAncestor ([bool]$fixture.forbiddenAncestor) `",
     "  -HealthOk ([bool]$fixture.healthOk) `",
+    "  -StartupGraceActive ([bool]$fixture.startupGraceActive) `",
     "  -LastRecoveryOutcome $fixture.lastRecoveryOutcome `",
     "  -ConsecutiveRecoveryFailures ([int]$fixture.consecutiveRecoveryFailures)",
   ].join("\n");
@@ -142,6 +144,53 @@ function evaluateOverall(overrides = {}) {
   );
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
   return result.stdout.trim();
+}
+
+function evaluateStartupTiming({ startedAt, taskLastRunTime, observedAt, graceSeconds = 45 }) {
+  const values = { startedAt, taskLastRunTime, observedAt, graceSeconds };
+  const command = [
+    `. '${helperPath.replaceAll("'", "''")}'`,
+    "$fixture = $env:PHYSIQUEOS_OWNERSHIP_FIXTURE | ConvertFrom-Json",
+    "$process = [pscustomobject]@{ startedAt = $fixture.startedAt }",
+    "$taskInfo = [pscustomobject]@{ LastRunTime = $fixture.taskLastRunTime }",
+    "$result = Get-PhysiqueOSRuntimeStartupTiming `",
+    "  -Process $process `",
+    "  -TaskInfo $taskInfo `",
+    "  -ObservedAt ([datetime]$fixture.observedAt) `",
+    "  -GraceSeconds ([int]$fixture.graceSeconds)",
+    "$result | ConvertTo-Json -Compress",
+  ].join("\n");
+  const result = spawnSync(
+    powershell,
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PHYSIQUEOS_OWNERSHIP_FIXTURE: JSON.stringify(values) },
+    }
+  );
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return JSON.parse(result.stdout.trim());
+}
+
+function evaluatePollingDecisions(states) {
+  const command = [
+    `. '${helperPath.replaceAll("'", "''")}'`,
+    "$states = $env:PHYSIQUEOS_OWNERSHIP_FIXTURE | ConvertFrom-Json",
+    "$decisions = @($states | ForEach-Object { Get-PhysiqueOSStartPollingDecision -RuntimeState $_ })",
+    "$decisions | ConvertTo-Json -Compress",
+  ].join("\n");
+  const result = spawnSync(
+    powershell,
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: { ...process.env, PHYSIQUEOS_OWNERSHIP_FIXTURE: JSON.stringify(states) },
+    }
+  );
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return JSON.parse(result.stdout.trim());
 }
 
 describe("strict S4U runtime ownership decision", () => {
@@ -285,6 +334,48 @@ describe("strict S4U runtime ownership decision", () => {
   it("Cases Q and R distinguish stale stopped control from healthy running control", () => {
     expect(evaluateOverall({ desiredState: "stopped" })).toBe("control_state_mismatch");
     expect(evaluateOverall()).toBe("healthy");
+  });
+
+  it("classifies listener-free task startup separately from bounded HTTP warming", () => {
+    expect(evaluateOverall({ listenerPresent: false, healthOk: false, taskState: "Running" }))
+      .toBe("starting");
+    expect(evaluateOverall({ healthOk: false, startupGraceActive: true }))
+      .toBe("starting_http");
+    expect(evaluateOverall({ healthOk: false, startupGraceActive: false }))
+      .toBe("unhealthy");
+  });
+
+  it("never lets startup grace mask foreign ownership or a task/process mismatch", () => {
+    expect(evaluateOverall({
+      canonicalOwnership: false,
+      healthOk: false,
+      startupGraceActive: true,
+    })).toBe("foreign_listener");
+    expect(evaluateOverall({
+      taskState: "Ready",
+      healthOk: false,
+      startupGraceActive: true,
+    })).toBe("task_process_mismatch");
+  });
+
+  it("bounds process-derived startup grace at 45 seconds", () => {
+    expect(evaluateStartupTiming({
+      startedAt: "2026-08-09T18:00:00.000Z",
+      taskLastRunTime: "2026-08-09T17:59:59.000Z",
+      observedAt: "2026-08-09T18:00:13.000Z",
+    })).toMatchObject({ launchSource: "process", ageSeconds: 13, graceSeconds: 45, graceActive: true });
+    expect(evaluateStartupTiming({
+      startedAt: "2026-08-09T18:00:00.000Z",
+      taskLastRunTime: "2026-08-09T17:59:59.000Z",
+      observedAt: "2026-08-09T18:00:45.001Z",
+    })).toMatchObject({ launchSource: "process", ageSeconds: 45.001, graceActive: false });
+  });
+
+  it("reproduces the incident without rollback and still fails genuine terminal states", () => {
+    expect(evaluatePollingDecisions(["starting_http", "healthy"]))
+      .toEqual(["continue", "success"]);
+    expect(evaluatePollingDecisions(["unhealthy", "foreign_listener", "task_process_mismatch"]))
+      .toEqual(["fail", "fail", "fail"]);
   });
 
   it("Cases S and T permit only verified canonical stop classifications", () => {

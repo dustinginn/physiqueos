@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 
 $script:PhysiqueOSLaunchToleranceMilliseconds = 5000
+$script:PhysiqueOSStartupGraceSeconds = 45
 $script:PhysiqueOSForbiddenAncestors = @(
   "powershell.exe",
   "pwsh.exe",
@@ -260,6 +261,72 @@ function Get-PhysiqueOSRuntimeOwnershipDecision {
   }
 }
 
+function Get-PhysiqueOSRuntimeStartupTiming {
+  [CmdletBinding()]
+  param(
+    $Process,
+    $TaskInfo,
+    [datetime]$ObservedAt = (Get-Date),
+    [int]$GraceSeconds = $script:PhysiqueOSStartupGraceSeconds
+  )
+
+  $launchValue = Get-PhysiqueOSProperty $Process "startedAt"
+  $launchSource = if ($launchValue) { "process" } else { $null }
+  if (-not $launchValue) {
+    $launchValue = Get-PhysiqueOSProperty $TaskInfo "LastRunTime"
+    if ($launchValue) { $launchSource = "task" }
+  }
+
+  $launchTime = $null
+  $ageSeconds = $null
+  if ($launchValue) {
+    try {
+      $launchTime = [datetime]$launchValue
+      $ageSeconds = [math]::Round(($ObservedAt - $launchTime).TotalSeconds, 3)
+    } catch {
+      $launchTime = $null
+      $ageSeconds = $null
+      $launchSource = $null
+    }
+  }
+
+  return [ordered]@{
+    launchTime = if ($launchTime) { $launchTime.ToString("o") } else { $null }
+    launchSource = $launchSource
+    ageSeconds = $ageSeconds
+    graceSeconds = $GraceSeconds
+    graceActive = [bool]($null -ne $ageSeconds -and $ageSeconds -ge 0 -and $ageSeconds -le $GraceSeconds)
+  }
+}
+
+function Get-PhysiqueOSRuntimeHttpState {
+  [CmdletBinding()]
+  param(
+    [string]$DesiredState,
+    [string]$TaskState,
+    [bool]$ListenerPresent,
+    [bool]$CanonicalOwnership,
+    [bool]$HealthOk,
+    [bool]$StartupGraceActive
+  )
+
+  if (-not $ListenerPresent -or -not $CanonicalOwnership -or
+    $DesiredState -ne "running" -or $TaskState -ne "Running") {
+    return $null
+  }
+  if ($HealthOk) { return "healthy" }
+  if ($StartupGraceActive) { return "starting_http" }
+  return "unhealthy"
+}
+
+function Get-PhysiqueOSStartPollingDecision([string]$RuntimeState) {
+  if ($RuntimeState -eq "healthy") { return "success" }
+  if ($RuntimeState -in @("starting", "starting_http", "recovering", "recovery_pending")) {
+    return "continue"
+  }
+  return "fail"
+}
+
 function Get-PhysiqueOSRuntimeOverallState {
   [CmdletBinding()]
   param(
@@ -274,6 +341,7 @@ function Get-PhysiqueOSRuntimeOverallState {
     [string]$TaskState,
     [bool]$ForbiddenAncestor,
     [bool]$HealthOk,
+    [bool]$StartupGraceActive = $false,
     [string]$LastRecoveryOutcome,
     [int]$ConsecutiveRecoveryFailures
   )
@@ -301,11 +369,16 @@ function Get-PhysiqueOSRuntimeOverallState {
   if ($DesiredState -eq "stopped" -and -not $ListenerPresent) {
     return "intentionally_stopped"
   }
+  $httpState = Get-PhysiqueOSRuntimeHttpState `
+    -DesiredState $DesiredState `
+    -TaskState $TaskState `
+    -ListenerPresent $ListenerPresent `
+    -CanonicalOwnership $CanonicalOwnership `
+    -HealthOk $HealthOk `
+    -StartupGraceActive $StartupGraceActive
+  if ($httpState) { return $httpState }
   if ($LastRecoveryOutcome -eq "recovery_failed" -or $ConsecutiveRecoveryFailures -ge 3) {
     return "recovery_failed"
-  }
-  if ($ListenerPresent -and $HealthOk -and $TaskState -eq "Running") {
-    return "healthy"
   }
   if (-not $ListenerPresent -and $LastRecoveryOutcome -eq "recovery_invoked") {
     return "recovering"

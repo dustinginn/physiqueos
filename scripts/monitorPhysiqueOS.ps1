@@ -14,7 +14,6 @@ $logsDirectory = Join-Path $repositoryRoot "logs"
 $controlPath = Join-Path $logsDirectory "physiqueos-runtime-control.json"
 $metadataPath = Join-Path $logsDirectory "physiqueos-runtime.json"
 $monitorLog = Join-Path $logsDirectory "physiqueos-runtime-monitor.log"
-$startupGraceSeconds = 45
 $failureBackoffMinutes = 5
 $ngrokTaskName = "PhysiqueOS Ngrok Tunnel"
 $ngrokPath = "C:\Users\dusti\AppData\Local\ngrok\ngrok.exe"
@@ -24,6 +23,7 @@ $ngrokMonitorLog = Join-Path $logsDirectory "physiqueos-ngrok-monitor.log"
 $cadenceRunnerPath = Join-Path $repositoryRoot "scripts\runBriefingCadence.mjs"
 $ownershipHelper = Join-Path $repositoryRoot "scripts\physiqueosRuntimeOwnership.ps1"
 . $ownershipHelper
+$startupGraceSeconds = $script:PhysiqueOSStartupGraceSeconds
 
 function Write-MonitorLog([string]$Message) {
   New-Item -ItemType Directory -Path $logsDirectory -Force | Out-Null
@@ -283,6 +283,7 @@ if ($listeners.Count -gt 0) {
     Get-ProcessRecord -ProcessId $listener.pid
   } else { $null }
   $ancestors = if ($process) { @(Get-Ancestors $process) } else { @() }
+  $startupTiming = Get-PhysiqueOSRuntimeStartupTiming -Process $process -TaskInfo $taskInfo
   $healthOk = $false
   try {
     $health = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 5
@@ -299,11 +300,22 @@ if ($listeners.Count -gt 0) {
     -ExpectedNodePath $nodePath `
     -ExpectedNextPath $nextPath `
     -ExpectedRepositoryRoot $repositoryRoot
-  if ($ownership.ownershipDecision -ne "canonical") {
-    Save-Outcome $control "foreign_listener" $true
-    exit 0
-  }
-  if ($healthOk) {
+  $runtimeState = Get-PhysiqueOSRuntimeOverallState `
+    -TaskQueryStatus $taskQuery.status `
+    -MonitorTaskQueryStatus "readable" `
+    -TaskDefinitionMatches $taskValid `
+    -MonitorDefinitionMatches $true `
+    -ControlValid $true `
+    -ListenerPresent $true `
+    -CanonicalOwnership ($ownership.ownershipDecision -eq "canonical") `
+    -DesiredState ([string]$control.desiredState) `
+    -TaskState ([string]$task.State) `
+    -ForbiddenAncestor ([bool]$ownership.forbiddenAncestor) `
+    -HealthOk $healthOk `
+    -StartupGraceActive ([bool]$startupTiming.graceActive) `
+    -LastRecoveryOutcome ([string]$control.lastRecoveryOutcome) `
+    -ConsecutiveRecoveryFailures ([int]$control.consecutiveRecoveryFailures)
+  if ($runtimeState -eq "healthy") {
       $metadata = [ordered]@{
         schemaVersion = 2; taskName = $productionTaskName; listenerPid = $listener.pid
         processStartedAt = $process.startedAt
@@ -318,6 +330,15 @@ if ($listeners.Count -gt 0) {
       Invoke-NgrokMonitor
       Invoke-BriefingCadenceRunner
       exit 0
+  }
+  if ($runtimeState -eq "starting_http") {
+    Save-Outcome $control "starting_http"
+    Write-MonitorLog "transition=starting_http listenerPid=$($listener.pid) startupAgeSeconds=$($startupTiming.ageSeconds) graceSeconds=$($startupTiming.graceSeconds)"
+    exit 0
+  }
+  if ($runtimeState -ne "unhealthy") {
+    Save-Outcome $control $runtimeState $true
+    exit 0
   }
   $priorUnhealthy = if ($null -ne $control.consecutiveUnhealthyChecks) { [int]$control.consecutiveUnhealthyChecks } else { 0 }
   $control.consecutiveUnhealthyChecks = $priorUnhealthy + 1

@@ -12,6 +12,7 @@ import {
   parseControlState,
   RESTART_COUNT,
   RESTART_INTERVAL_MINUTES,
+  STARTUP_GRACE_SECONDS,
   TASK_NAME,
 } from "./physiqueosTaskRuntime.mjs";
 import { parseNetstatOutput } from "./physiqueosRuntime.mjs";
@@ -39,6 +40,7 @@ describe("PhysiqueOS production scheduled runtime", () => {
   it("defines bounded failure restart settings", () => {
     expect(RESTART_COUNT).toBeGreaterThanOrEqual(3);
     expect(RESTART_INTERVAL_MINUTES).toBe(1);
+    expect(STARTUP_GRACE_SECONDS).toBe(45);
     const content = script("startPhysiqueOS.ps1");
     expect(content).toContain("<RestartOnFailure><Interval>PT1M</Interval><Count>5</Count></RestartOnFailure>");
     expect(content).toContain("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>");
@@ -78,6 +80,7 @@ describe("PhysiqueOS production scheduled runtime", () => {
     const content = `${script("statusPhysiqueOS.ps1")}\n${script("physiqueosRuntimeOwnership.ps1")}`;
     for (const state of [
       "healthy", "starting", "intentionally_stopped", "recovering", "recovery_pending",
+      "starting_http",
       "recovery_failed", "foreign_listener", "task_invalid", "task_process_mismatch",
       "control_state_mismatch", "task_access_denied", "task_query_failed", "unhealthy",
     ]) {
@@ -120,6 +123,14 @@ describe("PhysiqueOS production scheduled runtime", () => {
       .toEqual({ outcome: "healthy", action: "none" });
     expect(decideMonitorAction({ controlState: running, taskState: "Running" }))
       .toEqual({ outcome: "starting", action: "none" });
+    expect(decideMonitorAction({
+      controlState: running,
+      taskState: "Running",
+      listener: { pid: 1 },
+      canonicalListener: true,
+      healthOk: false,
+      withinStartupGrace: true,
+    })).toEqual({ outcome: "starting_http", action: "none" });
     expect(decideMonitorAction({ controlState: running, listener: { pid: 2 }, canonicalListener: false }))
       .toEqual({ outcome: "foreign_listener", action: "none" });
     expect(decideMonitorAction({ controlState: running, buildPresent: false }))
@@ -139,6 +150,8 @@ describe("PhysiqueOS production scheduled runtime", () => {
   it("monitor is short-lived, bounded, and cannot own or kill production Node", () => {
     const content = script("monitorPhysiqueOS.ps1");
     expect(content).toContain('Start-ScheduledTask -TaskName $productionTaskName');
+    expect(content).toContain("Get-PhysiqueOSRuntimeOverallState");
+    expect(content).toContain('Save-Outcome $control "starting_http"');
     expect(content).not.toMatch(/Start-Process|Stop-Process|taskkill|Invoke-Expression/i);
     expect(content).not.toMatch(/\bnpx(?:\.cmd)?\b|\bnpm\s+exec\b|tsx/i);
     expect(content).not.toMatch(/while\s*\(|do\s*\{/i);
@@ -151,6 +164,21 @@ describe("PhysiqueOS production scheduled runtime", () => {
     expect(content).toContain("cadenceOutcome=isolated_failure");
     expect(content).toContain("outcomes=$outcomes");
     expect(content).not.toContain("result=$summary");
+  });
+
+  it("keeps local startup polling fresh while preserving genuine rollback", () => {
+    const start = script("startPhysiqueOS.ps1");
+    const status = script("statusPhysiqueOS.ps1");
+    const deploy = script("deployPhysiqueOS.ps1");
+    expect(start).toContain("Get-PhysiqueOSStartPollingDecision");
+    expect(start).toContain("starting_http");
+    expect(start).toContain("Health wait timed out after $TimeoutSeconds seconds");
+    expect(status.indexOf('$ngrokStatus = if ($overall -ne "healthy")'))
+      .toBeLessThan(status.indexOf("& $ngrokStatusScript -AsJson"));
+    expect(status).toContain('overallState = "deferred"');
+    expect(deploy).toContain("Attempting automatic rollback to the previous production build.");
+    expect(deploy).toContain("Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath");
+    expect(deploy).toContain('throw "The rollback runtime did not start."');
   });
 
   it("start and stop atomically establish desired state before lifecycle action", () => {

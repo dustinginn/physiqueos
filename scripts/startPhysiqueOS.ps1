@@ -20,7 +20,9 @@ $logsDirectory = Join-Path $repositoryRoot "logs"
 $metadataPath = Join-Path $logsDirectory "physiqueos-runtime.json"
 $controlPath = Join-Path $logsDirectory "physiqueos-runtime-control.json"
 $lifecycleLog = Join-Path $logsDirectory "physiqueos-runtime.lifecycle.log"
+$ownershipHelper = Join-Path $PSScriptRoot "physiqueosRuntimeOwnership.ps1"
 $started = Get-Date
+. $ownershipHelper
 
 function Write-Lifecycle([string]$Message) {
   New-Item -ItemType Directory -Path $logsDirectory -Force | Out-Null
@@ -174,10 +176,21 @@ if (-not $before.task.matchesCanonicalDefinition) { throw "Installed task does n
 Write-Lifecycle "Requested canonical scheduled-task start."
 Start-ScheduledTask -TaskName $taskName
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+$listenerFirstObserved = $false
+$startingHttpObserved = $false
 do {
   Start-Sleep -Seconds 1
   $status = & $statusScript | ConvertFrom-Json
-  if ($status.overallState -eq "healthy") {
+  if ($status.listener -and -not $listenerFirstObserved) {
+    $listenerFirstObserved = $true
+    Write-Lifecycle "Canonical listener first observed with PID $($status.listener.pid); startup age $($status.startup.ageSeconds) seconds."
+  }
+  if ($status.overallState -eq "starting_http" -and -not $startingHttpObserved) {
+    $startingHttpObserved = $true
+    Write-Lifecycle "Canonical runtime entered starting_http; startup age $($status.startup.ageSeconds) seconds within $($status.startup.graceSeconds)-second grace."
+  }
+  $pollingDecision = Get-PhysiqueOSStartPollingDecision -RuntimeState $status.overallState
+  if ($pollingDecision -eq "success") {
     $metadata = [ordered]@{
       schemaVersion = 2
       taskName = $taskName
@@ -192,15 +205,18 @@ do {
       healthStatus = "healthy"
     }
     $metadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataPath -Encoding utf8
-    Write-Lifecycle "Canonical runtime healthy with listener PID $($status.listener.pid)."
+    Write-Lifecycle "Canonical runtime HTTP first succeeded with listener PID $($status.listener.pid) after $([math]::Round(((Get-Date)-$started).TotalSeconds, 3)) seconds."
     $status | Add-Member -NotePropertyName elapsedSeconds -NotePropertyValue ([math]::Round(((Get-Date)-$started).TotalSeconds, 2))
     $status | ConvertTo-Json -Depth 10
     exit 0
   }
-  if ($status.overallState -in @("foreign_listener", "task_process_mismatch", "unhealthy")) {
+  if ($pollingDecision -eq "fail") {
+    if ($status.overallState -eq "unhealthy") {
+      Write-Lifecycle "Canonical runtime startup grace expired; listener PID $($status.listener.pid), startup age $($status.startup.ageSeconds) seconds."
+    }
     throw "Canonical runtime entered state '$($status.overallState)'."
   }
 } while ((Get-Date) -lt $deadline)
 
-Write-Lifecycle "Health wait timed out after $TimeoutSeconds seconds."
+Write-Lifecycle "Health wait timed out after $TimeoutSeconds seconds; last state was '$($status.overallState)'."
 throw "Timed out waiting for the canonical runtime health endpoint."
