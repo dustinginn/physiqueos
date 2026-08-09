@@ -1,10 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAnalysisRepository } from "../../../data/repositories/AnalysisRepository";
-import { createCanonicalEvidenceRepository } from "../../../data/repositories/CanonicalEvidenceRepository";
-import { createDailyCheckInRepository } from "../../../data/repositories/DailyCheckInRepository";
-import { createReminderRepository } from "../../../data/repositories/ReminderRepository";
 import { createUserRepository } from "../../../data/repositories/UserRepository";
-import { createWeightRepository } from "../../../data/repositories/WeightRepository";
+import { FounderStoreUnitOfWorkErrorCode } from "../../../data/repositories/FounderStoreUnitOfWork";
 import { createDailyCheckIn } from "../../../domain/models/dailyCheckIn";
 import { createWeightEntry } from "../../../domain/models/weightEntry";
 
@@ -13,7 +12,12 @@ const actionHarness = vi.hoisted(() => ({
   redirectSignal: null,
   repositories: null,
   revalidatePath: vi.fn(),
+  faults: {},
+  liveStore: null,
+  runtimeStorePath: null,
 }));
+
+const directories = [];
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args) => actionHarness.revalidatePath(...args),
@@ -31,6 +35,26 @@ vi.mock("../../../data/repositories/founderRepositories", () => ({
   }),
 }));
 
+vi.mock("../../../data/repositories/founderRuntimeStore", () => ({
+  getFounderRuntimeStore: () => actionHarness.liveStore,
+  resolveFounderRuntimeStorePath: () => actionHarness.runtimeStorePath,
+}));
+
+vi.mock(
+  "../../../domain/services/MorningCheckInPersistenceService",
+  async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+      ...actual,
+      createMorningCheckInPersistenceService: (options) =>
+        actual.createMorningCheckInPersistenceService({
+          ...options,
+          faults: actionHarness.faults,
+        }),
+    };
+  }
+);
+
 import { saveMorningCheckIn } from "./actions";
 
 const NOW = new Date("2026-08-02T15:24:17.685Z");
@@ -43,6 +67,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   actionHarness.redirect.mockReset();
   actionHarness.revalidatePath.mockReset();
+  actionHarness.faults = {};
   actionHarness.redirectSignal = new Error("NEXT_REDIRECT");
   actionHarness.redirect.mockImplementation(() => {
     throw actionHarness.redirectSignal;
@@ -51,6 +76,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  for (const directory of directories.splice(0)) {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 describe("Morning Check-In executable action boundary", () => {
@@ -87,6 +115,10 @@ describe("Morning Check-In executable action boundary", () => {
     });
     expect(fixture.analyses).toHaveLength(1);
     expect(fixture.analyses[0].summary).toContain("down 1.6 lb");
+    expect(fixture.liveStore.revision).toBe(8);
+    expect(fixture.liveStore.lastCommitId).not.toBe("before-morning");
+    expect(JSON.parse(fs.readFileSync(fixture.filePath, "utf8")))
+      .toEqual(fixture.liveStore);
     expect(actionHarness.revalidatePath.mock.calls).toEqual([
       ["/"],
       ["/progress"],
@@ -174,6 +206,8 @@ describe("Morning Check-In executable action boundary", () => {
 
     await expectSuccessRedirect(weightForm("165.9"));
     const stateAfterFirstSave = fixtureCounts(fixture);
+    const revisionAfterFirstSave = fixture.liveStore.revision;
+    const commitAfterFirstSave = fixture.liveStore.lastCommitId;
     resetFrameworkSpies();
     await expectRedirect(weightForm("165.9"), "/?weight=unchanged");
 
@@ -181,6 +215,8 @@ describe("Morning Check-In executable action boundary", () => {
     expect(fixture.weights.filter((item) => item.measuredAt === TODAY)).toHaveLength(1);
     expect(fixture.canonicalEvidence).toHaveLength(1);
     expect(fixture.analyses).toHaveLength(1);
+    expect(fixture.liveStore.revision).toBe(revisionAfterFirstSave);
+    expect(fixture.liveStore.lastCommitId).toBe(commitAfterFirstSave);
     expect(actionHarness.revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -202,16 +238,24 @@ describe("Morning Check-In executable action boundary", () => {
     expect(fixture.analyses[0].replacedAnalysisHistory).toHaveLength(1);
   });
 
-  it("Case L documents the existing post-weight partial-write boundary", async () => {
+  it("Case L rolls every staged record back when a mid-operation failure occurs", async () => {
     const evidenceFailure = new Error("isolated evidence failure");
     const fixture = createFixture({ evidenceFailure });
+    const beforeBytes = fs.readFileSync(fixture.filePath);
+    const beforeStore = structuredClone(fixture.liveStore);
 
-    await expect(saveMorningCheckIn(weightForm("165.9"))).rejects.toBe(evidenceFailure);
+    await expect(saveMorningCheckIn(weightForm("165.9"))).rejects.toMatchObject({
+      code: FounderStoreUnitOfWorkErrorCode.STAGE_FAILED,
+      cause: evidenceFailure,
+      committed: false,
+    });
 
-    expect(fixture.weights.some((item) => item.measuredAt === TODAY)).toBe(true);
-    expect(fixture.checkIns.some((item) => item.date === TODAY)).toBe(true);
+    expect(fixture.weights.some((item) => item.measuredAt === TODAY)).toBe(false);
+    expect(fixture.checkIns.some((item) => item.date === TODAY)).toBe(false);
     expect(fixture.canonicalEvidence).toHaveLength(0);
     expect(fixture.analyses).toHaveLength(0);
+    expect(fixture.liveStore).toEqual(beforeStore);
+    expect(fs.readFileSync(fixture.filePath)).toEqual(beforeBytes);
     expect(actionHarness.revalidatePath).not.toHaveBeenCalled();
     expect(actionHarness.redirect).not.toHaveBeenCalled();
   });
@@ -221,39 +265,82 @@ function createFixture({ checkIns = [], evidenceFailure = null, reminders = [] }
   const weights = [weightEntry(YESTERDAY, 167.5)];
   const analyses = [];
   const canonicalEvidence = [];
-  const repositories = {
-    users: createUserRepository({
-      id: USER_ID,
-      timezone: "America/Los_Angeles",
-      preferences: {
-        weightUnit: "lb",
-        defaultWeighInContext: {
-          timing: "morning",
-          nutritionState: "fasted",
-          intakeState: "before_food_water",
-          scale: "normal_home_scale",
-          confidence: "high",
-        },
+  const user = {
+    id: USER_ID,
+    timezone: "America/Los_Angeles",
+    preferences: {
+      weightUnit: "lb",
+      defaultWeighInContext: {
+        timing: "morning",
+        nutritionState: "fasted",
+        intakeState: "before_food_water",
+        scale: "normal_home_scale",
+        confidence: "high",
       },
-    }),
-    weights: createWeightRepository(weights),
-    dailyCheckIns: createDailyCheckInRepository(checkIns),
-    reminders: createReminderRepository(reminders),
-    dexaScans: { listDEXAScans: vi.fn(async () => []) },
-    progressPhotos: { listPhotos: vi.fn(async () => []) },
-    analyses: createAnalysisRepository(analyses),
-    canonicalEvidence: createCanonicalEvidenceRepository(canonicalEvidence),
+    },
+  };
+  const liveStore = {
+    version: "morning-check-in-test",
+    revision: 7,
+    lastCommitId: "before-morning",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    user,
+    goals: [],
+    goalTransitionDrafts: [],
+    goalProtocolTransitionDrafts: [],
+    weightEntries: weights,
+    dexaScans: [],
+    protocols: [],
+    protocolVersions: [],
+    energyStrategyLinks: [],
+    executionItems: [],
+    reminders,
+    nutritionContext: null,
+    operatingPlan: null,
+    operatingRhythm: null,
+    adaptiveTrustProfile: null,
+    milestones: [],
+    progressPhotos: [],
+    dailyCheckIns: checkIns,
+    dailyBriefings: [],
+    analyses,
+    evidencePackages: [],
+    evidenceReviews: [],
+    trainingPerformanceEvents: [],
+    goalConfidenceSnapshots: [],
+    goalConfidenceHistory: [],
+    goalConfidenceContinuitySeeds: [],
+    canonicalEvidenceObjects: canonicalEvidence,
+  };
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "morning-check-in-action-")
+  );
+  directories.push(directory);
+  const filePath = path.join(directory, "runtime-store.json");
+  fs.writeFileSync(filePath, `${JSON.stringify(liveStore)}\n`);
+  const repositories = {
+    users: createUserRepository(user),
   };
   if (evidenceFailure) {
-    repositories.canonicalEvidence = {
-      ...repositories.canonicalEvidence,
-      upsertCanonicalEvidenceObjects: vi.fn(async () => {
+    actionHarness.faults = {
+      afterCanonicalEvidenceMutation: vi.fn(async () => {
         throw evidenceFailure;
       }),
     };
   }
+  actionHarness.liveStore = liveStore;
+  actionHarness.runtimeStorePath = filePath;
   actionHarness.repositories = repositories;
-  return { analyses, canonicalEvidence, checkIns, reminders, repositories, weights };
+  return {
+    analyses,
+    canonicalEvidence,
+    checkIns,
+    filePath,
+    liveStore,
+    reminders,
+    repositories,
+    weights,
+  };
 }
 
 function weightEntry(date, value) {

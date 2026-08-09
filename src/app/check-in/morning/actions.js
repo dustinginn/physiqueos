@@ -2,11 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createDailyCheckIn } from "../../../domain/models/dailyCheckIn";
-import { createCanonicalMorningWeightEvidenceObject } from "../../../domain/models/morningWeightEvidence";
-import { createWeightEntry } from "../../../domain/models/weightEntry";
-import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
-import { extractManualNoteEvidence } from "../../../domain/services/DailyEventService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
 import {
   getLocalDateKey,
@@ -18,14 +13,10 @@ import {
 } from "../../../data/repositories/founderRuntimeStore";
 import { createFounderStoreUnitOfWork } from "../../../data/repositories/FounderStoreUnitOfWork";
 import { createRecoveryCheckInIngestionService } from "../../../domain/services/RecoveryCheckInIngestionService";
+import { createMorningCheckInPersistenceService } from "../../../domain/services/MorningCheckInPersistenceService";
 import {
-  createMorningPriorityReconciliationService,
   parseMorningPriorityReconciliationFormData,
 } from "../../../domain/services/MorningPriorityReconciliationService";
-
-const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
-const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
-const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function saveStructuredRecoveryCheckIn(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
@@ -81,7 +72,6 @@ export async function saveMorningCheckIn(formData) {
   const today = getLocalDateKey(now, timeZone);
   const createdAt = now.toISOString();
   const notes = normalizeOptionalText(formData.get("notes"));
-  const noteEvidence = extractManualNoteEvidence(notes);
   const protocolChangeNote = normalizeOptionalText(formData.get("protocolChanges"));
   const estimatedCalories = normalizeOptionalNumber(formData.get("estimatedCalories"));
   const estimatedCaloriesBurned = normalizeOptionalNumber(
@@ -89,197 +79,42 @@ export async function saveMorningCheckIn(formData) {
   );
   const proteinTarget = normalizeOptionalNumber(formData.get("proteinTarget"));
   const proteinAchieved = normalizeOptionalNumber(formData.get("proteinAchieved"));
-  const weights = await FounderRepositories.weights.listWeightEntries(user.id);
-  const previousWeight = [...weights].filter((item)=>String(item.measuredAt).slice(0,10)<today).sort((a,b)=>String(b.measuredAt).localeCompare(String(a.measuredAt)))[0]??null;
   const weighInContext = resolveWeighInContext(
     formData,
     user.preferences?.defaultWeighInContext
   );
-  const existingSameDayWeight = weights.find((item)=>String(item.measuredAt).slice(0,10)===today)??null;
-
-  const contextAdjusted = !weighInContext.isDefault;
-  const evidenceConfidence = contextAdjusted ? "medium" : "high";
-  const confidenceAfter = getConfidenceAfter({
-    hasPreviousWeight: Boolean(previousWeight),
-    contextAdjusted,
-  });
-  const reconciliationService = createMorningPriorityReconciliationService({
-    repositories: FounderRepositories,
+  const liveStore = getFounderRuntimeStore();
+  const service = createMorningCheckInPersistenceService({
+    runtimeStorePath: resolveFounderRuntimeStorePath(),
+    liveStore,
     now: () => now,
   });
-  await reconciliationService.save({
-    userId: user.id,
-    timeZone,
-    submissions: parseMorningPriorityReconciliationFormData(formData),
+  const result = await service.save({
+    user,
+    weightValue,
+    today,
+    createdAt,
     at: now,
+    timeZone,
+    notes,
+    protocolChangeNote,
+    estimatedCalories,
+    estimatedCaloriesBurned,
+    proteinTarget,
+    proteinAchieved,
+    weighInContext,
+    reconciliationSubmissions:
+      parseMorningPriorityReconciliationFormData(formData),
   });
 
-  if (existingSameDayWeight?.weight?.value === weightValue) {
+  if (result.status === "unchanged") {
     redirect("/?weight=unchanged");
   }
-
-  const weightEntry = createWeightEntry({
-    id: `weight_${today.replaceAll("-", "_")}`,
-    userId: user.id,
-    measuredAt: today,
-    weight: {
-      value: weightValue,
-      unit: user.preferences?.weightUnit ?? "lb",
-    },
-    relatedGoalIds: [BODY_FAT_GOAL_ID, VISIBLE_ABS_GOAL_ID],
-    source: {
-      type: "manual",
-      name: "Morning Check-In",
-      externalId: null,
-      importedAt: null,
-      confidence: evidenceConfidence,
-      notes: contextAdjusted
-        ? "Manual weight recorded under different conditions; still overrides imported weight for the same day."
-        : "Manual morning weight overrides imported weight for the same day.",
-    },
-    fieldProvenance: {
-      imported: [
-        "measuredAt",
-        "weight.value",
-        "weight.unit",
-        "relatedGoalIds",
-        "context",
-        "notes",
-      ],
-      computed: [],
-    },
-    reliability: evidenceConfidence,
-    context: weighInContext,
-    notes,
-    createdAt,
-    updatedAt: createdAt,
-  });
-
-  await FounderRepositories.weights.addWeightEntry(weightEntry);
-
-  const existingTodayCheckIn =
-    await FounderRepositories.dailyCheckIns.getCheckInForDate(user.id, today);
-
-  const dailyCheckIn = await FounderRepositories.dailyCheckIns.saveCheckIn(
-    createDailyCheckIn({
-      ...existingTodayCheckIn,
-      id: `daily_check_in_${today.replaceAll("-", "_")}`,
-      userId: user.id,
-      date: today,
-      weightEntryId: weightEntry.id,
-      relatedGoalIds: [BODY_FAT_GOAL_ID, VISIBLE_ABS_GOAL_ID],
-      nutrition: {
-        proteinTargetHit: getTargetHit(proteinAchieved, proteinTarget),
-        calorieTargetHit: null,
-        estimatedCalories,
-        estimatedCaloriesIn: estimatedCalories,
-        estimatedCaloriesBurned,
-        proteinTarget,
-        proteinAchieved,
-        relatedGoalIds: [LEAN_MASS_GOAL_ID],
-        notes: "",
-      },
-      recovery: {
-        sleepHours: null,
-        sleepQuality:
-          noteEvidence?.category === "recovery" ? noteEvidence.sleepQuality : null,
-        sleepTargetHit:
-          noteEvidence?.category === "recovery"
-            ? noteEvidence.sleepTargetHit
-            : null,
-        notes:
-          noteEvidence?.category === "recovery"
-            ? noteEvidence.originalNote
-            : null,
-      },
-      protocols: {
-        completedProtocolIds: [],
-        changeNote: protocolChangeNote,
-      },
-      notes,
-      source: {
-        type: "manual",
-        name: "Morning Check-In",
-        externalId: null,
-        importedAt: null,
-        confidence: "high",
-        notes: "Founder Alpha morning check-in.",
-      },
-      fieldProvenance: {
-        imported: [
-          "date",
-          "weightEntryId",
-          "relatedGoalIds",
-          "nutrition.estimatedCalories",
-          "nutrition.estimatedCaloriesIn",
-          "nutrition.estimatedCaloriesBurned",
-          "nutrition.proteinTarget",
-          "nutrition.proteinAchieved",
-          "nutrition.relatedGoalIds",
-          "protocols.changeNote",
-          "notes",
-        ],
-        computed: [
-          "recovery.sleepQuality",
-          "recovery.sleepTargetHit",
-          "recovery.notes",
-        ],
-      },
-      createdAt,
-      updatedAt: createdAt,
-    })
-  );
-  await saveCanonicalMorningWeightEvidence({
-    createdAt,
-    dailyCheckIn,
-    userId: user.id,
-    weightEntry,
-  });
-
-  const analysis = createAnalysisFromEvidence({
-    id: weightEntry.id,
-    type: "weight",
-    createdAt,
-    analysisId: `analysis_morning_weight_${createdAt.replace(/\D/g, "")}`,
-    value: weightEntry.weight.value,
-    unit: weightEntry.weight.unit,
-    measuredAt: weightEntry.measuredAt,
-    previousValue: previousWeight?.weight?.value ?? null,
-    previousMeasuredAt: previousWeight?.measuredAt ?? null,
-    context: weighInContext,
-    notes,
-    confidenceBefore: previousWeight ? 0.62 : 0.52,
-    confidenceAfter,
-  });
-
-  await FounderRepositories.analyses.createAnalysis(analysis);
   revalidatePath("/");
   revalidatePath("/progress");
   revalidatePath("/progress/weight");
-  revalidatePath(`/analysis/${analysis.id}`);
+  revalidatePath(`/analysis/${result.analysisId}`);
   redirect("/?weight=saved");
-}
-
-async function saveCanonicalMorningWeightEvidence({
-  createdAt,
-  dailyCheckIn,
-  userId,
-  weightEntry,
-}) {
-  if (!FounderRepositories.canonicalEvidence) return;
-
-  const canonicalObject = createCanonicalMorningWeightEvidenceObject({
-    createdAt,
-    dailyCheckIn,
-    userId,
-    weightEntry,
-  });
-
-  if (!canonicalObject) return;
-
-  await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects([
-    canonicalObject,
-  ]);
 }
 
 function normalizeOptionalText(value) {
@@ -326,18 +161,4 @@ function resolveWeighInContext(formData, defaultContext = {}) {
     notes: normalizeOptionalText(formData.get("contextNotes")),
     isDefault: false,
   };
-}
-
-function getConfidenceAfter({ hasPreviousWeight, contextAdjusted }) {
-  if (contextAdjusted) {
-    return hasPreviousWeight ? 0.6 : 0.52;
-  }
-
-  return hasPreviousWeight ? 0.68 : 0.58;
-}
-
-function getTargetHit(achieved, target) {
-  if (achieved == null || target == null) return null;
-
-  return achieved >= target;
 }
