@@ -124,7 +124,12 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
                 structuredClone(command.artifact));
             } else {
               await repository.createDailyBriefing(
-                structuredClone(command.artifact));
+                structuredClone(command.artifact),
+                {
+                  replacementReason:
+                    command.assessment.sourceLineage?.reason ?? null,
+                }
+              );
             }
           }
         });

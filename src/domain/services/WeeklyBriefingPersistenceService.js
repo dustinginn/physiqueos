@@ -76,7 +76,8 @@ export function createFounderWeeklyBriefingPersistenceService(options = {}) {
             throw typedError("WEEKLY_SEMANTIC_CONFLICT", stagedCheck.error.message);
           }
           await createDailyBriefingRepository(candidate.dailyBriefings).createDailyBriefing(
-            structuredClone(prepared.artifact)
+            structuredClone(prepared.artifact),
+            { replacementReason: prepared.reason }
           );
         });
         const committed = await transaction.commit({
@@ -269,7 +270,7 @@ function occurrenceMatches(store, prepared) {
     item.id === prepared.artifactId ||
     (
       item.userId === prepared.artifact.userId &&
-      item.cadence === "weekly" &&
+      item.cadence === prepared.cadence &&
       item.evidenceWindow?.id === prepared.evidenceWindowId
     )
   );
@@ -278,7 +279,7 @@ function occurrenceMatches(store, prepared) {
 function sameOccurrence(left, right) {
   return left?.id === right?.id &&
     left?.userId === right?.userId &&
-    left?.cadence === "weekly" &&
+    left?.cadence === right?.cadence &&
     left?.artifactType === "scheduled" &&
     left?.evidenceWindow?.id === right?.evidenceWindow?.id &&
     left?.evidenceWindow?.startDate === right?.evidenceWindow?.startDate &&

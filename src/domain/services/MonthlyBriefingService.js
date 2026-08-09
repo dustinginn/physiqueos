@@ -15,6 +15,8 @@ import {
   composeMonthlyBriefingPresentation,
 } from "./MonthlyBriefingPresentationService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+import { attachBriefingDependencyManifest } from
+  "./BriefingDependencyManifestService";
 
 export const MONTHLY_BRIEFING_VERSION = "monthly_briefing_v1";
 export const MONTHLY_ARTIFACT_ID_VERSION = "monthly_artifact_id_v1";
@@ -39,11 +41,13 @@ export function createMonthlyBriefingService({
   repositories,
   now = () => new Date(),
   publicationService,
+  occurrencePreparer = prepareMonthlyOccurrence,
+  occurrencePublisher = publishMonthlyOccurrence,
 } = {}) {
   if (!repositories) throw new Error("Monthly repositories are required.");
   if (!publicationService) throw new Error("Monthly publication service is required.");
 
-  return Object.freeze({
+  const service = {
     async generateForCurrentWindow({ userId = null, asOf = now() } = {}) {
       const user = userId
         ? await repositories.users.getUserById(userId)
@@ -65,146 +69,241 @@ export function createMonthlyBriefingService({
       if (isCompletedMonthly(existing)) {
         return { state: "completed", artifact: existing, idempotent: true };
       }
-
-      const generatedAt = asOf.toISOString();
-      const artifactId = getMonthlyArtifactId({
-        userId: resolvedUserId,
-        window,
+      const prepared = await occurrencePreparer({
+        repositories, publicationService, userId: resolvedUserId, timeZone,
+        window, artifactId: getMonthlyArtifactId({ userId: resolvedUserId, window }),
+        generatedAt: asOf.toISOString(), existing: null,
       });
-      const narrative = await createMonthlyBriefingPreviewService({
-        repositories,
-      }).preview({
-        userId: resolvedUserId,
-        orchestration: {
-          previewWindow: {
-            startDate: window.startDate,
-            endDate: window.endDate,
-            deliveryDate: window.deliveryDate,
-            storyWindowStart: window.startDate,
-          },
-          confidenceCutoff: window.cutoff,
-          generatedAt,
-          timeZone,
-        },
-        syntheticContinuation: null,
-      });
-      assertProductionEvidenceBoundary(narrative);
-      if (!narrative.goalConfidence?.assessmentId) {
-        const error = new Error(
-          "Monthly production requires a canonical confidence assessment at or before the cutoff."
-        );
-        error.code = "monthly_confidence_unavailable";
-        throw error;
-      }
-      const presentation = toProductionPresentation(
-        composeMonthlyBriefingPresentation({
-          narrative,
-          decision: narrative.editorialDecision,
-          fixture: narrative.evidenceFixture,
-        }),
-        { artifactId, window }
-      );
-      const artifact = createMonthlyArtifact({
-        artifactId,
-        generatedAt,
-        narrative,
-        presentation,
-        userId: resolvedUserId,
-        window,
-      });
-      const baseline = publicationService.captureBaseline();
-      const goal = narrative.evidenceFixture.goal;
-      const activePhase = resolveCommittedPhaseContext(goal, { asOf: window.endDate }).activePhase;
-      const current = createCanonicalConfidenceReadService({ store: baseline.store })
-        .getCurrent({ goalId: goal.id, phaseId: activePhase?.id });
-      if (!current.assessment) {
-        const error = new Error("Monthly V2 requires a canonical predecessor.");
-        error.code = "canonical_predecessor_required";
-        throw error;
-      }
-      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
-        activePhase,
-      });
-      const finalized = await createBriefingForecastFinalizer({
-        publicationService, now,
-      }).finalize({
-        publisherType: "monthly_briefing", userId: resolvedUserId,
-        occurrenceId: artifact.id, artifactId: artifact.id,
-        cadenceOrEventType: "monthly", goalContract,
-        phaseId: activePhase?.id ?? null,
-        evidenceWindow: { id: window.id, start: window.startDate,
-          cutoff: window.cutoff, closed: window.closed },
-        strategyContext: goalContract.strategyHypothesis,
-        executionContext: { adequacy: "adequate",
-          elapsedTimeAdequacy: "adequate", refs: evidenceRefs(artifact) },
-        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
-        previousCanonicalAssessment: current.assessment,
-        publicationCutoff: window.cutoff, finalizedAt: generatedAt,
-        idempotencyKey: `confidence_v2|monthly|${artifact.id}`,
-        expectedPriorAssessmentId: current.assessment.id,
-        expectedPriorArtifactId: current.assessment.briefingArtifactId,
-        expectedRevision: baseline.revision,
-        expectedSemanticDigest: baseline.semanticDigest,
-        sourceLineage: { reason: "scheduled_monthly_cadence",
-          evidenceWindowId: window.id },
-        elapsedTimeAdequacy: "adequate",
-        phaseReviewContext: {
-          activeGoal: goal, activePhase,
-          reviewMilestone: activePhase?.reviewMilestone ?? null,
-          currentArtifact: { id: artifact.id, evidenceTypes: ["monthly"],
-            evidenceIdentities: [window.id] },
-          artifactType: "monthly", eventIdentity: artifact.id,
-          evidenceIdentity: window.id, artifactTimestamp: window.cutoff,
-          publicationTimestamp: generatedAt, currentDate: window.cutoff,
-          reviewState: activePhase?.reviewState,
-          decisionHistory: baseline.store.phaseReviewDecisions ?? [],
-          expectedStoreRevision: baseline.revision,
-        },
-        composeArtifact: (outputs) => {
-          const candidate = structuredClone(artifact);
-          const block = createBriefingGoalConfidenceBlockFromV2({
-            assessment: outputs.confidenceAssessment,
-            projection: outputs.numericConfidenceProjection,
-            narrativeAssessment: outputs.narrativeAssessment,
-            capturedAt: generatedAt,
-          });
-          candidate.briefing.monthlyNarrative.confidence = block;
-          candidate.briefing.confidenceAssessmentId = block.assessmentId;
-          if (candidate.briefing.monthlyPresentation?.hero) {
-            candidate.briefing.monthlyPresentation.hero.confidence = block;
+      try {
+        return await occurrencePublisher({
+          prepared, publicationService, now, operation: "create",
+          reason: "scheduled_monthly_cadence",
+        });
+      } catch (error) {
+        if (error?.code === "baseline_conflict") {
+          const concurrent = await repositories.dailyBriefings
+            .getBriefingByEvidenceWindow(resolvedUserId, window.id);
+          if (isCompletedMonthly(concurrent)) {
+            return { state: "completed", artifact: concurrent, idempotent: true };
           }
-          return { artifact: candidate };
-        },
-      });
-      const publication = finalized.commitResult;
-      if (publication.committed) {
-        return {
-          state: "completed",
-          artifact: publication.artifact,
-          idempotent: false,
-        };
-      }
-      if (publication.status === "matched") {
-        return {
-          state: "completed",
-          artifact: publication.artifact,
-          idempotent: true,
-        };
-      }
-      if (publication.status === "baseline_conflict") {
-        const concurrent = await repositories.dailyBriefings
-          .getBriefingByEvidenceWindow(resolvedUserId, window.id);
-        if (isCompletedMonthly(concurrent)) {
-          return { state: "completed", artifact: concurrent, idempotent: true };
         }
+        throw error;
       }
-      const error = new Error(
-        publication.error?.message ?? `Monthly publication failed: ${publication.status}`
-      );
-      error.code = publication.status ?? "monthly_persistence_failure";
+    },
+    async prepareRegeneration({
+      userId, reason, targetArtifactId, reconciliationContext = null,
+    } = {}) {
+      if (!reason) throw new Error("Monthly regeneration requires an explicit reason.");
+      if (!targetArtifactId) {
+        throw new Error("Monthly regeneration requires an exact target artifact ID.");
+      }
+      const user = userId
+        ? await repositories.users.getUserById(userId)
+        : await repositories.users.getCurrentUser();
+      const resolvedUserId = user?.id ?? userId;
+      const existing = (await repositories.dailyBriefings
+        .listDailyBriefings(resolvedUserId))
+        .find((item) => item.id === targetArtifactId);
+      if (!isCompletedMonthly(existing)) {
+        throw new Error("Monthly regeneration target was not found.");
+      }
+      const prepared = await occurrencePreparer({
+        repositories, publicationService, userId: resolvedUserId,
+        timeZone: existing.timeZone ?? user?.timeZone ?? "America/Los_Angeles",
+        window: existing.evidenceWindow, artifactId: existing.id,
+        generatedAt: now().toISOString(), existing,
+      });
+      prepared.artifact.publicationReconciliation = {
+        ...(prepared.artifact.publicationReconciliation ?? {}),
+        state: "current_after_revision",
+        replacementReason: reason,
+      };
+      prepared.artifact.revisionProvenance = {
+        schemaVersion: "briefing_revision_provenance_v1",
+        priorPublicationId: existing.id,
+        priorPublicationVersion: existing.briefing?.version ?? existing.version ?? null,
+        replacementTimestamp: prepared.artifact.generatedAt,
+        reason,
+        triggeringDependencies: structuredClone(
+          reconciliationContext?.affectedDependencies ?? []
+        ),
+        workItemId: reconciliationContext?.workItemId ?? null,
+        inputFingerprint: reconciliationContext?.inputFingerprint ?? null,
+      };
+      return { status: "prepared", prepared, artifact: prepared.artifact,
+        existing, reason };
+    },
+    async executePreparedRegeneration({ prepared } = {}) {
+      if (prepared?.status === "matched") {
+        return { status: "matched", committed: false, artifact: prepared.artifact };
+      }
+      const result = await occurrencePublisher({
+        prepared: prepared?.prepared ?? prepared,
+        publicationService,
+        now,
+        operation: "regenerate",
+        reason: prepared?.reason ?? "manual_regeneration",
+      });
+      if (result.state === "completed") {
+        return {
+          status: result.idempotent ? "matched" : "regenerated",
+          committed: !result.idempotent,
+          artifact: result.artifact,
+        };
+      }
+      return result;
+    },
+    async regenerate({
+      userId, reason, targetArtifactId, reconciliationContext = null,
+    } = {}) {
+      const prepared = await service.prepareRegeneration({
+        userId, reason, targetArtifactId, reconciliationContext,
+      });
+      const result = await service.executePreparedRegeneration({ prepared });
+      if (["matched", "regenerated"].includes(result.status)) return result.artifact;
+      const error = new Error(result.error?.message ?? "Monthly regeneration failed.");
+      error.code = result.status ?? "monthly_regeneration_failed";
       throw error;
     },
+  };
+  return Object.freeze(service);
+}
+
+async function prepareMonthlyOccurrence({
+  repositories, publicationService, userId, timeZone, window, artifactId,
+  generatedAt, existing,
+}) {
+  const narrative = await createMonthlyBriefingPreviewService({ repositories })
+    .preview({
+      userId,
+      orchestration: {
+        previewWindow: {
+          startDate: window.startDate,
+          endDate: window.endDate,
+          deliveryDate: window.deliveryDate,
+          storyWindowStart: window.startDate,
+        },
+        confidenceCutoff: window.cutoff,
+        generatedAt,
+        timeZone,
+      },
+      syntheticContinuation: null,
+    });
+  assertProductionEvidenceBoundary(narrative);
+  if (!narrative.goalConfidence?.assessmentId) {
+    const error = new Error(
+      "Monthly production requires a canonical confidence assessment at or before the cutoff."
+    );
+    error.code = "monthly_confidence_unavailable";
+    throw error;
+  }
+  const presentation = toProductionPresentation(
+    composeMonthlyBriefingPresentation({
+      narrative,
+      decision: narrative.editorialDecision,
+      fixture: narrative.evidenceFixture,
+    }),
+    { artifactId, window }
+  );
+  const artifact = createMonthlyArtifact({
+    artifactId, generatedAt, narrative, presentation, userId, window,
   });
+  const baseline = publicationService.captureBaseline();
+  const goal = narrative.evidenceFixture.goal;
+  const activePhase = resolveCommittedPhaseContext(goal, {
+    asOf: window.endDate,
+  }).activePhase;
+  const current = createCanonicalConfidenceReadService({ store: baseline.store })
+    .getCurrent({ goalId: goal.id, phaseId: activePhase?.id });
+  if (!current.assessment) {
+    const error = new Error("Monthly V2 requires a canonical predecessor.");
+    error.code = "canonical_predecessor_required";
+    throw error;
+  }
+  return {
+    artifact, activePhase, baseline, current, existing, generatedAt, goal,
+    goalContract: adaptProductionGoalToCanonicalContract(goal, { activePhase }),
+    userId, window,
+  };
+}
+
+async function publishMonthlyOccurrence({
+  prepared, publicationService, now, operation, reason,
+}) {
+  const { artifact, activePhase, baseline, current, existing, generatedAt,
+    goal, goalContract, userId, window } = prepared;
+  const replacement = operation === "regenerate";
+  const finalized = await createBriefingForecastFinalizer({
+    publicationService, now,
+  }).finalize({
+    publisherType: "monthly_briefing", userId,
+    occurrenceId: artifact.id, artifactId: artifact.id,
+    cadenceOrEventType: "monthly", goalContract,
+    phaseId: activePhase?.id ?? null,
+    evidenceWindow: { id: window.id, start: window.startDate,
+      cutoff: window.cutoff, closed: window.closed },
+    strategyContext: goalContract.strategyHypothesis,
+    executionContext: { adequacy: "adequate",
+      elapsedTimeAdequacy: "adequate", refs: evidenceRefs(artifact) },
+    evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
+    previousCanonicalAssessment: current.assessment,
+    publicationCutoff: window.cutoff, finalizedAt: generatedAt,
+    idempotencyKey: replacement
+      ? `confidence_v2|monthly|${artifact.id}|revision|${artifact.dependencyManifest.fingerprint}`
+      : `confidence_v2|monthly|${artifact.id}`,
+    expectedPriorAssessmentId: current.assessment.id,
+    expectedPriorArtifactId: current.assessment.briefingArtifactId,
+    expectedRevision: baseline.revision,
+    expectedSemanticDigest: baseline.semanticDigest,
+    replacementAuthorized: replacement,
+    replacesArtifactId: replacement ? existing?.id ?? null : null,
+    replacesAssessmentId: replacement
+      ? existing?.confidencePublication?.assessmentId ?? null : null,
+    sourceLineage: { reason, evidenceWindowId: window.id,
+      dependencyManifestFingerprint: artifact.dependencyManifest.fingerprint },
+    elapsedTimeAdequacy: "adequate",
+    phaseReviewContext: {
+      activeGoal: goal, activePhase,
+      reviewMilestone: activePhase?.reviewMilestone ?? null,
+      currentArtifact: { id: artifact.id, evidenceTypes: ["monthly"],
+        evidenceIdentities: [window.id] },
+      artifactType: "monthly", eventIdentity: artifact.id,
+      evidenceIdentity: window.id, artifactTimestamp: window.cutoff,
+      publicationTimestamp: generatedAt, currentDate: window.cutoff,
+      reviewState: activePhase?.reviewState,
+      decisionHistory: baseline.store.phaseReviewDecisions ?? [],
+      expectedStoreRevision: baseline.revision,
+    },
+    composeArtifact: (outputs) => {
+      const candidate = structuredClone(artifact);
+      const block = createBriefingGoalConfidenceBlockFromV2({
+        assessment: outputs.confidenceAssessment,
+        projection: outputs.numericConfidenceProjection,
+        narrativeAssessment: outputs.narrativeAssessment,
+        capturedAt: generatedAt,
+      });
+      candidate.briefing.monthlyNarrative.confidence = block;
+      candidate.briefing.confidenceAssessmentId = block.assessmentId;
+      if (candidate.briefing.monthlyPresentation?.hero) {
+        candidate.briefing.monthlyPresentation.hero.confidence = block;
+      }
+      return { artifact: candidate };
+    },
+  });
+  const publication = finalized.commitResult;
+  if (publication.committed || publication.status === "matched") {
+    return {
+      state: "completed",
+      artifact: publication.artifact,
+      idempotent: publication.status === "matched",
+      publicationStatus: publication.status,
+    };
+  }
+  const error = new Error(
+    publication.error?.message ?? `Monthly publication failed: ${publication.status}`
+  );
+  error.code = publication.status ?? "monthly_persistence_failure";
+  throw error;
 }
 
 function evidenceRefs(artifact) {
@@ -228,7 +327,7 @@ export function createMonthlyArtifact({
   )];
   const goal = narrative.evidenceFixture.goal;
   const phase = goal ? resolveCommittedPhaseContext(goal, { asOf: window.endDate }).activePhase : null;
-  return {
+  return attachBriefingDependencyManifest({
     id: artifactId,
     artifactIdVersion: MONTHLY_ARTIFACT_ID_VERSION,
     artifactType: "scheduled",
@@ -283,7 +382,12 @@ export function createMonthlyArtifact({
     },
     createdAt: generatedAt,
     updatedAt: generatedAt,
-  };
+  }, [
+    ...(narrative.evidenceFixture.canonicalDependencies ?? []),
+    ...(narrative.evidenceFixture.weights ?? []),
+    ...(narrative.evidenceFixture.dexaScans ?? []),
+    ...(narrative.evidenceFixture.progressPhotos ?? []),
+  ]);
 }
 
 function toProductionPresentation(presentation, { artifactId, window }) {

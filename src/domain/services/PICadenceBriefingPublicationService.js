@@ -75,7 +75,10 @@ export function createPICadenceBriefingPublicationService(options = {}) {
             stagePreparedPIGoalConfidencePublication(candidate, confidencePrepared);
           }
           await createDailyBriefingRepository(candidate.dailyBriefings)
-            .createDailyBriefing(structuredClone(command.artifact));
+            .createDailyBriefing(structuredClone(command.artifact), {
+              replacementReason: command.replacementReason ?? command.reason ??
+                command.confidencePublicationCommand?.sourceLineage?.reason ?? null,
+            });
         });
         const committed = await transaction.commit({
           validate: (candidate) => validateCandidate(

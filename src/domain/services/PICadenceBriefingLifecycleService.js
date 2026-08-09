@@ -58,7 +58,10 @@ export function createPICadenceBriefingLifecycleService({
         previousCanonicalAssessment: current.assessment,
         publicationCutoff: cutoff,
         finalizedAt: now().toISOString(),
-        idempotencyKey: `confidence_v2|${cadence}|${artifact.id}`,
+        idempotencyKey: operation === "regenerate"
+          ? `confidence_v2|${cadence}|${artifact.id}|revision|${
+            artifact.dependencyManifest?.fingerprint ?? artifact.generatedAt}`
+          : `confidence_v2|${cadence}|${artifact.id}`,
         expectedPriorAssessmentId: current.assessment.id,
         expectedPriorArtifactId: current.assessment.briefingArtifactId,
         expectedRevision: baseline.revision,
@@ -68,7 +71,9 @@ export function createPICadenceBriefingLifecycleService({
         replacesAssessmentId:
           replacementTarget?.confidencePublication?.assessmentId ?? null,
         sourceLineage: { reason, artifactVersion: artifact.version,
-          evidenceWindowId: artifact.evidenceWindow.id },
+          evidenceWindowId: artifact.evidenceWindow.id,
+          dependencyManifestFingerprint:
+            artifact.dependencyManifest?.fingerprint ?? null },
         elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
         phaseReviewContext: {
           activeGoal, activePhase,

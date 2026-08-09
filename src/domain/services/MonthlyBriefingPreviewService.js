@@ -1985,6 +1985,11 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         energyContinuations: canonical.energyContinuations,
         trainingObservations: canonical.trainingObservations,
         trainingPerformanceEvents: canonical.trainingPerformanceEvents,
+        canonicalDependencies: [
+          ...canonical.trainingRecords,
+          ...canonical.nutritionRecords,
+          ...canonical.activityRecords,
+        ],
         syntheticContinuation: acceptedSyntheticContinuation,
         evidenceResolution: {
           goalId: activeGoal?.id ?? null,

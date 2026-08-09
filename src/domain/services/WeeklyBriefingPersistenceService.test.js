@@ -325,10 +325,16 @@ describe("WeeklyBriefingPersistenceService", () => {
     const regenerated = await service.regenerate({
       userId: "user_founder_001",
       reason: "isolated late Activity verification",
+      targetArtifactId: "weekly_briefing_2026-07-26_2026-08-01",
     });
     const after = persistence.captureBaseline();
     const narrative = regenerated.briefing.weeklyNarrative;
     expect(regenerated.id).toBe("weekly_briefing_2026-07-26_2026-08-01");
+    expect(regenerated.dependencyManifest).toMatchObject({
+      schemaVersion: "briefing_dependency_manifest_v1",
+      briefingType: "weekly",
+      fingerprint: expect.stringMatching(/^sha256_/),
+    });
     expect(narrative.provenance.version).toBe("weekly_narrative_v5_2");
     expect(narrative.cards.progress.activity.completedDays).toBe(7);
     expect(

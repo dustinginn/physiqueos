@@ -98,6 +98,41 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
       .toBe(replacement.confidenceAssessment.id);
   });
 
+  it("publishes an auditable same-score successor at the stable root", async () => {
+    const fixture = setup();
+    const first = await fixture.finalizer.finalize(fixture.request());
+    const baseline = fixture.publication.captureBaseline();
+    const replacement = await fixture.finalizer.finalize(fixture.request({
+      idempotencyKey: "weekly-one|revision|dependency-b",
+      previousCanonicalAssessment: first.confidenceAssessment,
+      expectedPriorAssessmentId: first.confidenceAssessment.id,
+      expectedPriorArtifactId: "weekly-one",
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+      replacementAuthorized: true,
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: first.confidenceAssessment.id,
+      sourceLineage: { reason: "late_evidence_reconciliation" },
+    }));
+
+    expect(replacement.commitResult).toMatchObject({
+      status: "published_reaffirmation",
+      committed: true,
+    });
+    expect(replacement.numericConfidenceProjection.currentPercentage)
+      .toBe(first.numericConfidenceProjection.currentPercentage);
+    expect(replacement.numericConfidenceProjection.movement)
+      .toBe("no_meaningful_change");
+    const persisted = JSON.parse(fs.readFileSync(fixture.filePath, "utf8"));
+    expect(persisted.dailyBriefings).toHaveLength(1);
+    expect(persisted.dailyBriefings[0].id).toBe("weekly-one");
+    expect(persisted.dailyBriefings[0].replacedBriefingHistory[0]).toMatchObject({
+      reason: "late_evidence_reconciliation",
+      artifact: { id: "weekly-one" },
+    });
+    expect(persisted.goalConfidenceHistory).toHaveLength(3);
+  });
+
   it("fails closed on predecessor conflict without a partial artifact", async () => {
     const fixture = setup();
     const result = await fixture.finalizer.finalize(fixture.request({

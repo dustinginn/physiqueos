@@ -178,6 +178,11 @@ describe("Monthly production cadence", () => {
         cadence: "monthly",
         briefingMonth: "2026-07",
         evidenceCutoff: "2026-08-01T06:59:59.999Z",
+        dependencyManifest: {
+          schemaVersion: "briefing_dependency_manifest_v1",
+          briefingType: "monthly",
+          fingerprint: expect.stringMatching(/^sha256_/),
+        },
         briefing: {
           version: "monthly_briefing_v1",
           monthlyNarrative: {

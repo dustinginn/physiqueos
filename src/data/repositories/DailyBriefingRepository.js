@@ -131,7 +131,7 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
       return updateLifecycle(id, { surfacedAt });
     },
 
-    async createDailyBriefing(briefing) {
+    async createDailyBriefing(briefing, { replacementReason = null } = {}) {
       const matchingBriefings = dailyBriefings.filter((item) =>
         hasSameBriefingOccurrence(item, briefing)
       );
@@ -145,7 +145,11 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
 
         dailyBriefings.push({
           ...briefing,
-          replacedBriefingHistory: buildReplacementHistory(matchingBriefings, briefing),
+          replacedBriefingHistory: buildReplacementHistory(
+            matchingBriefings,
+            briefing,
+            replacementReason
+          ),
         });
       } else {
         dailyBriefings.push(briefing);
@@ -228,13 +232,16 @@ function hasSameBriefingOccurrence(left, right) {
   return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
 }
 
-function buildReplacementHistory(matching, replacement) {
+function buildReplacementHistory(matching, replacement, replacementReason = null) {
   const entries = matching.flatMap((item) => [
     ...flattenBriefingHistory(item, { replacedByArtifactId: replacement.id }),
     createBriefingHistoryEntry(item, {
       replacedAt: replacement.generatedAt ?? new Date().toISOString(),
       replacedByArtifactId: replacement.id,
-      reason: "Authoritative evidence correction regenerated briefing.",
+      reason: replacementReason ??
+        replacement.publicationReconciliation?.replacementReason ??
+        replacement.generation?.reason ??
+        "Authoritative evidence correction regenerated briefing.",
     }),
   ]);
   return flattenBriefingHistory({ replacedBriefingHistory: entries }, { replacedByArtifactId: replacement.id });

@@ -22,6 +22,8 @@ import {
 import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
 import { createPICadenceBriefingLifecycleService } from "./PICadenceBriefingLifecycleService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+import { attachBriefingDependencyManifest } from
+  "./BriefingDependencyManifestService";
 
 // Explicit diagnostic boundary only. Production generation never invokes,
 // returns, persists, renders, or hands off this result.
@@ -50,21 +52,31 @@ export function createFounderMidweekBriefingService({
 
 export function createMidweekBriefingService({ repositories, now = () => new Date(), confidenceStoreResolver = () => getFounderRuntimeStore(), midweekPersistence = null, cadenceLifecycle = null } = {}) {
   const service = {
-    async generateForCurrentWindow({ userId, asOf = now() } = {}) {
+    async generateForCurrentWindow({
+      userId,
+      asOf = now(),
+      windowOverride = null,
+      ignoreExisting = false,
+      reason = "scheduled_midweek_cadence",
+    } = {}) {
       const user = userId ? await repositories.users.getUserById(userId) : await repositories.users.getCurrentUser();
       const resolvedUserId = user?.id ?? userId;
       if (!resolvedUserId) return { state: "not_eligible", reason: "user_not_found" };
       const timeZone = user?.timeZone ?? "America/Los_Angeles";
       const coachingUpdates = await createCoachingUpdatesReadService({ repositories })
         .getCurrent({ userId: resolvedUserId });
-      if (selectScheduledBriefingCadence({ now: asOf, timeZone, coachingUpdates }) !== "midweek") {
+      if (!windowOverride &&
+          selectScheduledBriefingCadence({ now: asOf, timeZone, coachingUpdates }) !== "midweek") {
         return { state: "not_eligible", reason: "not_wednesday" };
       }
 
-      const window = createMidweekEvidenceWindow({ now: asOf, timeZone, coachingUpdates });
+      const window = windowOverride ??
+        createMidweekEvidenceWindow({ now: asOf, timeZone, coachingUpdates });
       const id = getMidweekArtifactId({ userId: resolvedUserId, window });
       const existing = await repositories.dailyBriefings.getBriefingByEvidenceWindow(resolvedUserId, window.id);
-      if (existing?.briefing) return { state: "completed", artifact: existing, idempotent: true };
+      if (!ignoreExisting && existing?.briefing) {
+        return { state: "completed", artifact: existing, idempotent: true };
+      }
 
       const generatedAt = asOf.toISOString();
       const claim = cadenceLifecycle ? {
@@ -216,7 +228,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
         const confidence = resolveActiveGoalConfidencePresentation({ activeGoal: goal, store: confidenceStoreResolver() });
         if (confidence.canonicalSeries) briefing.goalConfidence =
           createMidweekGoalConfidenceBlock(confidence, { capturedAt: generatedAt });
-        const artifact = {
+        let artifact = {
           id, userId: resolvedUserId, artifactType: "scheduled", cadence: "midweek", generatedAt,
           evidenceWindow: window,
           lifecycle: { generationStatus: "completed", claimedAt: claim.artifact.lifecycle.claimedAt, generatedAt, completedAt: generatedAt, failedAt: null, failureReason: null, openedAt: null, consumedAt: null },
@@ -225,6 +237,12 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
           sourceRevisions: { goalId: goal?.id ?? null, phaseId: briefing.activePhase?.id ?? null },
           createdAt: claim.artifact.createdAt, updatedAt: generatedAt,
         };
+        artifact = attachBriefingDependencyManifest(artifact, [
+          ...canonicalObjects,
+          ...weights,
+          ...dexaScans,
+          ...progressPhotos,
+        ]);
         if (authoritative) {
           try {
             artifact.piMemory = mergePIBriefingMemory(
@@ -250,7 +268,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
             operatingState: goal?.openingApproach?.value ??
               goal?.operatingState?.value ?? goal?.operatingState,
             piEnvelope: authoritative,
-            reason: "scheduled_midweek_cadence",
+            reason,
           });
           if (result.committed || result.status === "matched") {
             return {
@@ -268,10 +286,14 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
         return { state: "failed", reason: "midweek_generation_failed", error };
       }
     },
-    async prepareRegeneration({ userId, reason, targetArtifactId } = {}) {
+    async prepareRegeneration({
+      userId, reason, targetArtifactId, reconciliationContext = null,
+    } = {}) {
       if (!reason) throw new Error("Midweek regeneration requires an explicit reason.");
       if (!targetArtifactId) throw new Error("Midweek regeneration requires an exact target artifact ID.");
-      if (!midweekPersistence?.captureBaseline) throw new Error("Canonical Midweek persistence is unavailable.");
+      if (!cadenceLifecycle && !midweekPersistence?.captureBaseline) {
+        throw new Error("Canonical Midweek persistence is unavailable.");
+      }
       const existing = (await repositories.dailyBriefings.listDailyBriefings(userId))
         .find((item) => item.id === targetArtifactId);
       if (!existing || existing.cadence !== "midweek") {
@@ -282,13 +304,51 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
         asOf: existing?.evidenceWindow?.endDate ?? now(),
       }).activePhase : null;
       if (cadenceLifecycle) {
-        const artifact = structuredClone(existing);
-        const generatedAt = now().toISOString();
-        artifact.generatedAt = generatedAt;
-        artifact.updatedAt = generatedAt;
-        artifact.briefing.generatedAt = generatedAt;
+        let captured = null;
+        const captureLifecycle = {
+          async publish(input) {
+            captured = input;
+            return { status: "matched", committed: false, artifact: input.artifact };
+          },
+        };
+        const rebuilt = await createMidweekBriefingService({
+          repositories,
+          now,
+          confidenceStoreResolver,
+          cadenceLifecycle: captureLifecycle,
+        }).generateForCurrentWindow({
+          userId,
+          asOf: now(),
+          windowOverride: existing.evidenceWindow,
+          ignoreExisting: true,
+          reason,
+        });
+        if (rebuilt.state !== "completed" || !captured?.artifact) {
+          throw new Error("Midweek regeneration could not rebuild the target occurrence.");
+        }
+        const artifact = structuredClone(captured.artifact);
+        artifact.id = existing.id;
+        artifact.publicationReconciliation = {
+          ...(artifact.publicationReconciliation ?? {}),
+          state: "current_after_revision",
+          replacementReason: reason,
+        };
+        artifact.revisionProvenance = {
+          schemaVersion: "briefing_revision_provenance_v1",
+          priorPublicationId: existing.id,
+          priorPublicationVersion: existing.briefing?.version ?? existing.version ?? null,
+          replacementTimestamp: artifact.generatedAt,
+          reason,
+          triggeringDependencies: structuredClone(
+            reconciliationContext?.affectedDependencies ?? []
+          ),
+          workItemId: reconciliationContext?.workItemId ?? null,
+          inputFingerprint: reconciliationContext?.inputFingerprint ?? null,
+        };
         return { status: "prepared", artifact, existing,
-          sharedFinalizer: true, reason, activeGoal: goal, activePhase };
+          sharedFinalizer: true, reason, activeGoal: captured.activeGoal,
+          activePhase: captured.activePhase, piEnvelope: captured.piEnvelope,
+          operatingState: captured.operatingState };
       }
       const confidence = resolveActiveGoalConfidencePresentation({
         activeGoal: goal,
@@ -336,15 +396,31 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
           cadence: "midweek", operation: "regenerate",
           artifact: prepared.artifact, activeGoal: prepared.activeGoal,
           activePhase: prepared.activePhase,
-          operatingState: prepared.activeGoal?.openingApproach?.value ??
+          operatingState: prepared.operatingState ??
+            prepared.activeGoal?.openingApproach?.value ??
             prepared.activeGoal?.operatingState?.value,
-          piEnvelope: null, reason: prepared.reason,
+          piEnvelope: prepared.piEnvelope ?? null, reason: prepared.reason,
           replacementAuthorized: true,
         });
         return result.committed ? { ...result, status: "regenerated" } : result;
       }
       if (!midweekPersistence?.commit) throw new Error("Canonical Midweek persistence is unavailable.");
       return midweekPersistence.commit(prepared?.preparedCommit);
+    },
+    async regenerate({
+      userId, reason, targetArtifactId, reconciliationContext = null,
+    } = {}) {
+      const prepared = await service.prepareRegeneration({
+        userId, reason, targetArtifactId, reconciliationContext,
+      });
+      const result = await service.executePreparedRegeneration({ prepared });
+      if (result?.status === "matched" || result?.status === "regenerated" ||
+          result?.committed === true) return result.artifact;
+      const error = new Error(
+        result?.error?.message ?? "Midweek regeneration failed."
+      );
+      error.code = result?.status ?? "midweek_regeneration_failed";
+      throw error;
     },
   };
   return service;
