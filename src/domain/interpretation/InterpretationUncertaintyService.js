@@ -63,6 +63,23 @@ export function createRemainingInterpretationUncertainty({
       `evidence_quality_${evidenceReconciliation.quality.status}`,
       [], evidenceReconciliation.quality.missingEvidenceMapRefs, "moderate"));
   }
+  const energy = evidenceDescriptors.find((item) =>
+    item.capability === "energy_availability");
+  if (energy?.agreement === "indeterminate") {
+    items.push(uncertainty("energy_calibration_uncertain",
+      "energy_availability", "energy_goal_direction_unresolved", [],
+      capabilityMapRefs(goalContract, "energy_availability"), "moderate"));
+  }
+  const recovery = evidenceDescriptors.find((item) =>
+    item.capability === "recovery_capacity");
+  const recoveryMapped = capabilityMapRefs(goalContract, "recovery_capacity");
+  if (recoveryMapped.length && (!recovery ||
+      recovery.strength === "insufficient" ||
+      recovery.quality?.status === "limited")) {
+    items.push(uncertainty("recovery_evidence_missing",
+      "recovery_capacity", "recovery_evidence_unavailable", [],
+      recoveryMapped, "moderate"));
+  }
   if ((executionState?.adequacy ?? "unknown") === "unknown") {
     items.push(uncertainty("execution_ambiguous", "strategy_execution",
       "execution_adequacy_unknown", [], [], "moderate"));
@@ -169,6 +186,11 @@ function guardrailMapRefs(goal, id) {
 }
 function hypothesisMapRefs(goal, id) {
   return mapRefs(goal, "hypothesisRefs", id);
+}
+function capabilityMapRefs(goal, capability) {
+  return (goal?.relevantEvidence?.entries ?? [])
+    .filter((item) => item.evidenceCapability === capability)
+    .map((item) => item.evidenceMapId);
 }
 function mapRefs(goal, field, id) {
   return (goal?.relevantEvidence?.entries ?? [])

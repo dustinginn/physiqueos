@@ -1,7 +1,7 @@
 export const STRUCTURED_INTERPRETATION_VERSION =
   "structured_interpretation_v2_shadow_v1";
 export const INTERPRETATION_ENGINE_VERSION =
-  "interpretation_engine_v2_shadow_v1";
+  "interpretation_engine_v2_shadow_v2";
 
 export const ObjectiveStatus = enumValues([
   "ahead", "on_track", "uncertain", "behind", "contradicted",

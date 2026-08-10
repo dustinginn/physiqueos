@@ -275,7 +275,59 @@ describe("ForecastEngine", () => {
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.objectiveForecasts)).toBe(true);
   });
+
+  it("fingerprints bounded durability semantics independent of period order", () => {
+    const emerging = forecastWithDurability([]);
+    const repeated = forecastWithDurability([historicalPeriod(1)]);
+    const sustained = forecastWithDurability([
+      historicalPeriod(1), historicalPeriod(2),
+    ]);
+    const reordered = forecastWithDurability([
+      historicalPeriod(2), historicalPeriod(1),
+    ]);
+    expect(emerging.forecastMetadata.interpretationSemanticFingerprint)
+      .not.toBe(repeated.forecastMetadata.interpretationSemanticFingerprint);
+    expect(repeated.forecastMetadata.interpretationSemanticFingerprint)
+      .not.toBe(sustained.forecastMetadata.interpretationSemanticFingerprint);
+    expect(reordered.forecastMetadata.interpretationSemanticFingerprint)
+      .toBe(sustained.forecastMetadata.interpretationSemanticFingerprint);
+  });
 });
+
+function forecastWithDurability(priorPeriods) {
+  return forecast({
+    arrangeInterpretationInput(input) {
+      const training = input.evidenceDescriptors.find((item) =>
+        item.capability === "training_execution");
+      training.temporalIdentity = canonicalPeriod(3);
+      input.durabilityContext = {
+        currentPeriod: canonicalPeriod(3), priorPeriods,
+      };
+    },
+  });
+}
+
+function historicalPeriod(number) {
+  return { ...canonicalPeriod(number), signals: [{
+    capability: "training_execution", direction: "supports",
+    lineageDigest: `sha256_week_${number}`, lineageAvailable: true,
+  }] };
+}
+
+function canonicalPeriod(number) {
+  const dates = [
+    ["2026-07-12", "2026-07-18"],
+    ["2026-07-19", "2026-07-25"],
+    ["2026-07-26", "2026-08-01"],
+  ][number - 1];
+  return {
+    schemaVersion: "confidence_durability_period_v1",
+    id: `confidence_week|${dates[0]}|${dates[1]}|America/Los_Angeles`,
+    kind: "canonical_week", startDate: dates[0], endDate: dates[1],
+    timeZone: "America/Los_Angeles", state: "completed",
+    occurrenceId: `weekly-${number}`,
+  };
+}
 
 function forbiddenKeys(value, path = []) {
   if (!value || typeof value !== "object") return [];

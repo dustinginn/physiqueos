@@ -1,7 +1,7 @@
 export const FORECAST_ASSESSMENT_VERSION =
   "forecast_assessment_v2_shadow_v1";
-export const FORECAST_ENGINE_VERSION = "forecast_engine_v2_shadow_v1";
-export const FORECAST_PRODUCTION_ENGINE_VERSION = "forecast_engine_v2_production_v1";
+export const FORECAST_ENGINE_VERSION = "forecast_engine_v2_shadow_v2";
+export const FORECAST_PRODUCTION_ENGINE_VERSION = "forecast_engine_v2_production_v2";
 
 export const GoalForecastStatus = enumValues([
   "ahead_of_forecast",

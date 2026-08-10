@@ -13,6 +13,7 @@ import {
   semanticHash,
   uniqueStrings,
 } from "./interpretationRuntimeUtils";
+import { deriveEvidenceDurability } from "./EvidenceDurabilityService";
 
 const STRENGTHS = enumSet(EvidenceStrength);
 const AGREEMENTS = enumSet(EvidenceAgreement);
@@ -28,6 +29,8 @@ export function reconcileInterpretationEvidence({
   goalContract,
   evidenceDescriptors = [],
   evaluationContext,
+  strategyHypothesis = {},
+  durabilityContext = {},
 } = {}) {
   const descriptors = normalizeDescriptors(evidenceDescriptors, evaluationContext);
   const evidenceMap = goalContract?.relevantEvidence?.entries ?? [];
@@ -55,22 +58,32 @@ export function reconcileInterpretationEvidence({
   const sorted = items.sort((left, right) => left.id.localeCompare(right.id));
   const agreementStatus = aggregateAgreement(sorted);
   const quality = aggregateQuality({ descriptors, evidenceMap, items: sorted });
+  const contradictions = sorted.filter((item) =>
+    item.agreement === EvidenceAgreement.CONTRADICTS &&
+    [EvidenceRelevance.DECISIVE, EvidenceRelevance.MATERIAL]
+      .includes(item.relevance)
+  ).map((item) => ({
+    evidenceRef: item.evidenceRef,
+    evidenceMapRef: item.evidenceMapRef,
+    conclusionRef: item.conclusionRef,
+    strength: item.strength,
+    relevance: item.relevance,
+  }));
+  const durability = deriveEvidenceDurability({
+    goalId: goalContract?.goal?.goalId,
+    strategyRevision: strategyHypothesis?.strategyRef?.strategyVersion,
+    descriptors,
+    reconciliationItems: sorted,
+    contradictions,
+    durabilityContext,
+  });
   return deepFreeze({
     items: sorted,
     agreementStatus,
     quality,
     reconciledConclusions: reconcileConclusions(sorted),
-    contradictions: sorted.filter((item) =>
-      item.agreement === EvidenceAgreement.CONTRADICTS &&
-      [EvidenceRelevance.DECISIVE, EvidenceRelevance.MATERIAL]
-        .includes(item.relevance)
-    ).map((item) => ({
-      evidenceRef: item.evidenceRef,
-      evidenceMapRef: item.evidenceMapRef,
-      conclusionRef: item.conclusionRef,
-      strength: item.strength,
-      relevance: item.relevance,
-    })),
+    contradictions,
+    durability,
   });
 }
 
@@ -113,6 +126,9 @@ function normalizeDescriptors(values, context) {
         ? structuredClone(value.measurements) : [],
       sourceObservationIds: uniqueStrings(value.sourceObservationIds),
       sourceClaimIds: uniqueStrings(value.sourceClaimIds),
+      sourceEvidenceIds: uniqueStrings(value.sourceEvidenceIds),
+      temporalIdentity: value.temporalIdentity
+        ? structuredClone(value.temporalIdentity) : null,
     };
   }).sort((left, right) => left.id.localeCompare(right.id));
 }

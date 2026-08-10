@@ -116,6 +116,42 @@ describe("production Confidence V2 context adapters", () => {
     })).toMatchObject({ adequacy: "unknown", refs: [],
       evidenceCompleteness: { overall: "unknown", domains: {} } });
   });
+
+  it("normalizes the production-shaped Midweek shadow envelope", () => {
+    const artifact = cadenceArtifact();
+    artifact.cadence = "midweek";
+    artifact.evidenceWindow = {
+      id: "midweek:2026-08-02:2026-08-04:America/Los_Angeles",
+      cadence: "midweek", startDate: "2026-08-02", endDate: "2026-08-04",
+      timeZone: "America/Los_Angeles", closed: true,
+    };
+    const pi = artifact.briefing.weeklyNarrative.context.pi;
+    const descriptors = adaptBriefingArtifactToEvidenceDescriptors({
+      artifact,
+      piEnvelope: { shadow: { observations: pi.observations,
+        coverage: { training: "available", energy: "partial" } },
+        selection: pi.rankedClaims },
+    });
+    const training = descriptors.find((item) =>
+      item.capability === "training_progression");
+    expect(training).toMatchObject({
+      agreement: "supports",
+      temporalIdentity: {
+        id: "confidence_week|2026-08-02|2026-08-08|America/Los_Angeles",
+        state: "preliminary",
+      },
+    });
+    expect(descriptors.some((item) =>
+      item.capability === "execution_context")).toBe(false);
+    expect(adaptBriefingArtifactToExecutionContext({
+      artifact,
+      piEnvelope: { shadow: { observations: pi.observations,
+        coverage: { training: "available", energy: "partial" } } },
+      cadence: "midweek",
+    })).toMatchObject({ adequacy: "adequate", refs: [
+      "training-one", "training-two",
+    ] });
+  });
 });
 
 function goal() {

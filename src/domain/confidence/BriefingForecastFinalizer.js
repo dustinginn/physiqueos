@@ -46,6 +46,7 @@ export function createBriefingForecastFinalizer({
         strategyHypothesis: normalized.strategyContext,
         executionState: normalized.executionContext,
         evidenceDescriptors: normalized.evidenceDescriptors,
+        durabilityContext: normalized.durabilityContext,
         evaluationContext: {
           type: normalized.publisherType,
           windowStart: normalized.evidenceWindow.start,
@@ -65,10 +66,6 @@ export function createBriefingForecastFinalizer({
         structuredInterpretation,
         previousForecastContext,
       });
-      const narrativeAssessment = narrativeEngine.explain({
-        goalContract: normalized.goalContract,
-        forecastAssessment,
-      });
       const projection = projectionService({
         forecastAssessment,
         previousCanonicalAssessment: normalized.previousCanonicalAssessment,
@@ -80,6 +77,15 @@ export function createBriefingForecastFinalizer({
         startingForecastContext: normalized.publisherType === "goal_initialization"
           ? createStartingForecastContext(normalized.startingForecastContext)
           : null,
+      });
+      const narrativeAssessment = narrativeEngine.explain({
+        goalContract: normalized.goalContract,
+        forecastAssessment,
+        numericMovementContext: {
+          movement: projection.movement,
+          rationale: projection.rationale,
+          movementAudit: projection.movementAudit,
+        },
       });
       const assessment = createCanonicalConfidenceAssessment({
         goalId: normalized.goalContract.goal.goalId,
@@ -200,6 +206,7 @@ function normalizeRequest(request, now) {
       goalContract.strategyHypothesis ?? {}),
     executionContext: structuredClone(request.executionContext ?? {}),
     evidenceDescriptors: structuredClone(request.evidenceDescriptors ?? []),
+    durabilityContext: structuredClone(request.durabilityContext ?? {}),
     previousCanonicalAssessment:
       request.previousCanonicalAssessment
         ? structuredClone(request.previousCanonicalAssessment) : null,

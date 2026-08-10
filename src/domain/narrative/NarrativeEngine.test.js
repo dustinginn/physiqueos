@@ -172,6 +172,44 @@ describe("NarrativeEngine", () => {
     });
   });
 
+  it.each([
+    ["proxy_support_emerging_hold", "no_meaningful_change",
+      /still preliminary/i],
+    ["proxy_support_repeated_increase", "increase",
+      /persisted across completed evidence periods/i],
+    ["proxy_support_sustained_increase", "increase",
+      /Direct Goal confirmation remains pending/i],
+    ["uncertainty_reduced_increase", "increase",
+      /named material uncertainty was reduced/i],
+    ["material_contradiction_blocks_increase", "no_meaningful_change",
+      /material contradicting evidence/i],
+    ["same_period_revision_no_new_durability", "no_meaningful_change",
+      /same period/i],
+    ["duplicate_evidence_no_change", "no_meaningful_change",
+      /same semantic evidence/i],
+  ])("translates durability reason %s faithfully", (reasonCode, direction, text) => {
+    const fixture = createNarrativeV2Fixture();
+    const { id: _id, ...forecast } = fixture.forecastAssessment;
+    const forecastAssessment = createForecastAssessment({
+      ...forecast,
+      movement: {
+        direction, priorForecastRef: "prior", rationale: reasonCode,
+        reasonCode,
+        kind: direction === "increase" ? "proxy_durability_transition" :
+          "hold_emerging_proxy",
+        triggeringCapabilities: ["training_progression"],
+        priorPersistence: "emerging", currentPersistence: "repeated",
+        independentPeriodCount: 2, periodId: "week-2",
+        corroboratingCapabilityCount: 1, reducedUncertaintyKeys: [],
+      },
+    });
+    const result = NarrativeEngine.explain({
+      goalContract: fixture.goalContract, forecastAssessment,
+    });
+    expect(result.confidenceExplanation.movementRationaleCode).toBe(reasonCode);
+    expect(result.confidenceExplanation.text).toMatch(text);
+  });
+
   it("never invents an explanation for an unknown Forecast factor", () => {
     const fixture = createNarrativeV2Fixture();
     const forecastAssessment = createForecastAssessment({

@@ -90,6 +90,16 @@ export function createCanonicalConfidenceAssessment(input = {}) {
       },
     },
   };
+  const strategyRevision = input.strategyRevision ??
+    input.structuredInterpretation?.strategyRef?.strategyVersion ?? null;
+  if (strategyRevision) canonical.strategyRevision = strategyRevision;
+  const evidenceDurability = input.evidenceDurability ??
+    input.structuredInterpretation?.evidenceReconciliation?.durability ?? null;
+  if (evidenceDurability) {
+    canonical.evidenceDurability = structuredClone(evidenceDurability);
+  }
+  const movementAudit = input.movementAudit ?? input.projection?.movementAudit ?? null;
+  if (movementAudit) canonical.movementAudit = structuredClone(movementAudit);
   const id = assessmentIdentity(canonical);
   if (input.id && input.id !== id) throw new Error("Assessment identity mismatch.");
   return deepFreeze({ id, assessmentId: id, ...canonical });

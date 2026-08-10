@@ -6,6 +6,8 @@ import {
   adaptBriefingArtifactToEvidenceDescriptors,
   adaptProductionGoalToCanonicalContract,
 } from "../confidence/ProductionConfidenceContextAdapter";
+import { createCadenceEvidenceDurabilityContext } from
+  "../confidence/CadenceEvidenceDurabilityContextService";
 import { createBriefingGoalConfidenceBlockFromV2 } from
   "./BriefingGoalConfidencePresentationService";
 
@@ -36,6 +38,16 @@ export function createPICadenceBriefingLifecycleService({
       });
       const cutoff = artifact.evidenceCutoff ??
         `${artifact.evidenceWindow.endDate}T23:59:59.999Z`;
+      const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({
+        artifact, piEnvelope,
+      });
+      const durabilityContext = createCadenceEvidenceDurabilityContext({
+        store: baseline.store,
+        artifact,
+        cadence,
+        goalContract,
+        previousCanonicalAssessment: current.assessment,
+      });
       const result = await finalizer.finalize({
         publisherType: `${cadence}_briefing`,
         userId: artifact.userId,
@@ -51,9 +63,8 @@ export function createPICadenceBriefingLifecycleService({
         executionContext: adaptBriefingArtifactToExecutionContext({
           artifact, piEnvelope, cadence, operatingState,
         }),
-        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({
-          artifact, piEnvelope,
-        }),
+        evidenceDescriptors,
+        durabilityContext,
         previousCanonicalAssessment: current.assessment,
         publicationCutoff: cutoff,
         finalizedAt: now().toISOString(),

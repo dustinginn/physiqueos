@@ -1,6 +1,8 @@
 import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
 import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { createCanonicalConfidenceReadService } from "../confidence/CanonicalConfidenceReadService";
+import { createCadenceEvidenceDurabilityContext } from
+  "../confidence/CadenceEvidenceDurabilityContextService";
 import {
   adaptBriefingArtifactToEvidenceDescriptors,
   adaptProductionGoalToCanonicalContract,
@@ -233,6 +235,14 @@ async function publishMonthlyOccurrence({
   const { artifact, activePhase, baseline, current, existing, generatedAt,
     goal, goalContract, userId, window } = prepared;
   const replacement = operation === "regenerate";
+  const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({ artifact });
+  const durabilityContext = createCadenceEvidenceDurabilityContext({
+    store: baseline.store,
+    artifact,
+    cadence: "monthly",
+    goalContract,
+    previousCanonicalAssessment: current.assessment,
+  });
   const finalized = await createBriefingForecastFinalizer({
     publicationService, now,
   }).finalize({
@@ -245,7 +255,8 @@ async function publishMonthlyOccurrence({
     strategyContext: goalContract.strategyHypothesis,
     executionContext: { adequacy: "adequate",
       elapsedTimeAdequacy: "adequate", refs: evidenceRefs(artifact) },
-    evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
+    evidenceDescriptors,
+    durabilityContext,
     previousCanonicalAssessment: current.assessment,
     publicationCutoff: window.cutoff, finalizedAt: generatedAt,
     idempotencyKey: replacement

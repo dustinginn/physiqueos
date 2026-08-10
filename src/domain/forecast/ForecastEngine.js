@@ -48,6 +48,7 @@ export function createForecastEngine({ runtimeMode = "shadow" } = {}) {
           normalized.structuredInterpretation.strategyRef.strategyVersion,
         interpretationSemanticFingerprint,
         previousForecastContext: normalized.previousForecastContext,
+        structuredInterpretation: normalized.structuredInterpretation,
       });
       const forecastExplanation = createForecastExplanation({
         structuredInterpretation: normalized.structuredInterpretation,
@@ -204,6 +205,8 @@ function createInterpretationSemanticFingerprint(interpretation) {
     strategyStatus: interpretation.strategyValidation.status,
     agreementStatus: interpretation.evidenceReconciliation.agreementStatus,
     qualityStatus: interpretation.evidenceReconciliation.quality.status,
+    durability: semanticDurability(
+      interpretation.evidenceReconciliation.durability),
     uncertainty: {
       status: interpretation.remainingUncertainty.status,
       items: interpretation.remainingUncertainty.items.map((item) => ({
@@ -220,6 +223,27 @@ function createInterpretationSemanticFingerprint(interpretation) {
       decisionBoundary: interpretation.nextDecisiveEvidence.decisionBoundary,
     },
   })}`;
+}
+
+function semanticDurability(value = {}) {
+  return {
+    persistence: value.persistence ?? "emerging",
+    independentPeriodCount: Math.min(3,
+      Number(value.independentPeriodCount ?? 0)),
+    corroboratingCapabilityCount:
+      Number(value.corroboratingCapabilityCount ?? 0),
+    contradictionState: value.contradictionState ?? "none",
+    transition: value.transition ?? null,
+    signals: (value.signals ?? []).map((item) => ({
+      signalKey: item.signalKey,
+      persistence: item.persistence,
+      independentPeriodCount: Math.min(3,
+        Number(item.independentPeriodCount ?? 0)),
+      transition: item.transition ?? null,
+    })).sort((left, right) => String(left.signalKey)
+      .localeCompare(String(right.signalKey))),
+    reducedUncertaintyKeys: uniqueStrings(value.reducedUncertaintyKeys),
+  };
 }
 
 function stabilizeForecastForUnchangedInterpretation({

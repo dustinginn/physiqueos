@@ -60,6 +60,10 @@ const UNCERTAINTY = Object.freeze({
   measurement_precision: "Available measurement precision does not resolve the question.",
   goal_semantics_missing: "Required success criteria remain undefined.",
   unresolved_guardrail_risk: "A boundary risk remains unresolved.",
+  energy_calibration_uncertain:
+    "Energy evidence is available, but its Goal-relative direction remains unresolved.",
+  recovery_evidence_missing:
+    "Recovery evidence remains insufficient for this assessment window.",
 });
 
 export function forecastSummaryText(status) {

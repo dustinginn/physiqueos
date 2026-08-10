@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
+import { createCanonicalDurabilityPeriod } from
+  "../interpretation/EvidenceDurabilityService";
 import { resolveCommittedPhaseContext } from "../services/FounderPhaseCorrectionService";
 
 export const PRODUCTION_GOAL_CONTRACT_ADAPTER_VERSION =
   "production_goal_contract_adapter_v2";
 export const PRODUCTION_EVIDENCE_DESCRIPTOR_ADAPTER_VERSION =
-  "production_evidence_descriptor_adapter_v3";
+  "production_evidence_descriptor_adapter_v4";
 
 export function adaptProductionGoalToCanonicalContract(goal = {}, {
   activePhase = null,
@@ -213,6 +215,7 @@ export function adaptBriefingArtifactToExecutionContext({
 }
 
 function cadenceEvidenceCompleteness({ artifact, piEnvelope }) {
+  piEnvelope = normalizeCadencePIEnvelope(piEnvelope);
   const explicit = piEnvelope?.evidenceCompleteness;
   if (explicit) return normalizeCadenceCompleteness(explicit);
   const weekly = artifact?.briefing?.weeklyNarrative?.context
@@ -281,12 +284,13 @@ function adaptCadencePIObservations({ artifact, piEnvelope, cutoff }) {
   const descriptors = selected.map((item) => cadenceDescriptor({
     item,
     cutoff,
+    artifact,
     sourceClaimIds: claims.filter((claim) =>
       claim.participatingDomains?.includes(item.domain))
       .map((claim) => claim.id),
   }));
   const photo = cadencePhotoDescriptor({
-    observations, cutoff,
+    observations, cutoff, artifact,
     sourceClaimIds: claims.filter((claim) =>
       claim.participatingDomains?.includes("photos")).map((claim) => claim.id),
   });
@@ -294,13 +298,15 @@ function adaptCadencePIObservations({ artifact, piEnvelope, cutoff }) {
 }
 
 function cadenceObservations({ artifact, piEnvelope }) {
-  const values = piEnvelope?.observations ??
+  const normalized = normalizeCadencePIEnvelope(piEnvelope);
+  const values = normalized?.observations ??
     artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
   return Array.isArray(values) ? values : [];
 }
 
 function selectedCadenceClaims({ artifact, piEnvelope }) {
-  const selection = piEnvelope?.selection ?? piEnvelope?.rankedClaims ??
+  const normalized = normalizeCadencePIEnvelope(piEnvelope);
+  const selection = normalized?.selection ?? normalized?.rankedClaims ??
     artifact?.briefing?.weeklyNarrative?.context?.pi?.rankedClaims ?? {};
   return ["primary", "supporting", "background"].flatMap((key) =>
     (selection?.[key] ?? []).map((entry) => entry?.candidate ?? entry))
@@ -316,7 +322,7 @@ function selectObservation(values, domain, preferences) {
   return null;
 }
 
-function cadenceDescriptor({ item, cutoff, sourceClaimIds }) {
+function cadenceDescriptor({ item, cutoff, artifact, sourceClaimIds }) {
   const limitations = [...new Set([
     ...(item.confidence?.limitations ?? []),
     ...(item.explanationData?.limitations ?? []),
@@ -343,10 +349,11 @@ function cadenceDescriptor({ item, cutoff, sourceClaimIds }) {
     sourceObservationIds: [item.id],
     sourceClaimIds: [...new Set(sourceClaimIds.map(String))].sort(),
     sourceEvidenceIds: cadenceSourceEvidenceIds([item]),
+    temporalIdentity: cadenceTemporalIdentity(artifact),
   };
 }
 
-function cadencePhotoDescriptor({ observations, cutoff, sourceClaimIds }) {
+function cadencePhotoDescriptor({ observations, cutoff, artifact, sourceClaimIds }) {
   const values = observations.filter((item) =>
     item?.domain === "photos" &&
     item.kind !== "photo_comparability" &&
@@ -389,7 +396,33 @@ function cadencePhotoDescriptor({ observations, cutoff, sourceClaimIds }) {
     sourceObservationIds,
     sourceClaimIds: [...new Set(sourceClaimIds.map(String))].sort(),
     sourceEvidenceIds: cadenceSourceEvidenceIds(values),
+    temporalIdentity: cadenceTemporalIdentity(artifact),
   };
+}
+
+export function normalizeCadencePIEnvelope(value) {
+  if (!value || typeof value !== "object") return value ?? null;
+  const shadow = value.shadow && typeof value.shadow === "object"
+    ? value.shadow : {};
+  return {
+    ...shadow,
+    ...value,
+    observations: Array.isArray(value.observations)
+      ? value.observations : Array.isArray(shadow.observations)
+        ? shadow.observations : [],
+    coverage: value.coverage ?? shadow.coverage ?? null,
+    evidenceCompleteness: value.evidenceCompleteness ??
+      shadow.evidenceCompleteness ?? null,
+    claims: value.claims ?? shadow.claims ?? [],
+  };
+}
+
+function cadenceTemporalIdentity(artifact) {
+  return createCanonicalDurabilityPeriod({
+    evidenceWindow: artifact?.evidenceWindow ?? {},
+    cadence: artifact?.cadence ?? artifact?.evidenceWindow?.cadence ?? null,
+    occurrenceId: artifact?.id ?? null,
+  });
 }
 
 function cadenceCapability(domain) {
@@ -484,6 +517,17 @@ export function adaptPhotoEventToEvidenceDescriptors({ session, narrative } = {}
     agreement: narrative?.meaningfulGoalRelevantChange === true
       ? narrative?.direction === "conflicting" ? "contradicts" : "supports"
       : "neutral",
+    temporalIdentity: createCanonicalDurabilityPeriod({
+      evidenceWindow: {
+        id: `photo:${session.id}`,
+        cadence: "photo",
+        startDate: observedAt,
+        endDate: observedAt,
+        closed: true,
+      },
+      cadence: "photo",
+      occurrenceId: session.id,
+    }),
   }]);
 }
 

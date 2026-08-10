@@ -13,6 +13,7 @@ import {
   selectNextDecisiveEvidence,
 } from "./InterpretationUncertaintyService";
 import { createStructuredInterpretation } from "./StructuredInterpretationModel";
+import { attachNamedUncertaintyLifecycle } from "./EvidenceDurabilityService";
 import {
   requiredTimestamp,
   semanticHash,
@@ -35,13 +36,23 @@ export function createInterpretationEngine() {
         executionState: normalized.executionState,
         evidenceReconciliation,
       });
-      const remainingUncertainty = createRemainingInterpretationUncertainty({
+      const initialUncertainty = createRemainingInterpretationUncertainty({
         ...normalized,
         objectiveEvaluation,
         guardrailEvaluation,
         strategyValidation,
         evidenceReconciliation,
       });
+      const lifecycle = attachNamedUncertaintyLifecycle({
+        remainingUncertainty: initialUncertainty,
+        durability: evidenceReconciliation.durability,
+        durabilityContext: normalized.durabilityContext,
+      });
+      const finalizedEvidenceReconciliation = {
+        ...evidenceReconciliation,
+        durability: lifecycle.durability,
+      };
+      const remainingUncertainty = lifecycle.remainingUncertainty;
       const nextDecisiveEvidence = selectNextDecisiveEvidence({
         goalContract: normalized.goalContract,
         remainingUncertainty,
@@ -51,6 +62,7 @@ export function createInterpretationEngine() {
         strategyHypothesis: normalized.strategyHypothesis,
         executionState: normalized.executionState,
         evidenceDescriptors: normalized.evidenceDescriptors,
+        durabilityContext: normalized.durabilityContext,
         evaluationContext: {
           ...normalized.evaluationContext,
           interpretedAt: undefined,
@@ -87,7 +99,7 @@ export function createInterpretationEngine() {
         objectiveEvaluation,
         guardrailEvaluation,
         strategyValidation,
-        evidenceReconciliation,
+        evidenceReconciliation: finalizedEvidenceReconciliation,
         remainingUncertainty,
         nextDecisiveEvidence,
         interpretationSummary: {
@@ -95,7 +107,7 @@ export function createInterpretationEngine() {
           expectationMatch: objectiveEvaluation.aggregateStatus,
           strategyResult: strategyValidation.status,
           guardrailResult: guardrailEvaluation.aggregateStatus,
-          evidenceResult: evidenceReconciliation.agreementStatus,
+          evidenceResult: finalizedEvidenceReconciliation.agreementStatus,
           uncertaintyResult: remainingUncertainty.status,
         },
         provenance,
@@ -135,12 +147,26 @@ function normalizeInput(input) {
     trajectorySegmentId: input.evaluationContext?.trajectorySegmentId ?? null,
     elapsedTimeAdequacy: input.evaluationContext?.elapsedTimeAdequacy ?? "unknown",
   };
+  const durabilityContext = normalizeDurabilityContext(input.durabilityContext);
   return {
     goalContract,
     strategyHypothesis,
     executionState,
     evidenceDescriptors,
     evaluationContext,
+    durabilityContext,
     compatibility: structuredClone(input.compatibility ?? { missingMetadata: [] }),
   };
+}
+
+function normalizeDurabilityContext(value = {}) {
+  return structuredClone({
+    currentPeriod: value.currentPeriod ?? null,
+    priorPeriods: [...(value.priorPeriods ?? [])].sort((left, right) =>
+      String(left?.id ?? "").localeCompare(String(right?.id ?? ""))),
+    previousDurability: value.previousDurability ?? null,
+    previousUncertaintyKeys: [...new Set(
+      (value.previousUncertaintyKeys ?? []).map(String))].sort(),
+    uncertaintyComparisonSafe: value.uncertaintyComparisonSafe === true,
+  });
 }

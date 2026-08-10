@@ -21,7 +21,9 @@ import {
 } from "./NarrativeTemplates";
 import { semanticHash, uniqueStrings } from "./narrativeRuntimeUtils";
 
-const INPUT_KEYS = new Set(["goalContract", "forecastAssessment"]);
+const INPUT_KEYS = new Set([
+  "goalContract", "forecastAssessment", "numericMovementContext",
+]);
 
 export function createNarrativeEngine({
   forecastAdapter = adaptForecastAssessmentToNarrativeContext,
@@ -58,6 +60,7 @@ export function createNarrativeEngine({
         goalContext: normalized.goalContext,
         forecastRef: context.forecastRef,
         forecastFingerprint: context.sourceFingerprint,
+        numericMovementContext: normalized.numericMovementContext,
         engineVersion,
       })}`;
       return createNarrativeAssessment({
@@ -109,9 +112,38 @@ function normalizeInput(input, forecastAdapter) {
       goalContext.goalContractId !== forecastAssessment.goalRef.goalContractId) {
     throw new Error("Narrative Goal Contract and Forecast identity mismatch.");
   }
+  const adapted = forecastAdapter(forecastAssessment);
+  const numericMovementContext = normalizeNumericMovementContext(
+    input.numericMovementContext);
+  const forecastContext = numericMovementContext &&
+    numericMovementContext.movement !== adapted.movement.direction
+    ? {
+      ...adapted,
+      movement: {
+        ...adapted.movement,
+        direction: numericMovementContext.movement,
+        rationale: numericMovementContext.rationale,
+        reasonCode: numericMovementContext.rationale,
+        kind: "bounded_numeric_hold",
+      },
+    }
+    : adapted;
   return {
     goalContext,
-    forecastContext: forecastAdapter(forecastAssessment),
+    forecastContext,
+    numericMovementContext,
+  };
+}
+
+function normalizeNumericMovementContext(value) {
+  if (!value) return null;
+  const movement = ["increase", "decrease", "no_meaningful_change"]
+    .includes(value.movement) ? value.movement : null;
+  if (!movement) return null;
+  return {
+    movement,
+    rationale: value.rationale ?? "numeric_movement_context",
+    movementAudit: structuredClone(value.movementAudit ?? {}),
   };
 }
 
@@ -200,7 +232,8 @@ function createConfidenceExplanation({ forecastContext, supportingFactors,
       item.code === "quality_robust" ||
       item.code.startsWith("milestone_supported:"))
     : [];
-  const specificText = createSpecificConfidenceText(forecastContext) ??
+  const specificText = createDurabilityConfidenceText(forecastContext) ??
+    createSpecificConfidenceText(forecastContext) ??
     createEvidenceAwareHeldText({
       forecastContext, supportingFactors, limitingFactors,
     });
@@ -220,6 +253,44 @@ function createConfidenceExplanation({ forecastContext, supportingFactors,
     remainingUncertaintyStatus:
       forecastContext.remainingUncertainty.status ?? "unknown",
   };
+}
+
+function createDurabilityConfidenceText(context) {
+  const movement = context.movement ?? {};
+  const capability = capabilityText(movement.triggeringCapabilities?.[0]);
+  if (["proxy_support_repeated_increase",
+    "proxy_support_sustained_increase"].includes(movement.reasonCode)) {
+    return `Confidence increased slightly because ${capability} support persisted across completed evidence periods and the current strategy is more consistently supported. Direct Goal confirmation remains pending.`;
+  }
+  if (movement.reasonCode === "uncertainty_reduced_increase") {
+    return "Confidence increased slightly because a named material uncertainty was reduced while the current strategy remained supported. Direct Goal confirmation remains pending.";
+  }
+  if (movement.reasonCode === "proxy_support_emerging_hold") {
+    return `Confidence remained stable because the ${capability} signal is still preliminary within the current evidence period, while direct Goal confirmation remains unresolved.`;
+  }
+  if (movement.reasonCode === "material_contradiction_blocks_increase") {
+    return "Confidence did not increase because material contradicting evidence outweighs the supporting proxy signal.";
+  }
+  if (movement.reasonCode === "same_period_revision_no_new_durability") {
+    return "Confidence remained stable because the revised evidence strengthens the same period without adding another temporal confirmation.";
+  }
+  if (movement.reasonCode === "duplicate_evidence_no_change") {
+    return "Confidence remained stable because the same semantic evidence was evaluated again without a new evidence period.";
+  }
+  if (movement.reasonCode === "bounded_target_prevented_increase") {
+    return "Confidence remained stable because the supporting semantic transition did not justify movement beyond the current bounded target.";
+  }
+  return null;
+}
+
+function capabilityText(value) {
+  return ({
+    training_progression: "Training progression",
+    progress_photos: "visual trajectory",
+    energy_availability: "Energy",
+    recovery_capacity: "Recovery",
+    body_weight_trend: "body-weight trajectory",
+  })[value] ?? "supporting evidence";
 }
 
 function createEvidenceAwareHeldText({ forecastContext, supportingFactors,

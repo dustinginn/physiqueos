@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { validateForecastAssessment } from "../forecast/ForecastAssessmentModel";
 
 export const NUMERIC_CONFIDENCE_PROJECTION_VERSION =
-  "numeric_confidence_projection_v2";
+  "numeric_confidence_projection_v2_durability_v1";
 
 const BAND_TARGET = Object.freeze({
   very_low: 22, low: 34, developing: 47, moderate: 62, high: 78, very_high: 90,
@@ -14,6 +14,12 @@ const MOVEMENT_CEILING = Object.freeze({
   monthly_briefing: 5,
   dexa_event_briefing: 8,
   photo_event_briefing: 3,
+});
+const PROXY_MOVEMENT_CEILING = Object.freeze({
+  midweek_briefing: 1,
+  weekly_briefing: 1,
+  monthly_briefing: 2,
+  photo_event_briefing: 1,
 });
 const RAW_EVIDENCE_KEY = /^(rawEvidence|evidenceDescriptors|sourceObservations|sourceClaims|canonicalEvidence|dexaScans|photos|weights|workouts)$/i;
 
@@ -34,6 +40,9 @@ export function projectNumericConfidence(input = {}) {
   const target = boundedTarget(forecast);
   let current;
   let rationale;
+  let appliedCeiling = null;
+  const proxyMovement = ["proxy_durability_transition",
+    "uncertainty_reduction"].includes(forecast.movement.kind);
   if (!previous) {
     current = startingValue(target, input.startingForecastContext);
     rationale = "starting_forecast_from_structured_context";
@@ -43,13 +52,23 @@ export function projectNumericConfidence(input = {}) {
       ? "semantic_continuity_held"
       : "forecast_no_meaningful_change";
   } else {
-    const ceiling = MOVEMENT_CEILING[publisherType];
+    const globalCeiling = MOVEMENT_CEILING[publisherType];
+    const proxyCeiling = proxyMovement
+      ? PROXY_MOVEMENT_CEILING[publisherType] ?? globalCeiling
+      : globalCeiling;
+    const ceiling = Math.min(globalCeiling, proxyCeiling);
+    appliedCeiling = ceiling;
     const desiredDelta = target - previous.currentPercentage;
     if (forecast.movement.direction === "increase") {
-      current = previous.currentPercentage + Math.min(
-        ceiling, Math.max(1, desiredDelta)
-      );
-      rationale = "forecast_materially_strengthened_with_publisher_ceiling";
+      if (desiredDelta <= 0) {
+        current = previous.currentPercentage;
+        rationale = "bounded_target_prevented_increase";
+      } else {
+        current = previous.currentPercentage + Math.min(ceiling, desiredDelta);
+        rationale = proxyMovement
+          ? "proxy_semantic_transition_with_bounded_ceiling"
+          : "forecast_materially_strengthened_with_publisher_ceiling";
+      }
     } else {
       current = previous.currentPercentage - Math.min(
         ceiling, Math.max(1, -desiredDelta)
@@ -62,6 +81,25 @@ export function projectNumericConfidence(input = {}) {
   const delta = prior == null ? null : current - prior;
   const movement = delta == null || delta === 0
     ? "no_meaningful_change" : delta > 0 ? "increase" : "decrease";
+  const movementAudit = {
+    forecastMovementKind: forecast.movement.kind ?? "unknown",
+    forecastMovementReasonCode: forecast.movement.reasonCode ??
+      forecast.movement.rationale,
+    triggeringCapabilities: [...(forecast.movement.triggeringCapabilities ?? [])],
+    priorPersistence: forecast.movement.priorPersistence ?? null,
+    currentPersistence: forecast.movement.currentPersistence ?? null,
+    independentPeriodCount: forecast.movement.independentPeriodCount ?? 0,
+    periodId: forecast.movement.periodId ?? null,
+    corroboratingCapabilityCount:
+      forecast.movement.corroboratingCapabilityCount ?? 0,
+    reducedUncertaintyKeys: [...(forecast.movement.reducedUncertaintyKeys ?? [])],
+    proxyMovement,
+    proxyCap: proxyMovement ? PROXY_MOVEMENT_CEILING[publisherType] ?? null : null,
+    globalCadenceCap: MOVEMENT_CEILING[publisherType],
+    appliedCeiling,
+    boundedTarget: target,
+    finalDelta: delta,
+  };
   const semantic = {
     version: NUMERIC_CONFIDENCE_PROJECTION_VERSION,
     publisherType,
@@ -72,6 +110,7 @@ export function projectNumericConfidence(input = {}) {
     movement,
     semanticFingerprint,
     rationale,
+    movementAudit,
   };
   return deepFreeze({
     schemaVersion: NUMERIC_CONFIDENCE_PROJECTION_VERSION,
@@ -84,6 +123,7 @@ export function projectNumericConfidence(input = {}) {
     deterministic: true,
     explanationCodes: Object.freeze([
       rationale,
+      forecast.movement.reasonCode ?? forecast.movement.rationale,
       `goal_${forecast.goalForecastStatus}`,
       `band_${forecast.confidenceBand}`,
       ...guardrailCodes(forecast),
