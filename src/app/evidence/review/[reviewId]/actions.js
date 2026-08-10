@@ -103,6 +103,13 @@ export async function confirmEvidenceReview(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
+  if (review.status === "confirmed") {
+    if (recoveryContext) {
+      revalidatePath(recoveryContext.returnTo);
+      return redirect(recoveryContext.returnTo);
+    }
+    return redirect(`/evidence/review/${reviewId}?confirmed=1`);
+  }
   let evidencePackage;
   try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
   catch { throw new Error("The reviewed evidence contains invalid JSON."); }
@@ -613,11 +620,21 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       const briefable = filterEligibleEventBriefingTypes(eligible, eventPreferences);
       const artifacts = [];
       const photoSessionIds = [];
+      const deferredReasons = [];
       for (const type of briefable) {
         const object = (evidencePackage.evidence_objects ?? []).find((item) => item.evidence_type === type || (type === "dexa" && ["dexa_scan", "body_composition"].includes(item.evidence_type)));
         const canonicalId = getStableCanonicalId(object, user.id);
         if (type === "photo_session") {
-          const result = await createFounderPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+          let result;
+          try {
+            result = await createFounderPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+          } catch (error) {
+            if (error?.code === "canonical_goal_objective_incomplete") {
+              deferredReasons.push(error.code);
+              continue;
+            }
+            throw error;
+          }
           if (result.status !== "completed" || !result.artifactId) {
             throw new Error(`${result.code ?? "photo_event_briefing_failed"}: ${result.message ?? "Photo Event briefing was not created."}`);
           }
@@ -629,7 +646,17 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         if (!artifact?.artifactId && !artifact?.id) throw new Error("dexa_event_briefing_failed: DEXA Event briefing was not created.");
         artifacts.push(artifact.artifactId ?? artifact.id);
       }
-      return { status: "completed", artifactIds: artifacts, photoSessionIds, freshness: briefable.length ? "event_generated" : "scheduled_preserved" };
+      return {
+        status: "completed",
+        artifactIds: artifacts,
+        photoSessionIds,
+        freshness: artifacts.length
+          ? "event_generated"
+          : deferredReasons.length
+            ? "event_deferred"
+            : "scheduled_preserved",
+        deferredReasons,
+      };
     },
     home_refresh: async ({ results }) => {
       return {

@@ -185,7 +185,14 @@ vi.mock("../../../../domain/services/DEXAEventNarrativeService", () => ({
 vi.mock("../../../../domain/services/PhotoEventNarrativeService", () => ({
   createFounderPhotoEventNarrativeService: () => ({
     async getOrCreateResult() {
-      return { status: "completed", artifactId: null, sessionId: null };
+      const state = mockState.value;
+      state.photoNarrativeCalls = (state.photoNarrativeCalls ?? 0) + 1;
+      if (state.photoNarrativeError) throw state.photoNarrativeError;
+      return state.photoNarrativeResult ?? {
+        status: "completed",
+        artifactId: null,
+        sessionId: null,
+      };
     },
   }),
 }));
@@ -340,6 +347,27 @@ function confirmationForm(review) {
   };
 }
 
+function createBriefingFailedPhotoReviewState(store) {
+  const review = structuredClone(
+    store.evidenceReviews.find(
+      (item) => item.id === "evidence_review_20260810005949415"
+    )
+  );
+  return {
+    user: structuredClone(store.user),
+    evidenceReviews: [review],
+    canonicalEvidenceObjects: store.canonicalEvidenceObjects
+      .filter((item) =>
+        item.evidence_type === "photo_session" ||
+        item.evidence_type === "progress_photo"
+      )
+      .map((item) => structuredClone(item)),
+    analyses: [],
+    canonicalCommitCalls: 0,
+    photoNarrativeCalls: 0,
+  };
+}
+
 describe("confirmEvidenceReview", () => {
   beforeEach(() => {
     revalidatePath.mockClear();
@@ -466,6 +494,72 @@ describe("confirmEvidenceReview", () => {
       expect.stringContaining(`/evidence/review/${review.id}?resume=paused`)
     );
     expect(redirect).not.toHaveBeenCalledWith("/check-in/morning");
+  });
+
+  it("completes the live paused photo lifecycle when its event is not Confidence-eligible", async () => {
+    mockState.value = createBriefingFailedPhotoReviewState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+    mockState.value.photoNarrativeError = Object.assign(
+      new Error(
+        "Production Confidence context incomplete: canonical_goal_objective_incomplete."
+      ),
+      { code: "canonical_goal_objective_incomplete" }
+    );
+
+    await expect(confirmEvidenceReview(confirmationForm(review)))
+      .resolves.toBeUndefined();
+
+    const completed = mockState.value.evidenceReviews[0];
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.photoNarrativeCalls).toBe(1);
+    expect(completed.status).toBe("confirmed");
+    expect(completed.commitProgress.briefing).toMatchObject({
+      status: "completed",
+      attempts: 3,
+      result: {
+        status: "completed",
+        freshness: "event_deferred",
+        deferredReasons: ["canonical_goal_objective_incomplete"],
+      },
+    });
+    expect(completed.commitProgress.home_refresh.status).toBe("completed");
+    expect(redirect).toHaveBeenCalledWith("/check-in/morning");
+
+    const completedSnapshot = structuredClone(completed);
+    redirect.mockClear();
+    await expect(confirmEvidenceReview(confirmationForm(completed)))
+      .resolves.toBeUndefined();
+
+    expect(mockState.value.evidenceReviews[0]).toEqual(completedSnapshot);
+    expect(mockState.value.photoNarrativeCalls).toBe(1);
+    expect(redirect).toHaveBeenCalledWith("/check-in/morning");
+  });
+
+  it("keeps an unexpected photo briefing failure paused and retryable", async () => {
+    mockState.value = createBriefingFailedPhotoReviewState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+    mockState.value.photoNarrativeError = Object.assign(
+      new Error("photo provider unavailable"),
+      { code: "photo_provider_unavailable" }
+    );
+
+    await expect(confirmEvidenceReview(confirmationForm(review)))
+      .resolves.toBeUndefined();
+
+    expect(mockState.value.evidenceReviews[0]).toMatchObject({
+      status: "partially_committed",
+      commitError: expect.stringContaining("photo provider unavailable"),
+      commitProgress: {
+        briefing: {
+          status: "failed",
+          attempts: 3,
+          retryable: true,
+        },
+      },
+    });
+    expect(redirect).toHaveBeenCalledWith(
+      expect.stringContaining(`/evidence/review/${review.id}?resume=paused`)
+    );
   });
 
   it("completes the durable review when route invalidation reports a missing request store", async () => {
