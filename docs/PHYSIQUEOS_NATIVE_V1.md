@@ -200,15 +200,28 @@ Apple Health integration should respect existing workflows: it reduces manual
 effort while leaving specialized workout, nutrition, wearable, and health
 applications free to remain useful sources.
 
-## Live workout philosophy
+## Training Logger philosophy
 
-Live workouts are incrementally durable sessions.
+Training Logger is one product, not a separate Live Workout model. Live/in-gym
+logging and retrospective entry are two capture modes that converge on the same
+exercise-occurrence, set, execution-context, reconciliation, and final
+`TrainingSession` architecture. Mode may affect time context and incremental
+durability, but it must not create parallel workout semantics or client-specific
+session types.
 
-A workout can begin with a stable identity and accumulate movements, sets,
-reps, load, and relevant context throughout training. Saving progress preserves
-the current session; it does not submit a new workout. Final submission
-completes the canonical workout without breaking its identity or its link to an
-earlier Apple Health import.
+The isolated web Training Logger preview is the proving ground for this shared
+experience. Interaction patterns and platform-neutral draft logic that survive
+review should be promoted into the production web logger and then expressed by
+the SwiftUI client. Preview state is non-canonical and must never mutate a
+confirmed `TrainingSession`.
+
+In live mode, a workout can begin with a stable identity and accumulate
+movements, sets, reps, load, and relevant context throughout training. Saving
+progress preserves the current session; it does not submit a new workout. Final
+submission completes the canonical workout without breaking its identity or its
+link to an earlier Apple Health import. Retrospective mode builds the same
+structure around a past date/time context and reaches the same reconciliation
+and evidence boundary.
 
 If the application is interrupted, the user should return to the same in-flight
 workout with confirmed progress intact. Recovery should be calm and explicit.
@@ -250,6 +263,31 @@ exercise and presents Variant as secondary occurrence or record metadata.
 
 Future native capture and live-workout interfaces should write this contract
 directly instead of defining client-specific Variant semantics.
+
+### Adaptive progression guidance
+
+Training Logger progression guidance should be helpful, optional, and relative
+to the active Goal and phase rather than a universal plateau threshold. Its
+future recommendation boundary should consider the user's learned general
+progression cadence, movement-specific cadence, recent comparable history,
+Variant context, and Superset relationship context. A user may apply, modify,
+or ignore a recommendation; guidance does not become evidence and does not
+block logging.
+
+### Workout evidence reconciliation
+
+Apple Health acquisition is an adapter into evidence reconciliation, not the
+owner of detailed strength structure. An Apple workout supplies an evidence
+shell while PhysiqueOS owns exercises, occurrence identities, sets, Variants,
+and relationship groups. Strong matches may be offered directly; ambiguous
+matches require explicit selection; and the user may continue when no match is
+available.
+
+Before native iOS integration, production web capture may later pair a detailed
+Training Logger draft with uploaded Apple Health screenshot evidence through
+the same reconciliation boundary. Native iOS should replace that acquisition
+path with direct HealthKit access without changing the canonical
+`TrainingSession` contract.
 
 ## Notification philosophy
 
