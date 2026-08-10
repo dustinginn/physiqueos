@@ -4,7 +4,7 @@ import { resolveCommittedPhaseContext } from "../services/FounderPhaseCorrection
 export const PRODUCTION_GOAL_CONTRACT_ADAPTER_VERSION =
   "production_goal_contract_adapter_v2";
 export const PRODUCTION_EVIDENCE_DESCRIPTOR_ADAPTER_VERSION =
-  "production_evidence_descriptor_adapter_v2";
+  "production_evidence_descriptor_adapter_v3";
 
 export function adaptProductionGoalToCanonicalContract(goal = {}, {
   activePhase = null,
@@ -164,13 +164,15 @@ export function adaptDEXAEventToEvidenceDescriptors({ scan, priorScan } = {}) {
 }
 
 export function adaptBriefingArtifactToEvidenceDescriptors({
-  artifact, authoritativeDescriptors = [], supportingDescriptors = [],
+  artifact, piEnvelope = null, authoritativeDescriptors = [],
+  supportingDescriptors = [],
 } = {}) {
   const cutoff = iso(artifact?.evidenceCutoff ??
     `${artifact?.evidenceWindow?.endDate ?? artifact?.evidenceWindow?.cutoff}T23:59:59.999Z`);
   const descriptors = [
     ...authoritativeDescriptors,
     ...supportingDescriptors,
+    ...adaptCadencePIObservations({ artifact, piEnvelope, cutoff }),
   ];
   if (!descriptors.length) {
     descriptors.push(descriptor({
@@ -186,6 +188,281 @@ export function adaptBriefingArtifactToEvidenceDescriptors({
     }));
   }
   return freeze(descriptors);
+}
+
+export function adaptBriefingArtifactToExecutionContext({
+  artifact, piEnvelope = null, cadence, operatingState = null,
+} = {}) {
+  const observations = cadenceObservations({ artifact, piEnvelope });
+  const executionRefs = observations.filter((item) =>
+    item.domain === "training" && (item.supportingEvidenceIds?.length ?? 0) > 0)
+    .flatMap((item) => item.explanationData?.summary?.cadenceWindow
+      ?.evidenceIds ?? item.explanationData?.cadenceWindow?.evidenceIds ??
+      item.supportingEvidenceIds ?? []);
+  return freeze({
+    // Execution exposure and evidence completeness are separate concepts. A
+    // closed cadence window with canonical Training execution can be adequate
+    // even while another evidence domain remains partial.
+    adequacy: artifact?.evidenceWindow?.closed !== false && executionRefs.length
+      ? "adequate" : "unknown",
+    elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
+    refs: [...new Set(executionRefs.map(String))].sort(),
+    operatingState,
+    evidenceCompleteness: cadenceEvidenceCompleteness({ artifact, piEnvelope }),
+  });
+}
+
+function cadenceEvidenceCompleteness({ artifact, piEnvelope }) {
+  const explicit = piEnvelope?.evidenceCompleteness;
+  if (explicit) return normalizeCadenceCompleteness(explicit);
+  const weekly = artifact?.briefing?.weeklyNarrative?.context
+    ?.evidenceCompleteness;
+  if (weekly) return normalizeCadenceCompleteness(weekly);
+  const midweek = artifact?.briefing?.evidenceCompleteness;
+  if (midweek) return normalizeCadenceCompleteness(midweek);
+  const coverage = piEnvelope?.coverage;
+  return coverage ? normalizeCadenceCompleteness(coverage) : {
+    overall: "unknown", domains: {},
+  };
+}
+
+function normalizeCadenceCompleteness(value) {
+  if (typeof value === "string") return { overall: completenessState(value),
+    domains: {} };
+  const domains = Object.fromEntries(Object.entries(value ?? {})
+    .filter(([key]) => key !== "overall")
+    .map(([key, state]) => [key, completenessState(state)]));
+  const states = Object.values(domains);
+  const overall = value?.overall ? completenessState(value.overall) :
+    states.length && states.every((state) => state === "complete")
+      ? "complete"
+      : states.some((state) => ["complete", "partial"].includes(state))
+        ? "partial" : "unknown";
+  return { overall, domains };
+}
+
+function completenessState(value) {
+  if (typeof value === "string") {
+    return ({ available: "complete", complete: "complete", partial: "partial",
+      missing: "missing", unavailable: "missing", unknown: "unknown" })[
+      value] ?? "unknown";
+  }
+  if (!value || typeof value !== "object") return "unknown";
+  if (typeof value.state === "string") return completenessState(value.state);
+  const expected = Number(value.expectedDays);
+  const complete = Number(value.completeDays ?? value.observedDays ??
+    value.sessions);
+  if (Number.isFinite(expected) && expected > 0 && Number.isFinite(complete)) {
+    return complete >= expected ? "complete" : complete > 0 ? "partial" : "missing";
+  }
+  return "unknown";
+}
+
+function adaptCadencePIObservations({ artifact, piEnvelope, cutoff }) {
+  const observations = cadenceObservations({ artifact, piEnvelope });
+  const selected = [
+    selectObservation(observations, "training", [
+      (item) => item.id === "performance|overall|resistance",
+      (item) => item.kind === "training_performance" &&
+        item.subject?.type === "overall",
+    ]),
+    selectObservation(observations, "energy", [
+      (item) => item.kind === "energy_balance",
+    ]),
+    selectObservation(observations, "weight", [
+      (item) => item.kind === "weight_average_change",
+    ]),
+    selectObservation(observations, "recovery", [
+      (item) => item.kind === "recovery_state",
+      (item) => item.kind === "recovery_insufficient_evidence",
+    ]),
+  ].filter(Boolean);
+  const claims = selectedCadenceClaims({ artifact, piEnvelope });
+  const descriptors = selected.map((item) => cadenceDescriptor({
+    item,
+    cutoff,
+    sourceClaimIds: claims.filter((claim) =>
+      claim.participatingDomains?.includes(item.domain))
+      .map((claim) => claim.id),
+  }));
+  const photo = cadencePhotoDescriptor({
+    observations, cutoff,
+    sourceClaimIds: claims.filter((claim) =>
+      claim.participatingDomains?.includes("photos")).map((claim) => claim.id),
+  });
+  return photo ? [...descriptors, photo] : descriptors;
+}
+
+function cadenceObservations({ artifact, piEnvelope }) {
+  const values = piEnvelope?.observations ??
+    artifact?.briefing?.weeklyNarrative?.context?.pi?.observations ?? [];
+  return Array.isArray(values) ? values : [];
+}
+
+function selectedCadenceClaims({ artifact, piEnvelope }) {
+  const selection = piEnvelope?.selection ?? piEnvelope?.rankedClaims ??
+    artifact?.briefing?.weeklyNarrative?.context?.pi?.rankedClaims ?? {};
+  return ["primary", "supporting", "background"].flatMap((key) =>
+    (selection?.[key] ?? []).map((entry) => entry?.candidate ?? entry))
+    .filter((item) => item?.id);
+}
+
+function selectObservation(values, domain, preferences) {
+  const candidates = values.filter((item) => item?.domain === domain);
+  for (const preference of preferences) {
+    const match = candidates.find(preference);
+    if (match) return match;
+  }
+  return null;
+}
+
+function cadenceDescriptor({ item, cutoff, sourceClaimIds }) {
+  const limitations = [...new Set([
+    ...(item.confidence?.limitations ?? []),
+    ...(item.explanationData?.limitations ?? []),
+  ].filter(Boolean).map(String))].sort();
+  return {
+    schemaVersion: PRODUCTION_EVIDENCE_DESCRIPTOR_ADAPTER_VERSION,
+    id: `evidence_descriptor|cadence_pi|${item.id}`,
+    capability: cadenceCapability(item.domain),
+    observedAt: iso(item.evidenceWindow?.endDate ?? cutoff),
+    strength: cadenceStrength(item.confidence?.level),
+    agreement: cadenceAgreement(item),
+    temporalApplicability: "applicable",
+    independenceGroup: `cadence_pi|${item.domain}|${
+      item.evidenceWindow?.startDate ?? "unknown"}|${
+      item.evidenceWindow?.endDate ?? "unknown"}`,
+    quality: {
+      status: item.status === "insufficient_data" ? "limited" : "complete",
+      provenanceIntegrity: item.provenance?.producer ? "high" : "adequate",
+      temporalAdequacy: "adequate",
+      comparisonAdequacy: hasComparison(item) ? "adequate" : "not_required",
+      limitations,
+    },
+    measurements: cadenceMeasurements(item, cutoff),
+    sourceObservationIds: [item.id],
+    sourceClaimIds: [...new Set(sourceClaimIds.map(String))].sort(),
+    sourceEvidenceIds: cadenceSourceEvidenceIds([item]),
+  };
+}
+
+function cadencePhotoDescriptor({ observations, cutoff, sourceClaimIds }) {
+  const values = observations.filter((item) =>
+    item?.domain === "photos" &&
+    item.kind !== "photo_comparability" &&
+    item.kind !== "photo_insufficient_comparison" &&
+    item.status !== "insufficient_data" &&
+    ["high", "moderate", "low"].includes(item.confidence?.level));
+  if (!values.length) return null;
+  const sourceObservationIds = [...new Set(values.map((item) => item.id))].sort();
+  const limitations = [...new Set(values.flatMap((item) => [
+    ...(item.confidence?.limitations ?? []),
+    ...(item.explanationData?.limitations ?? []),
+  ]).filter(Boolean).map(String))].sort();
+  const dates = values.map((item) => item.evidenceWindow?.endDate)
+    .filter(Boolean).sort();
+  const windowStarts = values.map((item) => item.evidenceWindow?.startDate)
+    .filter(Boolean).sort();
+  return {
+    schemaVersion: PRODUCTION_EVIDENCE_DESCRIPTOR_ADAPTER_VERSION,
+    id: `evidence_descriptor|cadence_pi|photos|${
+      hash(sourceObservationIds).slice(0, 16)}`,
+    capability: "progress_photos",
+    observedAt: iso(dates.at(-1) ?? cutoff),
+    strength: weakestCadenceStrength(values.map((item) =>
+      cadenceStrength(item.confidence?.level))),
+    agreement: cadencePhotoAgreement(values),
+    temporalApplicability: "applicable",
+    // A cadence window receives one visual vote regardless of pose or metric
+    // count. Photo Event publication remains a separate occurrence boundary.
+    independenceGroup: `cadence_pi|photos|${windowStarts[0] ?? "unknown"}|${
+      dates.at(-1) ?? "unknown"}`,
+    quality: {
+      status: "complete",
+      provenanceIntegrity: values.every((item) => item.provenance?.producer)
+        ? "high" : "adequate",
+      temporalAdequacy: "adequate",
+      comparisonAdequacy: "adequate",
+      limitations,
+    },
+    measurements: [],
+    sourceObservationIds,
+    sourceClaimIds: [...new Set(sourceClaimIds.map(String))].sort(),
+    sourceEvidenceIds: cadenceSourceEvidenceIds(values),
+  };
+}
+
+function cadenceCapability(domain) {
+  return ({ training: "training_progression", energy: "energy_availability",
+    weight: "body_weight_trend", recovery: "recovery_capacity" })[domain];
+}
+
+function cadenceStrength(value) {
+  return ({ very_high: "high", high: "high", moderate: "moderate",
+    low: "low" })[value] ?? "insufficient";
+}
+
+function cadenceAgreement(item) {
+  if (item.domain !== "training") return "indeterminate";
+  if (item.status === "improving" && item.direction === "positive") {
+    return "supports";
+  }
+  if (item.status === "regressing" && item.direction === "negative") {
+    return "contradicts";
+  }
+  return "neutral";
+}
+
+function cadencePhotoAgreement(values) {
+  const roles = values.map((item) => {
+    const direction = item.direction;
+    if (item.kind === "photo_whole_body_softness_change") {
+      return direction === "falling" ? "supports" :
+        direction === "rising" ? "contradicts" : "neutral";
+    }
+    if (["photo_leanness_change", "photo_abdominal_definition_change",
+      "photo_muscularity_change"].includes(item.kind)) {
+      return direction === "rising" ? "supports" :
+        direction === "falling" ? "contradicts" : "neutral";
+    }
+    if (item.kind === "photo_visual_stability" && direction === "stable") {
+      return "supports";
+    }
+    return "neutral";
+  });
+  const supporting = roles.includes("supports");
+  const contradicting = roles.includes("contradicts");
+  return supporting && contradicting ? "indeterminate" :
+    supporting ? "supports" : contradicting ? "contradicts" : "neutral";
+}
+
+function weakestCadenceStrength(values) {
+  const rank = { insufficient: 0, low: 1, moderate: 2, high: 3,
+    authoritative: 4 };
+  return values.reduce((result, value) =>
+    rank[value] < rank[result] ? value : result, values[0] ?? "insufficient");
+}
+
+function cadenceSourceEvidenceIds(values) {
+  return [...new Set(values.flatMap((item) => [
+    ...(item.provenance?.sourceEvidenceIds ?? []),
+    ...(item.supportingEvidenceIds ?? []),
+  ]).filter(Boolean).map(String))].sort();
+}
+
+function hasComparison(item) {
+  return Boolean(item.evidenceWindow?.comparisonStartDate ||
+    Number.isFinite(Number(item.explanationData?.comparisonSampleCount)));
+}
+
+function cadenceMeasurements(item, cutoff) {
+  const data = item.explanationData ?? {};
+  const observedAt = iso(item.evidenceWindow?.endDate ?? cutoff);
+  if (item.domain === "weight" && Number.isFinite(Number(data.absoluteChange))) {
+    return [measurement("body_weight_change_lb", Number(data.absoluteChange),
+      data.unit ?? "lb", observedAt)];
+  }
+  return [];
 }
 
 export function adaptPhotoEventToEvidenceDescriptors({ session, narrative } = {}) {

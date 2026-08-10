@@ -52,6 +52,7 @@ export function createNarrativeEngine({
       const confidenceExplanation = createConfidenceExplanation({
         forecastContext: context,
         supportingFactors,
+        limitingFactors,
       });
       const inputFingerprint = `sha256_${semanticHash({
         goalContext: normalized.goalContext,
@@ -190,7 +191,8 @@ function translateNextEvidence(value = {}) {
   };
 }
 
-function createConfidenceExplanation({ forecastContext, supportingFactors }) {
+function createConfidenceExplanation({ forecastContext, supportingFactors,
+  limitingFactors }) {
   const movement = forecastContext.movement;
   const reductionCandidates = movement.direction === "increase"
     ? supportingFactors.filter((item) =>
@@ -198,7 +200,10 @@ function createConfidenceExplanation({ forecastContext, supportingFactors }) {
       item.code === "quality_robust" ||
       item.code.startsWith("milestone_supported:"))
     : [];
-  const specificText = createSpecificConfidenceText(forecastContext);
+  const specificText = createSpecificConfidenceText(forecastContext) ??
+    createEvidenceAwareHeldText({
+      forecastContext, supportingFactors, limitingFactors,
+    });
   return {
     confidenceBand: forecastContext.confidenceBand,
     movement: movement.direction,
@@ -215,6 +220,23 @@ function createConfidenceExplanation({ forecastContext, supportingFactors }) {
     remainingUncertaintyStatus:
       forecastContext.remainingUncertainty.status ?? "unknown",
   };
+}
+
+function createEvidenceAwareHeldText({ forecastContext, supportingFactors,
+  limitingFactors }) {
+  if (forecastContext.movement?.direction !== "no_meaningful_change") return null;
+  const support = supportingFactors.filter((item) =>
+    ["strategy_directionally_supported", "quality_adequate"]
+      .includes(item.code) && item.text);
+  if (!support.length) return null;
+  const primaryLimit = limitingFactors.find((item) =>
+    item.code === "objective_uncertain" && item.text) ??
+    limitingFactors.find((item) => item.text);
+  const unresolved = forecastContext.remainingUncertainty?.status === "material"
+    ? "Material questions remain unresolved."
+    : null;
+  return ["Confidence remained stable.", ...support.map((item) => item.text),
+    primaryLimit?.text, unresolved].filter(Boolean).join(" ");
 }
 
 function createForecastSummaryText(context) {

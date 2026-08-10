@@ -2,6 +2,7 @@ import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastF
 import { createCanonicalConfidenceReadService } from
   "../confidence/CanonicalConfidenceReadService";
 import {
+  adaptBriefingArtifactToExecutionContext,
   adaptBriefingArtifactToEvidenceDescriptors,
   adaptProductionGoalToCanonicalContract,
 } from "../confidence/ProductionConfidenceContextAdapter";
@@ -47,14 +48,12 @@ export function createPICadenceBriefingLifecycleService({
           start: artifact.evidenceWindow.startDate ?? null,
           cutoff, closed: artifact.evidenceWindow.closed !== false },
         strategyContext: goalContract.strategyHypothesis,
-        executionContext: {
-          adequacy: piEnvelope?.evidenceCompleteness === "complete"
-            ? "adequate" : "unknown",
-          elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
-          refs: piEnvelope?.sourceObservationIds ?? [],
-          operatingState,
-        },
-        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({ artifact }),
+        executionContext: adaptBriefingArtifactToExecutionContext({
+          artifact, piEnvelope, cadence, operatingState,
+        }),
+        evidenceDescriptors: adaptBriefingArtifactToEvidenceDescriptors({
+          artifact, piEnvelope,
+        }),
         previousCanonicalAssessment: current.assessment,
         publicationCutoff: cutoff,
         finalizedAt: now().toISOString(),

@@ -137,6 +137,41 @@ describe("NarrativeEngine", () => {
     });
   });
 
+  it("explains stronger cadence evidence without implying Forecast movement", () => {
+    const fixture = createNarrativeV2Fixture();
+    const forecastAssessment = createForecastAssessment({
+      ...fixture.forecastAssessment,
+      id: undefined,
+      goalForecastStatus: "forecast_uncertain",
+      confidenceBand: "moderate",
+      forecastDirection: "indeterminate",
+      movement: { direction: "no_meaningful_change",
+        priorForecastRef: "prior",
+        rationale: "forecast_change_not_material" },
+      forecastExplanation: {
+        ...fixture.forecastAssessment.forecastExplanation,
+        primarySupportingFactors: [
+          "strategy_directionally_supported", "quality_adequate",
+        ],
+        primaryLimitingFactors: ["objective_uncertain", "agreement_mixed"],
+        movementRationale: "forecast_change_not_material",
+      },
+      remainingUncertainty: {
+        ...fixture.forecastAssessment.remainingUncertainty,
+        status: "material",
+      },
+    });
+    const result = NarrativeEngine.explain({
+      goalContract: fixture.goalContract,
+      forecastAssessment,
+    });
+    expect(result.confidenceExplanation).toMatchObject({
+      movement: "no_meaningful_change",
+      movementRationaleCode: "forecast_change_not_material",
+      text: "Confidence remained stable. The available assessment quality is adequate. The current strategy is directionally supported but not fully confirmed. The primary outcome remains uncertain. Material questions remain unresolved.",
+    });
+  });
+
   it("never invents an explanation for an unknown Forecast factor", () => {
     const fixture = createNarrativeV2Fixture();
     const forecastAssessment = createForecastAssessment({
