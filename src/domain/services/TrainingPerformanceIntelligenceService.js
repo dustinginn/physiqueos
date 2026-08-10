@@ -246,7 +246,7 @@ function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDa
       relationshipComparisonKey
   );
   const previousComparableSession = comparableEntries.at(-2) ?? null;
-  const priorPrEntries = variantComparableEntries.filter(
+  const priorPrEntries = comparableEntries.filter(
     (entry) => entry !== lastSession
   );
   const prDetection = detectPrs({ lastSession, priorEntries: priorPrEntries });

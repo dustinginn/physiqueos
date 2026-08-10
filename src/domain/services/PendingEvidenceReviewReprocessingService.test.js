@@ -515,6 +515,38 @@ Skull crushers
     );
   });
 
+  it("preserves a manually reviewed Variant when a same-exercise reparse omits it", async () => {
+    const priorExercise = {
+      ...exerciseFixture("Spider Curls", [weightedSet(10, 35)]),
+      canonicalExerciseId: "spider_curl",
+      executionVariant: {
+        key: "static_hold",
+        label: "Static Hold",
+        rawLabel: "Static Hold",
+      },
+    };
+    const freshExercise = {
+      ...exerciseFixture("Spider Curls", [weightedSet(10, 35)]),
+      canonicalExerciseId: "spider_curl",
+    };
+    const state = semanticFixture({
+      priorExercise,
+      freshExercise,
+      sourceText: "Spider Curls\n10r 35p",
+    });
+
+    await reprocessSemanticFixture(state);
+    const review = await state.repositories.evidenceReviews.getReviewById(REVIEW_ID);
+    expect(review.interpretedEvidence.evidence_objects[0].exercises[0])
+      .toMatchObject({
+        canonicalExerciseId: "spider_curl",
+        executionVariant: {
+          key: "static_hold",
+          label: "Static Hold",
+        },
+      });
+  });
+
   it.each([
     ["added Hanging Leg Raise load", "Hanging Leg Raise\n16 reps with added 10 lb", exerciseFixture("Hanging Leg Raise", [weightedSet(16, 10)])],
     ["weighted Pull-Up", "Pull-Up\n8 reps with added 10 lb", exerciseFixture("Pull-Up", [weightedSet(8, 10)])],

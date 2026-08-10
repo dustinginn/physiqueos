@@ -247,14 +247,17 @@ export function deriveTrainingExerciseRelationshipContext({
 }
 
 export function getTrainingExerciseRelationshipComparisonKey(context) {
-  if (!context?.relationshipType) return "standalone";
-  const partnerIds = (context.orderedPartners ?? context.partners ?? [])
+  const relationshipType = context?.relationshipType ?? context?.relationship_type;
+  if (!relationshipType) return "standalone";
+  const partnerIds = (
+    context.orderedPartners ?? context.ordered_partners ?? context.partners ?? []
+  )
     .map((partner) =>
       cleanString(partner?.canonicalExerciseId ?? partner?.canonical_exercise_id)
     )
     .filter(Boolean)
     .sort();
-  return `${context.relationshipType}|partners:${partnerIds.join(",")}`;
+  return `${relationshipType}|partners:${partnerIds.join(",")}`;
 }
 
 export function haveSameTrainingExerciseRelationshipContext(left, right) {

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeTrainingExecutionVariant,
 } from "./trainingExecutionVariant";
-import { parseStrengthTrainingText } from "./trainingSessionEvidence";
+import {
+  parseStrengthTrainingSessionText,
+  parseStrengthTrainingText,
+} from "./trainingSessionEvidence";
 
 describe("Training execution variants", () => {
   it("parses Spider Curls Static Hold without changing canonical identity or sets", () => {
@@ -73,5 +76,50 @@ describe("Training execution variants", () => {
       rawLabel: "Static Holds",
     });
     expect(normalizeTrainingExecutionVariant("  STATIC-hold  ").key).toBe("static_hold");
+  });
+
+  it("applies an explicit Variant directive to one occurrence without leaking", () => {
+    const parsed = parseStrengthTrainingSessionText([
+      "Spider Curls",
+      "Variant: Static Hold",
+      "10r 35p",
+      "10r 35p",
+      "9r 35p",
+      "",
+      "Cable Rope Pushdowns",
+      "15r 50p",
+    ].join("\n"));
+
+    expect(parsed.exercises[0]).toMatchObject({
+      name: "Spider Curls",
+      canonicalExerciseId: "spider_curl",
+      executionVariant: {
+        key: "static_hold",
+        label: "Static Hold",
+        rawLabel: "Static Hold",
+      },
+    });
+    expect(parsed.exercises[0].sets.map(({ reps, weight }) => [reps, weight]))
+      .toEqual([[10, 35], [10, 35], [9, 35]]);
+    expect(parsed.exercises[1]).toMatchObject({
+      name: "Cable Rope Pushdowns",
+      canonicalExerciseId: "cable_pushdown",
+    });
+    expect(parsed.exercises[1]).not.toHaveProperty("executionVariant");
+  });
+
+  it("preserves meaningful freeform labels and punctuation", () => {
+    expect(normalizeTrainingExecutionVariant("3-Second Pause")).toEqual({
+      key: "3_second_pause",
+      label: "3-Second Pause",
+      rawLabel: "3-Second Pause",
+    });
+    expect(normalizeTrainingExecutionVariant("Slow Eccentric")).toEqual({
+      key: "slow_eccentric",
+      label: "Slow Eccentric",
+      rawLabel: "Slow Eccentric",
+    });
+    expect(parseStrengthTrainingText("Spider Curls\n35p 10r")[0])
+      .not.toHaveProperty("executionVariant");
   });
 });

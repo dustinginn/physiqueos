@@ -3,6 +3,7 @@ import {
   TRAINING_PERFORMANCE_EVENT_SCHEMA_VERSION,
   TRAINING_PERFORMANCE_EVENT_TYPES,
 } from "../models/trainingPerformanceEvent";
+import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
 
 export const TRAINING_LIBRARY_RECORD_LIMIT = 5;
 const TYPE_ORDER = {
@@ -58,6 +59,7 @@ function toItem(event, selectedId) {
     return null;
   }
 
+  const executionVariant = normalizeTrainingExecutionVariant(event.executionVariant);
   const common = {
     id: `training_library_record_${event.id}`,
     sourceEventId: event.id,
@@ -65,6 +67,10 @@ function toItem(event, selectedId) {
     canonicalExerciseName: event.canonicalExerciseName.trim(),
     achievementType: event.eventType,
     workoutDate: event.workoutDate,
+    ...(executionVariant ? { executionVariant } : {}),
+    ...(event.relationshipContext
+      ? { relationshipContext: structuredClone(event.relationshipContext) }
+      : {}),
   };
 
   if (event.eventType === TRAINING_PERFORMANCE_EVENT_TYPES.SESSION_VOLUME_PR) {

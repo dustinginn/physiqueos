@@ -4,7 +4,14 @@ import {
   TRAINING_PERFORMANCE_EVENT_TYPES,
 } from "../models/trainingPerformanceEvent";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
-import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
+import {
+  getTrainingExecutionVariantKey,
+  normalizeTrainingExecutionVariant,
+} from "../models/trainingExecutionVariant";
+import {
+  deriveTrainingExerciseRelationshipContext,
+  getTrainingExerciseRelationshipComparisonKey,
+} from "../models/trainingExerciseRelationship";
 
 export function produceTrainingPerformanceEvents({
   canonicalTrainingSession,
@@ -31,21 +38,33 @@ export function produceTrainingPerformanceEvents({
   }
 
   const workoutDate = String(session.observed_at ?? "").slice(0, 10);
-  const exercises = new Map(
-    (session.exercises ?? []).filter(
-      (exercise) => !normalizeTrainingExecutionVariant(exercise.executionVariant)
-    ).map((exercise) => {
-      const identity = resolveTrainingExerciseIdentity(exercise.name);
-      return [identity.canonicalExerciseId, { exercise, identity }];
-    })
-  );
+  const exercises = new Map();
+  for (const exercise of session.exercises ?? []) {
+    const identity = resolveTrainingExerciseIdentity(exercise.name);
+    const canonicalExerciseId = exercise.canonicalExerciseId ??
+      identity.canonicalExerciseId;
+    if (!canonicalExerciseId) continue;
+    const executionVariant = normalizeTrainingExecutionVariant(
+      exercise.executionVariant
+    );
+    const relationshipContext = deriveTrainingExerciseRelationshipContext({
+      exercise,
+      session,
+    });
+    const key = performanceContextKey({
+      canonicalExerciseId,
+      executionVariant,
+      relationshipContext,
+    });
+    exercises.set(key, [
+      ...(exercises.get(key) ?? []),
+      { exercise, executionVariant, identity, relationshipContext },
+    ]);
+  }
   const events = new Map();
 
   for (const observation of report.exerciseObservations) {
     const lastSession = observation?.explanation_data?.last_session;
-    if (normalizeTrainingExecutionVariant(lastSession?.execution_variant)) {
-      continue;
-    }
     if (
       lastSession?.session_id !== session.id ||
       lastSession?.date !== workoutDate
@@ -56,8 +75,13 @@ export function produceTrainingPerformanceEvents({
       observation?.exercise?.key ??
       resolveTrainingExerciseIdentity(observation?.exercise?.name)
         .canonicalExerciseId;
-    const currentExercise = exercises.get(canonicalExerciseId);
-    if (!currentExercise) continue;
+    const currentExercises = exercises.get(performanceContextKey({
+      canonicalExerciseId,
+      executionVariant: lastSession?.execution_variant,
+      relationshipContext: lastSession?.relationship_context,
+    })) ?? [];
+    if (currentExercises.length !== 1) continue;
+    const currentExercise = currentExercises[0];
 
     for (const descriptor of observation?.explanation_data?.pr_detection?.prs ?? []) {
       const event = createEventFromDescriptor({
@@ -75,7 +99,9 @@ export function produceTrainingPerformanceEvents({
         sourceSessionId: session.id,
         workoutDate,
         createdAt: now().toISOString(),
+        executionVariant: currentExercise.executionVariant,
         exercise: currentExercise.exercise,
+        relationshipContext: currentExercise.relationshipContext,
       });
       if (!event) continue;
       const existing = events.get(event.id);
@@ -87,6 +113,18 @@ export function produceTrainingPerformanceEvents({
   }
 
   return [...events.values()].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function performanceContextKey({
+  canonicalExerciseId,
+  executionVariant,
+  relationshipContext,
+}) {
+  return [
+    canonicalExerciseId,
+    `variant:${getTrainingExecutionVariantKey(executionVariant)}`,
+    `relationship:${getTrainingExerciseRelationshipComparisonKey(relationshipContext)}`,
+  ].join("|");
 }
 
 function createEventFromDescriptor({

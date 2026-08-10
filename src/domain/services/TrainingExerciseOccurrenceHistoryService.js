@@ -6,10 +6,15 @@ import {
   normalizeTrainingExecutionVariant,
   ORDINARY_EXECUTION_VARIANT_KEY,
 } from "../models/trainingExecutionVariant";
+import {
+  deriveTrainingExerciseRelationshipContext,
+  getTrainingExerciseRelationshipComparisonKey,
+} from "../models/trainingExerciseRelationship";
 
 export function resolvePreviousExerciseOccurrence({
   before = null,
   canonicalExerciseId,
+  relationshipContext = null,
   sessions = [],
   variantKey = null,
 } = {}) {
@@ -20,18 +25,29 @@ export function resolvePreviousExerciseOccurrence({
     canonicalExerciseId,
     sessions,
   });
+  const requestedRelationshipKey = getTrainingExerciseRelationshipComparisonKey(
+    relationshipContext
+  );
   const exactVariantOccurrence = occurrences.find(
     (occurrence) =>
-      getTrainingExecutionVariantKey(occurrence.exercise) === requestedVariantKey
+      getTrainingExecutionVariantKey(occurrence.exercise) === requestedVariantKey &&
+      getTrainingExerciseRelationshipComparisonKey(occurrence.relationshipContext) ===
+        requestedRelationshipKey
   ) ?? null;
   const canonicalFallbackOccurrence = occurrences.find(
     (occurrence) =>
-      getTrainingExecutionVariantKey(occurrence.exercise) !== requestedVariantKey
+      getTrainingExecutionVariantKey(occurrence.exercise) !== requestedVariantKey ||
+      getTrainingExerciseRelationshipComparisonKey(occurrence.relationshipContext) !==
+        requestedRelationshipKey
   ) ?? null;
 
   return {
     exactVariantOccurrence,
     canonicalFallbackOccurrence,
+    comparisonContext: {
+      relationshipKey: requestedRelationshipKey,
+      variantKey: requestedVariantKey,
+    },
     matchKind: exactVariantOccurrence
       ? "exact_variant"
       : occurrences.length
@@ -59,7 +75,14 @@ function listExerciseOccurrences({ before, canonicalExerciseId, sessions }) {
     : Number.POSITIVE_INFINITY;
   return sessions
     .map((candidate) => candidate?.payload ?? candidate)
-    .flatMap((session) => (session?.exercises ?? []).map((exercise) => ({ exercise, session })))
+    .flatMap((session) => (session?.exercises ?? []).map((exercise) => ({
+      exercise,
+      relationshipContext: deriveTrainingExerciseRelationshipContext({
+        exercise,
+        session,
+      }),
+      session,
+    })))
     .filter(({ exercise }) =>
       (exercise.canonicalExerciseId ?? getCanonicalTrainingExerciseSlug(exercise.name)) ===
       canonicalExerciseId

@@ -455,6 +455,20 @@ Downstream systems should never need to know whether a workout came from a scree
 
 Exercises are first-class historical child entities inside `TrainingSession`. Each exercise should include a stable `id`, `name`, `equipment`, `body_region`, `primary_muscle_groups`, `secondary_muscle_groups`, `movement_pattern`, `sets`, and provenance. This enables exercise history, PR tracking, volume trends, frequency, muscle group analytics, and future coaching without re-inferring basic exercise identity on every read.
 
+An exercise occurrence may also include `executionVariant` with normalized
+`key`, display `label`, and preserved `rawLabel`. This is occurrence context,
+not canonical identity: `Spider Curls` and `Spider Curls` performed as `Static
+Hold` remain one library exercise with distinct occurrences. In V1 the Variant
+applies to every set in that occurrence. Exercise relationship context, such as
+a Superset, is modeled independently and may coexist with a Variant.
+
+Training history, benchmarks, PR detection, and other performance comparisons
+must match canonical exercise plus execution Variant plus relevant relationship
+context. Evidence Review, corrections, reprocessing, canonical persistence,
+reporting, Progress Intelligence, and briefing dependencies must preserve the
+same contract without duplicating sets or fabricating a second exercise
+identity.
+
 The canonical exercise hierarchy lives in `exercises` and `sets`, not in serialized `values[]` JSON. `values[]` may preserve raw supplemental evidence or non-hierarchical fields, but it must not duplicate the exercise tree as a string.
 
 ## Canonical Nutrition Day Evidence

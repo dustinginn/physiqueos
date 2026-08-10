@@ -35,8 +35,9 @@ const navigationRowSource = fs.readFileSync(
   "utf8"
 );
 
-const occurrence = ({ date, executionVariant, sets }) => ({
+const occurrence = ({ date, executionVariant, relationshipContext, sets }) => ({
   exercise: { name: "Bench Press", ...(executionVariant ? { executionVariant } : {}), sets },
+  ...(relationshipContext ? { relationshipContext } : {}),
   session: { date, id: `session-${date}` },
 });
 
@@ -213,6 +214,30 @@ describe("Exercise Detail mobile workflow", () => {
     ]);
     expect(result.bestSet).toBe("10 x 140 lb");
     expect(result.comparison).toBe("No comparable prior variant session.");
+  });
+
+  it("does not compare a Superset benchmark with standalone history", () => {
+    const supersetContext = {
+      relationshipType: "superset",
+      orderedPartners: [{
+        canonicalExerciseId: "cable_pushdown",
+        name: "Cable Rope Pushdowns",
+      }],
+    };
+    const result = getCurrentExerciseBenchmark([
+      occurrence({
+        date: "2026-07-16",
+        relationshipContext: supersetContext,
+        sets: [{ reps: 10, weight: 140, weight_unit: "lb" }],
+      }),
+      occurrence({
+        date: "2026-07-09",
+        sets: [{ reps: 8, weight: 150, weight_unit: "lb" }],
+      }),
+    ]);
+
+    expect(result.bestSet).toBe("10 x 140 lb");
+    expect(result.comparison).toBe("No comparable prior superset session.");
   });
 
   it("keeps the existing volume, sets, set table, and history with optional source workouts", () => {

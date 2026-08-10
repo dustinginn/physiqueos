@@ -71,7 +71,7 @@ describe("Training execution variant propagation", () => {
     expect(observation.explanation_data.comparison_context.comparable_session_count).toBe(2);
   });
 
-  it("suppresses durable variant PR events while preserving ordinary event production", () => {
+  it("produces durable PR events with the matching variant context", () => {
     const report = createTrainingPerformanceIntelligenceReport({
       trainingSessions: [staticHold, session("static-2", "2026-08-15", {
         key: "static_hold", label: "Static Hold", rawLabel: "Static Hold",
@@ -81,12 +81,15 @@ describe("Training execution variant propagation", () => {
     const current = session("static-2", "2026-08-15", {
       key: "static_hold", label: "Static Hold", rawLabel: "Static Hold",
     }, 15, 35);
-    expect(produceTrainingPerformanceEvents({
+    const events = produceTrainingPerformanceEvents({
       canonicalTrainingSession: { canonicalId: "canonical-static", payload: current },
       trainingAnalysis: { id: "analysis-static", trainingPerformance: report },
       sourceReviewId: "review",
       sourceEvidencePackageId: "package",
-    })).toEqual([]);
+    });
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((event) => event.executionVariant?.key === "static_hold"))
+      .toBe(true);
   });
 });
 

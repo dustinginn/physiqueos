@@ -31,6 +31,7 @@ import {
 } from "../domain/models/trainingExecutionVariant";
 import {
   deriveTrainingExerciseRelationshipContext,
+  getTrainingExerciseRelationshipComparisonKey,
   normalizeTrainingExerciseRelationshipGroups,
 } from "../domain/models/trainingExerciseRelationship";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
@@ -1227,6 +1228,11 @@ function ExercisePerformanceRecordsCard({ model }) {
                 <p className="text-[13px] font-extrabold leading-5 text-[var(--text-primary)]">
                   {record.title}
                 </p>
+                {record.executionVariant?.label && (
+                  <p className="mt-0.5 text-xs font-bold text-indigo-600">
+                    Variant: {record.executionVariant.label}
+                  </p>
+                )}
                 <p className="mt-0.5 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
                   {record.value}
                 </p>
@@ -1634,9 +1640,14 @@ export function getCurrentExerciseBenchmark(occurrences = []) {
   const latest = occurrences[0];
   if (!latest?.session) return null;
   const latestVariantKey = getTrainingExecutionVariantKey(latest.exercise);
+  const latestRelationshipKey = getTrainingExerciseRelationshipComparisonKey(
+    latest.relationshipContext
+  );
   const comparableOccurrences = occurrences.filter(
     (occurrence) =>
-      getTrainingExecutionVariantKey(occurrence.exercise) === latestVariantKey
+      getTrainingExecutionVariantKey(occurrence.exercise) === latestVariantKey &&
+      getTrainingExerciseRelationshipComparisonKey(occurrence.relationshipContext) ===
+        latestRelationshipKey
   );
   const latestStats = getExerciseSetStats(latest.exercise?.sets ?? []);
   const lifetimeStats = getExerciseSetStats(
@@ -1648,10 +1659,12 @@ export function getCurrentExerciseBenchmark(occurrences = []) {
       .flatMap((occurrence) => occurrence.exercise?.sets ?? [])
   );
   if (!lifetimeStats.bestSet) return null;
+  const hasVariantContext = latestVariantKey !== ORDINARY_EXECUTION_VARIANT_KEY;
+  const hasRelationshipContext = latestRelationshipKey !== "standalone";
 
   const comparison = latestStats.bestSet && (
     comparableOccurrences.length > 1 ||
-    latestVariantKey === ORDINARY_EXECUTION_VARIANT_KEY
+    (!hasVariantContext && !hasRelationshipContext)
   )
     ? priorStats.bestSet &&
       compareExerciseSets(latestStats.bestSet, priorStats.bestSet) < 0
@@ -1659,8 +1672,10 @@ export function getCurrentExerciseBenchmark(occurrences = []) {
       : compareExerciseSets(latestStats.bestSet, lifetimeStats.bestSet) === 0
         ? "Last session matched your current best."
         : "Last session finished below your current best."
-    : latestStats.bestSet && latestVariantKey !== ORDINARY_EXECUTION_VARIANT_KEY
-      ? "No comparable prior variant session."
+    : latestStats.bestSet && (hasVariantContext || hasRelationshipContext)
+      ? hasRelationshipContext
+        ? `No comparable prior ${latest.relationshipContext?.relationshipType ?? "relationship"} session.`
+        : "No comparable prior variant session."
       : null;
 
   return {

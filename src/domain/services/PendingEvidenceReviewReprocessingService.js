@@ -164,10 +164,13 @@ function preserveExerciseSetSemantics({ freshExercises, priorExercises, typedEvi
     const blocksBodyweightNormalization = hasWeightedOrAssistedSignal(sourceBlock);
     const bodyweightOnlyIdentity = freshIdentity.exercise?.default_load_type === "bodyweight";
     const explicitBodyweightSource = /\bbody\s*weight\b|\bbodyweight\b|\bbw\b/i.test(sourceBlock);
+    const executionVariant = freshExercise.executionVariant ??
+      (sameCanonicalExercise ? priorExercise?.executionVariant : null);
 
     return {
       ...freshExercise,
       id: sameCanonicalExercise ? priorExercise.id ?? freshExercise.id : freshExercise.id,
+      ...(executionVariant ? { executionVariant: structuredClone(executionVariant) } : {}),
       sets: (freshExercise?.sets ?? []).map((freshSet, setIndex) => {
         if (!isZeroExternalLoad(freshSet) || blocksBodyweightNormalization) return freshSet;
 

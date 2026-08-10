@@ -47,6 +47,35 @@ describe("TrainingSession correction Superset semantics", () => {
     expect(workout.reconciliation.relationship_structure_authoritative)
       .toBe(true);
   });
+
+  it("preserves a reviewed occurrence Variant when correction text omits it", () => {
+    const canonical = target();
+    canonical.payload.exercises[0].executionVariant = {
+      key: "static_hold",
+      label: "Static Hold",
+      rawLabel: "Static Hold",
+    };
+    const result = createTrainingSessionCorrectionEvidencePackage({
+      capturedAt: "2026-08-10T18:00:00.000Z",
+      correctionText: [
+        "Chest Press Machine",
+        "8r 105p",
+        "Chest Fly Machine",
+        "10r 75p",
+      ].join("\n"),
+      targetCanonicalObject: canonical,
+      userId: "founder",
+    });
+
+    expect(result.evidence_objects[0].exercises[0]).toMatchObject({
+      id: "press_1",
+      executionVariant: {
+        key: "static_hold",
+        label: "Static Hold",
+      },
+      sets: [expect.objectContaining({ reps: 8, weight: 105 })],
+    });
+  });
 });
 
 function target() {

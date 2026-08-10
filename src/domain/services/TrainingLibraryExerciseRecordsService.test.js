@@ -32,6 +32,36 @@ describe("Training Library exercise records read model", () => {
     });
   });
 
+  it("keeps Variant and relationship context as secondary record metadata", () => {
+    const event = volume({
+      exerciseId: "spider_curl",
+      exerciseName: "Spider Curls",
+      executionVariant: {
+        key: "static_hold",
+        label: "Static Hold",
+        rawLabel: "Static Hold",
+      },
+      relationshipContext: {
+        relationshipType: "superset",
+        memberIndex: 0,
+        orderedPartners: [{
+          canonicalExerciseId: "cable_pushdown",
+          name: "Cable Rope Pushdowns",
+        }],
+      },
+    });
+    expect(compose("spider_curl", [event]).records[0]).toMatchObject({
+      canonicalExerciseId: "spider_curl",
+      executionVariant: { key: "static_hold", label: "Static Hold" },
+      relationshipContext: {
+        relationshipType: "superset",
+        orderedPartners: [
+          expect.objectContaining({ canonicalExerciseId: "cable_pushdown" }),
+        ],
+      },
+    });
+  });
+
   it("keeps both event types distinct and puts volume first on the same date", () => {
     const model = compose("ez_bar_curl", [
       reps(),
@@ -162,6 +192,8 @@ function volume({
   value = 6160,
   baseline = 5830,
   unit = "lb",
+  executionVariant = null,
+  relationshipContext = null,
 } = {}) {
   return { ...createTrainingPerformanceEvent({
     eventType: "session_volume_pr",
@@ -174,7 +206,9 @@ function volume({
     canonicalExerciseId: exerciseId,
     canonicalExerciseName: exerciseName,
     currentValue: value,
+    executionVariant,
     previousBaselineValue: baseline,
+    relationshipContext,
     sessionVolume: value,
     unit,
     createdAt,

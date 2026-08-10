@@ -74,6 +74,24 @@ describe("late-evidence briefing revision engine", () => {
     });
   });
 
+  it("includes a Training occurrence Variant in the semantic dependency digest", () => {
+    const publication = cadencePublication("weekly", "2026-08-02", "2026-08-08");
+    const variantTraining = trainingEvidence("training-1", "2026-08-08", confirmedAt);
+    const ordinaryTraining = structuredClone(variantTraining);
+    delete ordinaryTraining.payload.exercises[0].executionVariant;
+
+    const variantManifest = createBriefingDependencyManifest({
+      publication,
+      evidenceInputs: [variantTraining],
+    });
+    const ordinaryManifest = createBriefingDependencyManifest({
+      publication,
+      evidenceInputs: [ordinaryTraining],
+    });
+
+    expect(variantManifest.fingerprint).not.toBe(ordinaryManifest.fingerprint);
+  });
+
   it("treats newly present Nutrition as drift for a publication created without it", () => {
     const publication = attachBriefingDependencyManifest(
       cadencePublication("weekly", "2026-08-02", "2026-08-08"),
@@ -349,7 +367,9 @@ function trainingEvidence(id, date, changedAt) {
     payload: {
       id, evidence_type: "training", observed_at: date,
       metadata: { activity_type: "resistance", uploadNote: "ignored" },
-      exercises: [{ id: "squat", executionVariant: { stance: "high-bar" },
+      exercises: [{ id: "squat", executionVariant: {
+        key: "static_hold", label: "Static Hold", rawLabel: "Static Hold",
+      },
         sets: [{ reps: 5, weight: 225 }] }],
     },
   };

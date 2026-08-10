@@ -42,9 +42,10 @@ describe("Superset performance context", () => {
     expect(press.status).toBe("improving");
     expect(press.explanation_data.previous_comparable_session.session_id).toBe("first");
     expect(press.explanation_data.comparison_context.comparable_session_count).toBe(2);
+    expect(press.explanation_data.pr_detection.detected).toBe(true);
   });
 
-  it("keeps PR detection in the existing exercise and variant pool", () => {
+  it("does not compare Superset PRs against a standalone pool", () => {
     const report = createTrainingPerformanceIntelligenceReport({
       now: "2026-08-10T12:00:00.000Z",
       trainingSessions: [
@@ -58,8 +59,8 @@ describe("Superset performance context", () => {
 
     expect(press.id).toBe("performance|exercise|chest_press_machine");
     expect(press.explanation_data.pr_detection).toMatchObject({
-      detected: true,
-      type: "heaviest_load",
+      detected: false,
+      prs: [],
     });
     expect(report.exerciseObservations.filter(
       (observation) => observation.exercise.key === "chest_press_machine"

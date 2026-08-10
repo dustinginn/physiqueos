@@ -1,4 +1,12 @@
 import { createHash } from "node:crypto";
+import {
+  getTrainingExecutionVariantKey,
+  normalizeTrainingExecutionVariant,
+  ORDINARY_EXECUTION_VARIANT_KEY,
+} from "./trainingExecutionVariant";
+import {
+  getTrainingExerciseRelationshipComparisonKey,
+} from "./trainingExerciseRelationship";
 
 export const TRAINING_PERFORMANCE_EVENT_SCHEMA_VERSION =
   "training_performance_event_v1";
@@ -19,7 +27,9 @@ export function createTrainingPerformanceEvent({
   canonicalExerciseId,
   canonicalExerciseName,
   currentValue,
+  executionVariant = null,
   previousBaselineValue,
+  relationshipContext = null,
   load = null,
   loadUnit = null,
   reps = null,
@@ -27,12 +37,19 @@ export function createTrainingPerformanceEvent({
   unit,
   createdAt,
 } = {}) {
+  const normalizedExecutionVariant = normalizeTrainingExecutionVariant(executionVariant);
+  const relationshipKey = getTrainingExerciseRelationshipComparisonKey(relationshipContext);
+  const normalizedRelationshipContext = relationshipKey === "standalone"
+    ? null
+    : structuredClone(relationshipContext);
   const identity = getTrainingPerformanceEventIdentity({
     canonicalExerciseId,
     currentValue,
+    executionVariant: normalizedExecutionVariant,
     eventType,
     load,
     loadUnit,
+    relationshipContext: normalizedRelationshipContext,
     reps,
     sourceCanonicalTrainingId,
     sourceSessionId,
@@ -50,6 +67,12 @@ export function createTrainingPerformanceEvent({
     workoutDate,
     canonicalExerciseId,
     canonicalExerciseName,
+    ...(normalizedExecutionVariant
+      ? { executionVariant: normalizedExecutionVariant }
+      : {}),
+    ...(normalizedRelationshipContext
+      ? { relationshipContext: normalizedRelationshipContext }
+      : {}),
     currentValue,
     previousBaselineValue,
     improvement: currentValue - previousBaselineValue,
@@ -67,13 +90,19 @@ export function createTrainingPerformanceEvent({
 export function getTrainingPerformanceEventIdentity({
   canonicalExerciseId,
   currentValue,
+  executionVariant = null,
   eventType,
   load,
   loadUnit,
   reps,
+  relationshipContext = null,
   sourceCanonicalTrainingId,
   sourceSessionId,
 } = {}) {
+  const contextIdentity = getPerformanceEventContextIdentity({
+    executionVariant,
+    relationshipContext,
+  });
   if (eventType === TRAINING_PERFORMANCE_EVENT_TYPES.SESSION_VOLUME_PR) {
     return [
       TRAINING_PERFORMANCE_EVENT_SCHEMA_VERSION,
@@ -82,6 +111,7 @@ export function getTrainingPerformanceEventIdentity({
       canonicalExerciseId,
       eventType,
       currentValue,
+      ...contextIdentity,
     ].join("|");
   }
   if (eventType === TRAINING_PERFORMANCE_EVENT_TYPES.REPS_AT_LOAD_PR) {
@@ -94,6 +124,7 @@ export function getTrainingPerformanceEventIdentity({
       load,
       loadUnit,
       reps,
+      ...contextIdentity,
     ].join("|");
   }
   throw new Error(`Unsupported Training performance event type: ${eventType}`);
@@ -124,6 +155,12 @@ export function assertValidTrainingPerformanceEvent(event) {
     event.improvement !== event.currentValue - event.previousBaselineValue
   ) {
     throw new Error("Training performance event is invalid.");
+  }
+  if (
+    event.executionVariant &&
+    getTrainingExecutionVariantKey(event.executionVariant) === ORDINARY_EXECUTION_VARIANT_KEY
+  ) {
+    throw new Error("Ordinary Training performance events must omit executionVariant.");
   }
   if (
     event.eventType === TRAINING_PERFORMANCE_EVENT_TYPES.SESSION_VOLUME_PR &&
@@ -174,4 +211,19 @@ function stableStringify(value) {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function getPerformanceEventContextIdentity({ executionVariant, relationshipContext }) {
+  const values = [];
+  const variantKey = getTrainingExecutionVariantKey(executionVariant);
+  if (variantKey !== ORDINARY_EXECUTION_VARIANT_KEY) {
+    values.push(`variant:${variantKey}`);
+  }
+  const relationshipKey = getTrainingExerciseRelationshipComparisonKey(
+    relationshipContext
+  );
+  if (relationshipKey !== "standalone") {
+    values.push(`relationship:${relationshipKey}`);
+  }
+  return values;
 }

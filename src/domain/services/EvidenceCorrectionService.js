@@ -2,6 +2,7 @@ import {
   createTrainingSessionEvidenceFromText,
   parseStrengthTrainingSessionText,
 } from "../models/trainingSessionEvidence";
+import { getCanonicalTrainingExerciseSlug } from "../models/trainingExerciseIdentity";
 import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
 import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerciseRelationship";
 
@@ -201,18 +202,40 @@ function alignCorrectionOccurrences({
   parsedRelationshipGroups = [],
   targetExercises = [],
 } = {}) {
+  const targetOccurrences = (targetExercises ?? []).map((exercise) => ({
+    canonicalKey: exercise.canonicalExerciseId ??
+      getCanonicalTrainingExerciseSlug(exercise.name),
+    exercise,
+    key: getTrainingExerciseOccurrenceKey(exercise),
+    used: false,
+  }));
   const availableByKey = new Map();
-  for (const exercise of targetExercises ?? []) {
-    const key = getTrainingExerciseOccurrenceKey(exercise);
+  for (const occurrence of targetOccurrences) {
+    const { key } = occurrence;
     if (!availableByKey.has(key)) availableByKey.set(key, []);
-    availableByKey.get(key).push(exercise);
+    availableByKey.get(key).push(occurrence);
   }
   const idMap = new Map();
   const exercises = (parsedExercises ?? []).map((exercise) => {
-    const match = availableByKey.get(getTrainingExerciseOccurrenceKey(exercise))?.shift();
-    if (!match?.id) return exercise;
-    idMap.set(exercise.id, match.id);
-    return { ...exercise, id: match.id };
+    const exactMatches = availableByKey.get(getTrainingExerciseOccurrenceKey(exercise)) ?? [];
+    let match = exactMatches.find((candidate) => !candidate.used) ?? null;
+    if (!match) {
+      const canonicalKey = exercise.canonicalExerciseId ??
+        getCanonicalTrainingExerciseSlug(exercise.name);
+      const candidates = targetOccurrences.filter(
+        (candidate) => !candidate.used && candidate.canonicalKey === canonicalKey
+      );
+      if (candidates.length === 1) match = candidates[0];
+    }
+    if (!match?.exercise?.id) return exercise;
+    match.used = true;
+    idMap.set(exercise.id, match.exercise.id);
+    const executionVariant = exercise.executionVariant ?? match.exercise.executionVariant;
+    return {
+      ...exercise,
+      id: match.exercise.id,
+      ...(executionVariant ? { executionVariant: structuredClone(executionVariant) } : {}),
+    };
   });
   return {
     exercises,

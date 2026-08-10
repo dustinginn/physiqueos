@@ -125,9 +125,63 @@ describe("TrainingPerformanceEventProducer", () => {
     const second = produce(input, "2026-08-01T00:00:00.000Z");
     expect(first[0].id).toBe(second[0].id);
   });
+
+  it("carries independent Variant and Superset context into durable events", () => {
+    const variant = {
+      key: "static_hold",
+      label: "Static Hold",
+      rawLabel: "Static Hold",
+    };
+    const relationshipContext = {
+      relationship_type: "superset",
+      member_index: 0,
+      ordered_partners: [{
+        canonical_exercise_id: "cable_pushdown",
+        name: "Cable Rope Pushdowns",
+      }],
+    };
+    const events = produce({
+      exercises: [
+        exercise("Spider Curls", [[15, 35]], {
+          canonicalExerciseId: "spider_curl",
+          executionVariant: variant,
+          id: "spider",
+        }),
+        exercise("Cable Rope Pushdowns", [[15, 50]], {
+          canonicalExerciseId: "cable_pushdown",
+          id: "pushdown",
+        }),
+      ],
+      exerciseRelationshipGroups: [{
+        id: "superset_1",
+        relationshipType: "superset",
+        memberExerciseIds: ["spider", "pushdown"],
+      }],
+      observations: [observation("spider_curl", "Spider Curls", [
+        repsPr(15, 35, 13),
+      ], 525, {
+        executionVariant: variant,
+        relationshipContext,
+      })],
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      executionVariant: { key: "static_hold", label: "Static Hold" },
+      relationshipContext: {
+        relationshipType: "superset",
+        orderedPartners: [
+          expect.objectContaining({ canonicalExerciseId: "cable_pushdown" }),
+        ],
+      },
+    });
+  });
 });
 
-function produce({ exercises, observations }, timestamp = "2026-07-26T02:31:00.000Z") {
+function produce(
+  { exerciseRelationshipGroups = [], exercises, observations },
+  timestamp = "2026-07-26T02:31:00.000Z"
+) {
   return produceTrainingPerformanceEvents({
     canonicalTrainingSession: {
       canonicalId: CANONICAL_ID,
@@ -136,6 +190,7 @@ function produce({ exercises, observations }, timestamp = "2026-07-26T02:31:00.0
         evidence_type: "training",
         observed_at: "2026-07-25",
         exercises,
+        ...(exerciseRelationshipGroups.length ? { exerciseRelationshipGroups } : {}),
       },
     },
     trainingAnalysis: {
@@ -156,14 +211,21 @@ function observation(key, name, prs, totalVolume, overrides = {}) {
         date: overrides.date ?? "2026-07-25",
         session_id: overrides.sessionId ?? SESSION_ID,
         total_volume: totalVolume,
+        ...(overrides.executionVariant
+          ? { execution_variant: overrides.executionVariant }
+          : {}),
+        ...(overrides.relationshipContext
+          ? { relationship_context: overrides.relationshipContext }
+          : {}),
       },
       pr_detection: { detected: prs.length > 0, prs },
     },
   };
 }
 
-function exercise(name, sets) {
+function exercise(name, sets, context = {}) {
   return {
+    ...context,
     name,
     sets: sets.map(([reps, weight], index) => ({
       set_number: index + 1,

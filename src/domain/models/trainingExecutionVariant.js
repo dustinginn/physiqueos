@@ -11,13 +11,14 @@ export function normalizeTrainingExecutionVariant(value) {
   const rawLabel = cleanVariantText(source);
   if (!rawLabel) return null;
 
-  const normalizedText = EXECUTION_VARIANT_ALIASES[normalizeVariantText(rawLabel)] ??
-    normalizeVariantText(rawLabel);
+  const normalizedSource = normalizeVariantText(rawLabel);
+  const alias = EXECUTION_VARIANT_ALIASES[normalizedSource] ?? null;
+  const normalizedText = alias ?? normalizedSource;
   if (!normalizedText) return null;
 
   return {
     key: normalizedText.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
-    label: titleVariantLabel(normalizedText),
+    label: resolveVariantLabel(value, rawLabel, alias),
     rawLabel,
   };
 }
@@ -70,4 +71,21 @@ function normalizeVariantText(value) {
 
 function titleVariantLabel(value) {
   return String(value ?? "").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function resolveVariantLabel(value, rawLabel, alias) {
+  if (alias) return titleVariantLabel(alias);
+  const explicitLabel = typeof value === "object" ? cleanVariantText(value?.label) : null;
+  if (explicitLabel) return explicitLabel;
+  if (typeof value === "object" && !value?.rawLabel && value?.key) {
+    return titleVariantLabel(normalizeVariantText(value.key));
+  }
+
+  const letters = rawLabel.replace(/[^a-z]/gi, "");
+  const hasUniformCase = letters && (
+    letters === letters.toLowerCase() || letters === letters.toUpperCase()
+  );
+  return hasUniformCase
+    ? titleVariantLabel(rawLabel.toLowerCase().replace(/_/g, " "))
+    : rawLabel;
 }

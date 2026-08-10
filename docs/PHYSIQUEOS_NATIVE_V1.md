@@ -218,6 +218,39 @@ one training session into duplicates.
 This is a native expression of the stable identity and incremental persistence
 requirements established at the pre-iOS checkpoint, not a new workout system.
 
+### Shared Training occurrence contract
+
+Web, native, imports, review, correction, reporting, and future live logging
+must share one Training hierarchy:
+
+```text
+Canonical Exercise -> optional execution Variant -> Sets
+```
+
+The canonical exercise is the durable movement identity. A Variant describes
+how that movement was executed on one exercise occurrence, such as `Static
+Hold`, `3-Second Pause`, or `Slow Eccentric`; it does not create a second
+exercise-library identity. In V1, an occurrence Variant applies to all of that
+occurrence's sets. Set-level Variants are intentionally outside the contract.
+
+Typed evidence may declare `Variant: <freeform value>` immediately beneath an
+exercise heading. Meaningful user wording and punctuation should be preserved,
+and the Variant must not leak to a later exercise. Parenthetical headings may
+be interpreted as Variants only when the parenthetical is not already part of
+a known canonical exercise identity and the base movement can be resolved
+safely. Ambiguous input remains reviewable rather than being silently recast.
+
+Exercise relationship context is independent. An occurrence may be ordinary
+or have a Variant and may separately be standalone or participate in a
+Superset. Review, correction, reprocessing, persistence, and downstream
+briefings must preserve both dimensions. Historical and performance
+comparisons require the same canonical exercise, Variant, and relevant
+relationship context. The Training Library remains unified by canonical
+exercise and presents Variant as secondary occurrence or record metadata.
+
+Future native capture and live-workout interfaces should write this contract
+directly instead of defining client-specific Variant semantics.
+
 ## Notification philosophy
 
 Notifications exist to reduce navigation.
