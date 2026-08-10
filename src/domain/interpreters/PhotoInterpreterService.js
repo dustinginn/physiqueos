@@ -1,4 +1,5 @@
 import {
+  normalizePhotoModelSemantics,
   normalizePhotoInterpretationToStructuredObservations,
   normalizeStructuredPhotoSemantics,
   PHOTO_INTERPRETATION_SCHEMA_VERSION,
@@ -669,7 +670,7 @@ function normalizeInterpreterOutput(output, fallback) {
     ...output,
     photo_set_id: output.photo_set_id || fallback.photoSetId,
     capture_date: output.capture_date || fallback.captureDate,
-    comparison_metadata: output.comparison_metadata || fallback.comparisonMetadata,
+    comparison_metadata: fallback.comparisonMetadata,
     views_detected: output.views_detected?.length
       ? output.views_detected
       : getViewsDetected(fallback.photos),
@@ -686,7 +687,7 @@ function withStructuredObservations(interpretation) {
   const explicitSemantics = interpretation.structured_observations?.some(
     (item) => item?.metric != null || item?.direction != null
   )
-    ? normalizeStructuredPhotoSemantics(interpretation.structured_observations, {
+    ? normalizeStructuredPhotoSemantics(normalizePhotoModelSemantics(interpretation.structured_observations), {
         comparisonSessionId:
           interpretation.comparison_metadata?.previous_photo_set_id ?? null,
         sourceEvidenceIds: [interpretation.photo_set_id].filter(Boolean),
@@ -887,10 +888,12 @@ function getViewsDetected(photos) {
 }
 
 function normalizeView(view) {
-  const normalized = String(view ?? "unknown").toLowerCase();
+  const normalized = String(view ?? "unknown").toLowerCase().replaceAll("_", "-");
 
   if (["front", "side", "back"].includes(normalized)) return normalized;
-  if (normalized === "rear") return "back";
+  if (normalized.includes("side")) return "side";
+  if (normalized.includes("front")) return "front";
+  if (normalized.includes("back") || normalized.includes("rear")) return "back";
 
   return "unknown";
 }
@@ -2335,6 +2338,7 @@ export const photoInterpretationJsonSchema = {
     coach_briefing_insert: { type: "string" },
     structured_observations: {
       type: "array",
+      minItems: 1,
       items: {
         type: "object",
         additionalProperties: false,

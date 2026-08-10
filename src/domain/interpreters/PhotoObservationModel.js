@@ -80,6 +80,50 @@ export function normalizeStructuredPhotoSemantics(
   });
 }
 
+export function normalizePhotoModelSemantics(values = []) {
+  return (Array.isArray(values) ? values : []).map((value) => {
+    const metric = String(value?.metric ?? "unknown");
+    const direction = String(value?.direction ?? "unknown");
+    const magnitude = String(value?.magnitude ?? "unknown");
+    if (direction === "insufficient") {
+      return {
+        ...value,
+        magnitude: "unknown",
+        limitations: value?.limitations?.length
+          ? value.limitations
+          : ["The visual evidence was insufficient to determine direction."],
+      };
+    }
+    if (direction === "unknown") {
+      return { ...value, metric: "unknown", magnitude: "unknown" };
+    }
+    if (direction === "stable") {
+      if (metric === "unknown") return unresolvedModelSemantic(value, "The model did not identify a metric for the stability claim.");
+      return { ...value, magnitude: ["none", "subtle", "unknown"].includes(magnitude) ? magnitude : "none" };
+    }
+    if (metric === "unknown" ||
+        (metric === "visual_stability" && ["increased", "decreased"].includes(direction))) {
+      return unresolvedModelSemantic(value, "The model metric and direction were inconsistent.");
+    }
+    if (["increased", "decreased", "mixed"].includes(direction) &&
+        !["subtle", "moderate", "pronounced"].includes(magnitude)) {
+      return unresolvedModelSemantic(value, "The model output did not establish a visible-change magnitude.");
+    }
+    return value;
+  });
+}
+
+function unresolvedModelSemantic(value, limitation) {
+  return {
+    ...value,
+    metric: "unknown",
+    direction: "unknown",
+    magnitude: "unknown",
+    confidence: "low",
+    limitations: [...(value?.limitations ?? []), limitation],
+  };
+}
+
 export function validateStructuredPhotoSemantic(value = {}) {
   if (!PHOTO_INTERPRETATION_METRICS.includes(value.metric)) {
     throw new Error(`Unsupported Photo interpretation metric: ${value.metric}`);
@@ -96,7 +140,7 @@ export function validateStructuredPhotoSemantic(value = {}) {
   if (value.direction === "stable" && !["none", "subtle", "unknown"].includes(value.magnitude)) {
     throw new Error("Stable Photo interpretation cannot carry a meaningful-change magnitude.");
   }
-  if (["increased", "decreased"].includes(value.direction) &&
+  if (["increased", "decreased", "mixed"].includes(value.direction) &&
       !["subtle", "moderate", "pronounced"].includes(value.magnitude)) {
     throw new Error("Directional Photo interpretation requires a visible-change magnitude.");
   }

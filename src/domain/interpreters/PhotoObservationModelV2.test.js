@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizePhotoModelSemantics,
   normalizeStructuredPhotoSemantics,
   PHOTO_INTERPRETATION_SCHEMA_VERSION,
 } from "./PhotoObservationModel";
@@ -119,6 +120,27 @@ describe("photo_interpretation_v2", () => {
     expect(() => normalizeStructuredPhotoSemantics([{
       ...base, direction: "stable", magnitude: "pronounced", metric: "visual_stability",
     }])).toThrow(/magnitude/);
+    expect(() => normalizeStructuredPhotoSemantics([{
+      ...base, direction: "mixed", magnitude: "none",
+    }])).toThrow(/magnitude/);
+  });
+
+  it("normalizes contradictory provider enums without inventing direction", () => {
+    expect(normalizePhotoModelSemantics([{
+      ...base, metric: "leanness", direction: "insufficient", magnitude: "subtle",
+    }])[0]).toMatchObject({ direction: "insufficient", magnitude: "unknown" });
+    expect(normalizePhotoModelSemantics([{
+      ...base, metric: "leanness", direction: "increased", magnitude: "none",
+    }])[0]).toMatchObject({ metric: "unknown", direction: "unknown", magnitude: "unknown", confidence: "low" });
+    expect(normalizePhotoModelSemantics([{
+      ...base, metric: "visual_stability", direction: "increased", magnitude: "subtle",
+    }])[0]).toMatchObject({ metric: "unknown", direction: "unknown", magnitude: "unknown", confidence: "low" });
+    expect(normalizePhotoModelSemantics([{
+      ...base, metric: "unknown", direction: "stable", magnitude: "none",
+    }])[0]).toMatchObject({ metric: "unknown", direction: "unknown", magnitude: "unknown", confidence: "low" });
+    expect(normalizePhotoModelSemantics([{
+      ...base, metric: "unknown", direction: "insufficient", magnitude: "subtle", limitations: [],
+    }])[0]).toMatchObject({ direction: "insufficient", magnitude: "unknown", limitations: [expect.any(String)] });
   });
 
   it("rejects precise body-composition conclusions in display copy", () => {

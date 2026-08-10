@@ -73,6 +73,9 @@ export function createPhotoEventReinterpretationService({
         if (result.provider !== "openai") throw new Error(`Photo Interpreter did not complete ${view.poseId}: ${result.warning ?? "provider unavailable"}`);
         const interpretation = result.interpretation;
         const structuredObservations = interpretation.structured_observations ?? normalizePhotoInterpretationToStructuredObservations(interpretation);
+        if (!structuredObservations.length) {
+          throw new Error(`Photo Interpreter did not return a structured ${view.poseId} read.`);
+        }
         prepared.push({ view, interpretation, structuredObservations });
       }
 

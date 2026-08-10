@@ -22,6 +22,18 @@ describe("Photo Event reinterpretation lifecycle", () => {
     expect(fixture.createAnalysis).not.toHaveBeenCalled();
   });
 
+  it("rejects an empty pose read before any replacement write", async () => {
+    const fixture = repositories();
+    const service = createPhotoEventReinterpretationService({
+      repositories: fixture.repositories,
+      interpret: vi.fn(async () => ({ provider: "openai", interpretation: { user_facing_summary: "No pose read.", structured_observations: [] } })),
+      readImage: vi.fn(async () => "data:image/jpeg;base64,test"),
+    });
+    await expect(service.regenerate({ userId: "user", sessionId: "photo_session_user_2026-08-08", reason: "test", replacementAuthorized: true }))
+      .rejects.toThrow(/structured front-relaxed read/);
+    expect(fixture.createAnalysis).not.toHaveBeenCalled();
+  });
+
   it("replaces per-view analysis, synthesizes, and explicitly regenerates the Event", async () => {
     const fixture = repositories();
     const regenerate = vi.fn(async () => ({ status: "completed", artifactId: "event", artifact: { id: "event" } }));

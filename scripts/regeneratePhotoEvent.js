@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { loadEnvConfig } from "@next/env";
 import { FounderRepositories } from "../src/data/repositories/founderRepositories.js";
 import { resolveFounderRuntimeStorePath } from "../src/data/repositories/founderRuntimeStore.js";
 import { createPhotoEventReinterpretationService } from "../src/domain/services/PhotoEventReinterpretationService.js";
+
+loadEnvConfig(process.cwd(), false, { info() {}, error() {} });
 
 async function main() {
   const sessionId = argument("session");

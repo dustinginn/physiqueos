@@ -33,8 +33,10 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
   });
   const activeViews = session.views.map((view) => {
     const activeSourceIds=new Set(view.provenance?.sourceIds??[]);
-    const synthesisFindings=(session.synthesis?.observations??[]).filter((item)=>(item.sourceEvidenceIds??[]).some((id)=>activeSourceIds.has(id))).map((item)=>item.change??item.description).filter(Boolean);
-    const eligibleFindings=semanticDeduplicate([...synthesisFindings,...(view.structuredFindings ?? []).map((item)=>item.change ?? item.description).filter(Boolean), ...(view.observedChanges ?? [])]).filter(isNaturalFinding).slice(0,4);
+    const synthesisFindings=(session.synthesis?.observations??[]).filter((item)=>(item.sourceEvidenceIds??[]).some((id)=>activeSourceIds.has(id)) && isPublishableStructuredFinding(item)).map((item)=>item.change??item.description).filter(Boolean);
+    const structuredFindings=(view.structuredFindings??[]).filter(isPublishableStructuredFinding);
+    const legacyObservedChanges=structuredFindings.length || (view.structuredFindings??[]).length ? [] : (view.observedChanges??[]);
+    const eligibleFindings=semanticDeduplicate([...synthesisFindings,...structuredFindings.map((item)=>item.change ?? item.description).filter(Boolean), ...legacyObservedChanges]).filter(isNaturalFinding).slice(0,4);
     const comparisonMode = view.comparison ? "historical_comparison" : "new_pose_baseline";
     const completionView = goalCompletionHandoff?.visualCriterionStatus === "confirmed" ? confirmedPoseCopy(view) : null;
     return ({
@@ -57,7 +59,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
   });});
   const comparedViews=activeViews.filter((view)=>!view.establishesBaseline);
   const newBaselineViews=activeViews.filter((view)=>view.establishesBaseline);
-  const synthesisFindings=semanticDeduplicate((session.synthesis?.observations??[]).map((item)=>item.change??item.description).filter(Boolean)).filter(isNaturalFinding);
+  const synthesisFindings=semanticDeduplicate((session.synthesis?.observations??[]).filter(isPublishableStructuredFinding).map((item)=>item.change??item.description).filter(Boolean)).filter(isNaturalFinding);
   const allFindings = semanticDeduplicate([...synthesisFindings,...activeViews.flatMap((view)=>view.findings)]);
   const waistFinding=find(allFindings,/waist|midsection/i);
   const waist = waistFinding ?? find(allFindings,/front shape|front silhouette/i) ?? "No meaningful session-level visual change stands out this week.";
@@ -319,6 +321,7 @@ export function derivePhotoConfidenceDomainStates({
   return { energy, weight };
 }
 function isNaturalFinding(value){return !/fallback|metadata|persist|repository|evidence|claim|comparable set|confirmed/i.test(value);}
+function isPublishableStructuredFinding(item={}){const hasSemantics=item.direction!=null||item.magnitude!=null||item.confidence!=null;if(!hasSemantics)return true;if(["unknown","insufficient"].includes(item.direction))return false;if(["unknown","low"].includes(item.confidence))return false;if(item.magnitude==="unknown")return false;return true;}
 function poseHeadline(poseId,findings){if(poseId==="front-relaxed")return find(findings,/waist|midsection|front shape|silhouette/i)??"The front shape is the primary at-rest view.";if(poseId==="back-relaxed")return find(findings,/no meaningful|stable|maintain/i)??"Overall rear shape appears stable.";if(poseId==="back-flexed")return find(findings,/no meaningful|stable|maintain|taper/i)??"Back fullness and taper appear stable.";if(poseId.includes("side"))return find(findings,/waist|profile|abdomen|conditioning/i)??"This view adds context on waist profile and side-view conditioning.";if(poseId==="front-flexed")return find(findings,/abdominal|oblique|conditioning|separation/i)??"This view adds context on abdominal separation and overall conditioning.";return find(findings,/.+/)??"This confirmed view establishes useful visual context.";}
 function poseSupportingObservations(poseId,findings){const blocked=poseId==="front-relaxed"?/silhouette|front shape|shoulder.to.waist/i:/overall shape|no meaningful/i;return semanticDeduplicate(findings.filter((value)=>!blocked.test(value))).slice(0,2);}
 function confirmedPoseCopy(view){
