@@ -8,6 +8,7 @@ import {
 } from "../models/trainingSessionEvidence";
 import {
   getCanonicalTrainingExerciseSlug,
+  normalizeExercisePhrase,
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
@@ -1438,9 +1439,16 @@ export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEv
 export function assessTypedStrengthParseCompleteness({ existingExercises = [], parsedExercises = [], typedEvidence = "" } = {}) {
   const diagnostics = getStrengthTrainingBlockParseDiagnostics(typedEvidence);
   const recognizedIdentities = [...new Set((diagnostics.recognizedExerciseMentions ?? []).map(stableExerciseIdentity).filter(Boolean))];
-  const parsedIdentities = new Set(parsedExercises.filter((exercise) => (exercise.sets ?? []).length > 0).map((exercise) => stableExerciseIdentity(exercise.name)).filter(Boolean));
+  const parsedExercisesWithSets = parsedExercises.filter((exercise) => (exercise.sets ?? []).length > 0);
+  const parsedIdentities = new Set(parsedExercisesWithSets.map((exercise) => stableExerciseIdentity(exercise.name)).filter(Boolean));
   const existingTypedIdentities = [...new Set(existingExercises.filter(hasTypedExerciseEvidence).map((exercise) => stableExerciseIdentity(exercise.name)).filter(Boolean))];
-  const missingIdentities = recognizedIdentities.filter((identity) => !parsedIdentities.has(identity));
+  const missingIdentities = recognizedIdentities.filter(
+    (identity) =>
+      !parsedIdentities.has(identity) &&
+      !parsedExercisesWithSets.some((exercise) =>
+        provisionalExercisePreservesRecognizedIdentity(exercise, identity)
+      )
+  );
   const lowerCardinality = existingTypedIdentities.length > 0 && parsedIdentities.size < existingTypedIdentities.length;
   const missingWouldDiscardExisting = existingTypedIdentities.length > 0 && missingIdentities.length > 0;
   const complete =
@@ -1457,6 +1465,19 @@ export function assessTypedStrengthParseCompleteness({ existingExercises = [], p
     missingIdentities,
     reason: complete ? "Every recognized typed exercise survived deterministic parsing with set coverage." : "Deterministic typed parsing did not preserve every recognized exercise; the existing interpreter result was retained.",
   };
+}
+
+function provisionalExercisePreservesRecognizedIdentity(exercise, recognizedIdentity) {
+  if (exercise?.canonicalExerciseId) return false;
+  const recognized = resolveTrainingExerciseIdentity(recognizedIdentity);
+  if (recognized.resolutionStatus !== "resolved_high_confidence") return false;
+
+  const parsedName = normalizeExercisePhrase(exercise?.name);
+  const recognizedName = normalizeExercisePhrase(recognized.canonicalExerciseName);
+  return (
+    parsedName.length > recognizedName.length &&
+    parsedName.endsWith(` ${recognizedName}`)
+  );
 }
 
 function stableExerciseIdentity(name) {

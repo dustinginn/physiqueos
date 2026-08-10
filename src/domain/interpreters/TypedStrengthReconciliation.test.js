@@ -22,6 +22,29 @@ const MACHINE_LATERAL_RAISE_WORKOUT = [
   "12r 130p x4",
 ].join("\n");
 
+const AUG_9_MIXED_WORKOUT = [
+  "Pull ups",
+  "13r bw",
+  "13r bw",
+  "13r bw",
+  "13r bw",
+  "",
+  "Hanging leg raises",
+  "17r bw",
+  "17r bw",
+  "17r bw",
+  "17r bw",
+  "",
+  "ISO lateral high rows",
+  "140p 18r x4",
+  "",
+  "Wide Grip Seated Cable Rows",
+  "12r 100p",
+  "12r 100p",
+  "12r 100p",
+  "12r 100p",
+].join("\n");
+
 const SPECIALIZED_LEG_PRESS_IDS = [
   "leg_press_feet_middle",
   "leg_press_feet_high",
@@ -50,6 +73,98 @@ function strengthObject(exercises = parseStrengthTrainingText(JUL_14_STRENGTH_NO
 }
 
 describe("typed strength reconciliation completeness", () => {
+  it("enriches an empty screenshot shell with the exact mixed Aug 9 workout", () => {
+    const screenshotSession = strengthObject([]);
+    screenshotSession.observed_at = "2026-08-09";
+    screenshotSession.metadata = {
+      activity_type: "Traditional Strength Training",
+      active_calories: 508,
+      duration_seconds: 4355,
+      average_heart_rate: 120,
+    };
+    const parsedExercises = parseStrengthTrainingText(AUG_9_MIXED_WORKOUT);
+    const completeness = assessTypedStrengthParseCompleteness({
+      parsedExercises,
+      typedEvidence: AUG_9_MIXED_WORKOUT,
+    });
+    const [result] = mergeTypedEvidenceIntoTrainingObjects({
+      evidenceObjects: [screenshotSession],
+      typedEvidence: AUG_9_MIXED_WORKOUT,
+    });
+
+    expect(completeness).toMatchObject({
+      complete: true,
+      missingIdentities: [],
+      parsedIdentities: [
+        "pull_up",
+        "hanging_leg_raise",
+        "iso_lateral_high_row",
+        "wide_grip_seated_cable_rows",
+      ],
+      recognizedIdentities: [
+        "pull_up",
+        "hanging_leg_raise",
+        "seated_cable_row",
+      ],
+      status: "complete",
+    });
+    expect(result.metadata).toMatchObject(screenshotSession.metadata);
+    expect(result.exercises.map((exercise) => exercise.name)).toEqual([
+      "Pull-Ups",
+      "Hanging Leg Raises",
+      "Iso-Lateral High Rows",
+      "Wide Grip Seated Cable Rows",
+    ]);
+    expect(result.exercises.map((exercise) => exercise.canonicalExerciseId)).toEqual([
+      "pull_up",
+      "hanging_leg_raise",
+      "iso_lateral_high_row",
+      null,
+    ]);
+    expect(result.exercises.map((exercise) => exercise.sets.length)).toEqual([4, 4, 4, 4]);
+    expect(result.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(16);
+    expect(result.exercises[0].sets).toEqual(
+      Array(4).fill(expect.objectContaining({ reps: 13, load_type: "bodyweight", weight: null }))
+    );
+    expect(result.exercises[1].sets).toEqual(
+      Array(4).fill(expect.objectContaining({ reps: 17, load_type: "bodyweight", weight: null }))
+    );
+    expect(result.exercises[2].sets).toEqual(
+      Array(4).fill(expect.objectContaining({ reps: 18, weight: 140, weight_unit: "lb" }))
+    );
+    expect(result.exercises[3]).toMatchObject({
+      canonicalExerciseId: null,
+      resolutionStatus: "unresolved_provisional",
+      provisionalExercise: {
+        resolutionStatus: "unresolved",
+      },
+    });
+    expect(result.exercises[3].sets).toEqual(
+      Array(4).fill(expect.objectContaining({ reps: 12, weight: 100, weight_unit: "lb" }))
+    );
+
+    const presentation = createEvidenceReviewPresentation({
+      evidencePackage: {
+        evidence_objects: [result],
+        provenance: {
+          source_artifacts: [
+            { id: "IMG_1843.png", kind: "image" },
+            { id: "typed_evidence_0", kind: "typed_evidence", text: AUG_9_MIXED_WORKOUT },
+          ],
+        },
+      },
+    });
+    expect(presentation.items).toHaveLength(1);
+    expect(presentation.items[0].exercises.map((exercise) => exercise.name)).toEqual([
+      "Pull-Ups",
+      "Hanging Leg Raises",
+      "Iso-Lateral High Rows",
+      "Wide Grip Seated Cable Rows",
+    ]);
+    expect(presentation.items[0].exercises.slice(0, 3).every((exercise) => !exercise.provisionalExerciseId)).toBe(true);
+    expect(presentation.items[0].exercises[3].provisionalExerciseId).toMatch(/^provisional_exercise_/);
+  });
+
   it("merges the exact machine lateral-raise workout into an empty screenshot session", () => {
     const emptyScreenshotSession = strengthObject([]);
     const parsedExercises = parseStrengthTrainingText(MACHINE_LATERAL_RAISE_WORKOUT);

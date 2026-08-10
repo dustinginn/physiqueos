@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEvidenceReviewRepository } from "../../data/repositories/EvidenceReviewRepository";
 import { createEvidencePackageRepository } from "../../data/repositories/EvidencePackageRepository";
 import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
+import { mergeTypedEvidenceIntoTrainingObjects } from "../interpreters/ScreenshotInterpreterService";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
 import { JUL_25_STRENGTH_NOTE } from "../../fixtures/jul25TrainingEvidenceFixture";
 import {
@@ -54,6 +55,80 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("reprocesses the mixed Aug 9 screenshot shell with all typed movement detail", async () => {
+    const typedText = [
+      "Pull ups",
+      "13r bw",
+      "13r bw",
+      "13r bw",
+      "13r bw",
+      "",
+      "Hanging leg raises",
+      "17r bw",
+      "17r bw",
+      "17r bw",
+      "17r bw",
+      "",
+      "ISO lateral high rows",
+      "140p 18r x4",
+      "",
+      "Wide Grip Seated Cable Rows",
+      "12r 100p",
+      "12r 100p",
+      "12r 100p",
+      "12r 100p",
+    ].join("\n");
+    const state = fixture({
+      sources: [
+        { id: "typed_evidence_0", kind: "typed_evidence", text: typedText },
+        { id: "IMG_1843.png", kind: "screenshot", storage_path: "private/founder/evidence/uploads/IMG_1843.png" },
+      ],
+    });
+    const screenshotShell = {
+      ...trainingObject([]),
+      observed_at: "2026-08-09",
+      metadata: {
+        activity_type: "Traditional Strength Training",
+        duration_seconds: 4355,
+        active_calories: 508,
+        average_heart_rate: 120,
+      },
+    };
+    state.review.interpretedEvidence.evidence_objects = [structuredClone(screenshotShell)];
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret: async (sourcePackage) => ({
+        ...structuredClone(sourcePackage),
+        evidence_objects: mergeTypedEvidenceIntoTrainingObjects({
+          evidenceObjects: [structuredClone(screenshotShell)],
+          typedEvidence: typedText,
+        }),
+      }),
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+    const [session] = result.review.interpretedEvidence.evidence_objects;
+
+    expect(result.review).toMatchObject({ status: "pending", confirmation: null });
+    expect(session.metadata).toMatchObject(screenshotShell.metadata);
+    expect(session.exercises.map((exercise) => [
+      exercise.name,
+      exercise.canonicalExerciseId,
+      exercise.sets.length,
+    ])).toEqual([
+      ["Pull-Ups", "pull_up", 4],
+      ["Hanging Leg Raises", "hanging_leg_raise", 4],
+      ["Iso-Lateral High Rows", "iso_lateral_high_row", 4],
+      ["Wide Grip Seated Cable Rows", null, 4],
+    ]);
+    expect(session.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(16);
+    expect(session.exercises[3]).toMatchObject({
+      resolutionStatus: "unresolved_provisional",
+      provisionalExercise: { resolutionStatus: "unresolved" },
+    });
+    expect(state.repositories.canonicalEvidence.listCanonicalEvidenceObjects).toHaveBeenCalledTimes(1);
+  });
+
   it("runs once when an earlier completed parser version has the same source fingerprint", async () => {
     const state = fixture();
     const reinterpret = vi.fn(async () => correctedPackage(state.evidencePackage));
