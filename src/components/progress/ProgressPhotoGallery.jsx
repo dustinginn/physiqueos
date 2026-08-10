@@ -67,7 +67,8 @@ export default function ProgressPhotoGallery({
       {!triggerOnly && <>
       {latestPhotoSet && (
         <><PhotoSetCard label="Latest Photo Set" photoSet={latestPhotoSet} size="large" />
-        {latestPhotoSet.sourceMode === "canonical" && <Link className="mt-2 flex w-full items-center justify-center rounded-[14px] bg-[var(--primary)] px-4 py-3 text-sm font-extrabold text-white" href={`/briefings/photo/${latestPhotoSet.photoSessionId ?? latestPhotoSet.id}`}>Read Photo Briefing</Link>}</>
+        {latestPhotoSet.sourceMode === "canonical" && latestPhotoSet.photoBriefingHref && <Link className="mt-2 flex w-full items-center justify-center rounded-[14px] bg-[var(--primary)] px-4 py-3 text-sm font-extrabold text-white" href={latestPhotoSet.photoBriefingHref}>Read Photo Briefing</Link>}
+        {latestPhotoSet.sourceMode === "canonical" && !latestPhotoSet.photoBriefingHref && <p className="mt-2 rounded-[14px] bg-[var(--surface-muted)] px-4 py-3 text-center text-sm font-extrabold text-slate-500" role="status">Photo briefing is being finalized.</p>}</>
       )}
 
       <div className="mt-4">

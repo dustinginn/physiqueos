@@ -19,6 +19,14 @@ export async function getPhotosTimelineReport({
   const report = await createProgressReportingService({
     repositories,
   }).getPlaceholderReport("photos", undefined, { photoSessionWindow });
+  const user = await repositories.users.getCurrentUser();
+  const artifacts = user && repositories.dailyBriefings?.listDailyBriefings
+    ? await repositories.dailyBriefings.listDailyBriefings(user.id)
+    : [];
+  const publicationAwareReport = attachPhotoBriefingPublication({
+    report,
+    artifacts,
+  });
 
   return {
     timeline: Object.freeze({
@@ -35,7 +43,39 @@ export async function getPhotosTimelineReport({
           ? "canonical_photo_history"
           : "goal_lifecycle_with_photo_baseline",
     }),
-    report,
+    report: publicationAwareReport,
+  };
+}
+
+export function attachPhotoBriefingPublication({ report, artifacts = [] }) {
+  const publishedSessionIds = new Set(
+    artifacts
+      .filter((item) =>
+        item.artifactType === "event" &&
+        item.trigger?.evidenceType === "photo_session" &&
+        item.briefing?.photoEventNarrative
+      )
+      .map((item) => item.trigger.evidenceId)
+  );
+  const annotate = (photoSet) => {
+    if (!photoSet) return null;
+    const sessionId = photoSet.photoSessionId ?? photoSet.id;
+    return {
+      ...photoSet,
+      photoBriefingHref: publishedSessionIds.has(sessionId)
+        ? `/briefings/photo/${sessionId}`
+        : null,
+    };
+  };
+  const photoSets = (report.photoSets ?? []).map(annotate);
+  const latestPhotoSet = photoSets.find((item) =>
+    item.id === report.latestPhotoSet?.id
+  ) ?? annotate(report.latestPhotoSet);
+
+  return {
+    ...report,
+    latestPhotoSet,
+    photoSets,
   };
 }
 

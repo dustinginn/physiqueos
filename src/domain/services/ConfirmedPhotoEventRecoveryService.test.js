@@ -44,4 +44,29 @@ describe("ConfirmedPhotoEventRecoveryService", () => {
     });
     expect(repositories.evidenceReviews.updateReview).not.toHaveBeenCalled();
   });
+
+  it("repairs a missing artifact even when the confirmed review markers are complete", async () => {
+    const { repositories, state } = fixture();
+    state.review = {
+      ...state.review,
+      status: "confirmed",
+      commitProgress: {
+        ...state.review.commitProgress,
+        briefing: { status: "completed", attempts: 1 },
+        home_refresh: { status: "completed", attempts: 1 },
+      },
+    };
+
+    const result = await createConfirmedPhotoEventRecoveryService({
+      repositories,
+    }).inspect({ reviewId: "review", userId: "user" });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      existingArtifact: null,
+      firstIncompleteStep: "briefing",
+      artifactId:
+        "event_briefing_progress_photo_photo_session_user_2026-07-18",
+    });
+  });
 });

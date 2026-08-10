@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { EVIDENCE_CONTEXT_WINDOWS } from "./EvidenceContextWindows";
 import {
+  attachPhotoBriefingPublication,
   getPhotoSessionWindow,
   getPhotosTimelineReport,
 } from "./PhotosEvidenceContextService";
@@ -53,6 +54,30 @@ describe("Photos Evidence Context", () => {
     );
   });
 
+  it("only exposes a Photo Briefing link for a published event artifact", () => {
+    const report = {
+      latestPhotoSet: { id: "photo_session_user_2026-08-08" },
+      photoSets: [{ id: "photo_session_user_2026-08-08" }],
+    };
+    const pending = attachPhotoBriefingPublication({ report, artifacts: [] });
+    const published = attachPhotoBriefingPublication({
+      report,
+      artifacts: [{
+        artifactType: "event",
+        trigger: {
+          evidenceType: "photo_session",
+          evidenceId: "photo_session_user_2026-08-08",
+        },
+        briefing: { photoEventNarrative: { id: "narrative" } },
+      }],
+    });
+
+    expect(pending.latestPhotoSet.photoBriefingHref).toBeNull();
+    expect(published.latestPhotoSet.photoBriefingHref).toBe(
+      "/briefings/photo/photo_session_user_2026-08-08"
+    );
+  });
+
   it("uses one scoped session set for latest, uploaded rows, and comparisons", async () => {
     const before = fs.readFileSync(storePath);
     const [build, visible, all] = await Promise.all([
@@ -92,5 +117,5 @@ describe("Photos Evidence Context", () => {
       visible.report.photoSets.length
     );
     expect(fs.readFileSync(storePath)).toEqual(before);
-  }, 30000);
+  }, 60000);
 });

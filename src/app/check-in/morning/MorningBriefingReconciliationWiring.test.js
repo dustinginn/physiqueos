@@ -10,15 +10,14 @@ const screen = fs.readFileSync(
 
 describe("Morning Check-In briefing reconciliation wiring", () => {
   it("blocks finalization while canonical evidence still awaits confirmation", () => {
-    expect(actions).toContain("PENDING_CONFIRMATION");
     expect(actions).toContain("briefingUpdate=waiting");
-    expect(actions.indexOf("PENDING_CONFIRMATION"))
-      .toBeLessThan(actions.indexOf(".finalizePending"));
+    expect(actions).toContain("createFounderMorningBriefingFinalizationService");
   });
 
-  it("uses one explicit bounded finalization action instead of page-read generation", () => {
+  it("uses one bounded finalization path after persistence and for explicit retry", () => {
     expect(actions).toContain("finalizeMorningBriefingReconciliation");
-    expect(actions).toContain(".finalizePending");
+    expect(actions.match(/\.finalize\(\{ userId: user\.id, timeZone, at: now \}\)/g))
+      .toHaveLength(2);
     expect(page).toContain(
       "briefingFinalizationAction={finalizeMorningBriefingReconciliation}"
     );

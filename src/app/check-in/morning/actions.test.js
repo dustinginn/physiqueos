@@ -29,7 +29,7 @@ describe("Morning Check-In reconciliation action wiring", () => {
       source.match(
         /resolveLocalTimeZone\(user\.timeZone \?\? user\.timezone\)/g
       )
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(source).toContain("getLocalDateKey(now, timeZone)");
   });
 
@@ -43,5 +43,18 @@ describe("Morning Check-In reconciliation action wiring", () => {
     expect(source).not.toMatch(
       /FounderRepositories\.(weights|dailyCheckIns|canonicalEvidence|analyses|reminders)\./
     );
+  });
+
+  it("runs retryable briefing finalization only after the atomic Morning save resolves", () => {
+    const persistenceSave = source.indexOf("const result = await service.save");
+    const briefingFinalization = source.indexOf(
+      "await createFounderMorningBriefingFinalizationService",
+      persistenceSave
+    );
+
+    expect(persistenceSave).toBeGreaterThan(-1);
+    expect(briefingFinalization).toBeGreaterThan(persistenceSave);
+    expect(source).toContain("Briefing finalization remains retryable");
+    expect(source).toContain("briefingFinalization.attempted > 0");
   });
 });

@@ -19,38 +19,26 @@ import {
   createMorningPriorityReconciliationService,
 } from "../../../domain/services/MorningPriorityReconciliationService";
 import {
-  MORNING_EVIDENCE_RECOVERY_STATUSES,
-} from "../../../domain/services/MorningEvidenceRecoveryService";
-import {
-  createFounderBriefingReconciliationService,
-} from "../../../domain/services/FounderBriefingReconciliationService";
+  createFounderMorningBriefingFinalizationService,
+} from "../../../domain/services/MorningBriefingFinalizationService";
 
 export async function finalizeMorningBriefingReconciliation() {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) throw new Error("Founder user is not available.");
   const now = new Date();
   const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
-  const selection = await createMorningPriorityReconciliationService({
+  const result = await createFounderMorningBriefingFinalizationService({
     repositories: FounderRepositories,
     now: () => now,
-  }).getSelection({ userId: user.id, timeZone, at: now });
-  if (selection.evidenceRecoveryItems.some((item) =>
-    item.status === MORNING_EVIDENCE_RECOVERY_STATUSES.PENDING_CONFIRMATION
-  )) {
+  }).finalize({ userId: user.id, timeZone, at: now });
+  if (result.status === "waiting") {
     redirect("/check-in/morning?briefingUpdate=waiting");
   }
-  const result = await createFounderBriefingReconciliationService({
-    repositories: FounderRepositories,
-    now: () => now,
-  }).finalizePending({
-    userId: user.id,
-    evidenceDate: selection.window.previousLocalDate,
-  });
   revalidatePath("/");
   revalidatePath("/check-in/morning");
   revalidatePath("/briefings/weekly");
   revalidatePath("/briefings/review");
-  redirect(result.failed > 0
+  redirect(result.status === "failed"
     ? "/check-in/morning?briefingUpdate=failed"
     : "/briefings/weekly?briefingUpdate=current");
 }
@@ -143,6 +131,38 @@ export async function saveMorningCheckIn(formData) {
     reconciliationSubmissions:
       parseMorningPriorityReconciliationFormData(formData),
   });
+
+  let briefingFinalization;
+  try {
+    briefingFinalization =
+      await createFounderMorningBriefingFinalizationService({
+        repositories: FounderRepositories,
+        now: () => now,
+      }).finalize({ userId: user.id, timeZone, at: now });
+  } catch (error) {
+    console.warn("[MorningCheckIn] Briefing finalization remains retryable.", {
+      code: error?.code ?? "BRIEFING_FINALIZATION_FAILED",
+      message: String(error?.message ?? error),
+    });
+    briefingFinalization = { status: "failed", attempted: 0 };
+  }
+
+  if (briefingFinalization.status === "waiting") {
+    revalidatePath("/check-in/morning");
+    redirect("/check-in/morning?weight=saved&briefingUpdate=waiting");
+  }
+  if (briefingFinalization.status === "failed") {
+    revalidatePath("/");
+    revalidatePath("/check-in/morning");
+    redirect("/check-in/morning?weight=saved&briefingUpdate=failed");
+  }
+  if (briefingFinalization.attempted > 0) {
+    revalidatePath("/");
+    revalidatePath("/check-in/morning");
+    revalidatePath("/briefings/weekly");
+    revalidatePath("/briefings/review");
+    redirect("/briefings/weekly?weight=saved&briefingUpdate=current");
+  }
 
   if (result.status === "unchanged") {
     redirect("/?weight=unchanged");

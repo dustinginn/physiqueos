@@ -29,6 +29,8 @@ describe("Photos Evidence Context production presentation", () => {
 
   it("preserves briefing, gallery, complete session views, and existing styling", () => {
     expect(gallery).toContain("Read Photo Briefing");
+    expect(gallery).toContain("photoBriefingHref");
+    expect(gallery).toContain("Photo briefing is being finalized.");
     expect(gallery).toContain("selectedSessionRecords");
     expect(gallery).toContain("Open gallery");
     expect(gallery).not.toContain("TrainingTimelineSelector");

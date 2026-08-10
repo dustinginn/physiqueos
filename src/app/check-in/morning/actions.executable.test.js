@@ -15,7 +15,17 @@ const actionHarness = vi.hoisted(() => ({
   faults: {},
   liveStore: null,
   runtimeStorePath: null,
+  briefingFinalization: null,
 }));
+
+vi.mock(
+  "../../../domain/services/MorningBriefingFinalizationService",
+  () => ({
+    createFounderMorningBriefingFinalizationService: () => ({
+      finalize: (...args) => actionHarness.briefingFinalization(...args),
+    }),
+  })
+);
 
 const directories = [];
 
@@ -68,6 +78,12 @@ beforeEach(() => {
   actionHarness.redirect.mockReset();
   actionHarness.revalidatePath.mockReset();
   actionHarness.faults = {};
+  actionHarness.briefingFinalization = vi.fn(async () => ({
+    status: "current",
+    attempted: 0,
+    completed: 0,
+    failed: 0,
+  }));
   actionHarness.redirectSignal = new Error("NEXT_REDIRECT");
   actionHarness.redirect.mockImplementation(() => {
     throw actionHarness.redirectSignal;

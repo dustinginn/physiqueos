@@ -14,6 +14,12 @@ import {
 import {
   createBriefingReconciliationEnqueueService,
 } from "./BriefingReconciliationEnqueueService";
+import {
+  createMorningBriefingFinalizationService,
+} from "./MorningBriefingFinalizationService";
+import {
+  createConfirmedPhotoEventRecoveryService,
+} from "./ConfirmedPhotoEventRecoveryService";
 
 const USER = "founder";
 const CONFIRMED_AT = "2026-08-09T22:08:15.055Z";
@@ -241,6 +247,174 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       .toMatchObject({ completed: 1, failed: 0 });
     expect(items[0].status).toBe("current_after_revision");
     expect(cadence.executePreparedRegeneration).toHaveBeenCalledTimes(2);
+  });
+
+  it("finalizes one Weekly and one deferred Photo Event without duplicate roots or extra Confidence work", async () => {
+    const weekly = weeklyPublication();
+    const workItems = [pendingWorkItem()];
+    const photoSessionId = "photo_session_founder_2026-08-08";
+    const photoEventId = `event_briefing_progress_photo_${photoSessionId}`;
+    const canonicalEvidenceObjects = [{
+      canonicalId: photoSessionId,
+      evidence_type: "photo_session",
+      lastObservedAt: "2026-08-08",
+      quality: { status: "active" },
+    }];
+    const confidence = [{ id: "confidence-current", score: 59 }];
+    const review = {
+      id: "photo-review",
+      userId: USER,
+      status: "confirmed",
+      interpretedEvidence: {
+        package_id: "photo-package",
+        evidence_objects: [{
+          evidence_type: "photo_session",
+          observed_at: "2026-08-08",
+        }],
+      },
+      commitProgress: Object.fromEntries([
+        "canonical_commit",
+        "compatibility_writes",
+        "scheduled_completion",
+        "analysis",
+        "goal_evaluation",
+        "event_eligibility",
+        "briefing",
+        "home_refresh",
+      ].map((step) => [step, { status: "completed", attempts: 1 }])),
+    };
+    const state = {
+      dailyBriefings: [weekly],
+      review,
+    };
+    let confidenceFinalizations = 0;
+    const revised = {
+      ...structuredClone(weekly),
+      generatedAt: "2026-08-10T02:00:00.000Z",
+      dependencyManifest: {
+        fingerprint: "sha256_revised_combined",
+        canonicalDependencies: workItems[0].affectedDependencies,
+      },
+      replacedBriefingHistory: [{
+        artifact: structuredClone(weekly),
+        reason: "late_evidence_reconciliation",
+      }],
+    };
+    const repositories = {
+      briefingReconciliationWorkItems: {
+        listWorkItems: async () => structuredClone(workItems),
+      },
+      dailyBriefings: {
+        listDailyBriefings: async () => state.dailyBriefings,
+      },
+      evidenceReviews: {
+        getReviewById: async () => state.review,
+        updateReview: async (_id, patch) => {
+          state.review = { ...state.review, ...structuredClone(patch) };
+          return state.review;
+        },
+      },
+    };
+    const briefingService = createFounderBriefingReconciliationService({
+      repositories,
+      persistence: {
+        saveWorkItem: async (item) =>
+          workItems.splice(0, 1, structuredClone(item)),
+      },
+      cadenceServices: {
+        weekly: {
+          prepareRegeneration: vi.fn(async () => ({ status: "prepared" })),
+          executePreparedRegeneration: vi.fn(async () => {
+            confidenceFinalizations += 1;
+            state.dailyBriefings.splice(0, 1, revised);
+            return { status: "regenerated", committed: true, artifact: revised };
+          }),
+        },
+      },
+      now: sequenceClock("2026-08-10T02:00:00.000Z"),
+    });
+    const morningFinalization = createMorningBriefingFinalizationService({
+      priorityService: {
+        getSelection: async () => ({
+          window: { previousLocalDate: "2026-08-08" },
+          evidenceRecoveryItems: [],
+        }),
+      },
+      briefingService,
+    });
+    const photoRecovery = createConfirmedPhotoEventRecoveryService({
+      repositories,
+      photoEventService: {
+        getOrCreateResult: async () => {
+          const existing = state.dailyBriefings.find((item) =>
+            item.id === photoEventId
+          );
+          if (existing) return {
+            status: "completed",
+            artifact: existing,
+            artifactId: existing.id,
+            sessionId: photoSessionId,
+            created: false,
+          };
+          const artifact = {
+            id: photoEventId,
+            userId: USER,
+            artifactType: "event",
+            cadence: "event",
+            generatedAt: "2026-08-10T02:00:05.000Z",
+            trigger: {
+              evidenceType: "photo_session",
+              evidenceId: photoSessionId,
+            },
+            briefing: {
+              photoEventNarrative: { eventDate: "2026-08-08" },
+            },
+          };
+          state.dailyBriefings.push(artifact);
+          return {
+            status: "completed",
+            artifact,
+            artifactId: artifact.id,
+            sessionId: photoSessionId,
+            created: true,
+          };
+        },
+      },
+      now: sequenceClock("2026-08-10T02:00:05.000Z"),
+    });
+
+    expect(await morningFinalization.finalize({
+      userId: USER,
+      timeZone: "America/Los_Angeles",
+      at: new Date("2026-08-10T02:00:00.000Z"),
+    })).toMatchObject({ status: "completed", attempted: 1, completed: 1 });
+    expect(await photoRecovery.recover({
+      reviewId: review.id,
+      userId: USER,
+    })).toMatchObject({ status: "completed", created: true });
+    expect(await morningFinalization.finalize({
+      userId: USER,
+      timeZone: "America/Los_Angeles",
+      at: new Date("2026-08-10T02:00:10.000Z"),
+    })).toMatchObject({ status: "current", attempted: 0 });
+    expect(await photoRecovery.recover({
+      reviewId: review.id,
+      userId: USER,
+    })).toMatchObject({ status: "completed", created: false });
+
+    expect(state.dailyBriefings.filter((item) => item.id === ROOT))
+      .toHaveLength(1);
+    expect(state.dailyBriefings.find((item) => item.id === ROOT)
+      .replacedBriefingHistory).toHaveLength(1);
+    expect(state.dailyBriefings.filter((item) => item.id === photoEventId))
+      .toHaveLength(1);
+    expect(state.dailyBriefings.find((item) => item.id === photoEventId)
+      .briefing.photoEventNarrative.eventDate).toBe("2026-08-08");
+    expect(workItems).toHaveLength(1);
+    expect(workItems[0].status).toBe("current_after_revision");
+    expect(canonicalEvidenceObjects).toHaveLength(1);
+    expect(confidence).toEqual([{ id: "confidence-current", score: 59 }]);
+    expect(confidenceFinalizations).toBe(1);
   });
 
   it("presents pending, blocked, failed, and completed states without exposing work IDs", () => {

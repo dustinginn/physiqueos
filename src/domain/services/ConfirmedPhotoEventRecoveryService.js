@@ -10,7 +10,11 @@ const REQUIRED_COMPLETED_STEPS = [
   "event_eligibility",
 ];
 
-export function createConfirmedPhotoEventRecoveryService({ repositories, now = () => new Date() }) {
+export function createConfirmedPhotoEventRecoveryService({
+  repositories,
+  now = () => new Date(),
+  photoEventService = createPhotoEventNarrativeService({ repositories, now }),
+}) {
   return {
     async inspect({ reviewId, userId }) {
       const review = await repositories.evidenceReviews.getReviewById(reviewId);
@@ -35,7 +39,7 @@ export function createConfirmedPhotoEventRecoveryService({ repositories, now = (
         sessionId,
         artifactId,
         existingArtifact: existing,
-        firstIncompleteStep: review.commitProgress?.briefing?.status !== "completed"
+        firstIncompleteStep: !existing || review.commitProgress?.briefing?.status !== "completed"
           ? "briefing"
           : review.commitProgress?.home_refresh?.status !== "completed"
             ? "home_refresh"
@@ -58,8 +62,8 @@ export function createConfirmedPhotoEventRecoveryService({ repositories, now = (
       }
       let artifact = inspection.existingArtifact;
       let created = false;
-      if (inspection.review.commitProgress?.briefing?.status !== "completed" || refreshArtifact) {
-        const result = await createPhotoEventNarrativeService({ repositories, now }).getOrCreateResult({
+      if (inspection.firstIncompleteStep === "briefing" || refreshArtifact) {
+        const result = await photoEventService.getOrCreateResult({
           userId,
           sessionId: inspection.sessionId,
         });

@@ -24,7 +24,10 @@ import { normalizePhotoInterpretationToStructuredObservations } from "../../../.
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
 import { createFounderDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
-import { createFounderPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
+import {
+  createFounderPhotoEventNarrativeService,
+  createPhotoEventNarrativeService,
+} from "../../../../domain/services/PhotoEventNarrativeService";
 import { filterEligibleEventBriefingTypes, resolveEventBriefingPreferencesFromStore } from "../../../../domain/services/CoachingUpdatesReadService";
 import {
   createPhotoInterpreterGoalContext,
@@ -631,9 +634,12 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           } catch (error) {
             if (error?.code === "canonical_goal_objective_incomplete") {
               deferredReasons.push(error.code);
-              continue;
+              result = await createPhotoEventNarrativeService({
+                repositories: FounderRepositories,
+              }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+            } else {
+              throw error;
             }
-            throw error;
           }
           if (result.status !== "completed" || !result.artifactId) {
             throw new Error(`${result.code ?? "photo_event_briefing_failed"}: ${result.message ?? "Photo Event briefing was not created."}`);

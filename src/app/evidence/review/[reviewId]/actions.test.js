@@ -195,6 +195,21 @@ vi.mock("../../../../domain/services/PhotoEventNarrativeService", () => ({
       };
     },
   }),
+  createPhotoEventNarrativeService: () => ({
+    async getOrCreateResult({ sessionId }) {
+      const state = mockState.value;
+      state.photoNarrativeWithoutConfidenceCalls =
+        (state.photoNarrativeWithoutConfidenceCalls ?? 0) + 1;
+      const artifactId = `event_briefing_progress_photo_${sessionId}`;
+      return state.photoNarrativeWithoutConfidenceResult ?? {
+        status: "completed",
+        artifactId,
+        artifact: { id: artifactId },
+        sessionId,
+        created: true,
+      };
+    },
+  }),
 }));
 
 vi.mock("../../../../domain/services/TrainingPerformanceEventPersistenceService", () => ({
@@ -353,6 +368,17 @@ function createBriefingFailedPhotoReviewState(store) {
       (item) => item.id === "evidence_review_20260810005949415"
     )
   );
+  review.status = "partially_committed";
+  review.commitError = "briefing: prior publication failure";
+  review.commitProgress.briefing = {
+    status: "failed",
+    attempts: 2,
+    retryable: true,
+  };
+  review.commitProgress.home_refresh = {
+    status: "pending",
+    attempts: 0,
+  };
   return {
     user: structuredClone(store.user),
     evidenceReviews: [review],
@@ -496,7 +522,7 @@ describe("confirmEvidenceReview", () => {
     expect(redirect).not.toHaveBeenCalledWith("/check-in/morning");
   });
 
-  it("completes the live paused photo lifecycle when its event is not Confidence-eligible", async () => {
+  it("publishes the Photo Event without Confidence when the goal contract is ineligible", async () => {
     mockState.value = createBriefingFailedPhotoReviewState(runtimeStore);
     const review = mockState.value.evidenceReviews[0];
     mockState.value.photoNarrativeError = Object.assign(
@@ -512,14 +538,18 @@ describe("confirmEvidenceReview", () => {
     const completed = mockState.value.evidenceReviews[0];
     expect(mockState.value.canonicalCommitCalls).toBe(0);
     expect(mockState.value.photoNarrativeCalls).toBe(1);
+    expect(mockState.value.photoNarrativeWithoutConfidenceCalls).toBe(1);
     expect(completed.status).toBe("confirmed");
     expect(completed.commitProgress.briefing).toMatchObject({
       status: "completed",
       attempts: 3,
       result: {
         status: "completed",
-        freshness: "event_deferred",
+        freshness: "event_generated",
         deferredReasons: ["canonical_goal_objective_incomplete"],
+        artifactIds: [
+          "event_briefing_progress_photo_photo_session_user_founder_001_2026-08-08",
+        ],
       },
     });
     expect(completed.commitProgress.home_refresh.status).toBe("completed");
@@ -532,6 +562,7 @@ describe("confirmEvidenceReview", () => {
 
     expect(mockState.value.evidenceReviews[0]).toEqual(completedSnapshot);
     expect(mockState.value.photoNarrativeCalls).toBe(1);
+    expect(mockState.value.photoNarrativeWithoutConfidenceCalls).toBe(1);
     expect(redirect).toHaveBeenCalledWith("/check-in/morning");
   });
 
