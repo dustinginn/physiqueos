@@ -277,7 +277,10 @@ function presentDexa(object, common) {
 function presentPhotos(object, common) {
   const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
   const poseSummary = formatPhotoPoseSummary(photos);
-  return { ...common, title: "Progress Photos", noun: "photo session", metrics: compact([metric("Poses", poseSummary), metric("Source", common.sourceLabel)]), photoPoseSummary: poseSummary };
+  const timeOfDay = object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay;
+  const timeLabel = timeOfDay ? `${capitalize(timeOfDay)}${object.captureMetadata?.status === "inferred" ? " · From image metadata" : ""}` : "Needs session review";
+  const goalLabel = object.goalRelationship?.goalLabel ?? (object.goalRelationship?.status === "resolved" ? "Linked Goal" : "Needs session review");
+  return { ...common, title: "Progress Photos", noun: "photo session", metrics: compact([metric("Poses", poseSummary), metric("Time of day", timeLabel), metric("Goal relationship", goalLabel), metric("Source", common.sourceLabel)]), photoPoseSummary: poseSummary };
 }
 
 export function formatPhotoPoseSummary(photos = []) {
@@ -325,3 +328,4 @@ function metric(label, value) { return value ? { label, value } : null; }
 function compact(values) { return values.filter(Boolean); }
 function unique(values) { return [...new Set(values.filter(Boolean).map(String))]; }
 function labelize(value) { return String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()); }
+function capitalize(value) { const text=String(value??""); return text ? text[0].toUpperCase()+text.slice(1) : text; }

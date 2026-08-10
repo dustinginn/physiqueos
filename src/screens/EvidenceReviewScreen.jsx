@@ -31,7 +31,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const [nutritionDispositions, setNutritionDispositions] = useState(() =>
@@ -49,6 +49,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   const canEdit = ["pending", "commit_failed"].includes(status);
   const canContinue = hasCommitFailure(review);
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
+  const blockingPhotoSessionMetadata = presentation.items.some((item) => item.included && hasIncompletePhotoSessionMetadata(item.object));
   const evidenceWithLocalDecisions = {
     ...evidencePackage,
     evidence_objects: (evidencePackage.evidence_objects ?? []).map((object) => ({
@@ -113,7 +114,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} photoSessionMetadataAction={photoSessionMetadataAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -158,6 +159,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           )}
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
           {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
+          {blockingPhotoSessionMetadata && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review the shared photo-session details before saving.</p>}
           {blockingExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{blockingExercises.length} exercise {blockingExercises.length === 1 ? "identity needs" : "identities need"} details before this workout can be saved.</p>}
           {blockingStructuralIssues.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review or remove the unresolved Superset structure before saving.</p>}
           {blockingNutrition.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose how to update the existing Nutrition Day before saving.</p>}
@@ -170,7 +172,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
+            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue || blockingPhotoSessionMetadata))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
@@ -186,7 +188,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, photoSessionMetadataAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -338,7 +340,7 @@ function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantActi
         </section>
       )}
 
-      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} object={item.object} recoveryContext={recoveryContext} review={review} />}
+      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} metadataAction={photoSessionMetadataAction} object={item.object} recoveryContext={recoveryContext} review={review} />}
       <button
         aria-label={`${item.included ? "Exclude" : "Include"} ${item.title} ${item.date ?? ""}`.trim()}
         className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-extrabold text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-accent)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -693,9 +695,10 @@ function EvidenceSavedScreen({ experience, trainingAchievements }) {
   );
 }
 
-function PhotoPreviews({ action, canEdit, object, recoveryContext, review }) {
+function PhotoPreviews({ action, canEdit, metadataAction, object, recoveryContext, review }) {
   const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
   return <section aria-label="Photo pose review" className="space-y-4">
+    {(object.captureMetadata || object.goalRelationship) && <PhotoSessionMetadataReview action={metadataAction} canEdit={canEdit} object={object} recoveryContext={recoveryContext} review={review} />}
     <div>
       <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Match each photo to its pose</h3>
       <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">Each selection stays attached to this uploaded image.</p>
@@ -733,6 +736,22 @@ function PhotoPreviews({ action, canEdit, object, recoveryContext, review }) {
 }
 function PhotoPoseSaveButton({ disabled }) { const { pending } = useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? "Saving pose\u2026" : "Save pose"}</button>; }
 
+function PhotoSessionMetadataReview({ action, canEdit, object, recoveryContext, review }) {
+  const captureNeedsReview = object.captureMetadata?.status === "needs_review";
+  const goalNeedsReview = object.goalRelationship?.status === "needs_review";
+  if (!captureNeedsReview && !goalNeedsReview) return <div className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-3"><p className="text-xs font-extrabold text-[var(--text-primary)]">Shared session details</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{formatSessionTime(object)} · {object.goalRelationship?.goalLabel ?? "No Goal relationship"}</p></div>;
+  const options = object.goalRelationship?.options ?? [];
+  return <form action={action} className="space-y-3 rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
+    <div><p className="text-xs font-extrabold text-[var(--text-primary)]">Shared session details</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">These values apply once to every photo in this capture session.</p></div>
+    <input name="reviewId" type="hidden" value={review.id}/><input name="expectedUpdatedAt" type="hidden" value={review.updatedAt}/><input name="evidenceObjectId" type="hidden" value={object.id}/><EvidenceRecoveryContextFields context={recoveryContext}/>
+    {captureNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Time of day<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" name="timeOfDay" required><option disabled value="">Choose time of day</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></label> : <input name="timeOfDay" type="hidden" value={object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? ""}/>}
+    {goalNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Goal relationship<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" name="goalId" required={options.length > 0}><option value="">{options.length ? "Choose Goal" : "No Goal relationship"}</option>{options.map((goal)=><option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label> : <input name="goalId" type="hidden" value={object.goalRelationship?.goalIds?.[0] ?? ""}/>}
+    <PhotoSessionMetadataSaveButton disabled={!canEdit || !action}/>
+  </form>;
+}
+function PhotoSessionMetadataSaveButton({ disabled }) { const { pending }=useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:opacity-40" disabled={disabled||pending} type="submit">{pending?"Saving session details\u2026":"Save session details"}</button>; }
+function formatSessionTime(object) { const time=object.captureMetadata?.timeOfDay??object.conditions?.timeOfDay; const label=time?`${time[0].toUpperCase()}${time.slice(1)}`:"Time unavailable"; return object.captureMetadata?.status==="inferred"?`${label} · Inferred from image metadata`:label; }
+
 function EvidenceRecoveryContextFields({ context }) {
   if (!context) return null;
   return <>
@@ -747,4 +766,5 @@ function EvidenceRecoveryContextFields({ context }) {
 }
 function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
 function hasIncompletePhotoSet(object) { return object.evidence_type === "photo_session" && (object.photos ?? []).filter((photo) => photo.active !== false).some((photo) => !getCanonicalProgressPhotoCategory(photo)); }
+function hasIncompletePhotoSessionMetadata(object) { return object.evidence_type === "photo_session" && (object.captureMetadata?.status === "needs_review" || object.goalRelationship?.status === "needs_review"); }
 function hasCommitFailure(review) { return ["commit_failed", "partially_committed"].includes(review.status); }

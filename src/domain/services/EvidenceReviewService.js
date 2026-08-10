@@ -14,6 +14,7 @@ import {
   createTrainingExerciseRelationshipGroup,
   normalizeTrainingExerciseRelationshipGroups,
 } from "../models/trainingExerciseRelationship";
+import { normalizeReviewedPhotoSessionMetadata } from "./PhotoSessionMetadataService";
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
@@ -332,6 +333,55 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
         throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "Photo pose editing is temporarily unavailable.");
       }
       return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, update);
+    },
+    async setPhotoSessionMetadata(id, {
+      evidenceObjectId,
+      expectedUpdatedAt,
+      goalId,
+      timeOfDay,
+      updatedBy,
+    }) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("PHOTO_REVIEW_NOT_EDITABLE", "This photo review cannot be edited.");
+      }
+      if (!expectedUpdatedAt || review.updatedAt !== expectedUpdatedAt) {
+        throw reviewError("REVIEW_STALE", "This evidence review changed. Reload it before saving session details.");
+      }
+      let matched = 0;
+      const interpretedEvidence = {
+        ...review.interpretedEvidence,
+        evidence_objects: (review.interpretedEvidence?.evidence_objects ?? []).map((object) => {
+          if (object.id !== evidenceObjectId || object.evidence_type !== "photo_session") return object;
+          matched += 1;
+          const normalized = normalizeReviewedPhotoSessionMetadata({
+            goalId,
+            goalOptions: object.goalRelationship?.options ?? [],
+            timeOfDay,
+          });
+          return {
+            ...object,
+            captureMetadata: object.captureMetadata?.status === "inferred"
+              ? { ...object.captureMetadata, reviewed: true }
+              : normalized.captureMetadata,
+            conditions: {
+              ...(object.conditions ?? {}),
+              timeOfDay: normalized.captureMetadata.timeOfDay,
+            },
+            goalRelationship: object.goalRelationship?.status === "resolved"
+              ? { ...object.goalRelationship, reviewed: true }
+              : normalized.goalRelationship,
+          };
+        }),
+      };
+      if (matched !== 1) throw reviewError("PHOTO_SESSION_UNAVAILABLE", "The photo session is no longer available.");
+      if (typeof repositories.evidenceReviews.updateReviewIfCurrent !== "function") {
+        throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "Photo session editing is temporarily unavailable.");
+      }
+      return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, {
+        interpretedEvidence,
+        photoSessionMetadataEditing: { updatedAt: now().toISOString(), updatedBy },
+      });
     },
     async discard(id, { confirmedBy } = {}) {
       const timestamp = now().toISOString();

@@ -90,6 +90,17 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(actions).toContain("assertIncludedPhotoSessionsReady");
   });
 
+  it("reviews shared photo metadata once at the session level", () => {
+    expect(screen).toContain("Shared session details");
+    expect(screen).toContain("These values apply once to every photo in this capture session.");
+    expect(screen).toContain('name="timeOfDay"');
+    expect(screen).toContain('name="goalId"');
+    expect(screen).toContain("Inferred from image metadata");
+    expect(screen).toContain("blockingPhotoSessionMetadata");
+    expect(page).toContain("updateEvidenceReviewPhotoSessionMetadata");
+    expect(actions).toContain("setPhotoSessionMetadata");
+  });
+
   it("offers a bounded continuation after any recoverable commit failure", () => {
     expect(screen).toContain("const canContinue = hasCommitFailure(review)");
     expect(screen).toContain("Your ${experience.noun} is saved");

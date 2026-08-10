@@ -67,6 +67,7 @@ function changeObservation(comparison, finding, kind) {
       bodyView: comparison.bodyView,
       contractionState: comparison.contractionState,
       metric: finding.metric,
+      magnitude: finding.magnitude,
       comparisonQuality: comparison.quality,
       repeatedDirectionCount: finding.repeatedDirectionCount,
       comparability: structuredClone(comparison.comparability),
@@ -221,6 +222,7 @@ function normalizeFindings(findings) {
     .map((finding) => ({
       metric: String(finding.metric ?? finding.kind ?? "").replace(/^photo_/, ""),
       direction: normalizeDirection(finding.direction),
+      magnitude: normalizeMagnitude(finding.magnitude, finding.direction),
       repeatedDirectionCount: Math.max(1, Number(finding.repeatedDirectionCount) || 1),
       limitations: Array.isArray(finding.limitations) ? finding.limitations.map(String) : [],
     }))
@@ -228,7 +230,9 @@ function normalizeFindings(findings) {
 }
 
 function photoConfidence(comparison, finding) {
-  const level = comparison.quality === "high" && finding.repeatedDirectionCount >= 2
+  const level = finding.magnitude === "subtle"
+    ? "low"
+    : comparison.quality === "high" && finding.repeatedDirectionCount >= 2
     ? "high"
     : ["high", "moderate"].includes(comparison.quality) ? "moderate" : "low";
   return {
@@ -237,6 +241,12 @@ function photoConfidence(comparison, finding) {
     limitations: [...new Set([...comparison.limitations, ...finding.limitations])].sort(),
     method: "photo_comparability_and_repetition",
   };
+}
+
+function normalizeMagnitude(value, direction) {
+  const magnitude = String(value ?? "").toLowerCase();
+  if (["none", "subtle", "moderate", "pronounced", "unknown"].includes(magnitude)) return magnitude;
+  return normalizeDirection(direction) === "stable" ? "none" : "unknown";
 }
 
 function normalizeQuality(value, limitations, comparability) {

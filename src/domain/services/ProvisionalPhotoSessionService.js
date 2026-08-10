@@ -1,6 +1,6 @@
 import { getProgressPhotoCategoryId, normalizeProgressPhotoCategory } from "../models/progressPhotoPoseVocabulary";
 
-export function createProvisionalPhotoSession({ reviewId = null, captureDate, photos = [], conditions = {}, comparisonCandidates = [] } = {}) {
+export function createProvisionalPhotoSession({ reviewId = null, captureDate, photos = [], conditions = {}, comparisonCandidates = [], captureMetadata = null, goalRelationship = null } = {}) {
   const normalizedPhotos = photos.map((photo, index) => ({
     ...normalizeProgressPhotoCategory(photo),
     active: photo.active !== false,
@@ -15,6 +15,8 @@ export function createProvisionalPhotoSession({ reviewId = null, captureDate, ph
     observed_at: captureDate,
     photos: normalizedPhotos,
     conditions,
+    captureMetadata,
+    goalRelationship,
     comparison_candidates: comparisonCandidates,
     required_pose_ids: [],
     ...validation,

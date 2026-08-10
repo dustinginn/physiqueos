@@ -11,6 +11,7 @@ import {
 import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../domain/services/CanonicalEvidenceService";
 import { processEvidenceIntakeSubmission } from "../../../domain/services/EvidenceIntakeService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
+import { resolvePhotoSessionGoalRelationship } from "../../../domain/services/PhotoSessionMetadataService";
 import {
   appendEvidenceRecoveryContext,
   parseEvidenceRecoveryFormData,
@@ -42,12 +43,23 @@ export async function POST(request) {
       return redirectToLog({ error: "empty-intake" }, recoveryContext);
     }
 
+    const [goals, executionItems] = await Promise.all([
+      FounderRepositories.goals.listGoals(user.id),
+      FounderRepositories.executionItems?.listExecutionItems?.(user.id) ?? [],
+    ]);
     const result = await processEvidenceIntakeSubmission({
       evidenceDate,
       expectedEvidenceType: recoveryContext?.expectedEvidenceType ?? "auto",
       files,
       typedEvidence,
       userId: user.id,
+      photoSessionContext: {
+        goalRelationship: resolvePhotoSessionGoalRelationship({
+          evidenceDate,
+          executionItems,
+          goals,
+        }),
+      },
     });
     evidencePackage = {
       ...result.evidencePackage,

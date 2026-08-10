@@ -294,6 +294,26 @@ export async function updateEvidenceReviewPhotoPose(formData) {
   ));
 }
 
+export async function updateEvidenceReviewPhotoSessionMetadata(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
+  await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoSessionMetadata(reviewId, {
+    evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
+    expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+    goalId: String(formData.get("goalId") ?? ""),
+    timeOfDay: String(formData.get("timeOfDay") ?? ""),
+    updatedBy: user.id,
+  });
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?session=saved`,
+    recoveryContext
+  ));
+}
+
 function applyPersistedItemDecisions(evidencePackage, decisions = {}) {
   return { ...evidencePackage, evidence_objects: (evidencePackage.evidence_objects ?? []).map((item) => ({
     ...item, removed: decisions[item.id]?.included === false,
@@ -376,6 +396,9 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
     );
     if (unresolved.length) {
       throw new Error(`Choose a pose for ${unresolved.length === 1 ? "the remaining photo" : `all ${unresolved.length} remaining photos`} before saving.`);
+    }
+    if (object.captureMetadata?.status === "needs_review" || object.goalRelationship?.status === "needs_review") {
+      throw new Error("Review the shared photo-session details before saving.");
     }
   }
 }
@@ -800,7 +823,7 @@ async function commitCompatibilityRepositories({ evidencePackage, user }) {
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
         const id = `progress_photo_${user.id}_${date}_${photo.view}_${photo.pose}`;
         if (existing.some((item) => item.imagePath === photo.storage_path)) continue;
-        const record = createProgressPhoto({ id, userId: user.id, date, capturedAt: date, uploadedAt: object.created_at ?? new Date().toISOString(), imagePath: photo.storage_path, view: photo.view, pose: photo.pose, conditions: object.conditions, source: { type: "manual", name: "Confirmed Photo Session", confidence: "high" }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        const record = createProgressPhoto({ id, userId: user.id, date, capturedAt: object.captureMetadata?.capturedAt ?? date, uploadedAt: object.created_at ?? new Date().toISOString(), imagePath: photo.storage_path, relatedGoalIds: object.goalRelationship?.goalIds ?? [], view: photo.view, pose: photo.pose, conditions: { ...(object.conditions ?? {}), timeOfDay: object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? null }, source: { type: "manual", name: "Confirmed Photo Session", confidence: "high" }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
         await FounderRepositories.progressPhotos.upsertPhoto(record);
         records.push(id);
       }
@@ -815,7 +838,9 @@ function expandCanonicalPhotoSessions(canonicalObjects, evidencePackage, userId)
     const date = String(object.observed_at).slice(0, 10);
     const photos = (object.photos ?? []).map((photo, index) => ({ ...photo,
       canonicalPhotoId: photo.canonicalPhotoId ?? `canonical_photo_${userId}_${date}_${stablePhotoIdentity(photo.id ?? photo.source_hash ?? index)}`,
-      stableViewId: photo.stableViewId ?? photo.id, captureDate: date, occurrenceTimestamp: date,
+      stableViewId: photo.stableViewId ?? photo.id, captureDate: date, occurrenceTimestamp: object.captureMetadata?.capturedAt ?? date,
+      relatedGoalIds: object.goalRelationship?.goalIds ?? [],
+      conditions: { ...(object.conditions ?? {}), timeOfDay: object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? null },
       sourceIds: [photo.id], sourceHashes: [photo.source_hash].filter(Boolean),
       status: photo.active === false ? "inactive" : "active", sourceOrder: photo.sourceOrder ?? photo.order ?? index,
     }));

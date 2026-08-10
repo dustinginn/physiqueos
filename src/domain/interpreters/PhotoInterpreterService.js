@@ -160,14 +160,15 @@ async function callOpenAIPhotoInterpreter({
   return JSON.parse(outputText);
 }
 
-function getSystemPrompt() {
+export function getSystemPrompt() {
   return [
     "You are PhysiqueOS PhotoInterpreter.",
     "Return structured JSON only.",
-    "For every machine-readable structured_observations entry, assign metric and direction directly from your visual evaluation. Never derive them from the change sentence.",
+    "For every machine-readable structured_observations entry, determine comparability and magnitude before direction. Never derive semantics from the change sentence.",
     "Allowed metrics are leanness, abdominal_definition, whole_body_softness, muscularity, visual_stability, and unknown.",
     "Allowed directions are increased, decreased, stable, mixed, insufficient, and unknown. Direction is relative to the named metric.",
-    "Photos must never emit body-fat percentage, lean-mass amount, fat-mass amount, or any numeric body-composition measurement.",
+    "Allowed magnitudes are none, subtle, moderate, pronounced, and unknown. Stable findings should normally use none; possible small differences use subtle; directional claims require subtle, moderate, or pronounced magnitude.",
+    "Photos must never emit body-fat percentage, lean-mass amount, fat-mass amount, or any numeric body-composition measurement or estimate.",
     "Interpret progress photos as visual evidence.",
     "Optimize for being the best possible interpreter of progress photos, not for Daily Briefing brevity. The Daily Briefing is a separate consumer and can summarize later.",
     "Produce the complete coach's notebook for the photo comparison: the rich, careful observations an experienced physique coach would write after studying the photos for 30-60 seconds.",
@@ -176,7 +177,7 @@ function getSystemPrompt() {
     "If a goal is supplied, connect the interpretation to it lightly.",
     "If no specific goal is supplied, focus on visual change, photo quality, strengths, lagging areas, comparison evidence, uncertainty, and what additional evidence would help.",
     "Do not identify medical conditions, body shame, or overstate certainty.",
-    "Do not estimate exact body-fat percentage unless framed as low-confidence visual estimate.",
+    "Do not estimate body-fat percentage from photos, even as a low-confidence visual estimate.",
     "Compare only matching views when available: front-to-front, side-to-side, back-to-back.",
     "Do not hallucinate missing views.",
     "Do not call the user healthy, unhealthy, client, patient, or subject.",
@@ -186,18 +187,20 @@ function getSystemPrompt() {
     "Use plain coach language. Prefer back, lower back, waist, leanness, definition, maintained, emerging trend, and stay the course.",
     "Sound like a trusted coach who has been following this journey for months.",
     "Never sound like an anatomy textbook, image captioning model, bodybuilding forum, or radiology report.",
-    "Write for humans. Prefer: upper back appears well maintained; your waist looks slightly tighter; your taper appears a little stronger; definition is beginning to emerge; current evidence supports continuing your existing strategy.",
+    "Write for humans. Stability is useful evidence. Prefer: largely unchanged; definition appears comparable; no meaningful visible difference is apparent. Use possible or may only for genuinely subtle differences.",
     "Use evidence-to-confidence-to-strategy-to-goal language. Do not jump from observation directly to advice.",
     "PhotoInterpreter exists to interpret reality. Confidence qualifies the interpretation; confidence must not suppress an otherwise well-supported coach read.",
-    "Think like a coach: I believe this person is leaner; here is why; my confidence is moderate because the poses are not identical.",
+    "Think like a careful coach: first ask whether the photos are comparable, then whether any difference is large enough to characterize, then describe direction, then qualify certainty.",
     "Communicate trends with restraint: beginning to, appears to, emerging, suggests, supports, modestly increases confidence.",
     "End coach briefing by stating what PhysiqueOS will watch in the next comparison.",
     "Use natural coaching language instead of system language. Do not say typical threshold, assessment clarity reduced, interval below threshold, or pose mismatch limits comparability.",
     "When photos are close together, say: these photos are only a few days apart, so only subtle visual changes would be expected.",
     "When poses or conditions differ, say: because the poses or conditions differ slightly, it is harder to make a confident comparison.",
-    "When describing changes, lead with overall silhouette and visual shape before individual regions.",
+    "For every matched pose, reason in this strict order: comparability, visible-difference magnitude, direction only if magnitude exists, then certainty.",
+    "Do not force a directional finding. No meaningful visible change is a valid and useful result.",
+    "When describing supported changes, lead with overall silhouette and visual shape before individual regions.",
     "Before confidence or body parts, identify the dominant visual story: noticeably leaner, better conditioned, more muscular, visibly larger, no meaningful change, or possible regression.",
-    "Commit to the dominant visual story first. Then inspect the strongest visual evidence that explains why. Then list conflicting evidence. Then determine confidence.",
+    "Select the dominant visual story only after the magnitude pass. Then inspect the strongest supporting and conflicting evidence and determine confidence.",
     "Do not let uncertainty about one body part erase an obvious whole-body trend.",
     "If the abs, chest, or shoulders are individually hard to evaluate but the whole physique clearly appears leaner, preserve the overall conclusion and lower confidence rather than reversing the interpretation.",
     "Before regional analysis, always answer: if these photos were shown to an experienced physique coach with no additional context, would they say the overall physique appears meaningfully improved?",
@@ -219,7 +222,7 @@ function getSystemPrompt() {
     "Observation depth should scale with evidence quality. Do not artificially shorten high-confidence interpretations.",
     "Look for details when supported: clearer upper-ab separation, stronger mid-ab definition, more visible linea alba, flatter lower abdomen, lower abs beginning to emerge, improved oblique visibility, sharper lower chest border, cleaner chest separation, maintained chest despite reduced fullness, clearer shoulder cap, sharper shoulder-to-arm transition, better arm definition, clearer triceps contour, visibly tighter waist, cleaner taper, stronger shoulder-to-waist ratio, less visual softness, cleaner muscle transitions, improved conditioning, and maintained muscularity.",
     "Inspect regions more deeply when evidence supports it: upper chest, lower chest border, inner chest separation, upper abs, mid abs, lower abs, linea alba, horizontal ab separations, lower abdomen flatness, external obliques, rib-to-waist transition, shoulder cap, delt separation, shoulder-to-arm transition, triceps contour, biceps contour, V-taper, shoulder-to-waist ratio, torso shape, and athletic appearance.",
-    "Systematically evaluate visible regions: overall physique, conditioning, body fat, proportions, shoulder-to-waist ratio, symmetry, neck/traps, shoulders, chest, arms, midsection, obliques, serratus, waist, back when visible, lower body when visible, muscle separation, skin thickness, vascularity, fat distribution, and visual balance.",
+    "Evaluate only pose-relevant visible regions. Do not manufacture an observation merely because a region is listed in a guide.",
     "For each important visible region, explain what changed, what did not change, why you believe that, confidence, and what cannot be determined.",
     "Explicitly state when something cannot be evaluated. For example: rear delts cannot be evaluated from front photos; leg musculature is not visible; arm positioning introduces uncertainty when comparing shoulder width.",
     "Weave confidence throughout the detailed interpretation: Confidence high; Confidence moderate due to different lighting; Confidence reduced because waist angle differs slightly.",
@@ -250,12 +253,14 @@ function getSystemPrompt() {
     "Tie observations to visual trend, evidence quality, next evidence, and what this could contribute to future goal reasoning.",
     "You are not an image analyzer. You are a longitudinal evidence interpreter.",
     "Do not merely describe the current physique. Evaluate visual evidence through time.",
-    "Every observation must answer whether it increases, decreases, or does not change confidence that the current strategy is helping the user achieve the goal.",
+    "Visual observations describe the photos first. Goal and strategy context may inform synthesis but must never overwrite ambiguous or stable visual evidence.",
     "Classify evidence into high confidence, emerging evidence, or insufficient evidence.",
     "Prefer trend language over one-off observations: maintaining muscle while cutting, gradually increasing definition, stable physique, possible plateau, possible lean-mass loss, or emerging asymmetry.",
     "Always answer whether the user should change anything. Often the best answer is no, and you must explain why.",
     "Do not give generic bodybuilding advice. Only recommend a protocol or priority when visual evidence strongly supports it and it relates to the goal.",
-    "Treat photo types differently. Front Relaxed emphasizes waist, abdominal definition, posture, and front symmetry. Rear Relaxed emphasizes waist, symmetry, overall conditioning, and back thickness. Rear Flexed emphasizes lat width, rear delts, upper back, traps, and definition. Flexed poses are useful for muscle visibility but weaker for fat-loss comparison unless compared with the same pose.",
+    "Treat photo types differently. Front Relaxed can assess overall shape, visible definition, apparent leanness, waist appearance, symmetry, and shoulder-to-torso relationship. Rear Relaxed can assess back shape, visible fullness, symmetry, taper, and posterior definition. Rear Flexed can assess visible back muscularity, lat and upper-back presentation, symmetry, definition, and apparent fullness. Side Relaxed must assess the actual torso and abdominal profile, chest profile, posture, and other visible side-profile characteristics. Front Flexed can assess abdominal definition, torso muscularity, shoulder/chest/arm presentation, symmetry, and visible fullness.",
+    "Do not reduce a side comparison to generic tighter-waist language. If the side profile is unchanged, say so explicitly.",
+    "Visible fullness does not establish new muscle tissue. Apparent leanness does not establish fat loss. Goal phase permission does not prove either direction.",
     "For relaxed back comparisons, prioritize waist, lower back, taper, and overall conditioning.",
     "For Rear Flexed comparisons, prioritize lat width, rear delts, and upper/mid-back definition.",
     "When Rear Relaxed and Rear Flexed are both present, synthesize them: lower-back/waist leanness plus upper-back/shoulder/arm maintenance.",
@@ -281,7 +286,7 @@ function getSystemPrompt() {
   ].join(" ");
 }
 
-function getUserPrompt({
+export function getUserPrompt({
   captureDate,
   comparisonMetadata,
   goalContext,
@@ -301,10 +306,14 @@ function getUserPrompt({
         certainty: "Prefer visual trend and evidence quality over exact measurements.",
       },
       reasoning_rules: {
+        comparability_first:
+          "For each exact pose match, first assess pose equivalence, angle, framing, distance, lighting, preparation, time of day, image quality, and known session context.",
+        magnitude_before_direction:
+          "Before describing direction, classify the visible difference as no meaningful difference, subtle or possible difference, or meaningful visible difference. Do not force every pose to change.",
         dominant_visual_story:
-          "First decide the dominant visual story holistically: noticeably leaner, better conditioned, more muscular, visibly larger, no meaningful change, or possible regression. Do this before regional details and before confidence.",
+          "Only after the magnitude pass, select the dominant visual story: meaningfully changed, possibly changed, largely stable, or insufficiently comparable.",
         interpretation_then_confidence:
-          "Interpret first, support with observations second, then qualify with confidence. Confidence answers how certain you are, not what you are allowed to conclude.",
+          "Language strength must match both magnitude and comparability. Weak comparability cannot support a strong directional sentence.",
         never_guess_time:
           "Use only current_capture_date, previous_capture_date, and days_elapsed from comparison_metadata. If they are null, say the interval is unknown.",
         metadata_authority:
@@ -324,7 +333,7 @@ function getUserPrompt({
         suggested_priorities:
           "Do not create unnecessary work. If evidence is weak, recommend continuing the current plan and collecting another comparable photo set.",
         trajectory_classification:
-          "Classify evidence as supporting, neutral, or contradictory toward the working hypothesis. For visible abs, the working hypothesis is fat loss while preserving muscle.",
+          "Classify evidence as supporting, neutral, or contradictory only after the visual read. Goal context cannot turn ambiguous photos into directional evidence.",
         overall_physique_first:
           "Before judging individual regions, decide whether an experienced coach would say the overall physique appears meaningfully improved from silhouette, proportions, leanness, symmetry, and body shape. Preserve this overall read even when some regions remain uncertain.",
         conditioning_layer:
@@ -345,6 +354,8 @@ function getUserPrompt({
           "Use regional observations to explain the overall conclusion. Do not let one unchanged region erase meaningful overall improvement.",
       },
       evidence_framework: {
+        stable_evidence:
+          "No meaningful visible difference: largely unchanged, comparable definition or fullness, or no difference large enough to establish change.",
         high_confidence:
           "Meaningful visual change: noticeably leaner waist, clearly improved definition, visible muscle-size increase, or obvious regression under comparable conditions.",
         emerging_evidence:
@@ -357,7 +368,11 @@ function getUserPrompt({
           "Not enough to confidently call a visual change: photos are close together, lighting changed, pose changed, distance changed, views do not match, or evidence mostly supports stability.",
       },
       reasoning_order: [
-        "Dominant visual story: what is the biggest thing that changed between these two physiques?",
+        "Comparability: are pose, angle, framing, distance, lighting, preparation, timing, and image quality sufficient for this claim?",
+        "Magnitude: is there no meaningful difference, a subtle or possible difference, or a meaningful visible difference?",
+        "Direction: only if magnitude exists, what visibly increased, decreased, or changed?",
+        "Certainty: choose language that matches the evidence strength.",
+        "Dominant visual story: what changed, what remained stable, and what is unresolved?",
         "Primary overall conclusion: would an experienced physique coach say the physique appears meaningfully improved overall?",
         "Global shape analysis: silhouette, waist visual width, athletic shape, fullness or flatness.",
         "Conditioning analysis: overall leanness, sharpness, definition, torso softness, abdominal separation, obliques, chest borders, shoulder/arm separation, and visible anatomical landmarks.",
@@ -388,7 +403,7 @@ function getUserPrompt({
         rear_relaxed:
           "Waist, lower back, taper, overall conditioning, and back thickness.",
         side_relaxed:
-          "Waist, abdomen, posture, torso thickness, and glute/leg visibility when present.",
+          "Torso profile, abdominal projection or flatness, chest profile, posture, and other genuinely visible side-profile characteristics.",
         rear_flexed:
           "Lats, rear delts, shoulders, arms, upper/mid-back definition, back width, and muscularity.",
         flexed:
@@ -642,7 +657,7 @@ function createFallbackPhotoInterpretation({
 }
 
 function normalizeInterpreterOutput(output, fallback) {
-  const normalized = applyDetailedInterpretationDepth(applyReasoningGuardrails(sanitizeInterpreterOutput({
+  const normalized = applyDetailedInterpretationDepth(applyMagnitudeFirstReasoningGuardrails(assertPhotoEvidenceBoundaries(sanitizeInterpreterOutput({
     ...createFallbackPhotoInterpretation({
       captureDate: fallback.captureDate,
       photoSetId: fallback.photoSetId,
@@ -658,7 +673,7 @@ function normalizeInterpreterOutput(output, fallback) {
     views_detected: output.views_detected?.length
       ? output.views_detected
       : getViewsDetected(fallback.photos),
-  })));
+  }))));
 
   return withStructuredObservations({
     ...normalized,
@@ -895,6 +910,81 @@ function sanitizeInterpreterOutput(output) {
   );
 }
 
+function assertPhotoEvidenceBoundaries(output) {
+  const text = JSON.stringify(output);
+  if (/(?:\b(?:body[ -]?fat|lean mass|fat mass)\b[^.!?\n]{0,24}\b\d+(?:\.\d+)?\s*(?:%|lb|lbs|pounds?)(?!\w)|\b\d+(?:\.\d+)?\s*(?:%|lb|lbs|pounds?)?[^.!?\n]{0,12}\b(?:body[ -]?fat|lean mass|fat mass)\b)/i.test(text)) {
+    throw new Error("Photo Interpreter returned a precise body-composition conclusion.");
+  }
+  return output;
+}
+
+function applyMagnitudeFirstReasoningGuardrails(output) {
+  const metadata = output.comparison_metadata ?? {};
+  const observations = Array.isArray(output.structured_observations)
+    ? output.structured_observations
+    : [];
+  const comparable = metadata.match_status === "exact_match";
+  const meaningful = observations.some((item) =>
+    ["moderate", "pronounced"].includes(item?.magnitude) &&
+    ["increased", "decreased", "mixed"].includes(item?.direction)
+  );
+  const subtle = observations.some((item) =>
+    item?.magnitude === "subtle" &&
+    ["increased", "decreased", "mixed"].includes(item?.direction)
+  );
+  const stable = observations.some((item) =>
+    item?.magnitude === "none" || item?.direction === "stable"
+  );
+  const observationConfidence = (output.observation_confidence ?? []).map((item) => ({
+    ...item,
+    meaningful_change_supported: meaningful && item.meaningful_change_supported === true,
+  }));
+
+  if (!comparable) {
+    return {
+      ...output,
+      observation_confidence: observationConfidence,
+      should_change_plan: false,
+      strategy_recommendation: "No strategy change is warranted from a poorly comparable photo pair.",
+      decision_support: {
+        should_change_plan: false,
+        recommendation: "Keep the current strategy unchanged until a comparable photo set is available.",
+        rationale: "The pose or view match is not strong enough to support a directional coaching decision.",
+      },
+    };
+  }
+
+  if (meaningful) {
+    return { ...output, observation_confidence: observationConfidence };
+  }
+
+  const daysText = typeof metadata.days_elapsed === "number"
+    ? `Across this ${metadata.days_elapsed}-day comparison`
+    : "Across this comparison";
+  const stabilityCopy = stable && !subtle
+    ? `${daysText}, no meaningful visible difference is apparent.`
+    : `${daysText}, any visible difference is subtle and does not establish a meaningful change.`;
+
+  return {
+    ...output,
+    observation_confidence: observationConfidence,
+    trajectory_classification: subtle ? output.trajectory_classification : "neutral",
+    trajectory_support_summary: subtle
+      ? "A possible small visual difference is worth watching, but it does not establish a meaningful physique change."
+      : "The photos are useful evidence of visual stability and do not establish a directional physique change.",
+    biggest_takeaway: stabilityCopy,
+    meaningful_change_assessment: stabilityCopy,
+    should_change_plan: false,
+    strategy_recommendation: "No strategy change is warranted from this photo comparison.",
+    why_or_why_not: "The visible evidence is stable or too subtle to justify changing the current strategy.",
+    decision_support: {
+      should_change_plan: false,
+      recommendation: "Keep the current strategy unchanged.",
+      rationale: "Stable or ambiguous photos are not a sufficient reason to change course.",
+    },
+  };
+}
+
 function sanitizeInterpreterValue(value) {
   if (Array.isArray(value)) return value.map(sanitizeInterpreterValue);
   if (value && typeof value === "object") {
@@ -1016,7 +1106,7 @@ function sanitizeInterpreterValue(value) {
     );
 }
 
-function applyReasoningGuardrails(output) {
+export function applyReasoningGuardrails(output) {
   const metadata = output.comparison_metadata ?? {};
   const isShortInterval = metadata.interval_classification === "short";
   const observations = (output.observation_confidence ?? []).map((observation) => ({
@@ -1490,7 +1580,12 @@ function hasFrontComparison(metadata) {
 function applyDetailedInterpretationDepth(output) {
   const metadata = output.comparison_metadata ?? {};
   const existingSections = output.detailed_interpretation?.sections ?? [];
+  const hasMeaningfulStructuredChange = (output.structured_observations ?? []).some(
+    (item) => ["moderate", "pronounced"].includes(item?.magnitude) &&
+      ["increased", "decreased", "mixed"].includes(item?.direction)
+  );
   const needsFrontDepth =
+    hasMeaningfulStructuredChange &&
     hasFrontComparison(metadata) &&
     output.trajectory_classification === "supporting" &&
     existingSections.length < 7;
@@ -2284,7 +2379,7 @@ export const photoInterpretationJsonSchema = {
           },
           magnitude: {
             type: "string",
-            enum: ["subtle", "moderate", "pronounced", "unknown"],
+            enum: ["none", "subtle", "moderate", "pronounced", "unknown"],
           },
           change: { type: "string" },
           confidence: {

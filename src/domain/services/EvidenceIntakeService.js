@@ -11,6 +11,10 @@ import {
   normalizeProgressPhotoPose,
   normalizeProgressPhotoView,
 } from "../models/progressPhotoPoseVocabulary";
+import {
+  extractOriginalImageCaptureMetadata,
+  inferPhotoSessionCaptureMetadata,
+} from "./PhotoSessionMetadataService";
 
 const EVIDENCE_SCHEMA_VERSION = "physiqueos-evidence-v1";
 const INTAKE_ENGINE_NAME = "PhysiqueOS Evidence Intake Engine";
@@ -26,6 +30,7 @@ export async function processEvidenceIntakeSubmission({
   files = [],
   typedEvidence = null,
   userId = "founder",
+  photoSessionContext = null,
 } = {}) {
   const capturedAt = new Date().toISOString();
   const observedDate = normalizeDateKey(evidenceDate) ?? getLocalDateKey(capturedAt);
@@ -54,6 +59,7 @@ export async function processEvidenceIntakeSubmission({
       submissionId,
       typedEvidence,
       userId,
+      photoSessionContext,
     });
 
     return {
@@ -156,6 +162,7 @@ async function createEvidencePackageFromStoredArtifacts({
   submissionId,
   typedEvidence,
   userId,
+  photoSessionContext = null,
 }) {
   const imageArtifacts = storedArtifacts.filter((artifact) => isImageArtifact(artifact));
   const pdfArtifacts = storedArtifacts.filter((artifact) => isPdfArtifact(artifact));
@@ -180,6 +187,7 @@ async function createEvidencePackageFromStoredArtifacts({
         artifacts: classifiedImages.progressPhotos,
         evidenceDate,
         submissionId,
+        photoSessionContext,
       })
     );
   }
@@ -458,6 +466,7 @@ function createProgressPhotoEvidencePackage({
   artifacts,
   evidenceDate,
   submissionId,
+  photoSessionContext = null,
 }) {
   const photoSetId = `${submissionId}_progress_photos`;
   const routing = getProgressPhotoInterpreterRouting();
@@ -466,6 +475,14 @@ function createProgressPhotoEvidencePackage({
     id: photoSetId,
     evidence_type: "photo_session",
     observed_at: evidenceDate,
+    captureMetadata: inferPhotoSessionCaptureMetadata(artifacts, { evidenceDate }),
+    goalRelationship: photoSessionContext?.goalRelationship ?? {
+      status: "needs_review",
+      goalIds: [],
+      source: "session_review",
+      options: [],
+      limitations: ["goal_context_unavailable"],
+    },
     source: {
       modality: "photo",
       application: "Upload Anything",
@@ -898,6 +915,9 @@ async function storeEvidenceArtifact({
     .join("private", "founder", "evidence", "uploads", safeName)
     .replaceAll("\\", "/");
   const mimeType = file.type || inferMimeTypeFromName(file.name);
+  const originalCaptureMetadata = isImageMimeType(mimeType)
+    ? extractOriginalImageCaptureMetadata(buffer, { mimeType })
+    : null;
 
   await fs.mkdir(uploadDirectory, { recursive: true });
   await fs.writeFile(absolutePath, buffer);
@@ -911,6 +931,7 @@ async function storeEvidenceArtifact({
     id: `artifact_${submissionId}_${index + 1}`,
     mimeType,
     observedDate,
+    originalCaptureMetadata,
     relativePath,
     text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
@@ -934,6 +955,9 @@ async function createStoredArtifactFromExistingUpload({
     ""
   );
   const mimeType = inferMimeTypeFromName(fileName);
+  const originalCaptureMetadata = isImageMimeType(mimeType)
+    ? extractOriginalImageCaptureMetadata(buffer, { mimeType })
+    : null;
   const relativePath = path
     .relative(process.cwd(), absolutePath)
     .replaceAll("\\", "/");
@@ -947,6 +971,7 @@ async function createStoredArtifactFromExistingUpload({
     id: `artifact_${submissionId}_${index + 1}`,
     mimeType,
     observedDate,
+    originalCaptureMetadata,
     relativePath,
     text: isPdfArtifact({ mimeType }) ? "" : buffer.toString("utf8").slice(0, 20000),
     uploadedAt: capturedAt,
@@ -1047,6 +1072,7 @@ function toPersistedSourceArtifact(artifact) {
     file_name: artifact.fileName,
     mime_type: artifact.mimeType,
     observed_date: normalizeDateKey(artifact.observedDate),
+    original_capture_metadata: artifact.originalCaptureMetadata ?? null,
     storage_path: artifact.relativePath,
     uploaded_at: artifact.uploadedAt,
   };

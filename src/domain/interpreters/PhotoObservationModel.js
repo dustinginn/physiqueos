@@ -19,11 +19,14 @@ export const PHOTO_INTERPRETATION_DIRECTIONS = Object.freeze([
 ]);
 
 export const PHOTO_INTERPRETATION_MAGNITUDES = Object.freeze([
+  "none",
   "subtle",
   "moderate",
   "pronounced",
   "unknown",
 ]);
+
+const PRECISE_BODY_COMPOSITION_PATTERN = /(?:\b(?:body[ -]?fat|lean mass|fat mass)\b[^.!?\n]{0,24}\b\d+(?:\.\d+)?\s*(?:%|lb|lbs|pounds?)(?!\w)|\b\d+(?:\.\d+)?\s*(?:%|lb|lbs|pounds?)?[^.!?\n]{0,12}\b(?:body[ -]?fat|lean mass|fat mass)\b)/i;
 
 export function normalizeStructuredPhotoSemantics(
   values = [],
@@ -90,6 +93,16 @@ export function validateStructuredPhotoSemantic(value = {}) {
   if (value.direction === "insufficient" && !value.limitations?.length) {
     throw new Error("Insufficient Photo interpretation requires a limitation.");
   }
+  if (value.direction === "stable" && !["none", "subtle", "unknown"].includes(value.magnitude)) {
+    throw new Error("Stable Photo interpretation cannot carry a meaningful-change magnitude.");
+  }
+  if (["increased", "decreased"].includes(value.direction) &&
+      !["subtle", "moderate", "pronounced"].includes(value.magnitude)) {
+    throw new Error("Directional Photo interpretation requires a visible-change magnitude.");
+  }
+  if (["insufficient", "unknown"].includes(value.direction) && value.magnitude !== "unknown") {
+    throw new Error("Unresolved Photo interpretation must use unknown magnitude.");
+  }
   if (
     value.metric === "unknown" &&
     !["unknown", "insufficient"].includes(value.direction)
@@ -109,6 +122,9 @@ export function validateStructuredPhotoSemantic(value = {}) {
     value.numericBodyCompositionValue != null
   ) {
     throw new Error("Photo interpretation cannot contain numeric body-composition measurements.");
+  }
+  if (PRECISE_BODY_COMPOSITION_PATTERN.test(String(value.change ?? ""))) {
+    throw new Error("Photo interpretation cannot state precise body-composition measurements.");
   }
 }
 

@@ -13,7 +13,7 @@ import {
   createCadenceEnergyAssessment,
 } from "./CadenceEnergyAssessmentService";
 
-const EVENT_VERSION = "photo_event_v3_4_0";
+const EVENT_VERSION = "photo_event_v4_0_0";
 
 export function classifyPhotoAnalysis(view = {}) {
   if (!view.analysisMode) return "unavailable";
@@ -60,7 +60,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
   const synthesisFindings=semanticDeduplicate((session.synthesis?.observations??[]).map((item)=>item.change??item.description).filter(Boolean)).filter(isNaturalFinding);
   const allFindings = semanticDeduplicate([...synthesisFindings,...activeViews.flatMap((view)=>view.findings)]);
   const waistFinding=find(allFindings,/waist|midsection/i);
-  const waist = waistFinding ?? (find(allFindings,/front shape|front silhouette/i) && find(allFindings,/maintain|preserv|stable/i) ? "Your waist looks meaningfully tighter while upper-body size appears well maintained." : find(allFindings,/front shape|front silhouette/i)) ?? "No meaningful session-level visual change stands out this week.";
+  const waist = waistFinding ?? find(allFindings,/front shape|front silhouette/i) ?? "No meaningful session-level visual change stands out this week.";
   const stable = find(allFindings,/maintain|stable|preserv|no meaningful/i) ?? "Both rear views remain broadly stable.";
   const limitation = session.views.some((view)=>(view.conditionDifferences?.length??0)>0)
     ? "Different capture conditions make subtle changes harder to judge."
@@ -347,7 +347,7 @@ function ordinaryEventCopy({goalContext,limitation,milestone}){
     goalMeaning:"The photos fit what we would expect while you settle into maintenance. One week is far too soon to claim new muscle.",
     interpretation:"Across the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.",
     limitation:`${limitation} Interpret small changes cautiously over this short interval.${milestoneSentence}`,
-    coach:`Keep photo conditions consistent and let the pattern develop across several check-ins.${milestone?.label?` Use ${milestone.label} as the next useful comparison.`:""}`,
+    coach:`No strategy change is warranted from these photos. Continue the current approach and keep photo conditions consistent.${milestone?.label?` Use ${milestone.label} as the next useful comparison.`:""}`,
   };
   if(activeCut)return{
     title:"Today’s photos add a new check-in on your current goal.",

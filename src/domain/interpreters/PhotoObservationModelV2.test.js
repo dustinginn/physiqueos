@@ -34,6 +34,7 @@ describe("photo_interpretation_v2", () => {
         ...base,
         metric,
         direction,
+        magnitude: direction === "stable" ? "none" : ["insufficient", "unknown"].includes(direction) ? "unknown" : "subtle",
         limitations: direction === "insufficient" ? ["Direction unavailable."] : [],
       },
     ])[0];
@@ -74,6 +75,7 @@ describe("photo_interpretation_v2", () => {
         ...base,
         metric: "unknown",
         direction: "unknown",
+        magnitude: "unknown",
         change: "Waist looks tighter and body fat appears lower.",
       },
     ])[0];
@@ -101,9 +103,31 @@ describe("photo_interpretation_v2", () => {
   it("requires limitations for insufficient results", () => {
     expect(() =>
       normalizeStructuredPhotoSemantics([
-        { ...base, metric: "unknown", direction: "insufficient", limitations: [] },
+        { ...base, metric: "unknown", direction: "insufficient", magnitude: "unknown", limitations: [] },
       ])
     ).toThrow(/limitation/);
+  });
+
+  it("enforces magnitude before direction", () => {
+    expect(normalizeStructuredPhotoSemantics([{
+      ...base, metric: "visual_stability", direction: "stable", magnitude: "none",
+      change: "No meaningful visible difference is apparent.",
+    }])[0]).toMatchObject({ direction: "stable", magnitude: "none" });
+    expect(() => normalizeStructuredPhotoSemantics([{
+      ...base, direction: "increased", magnitude: "none",
+    }])).toThrow(/magnitude/);
+    expect(() => normalizeStructuredPhotoSemantics([{
+      ...base, direction: "stable", magnitude: "pronounced", metric: "visual_stability",
+    }])).toThrow(/magnitude/);
+  });
+
+  it("rejects precise body-composition conclusions in display copy", () => {
+    expect(() => normalizeStructuredPhotoSemantics([{
+      ...base, change: "The photos show body fat at 8.4%.",
+    }])).toThrow(/precise body-composition/);
+    expect(() => normalizeStructuredPhotoSemantics([{
+      ...base, change: "An estimated 12% body fat is visible.",
+    }])).toThrow(/precise body-composition/);
   });
 
   it("is deterministic, JSON-safe, immutable, clock-free, and repository-free", () => {

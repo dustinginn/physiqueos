@@ -25,6 +25,11 @@ import { FounderRepositories } from "../../../data/repositories/founderRepositor
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 import { createProvisionalPhotoSession } from "../../../domain/services/ProvisionalPhotoSessionService";
 import {
+  extractOriginalImageCaptureMetadata,
+  inferPhotoSessionCaptureMetadata,
+  resolvePhotoSessionGoalRelationship,
+} from "../../../domain/services/PhotoSessionMetadataService";
+import {
   appendEvidenceRecoveryContext,
   parseEvidenceRecoveryFormData,
 } from "../../../domain/services/EvidenceRecoveryContext";
@@ -80,6 +85,7 @@ export async function saveProgressPhotoEvidence(formData) {
     throw new Error("Confirm that the selected photos are original and unedited.");
   }
   const provisionalPhotos = [];
+  const captureArtifacts = [];
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
     await assertValidProgressPhotoFile(file);
@@ -91,7 +97,11 @@ export async function saveProgressPhotoEvidence(formData) {
     if (identity.poseId === "unknown" || (identity.poseVariant === "other" && !identity.customLabel)) {
       throw new Error(`Photo ${index + 1} needs a valid pose identity.`);
     }
-    const sourceHash = createPhotoSourceHash(Buffer.from(await file.arrayBuffer()));
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const sourceHash = createPhotoSourceHash(buffer);
+    captureArtifacts.push({
+      originalCaptureMetadata: extractOriginalImageCaptureMetadata(buffer, { mimeType: file.type }),
+    });
     const storedPath = await storePrivateUpload({ directory: path.join("private", "founder", "photos", "uploads"), file, prefix: `${capturedAt}-${identity.poseId}` });
     provisionalPhotos.push({
       id: `provisional_photo_${uploadedAt.replace(/\D/g, "")}_${index}`,
@@ -102,7 +112,22 @@ export async function saveProgressPhotoEvidence(formData) {
     });
   }
   const packageId = `photo_review_${uploadedAt.replace(/\D/g, "")}`;
-  const provisionalSession = createProvisionalPhotoSession({ captureDate: capturedAt, photos: provisionalPhotos, conditions });
+  const [goals, executionItems] = await Promise.all([
+    FounderRepositories.goals.listGoals(user.id),
+    FounderRepositories.executionItems?.listExecutionItems?.(user.id) ?? [],
+  ]);
+  const captureMetadata = inferPhotoSessionCaptureMetadata(captureArtifacts, { evidenceDate: capturedAt });
+  const goalRelationship = resolvePhotoSessionGoalRelationship({ evidenceDate: capturedAt, executionItems, goals });
+  const provisionalSession = createProvisionalPhotoSession({
+    captureDate: capturedAt,
+    photos: provisionalPhotos,
+    conditions: {
+      ...conditions,
+      timeOfDay: captureMetadata.timeOfDay ?? null,
+    },
+    captureMetadata,
+    goalRelationship,
+  });
   const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
     userId: user.id,
     source: "dedicated_progress_photo",

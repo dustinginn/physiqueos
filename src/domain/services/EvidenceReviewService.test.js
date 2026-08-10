@@ -210,6 +210,34 @@ describe("EvidenceReviewService execution variant editing", () => {
   });
 });
 
+describe("EvidenceReviewService photo session metadata", () => {
+  it("updates shared Time of Day and Goal relationship once for the session", async () => {
+    const state = reviewFixture();
+    state.review.interpretedEvidence.evidence_objects[0] = {
+      id: "photos_1",
+      evidence_type: "photo_session",
+      captureMetadata: { status: "needs_review", timeOfDay: null },
+      goalRelationship: {
+        status: "needs_review",
+        options: [{ id: "goal_build", title: "Build Lean Mass" }],
+      },
+      photos: [{ id: "front", view: "front", pose: "relaxed" }, { id: "rear", view: "back", pose: "relaxed" }],
+    };
+    await createEvidenceReviewService({ repositories: repositories(state) })
+      .setPhotoSessionMetadata(state.review.id, {
+        evidenceObjectId: "photos_1",
+        expectedUpdatedAt: state.review.updatedAt,
+        goalId: "goal_build",
+        timeOfDay: "afternoon",
+        updatedBy: "founder",
+      });
+    const session = state.review.interpretedEvidence.evidence_objects[0];
+    expect(session.captureMetadata).toMatchObject({ status: "reviewed", timeOfDay: "afternoon" });
+    expect(session.goalRelationship).toMatchObject({ status: "resolved", goalIds: ["goal_build"], source: "user_session_review" });
+    expect(session.photos).toEqual([{ id: "front", view: "front", pose: "relaxed" }, { id: "rear", view: "back", pose: "relaxed" }]);
+  });
+});
+
 function repositories(state) {
   return {
     evidenceReviews: {

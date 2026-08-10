@@ -39,6 +39,16 @@ describe("Photo PI observations", () => {
     expect(createPhotoPIObservations({ comparisons: [repeated] }).find((item) => item.kind === "photo_leanness_change").confidence.level).toBe("high");
   });
 
+  it("keeps a possible subtle difference low-certainty even with strong comparability", () => {
+    const subtle = comparison();
+    subtle.findings[0].magnitude = "subtle";
+    subtle.findings[0].repeatedDirectionCount = 3;
+    const finding = createPhotoPIObservations({ comparisons: [subtle] })
+      .find((item) => item.kind === "photo_leanness_change");
+    expect(finding.confidence.level).toBe("low");
+    expect(finding.explanationData.magnitude).toBe("subtle");
+  });
+
   it("suppresses duplicate session-pose comparisons deterministically", () => {
     const observations = createPhotoPIObservations({ comparisons: [comparison(), comparison()] });
     expect(observations.filter((item) => item.kind === "photo_leanness_change")).toHaveLength(1);
@@ -103,7 +113,7 @@ function comparison() {
     imageAvailable: true,
     comparisonImageAvailable: true,
     comparisonQuality: "high",
-    findings: [{ metric: "leanness", direction: "falling", repeatedDirectionCount: 1 }],
+    findings: [{ metric: "leanness", direction: "falling", magnitude: "moderate", repeatedDirectionCount: 1 }],
   };
 }
 
