@@ -1,7 +1,7 @@
 import PageHeader from "../components/layout/PageHeader";
 import HomeHeroCard from "../components/cards/HomeHeroCard";
 import NextBestAction from "../components/cards/NextBestAction";
-import LatestAnalysisCard from "../components/cards/LatestAnalysisCard";
+import HomeBriefingCardStack from "../components/cards/HomeBriefingCardStack";
 import GoalsCard from "../components/cards/GoalsCard";
 import TodaysFocusCard from "../components/cards/TodaysFocusCard";
 import { HomeBriefingService } from "../domain/services/HomeBriefingService";
@@ -24,9 +24,9 @@ export default async function HomeScreen() {
 
           <NextBestAction {...briefing.nextBestAction} />
 
-          {briefing.latestAnalysis && (
-            <LatestAnalysisCard {...briefing.latestAnalysis} />
-          )}
+          <HomeBriefingCardStack
+            cards={briefing.briefingCards ?? (briefing.latestAnalysis ? [briefing.latestAnalysis] : [])}
+          />
 
           <GoalsCard goals={briefing.goals} />
 

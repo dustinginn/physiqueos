@@ -204,7 +204,7 @@ export function createHomeBriefingService({
         weightEntries,
         expectedWindow: expectedDailyWindow,
       });
-      const briefingSelection = resolveHomeBriefingSelection({
+      const briefingSelections = resolveHomeBriefingSlots({
         dailyArtifact: currentDailyBriefing,
         eventArtifact: latestEventBriefing,
         midweekArtifact: latestMidweekBriefing,
@@ -214,18 +214,26 @@ export function createHomeBriefingService({
         weeklyArtifact: latestWeeklyBriefing,
         coachingUpdates: homeCoachingUpdates,
       });
-      const briefingCard = mapBriefingCard({
+      const briefingCardContext = {
         dailyEvent,
         freshness: briefingFreshness,
         latestAnalysis,
-        selection: briefingSelection,
         dexaScans,
         progressPhotos,
         weightEntries,
         expectation,
         generationArtifact: expectedDailyRecord,
         historicalDailyBriefing: latestDailyBriefing,
+      };
+      const activeEventBriefing = mapBriefingCard({
+        ...briefingCardContext,
+        selection: briefingSelections.activeEventSelection,
       });
+      const currentCadenceBriefing = mapBriefingCard({
+        ...briefingCardContext,
+        selection: briefingSelections.currentCadenceSelection,
+      });
+      const briefingCard = activeEventBriefing ?? currentCadenceBriefing;
       const overallGoalConfidence = activeGoal?.type === "build_lean_mass"
         ? resolveActiveGoalConfidencePresentation({
             activeGoal,
@@ -253,6 +261,19 @@ export function createHomeBriefingService({
         overallGoalConfidence,
         coachingUpdates,
       });
+      const presentedPrimaryBriefing = activeChapter?.briefingCard ?? briefingCard;
+      const presentedEventBriefing = activeEventBriefing
+        ? presentedPrimaryBriefing
+        : null;
+      const presentedCadenceBriefing = currentCadenceBriefing
+        ? activeEventBriefing
+          ? currentCadenceBriefing
+          : presentedPrimaryBriefing
+        : null;
+      const briefingCards = dedupeHomeBriefingCards([
+        presentedEventBriefing,
+        presentedCadenceBriefing,
+      ]);
 
       return {
         header: mapHeader(user),
@@ -263,11 +284,41 @@ export function createHomeBriefingService({
         goals: activeChapter?.goals ?? goalIntelligence.goals.map(mapGoal),
         todaysFocus,
         bottomNavigation: navigation,
-        latestAnalysis: activeChapter?.briefingCard ?? briefingCard,
+        activeEventBriefing: presentedEventBriefing,
+        currentCadenceBriefing: presentedCadenceBriefing,
+        briefingCards,
+        latestAnalysis: presentedPrimaryBriefing,
         ...viewData,
       };
     },
   };
+}
+
+export function resolveHomeBriefingSlots(options = {}) {
+  const activeEventSelection = resolveHomeBriefingSelection({
+    eventArtifact: options.eventArtifact,
+    now: options.now,
+    timeZone: options.timeZone,
+  });
+  const currentCadenceSelection = resolveHomeBriefingSelection({
+    ...options,
+    eventArtifact: null,
+  });
+  return {
+    activeEventSelection: activeEventSelection.briefingType === "event"
+      ? activeEventSelection
+      : null,
+    currentCadenceSelection,
+  };
+}
+
+export function dedupeHomeBriefingCards(cards = []) {
+  const seen = new Set();
+  return cards.filter((card) => {
+    if (!card || seen.has(card.id)) return false;
+    seen.add(card.id);
+    return true;
+  });
 }
 
 export function reconcileDailyBriefingAction(actionPlan, dailyArtifact) {
@@ -365,7 +416,7 @@ export function mapBriefingCard({
   const hasBriefingEvidence =
     weightEntries.length > 0 || dexaScans.length > 0 || progressPhotos.length > 0;
 
-  if (!hasBriefingEvidence) return null;
+  if (!hasBriefingEvidence || !selection) return null;
 
   if (selection.briefingType === "event") {
     const artifact = selection.artifact;

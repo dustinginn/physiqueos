@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import GoalRow from "../goals/GoalRow";
 import HomeHeroCard from "./HomeHeroCard";
+import HomeBriefingCardStack from "./HomeBriefingCardStack";
 import LatestAnalysisCard from "./LatestAnalysisCard";
 
 describe("Home active chapter components", () => {
@@ -88,5 +89,17 @@ describe("Home active chapter components", () => {
     }));
     expect(html).toContain("Previous Chapter Briefing");
     expect(html).toContain('aria-label="Still on track.: From the Visible Abs chapter. Your next briefing will evaluate Build Lean Mass."');
+  });
+
+  it("renders independently clickable Event and Weekly cards in event-first order", () => {
+    const html = renderToStaticMarkup(React.createElement(HomeBriefingCardStack, {
+      cards: [
+        { id: "event", sectionLabel: "Event Briefing", title: "Progress Photo Analysis Ready", prompt: "Open the latest coaching conversation.", href: "/briefings/photo/session" },
+        { id: "weekly", sectionLabel: "Weekly Briefing", title: "Weekly Briefing Ready", prompt: "Review the completed week.", href: "/briefings/review/weekly" },
+      ],
+    }));
+    expect(html.indexOf("Event Briefing")).toBeLessThan(html.indexOf("Weekly Briefing"));
+    expect(html).toContain('href="/briefings/photo/session"');
+    expect(html).toContain('href="/briefings/review/weekly"');
   });
 });
