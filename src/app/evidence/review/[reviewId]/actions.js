@@ -120,7 +120,11 @@ export async function confirmEvidenceReview(formData) {
     ...evidencePackage,
     review_metadata: {
       ...(evidencePackage.review_metadata ?? {}),
-      confirmedAt: new Date().toISOString(),
+      confirmedAt:
+        evidencePackage.review_metadata?.confirmedAt ??
+        review.interpretedEvidence?.review_metadata?.confirmedAt ??
+        review.confirmation?.confirmedAt ??
+        new Date().toISOString(),
       sourceReviewId: reviewId,
     },
   };
@@ -140,6 +144,21 @@ export async function confirmEvidenceReview(formData) {
     await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id });
   } catch (error) {
     await service.failCommit(reviewId, error);
+    if (error?.retryableFailures?.length) {
+      try {
+        revalidatePath(`/evidence/review/${reviewId}`);
+      } catch (revalidationError) {
+        console.warn("[EvidenceReview] Paused review refresh was deferred.", {
+          code: "PAUSED_REVIEW_REFRESH_DEFERRED",
+          reviewId,
+          message: String(revalidationError?.message ?? revalidationError),
+        });
+      }
+      return redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?resume=paused`,
+        recoveryContext
+      ));
+    }
     throw error;
   }
   const publication = publishPostConfirmationRefreshes(orchestrationResult);
@@ -341,24 +360,40 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           .includes(item.evidence_type)
       );
       const newExerciseDefinitions = canonicalDefinitionsPendingCreation(committedPackage);
-      const scopedResult = await createCanonicalEvidenceConfirmationCommitService({
-        runtimeStorePath: resolveFounderRuntimeStorePath(),
-        liveStore: getFounderRuntimeStore(),
-        enableEnergyConfidenceEnqueue:
-          energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
-      }).commitConfirmedEvidencePackage(committedPackage, user.id, {
-        canonicalExerciseDefinitions: newExerciseDefinitions,
-      });
+      const canonicalBeforeCommit = await FounderRepositories.canonicalEvidence
+        .listCanonicalEvidenceObjects(user.id);
+      const atomicPhotoCommitAlreadyPersisted =
+        isPersistedAtomicPhotoCommit(canonicalBeforeCommit, committedPackage);
+      const scopedResult = atomicPhotoCommitAlreadyPersisted
+        ? createPersistedPhotoCommitResult(committedPackage)
+        : await createCanonicalEvidenceConfirmationCommitService({
+          runtimeStorePath: resolveFounderRuntimeStorePath(),
+          liveStore: getFounderRuntimeStore(),
+          enableEnergyConfidenceEnqueue:
+            energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
+        }).commitConfirmedEvidencePackage(committedPackage, user.id, {
+          canonicalExerciseDefinitions: newExerciseDefinitions,
+        });
       if (
         scopedResult.committed !== true &&
         scopedResult.outcome !== "source_matched"
       ) {
         throw new Error(`Canonical evidence commit failed: ${scopedResult.outcome}`);
       }
-      canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      canonical = atomicPhotoCommitAlreadyPersisted
+        ? canonicalBeforeCommit
+        : await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       if (committedPackage.evidence_objects.some((item) => item.evidence_type === "photo_session")) {
-        canonical = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
-        await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(canonical);
+        const expanded = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
+        const projectionChanges = selectChangedPhotoProjectionObjects(
+          canonical,
+          expanded
+        );
+        if (projectionChanges.length > 0) {
+          await FounderRepositories.canonicalEvidence
+            .upsertCanonicalEvidenceObjects(projectionChanges);
+        }
+        canonical = expanded;
       }
       return {
         status: "completed",
@@ -607,6 +642,49 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       };
     },
   };
+}
+
+function isPersistedAtomicPhotoCommit(canonicalObjects, evidencePackage) {
+  const included = (evidencePackage.evidence_objects ?? [])
+    .filter((item) => item.removed !== true);
+  const packageId = String(evidencePackage.package_id ?? evidencePackage.id ?? "").trim();
+  if (
+    !packageId ||
+    included.length === 0 ||
+    included.some((item) => item.evidence_type !== "photo_session")
+  ) return false;
+
+  return included.every((item) => canonicalObjects.some((candidate) =>
+    candidate.evidence_type === "photo_session" &&
+    candidate.quality?.status !== "superseded" &&
+    (candidate.provenance?.evidence_package_ids ?? []).includes(packageId) &&
+    (candidate.provenance?.contributing_evidence_object_ids ?? [])
+      .includes(item.id)
+  ));
+}
+
+function createPersistedPhotoCommitResult(evidencePackage) {
+  const packageId = evidencePackage.package_id ?? evidencePackage.id;
+  return {
+    committed: false,
+    outcome: "source_matched",
+    report: {
+      addedCanonicalIds: [],
+      changedCanonicalIds: [],
+      sourceEvidencePackageIds: packageId ? [packageId] : [],
+      supersededCanonicalIds: [],
+      updatedCanonicalIds: [],
+    },
+  };
+}
+
+function selectChangedPhotoProjectionObjects(before, after) {
+  const beforeById = new Map(before.map((item) => [item.canonicalId, item]));
+  return after.filter((candidate) =>
+    ["photo_session", "progress_photo"].includes(candidate.evidence_type) &&
+    JSON.stringify(beforeById.get(candidate.canonicalId)) !==
+      JSON.stringify(candidate)
+  );
 }
 
 function publishPostConfirmationRefreshes(orchestrationResult) {

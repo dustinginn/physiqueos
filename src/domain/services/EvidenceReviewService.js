@@ -62,7 +62,11 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       assertNoUnresolvedProvisionalExercises(
         evidencePackage ?? review.interpretedEvidence
       );
-      return repositories.evidenceReviews.updateReview(id, { status: "committing", commitError: null });
+      return repositories.evidenceReviews.updateReview(id, {
+        status: "committing",
+        commitError: null,
+        interpretedEvidence: evidencePackage ?? review.interpretedEvidence,
+      });
     },
     async resolveProvisionalExercise(id, {
       expectedUpdatedAt,

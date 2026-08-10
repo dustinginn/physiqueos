@@ -67,7 +67,7 @@ describe("EvidenceReviewService provisional exercise safety", () => {
     }
   );
 
-  it("validates the authoritative prepared package without rewriting the pending review", async () => {
+  it("persists the authoritative prepared package before resumable work begins", async () => {
     const state = reviewFixture();
     const originalEvidence = structuredClone(state.review.interpretedEvidence);
     const service = createEvidenceReviewService({ repositories: repositories(state) });
@@ -88,7 +88,8 @@ describe("EvidenceReviewService provisional exercise safety", () => {
     await expect(service.beginCommit(state.review.id, {
       evidencePackage: preparedEvidence,
     })).resolves.toMatchObject({ status: "committing" });
-    expect(state.review.interpretedEvidence).toEqual(originalEvidence);
+    expect(state.review.interpretedEvidence).toEqual(preparedEvidence);
+    expect(state.review.interpretedEvidence).not.toEqual(originalEvidence);
   });
 });
 

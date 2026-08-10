@@ -48,8 +48,25 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
           return structuredClone(getState().canonicalEvidenceObjects);
         },
         async upsertCanonicalEvidenceObjects(canonicalObjects) {
-          getState().canonicalEvidenceObjects = structuredClone(canonicalObjects);
-          return getState().canonicalEvidenceObjects;
+          const state = getState();
+          if (
+            state.rejectBroadCanonicalUpserts &&
+            canonicalObjects.some((item) =>
+              (item.payload ?? item).evidence_type === "nutrition"
+            )
+          ) {
+            throw new Error(
+              "Cannot persist a second active canonical NutritionDay for nutrition|2026-07-25."
+            );
+          }
+          const byId = new Map(state.canonicalEvidenceObjects.map((item) =>
+            [item.canonicalId, item]
+          ));
+          canonicalObjects.forEach((item) =>
+            byId.set(item.canonicalId, structuredClone(item))
+          );
+          state.canonicalEvidenceObjects = [...byId.values()];
+          return structuredClone(canonicalObjects);
         },
         async reconcileConfirmedEvidencePackage(evidencePackage, userId) {
           const state = getState();
@@ -115,6 +132,8 @@ vi.mock("../../../../domain/services/CanonicalEvidenceConfirmationCommitService"
     createCanonicalEvidenceConfirmationCommitService: () => ({
       async commitConfirmedEvidencePackage(evidencePackage, userId) {
         const state = mockState.value;
+        state.canonicalCommitCalls = (state.canonicalCommitCalls ?? 0) + 1;
+        if (state.canonicalCommitError) throw state.canonicalCommitError;
         const reconciliation = reconcileConfirmedEvidencePackage({
           evidencePackage,
           existingCanonicalObjects: state.canonicalEvidenceObjects,
@@ -247,6 +266,80 @@ function createIsolatedReviewState(store) {
   };
 }
 
+function createFailedPhotoReviewState(store, { atomicCommitPersisted = true } = {}) {
+  const review = structuredClone(
+    store.evidenceReviews.find(
+      (item) => item.id === "evidence_review_20260810005949415"
+    )
+  );
+  const atomicPhoto = structuredClone(
+    store.canonicalEvidenceObjects.find((item) =>
+      item.evidence_type === "photo_session" &&
+      item.provenance?.evidence_package_ids?.includes(
+        review.interpretedEvidence.package_id
+      )
+    )
+  );
+  const historicalNutrition = store.canonicalEvidenceObjects
+    .filter((item) =>
+      (item.payload ?? item).evidence_type === "nutrition" &&
+      String(item.lastObservedAt).slice(0, 10) === "2026-07-25" &&
+      item.quality?.status !== "superseded"
+    )
+    .map((item) => structuredClone(item));
+  review.status = "commit_failed";
+  review.confirmation = null;
+  review.commitError = "Post-confirmation step canonical_commit failed";
+  review.commitProgress = Object.fromEntries([
+    ["canonical_commit", {
+      status: "failed",
+      attempts: 2,
+      error: review.commitError,
+      retryable: true,
+    }],
+    ...[
+      "compatibility_writes",
+      "scheduled_completion",
+      "analysis",
+      "training_performance_events",
+      "goal_evaluation",
+      "event_eligibility",
+      "briefing",
+      "home_refresh",
+    ].map((step) => [step, {
+      status: "completed",
+      attempts: 1,
+      result: { status: "completed" },
+    }]),
+  ]);
+  return {
+    user: structuredClone(store.user),
+    evidenceReviews: [review],
+    canonicalEvidenceObjects: [
+      ...historicalNutrition,
+      ...(atomicCommitPersisted && atomicPhoto ? [atomicPhoto] : []),
+    ],
+    analyses: [],
+    canonicalCommitCalls: 0,
+    rejectBroadCanonicalUpserts: true,
+  };
+}
+
+function confirmationForm(review) {
+  return {
+    get(key) {
+      if (key === "reviewId") return review.id;
+      if (key === "evidenceJson") {
+        return JSON.stringify(review.interpretedEvidence);
+      }
+      if (key === "itemDecisionsJson") {
+        return JSON.stringify(review.itemDecisions ?? {});
+      }
+      return null;
+    },
+  };
+}
+
 describe("confirmEvidenceReview", () => {
   beforeEach(() => {
     revalidatePath.mockClear();
@@ -312,6 +405,67 @@ describe("confirmEvidenceReview", () => {
 
     expect(revalidatePath).toHaveBeenCalledWith("/check-in/morning");
     expect(redirect).toHaveBeenCalledWith("/check-in/morning");
+  });
+
+  it("resumes the persisted photo commit without rerunning it or upserting unrelated canonical history", async () => {
+    mockState.value = createFailedPhotoReviewState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+    const nutritionBefore = structuredClone(
+      mockState.value.canonicalEvidenceObjects.filter((item) =>
+        (item.payload ?? item).evidence_type === "nutrition"
+      )
+    );
+
+    await expect(confirmEvidenceReview(confirmationForm(review)))
+      .resolves.toBeUndefined();
+
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.evidenceReviews[0].status).toBe("confirmed");
+    expect(
+      mockState.value.evidenceReviews[0].commitProgress.canonical_commit
+    ).toMatchObject({ status: "completed", attempts: 3 });
+    expect(
+      mockState.value.canonicalEvidenceObjects.filter((item) =>
+        item.evidence_type === "photo_session" &&
+        item.provenance?.evidence_package_ids?.includes(
+          review.interpretedEvidence.package_id
+        )
+      )
+    ).toHaveLength(1);
+    expect(
+      mockState.value.canonicalEvidenceObjects.filter((item) =>
+        item.evidence_type === "progress_photo" &&
+        item.lastObservedAt === "2026-08-08"
+      )
+    ).toHaveLength(5);
+    expect(
+      mockState.value.canonicalEvidenceObjects.filter((item) =>
+        (item.payload ?? item).evidence_type === "nutrition"
+      )
+    ).toEqual(nutritionBefore);
+    expect(redirect).toHaveBeenCalledWith("/check-in/morning");
+  });
+
+  it("returns a retryable failure to the paused review instead of a generic server error", async () => {
+    mockState.value = createFailedPhotoReviewState(runtimeStore, {
+      atomicCommitPersisted: false,
+    });
+    mockState.value.evidenceReviews[0].commitProgress = {};
+    mockState.value.canonicalCommitError = new Error("temporary commit failure");
+    const review = mockState.value.evidenceReviews[0];
+
+    await expect(confirmEvidenceReview(confirmationForm(review)))
+      .resolves.toBeUndefined();
+
+    expect(mockState.value.canonicalCommitCalls).toBe(1);
+    expect(mockState.value.evidenceReviews[0]).toMatchObject({
+      status: "commit_failed",
+      commitError: expect.stringContaining("canonical_commit"),
+    });
+    expect(redirect).toHaveBeenCalledWith(
+      expect.stringContaining(`/evidence/review/${review.id}?resume=paused`)
+    );
+    expect(redirect).not.toHaveBeenCalledWith("/check-in/morning");
   });
 
   it("completes the durable review when route invalidation reports a missing request store", async () => {

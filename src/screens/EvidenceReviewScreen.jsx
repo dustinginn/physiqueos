@@ -47,7 +47,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   const trainingAchievements = createTrainingPerformanceSuccessPresentation(review);
   const status = review.status;
   const canEdit = ["pending", "commit_failed"].includes(status);
-  const canContinue = status === "partially_committed";
+  const canContinue = hasCommitFailure(review);
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
   const evidenceWithLocalDecisions = {
     ...evidencePackage,
@@ -136,9 +136,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
               <div>
                 <h2 className="font-extrabold">{`Your ${experience.noun} is saved`}</h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  {canContinue
-                    ? `The ${experience.noun} review finished, but its follow-up did not. Finish saving without re-uploading or repeating completed work.`
-                    : "Saving paused safely. Try again to continue; completed steps will not run again."}
+                  We couldn’t finish the follow-up step. Continue without re-uploading or repeating completed work.
                 </p>
               </div>
             </div>
@@ -532,8 +530,8 @@ function ExerciseResolutionButton() {
 
 function ConfirmButton({ blockingCount = 0, disabled, retry, savingLabel }) {
   const { pending } = useFormStatus();
-  const label = blockingCount > 0 ? `Resolve ${blockingCount} exercise ${blockingCount === 1 ? "identity" : "identities"} to save` : retry ? "Finish saving" : "Save included evidence";
-  return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Finishing your upload\u2026" : savingLabel) : label}</button>;
+  const label = blockingCount > 0 ? `Resolve ${blockingCount} exercise ${blockingCount === 1 ? "identity" : "identities"} to save` : retry ? "Continue" : "Save included evidence";
+  return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Continuing\u2026" : savingLabel) : label}</button>;
 }
 
 function ReprocessButton() {

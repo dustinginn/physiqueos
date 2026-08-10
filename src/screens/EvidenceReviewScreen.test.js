@@ -90,10 +90,11 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(actions).toContain("assertIncludedPhotoSessionsReady");
   });
 
-  it("offers a bounded continuation after a partial commit without upload or edit controls", () => {
-    expect(screen).toContain('const canContinue = status === "partially_committed"');
+  it("offers a bounded continuation after any recoverable commit failure", () => {
+    expect(screen).toContain("const canContinue = hasCommitFailure(review)");
     expect(screen).toContain("Your ${experience.noun} is saved");
-    expect(screen).toContain("Finish saving");
+    expect(screen).toContain('retry ? "Continue"');
+    expect(screen).toContain("We couldn’t finish the follow-up step.");
     expect(screen).toContain("without re-uploading or repeating completed work");
   });
 
