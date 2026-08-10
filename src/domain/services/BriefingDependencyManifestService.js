@@ -59,9 +59,11 @@ export function createCanonicalEvidenceSemanticDescriptor(record = {}) {
       commitId: record.commitId ?? payload.commitId ?? null,
       repositoryId: record.repositoryId ?? payload.repositoryId ?? null,
       sourceEvidencePackageId:
+        record.sourceEvidencePackageId ?? payload.sourceEvidencePackageId ??
         nutritionRevision?.sourceEvidencePackageId ??
         latest(record.provenance?.evidence_package_ids) ?? null,
-      sourceReviewId: nutritionRevision?.sourceReviewId ?? null,
+      sourceReviewId: record.sourceReviewId ?? payload.sourceReviewId ??
+        nutritionRevision?.sourceReviewId ?? null,
     }),
   });
 }
@@ -228,7 +230,8 @@ function semanticPayloadFor(type, payload) {
   };
   if (type === "weight") return {
     observed_at: evidenceDate(payload, payload),
-    weight: payload.weight ?? payload.value ?? null,
+    weight: payload.weight ?? payload.value ?? payload.metadata?.value ?? null,
+    unit: payload.unit ?? payload.metadata?.unit ?? null,
   };
   if (["dexa", "dexa_scan", "body_composition"].includes(type)) return {
     observed_at: evidenceDate(payload, payload),
@@ -262,6 +265,7 @@ function logicalIdentityFor({ canonicalObjectId, evidenceType, observedDate, pay
 function evidenceDate(record = {}, payload = record) {
   return String(
     payload?.observed_at ?? payload?.measuredAt ?? payload?.date ??
+    payload?.evidenceDate ??
     payload?.metadata?.date ?? record?.lastObservedAt ?? record?.observedAt ?? ""
   ).slice(0, 10);
 }
@@ -279,7 +283,9 @@ function inferEvidenceType(payload = {}) {
 function normalizeEvidenceType(value) {
   const type = String(value ?? "").trim().toLowerCase();
   if (type === "activity") return "activity_day";
+  if (type === "morning_weight") return "weight";
   if (type === "nutrition_day") return "nutrition";
+  if (type === "recovery") return "recovery_day";
   if (type === "training_session") return "training";
   if (type === "progress_photo" || type === "progress_photos") {
     return "photo_session";

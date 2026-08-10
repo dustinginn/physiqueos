@@ -26,18 +26,19 @@ export function enqueueBriefingReconciliationWorkItems({
       cadence: plan.cadence,
     });
     const id = `briefing_reconciliation|${identityFingerprint.slice(7, 31)}`;
-    const index = items.findIndex((item) => item.id === id &&
-      ![BriefingReconciliationState.CURRENT_AFTER_REVISION,
-        BriefingReconciliationState.CURRENT].includes(item.status));
+    const index = items.findIndex((item) => item.id === id);
     const prior = index >= 0 ? items[index] : null;
+    const reopening = [BriefingReconciliationState.CURRENT_AFTER_REVISION,
+      BriefingReconciliationState.CURRENT].includes(prior?.status);
     const affected = coalesceDependencies([
-      ...(prior?.affectedDependencies ?? []),
+      ...(reopening ? [] : prior?.affectedDependencies ?? []),
       ...(plan.affectedDependencies ?? []),
     ]);
     const next = {
       schemaVersion: BRIEFING_RECONCILIATION_WORK_ITEM_VERSION,
       id,
       publicationRootId: plan.publicationRootId,
+      userId: plan.userId ?? prior?.userId ?? null,
       occurrenceIdentity: plan.occurrenceIdentity,
       cadence: plan.cadence,
       reason: plan.reason,
@@ -51,13 +52,19 @@ export function enqueueBriefingReconciliationWorkItems({
       affectedDependencies: affected,
       sourceCommitLinks: unique(affected.flatMap((item) =>
         [item.sourceLinkage?.commitId].filter(Boolean))),
-      attempts: prior?.attempts ?? 0,
-      enqueuedAt: prior?.enqueuedAt ?? enqueuedAt,
+      attempts: reopening ? 0 : prior?.attempts ?? 0,
+      enqueuedAt: reopening ? enqueuedAt : prior?.enqueuedAt ?? enqueuedAt,
       updatedAt: enqueuedAt,
       startedAt: null,
       completedAt: null,
       failure: null,
       result: null,
+      completionHistory: prior?.result
+        ? [...(prior.completionHistory ?? []), {
+            completedAt: prior.completedAt,
+            result: structuredClone(prior.result),
+          }]
+        : prior?.completionHistory ?? [],
     };
     if (index >= 0) items.splice(index, 1, next);
     else items.push(next);
@@ -111,11 +118,17 @@ export function failBriefingReconciliation(item, error, failedAt) {
     failure: {
       code: error?.code ?? "briefing_revision_failed",
       message: String(error?.message ?? error),
-      retryable: true,
+      retryable: !PERMANENT_FAILURE_CODES.has(error?.code),
       failedAt,
     },
   });
 }
+
+const PERMANENT_FAILURE_CODES = new Set([
+  "cadence_revision_unavailable",
+  "publication_not_current",
+  "revision_no_longer_eligible",
+]);
 
 function coalesceDependencies(items) {
   const byIdentity = new Map();

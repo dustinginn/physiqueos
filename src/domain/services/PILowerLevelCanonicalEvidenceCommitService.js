@@ -14,6 +14,9 @@ import {
 import { createPISemanticFingerprint } from "./PILowerLevelConfidenceContracts";
 import { findCanonicalExerciseConflict } from "./CanonicalExerciseLibraryService";
 import { registerRuntimeTrainingExercises } from "../models/trainingExerciseIdentity";
+import {
+  createBriefingReconciliationEnqueueService,
+} from "./BriefingReconciliationEnqueueService";
 
 export const PILowerLevelSourceCommitOutcome = Object.freeze({
   SOURCE_COMMITTED_WORK_ENQUEUED: "source_committed_work_enqueued",
@@ -30,6 +33,8 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
   now = () => new Date(),
   createUnitOfWork = createFounderStoreUnitOfWork,
   enqueueCoordinator = createPILowerLevelConfidenceWorkEnqueueService({ now }),
+  briefingCoordinator = createBriefingReconciliationEnqueueService({ now }),
+  enableEnergyConfidenceEnqueue = true,
 } = {}) {
   if (!runtimeStorePath || !liveStore) {
     throw new Error("Lower-level canonical commit requires a bound Founder store.");
@@ -48,8 +53,11 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
       }).begin();
       let reconciliation;
       const enqueueResults = [];
+      let briefingReconciliation = null;
+      let evidencePackageAdded = false;
       try {
         await transaction.mutate((candidate) => {
+          evidencePackageAdded = ensureEvidencePackage(candidate, evidencePackage);
           candidate.canonicalExerciseLibrary ??= [];
           for (const definition of canonicalExerciseDefinitions) {
             const conflict = findCanonicalExerciseConflict(
@@ -77,9 +85,9 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
             candidate.canonicalEvidenceObjects,
             reconciliation.changedObjects
           );
-          for (const record of reconciliation.changedObjects.filter(
-            isEnergySource
-          )) {
+          for (const record of enableEnergyConfidenceEnqueue
+            ? reconciliation.changedObjects.filter(isEnergySource)
+            : []) {
             const date = sourceDate(record);
             const counterpart = findCounterpart(
               candidate.canonicalEvidenceObjects,
@@ -99,7 +107,9 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
               })
             );
           }
-          for (const rmr of reconciliation.changedObjects.filter(isRmrSource)) {
+          for (const rmr of enableEnergyConfidenceEnqueue
+            ? reconciliation.changedObjects.filter(isRmrSource)
+            : []) {
             for (const date of boundedRmrAffectedDates(
               candidate.canonicalEvidenceObjects,
               sourceDate(rmr)
@@ -137,10 +147,20 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
               );
             }
           }
+          briefingReconciliation = briefingCoordinator
+            .stageCanonicalEvidenceChanges(candidate, {
+              canonicalChanges: reconciliation.changedObjects,
+              confirmedAt: evidencePackage.review_metadata?.confirmedAt ??
+                now().toISOString(),
+              sourceEvidencePackageId: evidencePackage.package_id ?? null,
+              sourceReviewId: evidencePackage.review_metadata?.sourceReviewId ?? null,
+              userId,
+            });
         });
         if (
           (!reconciliation || reconciliation.changedObjects.length === 0) &&
-          canonicalExerciseDefinitions.length === 0
+          canonicalExerciseDefinitions.length === 0 &&
+          !evidencePackageAdded
         ) {
           transaction.abort();
           return sourceResult(
@@ -152,6 +172,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         const committed = await transaction.commit({
           finalizeCandidate({ stagedState, commitId }) {
             stampPendingSourceCommits(stagedState, commitId);
+            briefingCoordinator.stampSourceCommit(stagedState, commitId);
           },
           validateFinalized(candidate) {
             return reconciliation.changedObjects.every((record) =>
@@ -162,19 +183,27 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
               candidate.canonicalExerciseLibrary?.some(
                 (item) => item.id === definition.id
               )
-            ) && enqueueResults.every((item) =>
+            ) && (!evidencePackageAdded || candidate.evidencePackages?.some(
+              (item) => item.package_id === evidencePackage.package_id
+            )) && enqueueResults.every((item) =>
               candidate.piEnergyConfidenceWorkItems?.some(
                 (work) => work.id === item.workId &&
                   work.sourceCommitLinks?.every(
                     (link) => link.commitId !== "pending_source_commit"
                   )
               )
+            ) && (briefingReconciliation?.workItemIds ?? []).every((workId) =>
+              candidate.briefingReconciliationWorkItems?.some((work) =>
+                work.id === workId &&
+                !work.sourceCommitLinks?.includes("pending_source_commit")
+              )
             );
           },
         });
         registerRuntimeTrainingExercises(liveStore.canonicalExerciseLibrary ?? []);
         return sourceResult(
-          enqueueResults.every((item) => item.outcome === "matched")
+          enqueueResults.every((item) => item.outcome === "matched") &&
+            !briefingReconciliation?.changed
             ? PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED
             : PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_ENQUEUED,
           reconciliation,
@@ -189,6 +218,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
                 ({ id, name }) => ({ id, name })
               ),
             },
+            briefingReconciliation,
           }
         );
       } catch (error) {
@@ -228,6 +258,17 @@ function applyChanges(existing = [], changed = []) {
   const byId = new Map(existing.map((item) => [item.canonicalId, item]));
   changed.forEach((item) => byId.set(item.canonicalId, item));
   return [...byId.values()];
+}
+function ensureEvidencePackage(candidate, evidencePackage) {
+  if (!evidencePackage?.package_id) return false;
+  candidate.evidencePackages ??= [];
+  if (!candidate.evidencePackages.some((item) =>
+    item.package_id === evidencePackage.package_id
+  )) {
+    candidate.evidencePackages.push(structuredClone(evidencePackage));
+    return true;
+  }
+  return false;
 }
 function isEnergySource(record) {
   return ["nutrition", "activity_day", "activity"].includes(

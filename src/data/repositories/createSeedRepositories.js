@@ -23,6 +23,9 @@ import { createWeightRepository } from "./WeightRepository";
 import { createEvidenceReviewRepository } from "./EvidenceReviewRepository";
 import { createTrainingPerformanceEventRepository } from "./TrainingPerformanceEventRepository";
 import { createGoalConfidenceRepository } from "./GoalConfidenceRepository";
+import {
+  createBriefingReconciliationWorkItemRepository,
+} from "./BriefingReconciliationWorkItemRepository";
 
 export function createSeedRepositories(seedPack, options = {}) {
   const evidencePackages = seedPack.evidencePackages ?? [];
@@ -75,6 +78,14 @@ export function createSeedRepositories(seedPack, options = {}) {
       seedPack.dailyBriefings ?? [],
       { ...options, onChange: () => options.onChange?.("dailyBriefings") }
     ),
+    briefingReconciliationWorkItems:
+      createBriefingReconciliationWorkItemRepository(
+        seedPack.briefingReconciliationWorkItems ?? [],
+        {
+          ...options,
+          onChange: () => options.onChange?.("briefingReconciliationWorkItems"),
+        }
+      ),
     analyses: createAnalysisRepository(seedPack.analyses, options),
     evidencePackages: createEvidencePackageRepository(
       evidencePackages,

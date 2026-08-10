@@ -41,8 +41,8 @@ import {
   resolveFounderRuntimeStorePath,
 } from "../../../../data/repositories/founderRuntimeStore";
 import {
-  createPILowerLevelCanonicalEvidenceCommitService,
-} from "../../../../domain/services/PILowerLevelCanonicalEvidenceCommitService";
+  createCanonicalEvidenceConfirmationCommitService,
+} from "../../../../domain/services/CanonicalEvidenceConfirmationCommitService";
 import {
   createPILowerLevelConfidenceWorkEnqueueService,
   isPIEnergyConfidenceEnqueueEnabled,
@@ -57,7 +57,6 @@ import { toDexaReadModel, selectValidDexaScans } from "../../../../domain/servic
 import { arePhotoPoseIdentitiesCompatible } from "../../../../domain/models/progressPhotoPoseVocabulary";
 import { satisfyPhotoPriorityFromCanonicalSession } from "../../../../domain/services/PhotoPrioritySatisfactionService";
 import { getCanonicalProgressPhotoCategory } from "../../../../domain/models/progressPhotoPoseVocabulary";
-import { createCanonicalExerciseWorkoutCommitService } from "../../../../domain/services/CanonicalExerciseWorkoutCommitService";
 import {
   assertNoUnresolvedProvisionalExercises,
   canonicalDefinitionsPendingCreation,
@@ -117,6 +116,14 @@ export async function confirmEvidenceReview(formData) {
     review.interpretedEvidence,
     reviewId
   );
+  evidencePackage = {
+    ...evidencePackage,
+    review_metadata: {
+      ...(evidencePackage.review_metadata ?? {}),
+      confirmedAt: new Date().toISOString(),
+      sourceReviewId: reviewId,
+    },
+  };
   evidencePackage = prepareCanonicalExerciseIdentitiesForConfirmation(evidencePackage);
   evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
   assertNoUnresolvedProvisionalExercises(evidencePackage);
@@ -334,24 +341,15 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           .includes(item.evidence_type)
       );
       const newExerciseDefinitions = canonicalDefinitionsPendingCreation(committedPackage);
-      const scopedResult =
-        energySourceCommit && isPIEnergyConfidenceEnqueueEnabled()
-          ? await createPILowerLevelCanonicalEvidenceCommitService({
-              runtimeStorePath: resolveFounderRuntimeStorePath(),
-              liveStore: getFounderRuntimeStore(),
-            }).commitConfirmedEvidencePackage(committedPackage, user.id, {
-              canonicalExerciseDefinitions: newExerciseDefinitions,
-            })
-          : newExerciseDefinitions.length > 0
-          ? await createCanonicalExerciseWorkoutCommitService({
-              runtimeStorePath: resolveFounderRuntimeStorePath(),
-              liveStore: getFounderRuntimeStore(),
-            }).commit(committedPackage, user.id)
-          : await FounderRepositories.canonicalEvidence
-              .reconcileConfirmedEvidencePackage(committedPackage, user.id);
+      const scopedResult = await createCanonicalEvidenceConfirmationCommitService({
+        runtimeStorePath: resolveFounderRuntimeStorePath(),
+        liveStore: getFounderRuntimeStore(),
+        enableEnergyConfidenceEnqueue:
+          energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
+      }).commitConfirmedEvidencePackage(committedPackage, user.id, {
+        canonicalExerciseDefinitions: newExerciseDefinitions,
+      });
       if (
-        energySourceCommit &&
-        isPIEnergyConfidenceEnqueueEnabled() &&
         scopedResult.committed !== true &&
         scopedResult.outcome !== "source_matched"
       ) {
@@ -374,6 +372,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         }),
         reconciliationScope: scopedResult.scope ?? scopedResult.reconciliationScope,
         lowerLevelWork: scopedResult.lowerLevelWork ?? [],
+        briefingReconciliation: scopedResult.briefingReconciliation ?? null,
         ...scopedResult.report,
       };
     },
@@ -612,7 +611,12 @@ function createHandlers({ evidencePackage, reviewId, user }) {
 
 function publishPostConfirmationRefreshes(orchestrationResult) {
   const publication = orchestrationResult?.homeRefreshResult ?? orchestrationResult?.results?.home_refresh ?? null;
-  const paths = uniqueStrings(publication?.pathsToRevalidate ?? []);
+  const paths = uniqueStrings([
+    ...(publication?.pathsToRevalidate ?? []),
+    "/briefings/weekly",
+    "/briefings/review",
+    "/check-in/morning",
+  ]);
   const tags = uniqueStrings(publication?.tagsToRevalidate ?? []);
   try {
     paths.forEach((path) => revalidatePath(path));

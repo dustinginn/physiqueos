@@ -8,6 +8,8 @@ import IconBadge from "../components/ui/IconBadge";
 
 export default function MorningCheckInScreen({
   action,
+  briefingFinalizationAction,
+  briefingReconciliation = null,
   recoveryAction,
   dateLabel,
   existingWeight = null,
@@ -35,6 +37,12 @@ export default function MorningCheckInScreen({
           <h1 className="text-3xl font-extrabold leading-tight text-slate-950">What’s your weight today?</h1>
           <p className="text-sm font-semibold text-slate-500">{dateLabel}</p>
         </div>
+        {briefingReconciliation?.visible && (
+          <BriefingReconciliationCard
+            action={briefingFinalizationAction}
+            presentation={briefingReconciliation}
+          />
+        )}
         <form action={action} className="space-y-4">
           {executionItems.length > 0 && (
             <Card className="min-w-0 space-y-4">
@@ -156,6 +164,40 @@ export default function MorningCheckInScreen({
         </form>
       </div>
     </main>
+  );
+}
+
+function BriefingReconciliationCard({ action, presentation }) {
+  const failed = presentation.state === "update_failed";
+  return (
+    <Card className="mb-4 space-y-3" variant={failed ? "warning" : "accent"}>
+      <div>
+        <p className="text-sm font-extrabold text-[var(--text-primary)]">
+          {presentation.title}
+        </p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+          {presentation.message}
+        </p>
+      </div>
+      {presentation.canFinalize && (
+        <form action={action}>
+          <BriefingFinalizationButton failed={failed}/>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+function BriefingFinalizationButton({ failed }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      className="min-h-12 w-full rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-60"
+      disabled={pending}
+      type="submit"
+    >
+      {pending ? "Updating briefingâ€¦" : failed ? "Retry briefing update" : "Finish recovery and update briefing"}
+    </button>
   );
 }
 

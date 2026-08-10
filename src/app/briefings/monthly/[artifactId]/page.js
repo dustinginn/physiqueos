@@ -2,15 +2,19 @@ import Link from "next/link";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
 import { projectPersistedMonthlyPresentationForRendering } from "../../../../domain/services/MonthlyPersistedArtifactCompatibilityService";
 import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
+import { createBriefingReconciliationPresentation } from "../../../../domain/services/BriefingReconciliationPresentationService";
 
 export const dynamic = "force-dynamic";
 
 export default async function MonthlyBriefingArtifactPage({ params }) {
   const { artifactId } = await params;
   const user = await FounderRepositories.users.getCurrentUser();
-  const artifacts = user?.id
-    ? await FounderRepositories.dailyBriefings.listDailyBriefings(user.id)
-    : [];
+  const [artifacts, workItems] = user?.id
+    ? await Promise.all([
+        FounderRepositories.dailyBriefings.listDailyBriefings(user.id),
+        FounderRepositories.briefingReconciliationWorkItems.listWorkItems(user.id),
+      ])
+    : [[], []];
   const artifact = artifacts.find((item) => item.id === artifactId);
   if (!isReadableMonthlyArtifact(artifact, user?.id)) {
     return <MonthlyUnavailableState />;
@@ -18,7 +22,14 @@ export default async function MonthlyBriefingArtifactPage({ params }) {
   const presentation = projectPersistedMonthlyPresentationForRendering(
     artifact.briefing.monthlyPresentation
   );
-  return <MonthlyBriefingScreen presentation={presentation} />;
+  const reconciliation = createBriefingReconciliationPresentation({
+    publicationRootId: artifact.id,
+    workItems,
+  });
+  return <MonthlyBriefingScreen
+    presentation={presentation}
+    reconciliation={reconciliation}
+  />;
 }
 
 function isReadableMonthlyArtifact(artifact, userId) {

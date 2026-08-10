@@ -102,6 +102,7 @@ function createPlan({ cadence, publication, affected, drift }) {
   return Object.freeze({
     schemaVersion: BRIEFING_AFFECTED_PUBLICATION_PLANNER_VERSION,
     publicationRootId: publication.id,
+    userId: publication.userId ?? null,
     occurrenceIdentity: publication.evidenceWindow?.id ?? publication.id,
     cadence,
     evidenceWindow: structuredClone(publication.evidenceWindow ?? null),

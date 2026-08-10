@@ -107,6 +107,39 @@ vi.mock("../../../../domain/services/PILowerLevelConfidenceWorkEnqueueService", 
   isPITrainingConfidenceEnqueueEnabled: () => false,
 }));
 
+vi.mock("../../../../domain/services/CanonicalEvidenceConfirmationCommitService", async () => {
+  const { reconcileConfirmedEvidencePackage } = await vi.importActual(
+    "../../../../domain/services/CanonicalEvidenceService"
+  );
+  return {
+    createCanonicalEvidenceConfirmationCommitService: () => ({
+      async commitConfirmedEvidencePackage(evidencePackage, userId) {
+        const state = mockState.value;
+        const reconciliation = reconcileConfirmedEvidencePackage({
+          evidencePackage,
+          existingCanonicalObjects: state.canonicalEvidenceObjects,
+          userId,
+        });
+        const byId = new Map(state.canonicalEvidenceObjects.map((item) =>
+          [item.canonicalId, item]
+        ));
+        reconciliation.changedObjects.forEach((item) =>
+          byId.set(item.canonicalId, structuredClone(item))
+        );
+        state.canonicalEvidenceObjects = [...byId.values()];
+        return {
+          committed: reconciliation.changedObjects.length > 0,
+          outcome: reconciliation.changedObjects.length > 0
+            ? "source_committed_work_matched"
+            : "source_matched",
+          report: reconciliation.report,
+          scope: reconciliation.scope,
+        };
+      },
+    }),
+  };
+});
+
 vi.mock("../../../../domain/services/PendingEvidenceReviewReprocessingService", () => ({
   createPendingEvidenceReviewReprocessingService: () => ({
     async reprocessPendingReviewInPlace() {

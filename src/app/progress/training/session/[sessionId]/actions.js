@@ -3,8 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../../../domain/services/CanonicalEvidenceService";
 import { createTrainingSessionCorrectionEvidencePackage } from "../../../../../domain/services/EvidenceCorrectionService";
+import {
+  getFounderRuntimeStore,
+  resolveFounderRuntimeStorePath,
+} from "../../../../../data/repositories/founderRuntimeStore";
+import {
+  createCanonicalEvidenceConfirmationCommitService,
+} from "../../../../../domain/services/CanonicalEvidenceConfirmationCommitService";
 import {
   normalizeTrainingContextId,
   resolveTrainingReturnPath,
@@ -52,26 +58,33 @@ export async function addTrainingSessionCorrection(formData) {
     if (!targetCanonicalObject) {
       redirectTarget = sessionTarget("session-not-found");
     } else {
-      const evidencePackage = createTrainingSessionCorrectionEvidencePackage({
+      const confirmedAt = new Date().toISOString();
+      const correctionPackage = createTrainingSessionCorrectionEvidencePackage({
         author: user.id,
+        capturedAt: confirmedAt,
         correctionText,
         targetCanonicalObject,
         userId: user.id,
       });
+      const evidencePackage = {
+        ...correctionPackage,
+        review_metadata: {
+          confirmedAt,
+          confirmationSource: "training_session_correction",
+        },
+      };
+      const result = await createCanonicalEvidenceConfirmationCommitService({
+        runtimeStorePath: resolveFounderRuntimeStorePath(),
+        liveStore: getFounderRuntimeStore(),
+        enableEnergyConfidenceEnqueue: false,
+      }).commitConfirmedEvidencePackage(evidencePackage, user.id);
+      if (result.committed !== true && result.outcome !== "source_matched") {
+        throw new Error(`Training correction commit failed: ${result.outcome}`);
+      }
 
-      await FounderRepositories.evidencePackages.saveEvidencePackage(evidencePackage);
-
-      const refreshedCanonicalObjects =
-        await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      const reconciledObjects = reconcileEvidencePackageIntoCanonicalHistory({
-        evidencePackage,
-        existingCanonicalObjects: refreshedCanonicalObjects,
-        userId: user.id,
-      });
-
-      await FounderRepositories.canonicalEvidence.upsertCanonicalEvidenceObjects(
-        reconciledObjects
-      );
+      revalidatePath("/briefings/weekly");
+      revalidatePath("/briefings/review");
+      revalidatePath("/check-in/morning");
 
       revalidatePath("/progress/training");
       revalidatePath("/progress/training/library");

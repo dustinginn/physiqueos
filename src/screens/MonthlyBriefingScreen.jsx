@@ -28,7 +28,7 @@ const sectionIcons = {
   weight: Scale,
 };
 
-export default function MonthlyBriefingScreen({ presentation }) {
+export default function MonthlyBriefingScreen({ presentation, reconciliation = null }) {
   return (
     <main className="app-surface min-h-screen overflow-x-hidden">
       <div className="mx-auto max-w-[393px] px-4 pb-32 pt-8">
@@ -40,6 +40,18 @@ export default function MonthlyBriefingScreen({ presentation }) {
           <ArrowLeft size={18} />Briefing History
         </Link>
         <Hero hero={presentation.hero} />
+        {reconciliation?.visible && reconciliation.state !== "current" && (
+          <aside className="mb-3 rounded-2xl border border-[var(--divider)] bg-[var(--surface-accent)] p-4">
+            <p className="text-sm font-extrabold text-[var(--text-primary)]">
+              {reconciliation.state === "updating"
+                ? "Updating with recently confirmed evidenceâ€¦"
+                : "This briefing update needs another try"}
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+              {reconciliation.message}
+            </p>
+          </aside>
+        )}
         {presentation.milestone && <GoalMilestone milestone={presentation.milestone} />}
         {presentation.training && <TrainingProgress training={presentation.training} />}
         {presentation.energy && <MonthlyEnergyEvolution model={presentation.energy} />}

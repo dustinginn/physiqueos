@@ -38,6 +38,23 @@ export function createBriefingRevisionExecutionService({
           throw typed("revision_no_longer_eligible",
             "The publication no longer qualifies for automatic revision.");
         }
+        if (eligibility.current === true) {
+          active = completeBriefingReconciliation(active, {
+            completedAt: now().toISOString(),
+            publicationArtifactId: publication.id,
+            dependencyManifestFingerprint:
+              publication.dependencyManifest?.fingerprint ?? null,
+            noOp: true,
+          });
+          await saveWorkItem(active);
+          return Object.freeze({
+            schemaVersion: BRIEFING_REVISION_EXECUTION_VERSION,
+            status: "completed_no_op",
+            committed: false,
+            artifact: publication,
+            workItem: active,
+          });
+        }
         const service = cadenceServices[active.cadence];
         if (!service) throw typed("cadence_revision_unavailable",
           `No canonical ${active.cadence} revision service is registered.`);

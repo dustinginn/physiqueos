@@ -3,11 +3,17 @@ import {
   createRecoveryEvidenceRecord,
 } from "../models/RecoveryEvidenceModel";
 import { createDailyCheckIn } from "../models/dailyCheckIn";
+import {
+  createBriefingReconciliationEnqueueService,
+} from "./BriefingReconciliationEnqueueService";
 
 export const RECOVERY_CHECK_IN_INGESTION_VERSION =
   "recovery_check_in_ingestion_v1";
 
-export function createRecoveryCheckInIngestionService({ unitOfWork }) {
+export function createRecoveryCheckInIngestionService({
+  unitOfWork,
+  briefingCoordinator = createBriefingReconciliationEnqueueService(),
+}) {
   if (!unitOfWork?.begin) {
     throw new Error("Recovery check-in ingestion requires an atomic unit of work.");
   }
@@ -41,6 +47,7 @@ export function createRecoveryCheckInIngestionService({ unitOfWork }) {
           : null;
         const evidenceIds = [];
         const created = [];
+        const canonicalChanges = [];
         for (const metricInput of normalized.metrics) {
           const active = currentMetricRecord(
             canonical,
@@ -90,7 +97,9 @@ export function createRecoveryCheckInIngestionService({ unitOfWork }) {
             updatedAt: normalized.recordedAt,
           });
           if (active) supersede(canonical, active.id, record);
-          canonical.push(createCanonicalRecoveryEvidenceObject(record));
+          const canonicalObject = createCanonicalRecoveryEvidenceObject(record);
+          canonical.push(canonicalObject);
+          canonicalChanges.push(canonicalObject);
           evidenceIds.push(record.id);
           created.push(record.id);
         }
@@ -137,14 +146,30 @@ export function createRecoveryCheckInIngestionService({ unitOfWork }) {
           checkInId,
           evidenceIds: unique(evidenceIds),
           createdEvidenceIds: unique(created),
+          briefingReconciliation:
+            briefingCoordinator.stageCanonicalEvidenceChanges(staged, {
+              canonicalChanges,
+              confirmedAt: normalized.recordedAt,
+              userId: normalized.userId,
+            }),
         };
       });
       await transaction.commit({
+        finalizeCandidate({ stagedState, commitId }) {
+          briefingCoordinator.stampSourceCommit(stagedState, commitId);
+        },
         validate(staged) {
           return (
             Array.isArray(staged.dailyCheckIns) &&
             Array.isArray(staged.canonicalEvidenceObjects)
           );
+        },
+        validateFinalized(staged) {
+          return (result.briefingReconciliation?.workItemIds ?? [])
+            .every((workId) => staged.briefingReconciliationWorkItems?.some(
+              (item) => item.id === workId &&
+                !item.sourceCommitLinks?.includes("pending_source_commit")
+            ));
         },
       });
       return Object.freeze(result);

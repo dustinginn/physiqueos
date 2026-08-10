@@ -29,6 +29,7 @@ const PERSISTED_COLLECTIONS = [
   "reminders",
   "dailyCheckIns",
   "dailyBriefings",
+  "briefingReconciliationWorkItems",
   "confidenceInitializationArtifacts",
   "analyses",
   "evidencePackages",
@@ -146,6 +147,10 @@ export function createFounderRuntimeStore(persisted = readPersistedRuntimeStore(
     dailyBriefings: mergeSeedWithPersisted(
       founderSeedPack.dailyBriefings,
       persisted.dailyBriefings
+    ),
+    briefingReconciliationWorkItems: mergeSeedWithPersisted(
+      [],
+      persisted.briefingReconciliationWorkItems
     ),
     confidenceInitializationArtifacts: mergeSeedWithPersisted(
       [],
@@ -571,6 +576,8 @@ function normalizeFounderRuntimeStore(store) {
       "replacedAnalysisHistory"
     ),
     dailyBriefings: normalizeDailyBriefingRecords(store.dailyBriefings),
+    briefingReconciliationWorkItems:
+      store.briefingReconciliationWorkItems ?? [],
     evidencePackages: store.evidencePackages ?? [],
     trainingPerformanceEvents: store.trainingPerformanceEvents ?? [],
     trainingPerformanceEventBatches:

@@ -22,7 +22,7 @@ import {
 } from "../components/briefings/CadenceBriefingPrimitives";
 import { createWeeklyBriefingScreenPresentation } from "../domain/services/WeeklyBriefingScreenPresentationService";
 
-export default function WeeklyBriefingScreen({ narrative }) {
+export default function WeeklyBriefingScreen({ narrative, reconciliation = null }) {
   const presentation = createWeeklyBriefingScreenPresentation(narrative);
   return <main className="app-surface min-h-screen overflow-x-hidden">
     <div className="mx-auto max-w-[393px] px-4 pb-32 pt-10">
@@ -50,6 +50,19 @@ export default function WeeklyBriefingScreen({ narrative }) {
       >
         <WeeklyStrategyContext hero={presentation.hero}/>
       </CadenceBriefingHero>
+
+      {reconciliation?.visible && reconciliation.state !== "current" && (
+        <Card className="mt-3" variant={reconciliation.state === "update_failed" ? "warning" : "accent"}>
+          <p className="text-sm font-extrabold text-[var(--text-primary)]">
+            {reconciliation.state === "updating"
+              ? "Updating with recently confirmed evidenceâ€¦"
+              : "This briefing update needs another try"}
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+            {reconciliation.message}
+          </p>
+        </Card>
+      )}
 
       <div className="mt-3 space-y-3">
         {presentation.energy && <WeeklyEnergy energy={presentation.energy}/>}

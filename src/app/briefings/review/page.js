@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { createBriefingReconciliationPresentation } from "../../../domain/services/BriefingReconciliationPresentationService";
 
 export const dynamic = "force-dynamic";
 
 export default async function BriefingHistoryPage() {
   const user = await FounderRepositories.users.getCurrentUser();
-  const artifacts = (await FounderRepositories.dailyBriefings.listDailyBriefings(user?.id))
+  const [briefings, workItems] = await Promise.all([
+    FounderRepositories.dailyBriefings.listDailyBriefings(user?.id),
+    FounderRepositories.briefingReconciliationWorkItems.listWorkItems(user?.id),
+  ]);
+  const artifacts = briefings
     .sort((left, right) => String(right.generatedAt).localeCompare(String(left.generatedAt)));
   const founderPhotoArtifact = artifacts.find((item) => item.id === "daily_briefing_20260710")
     ?? artifacts.find((item) => String(item.generatedAt).startsWith("2026-07-11"));
@@ -14,7 +19,23 @@ export default async function BriefingHistoryPage() {
     <Link className="font-bold text-[var(--primary)]" href="/">← Home</Link>
     <h1 className="mt-5 text-3xl font-extrabold">Briefing History</h1>
     {founderPhotoArtifact && <Link className="mt-4 inline-flex rounded-xl border border-[var(--divider)] px-4 py-3 text-sm font-extrabold text-[var(--primary)]" href={`/briefings/review/${founderPhotoArtifact.id}`}>Founder link · July 11 photo-era artifact</Link>}
-    <div className="mt-6 space-y-3">{artifacts.map((item) => <Link className="block min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4" href={artifactHref(item)} key={item.id}><p className="break-words font-extrabold">{artifactTitle(item)}</p><p className="mt-1 break-words text-xs text-slate-500">{artifactSubtitle(item)}</p></Link>)}</div>
+    <div className="mt-6 space-y-3">{artifacts.map((item) => {
+      const reconciliation = createBriefingReconciliationPresentation({
+        publicationRootId: item.id,
+        workItems,
+      });
+      return <Link className="block min-w-0 rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4" href={artifactHref(item)} key={item.id}>
+        <p className="break-words font-extrabold">{artifactTitle(item)}</p>
+        <p className="mt-1 break-words text-xs text-slate-500">{artifactSubtitle(item)}</p>
+        {reconciliation.visible && <p className="mt-2 text-xs font-extrabold text-[var(--primary)]">
+          {reconciliation.state === "updating"
+            ? "Updating with confirmed evidenceâ€¦"
+            : reconciliation.state === "update_failed"
+              ? "Update needs another try"
+              : "Revised with confirmed evidence"}
+        </p>}
+      </Link>;
+    })}</div>
   </div></main>;
 }
 

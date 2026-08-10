@@ -9,6 +9,9 @@ import {
   MorningPriorityReconciliationValidationError,
   createMorningPriorityReconciliationService,
 } from "./MorningPriorityReconciliationService";
+import {
+  createBriefingReconciliationEnqueueService,
+} from "./BriefingReconciliationEnqueueService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
@@ -19,6 +22,7 @@ export function createMorningCheckInPersistenceService({
   liveStore,
   now = () => new Date(),
   createUnitOfWork = (options) => createFounderStoreUnitOfWork(options),
+  briefingCoordinator = createBriefingReconciliationEnqueueService({ now }),
   faults = {},
 } = {}) {
   if (!runtimeStorePath || !liveStore) {
@@ -233,9 +237,17 @@ export function createMorningCheckInPersistenceService({
             await repositories.canonicalEvidence
               .upsertCanonicalEvidenceObjects([canonicalObject]);
           }
+          const briefingReconciliation = canonicalObject
+            ? briefingCoordinator.stageCanonicalEvidenceChanges(candidate, {
+                canonicalChanges: [canonicalObject],
+                confirmedAt: createdAt,
+                userId: command.user.id,
+              })
+            : null;
           await faults.afterCanonicalEvidenceMutation?.({
             candidate,
             canonicalObject,
+            briefingReconciliation,
             dailyCheckIn,
             repositories,
             weightEntry,
@@ -297,6 +309,9 @@ export function createMorningCheckInPersistenceService({
         }
 
         const committed = await transaction.commit({
+          finalizeCandidate({ stagedState, commitId }) {
+            briefingCoordinator.stampSourceCommit(stagedState, commitId);
+          },
           validateFinalized(candidate) {
             faults.beforeFinalValidation?.(candidate, stagedResult);
             return validateCandidate(candidate, stagedResult, command);
@@ -341,6 +356,11 @@ function validateCandidate(candidate, result, command) {
   const analyses = (candidate.analyses ?? []).filter(
     (item) => item.id === result.analysis.id
   );
+  const briefingWorkValid = (result.briefingReconciliation?.workItemIds ?? [])
+    .every((workId) => candidate.briefingReconciliationWorkItems?.some(
+      (item) => item.id === workId &&
+        !item.sourceCommitLinks?.includes("pending_source_commit")
+    ));
 
   return (
     weights.length === 1 &&
@@ -359,7 +379,8 @@ function validateCandidate(candidate, result, command) {
     ) &&
     analyses.length === 1 &&
     analyses[0].evidenceTypes?.includes("weight") &&
-    analyses[0].evidenceIds?.includes(result.weightEntry.id)
+    analyses[0].evidenceIds?.includes(result.weightEntry.id) &&
+    briefingWorkValid
   );
 }
 

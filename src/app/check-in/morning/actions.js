@@ -16,7 +16,44 @@ import { createRecoveryCheckInIngestionService } from "../../../domain/services/
 import { createMorningCheckInPersistenceService } from "../../../domain/services/MorningCheckInPersistenceService";
 import {
   parseMorningPriorityReconciliationFormData,
+  createMorningPriorityReconciliationService,
 } from "../../../domain/services/MorningPriorityReconciliationService";
+import {
+  MORNING_EVIDENCE_RECOVERY_STATUSES,
+} from "../../../domain/services/MorningEvidenceRecoveryService";
+import {
+  createFounderBriefingReconciliationService,
+} from "../../../domain/services/FounderBriefingReconciliationService";
+
+export async function finalizeMorningBriefingReconciliation() {
+  const user = await FounderRepositories.users.getCurrentUser();
+  if (!user) throw new Error("Founder user is not available.");
+  const now = new Date();
+  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
+  const selection = await createMorningPriorityReconciliationService({
+    repositories: FounderRepositories,
+    now: () => now,
+  }).getSelection({ userId: user.id, timeZone, at: now });
+  if (selection.evidenceRecoveryItems.some((item) =>
+    item.status === MORNING_EVIDENCE_RECOVERY_STATUSES.PENDING_CONFIRMATION
+  )) {
+    redirect("/check-in/morning?briefingUpdate=waiting");
+  }
+  const result = await createFounderBriefingReconciliationService({
+    repositories: FounderRepositories,
+    now: () => now,
+  }).finalizePending({
+    userId: user.id,
+    evidenceDate: selection.window.previousLocalDate,
+  });
+  revalidatePath("/");
+  revalidatePath("/check-in/morning");
+  revalidatePath("/briefings/weekly");
+  revalidatePath("/briefings/review");
+  redirect(result.failed > 0
+    ? "/check-in/morning?briefingUpdate=failed"
+    : "/briefings/weekly?briefingUpdate=current");
+}
 
 export async function saveStructuredRecoveryCheckIn(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
