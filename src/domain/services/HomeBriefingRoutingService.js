@@ -87,13 +87,16 @@ export function isCadenceArtifactReady(artifact, cadence) {
   return true;
 }
 
-function isEventActiveForHome({ artifact, localDate, timeZone }) {
+export function isEventActiveForHome({ artifact, localDate, timeZone }) {
   if (!artifact || artifact.lifecycle?.consumedAt) return false;
   if (!artifact.briefing || artifact.artifactType !== "event") return false;
   if (hasInvalidLifecycleStatus(artifact)) return false;
   if (!["progress_photo", "photo_session"].includes(artifact.trigger?.evidenceType)) return true;
   const eventDate = artifact.briefing?.photoEventNarrative?.eventDate ?? artifact.trigger?.occurredAt ?? artifact.generatedAt;
-  return getLocalDateKey(eventDate, timeZone) === localDate;
+  const eventLocalDate = getLocalDateKey(eventDate, timeZone);
+  if (eventLocalDate === localDate) return true;
+  const publicationLocalDate = getLocalDateKey(artifact.generatedAt, timeZone);
+  return eventLocalDate === shiftDate(localDate, -1) && publicationLocalDate === localDate;
 }
 
 function cadenceSelection(artifact, cadence, localDate, reason) {

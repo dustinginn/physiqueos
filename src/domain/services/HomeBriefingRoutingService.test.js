@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   isCadenceArtifactReady,
+  isEventActiveForHome,
   resolveHomeBriefingSelection,
 } from "./HomeBriefingRoutingService";
 import { createDailyBriefingService } from "./DailyBriefingService";
@@ -165,6 +166,70 @@ describe("artifact-backed Home briefing routing", () => {
       briefingType: "midweek",
       artifact: midweek,
     });
+  });
+
+  it("promotes a Photo Event published one local day after its evidence over Weekly", () => {
+    const latePhotoEvent = {
+      ...photoEvent,
+      id: "event_briefing_progress_photo_photo_session_user_founder_001_2026-08-08",
+      generatedAt: "2026-08-10T02:08:18.679Z",
+      trigger: {
+        evidenceType: "photo_session",
+        evidenceId: "photo_session_user_founder_001_2026-08-08",
+      },
+      briefing: { photoEventNarrative: { eventDate: "2026-08-08" } },
+    };
+
+    expect(select("2026-08-09", {
+      eventArtifact: latePhotoEvent,
+      weeklyArtifact: weekly,
+    })).toMatchObject({
+      artifact: latePhotoEvent,
+      briefingType: "event",
+      href: "/briefings/photo/photo_session_user_founder_001_2026-08-08",
+    });
+  });
+
+  it("does not reactivate historical or more-than-one-day-late Photo Events", () => {
+    expect(isEventActiveForHome({
+      artifact: {
+        ...photoEvent,
+        generatedAt: "2026-07-02T18:00:00Z",
+        briefing: { photoEventNarrative: { eventDate: "2026-07-01" } },
+      },
+      localDate: "2026-07-22",
+      timeZone: "America/Los_Angeles",
+    })).toBe(false);
+    expect(isEventActiveForHome({
+      artifact: {
+        ...photoEvent,
+        generatedAt: "2026-07-22T18:00:00Z",
+        briefing: { photoEventNarrative: { eventDate: "2026-07-20" } },
+      },
+      localDate: "2026-07-22",
+      timeZone: "America/Los_Angeles",
+    })).toBe(false);
+  });
+
+  it("keeps consumed Photo Events suppressed and preserves DEXA lifecycle behavior", () => {
+    expect(isEventActiveForHome({
+      artifact: {
+        ...photoEvent,
+        lifecycle: { consumedAt: "2026-07-22T18:05:00Z" },
+      },
+      localDate: "2026-07-22",
+      timeZone: "America/Los_Angeles",
+    })).toBe(false);
+    expect(isEventActiveForHome({
+      artifact: {
+        ...photoEvent,
+        generatedAt: "2026-07-01T18:00:00Z",
+        trigger: { evidenceType: "dexa", evidenceId: "scan" },
+        briefing: { dexaEventNarrative: { scanDate: "2026-07-01" } },
+      },
+      localDate: "2026-07-22",
+      timeZone: "America/Los_Angeles",
+    })).toBe(true);
   });
 
   it("promotes Monthly on its delivery date without hiding an active Event", () => {
