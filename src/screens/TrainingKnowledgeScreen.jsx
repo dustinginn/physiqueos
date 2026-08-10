@@ -29,6 +29,10 @@ import {
   getTrainingExecutionVariantKey,
   ORDINARY_EXECUTION_VARIANT_KEY,
 } from "../domain/models/trainingExecutionVariant";
+import {
+  deriveTrainingExerciseRelationshipContext,
+  normalizeTrainingExerciseRelationshipGroups,
+} from "../domain/models/trainingExerciseRelationship";
 import { withPrimaryTrainingNavigationCategory } from "../navigation/trainingNavigationMapping";
 import {
   formatTrainingLoad,
@@ -783,26 +787,16 @@ export function getSessionContent({
       session.exercises?.length > 0 && (
         <DeepPageCard className="space-y-2.5" key="exercises">
           <SectionHeader title="Exercises" />
-          {session.exercises.map((exercise) => (
-            <div
-              className="rounded-[12px] bg-[var(--surface-muted)] px-3 py-2.5"
-              key={exercise.id ?? exercise.name}
-            >
-              <p className="text-sm font-extrabold text-slate-950">
-                {formatTrainingExerciseOccurrenceLabel(exercise)}
-              </p>
-              <div className="mt-2 space-y-1">
-                {normalizeTrainingSetsForPresentation(exercise.sets ?? []).map((set, index) => (
-                  <p
-                    className="text-xs font-semibold text-slate-500"
-                    key={`${set.set_number ?? index}-${set.reps ?? "duration"}-${set.duration_seconds ?? set.weight ?? "bodyweight"}`}
-                  >
-                    Set {set.set_number ?? index + 1}: {formatSetDetail(set)}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ))}
+          {getTrainingSessionExerciseRenderItems(session).map((item) =>
+            item.type === "relationship" ? (
+              <section className="rounded-[14px] border border-indigo-200/70 bg-indigo-50/40 p-2.5 dark:border-indigo-300/15 dark:bg-indigo-300/[.04]" key={item.group.id}>
+                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.1em] text-indigo-600">Superset</p>
+                <div className="space-y-2">
+                  {item.exercises.map((exercise) => <WorkoutExerciseOccurrence exercise={exercise} key={exercise.id ?? exercise.name} />)}
+                </div>
+              </section>
+            ) : <WorkoutExerciseOccurrence exercise={item.exercise} key={item.exercise.id ?? item.exercise.name} />
+          )}
         </DeepPageCard>
       ),
       correctionAction && (
@@ -816,6 +810,45 @@ export function getSessionContent({
       ),
     ].filter(Boolean),
   };
+}
+
+export function getTrainingSessionExerciseRenderItems(session = {}) {
+  const exercises = session.exercises ?? [];
+  const groups = normalizeTrainingExerciseRelationshipGroups(
+    session.exerciseRelationshipGroups,
+    { exercises }
+  );
+  const groupByMemberId = new Map(
+    groups.flatMap((group) => group.memberExerciseIds.map((id) => [id, group]))
+  );
+  const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+  const emittedGroups = new Set();
+  return exercises.flatMap((exercise) => {
+    const group = groupByMemberId.get(exercise.id);
+    if (!group) return [{ type: "exercise", exercise }];
+    if (emittedGroups.has(group.id)) return [];
+    emittedGroups.add(group.id);
+    return [{
+      type: "relationship",
+      group,
+      exercises: group.memberExerciseIds.map((id) => exerciseById.get(id)).filter(Boolean),
+    }];
+  });
+}
+
+function WorkoutExerciseOccurrence({ exercise }) {
+  return (
+    <div className="rounded-[12px] bg-[var(--surface-muted)] px-3 py-2.5">
+      <p className="text-sm font-extrabold text-slate-950">{formatTrainingExerciseOccurrenceLabel(exercise)}</p>
+      <div className="mt-2 space-y-1">
+        {normalizeTrainingSetsForPresentation(exercise.sets ?? []).map((set, index) => (
+          <p className="text-xs font-semibold text-slate-500" key={`${set.set_number ?? index}-${set.reps ?? "duration"}-${set.duration_seconds ?? set.weight ?? "bodyweight"}`}>
+            Set {set.set_number ?? index + 1}: {formatSetDetail(set)}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function TrainingSessionCorrectionCard({ action, navigation, session, status }) {
@@ -1347,6 +1380,7 @@ function LastExerciseSessionCard({ occurrence }) {
               {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
             </p>
           )}
+          {formatRelationshipContext(occurrence.relationshipContext) && <p className="text-xs font-bold text-indigo-600">{formatRelationshipContext(occurrence.relationshipContext)}</p>}
           <MetricGroup items={getExerciseMetricItems(sets)} />
           <ExerciseSetList sets={sets} />
         </div>
@@ -1392,6 +1426,7 @@ function ExerciseHistoryCard({ occurrences = [] }) {
                         {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
                       </span>
                     )}
+                    {formatRelationshipContext(occurrence.relationshipContext) && <span className="block truncate text-xs font-bold text-indigo-600">{formatRelationshipContext(occurrence.relationshipContext)}</span>}
                     <span className="block truncate text-xs font-semibold text-slate-500">
                       {formatExerciseHistoryMeta(occurrence.exercise.sets)}
                     </span>
@@ -1405,6 +1440,7 @@ function ExerciseHistoryCard({ occurrences = [] }) {
                 <p className="mb-2 text-xs font-extrabold text-indigo-600">
                   {formatTrainingExerciseOccurrenceLabel(occurrence.exercise)}
                 </p>
+                {formatRelationshipContext(occurrence.relationshipContext) && <p className="mb-2 text-xs font-bold text-indigo-600">{formatRelationshipContext(occurrence.relationshipContext)}</p>}
                 <ExerciseSetList sets={occurrence.exercise.sets} />
               </div>
             </details>
@@ -1538,9 +1574,21 @@ function getExerciseOccurrences({ exerciseSlug, report }) {
             name: getCanonicalTrainingExerciseLabel(exercise.name),
             sets: normalizeTrainingSetsForPresentation(exercise.sets ?? []),
          },
+        relationshipContext: deriveTrainingExerciseRelationshipContext({
+          exercise,
+          session,
+        }),
         session,
       }))
   );
+}
+
+function formatRelationshipContext(context) {
+  if (context?.relationshipType !== "superset") return null;
+  const partners = (context.orderedPartners ?? [])
+    .map((partner) => getCanonicalTrainingExerciseLabel(partner.name ?? partner.canonicalExerciseId))
+    .filter(Boolean);
+  return partners.length > 0 ? `Superset with ${partners.join(" + ")}` : "Superset";
 }
 
 function dedupeRecords(records = []) {

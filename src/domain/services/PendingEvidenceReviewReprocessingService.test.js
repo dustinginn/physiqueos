@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEvidenceReviewRepository } from "../../data/repositories/EvidenceReviewRepository";
 import { createEvidencePackageRepository } from "../../data/repositories/EvidencePackageRepository";
-import { parseStrengthTrainingText } from "../models/trainingSessionEvidence";
+import {
+  parseStrengthTrainingSessionText,
+  parseStrengthTrainingText,
+} from "../models/trainingSessionEvidence";
 import { mergeTypedEvidenceIntoTrainingObjects } from "../interpreters/ScreenshotInterpreterService";
 import { JUL_14_STRENGTH_NOTE } from "../../fixtures/jul14StrengthEvidenceFixture";
 import { JUL_25_STRENGTH_NOTE } from "../../fixtures/jul25TrainingEvidenceFixture";
@@ -146,7 +149,7 @@ describe("reprocessPendingReviewInPlace", () => {
 
     const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
 
-    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("training-pending-review-parser-v2");
+    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("training-pending-review-parser-v3");
     expect(result).toMatchObject({ changed: true, idempotent: false });
     expect(result.review.reprocessing.version).toBe(PENDING_REVIEW_REPROCESS_VERSION);
     expect(result.review.reprocessing.sourceArtifactFingerprint).toBe(previousSourceFingerprint);
@@ -268,6 +271,47 @@ Skull crushers
     ]);
     expect(result.review.status).toBe("pending");
     expect(state.repositories.canonicalEvidence.listCanonicalEvidenceObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves relationship structure while remapping fresh members to retained occurrence ids", async () => {
+    const typedText = [
+      "Superset:",
+      "Chest Press Machine",
+      "8r 100p",
+      "Chest Fly Machine",
+      "10r 70p",
+      "End Superset",
+    ].join("\n");
+    const parsed = parseStrengthTrainingSessionText(typedText);
+    const state = fixture({
+      sources: [{ id: "typed_evidence_0", kind: "typed_evidence", text: typedText }],
+    });
+    const priorExercises = parsed.exercises.map((exercise, index) => ({
+      ...exercise,
+      id: index === 0 ? "retained_press" : "retained_fly",
+    }));
+    state.review.interpretedEvidence.evidence_objects = [trainingObject(priorExercises)];
+    state.review.interpretedEvidence.evidence_objects[0].exerciseRelationshipGroups = [{
+      ...parsed.exerciseRelationshipGroups[0],
+      memberExerciseIds: ["retained_press", "retained_fly"],
+    }];
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret: async (sourcePackage) => ({
+        ...structuredClone(sourcePackage),
+        evidence_objects: [{
+          ...trainingObject(parsed.exercises),
+          exerciseRelationshipGroups: parsed.exerciseRelationshipGroups,
+        }],
+      }),
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+    const workout = result.review.interpretedEvidence.evidence_objects[0];
+    expect(workout.exercises.map((exercise) => exercise.id))
+      .toEqual(["retained_press", "retained_fly"]);
+    expect(workout.exerciseRelationshipGroups[0].memberExerciseIds)
+      .toEqual(["retained_press", "retained_fly"]);
   });
 
   it("reprocesses the retained July 25 Training candidate in place without changing its Activity object or source package", async () => {

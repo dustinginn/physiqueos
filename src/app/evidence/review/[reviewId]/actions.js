@@ -237,6 +237,31 @@ export async function updateEvidenceReviewExerciseVariant(formData) {
   ));
 }
 
+export async function updateEvidenceReviewExerciseRelationship(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) {
+    throw new Error("Evidence review is unavailable.");
+  }
+  const recoveryContext = resolveRecoveryContext(review, formData);
+  await createEvidenceReviewService({ repositories: FounderRepositories })
+    .updateTrainingExerciseRelationship(reviewId, {
+      evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      memberExerciseIds: formData.getAll("memberExerciseId").map(String),
+      mode: String(formData.get("relationshipMode") ?? "save"),
+      relationshipGroupId: String(formData.get("relationshipGroupId") ?? "") || null,
+      structuralIssueId: String(formData.get("structuralIssueId") ?? "") || null,
+      updatedBy: user.id,
+    });
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?superset=updated`,
+    recoveryContext
+  ));
+}
+
 export async function updateEvidenceReviewItemDecision(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
   const itemId = String(formData.get("itemId") ?? "");

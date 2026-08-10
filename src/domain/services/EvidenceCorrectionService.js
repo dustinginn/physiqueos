@@ -1,4 +1,9 @@
-import { createTrainingSessionEvidenceFromText } from "../models/trainingSessionEvidence";
+import {
+  createTrainingSessionEvidenceFromText,
+  parseStrengthTrainingSessionText,
+} from "../models/trainingSessionEvidence";
+import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
+import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerciseRelationship";
 
 const EVIDENCE_SCHEMA_VERSION = "physiqueos-evidence-v1";
 const INTAKE_ENGINE_NAME = "PhysiqueOS Evidence Intake Engine";
@@ -34,6 +39,9 @@ export function createTrainingSessionCorrectionEvidencePackage({
     ...(targetPayload.provenance?.source_artifact_refs ?? []),
     ...(targetPayload.source?.source_artifact_refs ?? []),
   ]);
+  const parsedStructure = parseStrengthTrainingSessionText(text, {
+    provenanceRef: TYPED_EVIDENCE_REF,
+  });
   const parsedTrainingSession = createTrainingSessionEvidenceFromText({
     activityType:
       targetPayload.metadata?.activity_type ?? "Traditional Strength Training",
@@ -49,6 +57,13 @@ export function createTrainingSessionCorrectionEvidencePackage({
   if (!parsedTrainingSession) {
     throw new Error("No structured workout details were found in the correction.");
   }
+
+  const alignedStructure = alignCorrectionOccurrences({
+    parsedExercises: parsedStructure.exercises,
+    parsedRelationshipGroups: parsedStructure.exerciseRelationshipGroups,
+    targetExercises: targetPayload.exercises,
+  });
+  const relationshipSyntaxPresent = parsedStructure.relationshipSyntaxPresent === true;
 
   const sourceRefs = uniqueStrings([...targetSourceRefs, TYPED_EVIDENCE_REF]);
   const evidenceObject = {
@@ -66,7 +81,15 @@ export function createTrainingSessionCorrectionEvidencePackage({
       activity_type:
         targetPayload.metadata?.activity_type ?? "Traditional Strength Training",
     },
-    exercises: parsedTrainingSession.exercises,
+    exercises: alignedStructure.exercises,
+    ...(relationshipSyntaxPresent
+      ? { exerciseRelationshipGroups: alignedStructure.exerciseRelationshipGroups }
+      : targetPayload.exerciseRelationshipGroups?.length
+        ? { exerciseRelationshipGroups: targetPayload.exerciseRelationshipGroups }
+        : {}),
+    ...(parsedStructure.structuralReviewIssues.length > 0
+      ? { structuralReviewIssues: parsedStructure.structuralReviewIssues }
+      : {}),
     values: [],
     confidence: {
       extraction: "moderate",
@@ -89,6 +112,9 @@ export function createTrainingSessionCorrectionEvidencePackage({
         "Manual correction was attached to an existing TrainingSession by the user.",
       target_canonical_id: targetCanonicalId,
       target_evidence_object_id: targetPayload.id,
+      ...(relationshipSyntaxPresent
+        ? { relationship_structure_authoritative: true }
+        : {}),
     },
   };
 
@@ -167,6 +193,33 @@ export function createTrainingSessionCorrectionEvidencePackage({
       ],
       warnings: [],
     },
+  };
+}
+
+function alignCorrectionOccurrences({
+  parsedExercises = [],
+  parsedRelationshipGroups = [],
+  targetExercises = [],
+} = {}) {
+  const availableByKey = new Map();
+  for (const exercise of targetExercises ?? []) {
+    const key = getTrainingExerciseOccurrenceKey(exercise);
+    if (!availableByKey.has(key)) availableByKey.set(key, []);
+    availableByKey.get(key).push(exercise);
+  }
+  const idMap = new Map();
+  const exercises = (parsedExercises ?? []).map((exercise) => {
+    const match = availableByKey.get(getTrainingExerciseOccurrenceKey(exercise))?.shift();
+    if (!match?.id) return exercise;
+    idMap.set(exercise.id, match.id);
+    return { ...exercise, id: match.id };
+  });
+  return {
+    exercises,
+    exerciseRelationshipGroups: remapTrainingExerciseRelationshipGroups(
+      parsedRelationshipGroups,
+      idMap
+    ),
   };
 }
 

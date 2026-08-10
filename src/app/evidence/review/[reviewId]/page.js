@@ -4,7 +4,7 @@ import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
 import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
 import { listCanonicalTrainingExerciseIdentities } from "../../../../domain/models/trainingExerciseIdentity";
-import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, updateEvidenceReviewExerciseVariant, updateEvidenceReviewPhotoPose } from "./actions";
+import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, updateEvidenceReviewExerciseRelationship, updateEvidenceReviewExerciseVariant, updateEvidenceReviewPhotoPose } from "./actions";
 import {
   createEvidenceRecoveryContext,
   evidenceReviewMatchesRecoveryContext,
@@ -47,5 +47,5 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     reviewId,
   });
   const presentedReview = { ...review, interpretedEvidence };
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
+  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
 }

@@ -1,4 +1,8 @@
 import { getCanonicalTrainingExerciseLabel } from "../models/trainingExerciseIdentity";
+import { formatTrainingExerciseOccurrenceLabel } from "../models/trainingExecutionVariant";
+import {
+  normalizeTrainingExerciseRelationshipGroups,
+} from "../models/trainingExerciseRelationship";
 import {
   reconcileNutritionDayEvidence,
   restoreCollapsedNutritionFoodDuplicates,
@@ -116,6 +120,27 @@ export function formatDuration(seconds, { clock = false } = {}) {
 
 function presentTraining(object, common) {
   const metadata = object.metadata ?? {};
+  const groups = normalizeTrainingExerciseRelationshipGroups(
+    object.exerciseRelationshipGroups,
+    { exercises: object.exercises }
+  );
+  const presentedExercises = (object.exercises ?? [])
+    .map((exercise, exerciseIndex) => ({ exercise, exerciseIndex }))
+    .filter(({ exercise }) => !exercise.removed)
+    .map(({ exercise, exerciseIndex }) =>
+      presentReviewExercise(
+        exercise,
+        exerciseIndex,
+        groups.length > 0 || (object.structuralReviewIssues ?? []).length > 0
+      )
+    );
+  const exercisesById = new Map(
+    presentedExercises.filter((exercise) => exercise.id)
+      .map((exercise) => [exercise.id, exercise])
+  );
+  const groupedExerciseIds = new Set(
+    groups.flatMap((group) => group.memberExerciseIds)
+  );
   return {
     ...common,
     title: metadata.activity_type ?? object.title ?? "Workout",
@@ -126,28 +151,52 @@ function presentTraining(object, common) {
       metric("Average heart rate", unit(metadata.average_heart_rate, "bpm")),
       metric("Source", common.sourceLabel),
     ]),
-    exercises: (object.exercises ?? []).map((exercise, exerciseIndex) => ({ exercise, exerciseIndex })).filter(({ exercise }) => !exercise.removed).map(({ exercise, exerciseIndex }) => {
-      const provisionalExerciseId =
-        exercise.provisionalExercise?.resolutionStatus === "unresolved"
-          ? exercise.provisionalExercise.provisionalExerciseId
-          : null;
-      return {
-        name: getCanonicalTrainingExerciseLabel(exercise.name),
-        ...(exercise.id ? { id: exercise.id } : {}),
-        ...(exercise.canonicalExerciseId
-          ? { canonicalExerciseId: exercise.canonicalExerciseId }
-          : {}),
-        ...(exercise.executionVariant
-          ? { executionVariant: exercise.executionVariant }
-          : {}),
-        ...(exercise.id && exercise.canonicalExerciseId ? { exerciseIndex } : {}),
-        ...(provisionalExerciseId ? { provisionalExerciseId } : {}),
-        sets: (exercise.sets ?? []).map((set) => formatExerciseSet({
-          ...set,
-          load_type: exercise.equipment === "bodyweight" && Number(set.weight) === 0 ? "bodyweight" : set.load_type,
-        })).filter(Boolean),
-      };
-    }),
+    exercises: presentedExercises,
+    standaloneExercises: presentedExercises.filter(
+      (exercise) => !groupedExerciseIds.has(exercise.id)
+    ),
+    exerciseRelationshipGroups: groups.map((group) => ({
+      id: group.id,
+      relationshipType: group.relationshipType,
+      memberExerciseIds: group.memberExerciseIds,
+      members: group.memberExerciseIds.map((id) => exercisesById.get(id)).filter(Boolean),
+    })),
+    structuralReviewIssues: object.structuralReviewIssues ?? [],
+  };
+}
+
+function presentReviewExercise(exercise, exerciseIndex, includeOccurrenceLabel = false) {
+  const provisionalExerciseId =
+    exercise.provisionalExercise?.resolutionStatus === "unresolved"
+      ? exercise.provisionalExercise.provisionalExerciseId
+      : null;
+  const name = getCanonicalTrainingExerciseLabel(exercise.name);
+  return {
+    name,
+    ...(includeOccurrenceLabel
+      ? {
+          occurrenceLabel: formatTrainingExerciseOccurrenceLabel({
+            ...exercise,
+            name,
+          }),
+        }
+      : {}),
+    ...(exercise.id ? { id: exercise.id } : {}),
+    ...(exercise.canonicalExerciseId
+      ? { canonicalExerciseId: exercise.canonicalExerciseId }
+      : {}),
+    ...(exercise.executionVariant
+      ? { executionVariant: exercise.executionVariant }
+      : {}),
+    ...(exercise.id && exercise.canonicalExerciseId ? { exerciseIndex } : {}),
+    ...(provisionalExerciseId ? { provisionalExerciseId } : {}),
+    sets: (exercise.sets ?? []).map((set) => formatExerciseSet({
+      ...set,
+      load_type:
+        exercise.equipment === "bodyweight" && Number(set.weight) === 0
+          ? "bodyweight"
+          : set.load_type,
+    })).filter(Boolean),
   };
 }
 

@@ -3,6 +3,9 @@ import { createTrainingSessionEvidenceFromText } from "../models/trainingSession
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
 import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
 import {
+  normalizeTrainingExerciseRelationshipGroups,
+} from "../models/trainingExerciseRelationship";
+import {
   assessWorkoutDuplicatePair,
   getWorkoutDuplicateIdentityKey,
 } from "./WorkoutDuplicateIdentityService";
@@ -373,13 +376,18 @@ function getExplicitCanonicalRelationshipIds(evidenceObject = {}, evidencePackag
 
 function normalizeCanonicalPayload(evidenceObject) {
   const enrichedEvidenceObject = backfillKnownTrainingExerciseDetails(evidenceObject);
+  if (
+    isTrainingSession(enrichedEvidenceObject) &&
+    (enrichedEvidenceObject.structuralReviewIssues ?? []).length > 0
+  ) {
+    const error = new Error(
+      "Resolve Training structure review issues before canonical confirmation."
+    );
+    error.code = "TRAINING_STRUCTURE_REVIEW_REQUIRED";
+    throw error;
+  }
   const normalizedEvidenceObject = isTrainingSession(enrichedEvidenceObject)
-    ? {
-        ...enrichedEvidenceObject,
-        exercises: mergeExercises([], enrichedEvidenceObject.exercises ?? [], {
-          preserveInputOrder: true,
-        }),
-      }
+    ? normalizeCanonicalTrainingStructure(enrichedEvidenceObject)
     : enrichedEvidenceObject;
 
   return {
@@ -392,6 +400,25 @@ function normalizeCanonicalPayload(evidenceObject) {
           []
       ),
     },
+  };
+}
+
+function normalizeCanonicalTrainingStructure(trainingSession = {}) {
+  const relationshipGroups = trainingSession.exerciseRelationshipGroups ?? [];
+  const exercises = mergeExercises([], trainingSession.exercises ?? [], {
+    preserveInputOrder: true,
+    relationshipGroups,
+  });
+  const normalizedRelationshipGroups = normalizeTrainingExerciseRelationshipGroups(
+    relationshipGroups,
+    { exercises, strict: true }
+  );
+  return {
+    ...trainingSession,
+    exercises,
+    ...(normalizedRelationshipGroups.length > 0
+      ? { exerciseRelationshipGroups: normalizedRelationshipGroups }
+      : {}),
   };
 }
 
@@ -753,13 +780,26 @@ function mergeTrainingPayload(existingPayload, candidate, { evidencePackage = nu
     getEvidenceRichnessScore(candidate) >= getEvidenceRichnessScore(existingPayload)
       ? candidate
       : existingPayload;
+  const relationshipStructureAuthoritative =
+    candidate.reconciliation?.relationship_structure_authoritative === true;
+  const relationshipGroups = relationshipStructureAuthoritative
+    ? candidate.exerciseRelationshipGroups ?? []
+    : candidate.exerciseRelationshipGroups ??
+      existingPayload.exerciseRelationshipGroups ??
+      [];
   const exercises = shouldReplaceTrainingExercisesFromReprocess({
     candidate,
     evidencePackage,
     existingPayload,
   })
     ? candidate.exercises
-    : mergeExercises(existingPayload.exercises, candidate.exercises);
+    : mergeExercises(existingPayload.exercises, candidate.exercises, {
+        relationshipGroups,
+      });
+  const normalizedRelationshipGroups = normalizeTrainingExerciseRelationshipGroups(
+    relationshipGroups,
+    { exercises, strict: true }
+  );
 
   return {
     ...existingPayload,
@@ -767,6 +807,11 @@ function mergeTrainingPayload(existingPayload, candidate, { evidencePackage = nu
     ...preferredBase,
     metadata: mergeDefinedFields(existingPayload.metadata, candidate.metadata),
     exercises,
+    ...(normalizedRelationshipGroups.length > 0
+      ? { exerciseRelationshipGroups: normalizedRelationshipGroups }
+      : relationshipStructureAuthoritative
+        ? { exerciseRelationshipGroups: [] }
+        : {}),
     provenance: mergeObjectProvenance(existingPayload.provenance, candidate.provenance),
     source: mergeSource(existingPayload.source, candidate.source),
   };
@@ -821,16 +866,27 @@ function mergeDefinedFields(left = {}, right = {}) {
 function mergeExercises(
   left = [],
   right = [],
-  { preserveInputOrder = false } = {}
+  { preserveInputOrder = false, relationshipGroups = [] } = {}
 ) {
   const exercisesByName = new Map();
+  const protectedExerciseIds = new Set(
+    (relationshipGroups ?? []).flatMap(
+      (group) => group.memberExerciseIds ?? []
+    )
+  );
 
   [...left, ...right].forEach((exercise) => {
     const identity = resolveTrainingExerciseIdentity(exercise?.name ?? exercise?.id);
     if (identity.resolutionStatus === "unrecognized" && /^(reps|sets|weight|load|volume|notes|rest)$/i.test(String(exercise?.name ?? "").trim())) return;
     const movementKey = identity.canonicalExerciseId ?? normalizeMorphologicalExerciseIdentity(exercise?.name ?? exercise?.id);
     if (!movementKey) return;
-    const key = getTrainingExerciseOccurrenceKey(exercise, movementKey);
+    const hasOccurrenceIdentity = exercise?.id && (
+      protectedExerciseIds.has(exercise.id) ||
+      /^exercise_occurrence_[a-z0-9_]+$/i.test(exercise.id)
+    );
+    const key = hasOccurrenceIdentity
+      ? `occurrence:${exercise.id}`
+      : getTrainingExerciseOccurrenceKey(exercise, movementKey);
     const canonicalExercise = identity.canonicalExerciseId
       ? {
           ...exercise,
@@ -877,7 +933,9 @@ function mergeExercises(
   });
 
   const exercises = [...exercisesByName.values()];
-  return preserveInputOrder ? exercises : orderTrainingExercises(exercises);
+  return preserveInputOrder || relationshipGroups.length > 0
+    ? exercises
+    : orderTrainingExercises(exercises);
 }
 
 function normalizeMorphologicalExerciseIdentity(value) {

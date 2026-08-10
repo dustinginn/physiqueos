@@ -14,6 +14,7 @@ import {
   formatTrainingExerciseOccurrenceLabel,
   normalizeTrainingExecutionVariant,
 } from "../models/trainingExecutionVariant";
+import { deriveTrainingExerciseRelationshipContext } from "../models/trainingExerciseRelationship";
 import { interpretProgressPhotos } from "../interpreters";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import {
@@ -1105,6 +1106,7 @@ function getTrainingRecords(context = {}) {
         ]),
         canonicalId: session._canonicalId ?? null,
         exercises: session.exercises ?? [],
+        exerciseRelationshipGroups: session.exerciseRelationshipGroups ?? [],
         href: `/progress/training/session/${encodeURIComponent(id)}`,
         id,
         label: session.metadata?.activity_type ?? "Workout",
@@ -1971,6 +1973,10 @@ export function getResistanceBreakdown(resistanceSessions = []) {
         sessionId: session.id ?? null,
         observedAt: session.observed_at ?? session.date ?? null,
         executionVariant,
+        relationshipContext: deriveTrainingExerciseRelationshipContext({
+          exercise,
+          session,
+        }),
         sets: groupedSets,
       };
 

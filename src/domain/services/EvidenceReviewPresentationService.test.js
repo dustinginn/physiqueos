@@ -40,6 +40,48 @@ const evidencePackage = (objects = [training()]) => ({
 });
 
 describe("Evidence Review presentation", () => {
+  it("presents a Superset once with human-readable ordered occurrence labels", () => {
+    const exercises = [
+      {
+        id: "press_1",
+        name: "Chest Press Machine",
+        canonicalExerciseId: "chest_press_machine",
+        sets: [{ reps: 8, weight: 100 }],
+      },
+      {
+        id: "fly_1",
+        name: "Chest Fly Machine",
+        canonicalExerciseId: "chest_fly_machine",
+        executionVariant: { key: "static_hold", label: "Static Hold" },
+        sets: [{ reps: 10, weight: 70 }],
+      },
+      {
+        id: "extension_1",
+        name: "Leg Extensions",
+        canonicalExerciseId: "leg_extension",
+        sets: [{ reps: 12, weight: 80 }],
+      },
+    ];
+    const result = createEvidenceReviewPresentation({
+      evidencePackage: evidencePackage([training({
+        exercises,
+        exerciseRelationshipGroups: [{
+          id: "superset_1",
+          relationshipType: "superset",
+          memberExerciseIds: ["press_1", "fly_1"],
+          provenance_ref: "typed_evidence_0",
+        }],
+      })]),
+    });
+    const item = result.items[0];
+
+    expect(item.exerciseRelationshipGroups).toHaveLength(1);
+    expect(item.exerciseRelationshipGroups[0].members.map((member) => member.occurrenceLabel))
+      .toEqual(["Chest Press Machine", "Chest Fly Machine · Static Hold"]);
+    expect(item.standaloneExercises.map((exercise) => exercise.name))
+      .toEqual(["Leg Extensions"]);
+  });
+
   it("presents execution variants separately from canonical exercise names", () => {
     const result = createEvidenceReviewPresentation({
       evidencePackage: evidencePackage([training({

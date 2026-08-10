@@ -148,6 +148,66 @@ describe("EvidenceReviewService execution variant editing", () => {
       })).rejects.toMatchObject({ code: "REVIEW_STALE" });
     expect(state.review).toEqual(before);
   });
+
+  it("blocks commit until a malformed Superset is resolved or removed", async () => {
+    const state = relationshipReviewFixture();
+    const service = createEvidenceReviewService({ repositories: repositories(state) });
+
+    await expect(service.beginCommit(state.review.id)).rejects.toMatchObject({
+      code: "TRAINING_STRUCTURE_REVIEW_REQUIRED",
+    });
+    expect(state.review.status).toBe("pending");
+  });
+
+  it("saves an ordered Superset correction and clears its review blocker", async () => {
+    const state = relationshipReviewFixture();
+    const service = createEvidenceReviewService({
+      repositories: repositories(state),
+      now: () => new Date("2026-07-29T20:00:00.000Z"),
+    });
+
+    await service.updateTrainingExerciseRelationship(state.review.id, {
+      evidenceObjectId: "training_1",
+      expectedUpdatedAt: state.review.updatedAt,
+      memberExerciseIds: ["press_1", "fly_1"],
+      mode: "save",
+      structuralIssueId: "issue_1",
+      updatedBy: "founder",
+    });
+    const workout = state.review.interpretedEvidence.evidence_objects[0];
+    expect(workout.structuralReviewIssues).toEqual([]);
+    expect(workout.exerciseRelationshipGroups).toEqual([
+      expect.objectContaining({
+        relationshipType: "superset",
+        memberExerciseIds: ["press_1", "fly_1"],
+      }),
+    ]);
+    await expect(service.beginCommit(state.review.id)).resolves.toMatchObject({
+      status: "committing",
+    });
+  });
+
+  it("removes a Superset group without removing either exercise occurrence", async () => {
+    const state = relationshipReviewFixture();
+    const workout = state.review.interpretedEvidence.evidence_objects[0];
+    workout.structuralReviewIssues = [];
+    workout.exerciseRelationshipGroups = [{
+      id: "superset_1",
+      relationshipType: "superset",
+      memberExerciseIds: ["press_1", "fly_1"],
+    }];
+    await createEvidenceReviewService({ repositories: repositories(state) })
+      .updateTrainingExerciseRelationship(state.review.id, {
+        evidenceObjectId: "training_1",
+        expectedUpdatedAt: state.review.updatedAt,
+        mode: "remove",
+        relationshipGroupId: "superset_1",
+      });
+
+    expect(workout.exercises).toHaveLength(2);
+    expect(state.review.interpretedEvidence.evidence_objects[0].exerciseRelationshipGroups)
+      .toEqual([]);
+  });
 });
 
 function repositories(state) {
@@ -196,4 +256,33 @@ function reviewFixture() {
       },
     },
   };
+}
+
+function relationshipReviewFixture() {
+  const state = reviewFixture();
+  state.review.interpretedEvidence.evidence_objects[0] = {
+    id: "training_1",
+    evidence_type: "training",
+    provenance: { source_artifact_refs: ["typed_evidence_0"] },
+    exercises: [
+      {
+        id: "press_1",
+        name: "Chest Press Machine",
+        canonicalExerciseId: "chest_press_machine",
+        sets: [{ reps: 8, weight: 100 }],
+      },
+      {
+        id: "fly_1",
+        name: "Chest Fly Machine",
+        canonicalExerciseId: "chest_fly_machine",
+        sets: [{ reps: 10, weight: 70 }],
+      },
+    ],
+    structuralReviewIssues: [{
+      id: "issue_1",
+      code: "INCOMPLETE_SUPERSET",
+      message: "Choose a second exercise occurrence for this Superset.",
+    }],
+  };
+  return state;
 }

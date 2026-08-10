@@ -142,6 +142,17 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain('aria-live="assertive"');
   });
 
+  it("renders Superset review as one editable structure without exposing internal ids", () => {
+    expect(screen).toContain("Superset needs review");
+    expect(screen).toContain("Save Superset");
+    expect(screen).toContain("Remove Superset");
+    expect(screen).toContain('name="memberExerciseId"');
+    expect(screen).toContain("blockingStructuralIssues");
+    expect(page).toContain("exerciseRelationshipAction");
+    expect(actions).toContain("updateTrainingExerciseRelationship");
+    expect(screen).not.toContain("memberExerciseIds.join");
+  });
+
   it("routes every action outcome through revalidation and a visible query result", () => {
     expect(actions).toContain('outcome = result.changed ? "updated" : "current"');
     expect(actions).toContain('let outcome = "failed"');

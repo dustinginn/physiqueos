@@ -6,6 +6,7 @@ import {
 import {
   resolveCanonicalTrainingMuscleGroup,
 } from "../models/trainingMuscleGroupIdentity";
+import { removeExerciseFromTrainingRelationshipGroups } from "../models/trainingExerciseRelationship";
 
 export function listUnresolvedProvisionalExercises(evidencePackage = {}) {
   return (evidencePackage.evidence_objects ?? []).flatMap((object) =>
@@ -136,52 +137,64 @@ export function resolveProvisionalExerciseInPackage(
   let matches = 0;
   const evidence_objects = (evidencePackage.evidence_objects ?? []).map((object) => {
     if (object.evidence_type !== "training") return object;
-    return {
-      ...object,
-      exercises: (object.exercises ?? []).map((exercise) => {
-        if (exercise.provisionalExercise?.provisionalExerciseId !== provisionalExerciseId) {
-          return exercise;
-        }
-        matches += 1;
-        if (resolution.mode === "remove") {
-          return {
-            ...exercise,
-            removed: true,
-            resolutionStatus: "removed_by_user",
-            provisionalExercise: {
-              ...exercise.provisionalExercise,
-              resolutionStatus: "removed_by_user",
-              disposition: "explicitly_removed_from_workout",
-            },
-          };
-        }
-        const canonical = resolution.canonical;
+    const exercises = (object.exercises ?? []).map((exercise) => {
+      if (exercise.provisionalExercise?.provisionalExerciseId !== provisionalExerciseId) {
+        return exercise;
+      }
+      matches += 1;
+      if (resolution.mode === "remove") {
         return {
           ...exercise,
-          id: canonical.id,
-          name: canonical.name,
-          canonicalExerciseId: canonical.id,
-          equipment: canonical.equipment,
-          body_region: canonical.body_region,
-          primary_muscle_group_id:
-            canonical.primary_muscle_group_id ?? null,
-          primary_muscle_groups: canonical.primary_muscle_groups,
-          movement_pattern: canonical.movement_pattern,
-          laterality: canonical.laterality,
+          removed: true,
+          resolutionStatus: "removed_by_user",
+          provisionalExercise: {
+            ...exercise.provisionalExercise,
+            resolutionStatus: "removed_by_user",
+            disposition: "explicitly_removed_from_workout",
+          },
+        };
+      }
+      const canonical = resolution.canonical;
+      return {
+        ...exercise,
+        id: exercise.id ?? canonical.id,
+        name: canonical.name,
+        canonicalExerciseId: canonical.id,
+        equipment: canonical.equipment,
+        body_region: canonical.body_region,
+        primary_muscle_group_id:
+          canonical.primary_muscle_group_id ?? null,
+        primary_muscle_groups: canonical.primary_muscle_groups,
+        movement_pattern: canonical.movement_pattern,
+        laterality: canonical.laterality,
+        resolutionStatus: resolution.mode === "new"
+          ? "resolved_new_canonical"
+          : "resolved_existing_canonical",
+        provisionalExercise: {
+          ...exercise.provisionalExercise,
           resolutionStatus: resolution.mode === "new"
             ? "resolved_new_canonical"
             : "resolved_existing_canonical",
-          provisionalExercise: {
-            ...exercise.provisionalExercise,
-            resolutionStatus: resolution.mode === "new"
-              ? "resolved_new_canonical"
-              : "resolved_existing_canonical",
-            resolutionMode: resolution.mode,
-            resolvedCanonicalExerciseId: canonical.id,
-            confirmedDefinition: resolution.mode === "new" ? canonical : null,
-          },
-        };
-      }),
+          resolutionMode: resolution.mode,
+          resolvedCanonicalExerciseId: canonical.id,
+          confirmedDefinition: resolution.mode === "new" ? canonical : null,
+        },
+      };
+    });
+    const removedExerciseIds = exercises
+      .filter((exercise) => exercise.removed && exercise.id)
+      .map((exercise) => exercise.id);
+    const exerciseRelationshipGroups = removedExerciseIds.reduce(
+      (groups, exerciseId) =>
+        removeExerciseFromTrainingRelationshipGroups(groups, exerciseId),
+      object.exerciseRelationshipGroups ?? []
+    );
+    return {
+      ...object,
+      exercises,
+      ...(object.exerciseRelationshipGroups
+        ? { exerciseRelationshipGroups }
+        : {}),
     };
   });
   if (matches !== 1) {

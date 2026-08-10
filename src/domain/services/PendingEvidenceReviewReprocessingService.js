@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { recoverEvidenceIntakeSubmissionFromArtifacts } from "./EvidenceIntakeService";
 import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
 import { resolveExecutionVariantHeading } from "../models/trainingSessionEvidence";
+import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerciseRelationship";
 
 // Increment intentionally when a parser correction should make retained pending
 // evidence eligible for one new bounded interpretation.
-export const PENDING_REVIEW_REPROCESS_VERSION = "training-pending-review-parser-v2";
+export const PENDING_REVIEW_REPROCESS_VERSION = "training-pending-review-parser-v3";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {
@@ -107,15 +108,40 @@ function preserveCandidateImmutables(previous, evidencePackage, fresh) {
 function preserveSourceDerivedObjectFields(freshObject, previousObjects = [], evidencePackage = {}) {
   const prior = previousObjects.find((object) => sameEvidenceIdentity(object, freshObject));
   if (!prior) return freshObject;
+  const exercises = preserveExerciseSetSemantics({
+    freshExercises: freshObject.exercises,
+    priorExercises: prior.exercises,
+    typedEvidence: getTypedEvidence(evidencePackage),
+  });
+  const idMap = new Map(
+    (freshObject.exercises ?? []).map((exercise, index) => [
+      exercise?.id,
+      exercises?.[index]?.id ?? exercise?.id,
+    ])
+  );
+  const freshRelationshipGroups = remapTrainingExerciseRelationshipGroups(
+    freshObject.exerciseRelationshipGroups,
+    idMap
+  );
   return {
     ...freshObject,
     captured_at: prior.captured_at ?? freshObject.captured_at,
     metadata: structuredClone(prior.metadata ?? freshObject.metadata),
-    exercises: preserveExerciseSetSemantics({
-      freshExercises: freshObject.exercises,
-      priorExercises: prior.exercises,
-      typedEvidence: getTypedEvidence(evidencePackage),
-    }),
+    exercises,
+    ...((freshRelationshipGroups?.length || prior.exerciseRelationshipGroups?.length)
+      ? {
+          exerciseRelationshipGroups: freshRelationshipGroups?.length
+            ? freshRelationshipGroups
+            : structuredClone(prior.exerciseRelationshipGroups),
+        }
+      : {}),
+    ...((freshObject.structuralReviewIssues?.length || prior.structuralReviewIssues?.length)
+      ? {
+          structuralReviewIssues: freshObject.structuralReviewIssues?.length
+            ? freshObject.structuralReviewIssues
+            : structuredClone(prior.structuralReviewIssues),
+        }
+      : {}),
   };
 }
 

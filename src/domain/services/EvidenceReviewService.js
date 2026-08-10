@@ -10,6 +10,10 @@ import {
 } from "./CanonicalExerciseLibraryService";
 import { listCanonicalTrainingExerciseIdentities } from "../models/trainingExerciseIdentity";
 import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
+import {
+  createTrainingExerciseRelationshipGroup,
+  normalizeTrainingExerciseRelationshipGroups,
+} from "../models/trainingExerciseRelationship";
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
@@ -49,6 +53,7 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review is no longer pending.");
       assertNoUnresolvedProvisionalExercises(evidencePackage ?? review.interpretedEvidence);
+      assertNoTrainingStructureReviewIssues(evidencePackage ?? review.interpretedEvidence);
       const timestamp = now().toISOString();
       return repositories.evidenceReviews.updateReview(id, {
         status: "confirmed",
@@ -60,6 +65,9 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
       assertNoUnresolvedProvisionalExercises(
+        evidencePackage ?? review.interpretedEvidence
+      );
+      assertNoTrainingStructureReviewIssues(
         evidencePackage ?? review.interpretedEvidence
       );
       return repositories.evidenceReviews.updateReview(id, {
@@ -175,6 +183,85 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
         exerciseVariantEditing: { updatedAt: now().toISOString(), updatedBy },
       });
     },
+    async updateTrainingExerciseRelationship(id, {
+      evidenceObjectId,
+      expectedUpdatedAt,
+      memberExerciseIds = [],
+      mode,
+      relationshipGroupId = null,
+      structuralIssueId = null,
+      updatedBy,
+    }) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("EXERCISE_REVIEW_NOT_EDITABLE", "This exercise review cannot be edited.");
+      }
+      if (!expectedUpdatedAt || review.updatedAt !== expectedUpdatedAt) {
+        throw reviewError("REVIEW_STALE", "This evidence review changed. Reload it before editing the Superset.");
+      }
+      let matched = 0;
+      const interpretedEvidence = {
+        ...review.interpretedEvidence,
+        evidence_objects: (review.interpretedEvidence?.evidence_objects ?? []).map((object) => {
+          if (object.id !== evidenceObjectId || object.evidence_type !== "training") {
+            return object;
+          }
+          matched += 1;
+          const currentGroups = object.exerciseRelationshipGroups ?? [];
+          const remainingGroups = currentGroups.filter(
+            (group) => group.id !== relationshipGroupId
+          );
+          let nextGroups = remainingGroups;
+          if (mode === "save") {
+            const members = [...new Set(memberExerciseIds.map(String).filter(Boolean))];
+            if (members.length !== 2) {
+              throw reviewError(
+                "SUPERSET_MEMBERS_INVALID",
+                "Choose two distinct exercise occurrences for this Superset."
+              );
+            }
+            const sourceRef = object.provenance?.source_artifact_refs?.[0] ?? "unknown";
+            nextGroups = [
+              ...remainingGroups,
+              createTrainingExerciseRelationshipGroup({
+                id: relationshipGroupId || null,
+                relationshipType: "superset",
+                memberExerciseIds: members,
+                provenance_ref: sourceRef,
+                provenance: { source_artifact_refs: [sourceRef] },
+              }),
+            ];
+          } else if (!["remove", "dismiss_issue"].includes(mode)) {
+            throw reviewError("SUPERSET_EDIT_INVALID", "Choose how to update this Superset.");
+          }
+          const normalizedGroups = normalizeTrainingExerciseRelationshipGroups(
+            nextGroups,
+            { exercises: object.exercises, strict: true }
+          );
+          const structuralReviewIssues = (object.structuralReviewIssues ?? []).filter(
+            (issue) => issue.id !== structuralIssueId
+          );
+          return {
+            ...object,
+            exerciseRelationshipGroups: normalizedGroups,
+            structuralReviewIssues,
+          };
+        }),
+      };
+      if (matched !== 1) {
+        throw reviewError("TRAINING_SESSION_UNAVAILABLE", "The selected workout is no longer available.");
+      }
+      if (typeof repositories.evidenceReviews.updateReviewIfCurrent !== "function") {
+        throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "Superset editing is temporarily unavailable.");
+      }
+      return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, {
+        interpretedEvidence,
+        exerciseRelationshipEditing: {
+          updatedAt: now().toISOString(),
+          updatedBy,
+        },
+      });
+    },
     async failCommit(id, error) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       const completed = Object.values(review?.commitProgress ?? {}).some((item) => item?.status === "completed");
@@ -257,3 +344,18 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
 
 function unique(values) { return [...new Set(values.filter(Boolean))]; }
 function reviewError(code, message) { const error = new Error(message); error.code = code; return error; }
+
+function assertNoTrainingStructureReviewIssues(evidencePackage = {}) {
+  const issueCount = (evidencePackage.evidence_objects ?? [])
+    .filter((object) => object.evidence_type === "training" && !object.removed)
+    .reduce(
+      (count, object) => count + (object.structuralReviewIssues ?? []).length,
+      0
+    );
+  if (issueCount > 0) {
+    throw reviewError(
+      "TRAINING_STRUCTURE_REVIEW_REQUIRED",
+      "Resolve or remove the remaining Training structure review issues before saving."
+    );
+  }
+}

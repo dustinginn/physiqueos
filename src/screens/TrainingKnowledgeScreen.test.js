@@ -9,6 +9,7 @@ import TrainingKnowledgeScreen, {
   getTrainingLibraryHeaderItems,
   getTrainingLibraryExerciseAggregationKey,
   getTrainingLibraryExerciseRouteKey,
+  getTrainingSessionExerciseRenderItems,
 } from "./TrainingKnowledgeScreen";
 import { buildTrainingLibraryNavigation } from "../navigation/navigationRegistry";
 import { registerRuntimeTrainingExercises } from "../domain/models/trainingExerciseIdentity";
@@ -80,6 +81,30 @@ const taxonomyReport = {
 };
 
 describe("Training Library corrected taxonomy", () => {
+  it("renders a relationship group once while leaving other exercises standalone", () => {
+    const exercises = [
+      { id: "press", name: "Chest Press Machine", sets: [] },
+      { id: "fly", name: "Chest Fly Machine", sets: [] },
+      { id: "curl", name: "Spider Curls", sets: [] },
+    ];
+    const items = getTrainingSessionExerciseRenderItems({
+      exercises,
+      exerciseRelationshipGroups: [{
+        id: "superset",
+        relationshipType: "superset",
+        memberExerciseIds: ["press", "fly"],
+      }],
+    });
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        type: "relationship",
+        exercises: [exercises[0], exercises[1]],
+      }),
+      { type: "exercise", exercise: exercises[2] },
+    ]);
+  });
+
   it("renders the authoritative seated hip movement under Glutes", () => {
     expect(
       getExercisesForFlatTrainingGroup({

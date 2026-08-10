@@ -10,6 +10,10 @@ import {
   getTrainingExecutionVariantKey,
   normalizeTrainingExecutionVariant,
 } from "../models/trainingExecutionVariant";
+import {
+  deriveTrainingExerciseRelationshipContext,
+  getTrainingExerciseRelationshipComparisonKey,
+} from "../models/trainingExerciseRelationship";
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
 
 const OBSERVATION_TYPE = "training_performance";
@@ -147,12 +151,17 @@ function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
   const executionVariant = normalizeTrainingExecutionVariant(
     exercise.executionVariant
   );
+  const relationshipContext = deriveTrainingExerciseRelationshipContext({
+    exercise,
+    session,
+  });
 
   return {
     date: getDateKey(session.observed_at),
     exerciseKey: getCanonicalTrainingExerciseSlug(exercise.name),
     exerciseName: getCanonicalTrainingExerciseLabel(exercise.name),
     ...(executionVariant ? { executionVariant } : {}),
+    ...(relationshipContext ? { relationshipContext } : {}),
     primaryNavigationCategory: navigationExercise.primaryNavigationCategory,
     sessionId: session.id,
     setCount: sets.length,
@@ -223,14 +232,24 @@ function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDa
   const comparisonVariantKey = getTrainingExecutionVariantKey(
     lastSession?.executionVariant
   );
-  const comparableEntries = sortedEntries.filter(
+  const variantComparableEntries = sortedEntries.filter(
     (entry) =>
       getTrainingExecutionVariantKey(entry.executionVariant) ===
       comparisonVariantKey
   );
+  const relationshipComparisonKey = getTrainingExerciseRelationshipComparisonKey(
+    lastSession?.relationshipContext
+  );
+  const comparableEntries = variantComparableEntries.filter(
+    (entry) =>
+      getTrainingExerciseRelationshipComparisonKey(entry.relationshipContext) ===
+      relationshipComparisonKey
+  );
   const previousComparableSession = comparableEntries.at(-2) ?? null;
-  const priorEntries = comparableEntries.slice(0, -1);
-  const prDetection = detectPrs({ lastSession, priorEntries });
+  const priorPrEntries = variantComparableEntries.filter(
+    (entry) => entry !== lastSession
+  );
+  const prDetection = detectPrs({ lastSession, priorEntries: priorPrEntries });
   const volumeTrend = getVolumeTrend({
     lastSession,
     previousComparableSession,
@@ -278,14 +297,22 @@ function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDa
       },
       volume_trend: volumeTrend,
       frequency,
-      ...(lastSession.executionVariant
-        ? {
-            comparison_context: {
-              execution_variant: lastSession.executionVariant,
-              comparable_session_count: comparableEntries.length,
-              variant_key: comparisonVariantKey,
-            },
-          }
+       ...((lastSession.executionVariant || lastSession.relationshipContext)
+         ? {
+             comparison_context: {
+               ...(lastSession.executionVariant
+                 ? { execution_variant: lastSession.executionVariant }
+                 : {}),
+               ...(lastSession.relationshipContext
+                 ? {
+                     relationship: serializeRelationshipContext(lastSession.relationshipContext),
+                     relationship_key: relationshipComparisonKey,
+                   }
+                 : {}),
+               comparable_session_count: comparableEntries.length,
+               variant_key: comparisonVariantKey,
+             },
+           }
         : {}),
     },
     provenance: {
@@ -616,10 +643,24 @@ function serializeSessionEntry(entry) {
     ...(entry.executionVariant
       ? { execution_variant: entry.executionVariant }
       : {}),
+    ...(entry.relationshipContext
+      ? { relationship_context: serializeRelationshipContext(entry.relationshipContext) }
+      : {}),
     session_id: entry.sessionId,
     set_count: entry.setCount,
     best_set: entry.bestSet,
     total_volume: entry.totalVolume,
+  };
+}
+
+function serializeRelationshipContext(context) {
+  return {
+    relationship_type: context.relationshipType,
+    member_index: context.memberIndex,
+    ordered_partners: (context.orderedPartners ?? []).map((partner) => ({
+      canonical_exercise_id: partner.canonicalExerciseId ?? null,
+      name: partner.name ?? null,
+    })),
   };
 }
 

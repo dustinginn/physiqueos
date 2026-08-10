@@ -31,7 +31,7 @@ import {
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const [nutritionDispositions, setNutritionDispositions] = useState(() =>
@@ -89,6 +89,9 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
     item.object.reconciliation?.nutrition?.dispositionStatus ===
       "blocked_duplicate_active_days"
   );
+  const blockingStructuralIssues = presentation.items.filter((item) =>
+    item.included && (item.structuralReviewIssues ?? []).length > 0
+  );
   const toggleItem = (item) => {
     setItemDecisions((current) =>
       toggleEvidenceReviewItemDecision(current, item.object.id, item.included)
@@ -110,7 +113,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -156,6 +159,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           {!presentation.summary.included && <p className="text-sm font-semibold text-[var(--text-secondary)]">Select at least one item to continue.</p>}
           {blockingPhotoIssue && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose a pose for every included photo before saving.</p>}
           {blockingExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{blockingExercises.length} exercise {blockingExercises.length === 1 ? "identity needs" : "identities need"} details before this workout can be saved.</p>}
+          {blockingStructuralIssues.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review or remove the unresolved Superset structure before saving.</p>}
           {blockingNutrition.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose how to update the existing Nutrition Day before saving.</p>}
           {blockedNutritionInvariant.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">This date has conflicting active Nutrition records and needs repair before another update can be saved.</p>}
         </Card>
@@ -166,7 +170,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton blockingCount={blockingExercises.length} disabled={blockingExercises.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
+            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
@@ -182,7 +186,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -209,7 +213,18 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDispositi
         <section>
           <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Exercises</h3>
           <div className="mt-3 space-y-4">
-            {item.exercises.map((exercise, index) => (
+            {(item.exerciseRelationshipGroups ?? []).map((group) => (
+              <div className="rounded-2xl border border-[var(--primary)]/25 bg-[var(--surface-accent)]/45 p-3" key={group.id}>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--primary)]">Superset</p>
+                <div className="mt-3 space-y-4">
+                  {group.members.map((exercise) => (
+                    <GroupedExerciseReviewRow canEdit={canEdit} exercise={exercise} exerciseVariantAction={exerciseVariantAction} item={item} key={exercise.id} recoveryContext={recoveryContext} review={review} />
+                  ))}
+                </div>
+                {canEdit && exerciseRelationshipAction && <SupersetEditor action={exerciseRelationshipAction} exercises={item.exercises} group={group} item={item} recoveryContext={recoveryContext} review={review} />}
+              </div>
+            ))}
+            {(item.standaloneExercises ?? item.exercises).map((exercise, index) => (
               <div key={`${exercise.name}-${index}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -266,6 +281,13 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDispositi
                     </form>
                   </details>
                 )}
+              </div>
+            ))}
+            {(item.structuralReviewIssues ?? []).map((issue) => (
+              <div className="rounded-2xl border border-[var(--warning)] bg-[var(--surface-warning)] p-3" key={issue.id}>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">Superset needs review</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{issue.message}</p>
+                {canEdit && exerciseRelationshipAction && <SupersetEditor action={exerciseRelationshipAction} exercises={item.exercises} issue={issue} item={item} recoveryContext={recoveryContext} review={review} />}
               </div>
             ))}
           </div>
@@ -327,6 +349,72 @@ function EvidenceCard({ canEdit, exerciseVariantAction, item, nutritionDispositi
         {item.included ? "Exclude from log" : "Include in log"}
       </button>
     </Card>
+  );
+}
+
+function GroupedExerciseReviewRow({ canEdit, exercise, exerciseVariantAction, item, recoveryContext, review }) {
+  return (
+    <div className="rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-extrabold text-[var(--text-primary)]">{exercise.occurrenceLabel ?? exercise.name}</p>
+          {exercise.executionVariant?.label && <p className="mt-0.5 text-xs font-bold text-[var(--primary)]">Variant: {exercise.executionVariant.label}</p>}
+        </div>
+        {exercise.provisionalExerciseId && <span className="shrink-0 rounded-full bg-[var(--surface-warning)] px-2.5 py-1 text-xs font-extrabold text-[var(--text-primary)]">New exercise</span>}
+      </div>
+      {exercise.sets.length
+        ? <ul className="mt-1 space-y-1 text-sm text-[var(--text-secondary)]">{exercise.sets.map((set, setIndex) => <li key={`${set}-${setIndex}`}>• {set}</li>)}</ul>
+        : <p className="mt-1 text-sm text-[var(--text-muted)]">Set details unavailable</p>}
+      {canEdit && exercise.canonicalExerciseId && exerciseVariantAction && (
+        <details className="mt-2 rounded-xl border border-[var(--divider)] px-3 py-2">
+          <summary className="cursor-pointer text-xs font-extrabold text-[var(--primary)]">{exercise.executionVariant ? "Edit variant" : "Add variant"}</summary>
+          <form action={exerciseVariantAction} className="mt-3 space-y-2">
+            <input name="reviewId" type="hidden" value={review.id} />
+            <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+            <input name="evidenceObjectId" type="hidden" value={item.object.id} />
+            <input name="exerciseIndex" type="hidden" value={exercise.exerciseIndex} />
+            <EvidenceRecoveryContextFields context={recoveryContext}/>
+            <label className="block text-xs font-bold text-[var(--text-secondary)]" htmlFor={`variant-${item.object.id}-${exercise.exerciseIndex}`}>Execution variant</label>
+            <input className="min-h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)]" defaultValue={exercise.executionVariant?.label ?? ""} id={`variant-${item.object.id}-${exercise.exerciseIndex}`} name="variantLabel" placeholder="Static Hold" />
+            <div className="flex gap-2">
+              <button className="min-h-10 flex-1 rounded-xl bg-[var(--primary)] px-3 text-xs font-extrabold text-white" name="variantMode" type="submit" value="save">Save variant</button>
+              {exercise.executionVariant && <button className="min-h-10 rounded-xl border border-[var(--divider)] px-3 text-xs font-extrabold text-[var(--text-primary)]" name="variantMode" type="submit" value="remove">Remove</button>}
+            </div>
+          </form>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function SupersetEditor({ action, exercises, group = null, issue = null, item, recoveryContext, review }) {
+  const selectedIds = group?.memberExerciseIds ?? issue?.memberExerciseIds ?? [];
+  const formKey = group?.id ?? issue?.id ?? "new";
+  return (
+    <details className="mt-3 rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 py-2">
+      <summary className="cursor-pointer text-xs font-extrabold text-[var(--primary)]">{group ? "Edit Superset" : "Resolve Superset"}</summary>
+      <form action={action} className="mt-3 space-y-3">
+        <input name="reviewId" type="hidden" value={review.id} />
+        <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+        <input name="evidenceObjectId" type="hidden" value={item.object.id} />
+        {group?.id && <input name="relationshipGroupId" type="hidden" value={group.id} />}
+        {issue?.id && <input name="structuralReviewIssueId" type="hidden" value={issue.id} />}
+        <EvidenceRecoveryContextFields context={recoveryContext}/>
+        {[0, 1].map((memberIndex) => (
+          <label className="block text-xs font-bold text-[var(--text-secondary)]" key={memberIndex}>
+            Exercise {memberIndex + 1}
+            <select className="mt-1 min-h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-semibold text-[var(--text-primary)]" defaultValue={selectedIds[memberIndex] ?? ""} name="memberExerciseId" required>
+              <option disabled value="">Choose exercise</option>
+              {exercises.map((exercise) => <option key={`${formKey}-${memberIndex}-${exercise.id}`} value={exercise.id}>{exercise.occurrenceLabel ?? exercise.name}</option>)}
+            </select>
+          </label>
+        ))}
+        <div className="flex gap-2">
+          <button className="min-h-10 flex-1 rounded-xl bg-[var(--primary)] px-3 text-xs font-extrabold text-white" name="relationshipMode" type="submit" value="save">Save Superset</button>
+          {(group || issue) && <button className="min-h-10 rounded-xl border border-[var(--divider)] px-3 text-xs font-extrabold text-[var(--text-primary)]" name="relationshipMode" type="submit" value={group ? "remove" : "dismiss_issue"}>Remove Superset</button>}
+        </div>
+      </form>
+    </details>
   );
 }
 

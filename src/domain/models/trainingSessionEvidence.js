@@ -14,6 +14,11 @@ import {
   normalizeTrainingExecutionVariant,
   parseTrailingExecutionVariant,
 } from "./trainingExecutionVariant";
+import {
+  createTrainingExerciseRelationshipGroup,
+  ensureUniqueTrainingExerciseOccurrenceIds,
+  normalizeTrainingExerciseRelationshipGroups,
+} from "./trainingExerciseRelationship";
 
 const DEFAULT_METADATA = {
   activity_type: null,
@@ -62,6 +67,7 @@ const NUMBER_WORDS = {
 export function createTrainingSessionEvidenceObject({
   capturedAt = null,
   confidence = { extraction: "moderate", interpretation: "moderate" },
+  exerciseRelationshipGroups = [],
   exercises = [],
   id,
   metadata = {},
@@ -69,9 +75,14 @@ export function createTrainingSessionEvidenceObject({
   provenance = {},
   quality = { status: "partial", limitations: [] },
   source = {},
+  structuralReviewIssues = [],
   values = [],
 }) {
   const normalizedExercises = normalizeTrainingExercises(exercises);
+  const normalizedRelationshipGroups = normalizeTrainingExerciseRelationshipGroups(
+    exerciseRelationshipGroups,
+    { exercises: normalizedExercises, strict: true }
+  );
 
   return {
     id,
@@ -89,6 +100,12 @@ export function createTrainingSessionEvidenceObject({
       ...withoutEmptyValues(metadata),
     },
     exercises: normalizedExercises,
+    ...(normalizedRelationshipGroups.length > 0
+      ? { exerciseRelationshipGroups: normalizedRelationshipGroups }
+      : {}),
+    ...(structuralReviewIssues.length > 0
+      ? { structuralReviewIssues }
+      : {}),
     values: removeTrainingHierarchyValues(values),
     confidence,
     quality,
@@ -111,7 +128,8 @@ export function createTrainingSessionEvidenceFromText({
   sourceModality = "manual",
   text,
 }) {
-  const exercises = parseStrengthTrainingText(text, { provenanceRef });
+  const structure = parseStrengthTrainingSessionText(text, { provenanceRef });
+  const exercises = structure.exercises;
 
   if (exercises.length === 0) return null;
 
@@ -122,6 +140,7 @@ export function createTrainingSessionEvidenceFromText({
       interpretation: "moderate",
     },
     exercises,
+    exerciseRelationshipGroups: structure.exerciseRelationshipGroups,
     id,
     metadata: {
       activity_type: activityType,
@@ -139,11 +158,431 @@ export function createTrainingSessionEvidenceFromText({
       integration: null,
       source_artifact_refs: sourceArtifactRefs,
     },
+    structuralReviewIssues: structure.structuralReviewIssues,
     provenance: {
       source_artifact_refs: sourceArtifactRefs,
     },
     values: [],
   });
+}
+
+export function parseStrengthTrainingSessionText(
+  text,
+  { provenanceRef = "typed_evidence_0" } = {}
+) {
+  const source = normalizeTrainingTextInput(text);
+  const chunks = splitSupersetStructureChunks(source);
+  const exercises = [];
+  const pendingGroups = [];
+  const structuralReviewIssues = [];
+  const sourceLines = [];
+  const convenienceRelationships = [];
+
+  for (const chunk of chunks) {
+    if (chunk.type === "superset") {
+      const parsed = parseExplicitSupersetChunk(chunk, { provenanceRef });
+      const startIndex = exercises.length;
+      exercises.push(...parsed.exercises);
+      sourceLines.push(...parsed.sourceLines);
+      structuralReviewIssues.push(...parsed.issues);
+      if (parsed.valid) {
+        pendingGroups.push({
+          memberIndexes: parsed.exercises.map((_, index) => startIndex + index),
+          provenanceRef,
+          sourceLine: chunk.startLine,
+        });
+      }
+      continue;
+    }
+
+    const convenience = extractNaturalSupersetDeclarations(chunk.text, chunk.startLine);
+    convenienceRelationships.push(...convenience.declarations);
+    structuralReviewIssues.push(...convenience.issues);
+    const transformed = transformVariantDirectives(convenience.remainingText, {
+      lineOffset: chunk.startLine - 1,
+    });
+    structuralReviewIssues.push(...transformed.issues);
+    const parsed = parseStrengthTrainingText(transformed.text, { provenanceRef });
+    exercises.push(...parsed);
+    sourceLines.push(...parsed.map(() => chunk.startLine));
+  }
+
+  const uniqueExercises = ensureUniqueTrainingExerciseOccurrenceIds(exercises, {
+    preserveExisting: false,
+    provenanceRef,
+    sourceLines,
+  });
+  const relationshipGroups = pendingGroups.map((group) =>
+    createTrainingExerciseRelationshipGroup({
+      memberExerciseIds: group.memberIndexes.map(
+        (index) => uniqueExercises[index]?.id
+      ),
+      provenance_ref: group.provenanceRef,
+      provenance: { source_artifact_refs: [group.provenanceRef] },
+    })
+  );
+
+  for (const declaration of convenienceRelationships) {
+    const left = resolveNaturalRelationshipMember(
+      uniqueExercises,
+      declaration.left
+    );
+    const right = resolveNaturalRelationshipMember(
+      uniqueExercises,
+      declaration.right
+    );
+    const occupied = new Set(
+      relationshipGroups.flatMap((group) => group.memberExerciseIds)
+    );
+    if (
+      left.length !== 1 ||
+      right.length !== 1 ||
+      left[0]?.id === right[0]?.id ||
+      occupied.has(left[0]?.id) ||
+      occupied.has(right[0]?.id)
+    ) {
+      structuralReviewIssues.push(createStructuralReviewIssue({
+        code: "AMBIGUOUS_NATURAL_SUPERSET",
+        message: "Choose the two exercise occurrences that belong to this Superset.",
+        sourceLine: declaration.sourceLine,
+        candidateMemberExerciseIds: uniqueStrings([
+          ...left.map((exercise) => exercise.id),
+          ...right.map((exercise) => exercise.id),
+        ]),
+      }));
+      continue;
+    }
+    relationshipGroups.push(createTrainingExerciseRelationshipGroup({
+      memberExerciseIds: [left[0].id, right[0].id],
+      provenance_ref: provenanceRef,
+      provenance: { source_artifact_refs: [provenanceRef] },
+    }));
+  }
+
+  return {
+    exercises: uniqueExercises,
+    exerciseRelationshipGroups: normalizeTrainingExerciseRelationshipGroups(
+      relationshipGroups,
+      { exercises: uniqueExercises, strict: true }
+    ),
+    structuralReviewIssues,
+    relationshipSyntaxPresent:
+      chunks.some((chunk) => chunk.type === "superset") ||
+      convenienceRelationships.length > 0,
+  };
+}
+
+function splitSupersetStructureChunks(text) {
+  const lines = String(text ?? "").split("\n");
+  const chunks = [];
+  let plainLines = [];
+  let plainStartLine = 1;
+  let active = null;
+
+  const flushPlain = () => {
+    if (plainLines.some((line) => line.trim())) {
+      chunks.push({
+        type: "plain",
+        text: plainLines.join("\n"),
+        startLine: plainStartLine,
+      });
+    }
+    plainLines = [];
+  };
+
+  lines.forEach((rawLine, index) => {
+    const lineNumber = index + 1;
+    const line = rawLine.trim();
+    if (/^superset\s*:$/i.test(line)) {
+      if (active) {
+        active.lines.push(rawLine);
+        active.nestedSupersetLine = lineNumber;
+        return;
+      }
+      flushPlain();
+      active = {
+        type: "superset",
+        lines: [],
+        startLine: lineNumber,
+        terminated: false,
+      };
+      return;
+    }
+    if (/^end\s+superset\s*:?$/i.test(line) && active) {
+      active.terminated = true;
+      active.endLine = lineNumber;
+      chunks.push(active);
+      active = null;
+      plainStartLine = lineNumber + 1;
+      return;
+    }
+    if (active) {
+      active.lines.push(rawLine);
+      return;
+    }
+    if (plainLines.length === 0) plainStartLine = lineNumber;
+    plainLines.push(rawLine);
+  });
+
+  if (active) {
+    active.endLine = lines.length;
+    chunks.push(active);
+  }
+  flushPlain();
+  return chunks.length > 0
+    ? chunks
+    : [{ type: "plain", text: String(text ?? ""), startLine: 1 }];
+}
+
+function parseExplicitSupersetChunk(chunk, { provenanceRef }) {
+  const members = [];
+  const issues = [];
+  let current = null;
+
+  const pushCurrent = () => {
+    if (current) members.push(current);
+    current = null;
+  };
+
+  for (let index = 0; index < chunk.lines.length; index += 1) {
+    const rawLine = chunk.lines[index];
+    const line = rawLine.trim();
+    const sourceLine = chunk.startLine + index + 1;
+    if (!line) {
+      if (current) current.lines.push(rawLine);
+      continue;
+    }
+    const nextLine = chunk.lines
+      .slice(index + 1)
+      .find((candidate) => candidate.trim())?.trim() ?? "";
+    const variantMatch = line.match(/^variant\s*:\s*(.+)$/i);
+    if (variantMatch) {
+      if (!current) {
+        issues.push(createStructuralReviewIssue({
+          code: "VARIANT_WITHOUT_EXERCISE",
+          message: "Variant must follow an exercise heading inside the Superset.",
+          sourceLine,
+        }));
+      } else if (current.setSeen) {
+        issues.push(createStructuralReviewIssue({
+          code: "VARIANT_AFTER_SETS",
+          message: "Variant must appear before the exercise sets.",
+          sourceLine,
+        }));
+      } else if (current.variant || resolveExecutionVariantHeading(current.heading)) {
+        issues.push(createStructuralReviewIssue({
+          code: "DUPLICATE_EXECUTION_VARIANT",
+          message: "An exercise occurrence can declare only one execution variant.",
+          sourceLine,
+        }));
+      } else {
+        current.variant = variantMatch[1].trim();
+      }
+      continue;
+    }
+    if (current && hasExerciseSetSignal(line)) {
+      current.lines.push(rawLine);
+      current.setSeen = true;
+      continue;
+    }
+    if (isExerciseHeadingForStructure(line, nextLine)) {
+      pushCurrent();
+      current = {
+        heading: line,
+        lines: [],
+        setSeen: false,
+        sourceLine,
+        variant: null,
+      };
+      continue;
+    }
+    if (!current) {
+      issues.push(createStructuralReviewIssue({
+        code: "UNRELATED_SUPERSET_CONTENT",
+        message: "Superset content must begin with an exercise heading.",
+        sourceLine,
+      }));
+      continue;
+    }
+    current.lines.push(rawLine);
+    if (hasExerciseSetSignal(line)) current.setSeen = true;
+  }
+  pushCurrent();
+
+  if (chunk.nestedSupersetLine) {
+    issues.push(createStructuralReviewIssue({
+      code: "NESTED_SUPERSET",
+      message: "Finish the current Superset before starting another one.",
+      sourceLine: chunk.nestedSupersetLine,
+    }));
+  }
+  if (members.length !== 2) {
+    issues.push(createStructuralReviewIssue({
+      code: members.length < 2
+        ? "INCOMPLETE_SUPERSET"
+        : "UNSUPPORTED_SUPERSET_MEMBER_COUNT",
+      message: members.length < 2
+        ? "Choose a second exercise occurrence for this Superset."
+        : "Superset V1 authoring supports exactly two exercise occurrences.",
+      sourceLine: chunk.startLine,
+    }));
+  }
+
+  const exercises = [];
+  const sourceLines = [];
+  for (const member of members) {
+    const heading = member.variant
+      ? `${member.heading} (${member.variant})`
+      : member.heading;
+    const parsed = parseStrengthTrainingText(
+      [heading, ...member.lines].join("\n"),
+      { provenanceRef }
+    );
+    if (parsed.length !== 1 || (parsed[0]?.sets ?? []).length === 0) {
+      issues.push(createStructuralReviewIssue({
+        code: "UNRESOLVED_SUPERSET_MEMBER",
+        message: `Review the Superset member "${member.heading}" and its sets.`,
+        sourceLine: member.sourceLine,
+      }));
+      exercises.push(...parsed);
+      sourceLines.push(...parsed.map(() => member.sourceLine));
+      continue;
+    }
+    exercises.push(parsed[0]);
+    sourceLines.push(member.sourceLine);
+  }
+
+  return {
+    exercises,
+    sourceLines,
+    issues,
+    valid: issues.length === 0 && exercises.length === 2,
+  };
+}
+
+function transformVariantDirectives(text, { lineOffset = 0 } = {}) {
+  const lines = String(text ?? "").split("\n");
+  const issues = [];
+  let headingIndex = null;
+  let setSeen = false;
+  let variantSeen = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    const nextLine = lines.slice(index + 1)
+      .find((candidate) => candidate.trim())?.trim() ?? "";
+    const match = line.match(/^variant\s*:\s*(.+)$/i);
+    if (match) {
+      const sourceLine = lineOffset + index + 1;
+      if (headingIndex === null) {
+        issues.push(createStructuralReviewIssue({
+          code: "VARIANT_WITHOUT_EXERCISE",
+          message: "Variant must follow an exercise heading.",
+          sourceLine,
+        }));
+      } else if (setSeen) {
+        issues.push(createStructuralReviewIssue({
+          code: "VARIANT_AFTER_SETS",
+          message: "Variant must appear before the exercise sets.",
+          sourceLine,
+        }));
+      } else if (variantSeen) {
+        issues.push(createStructuralReviewIssue({
+          code: "DUPLICATE_EXECUTION_VARIANT",
+          message: "An exercise occurrence can declare only one execution variant.",
+          sourceLine,
+        }));
+      } else {
+        lines[headingIndex] = `${lines[headingIndex].trim()} (${match[1].trim()})`;
+        variantSeen = true;
+      }
+      lines[index] = "";
+      continue;
+    }
+    if (headingIndex !== null && hasExerciseSetSignal(line)) {
+      setSeen = true;
+      continue;
+    }
+    if (isExerciseHeadingForStructure(line, nextLine)) {
+      headingIndex = index;
+      setSeen = false;
+      variantSeen = Boolean(resolveExecutionVariantHeading(line));
+      continue;
+    }
+    if (hasExerciseSetSignal(line)) setSeen = true;
+  }
+  return { text: lines.join("\n"), issues };
+}
+
+function extractNaturalSupersetDeclarations(text, startLine) {
+  const declarations = [];
+  const issues = [];
+  const remainingLines = [];
+  String(text ?? "").split("\n").forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    const match = line.match(/^(.+?)\s+superset\s+with\s+(.+?)\s*$/i);
+    if (!match) {
+      if (/\bsuperset\b/i.test(line)) {
+        issues.push(createStructuralReviewIssue({
+          code: "AMBIGUOUS_NATURAL_SUPERSET",
+          message: "Use “Exercise A superset with Exercise B” or the explicit Superset block.",
+          sourceLine: startLine + index,
+        }));
+      }
+      remainingLines.push(rawLine);
+      return;
+    }
+    declarations.push({
+      left: match[1].trim(),
+      right: match[2].trim(),
+      sourceLine: startLine + index,
+    });
+  });
+  return {
+    declarations,
+    issues,
+    remainingText: remainingLines.join("\n"),
+  };
+}
+
+function resolveNaturalRelationshipMember(exercises, value) {
+  const resolution = resolveTrainingExerciseIdentity(value);
+  if (resolution.resolutionStatus !== "resolved_high_confidence") return [];
+  return exercises.filter((exercise) =>
+    exercise.canonicalExerciseId === resolution.canonicalExerciseId
+  );
+}
+
+function isExerciseHeadingForStructure(line, nextLine = "") {
+  const resolution = resolveTrainingExerciseIdentity(line);
+  if (resolution.resolutionStatus === "resolved_high_confidence") return true;
+  if (resolveExecutionVariantHeading(line)?.baseLabel) return true;
+  return isStructurallyValidUnknownExerciseHeading(line, nextLine);
+}
+
+function hasExerciseSetSignal(line) {
+  return /\d/.test(String(line ?? "")) && (
+    /\breps?\b|\br\b|\blbs?\b|\bpounds?\b|\bkg\b|\bp\b|\bbody\s*weight\b|\bbw\b|\d+(?:\.\d+)?\s*[rp]\b|\d\s*[x×]/i.test(line)
+  );
+}
+
+function createStructuralReviewIssue({
+  candidateMemberExerciseIds = [],
+  code,
+  message,
+  sourceLine,
+}) {
+  return {
+    id: `training_structure_issue_${stableExerciseHash([
+      code,
+      sourceLine,
+      message,
+    ].join("|"))}`,
+    code,
+    message,
+    sourceLineRange: { start: sourceLine, end: sourceLine },
+    candidateMemberExerciseIds: uniqueStrings(candidateMemberExerciseIds),
+  };
 }
 
 export function parseStrengthTrainingText(text, { provenanceRef = "typed_evidence_0" } = {}) {

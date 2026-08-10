@@ -109,7 +109,7 @@ Lying leg curls
     registerBicepCurlMachine();
     const [exercise] = parse(`${heading}\n15r 105p`);
     expect(exercise).toMatchObject({
-      id: "bicep_curl_machine",
+      id: expect.stringMatching(/^exercise_occurrence_[a-f0-9]+$/),
       name: "Bicep Curl Machine",
       canonicalExerciseId: "bicep_curl_machine",
       resolutionStatus: "resolved",

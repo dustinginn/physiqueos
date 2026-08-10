@@ -2,6 +2,7 @@ import {
   createExerciseId as createCanonicalExerciseId,
   normalizeTrainingExercises,
   normalizeTrainingSets,
+  parseStrengthTrainingSessionText,
   parseStrengthTrainingText,
   replaceTrainingHierarchyValue,
   getStrengthTrainingBlockParseDiagnostics,
@@ -12,6 +13,10 @@ import {
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import { getTrainingExerciseOccurrenceKey } from "../models/trainingExecutionVariant";
+import {
+  normalizeTrainingExerciseRelationshipGroups,
+  remapTrainingExerciseRelationshipGroups,
+} from "../models/trainingExerciseRelationship";
 import { createActivityDayEvidenceObject } from "../models/activityDayEvidence";
 import {
   createNutritionDayEvidenceObject,
@@ -1361,7 +1366,8 @@ function getObservedAtFromValues(values) {
 export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEvidence }) {
   if (!typedEvidence) return evidenceObjects;
 
-  const strengthExercises = parseStrengthTrainingEvidence(typedEvidence);
+  const parsedStructure = parseStrengthTrainingSessionText(typedEvidence);
+  const strengthExercises = parsedStructure.exercises;
   if (strengthExercises.length === 0) return evidenceObjects;
 
   const candidateIndexes = evidenceObjects
@@ -1393,7 +1399,23 @@ export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEv
       };
     }
 
-    const mergedExercises = mergeStrengthExercises(stripTypedEvidenceExercises(evidenceObject.exercises ?? []), strengthExercises);
+    const aligned = alignRelationshipExerciseOccurrenceIds({
+      existingExercises: stripTypedEvidenceExercises(evidenceObject.exercises ?? []),
+      parsedExercises: strengthExercises,
+      relationshipGroups: parsedStructure.exerciseRelationshipGroups,
+    });
+    const protectedExerciseIds = new Set(
+      aligned.relationshipGroups.flatMap((group) => group.memberExerciseIds)
+    );
+    const mergedExercises = mergeStrengthExercises(
+      stripTypedEvidenceExercises(evidenceObject.exercises ?? []),
+      aligned.exercises,
+      { protectedExerciseIds }
+    );
+    const exerciseRelationshipGroups = normalizeTrainingExerciseRelationshipGroups(
+      aligned.relationshipGroups,
+      { exercises: mergedExercises, strict: true }
+    );
     const mergedProvenanceRefs = [
       ...new Set([
         ...(evidenceObject.provenance?.source_artifact_refs ?? []),
@@ -1411,6 +1433,12 @@ export function mergeTypedEvidenceIntoTrainingObjects({ evidenceObjects, typedEv
         )
       ),
       exercises: mergedExercises,
+      ...(exerciseRelationshipGroups.length > 0
+        ? { exerciseRelationshipGroups }
+        : {}),
+      ...(parsedStructure.structuralReviewIssues.length > 0
+        ? { structuralReviewIssues: parsedStructure.structuralReviewIssues }
+        : {}),
       reconciliation: {
         ...(evidenceObject.reconciliation ?? {}),
         typed_parse: completeness,
@@ -2854,15 +2882,22 @@ function extractStrengthHierarchyExercises(evidenceObject) {
   }
 }
 
-function mergeStrengthExercises(existingExercises, newExercises) {
+function mergeStrengthExercises(
+  existingExercises,
+  newExercises,
+  { protectedExerciseIds = new Set() } = {}
+) {
   const exerciseMap = new Map();
 
   normalizeStrengthExercises(existingExercises).forEach((exercise) => {
-    exerciseMap.set(getStrengthExerciseMergeKey(exercise), exercise);
+    exerciseMap.set(
+      getStrengthExerciseMergeKey(exercise, { protectedExerciseIds }),
+      exercise
+    );
   });
 
   normalizeStrengthExercises(newExercises).forEach((exercise) => {
-    const key = getStrengthExerciseMergeKey(exercise);
+    const key = getStrengthExerciseMergeKey(exercise, { protectedExerciseIds });
     const existing = exerciseMap.get(key);
 
     if (!existing) {
@@ -2903,7 +2938,13 @@ function hasValidatedCanonicalExerciseIdentity(exercise = {}) {
     resolved.canonicalExerciseId === exercise.canonicalExerciseId;
 }
 
-function getStrengthExerciseMergeKey(exercise = {}) {
+function getStrengthExerciseMergeKey(
+  exercise = {},
+  { protectedExerciseIds = new Set() } = {}
+) {
+  if (exercise.id && protectedExerciseIds.has(exercise.id)) {
+    return `occurrence:${exercise.id}`;
+  }
   return hasValidatedCanonicalExerciseIdentity(exercise)
     ? `canonical:${getTrainingExerciseOccurrenceKey(exercise, exercise.canonicalExerciseId)}`
     : `unresolved:${getTrainingExerciseOccurrenceKey(exercise, createExerciseId(exercise.name))}`;
@@ -2971,6 +3012,43 @@ function isStrengthTrainingEvidenceObject(evidenceObject) {
 
 function parseStrengthTrainingEvidence(typedEvidence) {
   return parseStrengthTrainingText(typedEvidence);
+}
+
+function alignRelationshipExerciseOccurrenceIds({
+  existingExercises = [],
+  parsedExercises = [],
+  relationshipGroups = [],
+}) {
+  const protectedIds = new Set(
+    relationshipGroups.flatMap((group) => group.memberExerciseIds ?? [])
+  );
+  const existingByKey = new Map();
+  existingExercises.forEach((exercise) => {
+    const key = getStrengthExerciseMergeKey(exercise);
+    if (!existingByKey.has(key)) existingByKey.set(key, []);
+    existingByKey.get(key).push(exercise);
+  });
+  const usedExistingIds = new Set();
+  const idMap = new Map();
+  const exercises = parsedExercises.map((exercise) => {
+    if (!protectedIds.has(exercise.id)) return exercise;
+    const key = getStrengthExerciseMergeKey(exercise);
+    const candidates = (existingByKey.get(key) ?? []).filter(
+      (candidate) => candidate.id && !usedExistingIds.has(candidate.id)
+    );
+    if (candidates.length !== 1) return exercise;
+    const existingId = candidates[0].id;
+    usedExistingIds.add(existingId);
+    idMap.set(exercise.id, existingId);
+    return { ...exercise, id: existingId };
+  });
+  return {
+    exercises,
+    relationshipGroups: remapTrainingExerciseRelationshipGroups(
+      relationshipGroups,
+      idMap
+    ),
+  };
 }
 
 function appendStrengthSet({
@@ -3225,6 +3303,7 @@ function stripTrainingSessionToCanonicalFields(evidenceObject) {
     captured_at,
     confidence,
     evidence_type,
+    exerciseRelationshipGroups,
     exercises,
     id,
     metadata,
@@ -3233,6 +3312,7 @@ function stripTrainingSessionToCanonicalFields(evidenceObject) {
     quality,
     reconciliation,
     source,
+    structuralReviewIssues,
     values,
   } = evidenceObject;
 
@@ -3244,6 +3324,10 @@ function stripTrainingSessionToCanonicalFields(evidenceObject) {
     source,
     metadata,
     exercises: exercises ?? [],
+    ...(exerciseRelationshipGroups?.length
+      ? { exerciseRelationshipGroups }
+      : {}),
+    ...(structuralReviewIssues?.length ? { structuralReviewIssues } : {}),
     values: values ?? [],
     ...(reconciliation ? { reconciliation } : {}),
     confidence,

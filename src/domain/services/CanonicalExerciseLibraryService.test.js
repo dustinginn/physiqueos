@@ -70,6 +70,7 @@ describe("canonical exercise review resolution", () => {
     );
     const exercise = resolved.evidence_objects[0].exercises[0];
     expect(exercise).toMatchObject({
+      id: "provisional_1",
       canonicalExerciseId: "bicep_curl_machine",
       resolutionStatus: "resolved_new_canonical",
       provenance_ref: "typed_fixture",
@@ -102,6 +103,30 @@ describe("canonical exercise review resolution", () => {
       provisionalExercise: { disposition: "explicitly_removed_from_workout" },
     });
     expect(() => assertNoUnresolvedProvisionalExercises(resolved)).not.toThrow();
+  });
+
+  it("automatically dissolves a Superset when a member occurrence is removed", () => {
+    const evidencePackage = fixture();
+    evidencePackage.evidence_objects[0].exercises.push({
+      id: "press_1",
+      name: "Chest Press Machine",
+      canonicalExerciseId: "chest_press_machine",
+      sets: [{ reps: 8, weight: 100 }],
+    });
+    evidencePackage.evidence_objects[0].exerciseRelationshipGroups = [{
+      id: "superset_1",
+      relationshipType: "superset",
+      memberExerciseIds: ["provisional_1", "press_1"],
+    }];
+
+    const resolved = resolveProvisionalExerciseInPackage(
+      evidencePackage,
+      "provisional_1",
+      { mode: "remove" }
+    );
+
+    expect(resolved.evidence_objects[0].exerciseRelationshipGroups).toEqual([]);
+    expect(resolved.evidence_objects[0].exercises).toHaveLength(2);
   });
 
   it("detects normalized name and alias conflicts without fuzzy matching", () => {
