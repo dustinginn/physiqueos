@@ -284,13 +284,10 @@ async function loadSelectionInputs(repositories, userId, previousLocalDate) {
     repositories.executionItems?.listExecutionItems?.(userId) ?? [],
     repositories.protocols?.listActiveProtocols?.(userId) ?? [],
   ]);
-  const protocolVersions = (
-    await Promise.all(
-      protocols.map((protocol) =>
-        repositories.protocolVersions?.getCurrentVersion?.(protocol.id) ?? null
-      )
-    )
-  ).filter(Boolean);
+  const protocolVersions = await loadProtocolVersions(
+    repositories,
+    protocols
+  );
 
   return {
     canonicalObjects,
@@ -304,6 +301,30 @@ async function loadSelectionInputs(repositories, userId, previousLocalDate) {
     reviews,
     weightEntries,
   };
+}
+
+async function loadProtocolVersions(repositories, protocols) {
+  const groups = await Promise.all(protocols.map(async (protocol) => {
+    const current =
+      await repositories.protocolVersions?.getCurrentVersion?.(protocol.id) ??
+      null;
+    const sourceVersionId = Array.isArray(current?.expectations)
+      ? null
+      : protocol.activationProvenance?.sourceVersionId ??
+        current?.change?.previousVersionId ??
+        null;
+    const source = sourceVersionId &&
+      repositories.protocolVersions?.getVersionById
+      ? await repositories.protocolVersions.getVersionById(sourceVersionId)
+      : null;
+
+    return [current, source].filter(Boolean);
+  }));
+  const byId = new Map();
+  for (const version of groups.flat()) {
+    byId.set(version.id, version);
+  }
+  return [...byId.values()];
 }
 
 function composeMorningSelection({

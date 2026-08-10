@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDailyCheckInRepository } from "../../data/repositories/DailyCheckInRepository";
 import { createReminderRepository } from "../../data/repositories/ReminderRepository";
+import { createProtocolRepository } from "../../data/repositories/ProtocolRepository";
+import { createProtocolVersionRepository } from "../../data/repositories/ProtocolVersionRepository";
 import {
   MorningPriorityReconciliationValidationError,
   createMorningPriorityReconciliationService,
@@ -37,7 +39,12 @@ function submission(id, overrides = {}) {
   };
 }
 
-function fixture({ reminders = [reminder("one")], checkIns = [] } = {}) {
+function fixture({
+  reminders = [reminder("one")],
+  checkIns = [],
+  protocols = [],
+  protocolVersions = [],
+} = {}) {
   const reminderWrites = vi.fn();
   const checkInWrites = vi.fn();
   const reminderRepository = createReminderRepository(reminders, {
@@ -52,6 +59,8 @@ function fixture({ reminders = [reminder("one")], checkIns = [] } = {}) {
     dexaScans: { listDEXAScans: vi.fn(async () => []) },
     progressPhotos: { listPhotos: vi.fn(async () => []) },
     weights: { listWeightEntries: vi.fn(async () => []) },
+    protocols: createProtocolRepository(protocols),
+    protocolVersions: createProtocolVersionRepository(protocolVersions),
   };
   const service = createMorningPriorityReconciliationService({
     repositories,
@@ -311,5 +320,51 @@ describe("Morning priority reconciliation server boundary", () => {
     });
     expect(result.persisted).toEqual([]);
     expect(checkInWrites).not.toHaveBeenCalled();
+  });
+
+  it("loads the accepted source version for a sparse active Activity successor", async () => {
+    const sourceVersionId = "activity-source-v2";
+    const { service } = fixture({
+      reminders: [],
+      protocols: [{
+        id: "activity-successor",
+        userId: "user",
+        protocolType: "activity",
+        category: "activity",
+        status: "active",
+        currentVersionId: "activity-successor-v1",
+        activationProvenance: { sourceVersionId },
+      }],
+      protocolVersions: [{
+        id: "activity-successor-v1",
+        protocolId: "activity-successor",
+        status: "active",
+        effectiveAt: "2026-07-21",
+        change: { previousVersionId: sourceVersionId },
+      }, {
+        id: sourceVersionId,
+        protocolId: "activity-source",
+        status: "active",
+        effectiveAt: "2026-07-11",
+        expectations: [{
+          cadence: "daily",
+          includedEvidenceTypes: ["activity_day"],
+        }],
+      }],
+    });
+
+    const selected = await service.getSelection({
+      userId: "user",
+      timeZone: TIME_ZONE,
+    });
+
+    expect(selected.evidenceRecoveryItems).toEqual([
+      expect.objectContaining({
+        evidenceType: "activity_day",
+        occurrenceDate: "2026-07-28",
+        status: "missing",
+        primaryAction: expect.objectContaining({ label: "Add Activity" }),
+      }),
+    ]);
   });
 });

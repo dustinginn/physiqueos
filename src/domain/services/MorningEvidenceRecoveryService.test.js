@@ -51,6 +51,36 @@ function dailyProtocol(type) {
   };
 }
 
+function transitionedActivityProtocol() {
+  const sourceVersionId = "protocol_activity_source_v2";
+  return {
+    protocols: [{
+      id: "protocol_activity_successor",
+      currentVersionId: "protocol_activity_successor_v1",
+      protocolType: "activity",
+      category: "activity",
+      status: "active",
+      activationProvenance: { sourceVersionId },
+    }],
+    protocolVersions: [{
+      id: "protocol_activity_successor_v1",
+      protocolId: "protocol_activity_successor",
+      status: "active",
+      effectiveAt: "2026-08-01",
+      change: { previousVersionId: sourceVersionId },
+    }, {
+      id: sourceVersionId,
+      protocolId: "protocol_activity_source",
+      status: "active",
+      effectiveAt: "2026-07-11",
+      expectations: [{
+        cadence: "daily",
+        includedEvidenceTypes: ["activity_day", "training_session"],
+      }],
+    }],
+  };
+}
+
 function canonical(type, payload = {}) {
   return {
     canonicalId: `${type}|${DATE}|one`,
@@ -190,6 +220,57 @@ describe("Morning evidence recovery projection", () => {
       primaryAction: { label: "Resume review" },
     });
     expect(present.evidenceRecoveryItems).toEqual([]);
+  });
+
+  it("inherits the production-shape daily Activity expectation through accepted protocol lineage", () => {
+    const missing = selection(transitionedActivityProtocol());
+    expect(missing.evidenceRecoveryItems).toEqual([
+      expect.objectContaining({
+        evidenceType: "activity_day",
+        date: DATE,
+        status: "missing",
+        primaryAction: expect.objectContaining({ label: "Add Activity" }),
+        recoveryContext: {
+          date: DATE,
+          expectedEvidenceType: "activity_day",
+          recoveryKey: `protocol:activity_day:${DATE}`,
+          returnTo: "/check-in/morning",
+        },
+      }),
+    ]);
+    expect(missing.evidenceRecoveryItems[0].primaryAction.href)
+      .toContain("date=2026-08-08");
+    expect(missing.evidenceRecoveryItems[0].primaryAction.href)
+      .toContain("expectedEvidenceType=activity_day");
+  });
+
+  it("resumes a pending Activity review without duplicating Add Activity for inherited expectations", () => {
+    const result = selection({
+      ...transitionedActivityProtocol(),
+      reviews: [pending("activity_day", "review_activity")],
+    });
+    expect(result.evidenceRecoveryItems).toEqual([
+      expect.objectContaining({
+        evidenceType: "activity_day",
+        status: "pending_confirmation",
+        pendingReviewId: "review_activity",
+        primaryAction: expect.objectContaining({ label: "Resume review" }),
+      }),
+    ]);
+  });
+
+  it("suppresses inherited Activity recovery after canonical ActivityDay confirmation", () => {
+    const result = selection({
+      ...transitionedActivityProtocol(),
+      canonicalObjects: [canonical("activity_day")],
+    });
+    expect(result.evidenceRecoveryItems).toEqual([]);
+  });
+
+  it("does not infer a daily expectation from an Activity protocol with explicit no expectations", () => {
+    const protocol = transitionedActivityProtocol();
+    protocol.protocolVersions[0].expectations = [];
+    expect(selection(protocol).evidenceRecoveryItems).toEqual([]);
   });
 
   it("keeps ordinary reminders as explicit execution reconciliation", () => {

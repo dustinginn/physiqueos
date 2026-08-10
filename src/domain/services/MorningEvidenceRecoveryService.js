@@ -172,18 +172,27 @@ function hasDailyProtocolExpectation({
       : type === "nutrition";
   });
   return matchingRoots.some((root) => {
-    const version = protocolVersions.find((item) =>
+    const current = protocolVersions.find((item) =>
       item?.id === root.currentVersionId || item?.protocolId === root.id && item?.status === "active"
     );
-    if (!version || String(version.effectiveAt ?? "0000-00-00").slice(0, 10) > previousDate) {
-      return false;
-    }
-    return (version.expectations ?? []).some((expectation) => {
+    const sourceVersionId = root.activationProvenance?.sourceVersionId ??
+      current?.change?.previousVersionId ??
+      null;
+    const source = sourceVersionId
+      ? protocolVersions.find((item) => item?.id === sourceVersionId) ?? null
+      : null;
+    const candidates = Array.isArray(current?.expectations)
+      ? [current]
+      : [current, source].filter(Boolean);
+    return candidates.some((version) =>
+      String(version.effectiveAt ?? "0000-00-00").slice(0, 10) <= previousDate &&
+      (version.expectations ?? []).some((expectation) => {
       if (expectation.cadence !== "daily") return false;
       const included = (expectation.includedEvidenceTypes ?? [])
         .map(normalizeEvidenceRecoveryType);
       return included.includes(evidenceType);
-    });
+      })
+    );
   });
 }
 
