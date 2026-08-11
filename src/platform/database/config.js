@@ -7,10 +7,20 @@ export function readDatabaseConfig(env = process.env) {
   return Object.freeze({
     enabled,
     connectionString: enabled ? connectionString : null,
+    caCertificate: normalizeCertificate(env.PHYSIQUEOS_DATABASE_CA_CERT),
     applicationName: String(env.PHYSIQUEOS_DATABASE_APPLICATION_NAME ?? "physiqueos-foundation"),
     maximumPoolSize: normalizePoolSize(env.PHYSIQUEOS_DATABASE_POOL_MAX),
     statementTimeoutMs: normalizeTimeout(env.PHYSIQUEOS_DATABASE_STATEMENT_TIMEOUT_MS),
   });
+}
+
+function normalizeCertificate(value) {
+  const certificate = String(value ?? "").trim();
+  if (!certificate) return null;
+  if (!certificate.includes("-----BEGIN CERTIFICATE-----") || !certificate.includes("-----END CERTIFICATE-----")) {
+    throw new Error("The PostgreSQL CA certificate is invalid.");
+  }
+  return certificate;
 }
 
 function normalizePoolSize(value) {

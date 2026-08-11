@@ -6,6 +6,7 @@ export function createPostgresPool(config) {
   }
   return new pg.Pool({
     connectionString: config.connectionString,
+    ssl: config.caCertificate ? { ca: config.caCertificate, rejectUnauthorized: true } : undefined,
     application_name: config.applicationName,
     max: config.maximumPoolSize,
     statement_timeout: config.statementTimeoutMs,

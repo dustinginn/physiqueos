@@ -1,6 +1,6 @@
-import { ApplicationProblem } from "../../contracts/v1/problem";
-import { createUuidV7 } from "../../contracts/v1/identifiers";
-import { requireAuthenticationPrincipal } from "../../application/auth/principal";
+import { ApplicationProblem } from "../../contracts/v1/problem.js";
+import { createUuidV7 } from "../../contracts/v1/identifiers.js";
+import { requireAuthenticationPrincipal } from "../../application/auth/principal.js";
 
 const CHALLENGE_LIFETIME_MS = 5 * 60 * 1000;
 

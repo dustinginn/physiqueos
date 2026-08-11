@@ -1,4 +1,4 @@
-import { createUuidV7 } from "../../contracts/v1/identifiers";
+import { createUuidV7 } from "../../contracts/v1/identifiers.js";
 
 const SAFE_CORRELATION_ID = /^[A-Za-z0-9._:-]{8,128}$/;
 

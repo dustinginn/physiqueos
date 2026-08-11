@@ -1,4 +1,4 @@
-import { createUuidV7, requireResourceId } from "../../contracts/v1/identifiers";
+import { createUuidV7, requireResourceId } from "../../contracts/v1/identifiers.js";
 
 export const PrivateObjectState = Object.freeze({
   CREATED: "created",

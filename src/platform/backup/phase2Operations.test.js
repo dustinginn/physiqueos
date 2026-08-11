@@ -8,7 +8,8 @@ describe("Phase 2 operational recovery", () => {
   it("keeps the staging app spec bounded, manual, and secret-free", () => {
     const spec = fs.readFileSync("infra/digitalocean/app.template.yaml", "utf8");
     expect(spec.match(/instance_size_slug: apps-s-1vcpu-0\.5gb/g)).toHaveLength(2);
-    expect(spec.match(/deploy_on_push: false/g)).toHaveLength(2);
+    expect(spec.match(/repo_clone_url: \$\{GIT_REPOSITORY_URL\}/g)).toHaveLength(2);
+    expect(spec).not.toContain("deploy_on_push:");
     expect(spec).not.toMatch(/do[pat]_v1_|postgresql:\/\/[^$]|BEGIN PRIVATE KEY/);
   });
 

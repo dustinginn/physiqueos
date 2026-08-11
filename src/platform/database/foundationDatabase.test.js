@@ -20,6 +20,23 @@ describe("PostgreSQL foundation", () => {
     expect(readDatabaseConfig({ PHYSIQUEOS_DATABASE_ENABLED: "1", PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db" })).toMatchObject({ enabled: true, connectionString: "postgresql://synthetic.invalid/db" });
   });
 
+  it("configures an explicit provider CA with certificate verification", async () => {
+    const certificate = "-----BEGIN CERTIFICATE-----\nsynthetic\n-----END CERTIFICATE-----";
+    const config = readDatabaseConfig({
+      PHYSIQUEOS_DATABASE_ENABLED: "1",
+      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db",
+      PHYSIQUEOS_DATABASE_CA_CERT: certificate,
+    });
+    const pool = createPostgresPool(config);
+    expect(pool.options.ssl).toEqual({ ca: certificate, rejectUnauthorized: true });
+    await pool.end();
+    expect(() => readDatabaseConfig({
+      PHYSIQUEOS_DATABASE_ENABLED: "1",
+      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db",
+      PHYSIQUEOS_DATABASE_CA_CERT: "not-a-certificate",
+    })).toThrow("CA certificate");
+  });
+
   it("commits or rolls back transaction work", async () => {
     const client = { query: vi.fn(async () => ({})), release: vi.fn() };
     const runner = createPostgresTransactionRunner({ pool: { connect: vi.fn(async () => client) } });

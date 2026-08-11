@@ -3,16 +3,16 @@ region: ${DIGITALOCEAN_REGION}
 services:
   - name: web
     dockerfile_path: Dockerfile.foundation
-    github:
-      repo: ${GITHUB_REPOSITORY}
-      branch: ${GITHUB_BRANCH}
-      deploy_on_push: false
+    git:
+      repo_clone_url: ${GIT_REPOSITORY_URL}
+      branch: ${GIT_BRANCH}
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
+    run_command: node scripts/runFoundationWeb.mjs
     http_port: 8080
     health_check:
       http_path: /api/v1/health/live
-    envs: &foundation_environment
+    envs:
       - key: PHYSIQUEOS_DATABASE_ENABLED
         scope: RUN_TIME
         value: "1"
@@ -23,12 +23,16 @@ services:
         scope: RUN_TIME
         type: SECRET
         value: ${FOUNDATION_DATABASE_URL}
+      - key: PHYSIQUEOS_DATABASE_CA_CERT
+        scope: RUN_TIME
+        type: SECRET
+        value: ${DATABASE_CA_CERT}
       - key: PHYSIQUEOS_OBJECT_STORAGE_ENABLED
         scope: RUN_TIME
         value: "1"
       - key: PHYSIQUEOS_SPACES_REGION
         scope: RUN_TIME
-        value: ${DIGITALOCEAN_REGION}
+        value: ${SPACES_REGION}
       - key: PHYSIQUEOS_SPACES_ENDPOINT
         scope: RUN_TIME
         value: ${SPACES_ENDPOINT}
@@ -47,16 +51,42 @@ services:
         scope: RUN_TIME
         type: SECRET
         value: ${CREDENTIAL_PEPPER}
+      - key: PHYSIQUEOS_OPERATIONS_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+        value: ${OPERATIONS_TOKEN}
       - key: PHYSIQUEOS_BUILD_ID
         scope: RUN_AND_BUILD_TIME
         value: ${BUILD_ID}
+      - key: PHYSIQUEOS_GIT_SHA
+        scope: RUN_AND_BUILD_TIME
+        value: ${GIT_SHA}
   - name: worker
     dockerfile_path: Dockerfile.foundation
-    github:
-      repo: ${GITHUB_REPOSITORY}
-      branch: ${GITHUB_BRANCH}
-      deploy_on_push: false
+    git:
+      repo_clone_url: ${GIT_REPOSITORY_URL}
+      branch: ${GIT_BRANCH}
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
     run_command: node scripts/runFoundationWorker.mjs
-    envs: *foundation_environment
+    envs:
+      - key: PHYSIQUEOS_DATABASE_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: ${FOUNDATION_DATABASE_URL}
+      - key: PHYSIQUEOS_DATABASE_CA_CERT
+        scope: RUN_TIME
+        type: SECRET
+        value: ${DATABASE_CA_CERT}
+      - key: PHYSIQUEOS_BUILD_ID
+        scope: RUN_AND_BUILD_TIME
+        value: ${BUILD_ID}
+      - key: PHYSIQUEOS_GIT_SHA
+        scope: RUN_AND_BUILD_TIME
+        value: ${GIT_SHA}
+      - key: PHYSIQUEOS_WORKER_ID
+        scope: RUN_TIME
+        value: ${WORKER_ID}

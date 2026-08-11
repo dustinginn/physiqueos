@@ -1,8 +1,8 @@
-import { ApplicationProblem, staleVersionProblem } from "../../contracts/v1/problem";
-import { createPayloadHash } from "../../contracts/v1/canonicalJson";
-import { createUploadIntent } from "../../platform/object-storage/privateObjectContracts";
-import { createPrivateObjectKey } from "../../platform/object-storage/SpacesPrivateObjectProvider";
-import { assertPrincipalOwns, requireAuthenticationPrincipal } from "../auth/principal";
+import { ApplicationProblem, staleVersionProblem } from "../../contracts/v1/problem.js";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
+import { createUploadIntent } from "../../platform/object-storage/privateObjectContracts.js";
+import { createPrivateObjectKey } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
+import { assertPrincipalOwns, requireAuthenticationPrincipal } from "../auth/principal.js";
 
 const UPLOAD_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_ALLOWED_TYPES = Object.freeze(["application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif"]);

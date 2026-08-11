@@ -1,12 +1,13 @@
-import { readDatabaseConfig } from "../database/config";
-import { createPostgresPool } from "../database/pool";
-import { createFoundationPostgresAdapters } from "../database/foundationPostgresComposition";
-import { readSpacesConfig } from "../object-storage/spacesConfig";
-import { createSpacesPrivateObjectProvider } from "../object-storage/SpacesPrivateObjectProvider";
-import { evaluateOperationalReadiness } from "../observability/operationalReadiness";
-import { foundationBuildIdentity } from "./runtime";
+import { readDatabaseConfig } from "../database/config.js";
+import { createPostgresPool } from "../database/pool.js";
+import { createFoundationPostgresAdapters } from "../database/foundationPostgresComposition.js";
+import { readSpacesConfig } from "../object-storage/spacesConfig.js";
+import { createSpacesPrivateObjectProvider } from "../object-storage/SpacesPrivateObjectProvider.js";
+import { evaluateOperationalReadiness } from "../observability/operationalReadiness.js";
+import { readBuildIdentity } from "../observability/buildIdentity.js";
 
 let activeRuntime;
+export const foundationBuildIdentity = readBuildIdentity();
 
 export function isPhase2StagingEnabled(env = process.env) {
   return env.PHYSIQUEOS_PHASE2_STAGING_ENABLED === "1";
@@ -39,4 +40,12 @@ export async function getPhase2OperationalReadiness(env = process.env) {
     workerStore: runtime.adapters.outbox,
     workerRequired: true,
   });
+}
+
+export async function closePhase2StagingRuntime() {
+  if (!activeRuntime) return;
+  const runtime = activeRuntime;
+  activeRuntime = undefined;
+  runtime.objectProvider?.close?.();
+  await runtime.pool.end();
 }

@@ -3,7 +3,7 @@ import path from "node:path";
 
 const templatePath = path.join(import.meta.dirname, "app.template.yaml");
 const outputPath = path.join(import.meta.dirname, "app.staging.yaml");
-const required = ["DIGITALOCEAN_REGION", "GITHUB_REPOSITORY", "GITHUB_BRANCH", "FOUNDATION_DATABASE_URL", "SPACES_ENDPOINT", "SPACES_BUCKET", "SPACES_ACCESS_KEY_ID", "SPACES_SECRET_ACCESS_KEY", "CREDENTIAL_PEPPER", "BUILD_ID"];
+const required = ["DIGITALOCEAN_REGION", "GIT_REPOSITORY_URL", "GIT_BRANCH", "FOUNDATION_DATABASE_URL", "DATABASE_CA_CERT", "SPACES_REGION", "SPACES_ENDPOINT", "SPACES_BUCKET", "SPACES_ACCESS_KEY_ID", "SPACES_SECRET_ACCESS_KEY", "CREDENTIAL_PEPPER", "OPERATIONS_TOKEN", "BUILD_ID", "GIT_SHA", "WORKER_ID"];
 const missing = required.filter((key) => !String(process.env[key] ?? "").trim());
 if (missing.length > 0) throw new Error(`Missing app-spec inputs: ${missing.join(", ")}`);
 let template = await fs.readFile(templatePath, "utf8");
