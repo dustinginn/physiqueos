@@ -524,7 +524,7 @@ function LoggerScreen({
         </div>
       </header>
 
-      <div className="space-y-2" data-density-contract="v1.2">
+      <div className="space-y-2" data-density-contract="v1.3">
         {draft.exercises.map((exercise) => (
           <ExerciseCard
             draft={draft}
@@ -595,17 +595,31 @@ function ExerciseCard({
   onUpdateSet,
 }) {
   const superset = getSupersetContext(draft, exercise.id);
+  const previousContext = exercise.executionVariant || superset
+    ? `Comparable ${formatDate(exercise.previousPerformance.date)}`
+    : exercise.previousPerformance.context;
   return (
     <Card padding="none" className={superset ? "border-l-4 border-l-[var(--primary)]" : ""}>
-      <div className="px-3 pb-1.5 pt-2.5">
+      <div className="px-3 pb-2 pt-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-extrabold leading-tight">{exercise.name}</h2>
-            <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--text-secondary)]">
-              {exercise.executionVariant && <span className="font-extrabold text-[var(--primary)]">{exercise.executionVariant.label} · </span>}
-              {superset && <span className="font-bold">Superset with {superset.partners.map((partner) => partner.name).join(" + ")} · </span>}
+            {(exercise.executionVariant || superset) && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold leading-4 text-[var(--text-secondary)]">
+                {exercise.executionVariant && (
+                  <span className="font-extrabold text-[var(--primary)]">{exercise.executionVariant.label}</span>
+                )}
+                {superset && (
+                  <span className="inline-flex items-center gap-1">
+                    <Link2 aria-hidden="true" size={12} />
+                    Superset with {superset.partners.map((partner) => partner.name).join(" + ")}
+                  </span>
+                )}
+              </p>
+            )}
+            <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
               <span className="font-extrabold text-[var(--text-primary)]">Previous {exercise.previousPerformance.reps} × {formatLoad(exercise.previousPerformance.load)}</span>
-              <span> · {exercise.previousPerformance.context}</span>
+              <span> · {previousContext}</span>
             </p>
           </div>
           <button
@@ -696,29 +710,32 @@ function ExerciseCard({
         onKeepPrevious={onKeepPrevious}
       />
 
-      <div className="px-2.5 pb-2.5 pt-1.5">
-        <div className="mb-0.5 grid grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-1.5 px-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
-          <span>Set</span><span>Reps</span><span>Load</span><span className="text-center">Done</span><span />
+      <div className="px-2.5 pb-2.5 pt-1">
+        <div className="overflow-hidden rounded-xl border border-[var(--divider)]">
+          <div className="grid h-10 grid-cols-[26px_minmax(52px,1fr)_minmax(62px,1fr)_40px_48px] items-center gap-1 bg-[var(--surface-soft)] px-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+            <span>Set</span><span>Reps</span><span>Load</span><span className="text-center">Done</span>
+            <button
+              aria-label="Add Set"
+              className="flex h-10 w-12 items-center justify-center gap-0.5 text-[10px] font-extrabold normal-case tracking-normal text-[var(--primary)]"
+              onClick={onAddSet}
+              type="button"
+            >
+              <Plus aria-hidden="true" size={13} /> Set
+            </button>
+          </div>
+          <div>
+            {exercise.sets.map((set) => (
+              <SetRow
+                key={set.id}
+                onToggle={() => onToggleSet(set.id)}
+                onRemove={() => onRemoveSet(set.id)}
+                onUpdate={(changes) => onUpdateSet(set.id, changes)}
+                set={set}
+                showRemove={exercise.sets.length > 1}
+              />
+            ))}
+          </div>
         </div>
-        <div className="space-y-0.5">
-          {exercise.sets.map((set) => (
-            <SetRow
-              key={set.id}
-              onToggle={() => onToggleSet(set.id)}
-              onRemove={() => onRemoveSet(set.id)}
-              onUpdate={(changes) => onUpdateSet(set.id, changes)}
-              set={set}
-              showRemove={exercise.sets.length > 1}
-            />
-          ))}
-        </div>
-        <button
-          className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-soft)] text-xs font-extrabold text-[var(--primary)]"
-          onClick={onAddSet}
-          type="button"
-        >
-          <Plus aria-hidden="true" size={16} /> Add Set
-        </button>
       </div>
     </Card>
   );
@@ -726,44 +743,48 @@ function ExerciseCard({
 
 function SetRow({ onRemove, onToggle, onUpdate, set, showRemove }) {
   return (
-    <div className={`grid h-11 grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-1.5 rounded-lg px-1 ${set.confirmed
+    <div className={`grid h-10 grid-cols-[26px_minmax(52px,1fr)_minmax(62px,1fr)_40px_48px] items-center gap-1 border-t border-[var(--divider)] px-1 ${set.confirmed
       ? "bg-[var(--surface-success)]"
       : "bg-[var(--surface-muted)]"}`}>
       <span className="text-center text-sm font-extrabold">{set.order}</span>
-      <input
-        aria-label={`Set ${set.order} reps`}
-        className="h-11 min-w-0 rounded-lg border border-[var(--divider)] bg-[var(--input-bg)] px-2 text-center text-base font-extrabold text-[var(--text-primary)]"
-        inputMode="numeric"
-        min="0"
-        onChange={(event) => onUpdate({ reps: event.target.value, confirmed: false })}
-        type="number"
-        value={set.reps}
-      />
-      <label className="relative min-w-0">
+      <label className="flex h-10 min-w-0 items-center">
+        <span className="sr-only">Set {set.order} reps</span>
+        <input
+          className="h-8 min-w-0 w-full rounded-md border border-[var(--divider)] bg-[var(--input-bg)] px-1 text-center text-base font-extrabold text-[var(--text-primary)]"
+          inputMode="numeric"
+          min="0"
+          onChange={(event) => onUpdate({ reps: event.target.value, confirmed: false })}
+          type="number"
+          value={set.reps}
+        />
+      </label>
+      <label className="relative flex h-10 min-w-0 items-center">
         <span className="sr-only">Set {set.order} load in pounds</span>
         <input
-          className="h-11 w-full min-w-0 rounded-lg border border-[var(--divider)] bg-[var(--input-bg)] px-1 pr-6 text-center text-base font-extrabold text-[var(--text-primary)]"
+          className="h-8 w-full min-w-0 rounded-md border border-[var(--divider)] bg-[var(--input-bg)] px-1 pr-5 text-center text-base font-extrabold text-[var(--text-primary)]"
           inputMode="decimal"
           min="0"
           onChange={(event) => onUpdate({ load: event.target.value, confirmed: false })}
           type="number"
           value={set.load}
         />
-        <span className="pointer-events-none absolute right-1.5 top-3.5 text-[9px] font-extrabold text-[var(--text-subtle)]">lb</span>
+        <span className="pointer-events-none absolute right-1.5 top-3.5 text-[8px] font-extrabold text-[var(--text-subtle)]">lb</span>
       </label>
       <button
         aria-label={set.confirmed ? `Mark set ${set.order} incomplete` : `Mark set ${set.order} done`}
         aria-pressed={set.confirmed}
-        className={`flex h-11 w-11 items-center justify-center rounded-xl border ${set.confirmed
-          ? "border-emerald-500 bg-emerald-500 text-white"
-          : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-subtle)]"}`}
+        className="flex h-10 w-10 items-center justify-center"
         onClick={onToggle}
         type="button"
       >
-        <Check aria-hidden="true" size={19} strokeWidth={3} />
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${set.confirmed
+          ? "border-emerald-500 bg-emerald-500 text-white"
+          : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-subtle)]"}`}>
+          <Check aria-hidden="true" size={17} strokeWidth={3} />
+        </span>
       </button>
       {showRemove ? (
-        <button aria-label={`Remove set ${set.order}`} className="flex h-11 w-8 items-center justify-center text-[var(--text-subtle)]" onClick={onRemove} type="button">
+        <button aria-label={`Remove set ${set.order}`} className="flex h-10 w-12 items-center justify-center text-[var(--text-subtle)]" onClick={onRemove} type="button">
           <Minus aria-hidden="true" size={16} />
         </button>
       ) : <span />}
@@ -777,40 +798,42 @@ function ProgressionCard({ exercise, onApplySuggestion, onKeepPrevious }) {
   const suggestionSelected = exercise.progressionChoice === PROGRESSION_CHOICES.SUGGESTION;
   const previousSelected = exercise.progressionChoice === PROGRESSION_CHOICES.PREVIOUS;
   return (
-    <div className={`border-y border-[var(--divider)] px-2.5 py-1 ${opportunity
+    <div className={`border-y border-[var(--divider)] px-3 py-1.5 ${opportunity
       ? "bg-[var(--surface-accent)]"
       : recommendation.state === PROGRESSION_STATES.RECOVER
         ? "bg-[var(--surface-warning)]"
         : "bg-[var(--surface-soft)]"}`}>
-      <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] items-center gap-1.5">
+      <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_82px_90px] items-center gap-1.5">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--primary)]">
+          <p className="text-[10px] font-extrabold uppercase leading-4 tracking-[0.06em] text-[var(--primary)]">
             {recommendation.eyebrow}
           </p>
-          <p className="truncate text-xs font-extrabold">{recommendation.prescription}</p>
+          <p className="text-xs font-extrabold leading-4">{recommendation.prescription}</p>
         </div>
-            <button
-              aria-pressed={suggestionSelected}
-              className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border px-1.5 text-[11px] font-extrabold transition ${suggestionSelected
-                ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
-                : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
-              onClick={onApplySuggestion}
-              type="button"
-            >
-              {suggestionSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
-              Use suggestion
-            </button>
-            <button
-              aria-pressed={previousSelected}
-              className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border px-1.5 text-[11px] font-extrabold transition ${previousSelected
-                ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
-                : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
-              onClick={onKeepPrevious}
-              type="button"
-            >
-              {previousSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
-              Keep previous
-            </button>
+        <button
+          aria-label="Use suggestion"
+          aria-pressed={suggestionSelected}
+          className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl border px-1 text-[11px] font-extrabold transition ${suggestionSelected
+            ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
+            : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
+          onClick={onApplySuggestion}
+          type="button"
+        >
+          {suggestionSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
+          Use suggestion
+        </button>
+        <button
+          aria-label="Keep previous"
+          aria-pressed={previousSelected}
+          className={`inline-flex h-10 items-center justify-center gap-1 rounded-xl border px-1 text-[11px] font-extrabold transition ${previousSelected
+            ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
+            : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
+          onClick={onKeepPrevious}
+          type="button"
+        >
+          {previousSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
+          Keep previous
+        </button>
       </div>
     </div>
   );

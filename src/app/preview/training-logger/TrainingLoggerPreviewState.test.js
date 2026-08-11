@@ -56,6 +56,7 @@ describe("Training Logger preview state", () => {
   it("initializes live and retrospective modes into one shared draft architecture", () => {
     const entry = createTrainingLoggerPreviewDraft({ workoutDate: "2026-08-10" });
     expect(entry).toMatchObject({
+      previewVersion: "training_logger_preview_v1_3",
       mode: null,
       step: TRAINING_LOGGER_STEPS.ENTRY,
       isolation: {
@@ -64,6 +65,7 @@ describe("Training Logger preview state", () => {
         fixtureHistoryReadOnly: true,
       },
     });
+    expect(routeSource).toContain("Training Logger Preview V1.3");
 
     const live = initializeTrainingLoggerMode(entry, TRAINING_LOGGER_MODES.LIVE);
     const retrospective = initializeTrainingLoggerMode(
@@ -416,33 +418,63 @@ describe("Training Logger preview state", () => {
     );
   });
 
-  it("uses the canonical phone-width shell, large tap targets, and bottom-nav clearance", () => {
+  it("uses the canonical phone shell and a context-readable, set-dense layout contract", () => {
     expect(componentSource).toContain("max-w-[393px]");
     expect(componentSource).toContain("min-h-14");
     expect(componentSource).toContain("min-h-11");
     expect(componentSource).toContain("pb-36");
     expect(componentSource).toContain("bottom-24");
     expect(componentSource).toContain(
-      "grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px]"
+      "grid-cols-[26px_minmax(52px,1fr)_minmax(62px,1fr)_40px_48px]"
     );
-    expect(componentSource).toContain('data-density-contract="v1.2"');
-    expect(componentSource).toContain('className="space-y-0.5"');
-    expect(componentSource).toContain('className="px-3 pb-1.5 pt-2.5"');
-    expect(componentSource).toContain('className="px-2.5 pb-2.5 pt-1.5"');
+    expect(componentSource).toContain('data-density-contract="v1.3"');
+    expect(componentSource).toContain('className="px-3 pb-2 pt-3"');
+    expect(componentSource).toContain('className="px-2.5 pb-2.5 pt-1"');
+    expect(componentSource).toContain("previousContext");
+    expect(componentSource).toContain("overflow-hidden rounded-xl border");
+    expect(componentSource).toContain('aria-label="Add Set"');
+    expect(componentSource).toContain('className="flex h-10 min-w-0 items-center"');
+    expect(componentSource).toContain("h-8 min-w-0 w-full rounded-md");
     expect(componentSource).toContain("aria-pressed={suggestionSelected}");
     expect(componentSource).toContain("aria-pressed={previousSelected}");
     expect(TRAINING_LOGGER_DENSITY_CONTRACT).toMatchObject({
       canonicalShellWidthPx: 393,
       narrowShellWidthPx: 360,
       primaryTapTargetPx: 44,
-      setRowHeightPx: 44,
+      denseSetControlTargetPx: 40,
+      setRowVisualHeightPx: 40,
+      setRowGapPx: 0,
+      setHeaderWithAddSetHeightPx: 40,
       exerciseCardGapPx: 8,
     });
     expect(
-      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralTarget.ordinaryFourSetCardMaxPx
-    ).toBeLessThan(
-      TRAINING_LOGGER_DENSITY_CONTRACT.v1_1StructuralEstimate.ordinaryFourSetCardPx
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.ordinaryHeaderContextPx
+    ).toBeGreaterThan(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.headerContextPx
     );
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.recommendationPx
+    ).toBe(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.recommendationPx
+    );
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.setSectionPx
+    ).toBeLessThan(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.setSectionPx
+    );
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.ordinaryFourSetCardMaxPx
+    ).toBeLessThan(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.ordinaryFourSetCardPx
+    );
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.setSectionPx
+      - TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.setSectionPx
+    ).toBe(47);
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralEstimate.ordinaryFourSetCardPx
+      - TRAINING_LOGGER_DENSITY_CONTRACT.v1_3StructuralTarget.ordinaryFourSetCardMaxPx
+    ).toBe(42);
     expect(componentSource).not.toMatch(/max-w-screen|max-w-7xl/);
   });
 

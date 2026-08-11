@@ -34,7 +34,7 @@ export {
   APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
 } from "./TrainingLoggerAppleHealthReconciliation";
 
-export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_2";
+export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_3";
 
 export const TRAINING_LOGGER_MODES = Object.freeze({
   LIVE: "live",
@@ -83,10 +83,27 @@ export const TRAINING_LOGGER_DENSITY_CONTRACT = Object.freeze({
   canonicalShellWidthPx: 393,
   narrowShellWidthPx: 360,
   primaryTapTargetPx: 44,
-  setRowHeightPx: 44,
+  denseSetControlTargetPx: 40,
+  setRowVisualHeightPx: 40,
+  setRowGapPx: 0,
+  setHeaderWithAddSetHeightPx: 40,
   exerciseCardGapPx: 8,
-  v1_1StructuralEstimate: Object.freeze({ ordinaryFourSetCardPx: 492 }),
-  v1_2StructuralTarget: Object.freeze({ ordinaryFourSetCardMaxPx: 376 }),
+  v1_2StructuralEstimate: Object.freeze({
+    headerContextPx: 60,
+    recommendationPx: 52,
+    setSectionPx: 261,
+    ordinaryFourSetCardPx: 376,
+  }),
+  v1_3StructuralTarget: Object.freeze({
+    ordinaryHeaderContextPx: 65,
+    narrowOrdinaryHeaderContextPx: 85,
+    variantAndSupersetHeaderContextPx: 85,
+    recommendationPx: 52,
+    narrowRecommendationPx: 60,
+    setSectionPx: 214,
+    ordinaryFourSetCardMaxPx: 334,
+    narrowOrContextualFourSetCardMaxPx: 362,
+  }),
 });
 
 export const TRAINING_LOGGER_USER_FACING_AREA_IDS = Object.freeze([

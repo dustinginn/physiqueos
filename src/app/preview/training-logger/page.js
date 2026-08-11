@@ -1,7 +1,7 @@
 import TrainingLoggerPreview from "./TrainingLoggerPreview";
 
 export const metadata = {
-  title: "Training Logger Preview V1.2 | PhysiqueOS",
+  title: "Training Logger Preview V1.3 | PhysiqueOS",
   description: "An isolated, interactive preview of the PhysiqueOS Training Logger.",
 };
 
