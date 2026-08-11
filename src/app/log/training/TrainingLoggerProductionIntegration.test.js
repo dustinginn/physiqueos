@@ -19,11 +19,17 @@ const reviewActionsSource = fs.readFileSync(
   new URL("../../evidence/review/[reviewId]/actions.js", import.meta.url),
   "utf8"
 );
+const recoverySource = fs.readFileSync(
+  new URL("../../../domain/services/TrainingLoggerDraftRecoveryService.js", import.meta.url),
+  "utf8"
+);
 
 describe("production Training Logger integration", () => {
   it("adds a discoverable Log entry without replacing universal upload", () => {
     expect(logSource).toContain('href="/log/training"');
     expect(logSource).toContain("<UploadAnythingCard");
+    expect(logSource).toContain("exercises, sets, variants, and supersets.");
+    expect(logSource).not.toContain("exercises, sets, Variants, and Supersets.");
   });
 
   it("loads confirmed canonical Training history and active Goal context", () => {
@@ -45,6 +51,30 @@ describe("production Training Logger integration", () => {
     expect(clientSource).toContain("window.localStorage");
     expect(clientSource).toContain("serializeTrainingLoggerRecoveryDraft");
     expect(stateSource).toContain("const { productionContext: _productionContext, ...recoverable } = draft");
+  });
+
+  it("makes performed history the default picker and exposes the broader catalog explicitly", () => {
+    expect(stateSource).toContain("performedExerciseIds: listPerformedTrainingLoggerExerciseIds");
+    expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY");
+    expect(clientSource).toContain("Add new exercise");
+    expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL");
+  });
+
+  it("presents picker metadata through the user-facing presentation boundary", () => {
+    expect(clientSource).toContain("createTrainingLoggerExercisePickerPresentation");
+    expect(clientSource).not.toContain("`${exercise.body_region} · ${exercise.movement_pattern}`");
+  });
+
+  it("offers intentional resume, leave, and confirmed local-only cancellation", () => {
+    expect(clientSource).toContain("Workout draft saved");
+    expect(clientSource).toContain("Resume workout");
+    expect(clientSource).toContain("Leave workout");
+    expect(clientSource).toContain("Cancel this workout?");
+    expect(clientSource).toContain("Keep workout");
+    const cancelBody = clientSource.match(/function cancelWorkout\(\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+    expect(cancelBody).toContain("discardTrainingLoggerRecoveryDraft");
+    expect(cancelBody).not.toContain("fetch(");
+    expect(recoverySource).not.toMatch(/FounderRepositories|canonicalEvidence|evidenceReviews|fetch\(/);
   });
 
   it("stages the real Evidence Review and never confirms canonically in the logger route", () => {

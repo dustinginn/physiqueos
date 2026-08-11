@@ -60,6 +60,7 @@ import {
   toggleAppleHealthAdditionalEvidence,
   toggleTrainingCategory,
   TRAINING_LOGGER_CATEGORY_SUGGESTION,
+  TRAINING_LOGGER_EXERCISE_SCOPES,
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_STEPS,
   TRAINING_LOGGER_VARIANT_OPTIONS,
@@ -67,8 +68,12 @@ import {
   updateTrainingSet,
   updateWorkoutContext,
 } from "../../app/preview/training-logger/TrainingLoggerPreviewState";
-
-const PRODUCTION_DRAFT_STORAGE_KEY = "physiqueos.training-logger.web-v1.draft";
+import { createTrainingLoggerExercisePickerPresentation } from "../../presentation/trainingExercisePresentation";
+import {
+  discardTrainingLoggerRecoveryDraft,
+  loadTrainingLoggerRecoveryDraft,
+  saveTrainingLoggerRecoveryDraft,
+} from "../../domain/services/TrainingLoggerDraftRecoveryService";
 
 export default function TrainingLoggerClient({
   goalContext = null,
@@ -95,34 +100,42 @@ export default function TrainingLoggerClient({
   const [evidencePackageId, setEvidencePackageId] = useState(null);
   const [submissionError, setSubmissionError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savedDraft, setSavedDraft] = useState(null);
+  const [recoveryChecked, setRecoveryChecked] = useState(!production);
+  const [browseAllExercises, setBrowseAllExercises] = useState(false);
+  const [cancelWorkoutPending, setCancelWorkoutPending] = useState(false);
 
   useEffect(() => {
     if (!production) return;
-    try {
-      const stored = window.localStorage.getItem(PRODUCTION_DRAFT_STORAGE_KEY);
-      if (!stored) return;
-      const recovered = JSON.parse(stored);
-      const timer = window.setTimeout(() => {
-        setDraft(hydrateTrainingLoggerProductionDraft(recovered, {
-          exerciseLibrary: initialCanonicalExercises,
-          goalContext,
-          historySessions: initialHistorySessions,
-          workoutDate: initialDate,
-        }));
-      }, 0);
-      return () => window.clearTimeout(timer);
-    } catch {
-      window.localStorage.removeItem(PRODUCTION_DRAFT_STORAGE_KEY);
+    let recoveredDraft = null;
+    const recovered = loadTrainingLoggerRecoveryDraft(window.localStorage);
+    if (recovered) {
+      const hydrated = hydrateTrainingLoggerProductionDraft(recovered, {
+        exerciseLibrary: initialCanonicalExercises,
+        goalContext,
+        historySessions: initialHistorySessions,
+        workoutDate: initialDate,
+      });
+      if (hydrated.mode && hydrated.step !== TRAINING_LOGGER_STEPS.ENTRY) {
+        recoveredDraft = hydrated;
+      } else {
+        discardTrainingLoggerRecoveryDraft(window.localStorage);
+      }
     }
+    const timer = window.setTimeout(() => {
+      setSavedDraft(recoveredDraft);
+      setRecoveryChecked(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [goalContext, initialCanonicalExercises, initialDate, initialHistorySessions, production]);
 
   useEffect(() => {
-    if (!production) return;
+    if (!production || !recoveryChecked || !draft.mode) return;
     const recoverable = serializeTrainingLoggerRecoveryDraft(draft);
     if (recoverable) {
-      window.localStorage.setItem(PRODUCTION_DRAFT_STORAGE_KEY, JSON.stringify(recoverable));
+      saveTrainingLoggerRecoveryDraft(window.localStorage, recoverable);
     }
-  }, [draft, production]);
+  }, [draft, production, recoveryChecked]);
 
   function resetPreview() {
     setDraft(createInitialDraft());
@@ -134,12 +147,42 @@ export default function TrainingLoggerClient({
     setEvidenceFiles([]);
     setEvidencePackageId(null);
     setSubmissionError(null);
-    if (production) window.localStorage.removeItem(PRODUCTION_DRAFT_STORAGE_KEY);
+    setBrowseAllExercises(false);
+    setCancelWorkoutPending(false);
+    if (production) discardTrainingLoggerRecoveryDraft(window.localStorage);
+  }
+
+  function resumeSavedWorkout() {
+    if (!savedDraft) return;
+    setDraft(savedDraft);
+    setSavedDraft(null);
+    setCancelWorkoutPending(false);
+  }
+
+  function leaveWorkout() {
+    const recoverable = serializeTrainingLoggerRecoveryDraft(draft);
+    if (recoverable) {
+      saveTrainingLoggerRecoveryDraft(window.localStorage, recoverable);
+    }
+    window.location.assign("/log");
+  }
+
+  function cancelWorkout() {
+    discardTrainingLoggerRecoveryDraft(window.localStorage);
+    setSavedDraft(null);
+    setDraft(createInitialDraft());
+    setSearch("");
+    setBrowseAllExercises(false);
+    setCancelWorkoutPending(false);
+    setEvidenceFiles([]);
+    setEvidencePackageId(null);
+    setSubmissionError(null);
   }
 
   function navigate(step) {
     setDraft((current) => goToTrainingLoggerStep(current, step));
     setSearch("");
+    setBrowseAllExercises(false);
   }
 
   async function prepareAppleEvidence() {
@@ -189,7 +232,7 @@ export default function TrainingLoggerClient({
       if (!response.ok || !result.reviewUrl) {
         throw new Error(result.error ?? "Evidence Review could not be prepared.");
       }
-      window.localStorage.removeItem(PRODUCTION_DRAFT_STORAGE_KEY);
+      discardTrainingLoggerRecoveryDraft(window.localStorage);
       window.location.assign(result.reviewUrl);
     } catch (error) {
       setSubmissionError(error?.message ?? "Evidence Review could not be prepared.");
@@ -207,13 +250,17 @@ export default function TrainingLoggerClient({
             onChooseMode={(mode) => setDraft((current) =>
               initializeTrainingLoggerMode(current, mode)
             )}
+            onRequestCancel={() => setCancelWorkoutPending(true)}
+            onResume={resumeSavedWorkout}
+            recoveryPending={production && !recoveryChecked}
+            savedDraft={savedDraft}
           />
         )}
 
         {draft.step === TRAINING_LOGGER_STEPS.CATEGORIES && (
           <CategoryScreen
             draft={draft}
-            onBack={resetPreview}
+            onBack={production ? leaveWorkout : resetPreview}
             onContinue={() => navigate(TRAINING_LOGGER_STEPS.EXERCISES)}
             onSelectSuggestion={() => setDraft((current) =>
               acceptTrainingCategorySuggestion(
@@ -234,12 +281,24 @@ export default function TrainingLoggerClient({
           .includes(draft.step) && (
           <ExerciseSelectionScreen
             adding={draft.step === TRAINING_LOGGER_STEPS.ADD_EXERCISE}
+            broadCatalog={browseAllExercises}
             draft={draft}
-            onBack={() => navigate(
-              draft.step === TRAINING_LOGGER_STEPS.ADD_EXERCISE
-                ? TRAINING_LOGGER_STEPS.LOGGER
-                : TRAINING_LOGGER_STEPS.CATEGORIES
-            )}
+            onBack={() => {
+              if (browseAllExercises) {
+                setBrowseAllExercises(false);
+                setSearch("");
+                return;
+              }
+              navigate(
+                draft.step === TRAINING_LOGGER_STEPS.ADD_EXERCISE
+                  ? TRAINING_LOGGER_STEPS.LOGGER
+                  : TRAINING_LOGGER_STEPS.CATEGORIES
+              );
+            }}
+            onBrowseNew={() => {
+              setBrowseAllExercises(true);
+              setSearch("");
+            }}
             onContinue={() => navigate(TRAINING_LOGGER_STEPS.LOGGER)}
             onSearch={setSearch}
             onToggleExercise={(canonicalExerciseId) => setDraft((current) => {
@@ -251,6 +310,7 @@ export default function TrainingLoggerClient({
                 : addTrainingExercise(current, canonicalExerciseId);
             })}
             search={search}
+            production={production}
           />
         )}
 
@@ -287,6 +347,7 @@ export default function TrainingLoggerClient({
                 : goToTrainingLoggerStep(current, TRAINING_LOGGER_STEPS.SUMMARY));
               setSearch("");
             }}
+            onLeave={production ? leaveWorkout : null}
             onKeepPrevious={(exerciseId) => setDraft((current) =>
               keepPreviousPerformance(current, exerciseId)
             )}
@@ -307,6 +368,7 @@ export default function TrainingLoggerClient({
               setOpenMenuId(null);
             }}
             onRequestRemove={setRemoveExerciseId}
+            onRequestCancel={production ? () => setCancelWorkoutPending(true) : null}
             onSetMenu={setOpenMenuId}
             onSetSupersetPicker={setSupersetPickerId}
             onSetVariantPicker={setVariantPickerId}
@@ -371,6 +433,13 @@ export default function TrainingLoggerClient({
         {draft.step === TRAINING_LOGGER_STEPS.COMPLETE && (
           <CompletionScreen draft={draft} onRestart={resetPreview} />
         )}
+
+        {production && cancelWorkoutPending && (
+          <CancelWorkoutConfirmation
+            onCancel={cancelWorkout}
+            onKeep={() => setCancelWorkoutPending(false)}
+          />
+        )}
       </div>
     </main>
   );
@@ -390,7 +459,14 @@ function PreviewBanner({ compact = false }) {
   );
 }
 
-function EntryScreen({ onChooseMode }) {
+function EntryScreen({
+  onChooseMode,
+  onRequestCancel,
+  onResume,
+  recoveryPending = false,
+  savedDraft = null,
+}) {
+  const savedSummary = savedDraft ? buildTrainingWorkoutSummary(savedDraft) : null;
   return (
     <section>
       <header className="mb-8 pt-4">
@@ -409,20 +485,47 @@ function EntryScreen({ onChooseMode }) {
         </p>
       </header>
 
-      <div className="space-y-3">
-        <ModeCard
-          description="Fast set-by-set logging while you train."
-          icon={Play}
-          label="Start Workout"
-          onClick={() => onChooseMode(TRAINING_LOGGER_MODES.LIVE)}
-        />
-        <ModeCard
-          description="Add the same workout structure for an earlier session."
-          icon={History}
-          label="Log Past Workout"
-          onClick={() => onChooseMode(TRAINING_LOGGER_MODES.RETROSPECTIVE)}
-        />
-      </div>
+      {recoveryPending ? (
+        <Card variant="soft">
+          <p aria-live="polite" className="text-sm font-bold text-[var(--text-secondary)]">
+            Checking for a saved workout…
+          </p>
+        </Card>
+      ) : savedDraft ? (
+        <Card variant="accent">
+          <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">
+            Workout draft saved
+          </p>
+          <h2 className="mt-2 text-xl font-extrabold">Resume your workout?</h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+            {savedDraft.mode === TRAINING_LOGGER_MODES.LIVE ? "Workout in progress" : formatDate(savedDraft.workoutDate)}
+            {savedSummary?.exerciseCount ? ` · ${savedSummary.exerciseCount} exercises` : ""}
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button className="min-h-12 rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white" onClick={onResume} type="button">
+              Resume workout
+            </button>
+            <button className="min-h-12 rounded-xl border border-red-200 bg-[var(--surface-elevated)] px-4 text-sm font-extrabold text-red-600" onClick={onRequestCancel} type="button">
+              Cancel workout
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          <ModeCard
+            description="Fast set-by-set logging while you train."
+            icon={Play}
+            label="Start Workout"
+            onClick={() => onChooseMode(TRAINING_LOGGER_MODES.LIVE)}
+          />
+          <ModeCard
+            description="Add the same workout structure for an earlier session."
+            icon={History}
+            label="Log Past Workout"
+            onClick={() => onChooseMode(TRAINING_LOGGER_MODES.RETROSPECTIVE)}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -534,22 +637,46 @@ function CategoryScreen({
   );
 }
 
-function ExerciseSelectionScreen({ adding, draft, onBack, onContinue, onSearch, onToggleExercise, search }) {
+function ExerciseSelectionScreen({
+  adding,
+  broadCatalog,
+  draft,
+  onBack,
+  onBrowseNew,
+  onContinue,
+  onSearch,
+  onToggleExercise,
+  production,
+  search,
+}) {
   const available = useMemo(() => listTrainingLoggerExercises({
     categories: draft.selectedCategories,
     exerciseLibrary: draft.productionContext?.exerciseLibrary,
+    performedExerciseIds: draft.productionContext?.performedExerciseIds,
     search,
-  }), [draft.productionContext?.exerciseLibrary, draft.selectedCategories, search]);
+    scope: production && !broadCatalog
+      ? TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY
+      : TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
+  }), [
+    broadCatalog,
+    draft.productionContext?.exerciseLibrary,
+    draft.productionContext?.performedExerciseIds,
+    draft.selectedCategories,
+    production,
+    search,
+  ]);
   const selectedIds = new Set(draft.exercises.map((exercise) => exercise.canonicalExerciseId));
   return (
     <section>
       <PageHeader
-        description={adding
-          ? "Add another movement without leaving your workout."
-          : `Showing canonical exercises for ${draft.selectedCategories.join(" + ")}.`}
+        description={broadCatalog
+          ? `Search all available exercises for ${draft.selectedCategories.join(" + ")}.`
+          : adding
+            ? "Choose from exercises you have performed before, or add a new exercise."
+            : `Your performed exercises for ${draft.selectedCategories.join(" + ")}.`}
         onBack={onBack}
         step={adding ? "In workout" : "2 of 2"}
-        title={adding ? "Add an exercise" : "Choose exercises"}
+        title={broadCatalog ? "Add new exercise" : adding ? "Add an exercise" : "Choose exercises"}
       />
 
       <label className="relative mb-4 block">
@@ -558,7 +685,7 @@ function ExerciseSelectionScreen({ adding, draft, onBack, onContinue, onSearch, 
         <input
           className="h-12 w-full rounded-2xl border border-[var(--divider)] bg-[var(--input-bg)] pl-11 pr-4 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Search exercises"
+          placeholder={broadCatalog ? "Search all exercises" : "Search your exercises"}
           type="search"
           value={search}
         />
@@ -567,6 +694,7 @@ function ExerciseSelectionScreen({ adding, draft, onBack, onContinue, onSearch, 
       <div className="space-y-2">
         {available.map((exercise) => {
           const selected = selectedIds.has(exercise.id);
+          const presentation = createTrainingLoggerExercisePickerPresentation(exercise);
           return (
             <button
               aria-pressed={selected}
@@ -579,10 +707,12 @@ function ExerciseSelectionScreen({ adding, draft, onBack, onContinue, onSearch, 
               type="button"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-extrabold">{exercise.name}</span>
-                <span className="mt-1 block truncate text-xs font-semibold text-[var(--text-muted)]">
-                  {adding && selected ? "Already in workout" : `${exercise.body_region} · ${exercise.movement_pattern}`}
-                </span>
+                <span className="block truncate text-sm font-extrabold">{presentation.displayName}</span>
+                {((adding && selected) || presentation.secondaryLabel) && (
+                  <span className="mt-1 block truncate text-xs font-semibold text-[var(--text-muted)]">
+                    {adding && selected ? "Already in workout" : presentation.secondaryLabel}
+                  </span>
+                )}
               </span>
               <SelectionMark selected={selected} />
             </button>
@@ -590,11 +720,28 @@ function ExerciseSelectionScreen({ adding, draft, onBack, onContinue, onSearch, 
         })}
         {available.length === 0 && (
           <Card className="text-center" variant="soft">
-            <p className="font-extrabold">No matching exercises</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Try a broader search.</p>
+            <p className="font-extrabold">
+              {broadCatalog ? "No matching exercises" : "No performed exercises here yet"}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {broadCatalog
+                ? "Try a broader search."
+                : "Add a new exercise to grow your workout history."}
+            </p>
           </Card>
         )}
       </div>
+
+      {production && !broadCatalog && (
+        <button
+          className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] px-4 text-sm font-extrabold text-[var(--primary)]"
+          onClick={onBrowseNew}
+          type="button"
+        >
+          <CirclePlus aria-hidden="true" size={18} />
+          Add new exercise
+        </button>
+      )}
 
       <BottomAction
         disabled={draft.exercises.length === 0}
@@ -619,11 +766,13 @@ function LoggerScreen({
   onToggleSet,
   onFinish,
   onKeepPrevious,
+  onLeave,
   onLinkSuperset,
   onRemoveSet,
   onRemoveSuperset,
   onRemoveVariant,
   onRequestRemove,
+  onRequestCancel,
   onSetMenu,
   onSetSupersetPicker,
   onSetVariantPicker,
@@ -656,6 +805,17 @@ function LoggerScreen({
           </span>
         </div>
       </header>
+
+      {(onLeave || onRequestCancel) && (
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <button className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] text-xs font-extrabold text-[var(--text-secondary)]" onClick={onLeave} type="button">
+            <ArrowLeft aria-hidden="true" size={16} /> Leave workout
+          </button>
+          <button className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-[var(--surface-elevated)] text-xs font-extrabold text-red-600" onClick={onRequestCancel} type="button">
+            <Trash2 aria-hidden="true" size={15} /> Cancel workout
+          </button>
+        </div>
+      )}
 
       <div className="space-y-2" data-density-contract="v1.3">
         {draft.exercises.map((exercise) => (
@@ -829,7 +989,7 @@ function ExerciseCard({
               ))}
               {draft.exercises.length < 2 && (
                 <p className="text-sm font-semibold text-[var(--text-secondary)]">
-                  Add another exercise before creating a Superset.
+                  Add another exercise before creating a superset.
                 </p>
               )}
             </div>
@@ -1335,6 +1495,27 @@ function PageHeader({ description, onBack, step, title }) {
       <h1 className="text-3xl font-extrabold leading-tight tracking-[-0.03em]">{title}</h1>
       <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">{description}</p>
     </header>
+  );
+}
+
+function CancelWorkoutConfirmation({ onCancel, onKeep }) {
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 px-4 pb-24 pt-10" role="presentation">
+      <div aria-labelledby="cancel-workout-title" aria-modal="true" className="w-full max-w-[361px] rounded-[22px] border border-[var(--divider)] bg-[var(--surface-elevated)] p-5 shadow-2xl" role="dialog">
+        <h2 className="text-xl font-extrabold" id="cancel-workout-title">Cancel this workout?</h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+          Your current workout draft will be discarded. No Training or Evidence records will be created.
+        </p>
+        <div className="mt-5 grid grid-cols-1 gap-2">
+          <button className="min-h-12 rounded-xl bg-red-600 px-4 text-sm font-extrabold text-white" onClick={onCancel} type="button">
+            Cancel workout
+          </button>
+          <button className="min-h-12 rounded-xl border border-[var(--divider)] bg-[var(--surface-soft)] px-4 text-sm font-extrabold" onClick={onKeep} type="button">
+            Keep workout
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

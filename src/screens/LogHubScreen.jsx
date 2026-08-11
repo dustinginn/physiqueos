@@ -49,7 +49,7 @@ function TrainingLoggerCard() {
           <IconBadge icon={Dumbbell} color="primary" size="md" />
           <span className="min-w-0 flex-1">
             <span className="block text-xl font-black leading-tight text-slate-950">Training Logger</span>
-            <span className="mt-1 block text-sm font-medium leading-6 text-slate-500">Start a workout or log a past workout with exercises, sets, Variants, and Supersets.</span>
+            <span className="mt-1 block text-sm font-medium leading-6 text-slate-500">Start a workout or log a past workout with exercises, sets, variants, and supersets.</span>
           </span>
           <span aria-hidden="true" className="text-xl font-bold text-indigo-600">›</span>
         </div>

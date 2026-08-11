@@ -1,4 +1,5 @@
 import {
+  getCanonicalTrainingExerciseSlug,
   listCanonicalTrainingExerciseIdentities,
 } from "../../../domain/models/trainingExerciseIdentity";
 import {
@@ -50,6 +51,11 @@ export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_3";
 export const TRAINING_LOGGER_MODES = Object.freeze({
   LIVE: "live",
   RETROSPECTIVE: "retrospective",
+});
+
+export const TRAINING_LOGGER_EXERCISE_SCOPES = Object.freeze({
+  ALL_CANONICAL: "all_canonical",
+  PERFORMED_HISTORY: "performed_history",
 });
 
 export const TRAINING_LOGGER_STEPS = Object.freeze({
@@ -226,21 +232,37 @@ export function listTrainingLoggerCategories() {
 export function listTrainingLoggerExercises({
   categories = [],
   exerciseLibrary = null,
+  performedExerciseIds = [],
   search = "",
+  scope = TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
 } = {}) {
   const selected = new Set(categories.map((category) => category.toLowerCase()));
   const query = String(search).trim().toLowerCase();
   const canonicalExercises = Array.isArray(exerciseLibrary) && exerciseLibrary.length > 0
     ? exerciseLibrary
     : listCanonicalTrainingExerciseIdentities();
+  const performed = new Set(performedExerciseIds);
   return canonicalExercises.filter((exercise) => {
+    const scopeMatches = scope !== TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY ||
+      performed.has(exercise.id);
     const categoryMatches = selected.size === 0 || getExerciseTrainingCategories(exercise)
       .some((category) => selected.has(category));
     const searchMatches = !query || [exercise.name, exercise.movement_pattern, exercise.equipment]
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(query));
-    return categoryMatches && searchMatches;
+    return scopeMatches && categoryMatches && searchMatches;
   });
+}
+
+export function listPerformedTrainingLoggerExerciseIds(sessions = []) {
+  return [...new Set(sessions
+    .map((candidate) => candidate?.payload ?? candidate)
+    .filter((session) => session?.evidence_type === "training")
+    .flatMap((session) => session.exercises ?? [])
+    .map((exercise) =>
+      exercise.canonicalExerciseId ?? getCanonicalTrainingExerciseSlug(exercise.name)
+    )
+    .filter(Boolean))];
 }
 
 export function createTrainingLoggerProductionDraft({
@@ -263,6 +285,7 @@ export function createTrainingLoggerProductionDraft({
       exerciseLibrary,
       goalContext,
       historySessions,
+      performedExerciseIds: listPerformedTrainingLoggerExerciseIds(historySessions),
     },
     categorySuggestion: createTrainingLoggerSuggestion({
       date: workoutDate,
@@ -305,7 +328,12 @@ export function hydrateTrainingLoggerProductionDraft(
       canonicalTrainingSessionWritesEnabled: false,
       fixtureHistoryReadOnly: false,
     },
-    productionContext: { exerciseLibrary, goalContext, historySessions },
+    productionContext: {
+      exerciseLibrary,
+      goalContext,
+      historySessions,
+      performedExerciseIds: listPerformedTrainingLoggerExerciseIds(historySessions),
+    },
     categorySuggestion: createTrainingLoggerSuggestion({
       date: recoveredDraft.workoutDate ?? workoutDate,
       sessions: historySessions,

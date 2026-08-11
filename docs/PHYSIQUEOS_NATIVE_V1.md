@@ -375,6 +375,45 @@ repeated same-day rhythm with a conservative evidence minimum. Planned Goal or
 Training schedule intent is not an input to this behavior. When history is
 insufficient, production shows no suggestion.
 
+### Production exercise selection and draft semantics
+
+Normal Training Logger selection is user-history-first. It lists unique
+canonical exercise identities found in confirmed canonical TrainingSessions,
+then applies the selected training-area filter. Variant and Superset context do
+not create additional picker identities. The explicit **Add new exercise** path
+may search the broader canonical registry; choosing an existing movement keeps
+that canonical identity, and confirmation of its first legitimate session makes
+it part of the normal performed-history list later. Internal registry IDs,
+taxonomy enums, and missing metadata must never be rendered as picker copy.
+
+Web draft recovery is intentional and reversible:
+
+- **Leave workout** saves the recoverable local draft and exits to Log.
+- **Resume workout** explicitly restores that draft.
+- **Cancel workout** requires confirmation and removes only the local draft.
+
+### Production Logger QA mutation boundary
+
+Use these classifications when validating production without creating fake
+Founder evidence:
+
+| Stage | Class | Persistence behavior |
+| --- | --- | --- |
+| Open Logger through set editing, Done, Variant, Superset, progression choice, Finish, and Workout Review | A — local draft | Browser-local draft only; no server Evidence write. |
+| Continue without Apple screenshots and enter no-match reconciliation | B — transient server | Reads canonical evidence and computes candidates; saves no package or review. |
+| Select screenshot files before submission | A — local draft | Browser file selection only. |
+| Choose **Add Apple Health evidence** | C — persistent non-canonical staging | Uploads artifacts, interprets them, and saves the interpreted EvidencePackage even if the flow is abandoned. |
+| Select a strength match or include/exclude additional evidence | A — local draft | Reconciliation choices remain in the recoverable draft; uploaded source artifacts/package already exist when screenshots were submitted. |
+| Choose **Continue to Evidence Review** | C + D — package and Evidence Review staging | Saves the final Logger EvidencePackage and creates a pending Evidence Review record. |
+| View the pending Evidence Review | D — Evidence Review staging | Reads the staged review; canonical Training history is still unchanged. |
+| Confirm the Evidence Review | E — canonical mutation | The atomic confirmation pipeline creates/reconciles the detailed TrainingSession and any included cardio/other records. Apple source linkage becomes consumed here. |
+
+Therefore, no-screenshot production testing may safely continue through the
+no-match reconciliation screen, but fake data must not proceed through
+**Continue to Evidence Review**. Screenshot-based testing stops earlier:
+submitting screenshots already persists source artifacts and an interpreted
+EvidencePackage, so only legitimate evidence should be submitted.
+
 ## Notification philosophy
 
 Notifications exist to reduce navigation.

@@ -162,7 +162,8 @@ describe("Training Logger preview state", () => {
       categories: ["Biceps", "Triceps", "Core"],
       search: "hanging",
     }).map((exercise) => exercise.id)).toEqual(["hanging_leg_raise"]);
-    expect(componentSource).toContain('placeholder="Search exercises"');
+    expect(componentSource).toContain('"Search your exercises"');
+    expect(componentSource).toContain('"Search all exercises"');
     expect(componentSource).toContain("onToggleExercise(exercise.id)");
   });
 

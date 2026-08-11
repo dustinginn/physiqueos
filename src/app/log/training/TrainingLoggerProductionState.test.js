@@ -9,10 +9,12 @@ import {
   initializeTrainingLoggerMode,
   listTrainingLoggerCategories,
   listTrainingLoggerExercises,
+  listPerformedTrainingLoggerExerciseIds,
   removeTrainingSet,
   serializeTrainingLoggerRecoveryDraft,
   toggleTrainingSetCompletion,
   TRAINING_LOGGER_MODES,
+  TRAINING_LOGGER_EXERCISE_SCOPES,
   updateTrainingSet,
   updateWorkoutContext,
 } from "../../preview/training-logger/TrainingLoggerPreviewState";
@@ -48,6 +50,84 @@ describe("production Training Logger state", () => {
       canonicalExerciseId: "runtime_curl",
       name: "Runtime Curl",
     });
+  });
+
+  it("uses confirmed performed history for the normal picker and keeps the global registry explicit", () => {
+    const exerciseLibrary = [
+      {
+        id: "spider_curl",
+        name: "Spider Curls",
+        primary_muscle_groups: ["Biceps"],
+        movement_pattern: "Elbow Flexion",
+      },
+      {
+        id: "forearm_curl",
+        name: "Forearm Curls",
+        primary_muscle_groups: ["Biceps"],
+        movement_pattern: "Elbow / Wrist Flexion",
+      },
+      {
+        id: "cable_pushdown",
+        name: "Cable Rope Pushdowns",
+        primary_muscle_groups: ["Triceps"],
+        movement_pattern: "Elbow Extension",
+      },
+    ];
+    const performedExerciseIds = listPerformedTrainingLoggerExerciseIds([
+      history("2026-08-01", { load: 35, reps: 12, variant: "Static Hold" }),
+      {
+        ...history("2026-08-02", { load: 35, reps: 12 }),
+        exerciseRelationshipGroups: [{
+          id: "superset_1",
+          relationshipType: "superset",
+          memberExerciseIds: ["spider_2026-08-02", "pushdown_2026-08-02"],
+        }],
+      },
+      {
+        id: "history_pushdown",
+        evidence_type: "training",
+        observed_at: "2026-08-02",
+        exercises: [{
+          id: "pushdown_2026-08-02",
+          canonicalExerciseId: "cable_pushdown",
+          name: "Cable Rope Pushdowns",
+          sets: [{ reps: 12, weight: 40, weight_unit: "lb" }],
+        }],
+      },
+    ]);
+
+    expect(performedExerciseIds).toEqual(["spider_curl", "cable_pushdown"]);
+    expect(listTrainingLoggerExercises({
+      categories: ["Biceps"],
+      exerciseLibrary,
+      performedExerciseIds,
+      scope: TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY,
+    }).map((exercise) => exercise.id)).toEqual(["spider_curl"]);
+    expect(listTrainingLoggerExercises({
+      categories: ["Biceps"],
+      exerciseLibrary,
+      performedExerciseIds,
+      scope: TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
+    }).map((exercise) => exercise.id)).toEqual(["spider_curl", "forearm_curl"]);
+  });
+
+  it("adds an unperformed canonical exercise without duplicating its identity", () => {
+    const exerciseLibrary = [{
+      id: "runtime_curl",
+      name: "Runtime Curl",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: "Elbow Flexion",
+    }];
+    let draft = createTrainingLoggerProductionDraft({
+      exerciseLibrary,
+      historySessions: [],
+      workoutDate: "2026-08-10",
+    });
+    draft = addTrainingExercise(draft, "runtime_curl");
+    draft = addTrainingExercise(draft, "runtime_curl");
+
+    expect(draft.exercises).toHaveLength(1);
+    expect(draft.exercises[0].canonicalExerciseId).toBe("runtime_curl");
   });
 
   it("creates one shared live/retrospective draft and never fabricates retrospective time", () => {

@@ -5,6 +5,7 @@ import {
 import {
   createTrainingLibraryMetadata,
   createTrainingExercisePresentation,
+  createTrainingLoggerExercisePickerPresentation,
   getCanonicalTrainingCategoryLabel,
 } from "./trainingExercisePresentation";
 
@@ -68,6 +69,43 @@ describe("Training Library exercise presentation", () => {
       description: "Review Chest Fly Machine training history and performance.",
     });
     expect(JSON.stringify(metadata)).not.toContain("chest_fly_machine");
+  });
+
+  it("creates a human-readable Logger picker label without raw taxonomy leakage", () => {
+    registerRuntimeTrainingExercises([{
+      id: "runtime_curl",
+      name: "Runtime Curl",
+      body_region: "upper_body",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: null,
+    }]);
+
+    const presentation = createTrainingLoggerExercisePickerPresentation({
+      id: "runtime_curl",
+      name: "runtime_curl",
+      body_region: "upper_body",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: null,
+    });
+
+    expect(presentation).toMatchObject({
+      displayName: "Runtime Curl",
+      secondaryLabel: "Biceps",
+    });
+    expect(`${presentation.displayName} ${presentation.secondaryLabel}`)
+      .not.toMatch(/upper_body|runtime_curl|null|undefined/);
+  });
+
+  it("humanizes movement enums rather than exposing raw underscored values", () => {
+    const presentation = createTrainingLoggerExercisePickerPresentation({
+      id: "spider_curl",
+      name: "Spider Curls",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: "elbow_flexion",
+    });
+
+    expect(presentation.secondaryLabel).toBe("Biceps · Elbow flexion");
+    expect(presentation.secondaryLabel).not.toContain("elbow_flexion");
   });
 
   it("uses generic metadata when the canonical display name is missing", () => {

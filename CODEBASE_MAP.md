@@ -141,6 +141,9 @@ Key services:
 * `TrainingLoggerProgressionService`: conservative Goal-relative, user-adaptive, movement-specific progression recommendations.
 * `TrainingLoggerSuggestionService`: confirmed-history-only workout-rhythm suggestions.
 * `TrainingLoggerAppleHealthService`: normalized Apple workout candidates, consumption filtering, and Training Logger Evidence Review proposals.
+* `TrainingLoggerDraftRecoveryService`: browser-storage adapter for explicit Training Logger save, resume, and draft-only cancellation.
+
+Production Training Logger exercise selection is performed-history-first. The normal picker derives unique canonical exercise IDs from confirmed TrainingSessions; the explicit Add new exercise path searches the broader canonical registry through the shared Training Library presentation boundary.
 
 Repository implementations live in `src/data/repositories`.
 
