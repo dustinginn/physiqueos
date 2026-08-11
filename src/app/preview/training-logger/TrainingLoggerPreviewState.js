@@ -16,8 +16,25 @@ import {
 import {
   getPrimaryTrainingNavigationGroup,
 } from "../../../navigation/trainingNavigationMapping";
+import {
+  APPLE_HEALTH_RECONCILIATION_FIXTURES,
+  APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
+  canFinalizeAppleHealthReconciliation,
+  continueWithoutStrengthEvidence,
+  createAppleHealthReconciliation,
+  finalizeAppleHealthReconciliation,
+  getReconciliationEvidenceItem,
+  selectStrengthEvidence,
+  toggleAdditionalEvidence,
+} from "./TrainingLoggerAppleHealthReconciliation";
 
-export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_1";
+export {
+  APPLE_HEALTH_MATCH_STATES,
+  APPLE_HEALTH_RECONCILIATION_FIXTURES,
+  APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
+} from "./TrainingLoggerAppleHealthReconciliation";
+
+export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_2";
 
 export const TRAINING_LOGGER_MODES = Object.freeze({
   LIVE: "live",
@@ -34,12 +51,6 @@ export const TRAINING_LOGGER_STEPS = Object.freeze({
   RECONCILIATION: "reconciliation",
   EVIDENCE_REVIEW: "evidence_review",
   COMPLETE: "complete",
-});
-
-export const APPLE_HEALTH_MATCH_STATES = Object.freeze({
-  STRONG: "strong_match",
-  MULTIPLE: "multiple_matches",
-  NONE: "no_match",
 });
 
 export const PROGRESSION_STATES = Object.freeze({
@@ -66,6 +77,29 @@ export const TRAINING_LOGGER_VARIANT_OPTIONS = Object.freeze([
   "Static Hold",
   "3-Second Pause",
   "Slow Eccentric",
+]);
+
+export const TRAINING_LOGGER_DENSITY_CONTRACT = Object.freeze({
+  canonicalShellWidthPx: 393,
+  narrowShellWidthPx: 360,
+  primaryTapTargetPx: 44,
+  setRowHeightPx: 44,
+  exerciseCardGapPx: 8,
+  v1_1StructuralEstimate: Object.freeze({ ordinaryFourSetCardPx: 492 }),
+  v1_2StructuralTarget: Object.freeze({ ordinaryFourSetCardMaxPx: 376 }),
+});
+
+export const TRAINING_LOGGER_USER_FACING_AREA_IDS = Object.freeze([
+  "chest",
+  "back",
+  "shoulders",
+  "biceps",
+  "triceps",
+  "core",
+  "quads",
+  "hamstrings",
+  "glutes",
+  "calves",
 ]);
 
 const DEFAULT_HISTORY = Object.freeze({
@@ -154,19 +188,11 @@ const RECOMMENDATION_FIXTURES = Object.freeze({
   }),
 });
 
-export const APPLE_HEALTH_MATCH_FIXTURES = Object.freeze({
-  [APPLE_HEALTH_MATCH_STATES.STRONG]: Object.freeze([
-    healthMatch("health_strength_1612", "Traditional Strength Training", "4:12 PM", "5:06 PM", 54, 430),
-  ]),
-  [APPLE_HEALTH_MATCH_STATES.MULTIPLE]: Object.freeze([
-    healthMatch("health_strength_1612", "Traditional Strength Training", "4:12 PM", "5:06 PM", 54, 430),
-    healthMatch("health_strength_1740", "Functional Strength Training", "5:40 PM", "6:24 PM", 44, 356),
-  ]),
-  [APPLE_HEALTH_MATCH_STATES.NONE]: Object.freeze([]),
-});
-
 export function listTrainingLoggerCategories() {
-  return listCanonicalTrainingMuscleGroups().map((muscleGroup) => muscleGroup.label);
+  const userFacingAreas = new Set(TRAINING_LOGGER_USER_FACING_AREA_IDS);
+  return listCanonicalTrainingMuscleGroups()
+    .filter((muscleGroup) => userFacingAreas.has(muscleGroup.id))
+    .map((muscleGroup) => muscleGroup.label);
 }
 
 export function listTrainingLoggerExercises({ categories = [], search = "" } = {}) {
@@ -203,12 +229,10 @@ export function createTrainingLoggerPreviewDraft({
     exercises: [],
     exerciseRelationshipGroups: [],
     nextOccurrenceIndex: 0,
-    reconciliation: {
-      matchState: APPLE_HEALTH_MATCH_STATES.STRONG,
-      candidates: cloneMatches(APPLE_HEALTH_MATCH_STATES.STRONG),
-      selectedMatchId: null,
-      continueWithoutMatch: false,
-    },
+    reconciliation: createAppleHealthReconciliation({
+      evidenceItems: APPLE_HEALTH_RECONCILIATION_FIXTURES.BATCH,
+      workoutDate,
+    }),
   };
 }
 
@@ -224,12 +248,20 @@ export function initializeTrainingLoggerMode(draft, mode) {
 }
 
 export function updateWorkoutContext(draft, changes = {}) {
+  const workoutDate = changes.workoutDate ?? draft.workoutDate;
   return {
     ...draft,
     ...changes,
+    workoutDate,
     workoutTime: draft.mode === TRAINING_LOGGER_MODES.RETROSPECTIVE
       ? null
       : changes.workoutTime ?? draft.workoutTime,
+    reconciliation: workoutDate === draft.workoutDate
+      ? draft.reconciliation
+      : createAppleHealthReconciliation({
+          evidenceItems: draft.reconciliation.normalizedEvidence,
+          workoutDate,
+        }),
   };
 }
 
@@ -469,64 +501,87 @@ export function buildTrainingWorkoutSummary(draft) {
   };
 }
 
-export function setAppleHealthMatchState(draft, matchState) {
-  if (!Object.values(APPLE_HEALTH_MATCH_STATES).includes(matchState)) return draft;
+export function loadAppleHealthReconciliationFixture(draft, fixtureName) {
+  const evidenceItems = APPLE_HEALTH_RECONCILIATION_FIXTURES[fixtureName];
+  if (!evidenceItems) return draft;
   return {
     ...draft,
-    reconciliation: {
-      matchState,
-      candidates: cloneMatches(matchState),
-      selectedMatchId: null,
-      continueWithoutMatch: false,
-    },
+    reconciliation: createAppleHealthReconciliation({
+      evidenceItems,
+      workoutDate: draft.workoutDate,
+    }),
   };
 }
 
-export function selectAppleHealthMatch(draft, matchId) {
-  const exists = draft.reconciliation.candidates.some((match) => match.id === matchId);
-  if (!exists) return draft;
+export function selectAppleHealthMatch(draft, sourceWorkoutId) {
   return {
     ...draft,
-    reconciliation: {
-      ...draft.reconciliation,
-      selectedMatchId: matchId,
-      continueWithoutMatch: false,
-    },
+    reconciliation: selectStrengthEvidence(draft.reconciliation, sourceWorkoutId),
   };
 }
 
 export function continueWithoutAppleHealthMatch(draft) {
   return {
     ...draft,
-    reconciliation: {
-      ...draft.reconciliation,
-      selectedMatchId: null,
-      continueWithoutMatch: true,
-    },
+    reconciliation: continueWithoutStrengthEvidence(draft.reconciliation),
+  };
+}
+
+export function toggleAppleHealthAdditionalEvidence(draft, sourceWorkoutId) {
+  return {
+    ...draft,
+    reconciliation: toggleAdditionalEvidence(draft.reconciliation, sourceWorkoutId),
+  };
+}
+
+export function finalizeTrainingLoggerReconciliation(draft) {
+  return {
+    ...draft,
+    reconciliation: finalizeAppleHealthReconciliation(draft.reconciliation),
   };
 }
 
 export function buildEvidenceReviewHandoff(draft) {
   const summary = buildTrainingWorkoutSummary(draft);
-  const selectedMatch = draft.reconciliation.candidates.find(
-    (match) => match.id === draft.reconciliation.selectedMatchId
-  ) ?? null;
+  const proposedRecords = draft.reconciliation.proposedCanonicalRecords;
+  const strengthProposal = proposedRecords.find((record) =>
+    record.canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.TRAINING_SESSION
+  );
+  const acceptedAppleWorkouts = proposedRecords
+    .filter((record) => record.sourceWorkoutId)
+    .map((record) => ({
+      ...getReconciliationEvidenceItem(draft.reconciliation, record.sourceWorkoutId),
+      canonicalOwnerType: record.canonicalOwnerType,
+      disposition: record.disposition,
+    }));
   return {
     status: "ready_to_log",
     previewOnly: true,
-    workoutDetails: summary,
-    appleHealth: selectedMatch
-      ? { status: "matched", workout: selectedMatch }
-      : { status: "not_linked", workout: null },
-    executionContexts: draft.exercises
-      .filter((exercise) => exercise.executionVariant)
-      .map((exercise) => ({
-        exerciseOccurrenceId: exercise.id,
-        canonicalExerciseId: exercise.canonicalExerciseId,
-        exerciseName: exercise.name,
-        executionVariant: exercise.executionVariant,
-      })),
-    exerciseRelationshipGroups: draft.exerciseRelationshipGroups,
+    workoutDetails: {
+      ...summary,
+      workoutDate: draft.workoutDate,
+      workoutTime: draft.workoutTime,
+    },
+    appleHealth: {
+      status: strengthProposal?.sourceWorkoutId ? "matched" : "not_linked",
+      batchId: draft.reconciliation.batchId,
+      acceptedWorkouts: acceptedAppleWorkouts,
+      strengthWorkout: acceptedAppleWorkouts.find((workout) =>
+        workout.canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.TRAINING_SESSION
+      ) ?? null,
+    },
+    proposedCanonicalRecords: proposedRecords,
+    structuredTrainingContext: {
+      executionContexts: draft.exercises
+        .filter((exercise) => exercise.executionVariant)
+        .map((exercise) => ({
+          exerciseOccurrenceId: exercise.id,
+          canonicalExerciseId: exercise.canonicalExerciseId,
+          exerciseName: exercise.name,
+          executionVariant: exercise.executionVariant,
+        })),
+      exerciseRelationshipGroups: draft.exerciseRelationshipGroups,
+    },
   };
 }
 
@@ -543,10 +598,7 @@ export function getSupersetContext(draft, exerciseOccurrenceId) {
 }
 
 export function canContinueFromReconciliation(draft) {
-  if (draft.reconciliation.matchState === APPLE_HEALTH_MATCH_STATES.NONE) {
-    return draft.reconciliation.continueWithoutMatch;
-  }
-  return Boolean(draft.reconciliation.selectedMatchId);
+  return canFinalizeAppleHealthReconciliation(draft.reconciliation);
 }
 
 function updateExercise(draft, exerciseOccurrenceId, updater) {
@@ -608,14 +660,6 @@ function createMaintainRecommendation(previousPerformance) {
 
 function history(date, reps, load, setCount, context) {
   return Object.freeze({ date, reps, load, unit: "lb", setCount, context });
-}
-
-function healthMatch(id, type, startTime, endTime, durationMinutes, activeCalories) {
-  return Object.freeze({ id, type, startTime, endTime, durationMinutes, activeCalories });
-}
-
-function cloneMatches(matchState) {
-  return APPLE_HEALTH_MATCH_FIXTURES[matchState].map((match) => ({ ...match }));
 }
 
 function toNonNegativeNumber(value) {

@@ -5,6 +5,7 @@ import {
   addTrainingExercise,
   addTrainingSet,
   APPLE_HEALTH_MATCH_STATES,
+  APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
   applyProgressionSuggestion,
   assignTrainingVariant,
   buildEvidenceReviewHandoff,
@@ -13,20 +14,23 @@ import {
   continueWithoutAppleHealthMatch,
   createTrainingLoggerPreviewDraft,
   createTrainingSuperset,
+  finalizeTrainingLoggerReconciliation,
   getSupersetContext,
   initializeTrainingLoggerMode,
   keepPreviousPerformance,
   listTrainingLoggerCategories,
   listTrainingLoggerExercises,
+  loadAppleHealthReconciliationFixture,
   PROGRESSION_CHOICES,
   removeTrainingExercise,
   removeTrainingSet,
   removeTrainingSuperset,
   removeTrainingVariant,
   selectAppleHealthMatch,
-  setAppleHealthMatchState,
+  toggleAppleHealthAdditionalEvidence,
   toggleTrainingCategory,
   TRAINING_LOGGER_CATEGORY_SUGGESTION,
+  TRAINING_LOGGER_DENSITY_CONTRACT,
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_STEPS,
   toggleTrainingSetCompletion,
@@ -40,6 +44,10 @@ const componentSource = fs.readFileSync(
 );
 const stateSource = fs.readFileSync(
   new URL("./TrainingLoggerPreviewState.js", import.meta.url),
+  "utf8"
+);
+const reconciliationSource = fs.readFileSync(
+  new URL("./TrainingLoggerAppleHealthReconciliation.js", import.meta.url),
   "utf8"
 );
 const routeSource = fs.readFileSync(new URL("./page.js", import.meta.url), "utf8");
@@ -93,7 +101,7 @@ describe("Training Logger preview state", () => {
     expect(componentSource).not.toContain('type="time"');
   });
 
-  it("derives selectable areas from canonical muscle groups and removes Lower Body", () => {
+  it("exposes a practical user-facing area layer without changing canonical anatomy", () => {
     expect(listTrainingLoggerCategories()).toEqual([
       "Chest",
       "Back",
@@ -105,9 +113,9 @@ describe("Training Logger preview state", () => {
       "Hamstrings",
       "Glutes",
       "Calves",
-      "Adductors",
     ]);
     expect(listTrainingLoggerCategories()).not.toContain("Lower Body");
+    expect(listTrainingLoggerCategories()).not.toContain("Adductors");
     expect(listTrainingLoggerCategories()).toEqual(expect.arrayContaining([
       "Quads", "Glutes", "Hamstrings", "Calves",
     ]));
@@ -303,57 +311,97 @@ describe("Training Logger preview state", () => {
     });
   });
 
-  it("models Apple Health strong, multiple, and no-match decisions explicitly", () => {
+  it("derives strong, multiple, and no-match states without user-facing scenario controls", () => {
     let draft = createProvingDraft();
     expect(draft.reconciliation.matchState).toBe(APPLE_HEALTH_MATCH_STATES.STRONG);
-    expect(draft.reconciliation.candidates).toHaveLength(1);
-    expect(canContinueFromReconciliation(draft)).toBe(false);
-    draft = selectAppleHealthMatch(draft, draft.reconciliation.candidates[0].id);
+    expect(draft.reconciliation.strengthCandidateIds).toHaveLength(1);
+    expect(draft.reconciliation.selectedStrengthSourceId).toBe(
+      "apple_workout_strength_20260810_1612"
+    );
     expect(canContinueFromReconciliation(draft)).toBe(true);
 
-    draft = setAppleHealthMatchState(draft, APPLE_HEALTH_MATCH_STATES.MULTIPLE);
-    expect(draft.reconciliation.candidates).toHaveLength(2);
-    expect(draft.reconciliation.selectedMatchId).toBeNull();
+    draft = loadAppleHealthReconciliationFixture(draft, "MULTIPLE");
+    expect(draft.reconciliation.strengthCandidateIds).toHaveLength(2);
+    expect(draft.reconciliation.selectedStrengthSourceId).toBeNull();
     expect(canContinueFromReconciliation(draft)).toBe(false);
+    draft = selectAppleHealthMatch(draft, draft.reconciliation.strengthCandidateIds[1]);
+    expect(canContinueFromReconciliation(draft)).toBe(true);
 
-    draft = setAppleHealthMatchState(draft, APPLE_HEALTH_MATCH_STATES.NONE);
-    expect(draft.reconciliation.candidates).toEqual([]);
+    draft = loadAppleHealthReconciliationFixture(draft, "NONE");
+    expect(draft.reconciliation.strengthCandidateIds).toEqual([]);
     expect(canContinueFromReconciliation(draft)).toBe(false);
     draft = continueWithoutAppleHealthMatch(draft);
     expect(canContinueFromReconciliation(draft)).toBe(true);
+    expect(componentSource).not.toContain("Preview match scenario");
+    expect(componentSource).not.toContain('"Strong"');
   });
 
-  it("builds a concise Evidence Review handoff without asking for set re-entry", () => {
+  it("lets one batch independently include or exclude additional cardio evidence", () => {
+    let draft = createProvingDraft();
+    const cardioAction = draft.reconciliation.additionalEvidenceActions.find((action) =>
+      action.canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.CARDIO_WORKOUT
+    );
+    expect(cardioAction.included).toBe(true);
+    draft = toggleAppleHealthAdditionalEvidence(draft, cardioAction.sourceWorkoutId);
+    expect(draft.reconciliation.additionalEvidenceActions.find(
+      (action) => action.sourceWorkoutId === cardioAction.sourceWorkoutId
+    ).included).toBe(false);
+    draft = finalizeTrainingLoggerReconciliation(draft);
+    expect(draft.reconciliation.proposedCanonicalRecords.some(
+      (record) => record.canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.CARDIO_WORKOUT
+    )).toBe(false);
+  });
+
+  it("builds a dated batch Evidence Review handoff without an Execution Context card", () => {
     let draft = createProvingDraft();
     const [spider, pushdown] = draft.exercises;
     draft = assignTrainingVariant(draft, spider.id, "Static Hold");
     draft = createTrainingSuperset(draft, spider.id, pushdown.id);
-    draft = selectAppleHealthMatch(draft, draft.reconciliation.candidates[0].id);
+    draft = finalizeTrainingLoggerReconciliation(draft);
     const handoff = buildEvidenceReviewHandoff(draft);
     expect(handoff).toMatchObject({
       status: "ready_to_log",
       previewOnly: true,
-      workoutDetails: { exerciseCount: 2, setCount: 8, variantCount: 1, supersetCount: 1 },
+      workoutDetails: {
+        exerciseCount: 2,
+        setCount: 8,
+        variantCount: 1,
+        supersetCount: 1,
+        workoutDate: "2026-08-10",
+        workoutTime: null,
+      },
       appleHealth: {
         status: "matched",
-        workout: {
-          type: "Traditional Strength Training",
+        strengthWorkout: {
+          workoutType: "Traditional Strength Training",
+          sessionDate: "2026-08-10",
           durationMinutes: 54,
           activeCalories: 430,
         },
       },
     });
-    expect(handoff.executionContexts[0]).toMatchObject({
+    expect(handoff.structuredTrainingContext.executionContexts[0]).toMatchObject({
       canonicalExerciseId: "spider_curl",
       executionVariant: { key: "static_hold" },
     });
-    expect(handoff.exerciseRelationshipGroups).toHaveLength(1);
+    expect(handoff.structuredTrainingContext.exerciseRelationshipGroups).toHaveLength(1);
+    expect(handoff.appleHealth.acceptedWorkouts.map((workout) => workout.workoutType)).toEqual([
+      "Traditional Strength Training",
+      "Stair Stepper",
+      "Walking",
+    ]);
+    expect(handoff.proposedCanonicalRecords.map((record) => record.canonicalOwnerType)).toEqual([
+      APPLE_WORKOUT_CANONICAL_OWNER_TYPES.TRAINING_SESSION,
+      APPLE_WORKOUT_CANONICAL_OWNER_TYPES.CARDIO_WORKOUT,
+      APPLE_WORKOUT_CANONICAL_OWNER_TYPES.ACTIVITY_RECORD,
+    ]);
     expect(handoff).not.toHaveProperty("editableSets");
-    expect(componentSource).toContain("handoff.appleHealth.workout.activeCalories");
+    expect(componentSource).not.toContain('title="Execution Context"');
+    expect(componentSource).toContain("workout.activeCalories");
   });
 
   it("has no production TrainingSession write, network, persistence, or server-action boundary", () => {
-    const previewSource = `${componentSource}\n${stateSource}\n${routeSource}`;
+    const previewSource = `${componentSource}\n${stateSource}\n${reconciliationSource}\n${routeSource}`;
     expect(previewSource).not.toMatch(
       /fetch\(|FounderRepositories|CanonicalExerciseWorkoutCommitService|EvidenceIntakeService|createCanonical|updateCanonical|revalidatePath|server action|localStorage|sessionStorage/
     );
@@ -362,6 +410,10 @@ describe("Training Logger preview state", () => {
     expect(stateSource).toContain("canonicalTrainingSessionWritesEnabled: false");
     expect(stateSource).toContain('persistence: "memory_only"');
     expect(routeSource).not.toMatch(/actions|repositories|services/);
+    expect(reconciliationSource).toContain('HEALTH_KIT: "healthkit"');
+    expect(reconciliationSource).toContain(
+      'SCREENSHOT_INTERPRETATION: "apple_health_screenshot_interpretation"'
+    );
   });
 
   it("uses the canonical phone-width shell, large tap targets, and bottom-nav clearance", () => {
@@ -371,15 +423,42 @@ describe("Training Logger preview state", () => {
     expect(componentSource).toContain("pb-36");
     expect(componentSource).toContain("bottom-24");
     expect(componentSource).toContain(
-      "grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px]"
+      "grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px]"
     );
-    expect(componentSource).toContain('className="space-y-3"');
-    expect(componentSource).toContain('className="space-y-1"');
-    expect(componentSource).toContain('className="p-3 pb-2"');
-    expect(componentSource).toContain('className="px-3 pb-3 pt-2"');
+    expect(componentSource).toContain('data-density-contract="v1.2"');
+    expect(componentSource).toContain('className="space-y-0.5"');
+    expect(componentSource).toContain('className="px-3 pb-1.5 pt-2.5"');
+    expect(componentSource).toContain('className="px-2.5 pb-2.5 pt-1.5"');
     expect(componentSource).toContain("aria-pressed={suggestionSelected}");
     expect(componentSource).toContain("aria-pressed={previousSelected}");
+    expect(TRAINING_LOGGER_DENSITY_CONTRACT).toMatchObject({
+      canonicalShellWidthPx: 393,
+      narrowShellWidthPx: 360,
+      primaryTapTargetPx: 44,
+      setRowHeightPx: 44,
+      exerciseCardGapPx: 8,
+    });
+    expect(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_2StructuralTarget.ordinaryFourSetCardMaxPx
+    ).toBeLessThan(
+      TRAINING_LOGGER_DENSITY_CONTRACT.v1_1StructuralEstimate.ordinaryFourSetCardPx
+    );
     expect(componentSource).not.toMatch(/max-w-screen|max-w-7xl/);
+  });
+
+  it("preserves every accepted active-logger action after the density refactor", () => {
+    [
+      "Use suggestion",
+      "Keep previous",
+      "Add Variant",
+      "Link as Superset",
+      "Remove Exercise",
+      "Add Set",
+      "Add Exercise",
+      "Finish Workout",
+      "Mark set ${set.order} done",
+      "Remove set ${set.order}",
+    ].forEach((label) => expect(componentSource).toContain(label));
   });
 });
 

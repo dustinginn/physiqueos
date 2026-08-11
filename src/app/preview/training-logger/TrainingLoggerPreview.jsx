@@ -28,6 +28,7 @@ import {
   addTrainingExercise,
   addTrainingSet,
   APPLE_HEALTH_MATCH_STATES,
+  APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
   applyProgressionSuggestion,
   assignTrainingVariant,
   buildEvidenceReviewHandoff,
@@ -36,6 +37,7 @@ import {
   continueWithoutAppleHealthMatch,
   createTrainingLoggerPreviewDraft,
   createTrainingSuperset,
+  finalizeTrainingLoggerReconciliation,
   getSupersetContext,
   goToTrainingLoggerStep,
   initializeTrainingLoggerMode,
@@ -49,7 +51,7 @@ import {
   removeTrainingSuperset,
   removeTrainingVariant,
   selectAppleHealthMatch,
-  setAppleHealthMatchState,
+  toggleAppleHealthAdditionalEvidence,
   toggleTrainingCategory,
   TRAINING_LOGGER_CATEGORY_SUGGESTION,
   TRAINING_LOGGER_MODES,
@@ -207,15 +209,21 @@ export default function TrainingLoggerPreview({ initialDate }) {
           <ReconciliationScreen
             draft={draft}
             onBack={() => navigate(TRAINING_LOGGER_STEPS.SUMMARY)}
-            onContinue={() => navigate(TRAINING_LOGGER_STEPS.EVIDENCE_REVIEW)}
+            onContinue={() => {
+              setDraft((current) => goToTrainingLoggerStep(
+                finalizeTrainingLoggerReconciliation(current),
+                TRAINING_LOGGER_STEPS.EVIDENCE_REVIEW
+              ));
+              setSearch("");
+            }}
             onContinueWithoutMatch={() => setDraft((current) =>
               continueWithoutAppleHealthMatch(current)
             )}
             onSelectMatch={(matchId) => setDraft((current) =>
               selectAppleHealthMatch(current, matchId)
             )}
-            onSetMatchState={(matchState) => setDraft((current) =>
-              setAppleHealthMatchState(current, matchState)
+            onToggleAdditionalEvidence={(sourceWorkoutId) => setDraft((current) =>
+              toggleAppleHealthAdditionalEvidence(current, sourceWorkoutId)
             )}
           />
         )}
@@ -489,32 +497,34 @@ function LoggerScreen({
   const summary = buildTrainingWorkoutSummary(draft);
   return (
     <section>
-      <header className="mb-3">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div>
-            <div className="mb-1 flex items-center gap-2">
+      <header className="mb-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
               {draft.mode === TRAINING_LOGGER_MODES.LIVE && (
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50 motion-reduce:animate-none" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 </span>
               )}
-              <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">
+              <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">
                 {draft.mode === TRAINING_LOGGER_MODES.LIVE ? "Workout in progress" : "Past workout"}
               </p>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-[-0.03em]">Training Logger</h1>
+            <div className="mt-0.5 flex items-baseline gap-2">
+              <h1 className="shrink-0 text-2xl font-extrabold tracking-[-0.03em]">Training Logger</h1>
+              <p className="truncate text-[11px] font-semibold text-[var(--text-secondary)]">
+                {formatWorkoutContext(draft)} · {draft.exercises.length} exercises
+              </p>
+            </div>
           </div>
-          <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-secondary)]">
+          <span className="shrink-0 rounded-full bg-[var(--surface-muted)] px-2.5 py-1.5 text-xs font-extrabold text-[var(--text-secondary)]">
             {summary.confirmedSetCount}/{summary.setCount} sets
           </span>
         </div>
-        <p className="text-sm font-semibold text-[var(--text-secondary)]">
-          {formatWorkoutContext(draft)} · {draft.exercises.length} exercises
-        </p>
       </header>
 
-      <div className="space-y-3">
+      <div className="space-y-2" data-density-contract="v1.2">
         {draft.exercises.map((exercise) => (
           <ExerciseCard
             draft={draft}
@@ -548,7 +558,7 @@ function LoggerScreen({
       </div>
 
       <button
-        className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] text-sm font-extrabold text-[var(--primary)]"
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] text-sm font-extrabold text-[var(--primary)]"
         onClick={onAddExercise}
         type="button"
       >
@@ -587,21 +597,16 @@ function ExerciseCard({
   const superset = getSupersetContext(draft, exercise.id);
   return (
     <Card padding="none" className={superset ? "border-l-4 border-l-[var(--primary)]" : ""}>
-      <div className="p-3 pb-2">
+      <div className="px-3 pb-1.5 pt-2.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xl font-extrabold leading-tight">{exercise.name}</h2>
-            {exercise.executionVariant && (
-              <p className="mt-1 text-sm font-extrabold text-[var(--primary)]">
-                {exercise.executionVariant.label}
-              </p>
-            )}
-            {superset && (
-              <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)]">
-                <Link2 aria-hidden="true" size={13} />
-                Superset with {superset.partners.map((partner) => partner.name).join(" + ")}
-              </p>
-            )}
+            <h2 className="text-lg font-extrabold leading-tight">{exercise.name}</h2>
+            <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--text-secondary)]">
+              {exercise.executionVariant && <span className="font-extrabold text-[var(--primary)]">{exercise.executionVariant.label} · </span>}
+              {superset && <span className="font-bold">Superset with {superset.partners.map((partner) => partner.name).join(" + ")} · </span>}
+              <span className="font-extrabold text-[var(--text-primary)]">Previous {exercise.previousPerformance.reps} × {formatLoad(exercise.previousPerformance.load)}</span>
+              <span> · {exercise.previousPerformance.context}</span>
+            </p>
           </div>
           <button
             aria-expanded={menuOpen}
@@ -683,17 +688,6 @@ function ExerciseCard({
           </div>
         )}
 
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2">
-          <div className="flex shrink-0 items-baseline gap-2">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--text-muted)]">Previous</p>
-            <p className="text-sm font-extrabold">
-              {exercise.previousPerformance.reps} × {formatLoad(exercise.previousPerformance.load)}
-            </p>
-          </div>
-          <p className="truncate text-right text-[11px] font-semibold text-[var(--text-subtle)]">
-            {exercise.previousPerformance.context}
-          </p>
-        </div>
       </div>
 
       <ProgressionCard
@@ -702,11 +696,11 @@ function ExerciseCard({
         onKeepPrevious={onKeepPrevious}
       />
 
-      <div className="px-3 pb-3 pt-2">
-        <div className="mb-1 grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 px-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+      <div className="px-2.5 pb-2.5 pt-1.5">
+        <div className="mb-0.5 grid grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-1.5 px-1 text-[9px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
           <span>Set</span><span>Reps</span><span>Load</span><span className="text-center">Done</span><span />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {exercise.sets.map((set) => (
             <SetRow
               key={set.id}
@@ -719,7 +713,7 @@ function ExerciseCard({
           ))}
         </div>
         <button
-          className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-soft)] text-xs font-extrabold text-[var(--primary)]"
+          className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-soft)] text-xs font-extrabold text-[var(--primary)]"
           onClick={onAddSet}
           type="button"
         >
@@ -732,7 +726,7 @@ function ExerciseCard({
 
 function SetRow({ onRemove, onToggle, onUpdate, set, showRemove }) {
   return (
-    <div className={`grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 rounded-xl px-1 ${set.confirmed
+    <div className={`grid h-11 grid-cols-[28px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-1.5 rounded-lg px-1 ${set.confirmed
       ? "bg-[var(--surface-success)]"
       : "bg-[var(--surface-muted)]"}`}>
       <span className="text-center text-sm font-extrabold">{set.order}</span>
@@ -783,27 +777,21 @@ function ProgressionCard({ exercise, onApplySuggestion, onKeepPrevious }) {
   const suggestionSelected = exercise.progressionChoice === PROGRESSION_CHOICES.SUGGESTION;
   const previousSelected = exercise.progressionChoice === PROGRESSION_CHOICES.PREVIOUS;
   return (
-    <div className={`border-y border-[var(--divider)] px-3 py-2 ${opportunity
+    <div className={`border-y border-[var(--divider)] px-2.5 py-1 ${opportunity
       ? "bg-[var(--surface-accent)]"
       : recommendation.state === PROGRESSION_STATES.RECOVER
         ? "bg-[var(--surface-warning)]"
         : "bg-[var(--surface-soft)]"}`}>
-      <div className="flex items-start gap-2">
-        <Sparkles aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--primary)]" size={16} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">
-              {recommendation.eyebrow}
-            </p>
-            <p className="shrink-0 text-xs font-extrabold">{recommendation.prescription}</p>
-          </div>
-          <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-            {recommendation.message}
+      <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] items-center gap-1.5">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--primary)]">
+            {recommendation.eyebrow}
           </p>
-          <div className="mt-2 flex gap-2">
+          <p className="truncate text-xs font-extrabold">{recommendation.prescription}</p>
+        </div>
             <button
               aria-pressed={suggestionSelected}
-              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-extrabold transition ${suggestionSelected
+              className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border px-1.5 text-[11px] font-extrabold transition ${suggestionSelected
                 ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
                 : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
               onClick={onApplySuggestion}
@@ -814,7 +802,7 @@ function ProgressionCard({ exercise, onApplySuggestion, onKeepPrevious }) {
             </button>
             <button
               aria-pressed={previousSelected}
-              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-extrabold transition ${previousSelected
+              className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border px-1.5 text-[11px] font-extrabold transition ${previousSelected
                 ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
                 : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
               onClick={onKeepPrevious}
@@ -823,8 +811,6 @@ function ProgressionCard({ exercise, onApplySuggestion, onKeepPrevious }) {
               {previousSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
               Keep previous
             </button>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -871,7 +857,7 @@ function SummaryScreen({ draft, onBack, onContinue }) {
           })}
         </div>
       </Card>
-      <BottomAction label="Match Apple Health" onClick={onContinue} />
+      <BottomAction label="Add Apple Health evidence" onClick={onContinue} />
     </section>
   );
 }
@@ -882,52 +868,37 @@ function ReconciliationScreen({
   onContinue,
   onContinueWithoutMatch,
   onSelectMatch,
-  onSetMatchState,
+  onToggleAdditionalEvidence,
 }) {
   const { reconciliation } = draft;
   const canContinue = canContinueFromReconciliation(draft);
+  const strengthCandidates = reconciliation.strengthCandidateIds.map((sourceWorkoutId) =>
+    reconciliation.normalizedEvidence.find((item) => item.sourceWorkoutId === sourceWorkoutId)
+  ).filter(Boolean);
+  const additionalEvidence = reconciliation.additionalEvidenceActions.map((action) => ({
+    ...action,
+    evidence: reconciliation.normalizedEvidence.find(
+      (item) => item.sourceWorkoutId === action.sourceWorkoutId
+    ),
+  })).filter((item) => item.evidence);
+  const batchEvidenceCount = strengthCandidates.length + additionalEvidence.length;
   return (
     <section>
       <PageHeader
-        description="Apple Health supplies the evidence shell. PhysiqueOS keeps the detailed strength structure."
+        description={`${batchEvidenceCount} normalized workouts were found in this evidence batch.`}
         onBack={onBack}
         step="Workout reconciliation"
-        title="Match Apple Health"
+        title="Apple Health evidence"
       />
-
-      <fieldset className="mb-4">
-        <legend className="mb-2 text-xs font-extrabold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-          Preview match scenario
-        </legend>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            [APPLE_HEALTH_MATCH_STATES.STRONG, "Strong"],
-            [APPLE_HEALTH_MATCH_STATES.MULTIPLE, "Multiple"],
-            [APPLE_HEALTH_MATCH_STATES.NONE, "No match"],
-          ].map(([value, label]) => (
-            <button
-              aria-pressed={reconciliation.matchState === value}
-              className={`min-h-11 rounded-xl border px-2 text-xs font-extrabold ${reconciliation.matchState === value
-                ? "border-[var(--primary)] bg-[var(--surface-accent)] text-[var(--primary)]"
-                : "border-[var(--divider)] bg-[var(--surface-elevated)]"}`}
-              key={value}
-              onClick={() => onSetMatchState(value)}
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
 
       {reconciliation.matchState === APPLE_HEALTH_MATCH_STATES.STRONG && (
         <>
-          <StatusLead icon={Apple} label="Apple Health workout found" />
+          <StatusLead icon={Apple} label="Strength workout match" />
           <HealthMatchCard
-            match={reconciliation.candidates[0]}
-            onSelect={() => onSelectMatch(reconciliation.candidates[0].id)}
-            selected={reconciliation.selectedMatchId === reconciliation.candidates[0].id}
-            selectLabel={reconciliation.selectedMatchId ? "Workout linked" : "Link Workout"}
+            match={strengthCandidates[0]}
+            onSelect={() => onSelectMatch(strengthCandidates[0].sourceWorkoutId)}
+            selected={reconciliation.selectedStrengthSourceId === strengthCandidates[0].sourceWorkoutId}
+            selectLabel="Linked to this strength workout"
           />
         </>
       )}
@@ -936,16 +907,16 @@ function ReconciliationScreen({
         <>
           <StatusLead icon={Apple} label="Choose the matching workout" />
           <p className="mb-3 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
-            More than one session could match. PhysiqueOS won’t choose silently.
+            More than one unlinked session could match. Choose one explicitly.
           </p>
           <div className="space-y-3">
-            {reconciliation.candidates.map((match) => (
+            {strengthCandidates.map((match) => (
               <HealthMatchCard
-                key={match.id}
+                key={match.sourceWorkoutId}
                 match={match}
-                onSelect={() => onSelectMatch(match.id)}
-                selected={reconciliation.selectedMatchId === match.id}
-                selectLabel={reconciliation.selectedMatchId === match.id ? "Selected" : "Select Workout"}
+                onSelect={() => onSelectMatch(match.sourceWorkoutId)}
+                selected={reconciliation.selectedStrengthSourceId === match.sourceWorkoutId}
+                selectLabel={reconciliation.selectedStrengthSourceId === match.sourceWorkoutId ? "Selected" : "Select workout"}
               />
             ))}
           </div>
@@ -962,15 +933,32 @@ function ReconciliationScreen({
             Your detailed workout can still continue to Evidence Review.
           </p>
           <button
-            className={`mt-4 min-h-12 w-full rounded-xl border text-sm font-extrabold ${reconciliation.continueWithoutMatch
+            className={`mt-4 min-h-12 w-full rounded-xl border text-sm font-extrabold ${reconciliation.continueWithoutStrength
               ? "border-emerald-500 bg-[var(--surface-success)] text-emerald-700"
               : "border-[var(--divider)] bg-[var(--surface-elevated)]"}`}
             onClick={onContinueWithoutMatch}
             type="button"
           >
-            {reconciliation.continueWithoutMatch ? "Continuing without match" : "Continue without Apple Health workout"}
+            {reconciliation.continueWithoutStrength ? "Continuing without strength match" : "Continue without strength match"}
           </button>
         </Card>
+      )}
+
+      {additionalEvidence.length > 0 && (
+        <div className="mt-4">
+          <StatusLead icon={Apple} label="Additional workouts in this batch" />
+          <div className="space-y-2">
+            {additionalEvidence.map(({ evidence, included, canonicalOwnerType }) => (
+              <AdditionalEvidenceCard
+                canonicalOwnerType={canonicalOwnerType}
+                evidence={evidence}
+                included={included}
+                key={evidence.sourceWorkoutId}
+                onToggle={() => onToggleAdditionalEvidence(evidence.sourceWorkoutId)}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       <BottomAction disabled={!canContinue} label="Continue to Evidence Review" onClick={onContinue} />
@@ -979,23 +967,24 @@ function ReconciliationScreen({
 }
 
 function HealthMatchCard({ match, onSelect, selected, selectLabel }) {
+  if (!match) return null;
   return (
-    <Card className={selected ? "border-emerald-500" : ""}>
+    <Card className={selected ? "border-emerald-500" : ""} padding="sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-extrabold">{match.type}</h2>
+          <h2 className="text-base font-extrabold">{match.workoutType}</h2>
           <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">
-            {match.startTime}–{match.endTime}
+            {formatDate(match.sessionDate)} · {match.startTime}–{match.endTime}
           </p>
         </div>
         {selected && <CheckCircle2 aria-label="Selected" className="text-emerald-500" size={22} />}
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-[var(--surface-muted)] p-3">
+      <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-[var(--surface-muted)] p-2.5">
         <SummaryMetric compact label="Duration" value={`${match.durationMinutes} min`} />
         <SummaryMetric compact label="Active calories" value={match.activeCalories} />
       </div>
       <button
-        className={`mt-3 min-h-12 w-full rounded-xl text-sm font-extrabold ${selected
+        className={`mt-2 min-h-11 w-full rounded-xl text-sm font-extrabold ${selected
           ? "bg-emerald-500 text-white"
           : "bg-[var(--primary)] text-white"}`}
         onClick={onSelect}
@@ -1007,10 +996,39 @@ function HealthMatchCard({ match, onSelect, selected, selectLabel }) {
   );
 }
 
+function AdditionalEvidenceCard({ canonicalOwnerType, evidence, included, onToggle }) {
+  const actionLabel = canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.CARDIO_WORKOUT
+    ? "Add as cardio workout"
+    : "Add as workout/activity";
+  return (
+    <Card className={included ? "border-emerald-500" : ""} padding="sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-extrabold">{evidence.workoutType}</p>
+          <p className="mt-0.5 text-xs font-semibold text-[var(--text-secondary)]">
+            {formatDate(evidence.sessionDate)} · {evidence.durationMinutes} min · {evidence.activeCalories} active cal
+          </p>
+        </div>
+        <button
+          aria-label={`${included ? "Exclude" : "Include"} ${evidence.workoutType}`}
+          aria-pressed={included}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${included
+            ? "border-emerald-500 bg-emerald-500 text-white"
+            : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-subtle)]"}`}
+          onClick={onToggle}
+          type="button"
+        >
+          <Check aria-hidden="true" size={19} strokeWidth={3} />
+        </button>
+      </div>
+      <p className="mt-2 text-xs font-extrabold text-[var(--primary)]">{actionLabel}</p>
+    </Card>
+  );
+}
+
 function EvidenceReviewScreen({ draft, onBack, onComplete }) {
   const handoff = buildEvidenceReviewHandoff(draft);
   const summary = handoff.workoutDetails;
-  const variantContexts = handoff.executionContexts;
   return (
     <section>
       <PageHeader
@@ -1022,40 +1040,33 @@ function EvidenceReviewScreen({ draft, onBack, onComplete }) {
 
       <div className="space-y-3">
         <ReviewSection icon={Dumbbell} title="Workout Details">
-          <p className="text-lg font-extrabold">{summary.exerciseCount} exercises · {summary.setCount} sets</p>
-          <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{formatWorkoutContext(draft)}</p>
+          <p className="text-lg font-extrabold">{formatDate(summary.workoutDate)}</p>
+          <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">
+            {summary.exerciseCount} exercises · {summary.setCount} sets
+          </p>
         </ReviewSection>
 
         <ReviewSection icon={Apple} title="Apple Health">
-          {handoff.appleHealth.status === "matched" ? (
-            <>
-              <p className="font-extrabold">
-                {handoff.appleHealth.workout.type} · {handoff.appleHealth.workout.durationMinutes} min · {handoff.appleHealth.workout.activeCalories} active calories
-              </p>
-              <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-emerald-600"><CheckCircle2 aria-hidden="true" size={15} /> Matched</p>
-            </>
+          {handoff.appleHealth.acceptedWorkouts.length > 0 ? (
+            <div className="divide-y divide-[var(--divider)]">
+              {handoff.appleHealth.acceptedWorkouts.map((workout) => (
+                <div className="py-2 first:pt-0 last:pb-0" key={workout.sourceWorkoutId}>
+                  <p className="text-xs font-bold text-[var(--text-muted)]">{formatDate(workout.sessionDate)}</p>
+                  <p className="mt-0.5 font-extrabold">{workout.workoutType}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[var(--text-secondary)]">
+                    {workout.durationMinutes} min · {workout.activeCalories} active calories
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                    <CheckCircle2 aria-hidden="true" size={14} />
+                    {getEvidenceReviewDisposition(workout.canonicalOwnerType)}
+                  </p>
+                </div>
+              ))}
+            </div>
           ) : (
-            <p className="font-extrabold">No workout linked · Continue with detailed log</p>
+            <p className="font-extrabold">No Apple Health workout accepted · Continue with detailed log</p>
           )}
         </ReviewSection>
-
-        {(variantContexts.length > 0 || handoff.exerciseRelationshipGroups.length > 0) && (
-          <ReviewSection icon={Link2} title="Execution Context">
-            <div className="space-y-2">
-              {variantContexts.map((context) => (
-                <p className="text-sm font-extrabold" key={context.exerciseOccurrenceId}>
-                  {context.exerciseName} · <span className="text-[var(--primary)]">{context.executionVariant.label}</span>
-                </p>
-              ))}
-              {handoff.exerciseRelationshipGroups.map((group) => {
-                const names = group.memberExerciseIds.map((id) =>
-                  draft.exercises.find((exercise) => exercise.id === id)?.name
-                ).filter(Boolean);
-                return <p className="text-sm font-extrabold" key={group.id}>{names.join(" + ")} · <span className="text-[var(--primary)]">Superset</span></p>;
-              })}
-            </div>
-          </ReviewSection>
-        )}
       </div>
 
       <Card className="mt-4" variant="soft">
@@ -1186,6 +1197,16 @@ function formatDate(value) {
   if (![year, month, day].every(Number.isFinite)) return value;
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" })
     .format(new Date(year, month - 1, day, 12));
+}
+
+function getEvidenceReviewDisposition(canonicalOwnerType) {
+  if (canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.TRAINING_SESSION) {
+    return "Linked to detailed workout";
+  }
+  if (canonicalOwnerType === APPLE_WORKOUT_CANONICAL_OWNER_TYPES.CARDIO_WORKOUT) {
+    return "Add as separate cardio workout";
+  }
+  return "Add as separate activity record";
 }
 
 function formatLoad(load) {

@@ -299,6 +299,33 @@ the same reconciliation boundary. Native iOS should replace that acquisition
 path with direct HealthKit access without changing the canonical
 `TrainingSession` contract.
 
+Reconciliation accepts a batch of normalized Apple workout evidence, not only
+one source session. A single user flow may link strength evidence to the
+detailed `TrainingSession` while proposing separate cardio workout or activity
+records for other accepted evidence in the same batch. One reconciliation flow
+therefore does not imply one canonical record, and non-strength evidence must
+not be flattened into strength-session detail.
+
+Apple workout matching follows an explicit candidate pipeline: relevant date,
+eligible workout type, unlinked/unconsumed source workouts, then ranking and
+user confirmation where ambiguity remains. Each normalized source workout has
+a durable source identifier and consumption owner. Once consumed by a
+canonical record, it is ineligible for every other record; duplicate prevention
+belongs in the reconciliation model rather than presentation-only filtering.
+
+Both acquisition paths terminate at the same platform-independent contract:
+
+```text
+Web Apple Health screenshots -> evidence interpretation -> normalized Apple workout evidence
+Native HealthKit             -> normalized Apple workout evidence
+Normalized Apple workout evidence -> shared reconciliation -> canonical owner proposals
+```
+
+Manual retrospective logging continues to require a date without fabricating
+an exact start time. Apple source timing may enrich matched evidence later.
+Suggested Today should learn primarily from confirmed workout evidence and
+history, not planned Goal or Training schedule intent.
+
 ## Notification philosophy
 
 Notifications exist to reduce navigation.

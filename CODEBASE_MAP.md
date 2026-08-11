@@ -17,7 +17,7 @@ Founder Alpha uses the Next.js App Router under `src/app`.
 | `/briefings/monthly/preview/2026-07-01` | Isolated June 2026 Monthly Briefing architecture preview | `MonthlyBriefingScreen`, `MonthlyBriefingPreviewService` |
 | `/briefings/monthly/[artifactId]` | Read-only persisted production Monthly Briefing | `MonthlyBriefingScreen`, `MonthlyBriefingService` |
 | `/briefings/midweek/preview` | Read-only Wednesday Midweek Briefing preview | `MidweekBriefingScreen`, `MidweekBriefingPreviewService` |
-| `/preview/training-logger` | Isolated, memory-only Training Logger interaction preview | `TrainingLoggerPreview`, `TrainingLoggerPreviewState` |
+| `/preview/training-logger` | Isolated, memory-only Training Logger interaction and batch Apple Health reconciliation preview | `TrainingLoggerPreview`, `TrainingLoggerPreviewState`, `TrainingLoggerAppleHealthReconciliation` |
 | `/check-in/morning` | Morning Check-In | `MorningCheckInScreen`, check-in actions |
 | `/analysis/[analysisId]` | Saved Analysis detail | `AnalysisScreen`, `AnalysisRepository` |
 | `/goals` | Goals Hub | `GoalsHubScreen` |
