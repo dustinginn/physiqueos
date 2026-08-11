@@ -4,7 +4,7 @@ Status: living canonical transition document
 
 Last audited: 2026-08-11
 
-Foundation design decision: approved for the initial Founder-stage direction; Phase 1 structural implementation completed inactive on 2026-08-11. Remaining production and product approvals are recorded in section 18.
+Foundation design decision: approved for the initial Founder-stage direction; Phase 1 is accepted and Phase 2 local/provider-ready implementation reached the explicit DigitalOcean provisioning gate on 2026-08-11. Production remains on the JSON/file runtime. Remaining production and product approvals are recorded in section 18.
 
 Implementation base revision: `a4c759fd`
 
@@ -807,6 +807,8 @@ Implementation checkpoint (2026-08-11): the bounded Phase 1 structural subset is
 
 ### Phase 2 — platform adapters and operations
 
+Implementation checkpoint (2026-08-11): production-grade foundation adapters are implemented and locally validated against isolated PostgreSQL 17.10, but provider-backed staging has not been provisioned or exercised. This phase is paused at the mandatory paid-resource approval gate described in section 34.
+
 | Class | Work | Exit evidence |
 |---|---|---|
 | **FOUNDATION BLOCKER** | Implement Founder bootstrap, web passkey session, device pairing, opaque access/refresh rotation, authorization principal, revoke/logout, and negative tests. | Unauthenticated/expired/revoked/wrong-user/CSRF tests pass. |
@@ -934,4 +936,47 @@ Validation evidence:
 
 Windows validation constraint: the current worker environment has a 4 GB heap. One unrestricted repository-wide concurrent Vitest run exhausted that environment after approximately ten minutes and mixed production-state-dependent tests across workers. That result is classified as an environment/resource failure with test-order/concurrency contamination, not as evidence of a product regression. Do not repeat that execution mode or increase the heap merely to force it through. Repository-wide coverage remains required, but on this environment it must be executed as explicit deterministic groups, serially or with tightly bounded workers, with production-state-dependent suites isolated. The reusable Phase 1 harness is the accepted checkpoint command unless the environment changes.
 
-No architecture deviation was introduced. The only implementation refinements are the recorded recovery/PIN semantics, passive source-remediation scope, and bounded Windows test execution strategy. The next dependency-ordered work is Phase 2 platform adapters and operations, but it must begin as a separate high-safety patch after this checkpoint is preserved.
+No architecture deviation was introduced. The only Phase 1 implementation refinements were the recorded recovery/PIN semantics, passive source-remediation scope, and bounded Windows test execution strategy. Phase 2 subsequently began from the preserved `7e99af27` checkpoint and is recorded separately below.
+
+## 34. Phase 2 implementation and provisioning checkpoint
+
+Status on 2026-08-11: **local Phase 2 implementation is complete and validated; provider-backed acceptance is pending explicit provisioning approval.** The implementation started from clean accepted checkpoint `7e99af27`. No DigitalOcean resource was created, no Founder data or evidence was copied, and the production JSON/file runtime remains canonical.
+
+Implemented production-grade foundation adapters:
+
+- PostgreSQL stores for users/profiles, devices, access/refresh/recovery credentials, sessions, passkeys/challenges/pairing, operations, command receipts, outbox messages, stored objects/upload intents, worker heartbeats, feature flags, migration runs, security events, and backup runs.
+- Migration `000002_phase2_platform_operations` adds database-enforced cross-owner constraints, passkey/pairing/security state, upload-completion claims and receipts, terminal worker state, and backup metadata. It remains additive to the Phase 1 schema and has explicit down SQL.
+- Founder authentication lifecycle behind an inactive boundary: single-Founder enrollment lock, one-time recovery material, device pairing, opaque ten-minute access tokens, rotating refresh families, refresh-reuse family revocation, session/device logout and revocation, replacement-device recovery, authenticated principals, server-side WebAuthn verification, and an eight-digit local-PIN state policy. Face ID/PIN remain local unlock only; no PIN or reusable secret is committed.
+- A DigitalOcean Spaces-compatible S3 adapter for private owner-scoped keys, server-initiated multipart uploads, bounded signed part URLs, verified completion receipts, length/MIME/checksum checks where the provider exposes the checksum, five-minute reads, immutable originals, tombstones, interrupted-completion claims, and inventory. Provider identifiers remain internal.
+- A durable PostgreSQL outbox worker using `FOR UPDATE SKIP LOCKED`, leases, bounded exponential retry, terminal failure, dedupe constraints, heartbeat, correlation propagation, redacted logs, clean stop, lease-expiry recovery, and replay-safe handlers. No current domain workflow is connected.
+- Async operational readiness for database reachability, schema compatibility, optional object-provider reachability, worker heartbeat freshness, and required configuration. Public results expose only stable check codes; deeper composition remains behind the inactive staging flag.
+- Guarded `pg_dump`/`pg_restore`, tamper-evident backup manifests, object-inventory support, and isolated-restore naming checks.
+- A secret-free DigitalOcean app-spec template, a sensitive rendered-spec workflow, a Founder-data-denying `.dockerignore`, a web/worker container definition, and manual-deploy configuration. The template uses no provider resource ID and has `deploy_on_push: false`.
+
+Local PostgreSQL acceptance:
+
+- PostgreSQL 17.10 was installed locally on dedicated port `55432`; validation is hard-guarded to a database whose name begins `physiqueos_phase2_test` and uses synthetic fixtures only.
+- Fresh up, complete schema inventory, ownership/foreign-key constraints, idempotency uniqueness, transaction rollback, receipt/outbox atomicity, optimistic concurrency, opaque access authentication, refresh rotation/reuse revocation, and stored-object relationships passed.
+- Sessions/revocations, feature flags, stored-object metadata, command receipts, outbox work, and migration state survived pool/process-boundary restart checks. Expired worker leases were recovered and completed work was not repeated.
+- `pg_dump` produced a verified custom-format backup, `pg_restore` restored a deliberately removed durable flag, full down removed the foundation tables, and re-apply recreated the schema. The final local test database contains the re-applied empty foundation schema, not Founder data.
+
+Provider status and provisioning gate:
+
+- Recommended location: App Platform region `sfo`, with Managed PostgreSQL and Spaces in `sfo3`.
+- Proposed resources: one 512 MiB shared web container ($5.00/month), one 512 MiB shared worker container ($5.00/month), one-node Managed PostgreSQL 17 Basic Regular 1 GiB ($15.15/month), and one private versioned Spaces Standard subscription ($5.00/month).
+- Base recurring estimate: **$30.15/month**, plus only usage overages. No dedicated egress IP, standby database, load balancer, second web instance, or paid monitoring service is included. The plan remains below the approved $50 ceiling.
+- Explicit approval is required before creating these paid resources. Provider-backed object behavior, staging deployment, browser passkey behavior, secret injection, managed backup, object backup, rollback, and staging negative tests remain unvalidated until that approval.
+
+Production isolation:
+
+- Phase 2 composition activates only when `PHYSIQUEOS_PHASE2_STAGING_ENABLED=1` plus the explicit database/object flags and required secrets are supplied. Default/current production composition remains inactive and fail-closed.
+- Existing production domain repositories, routes, evidence paths, worker workflows, and authentication gate do not depend on the new adapters. The additive readiness route preserves its Phase 1 inactive response unless the staging flag is deliberately enabled.
+- No canonical migration, production cutover, evidence move, auth activation, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.
+
+Validation failures were classified and corrected rather than suppressed: a restore-credential process-argument leak and a refresh-reuse rollback issue were deterministic foundation defects; a `pg_dump` connection-environment issue was a deterministic backup defect; standalone ESM resolution and one async fake runner were harness defects; and one ownership probe hit an earlier uniqueness constraint because of a synthetic fixture defect. The earlier unrestricted all-files/4 GB limitation remains governed by section 33. No deterministic regression remains after bounded acceptance.
+
+Final bounded acceptance passed Phase 1 (9 files / 32 tests), Phase 2 (7 files / 42 tests), persistence isolation (2 files / 29 tests), adjacent application services (4 files / 29 tests), the standalone PostgreSQL durability cycle, targeted lint, production build, and `git diff --check`. Current and freshly built web smoke checks passed with the shared platform inactive/fail-closed. The Founder runtime remained revision `107`, size `25,964,481` bytes, and SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1`.
+
+`npm audit --omit=dev` continues to report 13 production-tree advisories (3 moderate, 10 high) in the pre-existing Next/PDF/CSS/image/CLI dependency graph. Dependency tracing does not attribute any reported advisory to the newly added AWS S3 or SimpleWebAuthn packages. No broad or major-version audit fix was applied inside this high-safety foundation patch; dependency remediation remains a separately reviewed release blocker.
+
+The next action is not Phase 3. It is explicit approval or rejection of the $30.15/month DigitalOcean staging plan. If approved, resume Phase 2 only for synthetic staging provisioning and provider-backed acceptance. Phase 3 application-boundary/domain extraction remains blocked until that staging evidence is complete.

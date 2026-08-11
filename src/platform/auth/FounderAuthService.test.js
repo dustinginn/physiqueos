@@ -1,0 +1,108 @@
+import { describe, expect, it, vi } from "vitest";
+import { createFounderAuthService } from "./FounderAuthService";
+import { advancePinFailureState, resetPinFailureState, validateLocalPinShape } from "./pinLockoutPolicy";
+
+const NOW = new Date("2026-08-11T12:00:00.000Z");
+const PEPPER = "p".repeat(64);
+
+describe("inactive Founder authentication lifecycle", () => {
+  it("enrolls exactly one Founder and returns recovery material only in the result", async () => {
+    const identity = baseIdentity({ lockFounderEnrollment: vi.fn().mockResolvedValue(true) });
+    const service = serviceFor(identity);
+    const result = await service.enrollFounder({ displayName: "Synthetic Founder", timeZone: "America/Los_Angeles" });
+    expect(result.recoveryCredential).toHaveLength(43);
+    expect(identity.createUserProfile).toHaveBeenCalledOnce();
+    expect(identity.createRecoveryCredential.mock.calls[0][0]).not.toHaveProperty("credential", result.recoveryCredential);
+    expect(identity.createRecoveryCredential.mock.calls[0][0].credentialHash).not.toContain(result.recoveryCredential);
+  });
+
+  it("fails closed when enrollment already exists", async () => {
+    const service = serviceFor(baseIdentity({ lockFounderEnrollment: vi.fn().mockResolvedValue(false) }));
+    await expect(service.enrollFounder({ displayName: "Synthetic", timeZone: "UTC" })).rejects.toMatchObject({ code: "FOUNDER_ALREADY_ENROLLED" });
+  });
+
+  it.each([
+    ["expired", { expires_at: "2026-08-11T11:59:00.000Z", session_status: "active", device_status: "active" }, "ACCESS_TOKEN_EXPIRED"],
+    ["revoked session", { expires_at: "2026-08-11T12:05:00.000Z", session_status: "revoked", device_status: "active" }, "ACCESS_TOKEN_REVOKED"],
+    ["revoked device", { expires_at: "2026-08-11T12:05:00.000Z", session_status: "active", device_status: "revoked" }, "ACCESS_TOKEN_REVOKED"],
+  ])("rejects %s access credentials", async (_name, state, code) => {
+    const record = { id: "access", user_id: "user", device_id: "device", session_id: "session", idle_expires_at: "2026-09-01T00:00:00.000Z", absolute_expires_at: "2026-10-01T00:00:00.000Z", revoked_at: null, ...state };
+    const service = serviceFor(baseIdentity({ findAccessCredentialForAuthentication: vi.fn().mockResolvedValue(record) }));
+    await expect(service.authenticateAccessToken("a".repeat(43))).rejects.toMatchObject({ code });
+  });
+
+  it("returns an authenticated principal only for a live access credential", async () => {
+    const identity = baseIdentity({ findAccessCredentialForAuthentication: vi.fn().mockResolvedValue({ user_id: "user", device_id: "device", session_id: "session", expires_at: "2026-08-11T12:05:00.000Z", idle_expires_at: "2026-09-01T00:00:00.000Z", absolute_expires_at: "2026-10-01T00:00:00.000Z", session_status: "active", device_status: "active", revoked_at: null }) });
+    const principal = await serviceFor(identity).authenticateAccessToken("a".repeat(43));
+    expect(principal).toMatchObject({ userId: "user", deviceId: "device", sessionId: "session" });
+    expect(identity.updateDeviceSeen).toHaveBeenCalledOnce();
+  });
+
+  it("revokes a refresh family when a consumed refresh credential is replayed", async () => {
+    const identity = baseIdentity({ lockRefreshCredential: vi.fn().mockResolvedValue({ id: "refresh", user_id: "user", family_id: "family", used_at: NOW, revoked_at: null }) });
+    await expect(serviceFor(identity).rotateRefreshCredential("r".repeat(43))).rejects.toMatchObject({ code: "REFRESH_REUSE_DETECTED" });
+    expect(identity.revokeRefreshFamily).toHaveBeenCalledWith({ userId: "user", familyId: "family", at: NOW });
+  });
+
+  it("consumes recovery once, revokes sessions, and never deletes canonical data", async () => {
+    const identity = baseIdentity({ findRecoveryCredentialForUse: vi.fn().mockResolvedValue({ id: "recovery", user_id: "user", used_at: null, revoked_at: null, expires_at: null }) });
+    const result = await serviceFor(identity).useRecoveryCredential("z".repeat(43));
+    expect(result).toEqual({ userId: "user", recoveryRequired: true, canonicalDataDeleted: false });
+    expect(identity.consumeRecoveryCredential).toHaveBeenCalledOnce();
+    expect(identity.revokeAllSessions).toHaveBeenCalledOnce();
+  });
+
+  it("re-enrolls a replacement device and rotates recovery material without deleting canonical data", async () => {
+    const identity = baseIdentity({ findRecoveryCredentialForUse: vi.fn().mockResolvedValue({ id: "recovery", user_id: "user", used_at: null, revoked_at: null, expires_at: null }) });
+    const result = await serviceFor(identity).recoverFounder({ recoveryCredential: "z".repeat(43), platform: "ios", displayName: "Replacement" });
+    expect(result).toMatchObject({ userId: "user", canonicalDataDeleted: false });
+    expect(result.recoveryCredential).toHaveLength(43);
+    expect(identity.revokeAllSessions).toHaveBeenCalledOnce();
+    expect(identity.createDevice).toHaveBeenCalledOnce();
+    expect(identity.createRecoveryCredential).toHaveBeenCalledOnce();
+    expect(identity.createSession).toHaveBeenCalledOnce();
+  });
+
+  it("rejects recovery credential misuse", async () => {
+    const identity = baseIdentity({ findRecoveryCredentialForUse: vi.fn().mockResolvedValue(null) });
+    await expect(serviceFor(identity).recoverFounder({ recoveryCredential: "x".repeat(43), platform: "ios", displayName: "Replacement" })).rejects.toMatchObject({ code: "RECOVERY_CREDENTIAL_INVALID" });
+    expect(identity.createDevice).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed credentials without querying storage", async () => {
+    const identity = baseIdentity();
+    await expect(serviceFor(identity).authenticateAccessToken("short")).rejects.toMatchObject({ code: "CREDENTIAL_MALFORMED" });
+    expect(identity.findAccessCredentialForAuthentication).not.toHaveBeenCalled();
+  });
+
+  it("enforces the eight-digit PIN and recovery threshold without data deletion", () => {
+    expect(() => validateLocalPinShape("1234567")).toThrow("eight digits");
+    expect(validateLocalPinShape("12345678")).toBe(true);
+    let state;
+    for (let index = 0; index < 10; index += 1) state = advancePinFailureState(state, { now: NOW });
+    expect(state).toMatchObject({ failureCount: 10, recoveryRequired: true, canonicalDataDeleted: false });
+    expect(() => resetPinFailureState()).toThrow("Founder recovery");
+    expect(resetPinFailureState({ recoveryCredentialVerified: true })).toMatchObject({ failureCount: 0, recoveryRequired: false, canonicalDataDeleted: false });
+  });
+});
+
+function serviceFor(identity) {
+  let id = 0;
+  let secret = 0;
+  return createFounderAuthService({
+    transactionRunner: { run: (work) => work({ identity }) }, credentialPepper: PEPPER, clock: () => NOW,
+    createId: () => `0198f000-0000-7000-8000-${String(++id).padStart(12, "0")}`,
+    createSecret: () => Buffer.alloc(32, ++secret).toString("base64url"),
+  });
+}
+
+function baseIdentity(overrides = {}) {
+  return {
+    lockFounderEnrollment: vi.fn().mockResolvedValue(true), createUserProfile: vi.fn(), createRecoveryCredential: vi.fn(),
+    createPairingCredential: vi.fn(), consumePairingCredential: vi.fn(), createDevice: vi.fn(), createSession: vi.fn(),
+    createAccessCredential: vi.fn(), createRefreshCredential: vi.fn(), findAccessCredentialForAuthentication: vi.fn(),
+    updateDeviceSeen: vi.fn(), lockRefreshCredential: vi.fn(), replaceRefreshCredential: vi.fn(), revokeRefreshFamily: vi.fn(),
+    revokeSession: vi.fn(), revokeDevice: vi.fn(), findRecoveryCredentialForUse: vi.fn(), consumeRecoveryCredential: vi.fn(),
+    revokeAllSessions: vi.fn(), ...overrides,
+  };
+}

@@ -1,11 +1,11 @@
-export function createPostgresTransactionRunner({ pool }) {
+export function createPostgresTransactionRunner({ pool, createContext = (context) => context }) {
   if (!pool?.connect) throw new Error("A PostgreSQL pool is required.");
   return Object.freeze({
     async run(work) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        const result = await work(createTransactionContext(client));
+        const result = await work(createContext(createTransactionContext(client)));
         await client.query("COMMIT");
         return result;
       } catch (error) {

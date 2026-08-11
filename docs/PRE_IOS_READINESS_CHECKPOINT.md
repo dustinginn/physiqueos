@@ -6,7 +6,7 @@ Last audited: 2026-08-11
 
 Implementation base revision: `a4c759fd`
 
-Foundation design: approved for the initial Founder-stage direction; Phase 1 structural foundation accepted inactive on 2026-08-11. Production activation remains gated by the exit evidence below.
+Foundation design: Phase 1 accepted; Phase 2 local/provider-ready implementation validated on 2026-08-11 and paused at the explicit DigitalOcean provisioning gate. Production activation remains gated by the exit evidence below.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -59,6 +59,16 @@ Bounded validation on 2026-08-11 passed 15 test files / 90 tests, targeted lint,
 
 The Windows worker environment has a 4 GB heap constraint. Unrestricted repository-wide concurrent Vitest execution can exhaust that environment and interleave production-state-dependent tests; the observed failed all-files run is classified as an environment/resource failure with test-order/concurrency contamination. It is not an acceptance gate and must not be rerun in that mode. Repository-wide coverage is not waived: future Windows validation must run explicit serial or tightly bounded groups, isolating production-state-dependent suites. `npm run validate:foundation` is the reusable Phase 1 checkpoint command unless the environment changes.
 
+## Phase 2 local implementation and provisioning gate
+
+**Local/provider-ready implementation passed; paid staging is not provisioned.** Phase 2 added PostgreSQL adapters for every foundation table, a second ownership/security migration, inactive Founder enrollment/session/recovery/passkey flows, a Spaces-compatible private-object adapter, a durable SQL outbox worker, async operational readiness, guarded backup/restore tools, and repository-owned DigitalOcean/container configuration.
+
+Real PostgreSQL 17.10 validation ran on local port `55432` against synthetic-only guarded database `physiqueos_phase2_test`. Fresh migration, schema/constraints, transactions, idempotency uniqueness, receipt/outbox atomicity, authentication and refresh-reuse revocation, object relationships, restart persistence, expired-lease recovery, non-repeat of completed work, verified `pg_dump`/`pg_restore`, full down, and re-apply passed. The final local database is an empty re-applied foundation schema and is not a canonical store.
+
+The proposed paid staging plan is App Platform `sfo` plus Managed PostgreSQL/Spaces `sfo3`: one $5 web container, one $5 worker container, one $15.15/month PostgreSQL 17 Basic Regular 1 GiB node, and one $5 Spaces Standard subscription. Base estimate: **$30.15/month**, excluding usage overages. No paid resource has been created. Explicit Founder approval is required before provisioning.
+
+Provider-backed Spaces behavior, managed backups/object backup, actual App Platform deployment/rollback, injected-secret handling, staging negative tests, and browser passkey acceptance remain pending. If the plan is approved, work resumes inside Phase 2 using synthetic staging data only; Phase 3 does not begin automatically.
+
 ## Status legend
 
 - **Ready:** suitable as-is for the next dependent step.
@@ -74,10 +84,10 @@ The Windows worker environment has a 4 GB heap constraint. Unrestricted reposito
 |---|---|---|---|---|
 | 0. Decision lock | Partially complete | product/operations choices | Provider direction/cost ceiling, recovery/PIN, native cache retention, passive source remediation, TestFlight, compatibility, and web fallback are approved; account/region/operator, object-deletion policy, notification details, Health types, and iOS floor remain gated at their implementation points | Product + platform |
 | 1. Founder data/privacy containment | Blocked / critical | Gate 0 | no Founder records in distributable client/source artifact; credential rotation/remediation plan; privacy inventory | Security + backend |
-| 2. Authenticated identity boundary | Blocked / critical | Gate 0 | enrollment/session/revoke endpoints; every protected read/write/media request derives Founder from session; negative auth tests | Backend + iOS security |
-| 3. Durable canonical persistence | Structural schema ready; production blocked / critical | Gates 0-1 | Phase 1 migration and transaction/version/idempotency primitives exist; real PostgreSQL adapters, isolated DB tests, import, deployment, and rollback rehearsal remain | Backend/data |
-| 4. Private object storage | Structural abstraction ready; production blocked / critical | Gates 1-2 | ownership/read-handle contracts and test adapter exist; provider adapter, authorized upload/rendition policy, backup/restore, and evidence migration remain | Backend/security |
-| 5. Durable downstream work | Structural outbox primitive ready; production needs work | Gate 3 | atomic receipt/outbox behavior is tested in memory; durable worker, restart/retry/dead-letter operation, and production observability remain | Backend |
+| 2. Authenticated identity boundary | Server lifecycle ready locally; activation blocked / critical | Gate 0 | enrollment, recovery, pairing, passkey server, opaque access/refresh, replay revocation, logout/device revoke, principal, and negative tests exist inactive; browser passkey/staging and current-web integration remain | Backend + iOS security |
+| 3. Durable canonical persistence | Foundation adapters proven locally; staging/cutover blocked / critical | Gates 0-1 | PostgreSQL 17.10 up/down/reapply, ownership, transactions, restart, backup/restore, and all foundation stores pass synthetic tests; managed staging, domain schemas/import, and rollback rehearsal remain | Backend/data |
+| 4. Private object storage | Provider adapter ready; provider exercise blocked / critical | Gates 1-2 | Spaces multipart/read/inventory adapter and ownership/replay tests exist; real private bucket/versioning, provider checksum behavior, backup/restore, and evidence migration remain | Backend/security |
+| 5. Durable downstream work | SQL worker proven locally; staging restart blocked | Gate 3 | claim/lease/retry/dead-letter/heartbeat and restart recovery pass with synthetic PostgreSQL work; managed staging worker and real domain handlers remain | Backend |
 | 6. Native-facing contracts | Initial foundation ready; domain surface needs work | Gates 2-5 | common contracts and minimal health/platform OpenAPI are tested; bounded domain read models/commands, fixtures, change feed, and compatibility suite remain | Backend + clients |
 | 7. Presentation logic extraction | Needs work | Gate 6 design | Goals/Operating Plan/Evidence orchestration and route mapping callable without React/Next | Domain/web |
 | 8. Web cutover to shared boundary | Blocked by 2-7 | Gates 2-7 | web parity tests pass on migrated canonical store; no singleton/file path in production request flow | Web + backend |
@@ -88,7 +98,7 @@ The Windows worker environment has a 4 GB heap constraint. Unrestricted reposito
 | 13. Notifications/actions | Future / Stage 2 | outbox + policy + API | generic intent engine, APNs/device tokens, suppression/action idempotency; physical-device acceptance | Backend + iOS |
 | 14. Native motion/graphs | Future / Stage 2 | Track A read models | accessibility/Reduce Motion fixtures; Xcode and device acceptance | iOS/design |
 | 15. Live Workout V1 | Future / Stage 2 | Track A + draft API + Health | complete experience, Windows preview, lifecycle/conflict/device acceptance | Domain + backend + iOS |
-| 16. Release operations | Needs work | all shipping gates | immutable builds, compatibility/rollback, TestFlight checklist, fallback drill, monitoring, explicit daily-driver acceptance | Release owner |
+| 16. Release operations | Local configuration ready; provisioning approval required | all shipping gates | container/app-spec, manual promotion, build identity, local backup/restore, and cost plan exist; provider deployment/rollback, alerts, managed restore, TestFlight checklist, fallback drill, and daily-driver acceptance remain | Release owner |
 
 ## Critical findings that keep the gate closed
 
@@ -156,6 +166,8 @@ Checkpoint: the bounded common-contract and foundation-schema subset is implemen
 Exit: schema tests pass and no contract exposes repositories, runtime snapshots, server paths, or provider secrets.
 
 ### Phase 2 — canonical platform
+
+Checkpoint: production-grade foundation adapters and local PostgreSQL durability are complete. The phase is deliberately paused before paid provisioning; provider-backed staging acceptance is still part of Phase 2 and must complete before Phase 3 extraction begins.
 
 1. Add authenticated enrollment/session/revoke/profile boundary.
 2. Add transactional database schema and uniqueness/version constraints.
@@ -311,3 +323,22 @@ Failures encountered and disposition:
 The runtime checkpoint was revision `107`, size `25,964,481` bytes, modified `2026-08-11T13:46:05.401Z`, SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1` both before and after the final harness. No stale Vitest/Jest/test-worker process attributable to the failed run remained, and no process was terminated. Existing production Node processes were left untouched.
 
 The implementation did not provision infrastructure, migrate or activate PostgreSQL, activate authentication, move evidence, alter canonical persistence, cut over the web, create iOS code, or claim Apple validation. Xcode, simulator, device, HealthKit, notification, Share Extension, signing, real-database migration, provider object storage, worker restart, backup, and restore status remain unvalidated.
+
+Phase 2 supersedes the final sentence only for local foundation evidence: real isolated PostgreSQL migration, local restart/durability, and local database backup/restore are now validated. Provider-backed staging and every Apple item remain unvalidated.
+
+Phase 2 bounded suites currently comprise Phase 1 foundation (9 files / 32 tests), Phase 2 foundation/security/operations (7 files / 42 tests), persistence isolation (2 files / 29 tests), adjacent application services (4 files / 29 tests), plus the standalone destructive-guarded PostgreSQL cycle. The reusable `npm run validate:phase2` command runs these serially with targeted lint, production build, `git diff --check`, and Founder runtime hash comparison.
+
+Phase 2 encountered and resolved:
+
+- **deterministic foundation regression:** restore initially placed the database URL in process arguments; credentials now travel only through the child environment;
+- **deterministic foundation regression:** refresh-reuse family revocation initially occurred in a transaction that then threw and would roll back; revocation now commits before the 401 is raised, and the real database test proves persistence;
+- **deterministic backup regression:** `pg_dump` initially failed to honor a full URL in `PGDATABASE` on Windows; both backup and restore now use parsed libpq environment variables and the nondefault port is proven;
+- **test-harness defect:** standalone Node could not resolve extensionless Phase 2 database imports; standalone execution paths now use explicit `.js` resolution;
+- **test fixture defect:** an ownership probe first hit the intended one-upload-per-object uniqueness constraint; a distinct synthetic object now reaches and proves the owner constraint;
+- **test fixture defect:** one object-service fake transaction runner returned a non-Promise; it now models the asynchronous production runner;
+- **environment/network constraint:** the first sandboxed npm dependency download timed out; the approved network retry succeeded;
+- **unrelated existing warning:** production build still reports the known broad filesystem trace from `EvidenceIntakeService`/the existing upload route.
+
+No deterministic product or foundation regression remains. The current Founder runtime checkpoint remains revision `107`, size `25,964,481` bytes, SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1`.
+
+Final documentation-complete acceptance confirmed that exact Founder checkpoint. The pre-existing production server continued returning 200 for `/`, `/log`, and `/api/health`. A temporary isolated server from the new production build returned 200 for those routes and `/api/v1/health/live`, while inactive `/api/v1/health/ready` and `/api/v1/platform` correctly returned 503; the temporary server was then stopped and its logs removed.

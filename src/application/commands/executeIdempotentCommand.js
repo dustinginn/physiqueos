@@ -10,7 +10,10 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
     if (existing) return replayReceipt(existing, payloadHash);
 
     await transaction.commandReceipts.insert({
+      id: metadata.commandId,
       userId: actor.userId,
+      deviceId: actor.deviceId,
+      sessionId: actor.sessionId,
       commandId: metadata.commandId,
       idempotencyKey: metadata.idempotencyKey,
       commandType,

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PhysiqueOS Application API",
-    "version": "1.0.0-foundation.1",
-    "description": "Inactive Phase 1 shared-platform boundary. Protected endpoints require a server-resolved principal; the production authenticator deliberately denies access until a later activation phase. Future mutations use Idempotency-Key, UUIDv7 commandId, canonical payload hashing, and If-Match/expectedVersion. Collections use bounded opaque cursors."
+    "version": "1.0.0-foundation.2",
+    "description": "Inactive Phase 2 shared-platform boundary. Production-grade PostgreSQL, authentication, private-object, worker, backup, and readiness adapters exist behind explicit staging flags, but the current production authenticator deliberately denies access and the Founder JSON/file runtime remains canonical. Future mutations use Idempotency-Key, UUIDv7 commandId, canonical payload hashing, and If-Match/expectedVersion. Collections use bounded opaque cursors."
   },
   "servers": [{ "url": "/api/v1" }],
   "paths": {

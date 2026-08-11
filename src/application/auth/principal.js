@@ -1,5 +1,5 @@
-import { ApplicationProblem } from "../../contracts/v1/problem";
-import { requireResourceId } from "../../contracts/v1/identifiers";
+import { ApplicationProblem } from "../../contracts/v1/problem.js";
+import { requireResourceId } from "../../contracts/v1/identifiers.js";
 
 export function createAuthenticationPrincipal({ userId, deviceId, sessionId, scopes = [], authenticatedAt } = {}) {
   return Object.freeze({

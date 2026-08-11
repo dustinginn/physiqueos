@@ -1,0 +1,62 @@
+name: physiqueos-foundation-staging
+region: ${DIGITALOCEAN_REGION}
+services:
+  - name: web
+    dockerfile_path: Dockerfile.foundation
+    github:
+      repo: ${GITHUB_REPOSITORY}
+      branch: ${GITHUB_BRANCH}
+      deploy_on_push: false
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 8080
+    health_check:
+      http_path: /api/v1/health/live
+    envs: &foundation_environment
+      - key: PHYSIQUEOS_DATABASE_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_PHASE2_STAGING_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: ${FOUNDATION_DATABASE_URL}
+      - key: PHYSIQUEOS_OBJECT_STORAGE_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_SPACES_REGION
+        scope: RUN_TIME
+        value: ${DIGITALOCEAN_REGION}
+      - key: PHYSIQUEOS_SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: ${SPACES_ENDPOINT}
+      - key: PHYSIQUEOS_SPACES_BUCKET
+        scope: RUN_TIME
+        value: ${SPACES_BUCKET}
+      - key: PHYSIQUEOS_SPACES_ACCESS_KEY_ID
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SPACES_ACCESS_KEY_ID}
+      - key: PHYSIQUEOS_SPACES_SECRET_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SPACES_SECRET_ACCESS_KEY}
+      - key: PHYSIQUEOS_CREDENTIAL_PEPPER
+        scope: RUN_TIME
+        type: SECRET
+        value: ${CREDENTIAL_PEPPER}
+      - key: PHYSIQUEOS_BUILD_ID
+        scope: RUN_AND_BUILD_TIME
+        value: ${BUILD_ID}
+  - name: worker
+    dockerfile_path: Dockerfile.foundation
+    github:
+      repo: ${GITHUB_REPOSITORY}
+      branch: ${GITHUB_BRANCH}
+      deploy_on_push: false
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    run_command: node scripts/runFoundationWorker.mjs
+    envs: *foundation_environment

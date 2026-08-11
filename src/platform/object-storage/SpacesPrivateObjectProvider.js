@@ -1,0 +1,99 @@
+import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+  UploadPartCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const MAX_READ_SECONDS = 300;
+const MAX_UPLOAD_PART_SECONDS = 900;
+
+export function createSpacesPrivateObjectProvider(config, { client, sign = getSignedUrl } = {}) {
+  if (!config?.enabled) throw new Error("Private object storage is inactive.");
+  const s3 = client ?? new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: false,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+  });
+
+  return Object.freeze({
+    async beginMultipartUpload({ ownerUserId, objectId, contentType, expectedSha256 }) {
+      const objectKey = createPrivateObjectKey(ownerUserId, objectId);
+      const result = await s3.send(new CreateMultipartUploadCommand({
+        Bucket: config.bucket,
+        Key: objectKey,
+        ContentType: contentType,
+        Metadata: expectedSha256 ? { "physiqueos-sha256": expectedSha256 } : undefined,
+      }));
+      if (!result.UploadId) throw new Error("The object provider did not create a multipart upload.");
+      return Object.freeze({ bucket: config.bucket, objectKey, providerUploadId: result.UploadId });
+    },
+    async authorizeUploadPart({ objectKey, providerUploadId, partNumber, expiresInSeconds = MAX_UPLOAD_PART_SECONDS }) {
+      if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > 10_000) throw new Error("Multipart part number is invalid.");
+      const expiresIn = clampSeconds(expiresInSeconds, MAX_UPLOAD_PART_SECONDS);
+      const url = await sign(s3, new UploadPartCommand({ Bucket: config.bucket, Key: objectKey, UploadId: providerUploadId, PartNumber: partNumber }), { expiresIn });
+      return Object.freeze({ url, partNumber, expiresInSeconds: expiresIn });
+    },
+    async completeMultipartUpload({ objectKey, providerUploadId, parts }) {
+      const normalizedParts = normalizeParts(parts);
+      const result = await s3.send(new CompleteMultipartUploadCommand({
+        Bucket: config.bucket, Key: objectKey, UploadId: providerUploadId,
+        MultipartUpload: { Parts: normalizedParts.map((part) => ({ ETag: part.etag, PartNumber: part.partNumber })) },
+      }));
+      return Object.freeze({ etag: stripQuotes(result.ETag), providerVersion: result.VersionId ?? null });
+    },
+    async abortMultipartUpload({ objectKey, providerUploadId }) {
+      await s3.send(new AbortMultipartUploadCommand({ Bucket: config.bucket, Key: objectKey, UploadId: providerUploadId }));
+    },
+    async inspectObject({ objectKey, providerVersion = null }) {
+      const result = await s3.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: providerVersion ?? undefined, ChecksumMode: "ENABLED" }));
+      return Object.freeze({
+        byteLength: Number(result.ContentLength), contentType: result.ContentType ?? null,
+        sha256: result.ChecksumSHA256 ? Buffer.from(result.ChecksumSHA256, "base64").toString("hex") : result.Metadata?.["physiqueos-sha256"] ?? null,
+        etag: stripQuotes(result.ETag), providerVersion: result.VersionId ?? providerVersion,
+      });
+    },
+    async authorizeRead({ objectKey, providerVersion = null, expiresInSeconds = MAX_READ_SECONDS }) {
+      const expiresIn = clampSeconds(expiresInSeconds, MAX_READ_SECONDS);
+      const url = await sign(s3, new GetObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: providerVersion ?? undefined }), { expiresIn });
+      return Object.freeze({ url, expiresInSeconds: expiresIn });
+    },
+    async healthCheck() {
+      await s3.send(new HeadBucketCommand({ Bucket: config.bucket }));
+      return Object.freeze({ reachable: true });
+    },
+    async listInventory({ continuationToken = null, maximum = 1000 } = {}) {
+      const result = await s3.send(new ListObjectsV2Command({ Bucket: config.bucket, ContinuationToken: continuationToken ?? undefined, MaxKeys: Math.min(1000, maximum) }));
+      return Object.freeze({
+        objects: Object.freeze((result.Contents ?? []).map((item) => Object.freeze({ key: item.Key, byteLength: Number(item.Size ?? 0), etag: stripQuotes(item.ETag), lastModified: item.LastModified?.toISOString() ?? null }))),
+        continuationToken: result.IsTruncated ? result.NextContinuationToken ?? null : null,
+      });
+    },
+    close() { s3.destroy?.(); },
+  });
+}
+
+export function createPrivateObjectKey(ownerUserId, objectId) {
+  if (!/^[A-Za-z0-9._:-]+$/.test(ownerUserId) || !/^[A-Za-z0-9._:-]+$/.test(objectId)) throw new Error("Private object identity is invalid.");
+  return `private/${ownerUserId}/${objectId}/original`;
+}
+
+function normalizeParts(parts) {
+  if (!Array.isArray(parts) || parts.length === 0) throw new Error("At least one uploaded part is required.");
+  const normalized = parts.map((part) => ({ partNumber: Number(part.partNumber), etag: String(part.etag ?? "") })).sort((a, b) => a.partNumber - b.partNumber);
+  if (normalized.some((part, index) => !Number.isInteger(part.partNumber) || part.partNumber !== index + 1 || !part.etag)) throw new Error("Multipart receipt is malformed or incomplete.");
+  return normalized;
+}
+function stripQuotes(value) { return value == null ? null : String(value).replace(/^"|"$/g, ""); }
+function clampSeconds(value, maximum) {
+  const seconds = Number(value);
+  if (!Number.isInteger(seconds) || seconds < 1) throw new Error("Signed access lifetime is invalid.");
+  return Math.min(seconds, maximum);
+}

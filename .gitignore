@@ -99,3 +99,5 @@ node_modules/
 /.energy-preview-dev.*.log
 /.pi-*-dev.*.log
 /.training-*-dev.*.log
+.tmp/
+infra/digitalocean/app.staging.yaml
