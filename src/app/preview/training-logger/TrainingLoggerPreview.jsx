@@ -33,7 +33,6 @@ import {
   buildEvidenceReviewHandoff,
   buildTrainingWorkoutSummary,
   canContinueFromReconciliation,
-  confirmTrainingSet,
   continueWithoutAppleHealthMatch,
   createTrainingLoggerPreviewDraft,
   createTrainingSuperset,
@@ -43,6 +42,7 @@ import {
   keepPreviousPerformance,
   listTrainingLoggerCategories,
   listTrainingLoggerExercises,
+  PROGRESSION_CHOICES,
   PROGRESSION_STATES,
   removeTrainingExercise,
   removeTrainingSet,
@@ -55,6 +55,7 @@ import {
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_STEPS,
   TRAINING_LOGGER_VARIANT_OPTIONS,
+  toggleTrainingSetCompletion,
   updateTrainingSet,
   updateWorkoutContext,
 } from "./TrainingLoggerPreviewState";
@@ -86,7 +87,7 @@ export default function TrainingLoggerPreview({ initialDate }) {
   return (
     <main className="min-h-screen bg-[var(--surface)] text-[var(--text-primary)]">
       <div className="mx-auto min-h-screen w-full max-w-[393px] px-4 pb-36 pt-5">
-        <PreviewBanner />
+        <PreviewBanner compact={draft.step === TRAINING_LOGGER_STEPS.LOGGER} />
 
         {draft.step === TRAINING_LOGGER_STEPS.ENTRY && (
           <EntryScreen
@@ -161,8 +162,8 @@ export default function TrainingLoggerPreview({ initialDate }) {
               setRemoveExerciseId(null);
               setOpenMenuId(null);
             }}
-            onConfirmSet={(exerciseId, setId) => setDraft((current) =>
-              confirmTrainingSet(current, exerciseId, setId)
+            onToggleSet={(exerciseId, setId) => setDraft((current) =>
+              toggleTrainingSetCompletion(current, exerciseId, setId)
             )}
             onFinish={() => navigate(TRAINING_LOGGER_STEPS.SUMMARY)}
             onKeepPrevious={(exerciseId) => setDraft((current) =>
@@ -235,9 +236,9 @@ export default function TrainingLoggerPreview({ initialDate }) {
   );
 }
 
-function PreviewBanner() {
+function PreviewBanner({ compact = false }) {
   return (
-    <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-[var(--divider)] bg-[var(--surface-accent)] px-3 py-2.5">
+    <div className={`${compact ? "mb-3 py-2" : "mb-5 py-2.5"} flex items-center justify-between gap-3 rounded-xl border border-[var(--divider)] bg-[var(--surface-accent)] px-3`}>
       <div className="flex items-center gap-2">
         <Sparkles aria-hidden="true" className="text-[var(--primary)]" size={16} />
         <span className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--primary)]">
@@ -318,7 +319,7 @@ function CategoryScreen({
   return (
     <section>
       <PageHeader
-        description="Choose every area you plan to train. You can change exercises later."
+        description="Choose every muscle group you plan to train. You can change exercises later."
         onBack={onBack}
         step="1 of 2"
         title="What are you training?"
@@ -328,29 +329,19 @@ function CategoryScreen({
         <Card className="mb-4" variant="soft">
           <div className="mb-3 flex items-center gap-2">
             <CalendarDays aria-hidden="true" className="text-[var(--primary)]" size={18} />
-            <p className="text-sm font-extrabold">Past workout time</p>
+            <p className="text-sm font-extrabold">Past workout date</p>
           </div>
-          <div className="grid grid-cols-[1fr_110px] gap-3">
-            <label className="text-xs font-bold text-[var(--text-muted)]">
-              Date
-              <input
-                className="mt-1.5 h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm text-[var(--text-primary)]"
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(event) => onUpdateContext({ workoutDate: event.target.value })}
-                type="date"
-                value={draft.workoutDate}
-              />
-            </label>
-            <label className="text-xs font-bold text-[var(--text-muted)]">
-              Start
-              <input
-                className="mt-1.5 h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm text-[var(--text-primary)]"
-                onChange={(event) => onUpdateContext({ workoutTime: event.target.value })}
-                type="time"
-                value={draft.workoutTime ?? "17:30"}
-              />
-            </label>
-          </div>
+          <label className="text-xs font-bold text-[var(--text-muted)]">
+            Date
+            <input
+              className="mt-1.5 h-11 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm text-[var(--text-primary)]"
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(event) => onUpdateContext({ workoutDate: event.target.value })}
+              required
+              type="date"
+              value={draft.workoutDate}
+            />
+          </label>
         </Card>
       )}
 
@@ -394,7 +385,7 @@ function CategoryScreen({
 
       <BottomAction
         disabled={draft.selectedCategories.length === 0}
-        label={`Choose exercises${draft.selectedCategories.length ? ` · ${draft.selectedCategories.length} areas` : ""}`}
+        label={`Choose exercises${draft.selectedCategories.length ? ` · ${draft.selectedCategories.length} groups` : ""}`}
         onClick={onContinue}
       />
     </section>
@@ -482,7 +473,7 @@ function LoggerScreen({
   onApplySuggestion,
   onAssignVariant,
   onConfirmRemove,
-  onConfirmSet,
+  onToggleSet,
   onFinish,
   onKeepPrevious,
   onLinkSuperset,
@@ -498,8 +489,8 @@ function LoggerScreen({
   const summary = buildTrainingWorkoutSummary(draft);
   return (
     <section>
-      <header className="mb-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <header className="mb-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <div className="mb-1 flex items-center gap-2">
               {draft.mode === TRAINING_LOGGER_MODES.LIVE && (
@@ -523,12 +514,11 @@ function LoggerScreen({
         </p>
       </header>
 
-      <div className="space-y-4">
-        {draft.exercises.map((exercise, exerciseIndex) => (
+      <div className="space-y-3">
+        {draft.exercises.map((exercise) => (
           <ExerciseCard
             draft={draft}
             exercise={exercise}
-            exerciseIndex={exerciseIndex}
             key={exercise.id}
             menuOpen={openMenuId === exercise.id}
             removePending={removeExerciseId === exercise.id}
@@ -538,7 +528,7 @@ function LoggerScreen({
             onApplySuggestion={() => onApplySuggestion(exercise.id)}
             onAssignVariant={(variant) => onAssignVariant(exercise.id, variant)}
             onConfirmRemove={() => onConfirmRemove(exercise.id)}
-            onConfirmSet={(setId) => onConfirmSet(exercise.id, setId)}
+            onToggleSet={(setId) => onToggleSet(exercise.id, setId)}
             onKeepPrevious={() => onKeepPrevious(exercise.id)}
             onLinkSuperset={(partnerId) => onLinkSuperset(exercise.id, partnerId)}
             onRemoveSet={(setId) => onRemoveSet(exercise.id, setId)}
@@ -558,7 +548,7 @@ function LoggerScreen({
       </div>
 
       <button
-        className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] text-sm font-extrabold text-[var(--primary)]"
+        className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] text-sm font-extrabold text-[var(--primary)]"
         onClick={onAddExercise}
         type="button"
       >
@@ -574,7 +564,6 @@ function LoggerScreen({
 function ExerciseCard({
   draft,
   exercise,
-  exerciseIndex,
   menuOpen,
   removePending,
   supersetPickerOpen,
@@ -583,7 +572,7 @@ function ExerciseCard({
   onApplySuggestion,
   onAssignVariant,
   onConfirmRemove,
-  onConfirmSet,
+  onToggleSet,
   onKeepPrevious,
   onLinkSuperset,
   onRemoveSet,
@@ -598,12 +587,9 @@ function ExerciseCard({
   const superset = getSupersetContext(draft, exercise.id);
   return (
     <Card padding="none" className={superset ? "border-l-4 border-l-[var(--primary)]" : ""}>
-      <div className="p-4 pb-3">
+      <div className="p-3 pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.1em] text-[var(--text-subtle)]">
-              Exercise {exerciseIndex + 1}
-            </p>
             <h2 className="text-xl font-extrabold leading-tight">{exercise.name}</h2>
             {exercise.executionVariant && (
               <p className="mt-1 text-sm font-extrabold text-[var(--primary)]">
@@ -697,16 +683,16 @@ function ExerciseCard({
           </div>
         )}
 
-        <div className="mt-4 rounded-xl bg-[var(--surface-muted)] px-3 py-2.5">
-          <p className="text-xs font-bold text-[var(--text-muted)]">Previous comparable session</p>
-          <div className="mt-1 flex items-baseline justify-between gap-3">
-            <p className="text-base font-extrabold">
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2">
+          <div className="flex shrink-0 items-baseline gap-2">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-[var(--text-muted)]">Previous</p>
+            <p className="text-sm font-extrabold">
               {exercise.previousPerformance.reps} × {formatLoad(exercise.previousPerformance.load)}
             </p>
-            <p className="truncate text-right text-[11px] font-semibold text-[var(--text-subtle)]">
-              {exercise.previousPerformance.context}
-            </p>
           </div>
+          <p className="truncate text-right text-[11px] font-semibold text-[var(--text-subtle)]">
+            {exercise.previousPerformance.context}
+          </p>
         </div>
       </div>
 
@@ -716,15 +702,15 @@ function ExerciseCard({
         onKeepPrevious={onKeepPrevious}
       />
 
-      <div className="px-3 pb-4 pt-3">
-        <div className="mb-2 grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 px-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+      <div className="px-3 pb-3 pt-2">
+        <div className="mb-1 grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 px-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
           <span>Set</span><span>Reps</span><span>Load</span><span className="text-center">Done</span><span />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {exercise.sets.map((set) => (
             <SetRow
               key={set.id}
-              onConfirm={() => onConfirmSet(set.id)}
+              onToggle={() => onToggleSet(set.id)}
               onRemove={() => onRemoveSet(set.id)}
               onUpdate={(changes) => onUpdateSet(set.id, changes)}
               set={set}
@@ -733,7 +719,7 @@ function ExerciseCard({
           ))}
         </div>
         <button
-          className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-soft)] text-xs font-extrabold text-[var(--primary)]"
+          className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface-soft)] text-xs font-extrabold text-[var(--primary)]"
           onClick={onAddSet}
           type="button"
         >
@@ -744,9 +730,9 @@ function ExerciseCard({
   );
 }
 
-function SetRow({ onConfirm, onRemove, onUpdate, set, showRemove }) {
+function SetRow({ onRemove, onToggle, onUpdate, set, showRemove }) {
   return (
-    <div className={`grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 rounded-xl p-1 ${set.confirmed
+    <div className={`grid grid-cols-[32px_minmax(58px,1fr)_minmax(68px,1fr)_44px_32px] items-center gap-2 rounded-xl px-1 ${set.confirmed
       ? "bg-[var(--surface-success)]"
       : "bg-[var(--surface-muted)]"}`}>
       <span className="text-center text-sm font-extrabold">{set.order}</span>
@@ -772,11 +758,12 @@ function SetRow({ onConfirm, onRemove, onUpdate, set, showRemove }) {
         <span className="pointer-events-none absolute right-1.5 top-3.5 text-[9px] font-extrabold text-[var(--text-subtle)]">lb</span>
       </label>
       <button
-        aria-label={set.confirmed ? `Set ${set.order} confirmed` : `Confirm set ${set.order}`}
+        aria-label={set.confirmed ? `Mark set ${set.order} incomplete` : `Mark set ${set.order} done`}
+        aria-pressed={set.confirmed}
         className={`flex h-11 w-11 items-center justify-center rounded-xl border ${set.confirmed
           ? "border-emerald-500 bg-emerald-500 text-white"
           : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-subtle)]"}`}
-        onClick={onConfirm}
+        onClick={onToggle}
         type="button"
       >
         <Check aria-hidden="true" size={19} strokeWidth={3} />
@@ -793,27 +780,47 @@ function SetRow({ onConfirm, onRemove, onUpdate, set, showRemove }) {
 function ProgressionCard({ exercise, onApplySuggestion, onKeepPrevious }) {
   const recommendation = exercise.progressionRecommendation;
   const opportunity = recommendation.state === PROGRESSION_STATES.OPPORTUNITY;
+  const suggestionSelected = exercise.progressionChoice === PROGRESSION_CHOICES.SUGGESTION;
+  const previousSelected = exercise.progressionChoice === PROGRESSION_CHOICES.PREVIOUS;
   return (
-    <div className={`border-y border-[var(--divider)] px-4 py-3 ${opportunity
+    <div className={`border-y border-[var(--divider)] px-3 py-2 ${opportunity
       ? "bg-[var(--surface-accent)]"
       : recommendation.state === PROGRESSION_STATES.RECOVER
         ? "bg-[var(--surface-warning)]"
         : "bg-[var(--surface-soft)]"}`}>
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
         <Sparkles aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--primary)]" size={16} />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">
-            {recommendation.eyebrow}
-          </p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">
+              {recommendation.eyebrow}
+            </p>
+            <p className="shrink-0 text-xs font-extrabold">{recommendation.prescription}</p>
+          </div>
           <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
             {recommendation.message}
           </p>
-          <p className="mt-1 text-sm font-extrabold">{recommendation.prescription}</p>
           <div className="mt-2 flex gap-2">
-            <button className="min-h-11 rounded-xl bg-[var(--primary)] px-3 text-xs font-extrabold text-white" onClick={onApplySuggestion} type="button">
+            <button
+              aria-pressed={suggestionSelected}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-extrabold transition ${suggestionSelected
+                ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
+                : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
+              onClick={onApplySuggestion}
+              type="button"
+            >
+              {suggestionSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
               Use suggestion
             </button>
-            <button className="min-h-11 rounded-xl px-3 text-xs font-extrabold text-[var(--text-secondary)]" onClick={onKeepPrevious} type="button">
+            <button
+              aria-pressed={previousSelected}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-extrabold transition ${previousSelected
+                ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[var(--shadow-card)]"
+                : "border-[var(--divider)] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"}`}
+              onClick={onKeepPrevious}
+              type="button"
+            >
+              {previousSelected && <Check aria-hidden="true" size={14} strokeWidth={3} />}
               Keep previous
             </button>
           </div>
@@ -1022,7 +1029,9 @@ function EvidenceReviewScreen({ draft, onBack, onComplete }) {
         <ReviewSection icon={Apple} title="Apple Health">
           {handoff.appleHealth.status === "matched" ? (
             <>
-              <p className="font-extrabold">{handoff.appleHealth.workout.type} · {handoff.appleHealth.workout.durationMinutes} min</p>
+              <p className="font-extrabold">
+                {handoff.appleHealth.workout.type} · {handoff.appleHealth.workout.durationMinutes} min · {handoff.appleHealth.workout.activeCalories} active calories
+              </p>
               <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-emerald-600"><CheckCircle2 aria-hidden="true" size={15} /> Matched</p>
             </>
           ) : (
@@ -1169,7 +1178,7 @@ function ReviewSection({ children, icon: Icon, title }) {
 
 function formatWorkoutContext(draft) {
   if (draft.mode === TRAINING_LOGGER_MODES.LIVE) return draft.startedAtLabel ?? "In progress";
-  return `${formatDate(draft.workoutDate)} · ${formatTime(draft.workoutTime)}`;
+  return formatDate(draft.workoutDate);
 }
 
 function formatDate(value) {
@@ -1177,13 +1186,6 @@ function formatDate(value) {
   if (![year, month, day].every(Number.isFinite)) return value;
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" })
     .format(new Date(year, month - 1, day, 12));
-}
-
-function formatTime(value) {
-  const [hour, minute] = String(value ?? "17:30").split(":").map(Number);
-  if (![hour, minute].every(Number.isFinite)) return value;
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
-    .format(new Date(2026, 0, 1, hour, minute));
 }
 
 function formatLoad(load) {

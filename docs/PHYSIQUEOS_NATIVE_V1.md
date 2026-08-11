@@ -220,8 +220,16 @@ movements, sets, reps, load, and relevant context throughout training. Saving
 progress preserves the current session; it does not submit a new workout. Final
 submission completes the canonical workout without breaking its identity or its
 link to an earlier Apple Health import. Retrospective mode builds the same
-structure around a past date/time context and reaches the same reconciliation
-and evidence boundary.
+structure around a required past date and reaches the same reconciliation and
+evidence boundary. Manual retrospective capture must not fabricate an exact
+start time when the user does not know one; reconciled Apple Health or uploaded
+screenshot evidence may later supply better-supported timing metadata.
+
+Training Logger's future `Suggested Today` intelligence should learn primarily
+from actual confirmed workout evidence and TrainingSession history. Goal and
+Training Strategy schedules describe intent and may provide context, but they
+must not become the behavioral source of truth when observed training rhythm
+differs from the plan.
 
 If the application is interrupted, the user should return to the same in-flight
 workout with confirmed progress intact. Recovery should be calm and explicit.
@@ -279,8 +287,10 @@ block logging.
 Apple Health acquisition is an adapter into evidence reconciliation, not the
 owner of detailed strength structure. An Apple workout supplies an evidence
 shell while PhysiqueOS owns exercises, occurrence identities, sets, Variants,
-and relationship groups. Strong matches may be offered directly; ambiguous
-matches require explicit selection; and the user may continue when no match is
+and relationship groups. Reconciliation should preserve meaningful source
+metadata such as authoritative timing, duration, and active calories through
+Evidence Review. Strong matches may be offered directly; ambiguous matches
+require explicit selection; and the user may continue when no match is
 available.
 
 Before native iOS integration, production web capture may later pair a detailed

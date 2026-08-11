@@ -2,6 +2,9 @@ import {
   FOUNDER_ALPHA_TRAINING_EXERCISES,
 } from "../../../domain/models/trainingExerciseIdentity";
 import {
+  listCanonicalTrainingMuscleGroups,
+} from "../../../domain/models/trainingMuscleGroupIdentity";
+import {
   normalizeTrainingExecutionVariant,
 } from "../../../domain/models/trainingExecutionVariant";
 import {
@@ -10,8 +13,11 @@ import {
   removeExerciseFromTrainingRelationshipGroups,
   TRAINING_EXERCISE_RELATIONSHIP_TYPES,
 } from "../../../domain/models/trainingExerciseRelationship";
+import {
+  getPrimaryTrainingNavigationGroup,
+} from "../../../navigation/trainingNavigationMapping";
 
-export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1";
+export const TRAINING_LOGGER_PREVIEW_VERSION = "training_logger_preview_v1_1";
 
 export const TRAINING_LOGGER_MODES = Object.freeze({
   LIVE: "live",
@@ -42,11 +48,18 @@ export const PROGRESSION_STATES = Object.freeze({
   RECOVER: "recover_prior_performance",
 });
 
+export const PROGRESSION_CHOICES = Object.freeze({
+  PREVIOUS: "previous",
+  SUGGESTION: "suggestion",
+});
+
 export const TRAINING_LOGGER_CATEGORY_SUGGESTION = Object.freeze({
   id: "suggested_arms_core",
   label: "Arms + Core",
-  categories: Object.freeze(["Arms", "Core"]),
+  categories: Object.freeze(["Biceps", "Triceps", "Core"]),
   reason: "Based on your recent training rhythm",
+  source: "synthetic_preview_fixture",
+  futureLearningSource: "confirmed_training_evidence_history",
 });
 
 export const TRAINING_LOGGER_VARIANT_OPTIONS = Object.freeze([
@@ -54,17 +67,6 @@ export const TRAINING_LOGGER_VARIANT_OPTIONS = Object.freeze([
   "3-Second Pause",
   "Slow Eccentric",
 ]);
-
-const CATEGORY_ORDER = [
-  "Chest",
-  "Back",
-  "Shoulders",
-  "Arms",
-  "Core",
-  "Lower Body",
-  "Quads",
-  "Glutes",
-];
 
 const DEFAULT_HISTORY = Object.freeze({
   date: "2026-08-03",
@@ -164,25 +166,15 @@ export const APPLE_HEALTH_MATCH_FIXTURES = Object.freeze({
 });
 
 export function listTrainingLoggerCategories() {
-  const categories = new Set(
-    FOUNDER_ALPHA_TRAINING_EXERCISES.map((exercise) => exercise.body_region)
-      .filter(Boolean)
-  );
-  return [...categories].sort((left, right) => {
-    const leftIndex = CATEGORY_ORDER.indexOf(left);
-    const rightIndex = CATEGORY_ORDER.indexOf(right);
-    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
-    if (leftIndex === -1) return 1;
-    if (rightIndex === -1) return -1;
-    return leftIndex - rightIndex;
-  });
+  return listCanonicalTrainingMuscleGroups().map((muscleGroup) => muscleGroup.label);
 }
 
 export function listTrainingLoggerExercises({ categories = [], search = "" } = {}) {
-  const selected = new Set(categories);
+  const selected = new Set(categories.map((category) => category.toLowerCase()));
   const query = String(search).trim().toLowerCase();
   return FOUNDER_ALPHA_TRAINING_EXERCISES.filter((exercise) => {
-    const categoryMatches = selected.size === 0 || selected.has(exercise.body_region);
+    const categoryMatches = selected.size === 0 || getExerciseTrainingCategories(exercise)
+      .some((category) => selected.has(category));
     const searchMatches = !query || [exercise.name, exercise.movement_pattern, exercise.equipment]
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(query));
@@ -204,7 +196,7 @@ export function createTrainingLoggerPreviewDraft({
     step: mode ? TRAINING_LOGGER_STEPS.CATEGORIES : TRAINING_LOGGER_STEPS.ENTRY,
     mode,
     workoutDate,
-    workoutTime: mode === TRAINING_LOGGER_MODES.RETROSPECTIVE ? "17:30" : null,
+    workoutTime: null,
     startedAtLabel: mode === TRAINING_LOGGER_MODES.LIVE ? "Started now" : null,
     selectedCategories: [],
     acceptedSuggestionId: null,
@@ -227,14 +219,18 @@ export function initializeTrainingLoggerMode(draft, mode) {
     mode,
     step: TRAINING_LOGGER_STEPS.CATEGORIES,
     startedAtLabel: mode === TRAINING_LOGGER_MODES.LIVE ? "Started now" : null,
-    workoutTime: mode === TRAINING_LOGGER_MODES.RETROSPECTIVE
-      ? draft.workoutTime ?? "17:30"
-      : null,
+    workoutTime: null,
   };
 }
 
 export function updateWorkoutContext(draft, changes = {}) {
-  return { ...draft, ...changes };
+  return {
+    ...draft,
+    ...changes,
+    workoutTime: draft.mode === TRAINING_LOGGER_MODES.RETROSPECTIVE
+      ? null
+      : changes.workoutTime ?? draft.workoutTime,
+  };
 }
 
 export function toggleTrainingCategory(draft, category) {
@@ -303,6 +299,7 @@ export function addTrainingExercise(draft, canonicalExerciseId) {
     previousPerformance,
     progressionRecommendation:
       RECOMMENDATION_FIXTURES[canonicalExerciseId] ?? createMaintainRecommendation(previousPerformance),
+    progressionChoice: PROGRESSION_CHOICES.PREVIOUS,
   };
   return {
     ...draft,
@@ -329,6 +326,9 @@ export function removeTrainingExercise(draft, exerciseOccurrenceId) {
 export function updateTrainingSet(draft, exerciseOccurrenceId, setId, changes = {}) {
   return updateExercise(draft, exerciseOccurrenceId, (exercise) => ({
     ...exercise,
+    ...(Object.hasOwn(changes, "reps") || Object.hasOwn(changes, "load")
+      ? { progressionChoice: null }
+      : {}),
     sets: exercise.sets.map((set) => set.id === setId
       ? {
           ...set,
@@ -340,8 +340,13 @@ export function updateTrainingSet(draft, exerciseOccurrenceId, setId, changes = 
   }));
 }
 
-export function confirmTrainingSet(draft, exerciseOccurrenceId, setId) {
-  return updateTrainingSet(draft, exerciseOccurrenceId, setId, { confirmed: true });
+export function toggleTrainingSetCompletion(draft, exerciseOccurrenceId, setId) {
+  const exercise = draft.exercises.find((candidate) => candidate.id === exerciseOccurrenceId);
+  const set = exercise?.sets.find((candidate) => candidate.id === setId);
+  if (!set) return draft;
+  return updateTrainingSet(draft, exerciseOccurrenceId, setId, {
+    confirmed: !set.confirmed,
+  });
 }
 
 export function addTrainingSet(draft, exerciseOccurrenceId) {
@@ -428,6 +433,7 @@ export function applyProgressionSuggestion(draft, exerciseOccurrenceId) {
     const recommendation = exercise.progressionRecommendation;
     return {
       ...exercise,
+      progressionChoice: PROGRESSION_CHOICES.SUGGESTION,
       sets: exercise.sets.map((set) => ({
         ...set,
         reps: recommendation.suggestedReps,
@@ -441,6 +447,7 @@ export function applyProgressionSuggestion(draft, exerciseOccurrenceId) {
 export function keepPreviousPerformance(draft, exerciseOccurrenceId) {
   return updateExercise(draft, exerciseOccurrenceId, (exercise) => ({
     ...exercise,
+    progressionChoice: PROGRESSION_CHOICES.PREVIOUS,
     sets: exercise.sets.map((set) => ({
       ...set,
       reps: exercise.previousPerformance.reps,
@@ -615,4 +622,14 @@ function toNonNegativeNumber(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, parsed);
+}
+
+function getExerciseTrainingCategories(exercise) {
+  const navigationCategory = getPrimaryTrainingNavigationGroup({
+    canonicalExerciseId: exercise.id,
+    label: exercise.name,
+    primaryMuscleGroups: exercise.primary_muscle_groups,
+    regionLabel: exercise.body_region,
+  });
+  return navigationCategory ? [navigationCategory] : [];
 }
