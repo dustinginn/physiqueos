@@ -34,6 +34,8 @@ describe("production Training Logger integration", () => {
 
   it("loads confirmed canonical Training history and active Goal context", () => {
     expect(pageSource).toContain("listCanonicalEvidenceObjects");
+    expect(pageSource).toContain("confirmedTrainingRecords");
+    expect(pageSource).toContain("initialPerformedExerciseIds={performedExerciseIds}");
     expect(pageSource).toContain("getActiveGoal");
     expect(pageSource).toContain("initialHistorySessions");
   });
@@ -54,7 +56,8 @@ describe("production Training Logger integration", () => {
   });
 
   it("makes performed history the default picker and exposes the broader catalog explicitly", () => {
-    expect(stateSource).toContain("performedExerciseIds: listPerformedTrainingLoggerExerciseIds");
+    expect(stateSource).toContain("listPerformedTrainingLoggerExerciseIds(historySessions)");
+    expect(stateSource).toContain("Array.isArray(performedExerciseIds)");
     expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY");
     expect(clientSource).toContain("Add new exercise");
     expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL");

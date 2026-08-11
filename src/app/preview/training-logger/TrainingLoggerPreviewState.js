@@ -270,6 +270,7 @@ export function createTrainingLoggerProductionDraft({
   goalContext = null,
   historySessions = [],
   mode = null,
+  performedExerciseIds = null,
   workoutDate,
 } = {}) {
   const draftId = createClientDraftId("training_logger");
@@ -285,7 +286,9 @@ export function createTrainingLoggerProductionDraft({
       exerciseLibrary,
       goalContext,
       historySessions,
-      performedExerciseIds: listPerformedTrainingLoggerExerciseIds(historySessions),
+      performedExerciseIds: Array.isArray(performedExerciseIds)
+        ? performedExerciseIds
+        : listPerformedTrainingLoggerExerciseIds(historySessions),
     },
     categorySuggestion: createTrainingLoggerSuggestion({
       date: workoutDate,
@@ -312,14 +315,26 @@ export function createTrainingLoggerProductionDraft({
 
 export function hydrateTrainingLoggerProductionDraft(
   recoveredDraft,
-  { exerciseLibrary = [], goalContext = null, historySessions = [], workoutDate } = {}
+  {
+    exerciseLibrary = [],
+    goalContext = null,
+    historySessions = [],
+    performedExerciseIds = null,
+    workoutDate,
+  } = {}
 ) {
   if (
     recoveredDraft?.draftVersion !== "training_logger_web_v1" ||
     !recoveredDraft?.draftId ||
     !Object.values(TRAINING_LOGGER_STEPS).includes(recoveredDraft.step)
   ) {
-    return createTrainingLoggerProductionDraft({ exerciseLibrary, goalContext, historySessions, workoutDate });
+    return createTrainingLoggerProductionDraft({
+      exerciseLibrary,
+      goalContext,
+      historySessions,
+      performedExerciseIds,
+      workoutDate,
+    });
   }
   return refreshComparableContexts({
     ...recoveredDraft,
@@ -332,7 +347,9 @@ export function hydrateTrainingLoggerProductionDraft(
       exerciseLibrary,
       goalContext,
       historySessions,
-      performedExerciseIds: listPerformedTrainingLoggerExerciseIds(historySessions),
+      performedExerciseIds: Array.isArray(performedExerciseIds)
+        ? performedExerciseIds
+        : listPerformedTrainingLoggerExerciseIds(historySessions),
     },
     categorySuggestion: createTrainingLoggerSuggestion({
       date: recoveredDraft.workoutDate ?? workoutDate,

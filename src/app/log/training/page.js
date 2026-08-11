@@ -14,12 +14,17 @@ export default async function TrainingLoggerPage() {
     new Date(),
     user.timeZone ?? user.timezone ?? "America/Los_Angeles"
   );
-  const historySessions = canonicalObjects
+  const confirmedTrainingRecords = canonicalObjects
     .filter((record) =>
       record.evidence_type === "training" &&
       record.quality?.status !== "superseded" &&
       !record.quality?.supersededBy
-    )
+    );
+  const performedExerciseIds = [...new Set(confirmedTrainingRecords
+    .flatMap((record) => (record.payload ?? record).exercises ?? [])
+    .map((exercise) => exercise.canonicalExerciseId)
+    .filter(Boolean))];
+  const historySessions = confirmedTrainingRecords
     .map(projectTrainingHistorySession)
     .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
     .slice(0, 120);
@@ -30,6 +35,7 @@ export default async function TrainingLoggerPage() {
       initialCanonicalExercises={listCanonicalTrainingExerciseIdentities()}
       initialDate={initialDate}
       initialHistorySessions={historySessions}
+      initialPerformedExerciseIds={performedExerciseIds}
       production
     />
   );

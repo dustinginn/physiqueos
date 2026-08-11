@@ -130,6 +130,17 @@ describe("production Training Logger state", () => {
     expect(draft.exercises[0].canonicalExerciseId).toBe("runtime_curl");
   });
 
+  it("accepts the complete confirmed-history identity set independently of capped performance history", () => {
+    const draft = createTrainingLoggerProductionDraft({
+      historySessions: [history("2026-08-01", { load: 35, reps: 12 })],
+      performedExerciseIds: ["spider_curl", "forearm_curl"],
+      workoutDate: "2026-08-10",
+    });
+
+    expect(draft.productionContext.performedExerciseIds)
+      .toEqual(["spider_curl", "forearm_curl"]);
+  });
+
   it("creates one shared live/retrospective draft and never fabricates retrospective time", () => {
     const initial = createTrainingLoggerProductionDraft({ workoutDate: "2026-08-10" });
     const live = initializeTrainingLoggerMode(initial, TRAINING_LOGGER_MODES.LIVE);

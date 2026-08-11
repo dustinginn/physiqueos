@@ -80,6 +80,7 @@ export default function TrainingLoggerClient({
   initialCanonicalExercises = [],
   initialDate,
   initialHistorySessions = [],
+  initialPerformedExerciseIds = null,
   production = false,
 }) {
   const createInitialDraft = () => production
@@ -87,6 +88,7 @@ export default function TrainingLoggerClient({
         exerciseLibrary: initialCanonicalExercises,
         goalContext,
         historySessions: initialHistorySessions,
+        performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       })
     : createTrainingLoggerPreviewDraft({ workoutDate: initialDate });
@@ -114,6 +116,7 @@ export default function TrainingLoggerClient({
         exerciseLibrary: initialCanonicalExercises,
         goalContext,
         historySessions: initialHistorySessions,
+        performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       });
       if (hydrated.mode && hydrated.step !== TRAINING_LOGGER_STEPS.ENTRY) {
@@ -127,7 +130,14 @@ export default function TrainingLoggerClient({
       setRecoveryChecked(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [goalContext, initialCanonicalExercises, initialDate, initialHistorySessions, production]);
+  }, [
+    goalContext,
+    initialCanonicalExercises,
+    initialDate,
+    initialHistorySessions,
+    initialPerformedExerciseIds,
+    production,
+  ]);
 
   useEffect(() => {
     if (!production || !recoveryChecked || !draft.mode) return;
