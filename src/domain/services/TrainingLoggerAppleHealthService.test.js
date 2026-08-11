@@ -145,6 +145,85 @@ describe("TrainingLoggerAppleHealthService", () => {
       { label: "Sets", value: "2" },
       { label: "Apple link", value: "Linked" },
     ]));
+    expect(reviewItem.strengthSetDetails).toEqual([
+      {
+        name: "Spider Curls",
+        sets: ["12 reps @ 35 lb"],
+        variantLabel: "Static Hold",
+        supersetWith: ["Cable Rope Pushdowns"],
+      },
+      {
+        name: "Cable Rope Pushdowns",
+        sets: ["12 reps @ 50 lb"],
+        supersetWith: ["Spider Curls"],
+      },
+    ]);
+    expect(JSON.stringify(reviewItem.strengthSetDetails)).not.toMatch(
+      /occ_spider|occ_pushdown|spider_curl|cable_pushdown/
+    );
+  });
+
+  it("carries a provisional Logger occurrence into the authoritative review proposal", () => {
+    const provisionalExercise = {
+      provisionalExerciseId: "provisional_exercise_cross_body_arc",
+      rawSubmittedName: "Cross-body Cable Arc",
+      normalizedDisplayName: "Cross-body Cable Arc",
+      originalSourceText: "Cross-body Cable Arc",
+      sourceProvenance: {
+        sourceArtifactId: "training_logger_draft_draft_1",
+        sourceRef: "training_logger_draft_draft_1",
+      },
+      resolutionStatus: "unresolved",
+      suggestedCanonicalName: "Cross-body Cable Arc",
+      suggestedPrimaryMuscleGroup: "Biceps",
+      suggestedPrimaryMuscleGroupId: "biceps",
+      suggestedPrimaryMuscleGroupConfidence: "user_supplied",
+      matchingCanonicalCandidates: [],
+    };
+    const evidencePackage = buildTrainingLoggerEvidencePackage({
+      draft: {
+        ...draft({
+          normalizedEvidence: [],
+          selectedStrengthSourceId: null,
+          continueWithoutStrength: true,
+          additionalEvidenceActions: [],
+          finalized: true,
+        }),
+        exercises: [{
+          id: "occ_new",
+          canonicalExerciseId: null,
+          name: "Cross-body Cable Arc",
+          resolutionStatus: "unresolved_provisional",
+          provisionalExercise,
+          executionVariant: { key: "static_hold", label: "Static Hold" },
+          sets: [
+            { id: "set_1", reps: 14, load: 22.5, unit: "lb", confirmed: true },
+            { id: "set_2", reps: 12, load: 25, unit: "lb", confirmed: true },
+          ],
+        }],
+        exerciseRelationshipGroups: [],
+      },
+      userId: "user_1",
+    });
+    const proposed = evidencePackage.evidence_objects[0].exercises[0];
+    expect(proposed).toMatchObject({
+      id: "occ_new",
+      canonicalExerciseId: null,
+      resolutionStatus: "unresolved_provisional",
+      provisionalExercise,
+      executionVariant: { label: "Static Hold" },
+      sets: [
+        { reps: 14, weight: 22.5 },
+        { reps: 12, weight: 25 },
+      ],
+    });
+    expect(createEvidenceReviewPresentation({ evidencePackage }).items[0].strengthSetDetails)
+      .toEqual([{
+        name: "Cross-body Cable Arc",
+        proposedNewExercise: true,
+        sets: ["14 reps @ 22.5 lb", "12 reps @ 25 lb"],
+        variantLabel: "Static Hold",
+      }]);
   });
 
   it("keeps retrospective time unknown without Apple evidence and rejects duplicate source consumption", () => {

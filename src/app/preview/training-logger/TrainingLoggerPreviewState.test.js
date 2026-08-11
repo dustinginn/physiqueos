@@ -164,7 +164,7 @@ describe("Training Logger preview state", () => {
     }).map((exercise) => exercise.id)).toEqual(["hanging_leg_raise"]);
     expect(componentSource).toContain('"Search your exercises"');
     expect(componentSource).toContain('"Search all exercises"');
-    expect(componentSource).toContain("onToggleExercise(exercise.id)");
+    expect(componentSource).toContain("onSelectExercise(exercise.id)");
   });
 
   it("adds and removes canonical exercise occurrences without changing their identities", () => {

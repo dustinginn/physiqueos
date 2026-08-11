@@ -23,6 +23,10 @@ const recoverySource = fs.readFileSync(
   new URL("../../../domain/services/TrainingLoggerDraftRecoveryService.js", import.meta.url),
   "utf8"
 );
+const appleHealthServiceSource = fs.readFileSync(
+  new URL("../../../domain/services/TrainingLoggerAppleHealthService.js", import.meta.url),
+  "utf8"
+);
 
 describe("production Training Logger integration", () => {
   it("adds a discoverable Log entry without replacing universal upload", () => {
@@ -61,6 +65,33 @@ describe("production Training Logger integration", () => {
     expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY");
     expect(clientSource).toContain("Add new exercise");
     expect(clientSource).toContain("TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL");
+  });
+
+  it("creates only a provisional name and accepted category inside the Logger", () => {
+    expect(clientSource).toContain("Create new exercise");
+    expect(clientSource).toContain("Exercise name");
+    expect(clientSource).toContain("Category");
+    expect(clientSource).toContain("stays provisional until you confirm it in Evidence Review");
+    const createForm = clientSource.match(
+      /function CreateNewExerciseForm[\s\S]*?\n}\n\nfunction LoggerScreen/
+    )?.[0] ?? "";
+    expect(createForm).not.toMatch(/equipment|movement pattern|secondary muscle|alias/i);
+    const provisionalMutation = stateSource.match(
+      /export function addProvisionalTrainingExercise[\s\S]*?\n}\n\nexport function swapTrainingExercise/
+    )?.[0] ?? "";
+    expect(provisionalMutation).not.toMatch(/fetch\(|canonicalExerciseLibrary|createCanonical/);
+    expect(appleHealthServiceSource).toContain("provisionalExercise: structuredClone");
+  });
+
+  it("offers an atomic exercise swap without carrying the old occurrence values", () => {
+    expect(clientSource).toContain('label="Swap exercise"');
+    expect(clientSource).toContain("swapTrainingExercise(current, swapExerciseId");
+    expect(stateSource).toContain("exercise.id === exerciseOccurrenceId ? replacement : exercise");
+    const swapMutation = stateSource.match(
+      /export function swapTrainingExercise[\s\S]*?\n}\n\nexport function removeTrainingExercise/
+    )?.[0] ?? "";
+    expect(swapMutation.replace(/export function removeTrainingExercise[\s\S]*/, ""))
+      .not.toMatch(/fetch\(|removeTrainingExercise\(|addTrainingExercise\(/);
   });
 
   it("presents picker metadata through the user-facing presentation boundary", () => {

@@ -164,6 +164,18 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).not.toContain("memberExerciseIds.join");
   });
 
+  it("shows authoritative Logger set details with variants and human Superset context", () => {
+    expect(screen).toContain("Recorded sets");
+    expect(screen).toContain("item.strengthSetDetails");
+    expect(screen).toContain("exercise.variantLabel");
+    expect(screen).toContain("Superset with {exercise.supersetWith.join(\" + \")}");
+    expect(screen).toContain("New exercise");
+    const recordedSetDetails = screen.match(
+      /function RecordedStrengthSetDetails[\s\S]*?\n}\n\nfunction GroupedExerciseReviewRow/
+    )?.[0] ?? "";
+    expect(recordedSetDetails).not.toContain("canonicalExerciseId");
+  });
+
   it("routes every action outcome through revalidation and a visible query result", () => {
     expect(actions).toContain('outcome = result.changed ? "updated" : "current"');
     expect(actions).toContain('let outcome = "failed"');

@@ -147,6 +147,29 @@ function presentTraining(object, common, evidencePackage = {}) {
     (total, exercise) => total + (exercise.sets?.length ?? 0),
     0
   );
+  const strengthSetDetails = loggerSummary
+    ? presentedExercises.map((exercise) => {
+        const group = groups.find((candidate) =>
+          candidate.memberExerciseIds.includes(exercise.id)
+        );
+        return {
+          name: exercise.name,
+          sets: exercise.sets,
+          ...(exercise.executionVariant?.label
+            ? { variantLabel: exercise.executionVariant.label }
+            : {}),
+          ...(exercise.provisionalExerciseId ? { proposedNewExercise: true } : {}),
+          ...(group
+            ? {
+                supersetWith: group.memberExerciseIds
+                  .filter((id) => id !== exercise.id)
+                  .map((id) => exercisesById.get(id)?.name)
+                  .filter(Boolean),
+              }
+            : {}),
+        };
+      })
+    : [];
   return {
     ...common,
     title: loggerSummary ? "Detailed strength workout" : metadata.activity_type ?? object.title ?? "Workout",
@@ -165,6 +188,7 @@ function presentTraining(object, common, evidencePackage = {}) {
       metric("Source", common.sourceLabel),
     ]),
     exercises: loggerSummary ? [] : presentedExercises,
+    strengthSetDetails,
     standaloneExercises: loggerSummary ? [] : presentedExercises.filter(
       (exercise) => !groupedExerciseIds.has(exercise.id)
     ),

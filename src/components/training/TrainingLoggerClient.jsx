@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Apple,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Play,
   Plus,
+  RefreshCw,
   Search,
   Sparkles,
   Trash2,
@@ -25,6 +26,7 @@ import {
 import Card from "../ui/Card";
 import {
   acceptTrainingCategorySuggestion,
+  addProvisionalTrainingExercise,
   addTrainingExercise,
   addTrainingSet,
   APPLE_HEALTH_MATCH_STATES,
@@ -34,6 +36,7 @@ import {
   buildEvidenceReviewHandoff,
   buildTrainingWorkoutSummary,
   canContinueFromReconciliation,
+  canCreateNewTrainingLoggerExercise,
   canFinishTrainingLoggerDraft,
   continueWithoutAppleHealthMatch,
   createTrainingLoggerProductionDraft,
@@ -47,6 +50,7 @@ import {
   initializeTrainingLoggerMode,
   keepPreviousPerformance,
   listTrainingLoggerCategories,
+  listTrainingLoggerExerciseCategories,
   listTrainingLoggerExercises,
   PROGRESSION_CHOICES,
   PROGRESSION_STATES,
@@ -56,6 +60,7 @@ import {
   removeTrainingVariant,
   serializeTrainingLoggerRecoveryDraft,
   selectAppleHealthMatch,
+  swapTrainingExercise,
   attachProductionAppleHealthReconciliation,
   toggleAppleHealthAdditionalEvidence,
   toggleTrainingCategory,
@@ -106,6 +111,7 @@ export default function TrainingLoggerClient({
   const [recoveryChecked, setRecoveryChecked] = useState(!production);
   const [browseAllExercises, setBrowseAllExercises] = useState(false);
   const [cancelWorkoutPending, setCancelWorkoutPending] = useState(false);
+  const [swapExerciseId, setSwapExerciseId] = useState(null);
 
   useEffect(() => {
     if (!production) return;
@@ -159,6 +165,7 @@ export default function TrainingLoggerClient({
     setSubmissionError(null);
     setBrowseAllExercises(false);
     setCancelWorkoutPending(false);
+    setSwapExerciseId(null);
     if (production) discardTrainingLoggerRecoveryDraft(window.localStorage);
   }
 
@@ -167,6 +174,7 @@ export default function TrainingLoggerClient({
     setDraft(savedDraft);
     setSavedDraft(null);
     setCancelWorkoutPending(false);
+    setSwapExerciseId(null);
   }
 
   function leaveWorkout() {
@@ -187,6 +195,7 @@ export default function TrainingLoggerClient({
     setEvidenceFiles([]);
     setEvidencePackageId(null);
     setSubmissionError(null);
+    setSwapExerciseId(null);
   }
 
   function navigate(step) {
@@ -293,12 +302,16 @@ export default function TrainingLoggerClient({
             adding={draft.step === TRAINING_LOGGER_STEPS.ADD_EXERCISE}
             broadCatalog={browseAllExercises}
             draft={draft}
+            swappingExercise={draft.exercises.find(
+              (exercise) => exercise.id === swapExerciseId
+            ) ?? null}
             onBack={() => {
               if (browseAllExercises) {
                 setBrowseAllExercises(false);
                 setSearch("");
                 return;
               }
+              setSwapExerciseId(null);
               navigate(
                 draft.step === TRAINING_LOGGER_STEPS.ADD_EXERCISE
                   ? TRAINING_LOGGER_STEPS.LOGGER
@@ -310,15 +323,38 @@ export default function TrainingLoggerClient({
               setSearch("");
             }}
             onContinue={() => navigate(TRAINING_LOGGER_STEPS.LOGGER)}
+            onCreateExercise={({ category, name }) => {
+              setDraft((current) => goToTrainingLoggerStep(
+                swapExerciseId
+                  ? swapTrainingExercise(current, swapExerciseId, { category, name })
+                  : addProvisionalTrainingExercise(current, { category, name }),
+                TRAINING_LOGGER_STEPS.LOGGER
+              ));
+              setSwapExerciseId(null);
+              setBrowseAllExercises(false);
+              setSearch("");
+            }}
             onSearch={setSearch}
-            onToggleExercise={(canonicalExerciseId) => setDraft((current) => {
-              const existing = current.exercises.find(
-                (exercise) => exercise.canonicalExerciseId === canonicalExerciseId
-              );
-              return existing
-                ? removeTrainingExercise(current, existing.id)
-                : addTrainingExercise(current, canonicalExerciseId);
-            })}
+            onSelectExercise={(canonicalExerciseId) => {
+              if (swapExerciseId) {
+                setDraft((current) => goToTrainingLoggerStep(
+                  swapTrainingExercise(current, swapExerciseId, { canonicalExerciseId }),
+                  TRAINING_LOGGER_STEPS.LOGGER
+                ));
+                setSwapExerciseId(null);
+                setBrowseAllExercises(false);
+                setSearch("");
+                return;
+              }
+              setDraft((current) => {
+                const existing = current.exercises.find(
+                  (exercise) => exercise.canonicalExerciseId === canonicalExerciseId
+                );
+                return existing
+                  ? removeTrainingExercise(current, existing.id)
+                  : addTrainingExercise(current, canonicalExerciseId);
+              });
+            }}
             search={search}
             production={production}
           />
@@ -331,7 +367,10 @@ export default function TrainingLoggerClient({
             removeExerciseId={removeExerciseId}
             supersetPickerId={supersetPickerId}
             variantPickerId={variantPickerId}
-            onAddExercise={() => navigate(TRAINING_LOGGER_STEPS.ADD_EXERCISE)}
+            onAddExercise={() => {
+              setSwapExerciseId(null);
+              navigate(TRAINING_LOGGER_STEPS.ADD_EXERCISE);
+            }}
             onAddSet={(exerciseId) => setDraft((current) =>
               addTrainingSet(current, exerciseId)
             )}
@@ -378,6 +417,11 @@ export default function TrainingLoggerClient({
               setOpenMenuId(null);
             }}
             onRequestRemove={setRemoveExerciseId}
+            onRequestSwap={(exerciseId) => {
+              setSwapExerciseId(exerciseId);
+              setOpenMenuId(null);
+              navigate(TRAINING_LOGGER_STEPS.ADD_EXERCISE);
+            }}
             onRequestCancel={production ? () => setCancelWorkoutPending(true) : null}
             onSetMenu={setOpenMenuId}
             onSetSupersetPicker={setSupersetPickerId}
@@ -654,40 +698,78 @@ function ExerciseSelectionScreen({
   onBack,
   onBrowseNew,
   onContinue,
+  onCreateExercise,
   onSearch,
-  onToggleExercise,
+  onSelectExercise,
   production,
   search,
+  swappingExercise,
 }) {
-  const available = useMemo(() => listTrainingLoggerExercises({
-    categories: draft.selectedCategories,
-    exerciseLibrary: draft.productionContext?.exerciseLibrary,
+  const [creatingNewExercise, setCreatingNewExercise] = useState(false);
+  const exerciseLibrary = draft.productionContext?.exerciseLibrary;
+  const swapIdentity = swappingExercise?.canonicalExerciseId
+    ? exerciseLibrary?.find((exercise) =>
+        exercise.id === swappingExercise.canonicalExerciseId
+      ) ?? swappingExercise
+    : swappingExercise;
+  const swapCategories = swappingExercise
+    ? listTrainingLoggerExerciseCategories(swapIdentity)
+    : [];
+  const pickerCategories = swapCategories.length > 0
+    ? swapCategories
+    : draft.selectedCategories;
+  const available = listTrainingLoggerExercises({
+    categories: pickerCategories,
+    exerciseLibrary,
     performedExerciseIds: draft.productionContext?.performedExerciseIds,
     search,
     scope: production && !broadCatalog
       ? TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY
       : TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
-  }), [
-    broadCatalog,
-    draft.productionContext?.exerciseLibrary,
-    draft.productionContext?.performedExerciseIds,
-    draft.selectedCategories,
-    production,
-    search,
-  ]);
+  });
   const selectedIds = new Set(draft.exercises.map((exercise) => exercise.canonicalExerciseId));
+  const canCreateExercise = production && broadCatalog &&
+    canCreateNewTrainingLoggerExercise({ exerciseLibrary, search });
+  const defaultCategory = listTrainingLoggerCategories().find(
+    (categoryLabel) => categoryLabel.toLowerCase() === swapCategories[0]
+  ) ?? draft.selectedCategories[0] ?? "";
+  const handleBack = () => {
+    if (creatingNewExercise) {
+      setCreatingNewExercise(false);
+      return;
+    }
+    onBack();
+  };
   return (
     <section>
       <PageHeader
-        description={broadCatalog
-          ? `Search all available exercises for ${draft.selectedCategories.join(" + ")}.`
-          : adding
-            ? "Choose from exercises you have performed before, or add a new exercise."
-            : `Your performed exercises for ${draft.selectedCategories.join(" + ")}.`}
-        onBack={onBack}
+        description={swappingExercise
+          ? broadCatalog
+            ? "Choose an existing canonical exercise or create a genuinely new one."
+            : "Choose from your performed exercise history first."
+          : broadCatalog
+            ? `Search all available exercises for ${draft.selectedCategories.join(" + ")}.`
+            : adding
+              ? "Choose from exercises you have performed before, or add a new exercise."
+              : `Your performed exercises for ${draft.selectedCategories.join(" + ")}.`}
+        onBack={handleBack}
         step={adding ? "In workout" : "2 of 2"}
-        title={broadCatalog ? "Add new exercise" : adding ? "Add an exercise" : "Choose exercises"}
+        title={creatingNewExercise
+          ? "Create new exercise"
+          : swappingExercise
+            ? "Swap exercise"
+            : broadCatalog
+              ? "Add new exercise"
+              : adding ? "Add an exercise" : "Choose exercises"}
       />
+
+      {creatingNewExercise ? (
+        <CreateNewExerciseForm
+          defaultCategory={defaultCategory}
+          defaultName={search}
+          onCreate={onCreateExercise}
+        />
+      ) : <>
 
       <label className="relative mb-4 block">
         <Search aria-hidden="true" className="absolute left-3.5 top-3.5 text-[var(--text-subtle)]" size={18} />
@@ -711,16 +793,18 @@ function ExerciseSelectionScreen({
               className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition active:scale-[0.99] ${selected
                 ? "border-[var(--primary)] bg-[var(--surface-accent)]"
                 : "border-[var(--divider)] bg-[var(--surface-elevated)]"}`}
-              disabled={adding && selected}
+              disabled={(adding || Boolean(swappingExercise)) && selected}
               key={exercise.id}
-              onClick={() => onToggleExercise(exercise.id)}
+              onClick={() => onSelectExercise(exercise.id)}
               type="button"
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-extrabold">{presentation.displayName}</span>
-                {((adding && selected) || presentation.secondaryLabel) && (
+                {(((adding || swappingExercise) && selected) || presentation.secondaryLabel) && (
                   <span className="mt-1 block truncate text-xs font-semibold text-[var(--text-muted)]">
-                    {adding && selected ? "Already in workout" : presentation.secondaryLabel}
+                    {(adding || swappingExercise) && selected
+                      ? "Already in workout"
+                      : presentation.secondaryLabel}
                   </span>
                 )}
               </span>
@@ -742,6 +826,17 @@ function ExerciseSelectionScreen({
         )}
       </div>
 
+      {canCreateExercise && available.length === 0 && (
+        <button
+          className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--primary)] bg-[var(--surface-accent)] px-4 text-sm font-extrabold text-[var(--primary)]"
+          onClick={() => setCreatingNewExercise(true)}
+          type="button"
+        >
+          <CirclePlus aria-hidden="true" size={18} />
+          Create new exercise
+        </button>
+      )}
+
       {production && !broadCatalog && (
         <button
           className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] px-4 text-sm font-extrabold text-[var(--primary)]"
@@ -749,16 +844,72 @@ function ExerciseSelectionScreen({
           type="button"
         >
           <CirclePlus aria-hidden="true" size={18} />
-          Add new exercise
+          {swappingExercise ? "Browse all exercises" : "Add new exercise"}
         </button>
       )}
 
       <BottomAction
         disabled={draft.exercises.length === 0}
-        label={adding ? "Return to workout" : `Start logging · ${draft.exercises.length} selected`}
-        onClick={onContinue}
+        label={swappingExercise
+          ? `Keep ${swappingExercise.name}`
+          : adding
+            ? "Return to workout"
+            : `Start logging · ${draft.exercises.length} selected`}
+        onClick={swappingExercise ? handleBack : onContinue}
       />
+      </>}
     </section>
+  );
+}
+
+function CreateNewExerciseForm({ defaultCategory, defaultName, onCreate }) {
+  const [name, setName] = useState(defaultName);
+  const [category, setCategory] = useState(defaultCategory);
+  const canSubmit = name.trim().length > 0 && category.length > 0;
+
+  return (
+    <Card>
+      <p className="text-sm font-extrabold">New exercise details</p>
+      <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+        This stays provisional until you confirm it in Evidence Review.
+      </p>
+
+      <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
+        Exercise name
+        <input
+          autoFocus
+          className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Exercise name"
+          type="text"
+          value={name}
+        />
+      </label>
+
+      <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
+        Category
+        <select
+          className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+          onChange={(event) => setCategory(event.target.value)}
+          required
+          value={category}
+        >
+          <option value="">Select a category</option>
+          {listTrainingLoggerCategories().map((categoryLabel) => (
+            <option key={categoryLabel} value={categoryLabel}>{categoryLabel}</option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        className="mt-5 min-h-12 w-full rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-40"
+        disabled={!canSubmit}
+        onClick={() => onCreate({ category, name: name.trim() })}
+        type="button"
+      >
+        Add to workout
+      </button>
+    </Card>
   );
 }
 
@@ -782,6 +933,7 @@ function LoggerScreen({
   onRemoveSuperset,
   onRemoveVariant,
   onRequestRemove,
+  onRequestSwap,
   onRequestCancel,
   onSetMenu,
   onSetSupersetPicker,
@@ -848,6 +1000,7 @@ function LoggerScreen({
             onRemoveSuperset={onRemoveSuperset}
             onRemoveVariant={() => onRemoveVariant(exercise.id)}
             onRequestRemove={() => onRequestRemove(exercise.id)}
+            onRequestSwap={() => onRequestSwap(exercise.id)}
             onToggleMenu={() => onSetMenu(openMenuId === exercise.id ? null : exercise.id)}
             onToggleSupersetPicker={() => onSetSupersetPicker(
               supersetPickerId === exercise.id ? null : exercise.id
@@ -896,6 +1049,7 @@ function ExerciseCard({
   onRemoveSuperset,
   onRemoveVariant,
   onRequestRemove,
+  onRequestSwap,
   onToggleMenu,
   onToggleSupersetPicker,
   onToggleVariantPicker,
@@ -949,6 +1103,7 @@ function ExerciseCard({
         {menuOpen && (
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-[var(--surface-muted)] p-2">
             <ActionMenuButton icon={Sparkles} label={exercise.executionVariant ? "Edit Variant" : "Add Variant"} onClick={onToggleVariantPicker} />
+            <ActionMenuButton icon={RefreshCw} label="Swap exercise" onClick={onRequestSwap} />
             {exercise.executionVariant && (
               <ActionMenuButton icon={Minus} label="Remove Variant" onClick={onRemoveVariant} />
             )}

@@ -1,9 +1,12 @@
 import {
   getCanonicalTrainingExerciseSlug,
   listCanonicalTrainingExerciseIdentities,
+  normalizeExercisePhrase,
+  resolveTrainingExerciseIdentity,
 } from "../../../domain/models/trainingExerciseIdentity";
 import {
   listCanonicalTrainingMuscleGroups,
+  resolveCanonicalTrainingMuscleGroup,
 } from "../../../domain/models/trainingMuscleGroupIdentity";
 import {
   normalizeTrainingExecutionVariant,
@@ -245,13 +248,43 @@ export function listTrainingLoggerExercises({
   return canonicalExercises.filter((exercise) => {
     const scopeMatches = scope !== TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY ||
       performed.has(exercise.id);
-    const categoryMatches = selected.size === 0 || getExerciseTrainingCategories(exercise)
+    const categoryMatches = selected.size === 0 || listTrainingLoggerExerciseCategories(exercise)
       .some((category) => selected.has(category));
     const searchMatches = !query || [exercise.name, exercise.movement_pattern, exercise.equipment]
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(query));
     return scopeMatches && categoryMatches && searchMatches;
   });
+}
+
+export function canCreateNewTrainingLoggerExercise({
+  exerciseLibrary = null,
+  search = "",
+} = {}) {
+  const normalized = normalizeExercisePhrase(search);
+  if (!normalized) return false;
+  const canonicalExercises = Array.isArray(exerciseLibrary) && exerciseLibrary.length > 0
+    ? exerciseLibrary
+    : listCanonicalTrainingExerciseIdentities();
+  return !canonicalExercises.some((exercise) =>
+    [exercise.name, ...(exercise.aliases ?? [])]
+      .some((value) => normalizeExercisePhrase(value) === normalized)
+  );
+}
+
+export function listTrainingLoggerExerciseCategories(exercise = {}) {
+  const provisionalCategory = resolveCanonicalTrainingMuscleGroup(
+    exercise.provisionalExercise?.suggestedPrimaryMuscleGroupId ??
+      exercise.provisionalExercise?.suggestedPrimaryMuscleGroup
+  );
+  if (provisionalCategory) return [provisionalCategory.id];
+  const navigationCategory = getPrimaryTrainingNavigationGroup({
+    canonicalExerciseId: exercise.id ?? exercise.canonicalExerciseId,
+    label: exercise.name,
+    primaryMuscleGroups: exercise.primary_muscle_groups,
+    regionLabel: exercise.body_region ?? exercise.bodyRegion,
+  });
+  return navigationCategory ? [navigationCategory] : [];
 }
 
 export function listPerformedTrainingLoggerExerciseIds(sessions = []) {
@@ -538,6 +571,84 @@ export function addTrainingExercise(draft, canonicalExerciseId) {
     ...draft,
     exercises: [...draft.exercises, occurrence],
     nextOccurrenceIndex: occurrenceIndex + 1,
+  };
+}
+
+export function addProvisionalTrainingExercise(draft, input = {}) {
+  const definition = resolveProvisionalTrainingLoggerInput(draft, input);
+  if (!definition) return draft;
+  if (definition.canonicalExerciseId) {
+    return addTrainingExercise(draft, definition.canonicalExerciseId);
+  }
+  if (draft.exercises.some((exercise) =>
+    !exercise.canonicalExerciseId &&
+    normalizeExercisePhrase(exercise.name) === normalizeExercisePhrase(definition.name)
+  )) return draft;
+
+  const occurrenceIndex = draft.nextOccurrenceIndex;
+  const occurrenceId = createTrainingExerciseOccurrenceId({
+    name: definition.name,
+    occurrenceIndex,
+    provenanceRef: getTrainingLoggerDraftProvenanceRef(draft),
+  });
+  const previousPerformance = createFirstUsePreviousPerformance();
+  return {
+    ...draft,
+    exercises: [...draft.exercises, createProvisionalTrainingLoggerOccurrence({
+      category: definition.category,
+      draft,
+      name: definition.name,
+      occurrenceId,
+      previousPerformance,
+    })],
+    nextOccurrenceIndex: occurrenceIndex + 1,
+  };
+}
+
+export function swapTrainingExercise(draft, exerciseOccurrenceId, input = {}) {
+  const current = draft.exercises.find((exercise) => exercise.id === exerciseOccurrenceId);
+  if (!current) return draft;
+  const definition = resolveProvisionalTrainingLoggerInput(draft, input);
+  if (!definition) return draft;
+  if (
+    definition.canonicalExerciseId &&
+    draft.exercises.some((exercise) =>
+      exercise.id !== exerciseOccurrenceId &&
+      exercise.canonicalExerciseId === definition.canonicalExerciseId
+    )
+  ) return draft;
+
+  const relationshipContext = getRelationshipContext(draft, exerciseOccurrenceId);
+  const relationshipKey = getRelationshipKey(draft, exerciseOccurrenceId);
+  const previousPerformance = definition.canonicalExerciseId
+    ? selectDraftPreviousPerformance(draft, {
+        canonicalExerciseId: definition.canonicalExerciseId,
+        executionVariant: null,
+        relationshipContext,
+        relationshipKey,
+      })
+    : createFirstUsePreviousPerformance();
+  const replacement = definition.canonicalExerciseId
+    ? buildCanonicalTrainingLoggerOccurrence({
+        draft,
+        identity: definition.identity,
+        occurrenceId: exerciseOccurrenceId,
+        previousPerformance,
+        relationshipContext,
+      })
+    : createProvisionalTrainingLoggerOccurrence({
+        category: definition.category,
+        draft,
+        name: definition.name,
+        occurrenceId: exerciseOccurrenceId,
+        previousPerformance,
+      });
+
+  return {
+    ...draft,
+    exercises: draft.exercises.map((exercise) =>
+      exercise.id === exerciseOccurrenceId ? replacement : exercise
+    ),
   };
 }
 
@@ -967,6 +1078,135 @@ function selectRepresentativeSet(sets = []) {
   })).sort((left, right) => right.load - left.load || right.reps - left.reps)[0] ?? null;
 }
 
+function resolveProvisionalTrainingLoggerInput(draft, input = {}) {
+  const canonicalExercises = draft.productionContext?.exerciseLibrary?.length
+    ? draft.productionContext.exerciseLibrary
+    : listCanonicalTrainingExerciseIdentities();
+  if (input.canonicalExerciseId) {
+    const identity = canonicalExercises.find(
+      (exercise) => exercise.id === input.canonicalExerciseId
+    );
+    return identity ? { canonicalExerciseId: identity.id, identity } : null;
+  }
+
+  const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
+  if (!name) return null;
+  const normalizedName = normalizeExercisePhrase(name);
+  const exactIdentity = canonicalExercises.find((exercise) =>
+    [exercise.name, ...(exercise.aliases ?? [])]
+      .some((value) => normalizeExercisePhrase(value) === normalizedName)
+  );
+  const resolved = exactIdentity ? null : resolveTrainingExerciseIdentity(name);
+  const identity = exactIdentity ?? canonicalExercises.find(
+    (exercise) => exercise.id === resolved?.canonicalExerciseId
+  );
+  if (identity) return { canonicalExerciseId: identity.id, identity };
+
+  const category = resolveCanonicalTrainingMuscleGroup(input.category);
+  if (!category || !TRAINING_LOGGER_USER_FACING_AREA_IDS.includes(category.id)) return null;
+  return { canonicalExerciseId: null, category, name };
+}
+
+function buildCanonicalTrainingLoggerOccurrence({
+  draft,
+  identity,
+  occurrenceId,
+  previousPerformance,
+  relationshipContext = null,
+}) {
+  return {
+    id: occurrenceId,
+    exerciseOccurrenceId: occurrenceId,
+    canonicalExerciseId: identity.id,
+    name: identity.name,
+    bodyRegion: identity.body_region,
+    equipment: identity.equipment,
+    executionVariant: null,
+    sets: createTrainingLoggerDraftSets(occurrenceId, previousPerformance),
+    previousPerformance,
+    progressionRecommendation: selectDraftProgressionRecommendation(draft, {
+      canonicalExerciseId: identity.id,
+      executionVariant: null,
+      previousPerformance,
+      relationshipContext,
+    }),
+    progressionChoice: PROGRESSION_CHOICES.PREVIOUS,
+  };
+}
+
+function createProvisionalTrainingLoggerOccurrence({
+  category,
+  draft,
+  name,
+  occurrenceId,
+  previousPerformance,
+}) {
+  const provenanceRef = getTrainingLoggerDraftProvenanceRef(draft);
+  const provisionalExerciseId = `provisional_exercise_${occurrenceId
+    .replace(/^exercise_occurrence_/, "")}`;
+  return {
+    id: occurrenceId,
+    exerciseOccurrenceId: occurrenceId,
+    canonicalExerciseId: null,
+    name,
+    bodyRegion: null,
+    equipment: null,
+    executionVariant: null,
+    resolutionStatus: "unresolved_provisional",
+    provisionalExercise: {
+      provisionalExerciseId,
+      rawSubmittedName: name,
+      normalizedDisplayName: name,
+      originalSourceText: name,
+      sourceProvenance: { sourceArtifactRefs: [provenanceRef] },
+      resolutionStatus: "unresolved",
+      suggestedCanonicalName: name,
+      suggestedPrimaryMuscleGroup: category.label,
+      suggestedPrimaryMuscleGroupId: category.id,
+      suggestedPrimaryMuscleGroupConfidence: "user_supplied",
+      suggestedMovementPattern: null,
+      suggestedEquipment: null,
+      suggestedLaterality: null,
+      suggestedAliases: [],
+      matchingCanonicalCandidates: [],
+    },
+    sets: createTrainingLoggerDraftSets(occurrenceId, previousPerformance),
+    previousPerformance,
+    progressionRecommendation: null,
+    progressionChoice: PROGRESSION_CHOICES.PREVIOUS,
+  };
+}
+
+function createTrainingLoggerDraftSets(occurrenceId, previousPerformance) {
+  return Array.from({ length: previousPerformance.setCount }, (_, index) => ({
+    id: `${occurrenceId}_set_${index + 1}`,
+    order: index + 1,
+    reps: previousPerformance.reps,
+    load: previousPerformance.load,
+    unit: previousPerformance.unit,
+    confirmed: false,
+  }));
+}
+
+function createFirstUsePreviousPerformance() {
+  return {
+    date: null,
+    reps: 0,
+    load: 0,
+    unit: "lb",
+    setCount: 3,
+    context: "No comparable history yet",
+    firstUse: true,
+    matchKind: "none",
+  };
+}
+
+function getTrainingLoggerDraftProvenanceRef(draft) {
+  return isProductionDraft(draft)
+    ? `training_logger_draft_${draft.draftId}`
+    : "training_logger_preview_draft";
+}
+
 function isProductionDraft(draft) {
   return draft?.draftVersion === "training_logger_web_v1";
 }
@@ -998,14 +1238,4 @@ function toNonNegativeNumber(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, parsed);
-}
-
-function getExerciseTrainingCategories(exercise) {
-  const navigationCategory = getPrimaryTrainingNavigationGroup({
-    canonicalExerciseId: exercise.id,
-    label: exercise.name,
-    primaryMuscleGroups: exercise.primary_muscle_groups,
-    regionLabel: exercise.body_region,
-  });
-  return navigationCategory ? [navigationCategory] : [];
 }

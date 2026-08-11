@@ -251,6 +251,12 @@ function createDetailedTrainingSession({ draft, draftArtifactId, matchedStrength
       name: exercise.name,
       body_region: exercise.bodyRegion,
       equipment: exercise.equipment,
+      ...(exercise.resolutionStatus
+        ? { resolutionStatus: exercise.resolutionStatus }
+        : {}),
+      ...(exercise.provisionalExercise
+        ? { provisionalExercise: structuredClone(exercise.provisionalExercise) }
+        : {}),
       ...(exercise.executionVariant ? { executionVariant: exercise.executionVariant } : {}),
       sets: exercise.sets.map((set, index) => ({
         id: set.id,

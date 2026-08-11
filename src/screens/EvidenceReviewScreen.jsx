@@ -8,6 +8,7 @@ import Card from "../components/ui/Card";
 import EvidenceImage from "../components/progress/EvidenceImage";
 import {
   createEvidenceReviewPresentation,
+  formatExerciseSet,
   toggleEvidenceReviewItemDecision,
 } from "../domain/services/EvidenceReviewPresentationService";
 import {
@@ -202,6 +203,10 @@ function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantActi
 
       {item.metrics.length > 0 && <dl className="grid grid-cols-2 gap-3">{item.metrics.map((metric) => <div className="rounded-xl bg-[var(--surface-muted)] p-3" key={metric.label}><dt className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{metric.label}</dt><dd className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{metric.value}</dd></div>)}</dl>}
 
+      {item.strengthSetDetails?.length > 0 && (
+        <RecordedStrengthSetDetails exercises={item.strengthSetDetails} />
+      )}
+
       {item.type === "nutrition" && item.object.reconciliation?.nutrition?.targetCanonicalId && (
         <NutritionReplacementControl
           canEdit={canEdit && item.included}
@@ -354,6 +359,47 @@ function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantActi
   );
 }
 
+function RecordedStrengthSetDetails({ exercises }) {
+  return (
+    <section>
+      <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Recorded sets</h3>
+      <div className="mt-3 divide-y divide-[var(--divider)] rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] px-3">
+        {exercises.map((exercise, index) => (
+          <div className="py-3" key={`${exercise.name}-${index}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-extrabold text-[var(--text-primary)]">{exercise.name}</p>
+                {exercise.variantLabel && (
+                  <p className="mt-0.5 text-xs font-bold text-[var(--primary)]">
+                    Variant: {exercise.variantLabel}
+                  </p>
+                )}
+                {exercise.supersetWith?.length > 0 && (
+                  <p className="mt-0.5 text-xs font-semibold text-[var(--text-muted)]">
+                    Superset with {exercise.supersetWith.join(" + ")}
+                  </p>
+                )}
+              </div>
+              {exercise.proposedNewExercise && (
+                <span className="shrink-0 rounded-full bg-[var(--surface-warning)] px-2.5 py-1 text-xs font-extrabold text-[var(--text-primary)]">
+                  New exercise
+                </span>
+              )}
+            </div>
+            {exercise.sets.length > 0 ? (
+              <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+                {exercise.sets.join(" Â· ")}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-[var(--text-muted)]">Set details unavailable</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function GroupedExerciseReviewRow({ canEdit, exercise, exerciseVariantAction, item, recoveryContext, review }) {
   return (
     <div className="rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-3">
@@ -474,7 +520,9 @@ function NewExerciseCard({ action, canonicalExercises, exercise, recoveryContext
   const inferredMuscleGroup =
     suggestCanonicalTrainingMuscleGroup(provisional.normalizedDisplayName);
   const persistedMuscleGroup =
-    provisional.suggestedPrimaryMuscleGroupConfidence === "high"
+    ["high", "user_supplied"].includes(
+      provisional.suggestedPrimaryMuscleGroupConfidence
+    )
       ? resolveCanonicalTrainingMuscleGroup(
           provisional.suggestedPrimaryMuscleGroupId ??
             provisional.suggestedPrimaryMuscleGroup
@@ -521,7 +569,9 @@ function NewExerciseCard({ action, canonicalExercises, exercise, recoveryContext
         <h2 className="mt-1 text-xl font-extrabold text-[var(--text-primary)]">{provisional.normalizedDisplayName}</h2>
         <p className="mt-1 text-sm font-semibold text-[var(--text-secondary)]">{exercise.sets?.length ?? 0} sets</p>
         <ul className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
-          {(exercise.sets ?? []).map((set, index) => <li key={index}>{set.reps} reps{set.weight != null ? ` at ${set.weight} lb` : ""}</li>)}
+          {(exercise.sets ?? []).map((set, index) => (
+            <li key={index}>{formatExerciseSet(set) ?? "Set details unavailable"}</li>
+          ))}
         </ul>
       </div>
       <div className="grid grid-cols-2 gap-2">
