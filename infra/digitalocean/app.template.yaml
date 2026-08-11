@@ -61,6 +61,7 @@ services:
       - key: PHYSIQUEOS_GIT_SHA
         scope: RUN_AND_BUILD_TIME
         value: ${GIT_SHA}
+workers:
   - name: worker
     dockerfile_path: Dockerfile.foundation
     git:
