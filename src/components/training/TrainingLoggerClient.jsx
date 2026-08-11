@@ -36,7 +36,6 @@ import {
   buildEvidenceReviewHandoff,
   buildTrainingWorkoutSummary,
   canContinueFromReconciliation,
-  canCreateNewTrainingLoggerExercise,
   canFinishTrainingLoggerDraft,
   continueWithoutAppleHealthMatch,
   createTrainingLoggerProductionDraft,
@@ -728,8 +727,6 @@ function ExerciseSelectionScreen({
       : TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
   });
   const selectedIds = new Set(draft.exercises.map((exercise) => exercise.canonicalExerciseId));
-  const canCreateExercise = production && broadCatalog &&
-    canCreateNewTrainingLoggerExercise({ exerciseLibrary, search });
   const defaultCategory = listTrainingLoggerCategories().find(
     (categoryLabel) => categoryLabel.toLowerCase() === swapCategories[0]
   ) ?? draft.selectedCategories[0] ?? "";
@@ -783,6 +780,17 @@ function ExerciseSelectionScreen({
         />
       </label>
 
+      {production && broadCatalog && (
+        <button
+          className="mb-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--primary)] bg-[var(--surface-accent)] px-4 text-sm font-extrabold text-[var(--primary)]"
+          onClick={() => setCreatingNewExercise(true)}
+          type="button"
+        >
+          <CirclePlus aria-hidden="true" size={18} />
+          Create new exercise
+        </button>
+      )}
+
       <div className="space-y-2">
         {available.map((exercise) => {
           const selected = selectedIds.has(exercise.id);
@@ -826,17 +834,6 @@ function ExerciseSelectionScreen({
         )}
       </div>
 
-      {canCreateExercise && available.length === 0 && (
-        <button
-          className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--primary)] bg-[var(--surface-accent)] px-4 text-sm font-extrabold text-[var(--primary)]"
-          onClick={() => setCreatingNewExercise(true)}
-          type="button"
-        >
-          <CirclePlus aria-hidden="true" size={18} />
-          Create new exercise
-        </button>
-      )}
-
       {production && !broadCatalog && (
         <button
           className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-soft)] px-4 text-sm font-extrabold text-[var(--primary)]"
@@ -868,48 +865,53 @@ function CreateNewExerciseForm({ defaultCategory, defaultName, onCreate }) {
   const canSubmit = name.trim().length > 0 && category.length > 0;
 
   return (
-    <Card>
-      <p className="text-sm font-extrabold">New exercise details</p>
-      <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-        This stays provisional until you confirm it in Evidence Review.
-      </p>
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      if (canSubmit) onCreate({ category, name: name.trim() });
+    }}>
+      <Card>
+        <p className="text-sm font-extrabold">New exercise details</p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
+          This stays provisional until you confirm it in Evidence Review.
+        </p>
 
-      <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
-        Exercise name
-        <input
-          autoFocus
-          className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Exercise name"
-          type="text"
-          value={name}
-        />
-      </label>
+        <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
+          Exercise name
+          <input
+            autoFocus
+            className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Exercise name"
+            required
+            type="text"
+            value={name}
+          />
+        </label>
 
-      <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
-        Category
-        <select
-          className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
-          onChange={(event) => setCategory(event.target.value)}
-          required
-          value={category}
+        <label className="mt-4 block text-xs font-extrabold text-[var(--text-secondary)]">
+          Category
+          <select
+            className="mt-2 h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+            onChange={(event) => setCategory(event.target.value)}
+            required
+            value={category}
+          >
+            <option value="">Select a category</option>
+            {listTrainingLoggerCategories().map((categoryLabel) => (
+              <option key={categoryLabel} value={categoryLabel}>{categoryLabel}</option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          className="mt-5 min-h-12 w-full rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-40"
+          disabled={!canSubmit}
+          type="submit"
         >
-          <option value="">Select a category</option>
-          {listTrainingLoggerCategories().map((categoryLabel) => (
-            <option key={categoryLabel} value={categoryLabel}>{categoryLabel}</option>
-          ))}
-        </select>
-      </label>
-
-      <button
-        className="mt-5 min-h-12 w-full rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-40"
-        disabled={!canSubmit}
-        onClick={() => onCreate({ category, name: name.trim() })}
-        type="button"
-      >
-        Add to workout
-      </button>
-    </Card>
+          Add to workout
+        </button>
+      </Card>
+    </form>
   );
 }
 

@@ -83,6 +83,43 @@ describe("production Training Logger integration", () => {
     expect(appleHealthServiceSource).toContain("provisionalExercise: structuredClone");
   });
 
+  it("keeps Create new exercise visible above canonical results and the sticky action", () => {
+    const picker = clientSource.match(
+      /function ExerciseSelectionScreen[\s\S]*?\n}\n\nfunction CreateNewExerciseForm/
+    )?.[0] ?? "";
+    const searchPosition = picker.indexOf('placeholder={broadCatalog ? "Search all exercises"');
+    const createPosition = picker.indexOf("Create new exercise", searchPosition);
+    const resultsPosition = picker.indexOf('<div className="space-y-2">', searchPosition);
+    const stickyActionPosition = picker.indexOf("<BottomAction", resultsPosition);
+
+    expect(picker).toContain("{production && broadCatalog && (");
+    expect(picker).not.toContain("canCreateExercise && available.length === 0");
+    expect(picker).not.toContain("canCreateExercise");
+    expect(searchPosition).toBeGreaterThan(-1);
+    expect(createPosition).toBeGreaterThan(searchPosition);
+    expect(resultsPosition).toBeGreaterThan(createPosition);
+    expect(stickyActionPosition).toBeGreaterThan(resultsPosition);
+  });
+
+  it("uses the same visible create action for Add and Swap and opens the bounded form", () => {
+    const picker = clientSource.match(
+      /function ExerciseSelectionScreen[\s\S]*?\n}\n\nfunction CreateNewExerciseForm/
+    )?.[0] ?? "";
+    const createForm = clientSource.match(
+      /function CreateNewExerciseForm[\s\S]*?\n}\n\nfunction LoggerScreen/
+    )?.[0] ?? "";
+
+    expect(picker).toContain("swappingExercise");
+    expect(picker).toContain("setCreatingNewExercise(true)");
+    expect(picker).toContain("<CreateNewExerciseForm");
+    expect(picker).not.toMatch(/!swappingExercise[\s\S]{0,300}Create new exercise/);
+    expect(createForm).toContain("<form onSubmit=");
+    expect(createForm).toMatch(/placeholder="Exercise name"\s+required/);
+    expect(createForm).toContain("<option value=\"\">Select a category</option>");
+    expect(createForm).toMatch(/required\s+value={category}/);
+    expect(createForm).toContain('type="submit"');
+  });
+
   it("offers an atomic exercise swap without carrying the old occurrence values", () => {
     expect(clientSource).toContain('label="Swap exercise"');
     expect(clientSource).toContain("swapTrainingExercise(current, swapExerciseId");
