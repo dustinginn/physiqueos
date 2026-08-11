@@ -2,11 +2,11 @@
 
 Status: active operational gate
 
-Last audited: 2026-08-10
+Last audited: 2026-08-11
 
-Audited revision: `f6944940232a`
+Implementation base revision: `a4c759fd`
 
-Foundation design: complete and recommended 2026-08-10; implementation remains gated by the explicit approvals and exit evidence below
+Foundation design: approved for the initial Founder-stage direction; Phase 1 structural foundation accepted inactive on 2026-08-11. Production activation remains gated by the exit evidence below.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -16,19 +16,20 @@ Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
 The production behavior is rich and well tested, but the current runtime is not a secure shared-client platform. The critical path is authentication/authorization, canonical persistence, private object storage, application APIs, and cross-client correctness. No production data was changed during this audit.
 
-Observed read-only runtime checkpoint on 2026-08-10:
+Observed production runtime checkpoint after the Founder's legitimate Aug 10-11 logging activity:
 
 - runtime schema/version: `founder-seed-v2`
-- persisted revision: `104`
-- updated at: `2026-08-10T20:54:10.693Z`
-- runtime file size: approximately 25.8 MB
+- persisted revision: `107`
+- updated at: `2026-08-11T13:46:05.401Z`
+- runtime file size: `25,964,481` bytes
+- runtime SHA-256: `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1`
 - audited source: 1,389 files under `src`, including 498 test files and 95 page/route files
 
-The prior checkpoint’s lower runtime revision was stale, so operational status must never be inferred from an old document. Runtime record contents and credentials are intentionally omitted.
+Revision `104` was the valid pre-upload checkpoint. The Founder then uploaded Aug 10 Nutrition and Activity, completed the Aug 10 Foam Roll and Tesamorelin priorities, and entered the Aug 11 weight; revision `107` is therefore expected user-authored production state. The bounded acceptance harness observed the revision, size, and hash above unchanged before and after validation. Runtime record contents and credentials are intentionally omitted.
 
 ## Foundation decision snapshot
 
-The repository-grounded recommendation is now concrete. Full rationale, contracts, schema families, migration rules, approvals, and implementation file inventory are canonical in `docs/PHYSIQUEOS_NATIVE_V1.md` sections 18-32.
+The repository-grounded recommendation is now concrete. Full rationale, contracts, schema families, migration rules, approvals, implementation file inventory, and the Phase 1 checkpoint are canonical in `docs/PHYSIQUEOS_NATIVE_V1.md` sections 18-33.
 
 ```text
 production web + /api/v1 (one Next.js modular monolith)
@@ -38,15 +39,25 @@ production web + /api/v1 (one Next.js modular monolith)
 future iOS ------/
 ```
 
-- **Runtime:** DigitalOcean App Platform in an approved US region, one immutable build with web and worker process types, Managed PostgreSQL 17, and a private versioned DigitalOcean Space. Start with one web instance during foundation validation and move to two before iOS daily-driver acceptance. Provider/account/region/budget and operator approval are still required.
+- **Runtime:** DigitalOcean App Platform is approved as the eventual provider: an approved US region, one immutable build with web and worker process types, Managed PostgreSQL 17, and a private versioned DigitalOcean Space. Founder-stage cost targets USD 25-35/month and may not exceed USD 50/month without approval. Account owner, exact region, alert recipient, and operator remain required before provisioning; nothing was provisioned in Phase 1.
 - **Persistence:** relational/JSONB bounded PostgreSQL schema; legacy IDs preserved as text, new IDs use UUIDv7 strings; `user_id` on every owned record; bigint aggregate versions; explicit SQL migrations; no runtime snapshot table.
 - **Concurrency:** optimistic version checks, unique idempotency receipts with request hashes, database constraints, atomic multi-record commands, stable occurrence/source identities, and a durable transactional outbox. Stale state is rejected, never silently overwritten.
 - **Files:** database-owned opaque object identity, private S3-compatible bytes, direct resumable uploads with verified receipts, five-minute authorized reads, versioning plus an independent backup copy. Filesystem paths and permanent URLs leave client contracts.
-- **Authentication:** server-created Founder user, web passkey, authenticated web-issued one-time iOS pairing code, revocable device sessions, 10-minute access token, rotating refresh credentials. Face ID/eight-digit PIN only unlock local credentials; forgotten/locked PIN requires re-enrollment.
+- **Authentication:** server-created Founder user, web passkey, authenticated web-issued one-time iOS pairing code, revocable device sessions, 10-minute access token, and rotating refresh credentials. Face ID/eight-digit PIN only unlock local credentials. Progressive PIN delays culminate in local credential invalidation and recovery-credential/re-enrollment; canonical Founder data is never deleted. The one-time high-entropy recovery credential is stored externally in the Founder's password manager, not delivered through consumer email/password recovery.
 - **API:** REST/JSON `/api/v1`, OpenAPI 3.1, bounded read models and task commands, cursors/ETags/typed destinations/operations/change feed, RFC 9457-style errors, additive compatibility for current and previous accepted build for at least 180 days.
 - **Cutover:** deterministic rehearsals on copies, compatibility release, short read-only final fence targeted below 10 minutes (automatic abort at 15 before a database write), complete snapshot/file verification, then web becomes the first production shared-platform client. No production dual-write.
 - **Offline:** seven-day protected read cache and narrow safe command queue; sensitive edits/confirmation require live state. Live Workout later uses one editor lease and versioned durable autosave.
 - **Stage 2 foundation:** create occurrence/outbox, Health source/checkpoint, notification-intent, and workout-draft identities/contracts on Windows; do not implement HealthKit, APNs presentation, or SwiftUI in this phase.
+
+## Phase 1 implementation checkpoint
+
+**Accepted as additive structural preparation; all shared-platform activation remains off.** Phase 1 added the versioned contract/error/identity/command layer, an initial OpenAPI 3.1 API skeleton, an explicit PostgreSQL migration, opt-in database composition, private-object ports with a deterministic test adapter, idempotency/version/transaction/outbox primitives, migration-manifest validation, and redacted observability/readiness seams.
+
+The current production web application still uses the existing canonical JSON/file runtime. No DigitalOcean resources were provisioned, no PostgreSQL database was created or contacted, no authentication gate was activated, and no evidence was moved. The new readiness endpoint reports not ready and the protected platform endpoint denies access until later production composition is deliberately supplied.
+
+Bounded validation on 2026-08-11 passed 15 test files / 90 tests, targeted lint, the production build, `git diff --check`, and smoke checks for `/api/health`, `/`, and `/log`. PostgreSQL/Docker was not available, so the migration has structural up/down coverage but still requires a real isolated-database integration test before activation.
+
+The Windows worker environment has a 4 GB heap constraint. Unrestricted repository-wide concurrent Vitest execution can exhaust that environment and interleave production-state-dependent tests; the observed failed all-files run is classified as an environment/resource failure with test-order/concurrency contamination. It is not an acceptance gate and must not be rerun in that mode. Repository-wide coverage is not waived: future Windows validation must run explicit serial or tightly bounded groups, isolating production-state-dependent suites. `npm run validate:foundation` is the reusable Phase 1 checkpoint command unless the environment changes.
 
 ## Status legend
 
@@ -61,13 +72,13 @@ future iOS ------/
 
 | Gate | Status | Dependency | Exit evidence | Suggested owner |
 |---|---|---|---|---|
-| 0. Decision lock | Blocked (design complete; approvals pending) | product/operations choices | approve the rows explicitly marked in Native V1 section 18 that affect provider/cost, auth recovery, privacy/retention, distribution, and source remediation | Product + platform |
+| 0. Decision lock | Partially complete | product/operations choices | Provider direction/cost ceiling, recovery/PIN, native cache retention, passive source remediation, TestFlight, compatibility, and web fallback are approved; account/region/operator, object-deletion policy, notification details, Health types, and iOS floor remain gated at their implementation points | Product + platform |
 | 1. Founder data/privacy containment | Blocked / critical | Gate 0 | no Founder records in distributable client/source artifact; credential rotation/remediation plan; privacy inventory | Security + backend |
 | 2. Authenticated identity boundary | Blocked / critical | Gate 0 | enrollment/session/revoke endpoints; every protected read/write/media request derives Founder from session; negative auth tests | Backend + iOS security |
-| 3. Durable canonical persistence | Needs work / critical | Gates 0-1 | transactional database, user-scoped schema, revisions/idempotency constraints, migration/rollback rehearsal | Backend/data |
-| 4. Private object storage | Needs work / critical | Gates 1-2 | authorized uploads/renditions, stable receipts, size/content policy, encrypted backup/restore | Backend/security |
-| 5. Durable downstream work | Needs work | Gate 3 | evidence/briefing/notification work survives restart, records progress, retries idempotently, observable failures | Backend |
-| 6. Native-facing contracts | Needs work | Gates 2-5 | versioned schemas for read models, commands, errors, destinations, pagination/cache, generated/validated fixtures | Backend + clients |
+| 3. Durable canonical persistence | Structural schema ready; production blocked / critical | Gates 0-1 | Phase 1 migration and transaction/version/idempotency primitives exist; real PostgreSQL adapters, isolated DB tests, import, deployment, and rollback rehearsal remain | Backend/data |
+| 4. Private object storage | Structural abstraction ready; production blocked / critical | Gates 1-2 | ownership/read-handle contracts and test adapter exist; provider adapter, authorized upload/rendition policy, backup/restore, and evidence migration remain | Backend/security |
+| 5. Durable downstream work | Structural outbox primitive ready; production needs work | Gate 3 | atomic receipt/outbox behavior is tested in memory; durable worker, restart/retry/dead-letter operation, and production observability remain | Backend |
+| 6. Native-facing contracts | Initial foundation ready; domain surface needs work | Gates 2-5 | common contracts and minimal health/platform OpenAPI are tested; bounded domain read models/commands, fixtures, change feed, and compatibility suite remain | Backend + clients |
 | 7. Presentation logic extraction | Needs work | Gate 6 design | Goals/Operating Plan/Evidence orchestration and route mapping callable without React/Next | Domain/web |
 | 8. Web cutover to shared boundary | Blocked by 2-7 | Gates 2-7 | web parity tests pass on migrated canonical store; no singleton/file path in production request flow | Web + backend |
 | 9. Cross-client correctness | Blocked by 8 | Gate 8 | replay, stale update, simultaneous web/native, partial failure, and invalidation contract tests pass | QA/platform |
@@ -133,6 +144,8 @@ This is the operational summary. The authoritative dependency order, task classi
 Exit: privacy threat model and data-flow diagram approved; distribution/auth/hosting direction recorded.
 
 ### Phase 1 — contracts before implementation
+
+Checkpoint: the bounded common-contract and foundation-schema subset is implemented and validated inactive. The broader domain contract map and real isolated PostgreSQL verification remain required; Phase 1 completion does not satisfy any production-activation gate by itself.
 
 1. Define canonical user/resource/occurrence IDs and per-resource versions.
 2. Define the command envelope, idempotency receipts, conflict/error vocabulary, local-date/time-zone contract, and audit event fields.
@@ -285,4 +298,16 @@ Significant SwiftUI work may begin only when all are true:
 
 ## Current validation evidence
 
-The audit and foundation-design phase performed read-only source/runtime inspection and documentation-only edits. It selected a recommended architecture and migration sequence but did not alter production data, refactor production source, provision infrastructure, implement persistence/API/auth, create iOS code, or claim Apple validation. Xcode, simulator, device, HealthKit, notification, Share Extension, and signing status remain unvalidated.
+Phase 1 is now implemented as inactive, additive code. The accepted bounded run executed these groups sequentially: focused foundation (9 files / 32 tests), persistence isolation (2 files / 29 tests), and adjacent application services (4 files / 29 tests). All 15 files / 90 tests passed. Targeted lint, production Next.js build, `git diff --check`, and current-runtime smoke checks passed. No unresolved deterministic product or foundation regression remains.
+
+Failures encountered and disposition:
+
+- One new error-contract assertion expected an error title where the implementation correctly exposed the detail as the JavaScript `Error.message`: **test fixture/assertion defect**, corrected in the test.
+- New route tests initially relied on a Vitest-unconfigured `@/` alias: **test-harness/module-resolution defect**, corrected by using relative imports in only the new routes.
+- The first reusable harness run passed all tests/lint but Windows returned `EINVAL` while spawning `npm.cmd` for the build: **test-harness defect**, corrected by invoking the local Next CLI through Node.
+- The earlier unrestricted all-files run exceeded the 4 GB worker heap after approximately ten minutes and surfaced concurrently observed production-state tests: **environment/resource failure plus test-order/concurrency contamination**. No individual result from that run is treated as a regression without bounded deterministic reproduction, and no bounded reproduction failed.
+- Full repository lint previously exceeded the available command window without producing an error: **environment/tool-duration limitation**. Targeted lint over the complete changed surface is the accepted result for this patch.
+
+The runtime checkpoint was revision `107`, size `25,964,481` bytes, modified `2026-08-11T13:46:05.401Z`, SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1` both before and after the final harness. No stale Vitest/Jest/test-worker process attributable to the failed run remained, and no process was terminated. Existing production Node processes were left untouched.
+
+The implementation did not provision infrastructure, migrate or activate PostgreSQL, activate authentication, move evidence, alter canonical persistence, cut over the web, create iOS code, or claim Apple validation. Xcode, simulator, device, HealthKit, notification, Share Extension, signing, real-database migration, provider object storage, worker restart, backup, and restore status remain unvalidated.

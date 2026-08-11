@@ -1,0 +1,62 @@
+import { createPayloadHash } from "../../contracts/v1/canonicalJson";
+import { createUuidV7 } from "../../contracts/v1/identifiers";
+import { FOUNDATION_RUNTIME_METADATA_KEYS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections";
+
+export const MIGRATION_MANIFEST_VERSION = "1";
+
+export function createMigrationManifest({ source, collections, files = [], relationships = [], criticalValues = {}, createdAt }, options = {}) {
+  const sourceKeys = Object.keys(collections ?? {});
+  const unknown = sourceKeys.filter((key) => !FOUNDATION_SOURCE_COLLECTIONS.includes(key));
+  if (unknown.length) throw new Error(`Unknown migration source collections: ${unknown.sort().join(", ")}`);
+  const entries = sourceKeys.sort().map((name) => createCollectionEntry(name, collections[name]));
+  const fileEntries = files.map(validateFileEntry).sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  const manifest = {
+    manifestVersion: MIGRATION_MANIFEST_VERSION,
+    migrationId: options.migrationId ?? createUuidV7(options),
+    createdAt,
+    importerVersion: String(source.importerVersion),
+    targetSchemaVersion: String(source.targetSchemaVersion),
+    source: {
+      repositoryRevision: String(source.repositoryRevision),
+      runtimeVersion: String(source.runtimeVersion),
+      runtimeRevision: String(source.runtimeRevision),
+      runtimeSha256: validateSha256(source.runtimeSha256, "runtimeSha256"),
+    },
+    collections: entries,
+    relationships: structuredClone(relationships),
+    criticalValues: structuredClone(criticalValues),
+    files: fileEntries,
+    result: "pending",
+    validationResult: "pending",
+  };
+  return Object.freeze({ ...manifest, semanticDigest: createPayloadHash(manifest) });
+}
+
+export function validateMigrationSourceKeys(sourceObject) {
+  const allowed = new Set([...FOUNDATION_RUNTIME_METADATA_KEYS, ...FOUNDATION_SOURCE_COLLECTIONS]);
+  const unknown = Object.keys(sourceObject ?? {}).filter((key) => !allowed.has(key));
+  if (unknown.length) throw new Error(`Unknown runtime source keys: ${unknown.sort().join(", ")}`);
+  return true;
+}
+
+function createCollectionEntry(name, records) {
+  const values = records == null ? [] : Array.isArray(records) ? records : [records];
+  const ids = values.map((record, index) => resolveRecordId(record, index));
+  return Object.freeze({ sourceCollection: name, recordCount: values.length, exactIds: Object.freeze(ids), semanticDigest: createPayloadHash(values), migrationResult: "pending", validationResult: "pending" });
+}
+
+function resolveRecordId(record, index) {
+  const id = record?.id ?? record?.package_id ?? record?.review_id;
+  return id == null ? `@index:${index}` : String(id);
+}
+
+function validateFileEntry(file) {
+  if (!file?.relativePath || !Number.isSafeInteger(file.size) || file.size < 0 || !file.mimeType) throw new Error("Migration file path, size, and MIME type are required.");
+  return Object.freeze({ relativePath: String(file.relativePath), size: file.size, sha256: validateSha256(file.sha256, "file.sha256"), mimeType: String(file.mimeType), ownerUserId: String(file.ownerUserId), relationshipIds: Object.freeze([...(file.relationshipIds ?? [])].map(String)), migrationResult: "pending", validationResult: "pending" });
+}
+
+function validateSha256(value, field) {
+  const candidate = String(value ?? "").toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(candidate)) throw new Error(`${field} must be SHA-256 hex.`);
+  return candidate;
+}

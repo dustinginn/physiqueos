@@ -1,0 +1,212 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PhysiqueOS Application API",
+    "version": "1.0.0-foundation.1",
+    "description": "Inactive Phase 1 shared-platform boundary. Protected endpoints require a server-resolved principal; the production authenticator deliberately denies access until a later activation phase. Future mutations use Idempotency-Key, UUIDv7 commandId, canonical payload hashing, and If-Match/expectedVersion. Collections use bounded opaque cursors."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getFoundationLiveness",
+        "summary": "Return non-sensitive process liveness",
+        "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "headers": { "X-Request-ID": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Liveness" } } }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getFoundationReadiness",
+        "summary": "Return minimal shared-platform readiness",
+        "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+        "responses": {
+          "200": {
+            "description": "Every required shared-platform dependency is ready",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Readiness" } } }
+          },
+          "503": {
+            "description": "One or more shared-platform dependencies are intentionally inactive or unavailable",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Readiness" } } }
+          }
+        }
+      }
+    },
+    "/platform": {
+      "get": {
+        "operationId": "getPlatformStatus",
+        "summary": "Return protected platform build, readiness, and capability state",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+        "responses": {
+          "200": {
+            "description": "Authenticated platform status",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlatformStatus" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "opaque" }
+    },
+    "parameters": {
+      "RequestId": {
+        "name": "X-Request-ID",
+        "in": "header",
+        "required": false,
+        "schema": { "type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9._:/-]+$" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "ETag/resource version required for edits. A stale value returns 412.",
+        "schema": { "type": "string" }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    },
+    "headers": {
+      "RequestId": { "description": "Server-accepted or generated request correlation ID", "schema": { "type": "string" } },
+      "ResourceEtag": { "description": "Version validator for the returned resource/read model", "schema": { "type": "string" } }
+    },
+    "responses": {
+      "Problem": {
+        "description": "Versioned structured problem",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      }
+    },
+    "schemas": {
+      "UuidV7": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F-]{36}$" },
+      "AggregateVersion": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+      "CommandMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["commandId", "idempotencyKey", "payloadVersion"],
+        "properties": {
+          "commandId": { "$ref": "#/components/schemas/UuidV7" },
+          "idempotencyKey": { "type": "string", "minLength": 16, "maxLength": 200 },
+          "expectedVersion": { "oneOf": [{ "$ref": "#/components/schemas/AggregateVersion" }, { "type": "null" }] },
+          "payloadVersion": { "type": "string" },
+          "clientOccurredAt": { "type": ["string", "null"], "format": "date-time" },
+          "clientTimeZone": { "type": ["string", "null"] }
+        }
+      },
+      "Destination": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "parameters"],
+        "properties": {
+          "id": { "type": "string", "enum": ["platform.status", "operation.detail"] },
+          "parameters": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "CursorPage": {
+        "type": "object",
+        "required": ["items", "nextCursor", "resourceVersion"],
+        "properties": {
+          "items": { "type": "array", "items": {} },
+          "nextCursor": { "type": ["string", "null"] },
+          "resourceVersion": { "$ref": "#/components/schemas/AggregateVersion" }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["problemVersion", "type", "title", "status", "code", "fieldErrors"],
+        "properties": {
+          "problemVersion": { "const": "1" },
+          "type": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+          "code": { "type": "string" },
+          "detail": { "type": ["string", "null"] },
+          "instance": { "type": ["string", "null"] },
+          "requestId": { "type": ["string", "null"] },
+          "fieldErrors": { "type": "array", "items": { "type": "object" } },
+          "recovery": { "type": ["object", "null"] }
+        }
+      },
+      "Liveness": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "buildId", "apiVersion", "startedAt"],
+        "properties": {
+          "status": { "const": "ok" },
+          "buildId": { "type": "string" },
+          "apiVersion": { "const": "v1" },
+          "startedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ReadinessCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "ready", "code"],
+        "properties": { "name": { "type": "string" }, "ready": { "type": "boolean" }, "code": { "type": "string" } }
+      },
+      "Readiness": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "buildId", "apiVersion", "checks"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ready", "not_ready"] },
+          "buildId": { "type": "string" },
+          "apiVersion": { "const": "v1" },
+          "checks": { "type": "array", "items": { "$ref": "#/components/schemas/ReadinessCheck" } }
+        }
+      },
+      "FeatureCapability": {
+        "type": "object",
+        "required": ["key", "enabled"],
+        "properties": {
+          "key": { "type": "string" }, "enabled": { "type": "boolean" },
+          "platforms": { "type": ["array", "null"], "items": { "type": "string" } },
+          "minimumBuild": { "type": ["integer", "null"] }
+        }
+      },
+      "PlatformStatus": {
+        "type": "object",
+        "required": ["contractVersion", "apiVersion", "build", "readiness", "capabilities", "destination"],
+        "properties": {
+          "contractVersion": { "const": "1" },
+          "apiVersion": { "const": "v1" },
+          "build": { "type": "object" },
+          "readiness": { "$ref": "#/components/schemas/Readiness" },
+          "capabilities": { "type": "array", "items": { "$ref": "#/components/schemas/FeatureCapability" } },
+          "destination": { "$ref": "#/components/schemas/Destination" }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "required": ["operationVersion", "id", "status"],
+        "properties": {
+          "operationVersion": { "const": "1" },
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "canceled"] },
+          "result": {},
+          "problem": { "oneOf": [{ "$ref": "#/components/schemas/Problem" }, { "type": "null" }] }
+        }
+      }
+    }
+  }
+}

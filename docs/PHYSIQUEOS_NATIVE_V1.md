@@ -2,11 +2,11 @@
 
 Status: living canonical transition document
 
-Last audited: 2026-08-10
+Last audited: 2026-08-11
 
-Foundation design decision: recommended 2026-08-10; implementation awaits only the approvals explicitly marked in section 18
+Foundation design decision: approved for the initial Founder-stage direction; Phase 1 structural implementation completed inactive on 2026-08-11. Remaining production and product approvals are recorded in section 18.
 
-Audited revision: `f6944940232a`
+Implementation base revision: `a4c759fd`
 
 Authority: current production behavior remains authoritative; this document records the approved transition constraints and must change when a material decision changes.
 
@@ -452,6 +452,18 @@ Engineering choices are recommendations in force for implementation planning unl
 | Founder source remediation | Stop treating tracked Founder seed records as deployable production data; rotate exposed credentials; decide whether repository history must be rewritten only after a scoped exposure review. | A history rewrite is disruptive and should follow evidence, while deployable artifacts must become clean immediately. | Old commits may remain sensitive until the review and any rewrite are complete. | **Yes — history rewrite/rotation scope.** |
 | iOS support floor | Select the oldest iOS/device version only during Mac baseline preparation, then hold it for the V1 support window. | The choice depends on actual Xcode/SDK and device availability, not Windows inference. | A newer floor reduces compatibility testing but excludes older hardware. | **Yes — during Mac acceptance preparation.** |
 
+Recorded Founder decisions for the Phase 1 implementation boundary (2026-08-11):
+
+- DigitalOcean is approved as the eventual provider. Founder-stage infrastructure targets approximately USD 25-35/month and must remain at or below USD 50/month without additional approval. Account ownership, region, billing-alert recipient, and named operator remain required before provisioning. Phase 1 does not provision anything.
+- Founder recovery uses a one-time high-entropy recovery credential created during enrollment and stored externally in the Founder's password manager. Consumer email/password recovery is excluded.
+- The local fallback PIN is eight digits with progressive delay. Crossing the security threshold invalidates local credentials and requires the recovery credential/re-enrollment path; it never deletes canonical Founder data.
+- The seven-day encrypted read-model cache and maximum 24-hour protected temporary media/upload retention are approved for later native implementation.
+- Source remediation is passive for now: prevent sensitive Founder material from entering distributable artifacts and rotate credentials when indicated, but do not rewrite repository history without a separate scoped decision.
+- Private TestFlight is approved for initial native acceptance. Final App Store distribution remains a later decision.
+- High-safety compatibility and the production web fallback are approved requirements: no native release may make an unvalidated native build mandatory or weaken the web client.
+
+These decisions supersede the corresponding approval wording in the table where they are more specific. Object-deletion retention, notification presentation policy, exact Apple Health types, iOS support floor, and the DigitalOcean account/region/operator details remain unresolved at their later implementation gates.
+
 ## 19. Shared-platform architecture decision
 
 ### 19.1 Target topology
@@ -785,6 +797,8 @@ No significant SwiftUI implementation starts until Phase 8 reaches the named gat
 
 ### Phase 1 — contracts and schema
 
+Implementation checkpoint (2026-08-11): the bounded Phase 1 structural subset is complete and intentionally inactive. Shared contracts, identity/error/command/concurrency primitives, an initial OpenAPI surface, PostgreSQL foundation migration, private-object abstraction, migration-manifest validation, and observability/readiness seams now exist. This is not a production database, authentication, object-store, worker, deployment, domain API, or cutover completion; those remain gated below.
+
 | Class | Work | Exit evidence |
 |---|---|---|
 | **WINDOWS IMPLEMENTATION** | Add OpenAPI/JSON schemas, error vocabulary, command envelope/receipts, typed destinations, pagination/cache/change-feed contracts, and golden synthetic fixtures. | Contract tests; no DTO exposes a repository, server path, secret, or runtime snapshot. |
@@ -886,3 +900,38 @@ No file in this table is changed merely by this foundation-design decision; it i
 | Tests | contract/schema/golden fixtures, PostgreSQL integration tests, auth/media negative suites, migration parity, outbox restart, concurrent simulated clients, API compatibility, cutover/rollback, backup/object restore, and web fallback end-to-end tests alongside existing domain regressions. |
 
 Repository-grounded deviation from the prior roadmap: foundation extraction precedes SwiftUI and the production web cutover precedes native dependency. The earlier product aspiration to prioritize Apple Health/Live Workout cannot determine implementation order because the current singleton, filesystem, unauthenticated route, and presentation-owned orchestration are shared-state blockers. Their product scope remains; their sequencing moves behind the shared-platform gate.
+
+## 33. Phase 1 implementation checkpoint
+
+Status on 2026-08-11: **accepted as an additive, production-isolated structural foundation; inactive by design.** The implementation started from clean checkpoint `a4c759fd`. The current JSON/file runtime remains canonical and no existing production module imports or depends on the new foundation composition.
+
+Implemented:
+
+- Versioned contracts for UUIDv7/new identifiers, exact legacy-ID preservation, canonical JSON/request hashing, structured application problems, typed destinations, cursor pagination, command receipts, operations, and authenticated principals.
+- An atomic idempotent-command primitive with stable source/occurrence identity, expected-version checking, payload-mismatch rejection, and transactional receipt/outbox behavior.
+- A PostgreSQL foundation migration for users/profiles, devices and hash-only credentials, sessions, operations, command receipts, outbox messages, private object metadata/upload intents, worker heartbeats, feature flags, and migration runs. Explicit `node-pg-migrate` up/down definitions and lazy opt-in database composition were added; no database is contacted unless explicitly enabled.
+- Private-object contracts and a deterministic in-memory test adapter with ownership authorization and read handles capped at five minutes. No provider URL or server path enters a client contract.
+- Correlation IDs, redacting structured logs, build identity, health/readiness/heartbeat primitives, and fail-closed feature flags.
+- A deliberately small OpenAPI 3.1 surface: public `/api/v1/health/live`, inactive readiness at `/api/v1/health/ready`, and protected `/api/v1/platform`. The production authenticator denies access as `FOUNDATION_AUTH_INACTIVE`; only tests may inject the explicit test authenticator.
+- A deterministic migration-manifest builder that recognizes the enumerated current source collections and fails closed on an unknown source. It reads and validates; it does not import or mutate production.
+- A bounded Windows acceptance harness (`npm run validate:foundation`) and single-worker Vitest configuration.
+
+Intentionally inactive or deferred:
+
+- DigitalOcean provisioning, executable deployment specifications, production secrets, PostgreSQL production adapters, database migration/import, object transfer, real Founder enrollment/session activation, a durable worker, domain-facing APIs, and production web cutover.
+- SwiftUI, Xcode, TestFlight execution, HealthKit, APNs, Share Extension, and every other Apple-specific implementation.
+- Existing Founder runtime persistence and evidence locations are unchanged and remain authoritative.
+
+Validation evidence:
+
+- Focused foundation: 9 files / 32 tests passed serially.
+- Persistence isolation: 2 files / 29 tests passed serially.
+- Adjacent application services: 4 files / 29 tests passed serially.
+- Total bounded regression result: 15 files / 90 tests passed; targeted lint, production build, and `git diff --check` passed.
+- Current web smoke checks passed for `/api/health`, `/`, and `/log` against the unchanged production path.
+- PostgreSQL/Docker tooling was unavailable locally, so migration acceptance is structural up/down verification rather than a real isolated-database integration test. A real database test remains required before activation.
+- The user-authored Aug 10 Nutrition/Activity uploads and Foam Roll/Tesamorelin completions plus the Aug 11 weight moved the legitimate production checkpoint to revision `107`. The bounded acceptance harness observed revision `107`, size `25,964,481` bytes, and SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1` both before and after validation.
+
+Windows validation constraint: the current worker environment has a 4 GB heap. One unrestricted repository-wide concurrent Vitest run exhausted that environment after approximately ten minutes and mixed production-state-dependent tests across workers. That result is classified as an environment/resource failure with test-order/concurrency contamination, not as evidence of a product regression. Do not repeat that execution mode or increase the heap merely to force it through. Repository-wide coverage remains required, but on this environment it must be executed as explicit deterministic groups, serially or with tightly bounded workers, with production-state-dependent suites isolated. The reusable Phase 1 harness is the accepted checkpoint command unless the environment changes.
+
+No architecture deviation was introduced. The only implementation refinements are the recorded recovery/PIN semantics, passive source-remediation scope, and bounded Windows test execution strategy. The next dependency-ordered work is Phase 2 platform adapters and operations, but it must begin as a separate high-safety patch after this checkpoint is preserved.
