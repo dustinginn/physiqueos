@@ -75,7 +75,7 @@ export function presentEvidenceObject(object = {}, evidencePackage = {}) {
     type,
   };
 
-  if (type === "training") return presentTraining(object, common);
+  if (type === "training") return presentTraining(object, common, evidencePackage);
   if (type === "weight") return presentWeight(object, common);
   if (type === "activity") return presentActivity(object, common);
   if (type === "nutrition") return presentNutrition(object, common);
@@ -118,7 +118,7 @@ export function formatDuration(seconds, { clock = false } = {}) {
   return minutes > 0 ? `${minutes} min` : `${remaining} sec`;
 }
 
-function presentTraining(object, common) {
+function presentTraining(object, common, evidencePackage = {}) {
   const metadata = object.metadata ?? {};
   const groups = normalizeTrainingExerciseRelationshipGroups(
     object.exerciseRelationshipGroups,
@@ -141,21 +141,34 @@ function presentTraining(object, common) {
   const groupedExerciseIds = new Set(
     groups.flatMap((group) => group.memberExerciseIds)
   );
+  const loggerSummary = evidencePackage.review_metadata?.presentationMode === "training_logger_summary" &&
+    object.metadata?.logger_origin === "training_logger";
+  const setCount = (object.exercises ?? []).reduce(
+    (total, exercise) => total + (exercise.sets?.length ?? 0),
+    0
+  );
   return {
     ...common,
-    title: metadata.activity_type ?? object.title ?? "Workout",
+    title: loggerSummary ? "Detailed strength workout" : metadata.activity_type ?? object.title ?? "Workout",
     noun: "workout",
-    metrics: compact([
+    metrics: loggerSummary ? compact([
+      metric("Exercises", String(object.exercises?.length ?? 0)),
+      metric("Sets", String(setCount)),
+      metric("Apple duration", formatDuration(metadata.duration_seconds)),
+      metric("Active calories", calories(metadata.active_calories)),
+      metric("Apple link", object.reconciliation?.source_workout_id ? "Linked" : "Not linked"),
+      metric("Source", common.sourceLabel),
+    ]) : compact([
       metric("Duration", formatDuration(metadata.duration_seconds)),
       metric("Active calories", calories(metadata.active_calories)),
       metric("Average heart rate", unit(metadata.average_heart_rate, "bpm")),
       metric("Source", common.sourceLabel),
     ]),
-    exercises: presentedExercises,
-    standaloneExercises: presentedExercises.filter(
+    exercises: loggerSummary ? [] : presentedExercises,
+    standaloneExercises: loggerSummary ? [] : presentedExercises.filter(
       (exercise) => !groupedExerciseIds.has(exercise.id)
     ),
-    exerciseRelationshipGroups: groups.map((group) => ({
+    exerciseRelationshipGroups: loggerSummary ? [] : groups.map((group) => ({
       id: group.id,
       relationshipType: group.relationshipType,
       memberExerciseIds: group.memberExerciseIds,

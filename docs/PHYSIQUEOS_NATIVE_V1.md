@@ -209,11 +209,12 @@ exercise-occurrence, set, execution-context, reconciliation, and final
 durability, but it must not create parallel workout semantics or client-specific
 session types.
 
-The isolated web Training Logger preview is the proving ground for this shared
-experience. Interaction patterns and platform-neutral draft logic that survive
-review should be promoted into the production web logger and then expressed by
-the SwiftUI client. Preview state is non-canonical and must never mutate a
-confirmed `TrainingSession`.
+The production web Training Logger at `/log/training` is now the accepted
+pre-iOS implementation. The isolated `/preview/training-logger` route remains
+available as a memory-only interaction reference and never mutates a confirmed
+`TrainingSession`. Production reuses that accepted interaction model while
+routing history, progression, Apple evidence, Evidence Review, and confirmation
+through canonical PhysiqueOS owners.
 
 In live mode, a workout can begin with a stable identity and accumulate
 movements, sets, reps, load, and relevant context throughout training. Saving
@@ -231,10 +232,13 @@ Training Strategy schedules describe intent and may provide context, but they
 must not become the behavioral source of truth when observed training rhythm
 differs from the plan.
 
-If the application is interrupted, the user should return to the same in-flight
-workout with confirmed progress intact. Recovery should be calm and explicit.
-Connectivity loss, process interruption, or device suspension should not turn
-one training session into duplicates.
+On web, the non-canonical working draft is recoverable from local browser
+storage. Loaded Training history and Goal context are deliberately excluded
+from the persisted recovery payload and are rehydrated from current canonical
+reads. Evidence packages and pending Evidence Reviews remain server-owned.
+Clearing browser storage or moving devices does not provide recovery; native
+work should replace this bounded web mechanism with durable, encrypted local
+state and synchronization without changing canonical identity.
 
 This is a native expression of the stable identity and incremental persistence
 requirements established at the pre-iOS checkpoint, not a new workout system.
@@ -274,13 +278,16 @@ directly instead of defining client-specific Variant semantics.
 
 ### Adaptive progression guidance
 
-Training Logger progression guidance should be helpful, optional, and relative
-to the active Goal and phase rather than a universal plateau threshold. Its
-future recommendation boundary should consider the user's learned general
-progression cadence, movement-specific cadence, recent comparable history,
-Variant context, and Superset relationship context. A user may apply, modify,
-or ignore a recommendation; guidance does not become evidence and does not
-block logging.
+Training Logger progression guidance is helpful, optional, and relative to the
+active Goal and phase rather than a universal plateau threshold. The shared
+production recommendation service uses a conservative fallback hierarchy:
+Goal/phase expectation, then sufficiently supported user-wide actual cadence,
+then sufficiently supported movement-specific cadence. Only canonical
+exercise occurrences with matching Variant and Superset comparison context
+participate. Insufficient evidence produces no synthetic recommendation;
+precise load or repetition targets appear only when historical increments
+support them. A user may apply, modify, or ignore a recommendation; guidance
+does not become evidence and does not block logging.
 
 ### Workout evidence reconciliation
 
@@ -293,11 +300,14 @@ Evidence Review. Strong matches may be offered directly; ambiguous matches
 require explicit selection; and the user may continue when no match is
 available.
 
-Before native iOS integration, production web capture may later pair a detailed
-Training Logger draft with uploaded Apple Health screenshot evidence through
-the same reconciliation boundary. Native iOS should replace that acquisition
-path with direct HealthKit access without changing the canonical
-`TrainingSession` contract.
+Production web capture pairs a detailed Training Logger draft with zero, one,
+or many Apple Health screenshots through the universal Evidence Intake
+interpreter. The adapter normalizes each visible Apple workout into the same
+reconciliation shape intended for HealthKit: source workout identity, source
+artifact references, date, workout type, supported timing, duration, calories,
+provenance, and consumed state. Missing or ambiguous values remain null. Native
+iOS replaces screenshot acquisition with direct HealthKit access without
+changing reconciliation or the canonical `TrainingSession` contract.
 
 Reconciliation accepts a batch of normalized Apple workout evidence, not only
 one source session. A single user flow may link strength evidence to the
@@ -325,6 +335,45 @@ Manual retrospective logging continues to require a date without fabricating
 an exact start time. Apple source timing may enrich matched evidence later.
 Suggested Today should learn primarily from confirmed workout evidence and
 history, not planned Goal or Training schedule intent.
+
+### Production web Training Logger boundary
+
+The production flow is:
+
+```text
+Log -> Training Logger -> Start Workout | Log Past Workout
+-> detailed draft -> Workout Review -> optional Apple screenshot batch
+-> normalized reconciliation -> canonical Evidence Review -> confirmation
+```
+
+The draft owns interaction-only state such as Done toggles. The proposed
+TrainingSession contains final exercises and sets, canonical exercise IDs,
+stable exercise-occurrence IDs, occurrence Variants, Superset relationship
+groups, workout date, legitimate timing, and source provenance. Logger mode is
+optional provenance and never partitions Training history.
+
+The real Evidence Review lifecycle is the only authorization boundary for the
+canonical write. It presents the detailed strength proposal as workout date,
+exercise count, and set count rather than requiring another set-by-set review.
+Matched Apple duration/calories/linkage and additional workout proposals remain
+visible. Confirmation uses the existing atomic canonical evidence coordinator,
+then the normal Training Library, performance-event, Progress Intelligence,
+reporting, briefing, and Goal-evaluation pipelines.
+
+Candidate filtering happens before presentation. Only relevant, eligible,
+unconsumed Apple source workouts can be selected; source identity is checked
+again while staging Evidence Review to prevent a race or duplicate link.
+Ambiguous strength matches require explicit selection, and no match never
+blocks a valid detailed log. Cardio workouts remain separate canonical
+TrainingSession workout records under existing ownership. Walking is presented
+as optional activity/workout evidence and is excluded by default because the
+current product has no accepted rule to create every Walking workout
+automatically.
+
+`Suggested Today` is emitted only when confirmed Training history contains a
+repeated same-day rhythm with a conservative evidence minimum. Planned Goal or
+Training schedule intent is not an input to this behavior. When history is
+insufficient, production shows no suggestion.
 
 ## Notification philosophy
 

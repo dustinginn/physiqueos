@@ -1,5 +1,5 @@
 import {
-  FOUNDER_ALPHA_TRAINING_EXERCISES,
+  listCanonicalTrainingExerciseIdentities,
 } from "../../../domain/models/trainingExerciseIdentity";
 import {
   listCanonicalTrainingMuscleGroups,
@@ -16,6 +16,17 @@ import {
 import {
   getPrimaryTrainingNavigationGroup,
 } from "../../../navigation/trainingNavigationMapping";
+import {
+  resolvePreviousExerciseOccurrence,
+} from "../../../domain/services/TrainingExerciseOccurrenceHistoryService";
+import {
+  createTrainingLoggerProgressionRecommendation,
+  TRAINING_LOGGER_PROGRESSION_STATUS,
+} from "../../../domain/services/TrainingLoggerProgressionService";
+import {
+  createTrainingLoggerSuggestion,
+} from "../../../domain/services/TrainingLoggerSuggestionService";
+import { createClientDraftId } from "../../../lib/clientDraftId";
 import {
   APPLE_HEALTH_RECONCILIATION_FIXTURES,
   APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
@@ -212,10 +223,17 @@ export function listTrainingLoggerCategories() {
     .map((muscleGroup) => muscleGroup.label);
 }
 
-export function listTrainingLoggerExercises({ categories = [], search = "" } = {}) {
+export function listTrainingLoggerExercises({
+  categories = [],
+  exerciseLibrary = null,
+  search = "",
+} = {}) {
   const selected = new Set(categories.map((category) => category.toLowerCase()));
   const query = String(search).trim().toLowerCase();
-  return FOUNDER_ALPHA_TRAINING_EXERCISES.filter((exercise) => {
+  const canonicalExercises = Array.isArray(exerciseLibrary) && exerciseLibrary.length > 0
+    ? exerciseLibrary
+    : listCanonicalTrainingExerciseIdentities();
+  return canonicalExercises.filter((exercise) => {
     const categoryMatches = selected.size === 0 || getExerciseTrainingCategories(exercise)
       .some((category) => selected.has(category));
     const searchMatches = !query || [exercise.name, exercise.movement_pattern, exercise.equipment]
@@ -223,6 +241,87 @@ export function listTrainingLoggerExercises({ categories = [], search = "" } = {
       .some((value) => value.toLowerCase().includes(query));
     return categoryMatches && searchMatches;
   });
+}
+
+export function createTrainingLoggerProductionDraft({
+  exerciseLibrary = [],
+  goalContext = null,
+  historySessions = [],
+  mode = null,
+  workoutDate,
+} = {}) {
+  const draftId = createClientDraftId("training_logger");
+  return {
+    draftVersion: "training_logger_web_v1",
+    draftId,
+    isolation: {
+      persistence: "local_draft_recovery",
+      canonicalTrainingSessionWritesEnabled: false,
+      fixtureHistoryReadOnly: false,
+    },
+    productionContext: {
+      exerciseLibrary,
+      goalContext,
+      historySessions,
+    },
+    categorySuggestion: createTrainingLoggerSuggestion({
+      date: workoutDate,
+      sessions: historySessions,
+    }),
+    step: mode ? TRAINING_LOGGER_STEPS.CATEGORIES : TRAINING_LOGGER_STEPS.ENTRY,
+    mode,
+    workoutDate,
+    workoutTime: null,
+    startedAt: null,
+    finishedAt: null,
+    startedAtLabel: mode === TRAINING_LOGGER_MODES.LIVE ? "Started now" : null,
+    selectedCategories: [],
+    acceptedSuggestionId: null,
+    exercises: [],
+    exerciseRelationshipGroups: [],
+    nextOccurrenceIndex: 0,
+    reconciliation: createAppleHealthReconciliation({
+      evidenceItems: [],
+      workoutDate,
+    }),
+  };
+}
+
+export function hydrateTrainingLoggerProductionDraft(
+  recoveredDraft,
+  { exerciseLibrary = [], goalContext = null, historySessions = [], workoutDate } = {}
+) {
+  if (
+    recoveredDraft?.draftVersion !== "training_logger_web_v1" ||
+    !recoveredDraft?.draftId ||
+    !Object.values(TRAINING_LOGGER_STEPS).includes(recoveredDraft.step)
+  ) {
+    return createTrainingLoggerProductionDraft({ exerciseLibrary, goalContext, historySessions, workoutDate });
+  }
+  return refreshComparableContexts({
+    ...recoveredDraft,
+    isolation: {
+      persistence: "local_draft_recovery",
+      canonicalTrainingSessionWritesEnabled: false,
+      fixtureHistoryReadOnly: false,
+    },
+    productionContext: { exerciseLibrary, goalContext, historySessions },
+    categorySuggestion: createTrainingLoggerSuggestion({
+      date: recoveredDraft.workoutDate ?? workoutDate,
+      sessions: historySessions,
+    }),
+  });
+}
+
+export function serializeTrainingLoggerRecoveryDraft(draft) {
+  if (!isProductionDraft(draft)) return null;
+  const { productionContext: _productionContext, ...recoverable } = draft;
+  return recoverable;
+}
+
+export function attachProductionAppleHealthReconciliation(draft, reconciliation) {
+  if (!isProductionDraft(draft) || !reconciliation) return draft;
+  return { ...draft, reconciliation };
 }
 
 export function createTrainingLoggerPreviewDraft({
@@ -259,14 +358,38 @@ export function initializeTrainingLoggerMode(draft, mode) {
     ...draft,
     mode,
     step: TRAINING_LOGGER_STEPS.CATEGORIES,
+    startedAt: isProductionDraft(draft) && mode === TRAINING_LOGGER_MODES.LIVE
+      ? new Date().toISOString()
+      : null,
+    finishedAt: null,
     startedAtLabel: mode === TRAINING_LOGGER_MODES.LIVE ? "Started now" : null,
     workoutTime: null,
   };
 }
 
+export function finishTrainingLoggerDraft(draft) {
+  return {
+    ...draft,
+    finishedAt: isProductionDraft(draft) && draft.mode === TRAINING_LOGGER_MODES.LIVE
+      ? new Date().toISOString()
+      : null,
+    step: TRAINING_LOGGER_STEPS.SUMMARY,
+  };
+}
+
+export function canFinishTrainingLoggerDraft(draft) {
+  return (draft?.exercises ?? []).length > 0 && draft.exercises.every((exercise) =>
+    (exercise.sets ?? []).length > 0 && exercise.sets.every((set) => {
+      const reps = Number(set.reps);
+      const load = Number(set.load);
+      return Number.isFinite(reps) && reps > 0 && Number.isFinite(load) && load >= 0;
+    })
+  );
+}
+
 export function updateWorkoutContext(draft, changes = {}) {
   const workoutDate = changes.workoutDate ?? draft.workoutDate;
-  return {
+  const updated = {
     ...draft,
     ...changes,
     workoutDate,
@@ -280,6 +403,14 @@ export function updateWorkoutContext(draft, changes = {}) {
           workoutDate,
         }),
   };
+  if (!isProductionDraft(updated)) return updated;
+  return refreshComparableContexts({
+    ...updated,
+    categorySuggestion: createTrainingLoggerSuggestion({
+      date: workoutDate,
+      sessions: updated.productionContext?.historySessions ?? [],
+    }),
+  });
 }
 
 export function toggleTrainingCategory(draft, category) {
@@ -314,7 +445,11 @@ export function addTrainingExercise(draft, canonicalExerciseId) {
   if (draft.exercises.some((exercise) => exercise.canonicalExerciseId === canonicalExerciseId)) {
     return draft;
   }
-  const identity = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+  const identity = (
+    draft.productionContext?.exerciseLibrary?.length
+      ? draft.productionContext.exerciseLibrary
+      : listCanonicalTrainingExerciseIdentities()
+  ).find(
     (exercise) => exercise.id === canonicalExerciseId
   );
   if (!identity) return draft;
@@ -323,9 +458,11 @@ export function addTrainingExercise(draft, canonicalExerciseId) {
   const id = createTrainingExerciseOccurrenceId({
     canonicalExerciseId,
     occurrenceIndex,
-    provenanceRef: "training_logger_preview_draft",
+    provenanceRef: isProductionDraft(draft)
+      ? `training_logger_draft_${draft.draftId}`
+      : "training_logger_preview_draft",
   });
-  const previousPerformance = selectComparablePreviousPerformance({
+  const previousPerformance = selectDraftPreviousPerformance(draft, {
     canonicalExerciseId,
   });
   const sets = Array.from({ length: previousPerformance.setCount }, (_, index) => ({
@@ -346,8 +483,10 @@ export function addTrainingExercise(draft, canonicalExerciseId) {
     executionVariant: null,
     sets,
     previousPerformance,
-    progressionRecommendation:
-      RECOMMENDATION_FIXTURES[canonicalExerciseId] ?? createMaintainRecommendation(previousPerformance),
+    progressionRecommendation: selectDraftProgressionRecommendation(draft, {
+      canonicalExerciseId,
+      previousPerformance,
+    }),
     progressionChoice: PROGRESSION_CHOICES.PREVIOUS,
   };
   return {
@@ -459,7 +598,9 @@ export function createTrainingSuperset(draft, firstExerciseId, secondExerciseId)
   groups = removeExerciseFromTrainingRelationshipGroups(groups, secondExerciseId);
   const group = createTrainingExerciseRelationshipGroup({
     memberExerciseIds: [firstExerciseId, secondExerciseId],
-    provenance_ref: "training_logger_preview_draft",
+    provenance_ref: isProductionDraft(draft)
+      ? `training_logger_draft_${draft.draftId}`
+      : "training_logger_preview_draft",
     relationshipType: TRAINING_EXERCISE_RELATIONSHIP_TYPES.SUPERSET,
   });
   return refreshComparableContexts({
@@ -480,6 +621,10 @@ export function removeTrainingSuperset(draft, relationshipGroupId) {
 export function applyProgressionSuggestion(draft, exerciseOccurrenceId) {
   return updateExercise(draft, exerciseOccurrenceId, (exercise) => {
     const recommendation = exercise.progressionRecommendation;
+    if (
+      recommendation?.suggestedReps == null ||
+      recommendation?.suggestedLoad == null
+    ) return exercise;
     return {
       ...exercise,
       progressionChoice: PROGRESSION_CHOICES.SUGGESTION,
@@ -514,7 +659,11 @@ export function buildTrainingWorkoutSummary(draft) {
     confirmedSetCount: sets.filter((set) => set.confirmed).length,
     variantCount: draft.exercises.filter((exercise) => exercise.executionVariant).length,
     supersetCount: draft.exerciseRelationshipGroups.length,
-    durationMinutes: draft.mode === TRAINING_LOGGER_MODES.LIVE ? 54 : null,
+    durationMinutes: isProductionDraft(draft) && draft.mode === TRAINING_LOGGER_MODES.LIVE
+      ? getElapsedMinutes(draft.startedAt, draft.finishedAt)
+      : draft.mode === TRAINING_LOGGER_MODES.LIVE
+        ? 54
+        : null,
   };
 }
 
@@ -630,13 +779,36 @@ function updateExercise(draft, exerciseOccurrenceId, updater) {
 function refreshComparableContexts(draft) {
   return {
     ...draft,
-    exercises: draft.exercises.map((exercise) => ({
-      ...exercise,
-      previousPerformance: selectComparablePreviousPerformance({
+    exercises: draft.exercises.map((exercise) => {
+      const relationshipContext = getRelationshipContext(draft, exercise.id);
+      const previousPerformance = selectDraftPreviousPerformance(draft, {
         canonicalExerciseId: exercise.canonicalExerciseId,
         executionVariant: exercise.executionVariant,
+        relationshipContext,
         relationshipKey: getRelationshipKey(draft, exercise.id),
-      }),
+      });
+      return {
+        ...exercise,
+        previousPerformance,
+        progressionRecommendation: selectDraftProgressionRecommendation(draft, {
+          canonicalExerciseId: exercise.canonicalExerciseId,
+          executionVariant: exercise.executionVariant,
+          previousPerformance,
+          relationshipContext,
+        }),
+      };
+    }),
+  };
+}
+
+function getRelationshipContext(draft, exerciseOccurrenceId) {
+  const context = getSupersetContext(draft, exerciseOccurrenceId);
+  if (!context) return null;
+  return {
+    relationshipType: context.group.relationshipType,
+    orderedPartners: context.partners.map((partner) => ({
+      canonicalExerciseId: partner.canonicalExerciseId,
+      name: partner.name,
     })),
   };
 }
@@ -662,6 +834,104 @@ function selectComparablePreviousPerformance({
     ?? HISTORY_FIXTURES[canonicalExerciseId]?.ordinary?.standalone
     ?? DEFAULT_HISTORY;
   return { ...fixture };
+}
+
+function selectDraftPreviousPerformance(draft, context) {
+  if (!isProductionDraft(draft)) return selectComparablePreviousPerformance(context);
+  const result = resolvePreviousExerciseOccurrence({
+    before: `${draft.workoutDate}T00:00:00.000Z`,
+    canonicalExerciseId: context.canonicalExerciseId,
+    relationshipContext: context.relationshipContext,
+    sessions: draft.productionContext?.historySessions ?? [],
+    variantKey: context.executionVariant,
+  });
+  const occurrence = result.exactVariantOccurrence;
+  if (!occurrence) {
+    return {
+      date: null,
+      reps: 0,
+      load: 0,
+      unit: "lb",
+      setCount: 3,
+      context: "No comparable history yet",
+      firstUse: true,
+      matchKind: result.matchKind,
+    };
+  }
+  const set = selectRepresentativeSet(occurrence.exercise.sets);
+  return {
+    date: String(occurrence.session.observed_at ?? occurrence.session.date).slice(0, 10),
+    reps: set?.reps ?? 0,
+    load: set?.load ?? 0,
+    unit: set?.unit ?? "lb",
+    setCount: Math.max(1, occurrence.exercise.sets?.length ?? 0),
+    context: "Previous comparable session",
+    firstUse: false,
+    matchKind: result.matchKind,
+    sourceSessionId: occurrence.session.id ?? null,
+  };
+}
+
+function selectDraftProgressionRecommendation(draft, context) {
+  if (!isProductionDraft(draft)) {
+    return RECOMMENDATION_FIXTURES[context.canonicalExerciseId]
+      ?? createMaintainRecommendation(context.previousPerformance);
+  }
+  const result = createTrainingLoggerProgressionRecommendation({
+    canonicalExerciseId: context.canonicalExerciseId,
+    goalContext: draft.productionContext?.goalContext,
+    nowDate: draft.workoutDate,
+    relationshipContext: context.relationshipContext,
+    sessions: draft.productionContext?.historySessions ?? [],
+    variant: context.executionVariant,
+  });
+  if (result.status === TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT) return null;
+  const state = result.status === TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY
+    ? PROGRESSION_STATES.OPPORTUNITY
+    : result.status === TRAINING_LOGGER_PROGRESSION_STATUS.RECOVER
+      ? PROGRESSION_STATES.RECOVER
+      : PROGRESSION_STATES.MAINTAIN;
+  const prescription = result.recommendedLoad != null && result.recommendedReps != null
+    ? `${result.recommendedLoad} lb × ${result.recommendedReps}`
+    : result.recommendedAction === "consider_progression"
+      ? "Progress manually if today’s performance supports it"
+      : "Repeat the latest comparable performance";
+  return {
+    state,
+    eyebrow: state === PROGRESSION_STATES.OPPORTUNITY
+      ? "Progression opportunity"
+      : state === PROGRESSION_STATES.RECOVER
+        ? "Recovery opportunity"
+        : "Maintain current performance",
+    message: result.reason,
+    prescription,
+    suggestedLoad: result.recommendedLoad,
+    suggestedReps: result.recommendedReps,
+    confidence: result.confidence,
+    historyReferences: result.historyReferences,
+    comparisonContext: result.comparisonContext,
+    calibration: result.calibration,
+  };
+}
+
+function selectRepresentativeSet(sets = []) {
+  return (sets ?? []).map((set) => ({
+    load: Number(set.weight ?? set.load ?? 0),
+    reps: Number(set.reps ?? 0),
+    unit: set.weight_unit ?? set.unit ?? "lb",
+  })).sort((left, right) => right.load - left.load || right.reps - left.reps)[0] ?? null;
+}
+
+function isProductionDraft(draft) {
+  return draft?.draftVersion === "training_logger_web_v1";
+}
+
+function getElapsedMinutes(startedAt, finishedAt = null) {
+  const started = Date.parse(String(startedAt ?? ""));
+  if (!Number.isFinite(started)) return null;
+  const finished = Date.parse(String(finishedAt ?? ""));
+  const end = Number.isFinite(finished) ? finished : Date.now();
+  return Math.max(1, Math.round((end - started) / 60000));
 }
 
 function createMaintainRecommendation(previousPerformance) {

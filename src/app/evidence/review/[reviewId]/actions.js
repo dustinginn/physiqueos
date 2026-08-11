@@ -337,6 +337,7 @@ function mergeAuthoritativePhotoSessions(submitted = {}, authoritative = {}) {
 }
 
 function mergeAuthoritativeTrainingSessions(submitted = {}, authoritative = {}) {
+  const trainingLoggerReview = authoritative.review_metadata?.origin === "training_logger";
   const training = new Map(
     (authoritative.evidence_objects ?? [])
       .filter((item) => item.evidence_type === "training")
@@ -346,7 +347,7 @@ function mergeAuthoritativeTrainingSessions(submitted = {}, authoritative = {}) 
     ...submitted,
     evidence_objects: (submitted.evidence_objects ?? []).map((item) =>
       item.evidence_type === "training" &&
-      training.get(item.id)?.exercises?.some((exercise) => exercise.provisionalExercise)
+      (trainingLoggerReview || training.get(item.id)?.exercises?.some((exercise) => exercise.provisionalExercise))
         ? structuredClone(training.get(item.id))
         : item
     ),

@@ -39,6 +39,10 @@ import {
 } from "./TrainingLoggerPreviewState";
 
 const componentSource = fs.readFileSync(
+  new URL("../../../components/training/TrainingLoggerClient.jsx", import.meta.url),
+  "utf8"
+);
+const previewWrapperSource = fs.readFileSync(
   new URL("./TrainingLoggerPreview.jsx", import.meta.url),
   "utf8"
 );
@@ -403,11 +407,12 @@ describe("Training Logger preview state", () => {
   });
 
   it("has no production TrainingSession write, network, persistence, or server-action boundary", () => {
-    const previewSource = `${componentSource}\n${stateSource}\n${reconciliationSource}\n${routeSource}`;
+    const previewSource = `${previewWrapperSource}\n${stateSource}\n${reconciliationSource}\n${routeSource}`;
     expect(previewSource).not.toMatch(
       /fetch\(|FounderRepositories|CanonicalExerciseWorkoutCommitService|EvidenceIntakeService|createCanonical|updateCanonical|revalidatePath|server action|localStorage|sessionStorage/
     );
-    expect(componentSource).not.toContain("<form");
+    expect(previewWrapperSource).not.toContain("<form");
+    expect(previewWrapperSource).not.toContain("production");
     expect(componentSource).toContain("No production workout was created");
     expect(stateSource).toContain("canonicalTrainingSessionWritesEnabled: false");
     expect(stateSource).toContain('persistence: "memory_only"');

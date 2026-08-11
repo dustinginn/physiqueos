@@ -180,6 +180,7 @@ function getScreenshotSystemPrompt() {
     "When typed evidence and screenshots describe the same real-world event with high confidence, merge them into one enriched evidence_object instead of creating a duplicate.",
     "Preserve field-level provenance: screenshot-derived values should reference screenshot artifacts; typed-derived values should reference typed evidence artifacts.",
     "For strength training, capture exercise name, sets, reps, weight, volume if available, notes, and the matching workout's calories/duration when available.",
+    "For every workout, preserve visible start and end times in metadata.start_time and metadata.end_time. Leave them null when absent or ambiguous; never invent an exact time.",
     "For strength training, use the canonical TrainingSession shape: the training session is the evidence_object; metadata holds workout-level fields; exercises is an array of child exercises; sets are child records inside each exercise.",
     "Never emit Spider Curls, EZ Bar Curls, or other exercises as standalone training evidence_objects. They must be nested under the matching Traditional Strength Training evidence_object.",
     "For nutrition, use the canonical NutritionDay shape: the calendar day is the evidence_object; daily_totals, targets, meals, and foods are structured children. Screenshots are artifacts that enrich NutritionDay.",
@@ -1657,6 +1658,8 @@ function mergeMetadata(...metadataObjects) {
 function withTrainingMetadataDefaults(metadata = {}) {
   return {
     activity_type: metadata.activity_type ?? null,
+    start_time: metadata.start_time ?? null,
+    end_time: metadata.end_time ?? null,
     active_calories: metadata.active_calories ?? null,
     total_calories: metadata.total_calories ?? null,
     duration_seconds: metadata.duration_seconds ?? null,
@@ -2703,6 +2706,12 @@ function extractTrainingMetadata(evidenceObject) {
 
   return {
     activity_type: activityType ?? null,
+    start_time:
+      evidenceObject.metadata?.start_time ??
+      cleanMetadataText(findEvidenceValueByPatterns(values, ["start time", "started at"])?.value),
+    end_time:
+      evidenceObject.metadata?.end_time ??
+      cleanMetadataText(findEvidenceValueByPatterns(values, ["end time", "ended at"])?.value),
     active_calories: getNumericEvidenceValue(values, [
       "active calories",
       "active calorie",
@@ -3732,6 +3741,8 @@ const trainingMetadataSchema = {
   additionalProperties: false,
   required: [
     "activity_type",
+    "start_time",
+    "end_time",
     "active_calories",
     "total_calories",
     "duration_seconds",
@@ -3744,6 +3755,8 @@ const trainingMetadataSchema = {
   ],
   properties: {
     activity_type: { type: ["string", "null"] },
+    start_time: { type: ["string", "null"] },
+    end_time: { type: ["string", "null"] },
     active_calories: { type: ["number", "null"] },
     total_calories: { type: ["number", "null"] },
     duration_seconds: { type: ["number", "null"] },

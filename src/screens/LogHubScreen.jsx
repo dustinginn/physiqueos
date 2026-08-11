@@ -33,10 +33,28 @@ export default function LogHubScreen({
         <div className="space-y-4">
           <LoggedTodayCard summary={loggedToday} />
           {pendingEvidenceReviews.length > 0 && <PendingEvidenceReviews reviews={pendingEvidenceReviews} />}
+          <TrainingLoggerCard />
           <UploadAnythingCard action={uploadAnythingAction} recoveryContext={recoveryContext} />
         </div>
       </div>
     </main>
+  );
+}
+
+function TrainingLoggerCard() {
+  return (
+    <Link className="block" href="/log/training">
+      <Card className="transition hover:border-indigo-300" variant="accent">
+        <div className="flex items-center gap-3">
+          <IconBadge icon={Dumbbell} color="primary" size="md" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-black leading-tight text-slate-950">Training Logger</span>
+            <span className="mt-1 block text-sm font-medium leading-6 text-slate-500">Start a workout or log a past workout with exercises, sets, Variants, and Supersets.</span>
+          </span>
+          <span aria-hidden="true" className="text-xl font-bold text-indigo-600">›</span>
+        </div>
+      </Card>
+    </Link>
   );
 }
 

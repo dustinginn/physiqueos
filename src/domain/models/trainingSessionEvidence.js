@@ -22,6 +22,8 @@ import {
 
 const DEFAULT_METADATA = {
   activity_type: null,
+  start_time: null,
+  end_time: null,
   active_calories: null,
   total_calories: null,
   duration_seconds: null,

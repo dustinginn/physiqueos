@@ -25,6 +25,7 @@ Founder Alpha uses the Next.js App Router under `src/app`.
 | `/goals/maintenance` | Body-fat maintenance Narrative Goal journey | `NarrativeGoalPreviewScreen`, `NarrativeGoalPresentationLoader`, `SupportingNarrativeGoalPreviewService` |
 | `/goals/lean-mass` | Lean-mass preservation Narrative Goal journey | `NarrativeGoalPreviewScreen`, `NarrativeGoalPresentationLoader`, `SupportingNarrativeGoalPreviewService` |
 | `/log` | Universal evidence capture hub | `LogHubScreen`, log actions |
+| `/log/training` | Production unified live/retrospective Training Logger | `TrainingLoggerClient`, Training Logger domain services, Evidence Review |
 | `/evidence/photos` | Progress Photo upload | `ProgressPhotoUploadScreen`, photo actions |
 | `/evidence/dexa` | DEXA PDF upload/confirm | `DEXAUploadScreen`, DEXA actions |
 | `/priorities/[priorityId]` | Priority operational detail | `PriorityDetailScreen`, `PriorityDetailService` |
@@ -65,6 +66,7 @@ Primary daily-use screens:
 * `DailyBriefingScreen`
 * `MorningCheckInScreen`
 * `LogHubScreen`
+* `TrainingLoggerClient`
 * `PriorityDetailScreen`
 
 Narrative briefing screens:
@@ -136,6 +138,9 @@ Key services:
 * `AnalysisService`: deterministic Analysis generation.
 * `MonthlyBriefingPreviewService`: read-only composition boundary for deterministic Monthly development previews.
 * `MonthlyBriefingService`: production calendar-window, identity, real-evidence composition, confidence transport, and immutable Monthly publication.
+* `TrainingLoggerProgressionService`: conservative Goal-relative, user-adaptive, movement-specific progression recommendations.
+* `TrainingLoggerSuggestionService`: confirmed-history-only workout-rhythm suggestions.
+* `TrainingLoggerAppleHealthService`: normalized Apple workout candidates, consumption filtering, and Training Logger Evidence Review proposals.
 
 Repository implementations live in `src/data/repositories`.
 
