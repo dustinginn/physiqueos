@@ -2,11 +2,11 @@
 
 Status: active operational gate
 
-Last audited: 2026-08-11
+Last audited: 2026-08-12
 
-Implementation base revision: `a4c759fd`
+Accepted compatibility source: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`; production build: `RmjN47V8xsq3-6jSlZh-9`
 
-Foundation design: Phases 1-5 technically accepted on local and live synthetic provider evidence. Production migration remains separately gated by checkpoint publication, compatibility-release acceptance, named operations/alert ownership, verified production backups, and an explicit migration-window go/no-go.
+Foundation design: Phases 1-6 accepted on bounded local, live synthetic provider, and production compatibility evidence. Production migration remains separately gated by checkpoint publication, named operations/alert ownership, verified production backups/retention, and an explicit migration-window go/no-go.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -16,12 +16,13 @@ Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
 The production behavior is rich and well tested, but the current runtime is not a secure shared-client platform. The critical path is authentication/authorization, canonical persistence, private object storage, application APIs, and cross-client correctness. No production data was changed during this audit.
 
-Observed production runtime checkpoint after the Founder's legitimate Aug 10-11 logging activity:
+Current production runtime checkpoint after the Founder's legitimate Aug 11-12 logging activity and Phase 6 compatibility deployment:
 
 - runtime schema/version: `founder-seed-v2`
-- persisted revision: `107`
-- updated at: `2026-08-11T13:46:05.401Z`
-- runtime file size: `25,964,481` bytes
+- persisted revision: `119`
+- updated at: `2026-08-12T16:02:21.133Z`
+- runtime file size: `26,955,008` bytes
+- SHA-256: `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`
 - runtime SHA-256: `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1`
 - audited source: 1,389 files under `src`, including 498 test files and 95 page/route files
 
@@ -417,3 +418,10 @@ Live provider proof passed on the existing app, one-node PostgreSQL cluster, and
 Readiness classification: **Phase 5 accepted; production migration technically READY for a separate compatibility-release and migration authorization, but not authorized; significant SwiftUI remains BLOCKED.** The 2-5 minute write-fence estimate is supported and the ten-minute hard boundary remains. Production JSON/file state/evidence/auth/deployment are unchanged. No Founder data was uploaded; no production cutover, auth activation, evidence move, write fence, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.
 
 Final Phase 5 bounded validation passed 48 test files / 221 tests, targeted lint, production build, isolated smoke, and diff checks. Founder revision 110, 26,402,081 bytes, and SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D` remained exact. The known Turbopack broad-trace warning remains.
+## Phase 6 production compatibility checkpoint (2026-08-12)
+
+Production now runs accepted descendant source `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`, build `RmjN47V8xsq3-6jSlZh-9`, against the unchanged canonical JSON/file runtime. The refreshed legitimate Founder checkpoint is revision `119`, `26,955,008` bytes, updated `2026-08-12T16:02:21.133Z`, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`; it includes the Aug 11 Activity/Nutrition/Workout Logger activity and Aug 12 weight and remained byte-identical across validation and deployment.
+
+Bounded Phase 1-6, Training, Photo, ownership, persistence-isolation, lint, build, local/LAN/public routes, 24 static assets, authorized media, and fail-closed inactive-provider/auth checks pass. Full evidence and the updated migration packet are in `docs/PHASE6_COMPATIBILITY_RELEASE.md`.
+
+Readiness classification: **Phase 6 compatibility accepted; canonical migration BLOCKED pending separate named-role approval, verified alert delivery, verified production backup/retention acceptance, exact migration-window approval, and final go/no-go. Native Baseline remains blocked until a later migration plus seven accepted daily-use days.**

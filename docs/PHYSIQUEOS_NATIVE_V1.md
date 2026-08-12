@@ -2,11 +2,11 @@
 
 Status: living canonical transition document
 
-Last audited: 2026-08-11
+Last audited: 2026-08-12
 
-Foundation design decision: approved for the initial Founder-stage direction; Phases 1-5 are technically accepted, including live synthetic DigitalOcean provider evidence. Production remains on the JSON/file runtime and no migration is authorized. Remaining production and product approvals are recorded in section 18 and the Phase 5 packet.
+Foundation design decision: approved for the initial Founder-stage direction; Phases 1-6 are accepted, including live synthetic DigitalOcean provider evidence and the production compatibility release. Production remains on the JSON/file runtime and no migration is authorized. Remaining operational and migration approvals are recorded in section 39 and the Phase 6 packet.
 
-Implementation base revision: `a4c759fd`
+Accepted compatibility source: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`; production build: `RmjN47V8xsq3-6jSlZh-9`
 
 Authority: current production behavior remains authoritative; this document records the approved transition constraints and must change when a material decision changes.
 
@@ -1048,3 +1048,8 @@ The provisional production write fence remains 2-5 minutes with a ten-minute har
 Live provider acceptance passed on the existing $30.15/month staging footprint: 42 collections / 370 synthetic records, three versioned objects / 111 bytes, 17 read surfaces, 17 commands, concurrency/retry, encrypted opaque media handles, dependency readiness, real App Platform restart, and exact backup/isolated restore. Provider critical work measured about 40 seconds excluding restart and about 83 seconds including restart, supporting the 2-5 minute estimate and ten-minute hard boundary. The temporary firewall, restore database, and dump were removed; the accepted synthetic test database/objects remain. No full-access token, new Space key, paid resource, cost change, Founder upload, production deployment, auth activation, evidence move, or write fence occurred.
 
 Phase 5 is **ACCEPTED** and production migration is technically **READY for separate authorization**, not authorized. Before Phase 6: run and publish the end-work-session checkpoint; then separately accept the immutable compatibility release, name operator/abort/alert owners, verify alert delivery and production backups, and approve the migration window/go-no-go. Phase 6 must not start automatically and is the compatibility-release plus canonical-migration/stabilization scope, not Native Baseline.
+## 39. Phase 6 compatibility-release acceptance (2026-08-12)
+
+Phase 6 is accepted as a compatibility deployment against the unchanged Founder JSON/file runtime. Exact source `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`, production build `RmjN47V8xsq3-6jSlZh-9`, refreshed Founder revision `119`, deployment evidence, operational ownership, alerts, backups, migration authorization packet, and the unstarted seven-day stabilization plan are canonical in `docs/PHASE6_COMPATIBILITY_RELEASE.md`.
+
+This is a deliberate roadmap clarification: Phase 6 is the compatibility-release acceptance gate before canonical migration, not Native Baseline. PostgreSQL, Spaces, Founder authentication, production migration, the write fence, and every Apple/Native capability remain inactive and separately gated. Migration is technically prepared but blocked until the user separately approves named ownership, verified alert delivery, backup/retention acceptance, the exact window, and final go/no-go.

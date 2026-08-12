@@ -205,3 +205,10 @@ All Phase 5 technical acceptance items pass. Separate production-window prerequi
 ## Recommended next step
 
 Complete the final bounded regression, publish the exact Phase 5 checkpoint with the end-work-session task, then return this packet for a separate Phase 6 decision. Phase 6 should be the production compatibility-release acceptance and separately authorized canonical migration/stabilization window—not Native Baseline. Run the end-work-session task before any Phase 6 or migration work.
+## Phase 6 compatibility-release addendum (2026-08-12)
+
+The separately required compatibility release is now accepted and deployed: source `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`, build `RmjN47V8xsq3-6jSlZh-9`. Production continues to use the canonical Founder JSON/file runtime and current local evidence/media. PostgreSQL, Spaces, shared authentication, the shared worker requirement, migration fence, and canonical migration remain inactive.
+
+The refreshed Founder checkpoint is revision `119`, `26,955,008` bytes, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, unchanged across deployment. Local, LAN, and public route/asset/media acceptance passed. See `docs/PHASE6_COMPATIBILITY_RELEASE.md` for complete evidence, the strengthened deployment lifecycle, ownership recommendation, exact alert actions, backup/retention recommendation, updated authorization packet, and seven-day plan.
+
+This satisfies the Phase 5 compatibility-release prerequisite but does not authorize migration. Remaining production-window gates are explicit user approval of named roles, recorded alert delivery, verified pre-cutover backups and retention, exact window, and final go/no-go.
