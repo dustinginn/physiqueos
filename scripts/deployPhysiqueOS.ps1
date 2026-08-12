@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$SourceRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
+    [string]$SourceRoot = "C:\Users\dusti\Documents\GitHub\physiqueos",
+    [switch]$UsePrebuiltArtifact
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +25,8 @@ $RollbackBuildPath = Join-Path $RepoRoot ".next.rollback-$PID"
 $FailedBuildPath = Join-Path $RepoRoot ".next.failed-$PID"
 $ReplacementPromoted = $false
 $RuntimeStopped = $false
+$ExpectedBuildId = $null
+$ExpectedSourceCommit = $null
 
 function Write-Step {
     param([string]$Message)
@@ -143,8 +146,35 @@ function Invoke-SourceBuild {
         throw "The supplied source did not produce a Next.js build identity."
     }
 
+    $script:ExpectedBuildId = (Get-Content -LiteralPath $BuildIdPath -Raw).Trim()
+    if (-not $script:ExpectedBuildId) {
+        throw "The supplied source produced an empty Next.js build identity."
+    }
+    Set-Content -LiteralPath (Join-Path $ResolvedSourceRoot ".next\SOURCE_COMMIT") -Value $ExpectedSourceCommit -Encoding Ascii -NoNewline
+
     Write-Host "Production build completed successfully."
-    Write-Host "Build ID: $((Get-Content -LiteralPath $BuildIdPath -Raw).Trim())"
+    Write-Host "Build ID: $script:ExpectedBuildId"
+}
+
+function Use-PrebuiltSourceArtifact {
+    $BuildIdPath = Join-Path $ResolvedSourceRoot ".next\BUILD_ID"
+    $SourceCommitPath = Join-Path $ResolvedSourceRoot ".next\SOURCE_COMMIT"
+    if (-not (Test-Path -LiteralPath $BuildIdPath -PathType Leaf)) {
+        throw "The prebuilt source artifact does not contain a Next.js build identity."
+    }
+    $script:ExpectedBuildId = (Get-Content -LiteralPath $BuildIdPath -Raw).Trim()
+    if (-not $script:ExpectedBuildId) {
+        throw "The prebuilt source artifact contains an empty Next.js build identity."
+    }
+    if (-not (Test-Path -LiteralPath $SourceCommitPath -PathType Leaf)) {
+        throw "The prebuilt source artifact does not contain an immutable source identity."
+    }
+    $ArtifactSourceCommit = (Get-Content -LiteralPath $SourceCommitPath -Raw).Trim()
+    if ($ArtifactSourceCommit -ne $ExpectedSourceCommit) {
+        throw "Prebuilt artifact source '$ArtifactSourceCommit' does not match deployment source '$ExpectedSourceCommit'."
+    }
+    Write-Host "Using the explicitly supplied preflighted artifact."
+    Write-Host "Build ID: $script:ExpectedBuildId"
 }
 
 function Stage-IsolatedBuild {
@@ -211,18 +241,39 @@ try {
     if (-not (Test-Path $StatusScript)) {
         throw "Runtime status script not found: $StatusScript"
     }
+    if ($UsePrebuiltArtifact -and -not $UsesIsolatedSource) {
+        throw "-UsePrebuiltArtifact requires an explicitly supplied isolated source root."
+    }
 
     Write-Host "Production repository: $RepoRoot"
     Write-Host "Deployment source:    $ResolvedSourceRoot"
     Write-Host "Source mode:          $(if ($UsesIsolatedSource) { 'isolated' } else { 'default' })"
     $SourceCommit = (& git -C $ResolvedSourceRoot rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw "Unable to identify the deployment source commit." }
+    $RepositoryCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Unable to identify the canonical repository commit." }
+    if ($RepositoryCommit -ne $SourceCommit) {
+        throw "Deployment source commit $SourceCommit does not match canonical repository HEAD $RepositoryCommit."
+    }
+    $SourceStatus = @(& git -C $ResolvedSourceRoot status --porcelain --untracked-files=no)
+    if ($LASTEXITCODE -ne 0) { throw "Unable to verify deployment source cleanliness." }
+    if ($SourceStatus.Count -gt 0) { throw "Deployment source contains tracked working-tree changes." }
+    $RepositoryStatus = @(& git -C $RepoRoot status --porcelain --untracked-files=no)
+    if ($LASTEXITCODE -ne 0) { throw "Unable to verify canonical repository cleanliness." }
+    if ($RepositoryStatus.Count -gt 0) { throw "Canonical repository contains tracked working-tree changes." }
+    $ExpectedSourceCommit = $SourceCommit
     Write-Host "Source commit:        $SourceCommit"
     Write-Host "Started:    $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
 
     if ($UsesIsolatedSource) {
-        Write-Step "1. Building the explicitly supplied isolated source"
-        Invoke-SourceBuild
+        if ($UsePrebuiltArtifact) {
+            Write-Step "1. Verifying the explicitly supplied preflighted artifact"
+            Use-PrebuiltSourceArtifact
+        }
+        else {
+            Write-Step "1. Building the explicitly supplied isolated source"
+            Invoke-SourceBuild
+        }
         Stage-IsolatedBuild
 
         Write-Step "2. Stopping the current production runtime"
@@ -257,7 +308,22 @@ try {
         -Url $HealthUrl `
         -MaximumWaitSeconds 60
 
+    try {
+        $HealthIdentity = $HealthResult.Content | ConvertFrom-Json
+    }
+    catch {
+        throw "The health endpoint did not return a valid build identity document."
+    }
+    if ($HealthIdentity.buildId -ne $ExpectedBuildId) {
+        throw "Health build identity '$($HealthIdentity.buildId)' does not match promoted build '$ExpectedBuildId'."
+    }
+    if ($HealthIdentity.gitHead -ne $ExpectedSourceCommit) {
+        throw "Health source identity '$($HealthIdentity.gitHead)' does not match deployment source '$ExpectedSourceCommit'."
+    }
+
     Write-Host "Health endpoint: HTTP $($HealthResult.StatusCode)"
+    Write-Host "Health build identity: $($HealthIdentity.buildId)"
+    Write-Host "Health source identity: $($HealthIdentity.gitHead)"
 
     Write-Step "5. Verifying the application page"
 
@@ -293,17 +359,28 @@ try {
         }
     }
 
-    $FailedAssets = @($AssetResults | Where-Object { -not $_.Success })
+    $FailedAssets = @($AssetResults | Where-Object {
+        $ExpectedContentType = if ($_.Path -match '\.css(?:\?|$)') {
+            '^text/css(?:;|$)'
+        }
+        elseif ($_.Path -match '\.js(?:\?|$)') {
+            '^(?:application|text)/javascript(?:;|$)'
+        }
+        else {
+            $null
+        }
+        -not $_.Success -or -not $ExpectedContentType -or $_.ContentType -notmatch $ExpectedContentType
+    })
 
     $AssetResults |
         Select-Object Status, ContentType, Path |
         Format-Table -AutoSize
 
     if ($FailedAssets.Count -gt 0) {
-        throw "$($FailedAssets.Count) referenced static asset(s) failed validation."
+        throw "$($FailedAssets.Count) referenced static asset(s) failed status or content-type validation."
     }
 
-    Write-Host "All $($AssetResults.Count) referenced static assets returned HTTP 200."
+    Write-Host "All $($AssetResults.Count) referenced static assets returned HTTP 200 with the expected CSS/JavaScript content type."
 
     Write-Step "7. Verifying canonical runtime ownership"
 

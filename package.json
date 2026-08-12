@@ -22,6 +22,8 @@
     "test:phase5": "vitest --config vitest.phase5.config.js run",
     "phase5:synthetic-package": "node scripts/createPhase5SyntheticPackage.mjs",
     "validate:phase5": "node scripts/validatePhase5Foundation.mjs",
+    "test:phase6": "vitest --config vitest.phase6.config.js run",
+    "validate:phase6": "node scripts/validatePhase6Compatibility.mjs",
     "worker:foundation": "node scripts/runFoundationWorker.mjs",
     "backup:foundation": "node scripts/foundationBackup.mjs",
     "infra:digitalocean:render": "node infra/digitalocean/renderAppSpec.mjs",

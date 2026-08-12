@@ -25,10 +25,15 @@ export async function GET() {
 }
 
 async function readBuildId() {
-  return String(await readFile(path.join(process.cwd(), ".next", "BUILD_ID"), "utf8")).trim();
+  const distDirectory = process.env.PHYSIQUEOS_BUILD_DIST_DIR || ".next";
+  return String(await readFile(path.join(process.cwd(), distDirectory, "BUILD_ID"), "utf8")).trim();
 }
 
 async function readGitHead() {
+  const distDirectory = process.env.PHYSIQUEOS_BUILD_DIST_DIR || ".next";
+  try {
+    return String(await readFile(path.join(process.cwd(), distDirectory, "SOURCE_COMMIT"), "utf8")).trim();
+  } catch {}
   const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: process.cwd(), windowsHide: true, encoding: "utf8" });
   return String(stdout ?? "").trim();
 }
