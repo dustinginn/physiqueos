@@ -24,11 +24,13 @@ describe("PostgreSQL foundation", () => {
     const certificate = "-----BEGIN CERTIFICATE-----\nsynthetic\n-----END CERTIFICATE-----";
     const config = readDatabaseConfig({
       PHYSIQUEOS_DATABASE_ENABLED: "1",
-      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db",
+      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db?sslmode=require&application_name=synthetic",
       PHYSIQUEOS_DATABASE_CA_CERT: certificate,
     });
     const pool = createPostgresPool(config);
     expect(pool.options.ssl).toEqual({ ca: certificate, rejectUnauthorized: true });
+    expect(pool.options.connectionString).not.toContain("sslmode");
+    expect(pool.options.connectionString).toContain("application_name=synthetic");
     await pool.end();
     expect(() => readDatabaseConfig({
       PHYSIQUEOS_DATABASE_ENABLED: "1",
