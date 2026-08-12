@@ -40,6 +40,7 @@ export function createHomeBriefingService({
   navigation = bottomNavigation,
   viewData = {},
   now = () => new Date(),
+  readRuntimeStore = getFounderRuntimeStore,
 } = {}) {
   return {
     async getHomeBriefing(userId) {
@@ -237,7 +238,7 @@ export function createHomeBriefingService({
       const overallGoalConfidence = activeGoal?.type === "build_lean_mass"
         ? resolveActiveGoalConfidencePresentation({
             activeGoal,
-            store: getFounderRuntimeStore(),
+            store: readRuntimeStore(),
           })
         : null;
       const activeChapter = deriveHomeActiveChapterPresentation({

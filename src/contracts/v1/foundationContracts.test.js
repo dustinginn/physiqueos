@@ -42,12 +42,12 @@ describe("Phase 1 application contracts", () => {
     expect(createDestination(DestinationId.OPERATION_DETAIL, { operationId: "op" })).toEqual({ id: "operation.detail", parameters: { operationId: "op" } });
   });
 
-  it("keeps OpenAPI limited to implemented Phase 1 routes", () => {
+  it("keeps OpenAPI limited to implemented foundation routes", () => {
     const document = JSON.parse(fs.readFileSync(path.join(process.cwd(), "openapi", "physiqueos-v1.json"), "utf8"));
     expect(document.openapi).toBe("3.1.0");
-    expect(Object.keys(document.paths).sort()).toEqual(["/health/live", "/health/ready", "/platform"]);
+    expect(Object.keys(document.paths).sort()).toEqual(["/capabilities", "/health/live", "/health/ready", "/platform"]);
     expect(document.components.schemas.CommandMetadata.properties.expectedVersion).toBeDefined();
-    for (const route of ["health/live", "health/ready", "platform"]) {
+    for (const route of ["health/live", "health/ready", "platform", "capabilities"]) {
       expect(fs.existsSync(path.join(process.cwd(), "src", "app", "api", "v1", ...route.split("/"), "route.js"))).toBe(true);
     }
   });

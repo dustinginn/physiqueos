@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GET as getLive } from "./health/live/route";
 import { GET as getReady } from "./health/ready/route";
 import { GET as getPlatform } from "./platform/route";
+import { GET as getCapabilities } from "./capabilities/route";
 
 describe("inactive /api/v1 foundation", () => {
   it("exposes only non-sensitive process liveness", async () => {
@@ -26,5 +27,13 @@ describe("inactive /api/v1 foundation", () => {
     expect(response.headers.get("content-type")).toContain("application/problem+json");
     expect(body).toMatchObject({ problemVersion: "1", code: "FOUNDATION_AUTH_INACTIVE" });
     expect(JSON.stringify(body)).not.toContain("Founder");
+  });
+
+  it("keeps Phase 3 capability discovery protected while production auth is inactive", async () => {
+    const response = await getCapabilities(new Request("http://localhost/api/v1/capabilities"));
+    const body = await response.json();
+    expect(response.status).toBe(503);
+    expect(body.code).toBe("FOUNDATION_AUTH_INACTIVE");
+    expect(JSON.stringify(body)).not.toContain("legacy_json_file");
   });
 });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = fs.readFileSync(new URL("./GoalsHubScreen.jsx", import.meta.url), "utf8");
+const applicationSource = fs.readFileSync(new URL("../application/goals/GoalsHubReadService.js", import.meta.url), "utf8");
 
 describe("GoalsHubScreen finalized goal index", () => {
   it("renders the approved landing-page hierarchy in order", () => {
@@ -17,8 +18,8 @@ describe("GoalsHubScreen finalized goal index", () => {
   it("retires supporting-goal and relationship presentation without deleting records", () => {
     expect(source).not.toMatch(/Supporting Goals|Goal Relationships|GoalRelationships|getRelationships/);
     expect(source).toContain("CompletedGoals");
-    expect(source).toContain('title: completedJourney.hero.title');
-    expect(source).toContain('href: "/goals/visible-abs"');
+    expect(applicationSource).toContain("title: completed.hero.title");
+    expect(applicationSource).toContain('href: "/goals/visible-abs"');
   });
 
   it("keeps future, edit, progress, projection, and explanatory card UI out of the index", () => {
@@ -28,7 +29,7 @@ describe("GoalsHubScreen finalized goal index", () => {
   });
 
   it("links each full active-goal card to its canonical production route", () => {
-    expect(source).toContain("resolveGoalNavigationHref");
+    expect(applicationSource).toContain("resolveGoalNavigationHref");
     expect(source).toContain("href={withReturnContext(goal.navigation.href, from)}");
     expect(source).toContain("if (!goal.navigation.available)");
     expect(source).not.toContain("narrative-preview");
@@ -42,17 +43,17 @@ describe("GoalsHubScreen finalized goal index", () => {
   });
 
   it("keeps objective-specific live states and compact confidence values", () => {
-    expect(source).toContain("evaluation?.projection?.completionStageLabel");
-    expect(source).toContain("summary.presentation?.status ?? summary.current");
-    expect(source).toContain("resolveActiveGoalConfidencePresentation");
-    expect(source).not.toContain("resolveOverallGoalConfidenceReadModel");
+    expect(applicationSource).toContain("evaluation?.projection?.completionStageLabel");
+    expect(applicationSource).toContain("summary.presentation?.status ?? summary.current");
+    expect(applicationSource).toContain("resolveActiveGoalConfidencePresentation");
+    expect(applicationSource).not.toContain("resolveOverallGoalConfidenceReadModel");
     expect(source).toContain("formatConfidence(goal.confidence)");
     expect(source).toContain('"Confidence unavailable"');
-    expect(source).not.toContain("summary.confidence ?? evaluation?.confidence ?? 0");
-    expect(source).toContain('"Visual confirmation developing": "Visual Confirmation Developing"');
-    expect(source).toContain('"Entering target range": "Entering Target Range"');
-    expect(source).toContain('Stable: "Stable"');
-    expect(source).not.toMatch(/toTitleCase|toLocaleUpperCase/);
+    expect(applicationSource).not.toContain("summary.confidence ?? evaluation?.confidence ?? 0");
+    expect(applicationSource).toContain('"Visual confirmation developing": "Visual Confirmation Developing"');
+    expect(applicationSource).toContain('"Entering target range": "Entering Target Range"');
+    expect(applicationSource).toContain('Stable: "Stable"');
+    expect(applicationSource).not.toMatch(/toTitleCase|toLocaleUpperCase/);
   });
 
   it("renders state, separator, and confidence on one shared text baseline", () => {

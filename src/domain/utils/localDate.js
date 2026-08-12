@@ -40,6 +40,38 @@ export function getPreviousLocalDayWindow({
   });
 }
 
+export function getLocalDayWindow({
+  dateKey,
+  timeZone = DEFAULT_LOCAL_TIME_ZONE,
+} = {}) {
+  const resolvedTimeZone = resolveLocalTimeZone(timeZone);
+  const resolvedDateKey = getLocalDateKey(dateKey, resolvedTimeZone);
+  if (!isValidDateKey(resolvedDateKey)) {
+    throw new Error("A valid local calendar date is required.");
+  }
+  const nextDateKey = shiftLocalDateKey(resolvedDateKey, 1);
+  return Object.freeze({
+    dateKey: resolvedDateKey,
+    timeZone: resolvedTimeZone,
+    startInclusive: localMidnightToUtc(resolvedDateKey, resolvedTimeZone).toISOString(),
+    endExclusive: localMidnightToUtc(nextDateKey, resolvedTimeZone).toISOString(),
+  });
+}
+
+export function shiftLocalDateKey(dateKey, days) {
+  if (!isValidDateKey(dateKey) || !Number.isInteger(days)) {
+    throw new Error("A valid local date and whole-day offset are required.");
+  }
+  return shiftDateKey(dateKey, days);
+}
+
+function isValidDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ""))) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const canonical = new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
+  return canonical === value;
+}
+
 export function resolveLocalTimeZone(value) {
   const candidate = String(value ?? "").trim() || DEFAULT_LOCAL_TIME_ZONE;
 

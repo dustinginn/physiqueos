@@ -11,10 +11,11 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
-import { getOperatingPlanStrategyHref } from "../domain/services/OperatingPlanStrategyDetailService";
 import {
-  resolveMorningWeighInSupport,
-} from "../domain/services/TrackingSupportService";
+  buildEnergyStrategyPlanItem as buildApplicationEnergyStrategyPlanItem,
+  buildOperatingPlan as buildApplicationOperatingPlan,
+  buildTrainingPlanItem as buildApplicationTrainingPlanItem,
+} from "../application/plan/OperatingPlanReadService";
 
 export default function OperatingPlanScreen({
   activityActivated = false,
@@ -26,8 +27,9 @@ export default function OperatingPlanScreen({
   energyActivated = false,
   energyStrategy,
   executionItems = [],
+  planSections = null,
 }) {
-  const plan = buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol });
+  const plan = planSections ?? buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol });
 
   return (
     <main className="app-surface min-h-screen">
@@ -85,12 +87,13 @@ export default function OperatingPlanScreen({
 }
 
 function PlanSection({ section }) {
-  if (section.supplements) return <Card className="space-y-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><Link className="inline-flex min-h-11 items-center text-xs font-extrabold text-[var(--primary)]" href="/profile/operating-plan/supplements/new">Add Supplement</Link></div><div className="space-y-2">{section.items.map((item)=><PlanRow item={item} key={item.id}/>)}</div></Card>;
+  const icon = PLAN_ICONS[section.iconKey] ?? Activity;
+  if (section.supplements) return <Card className="space-y-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><IconBadge className="rounded-full" color={section.tone} icon={icon} size="sm"/><div><h2 className="text-base font-extrabold">{section.title}</h2><p className="text-xs font-semibold text-[var(--text-secondary)]">{section.subtitle}</p></div></div><Link className="inline-flex min-h-11 items-center text-xs font-extrabold text-[var(--primary)]" href="/profile/operating-plan/supplements/new">Add Supplement</Link></div><div className="space-y-2">{section.items.map((item)=><PlanRow item={item} key={item.id}/>)}</div></Card>;
   return (
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <IconBadge className="rounded-full" color={section.tone} icon={section.icon} size="sm" />
+          <IconBadge className="rounded-full" color={section.tone} icon={icon} size="sm" />
           <div>
             <h2 className="text-base font-extrabold text-[var(--text-primary)]">
               {section.title}
@@ -139,117 +142,10 @@ function PlanRow({ item }) {
 }
 
 export function buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders = [], trainingProtocol }) {
-  const activeProtocols = protocols.filter((protocol) => protocol.status === "active");
-  const supplements = activeProtocols.filter((protocol) => protocol.category === "supplement");
-  const recoveryProtocols = activeProtocols.filter((protocol) => protocol.category === "recovery");
-  const coachingProtocol = activeProtocols.find((protocol) => protocol.category === "briefings");
-  const peptides = activeProtocols.filter((protocol) => protocol.category === "peptide");
-  const morningWeighIn = resolveMorningWeighInSupport({
-    executionItems,
-    protocols: activeProtocols,
-    reminders,
-  });
-
-  return [
-    {
-      icon: Activity,
-      title: "Energy Strategy",
-      subtitle: energyStrategy ? "Active" : "Not configured",
-      tone: "primary",
-      items: [buildEnergyStrategyPlanItem(energyStrategy)],
-    },
-    {
-      icon: Scale,
-      title: "Tracking",
-      subtitle: "Recurring measurements",
-      tone: "evidence",
-      items: [{
-        id: "tracking",
-        title: "Tracking",
-        detail: morningWeighIn?.supportSummary ?? "Morning Weigh-In Support",
-        href: "/profile/operating-plan/tracking",
-        status: morningWeighIn ? "Active" : "Review",
-      }],
-    },
-    {
-      icon: Dumbbell,
-      title: "Training",
-      subtitle: trainingProtocol ? "Active protocol" : "Protocol not defined",
-      tone: "effort",
-      items: [buildTrainingPlanItem(trainingProtocol)],
-    },
-    {
-      icon: Dumbbell,
-      title: "Supplements",
-      subtitle: `${supplements.length} current supplement${supplements.length === 1 ? "" : "s"}`,
-      tone: "success",
-      supplements: true,
-      items: supplements.length ? [{
-        id: "supplement-strategy",
-        title: "Supplement Strategy",
-        detail: supplements.map((protocol) => protocol.name).join(", "),
-        href: `/profile/protocols/${supplements[0].id}?from=operating-plan`,
-        status: "Active",
-      }] : [],
-    },
-    {
-      icon: Salad,
-      title: "Nutrition",
-      subtitle: "Manual context",
-      tone: "primary",
-      items: [
-        {
-          id: "nutrition-calorie-range",
-          title: nutritionContext?.calibrationStrategy ? "Maintenance Calibration" : "Calorie Range",
-          detail: formatCalorieRange(nutritionContext),
-          href: getOperatingPlanStrategyHref("nutrition", nutritionContext?.activeProtocolId),
-          status: "Active",
-        },
-      ],
-    },
-    {
-      icon: Syringe,
-      title: "Peptides",
-      subtitle: `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`,
-      tone: "effort",
-      items: peptides.length ? [{
-        id: "peptide-strategy",
-        title: "Peptide Strategy",
-        detail: peptides.map((protocol) => protocol.name).join(", "),
-        href: `/profile/protocols/${peptides[0].id}?from=operating-plan`,
-        status: "Active",
-      }] : [],
-    },
-    {
-      icon: Activity,
-      title: "Recovery",
-      subtitle: recoveryProtocols.length ? `${recoveryProtocols.length} current method` : "Strategy coming soon",
-      tone: "success",
-      items: recoveryProtocols.length
-        ? [{
-            id: "recovery-strategy",
-            title: "Recovery Strategy",
-            detail: recoveryProtocols.map((protocol) => protocol.name).join(", "),
-            href: `/profile/protocols/${recoveryProtocols[0].id}?from=operating-plan`,
-            status: "Active",
-          }]
-        : [{ id:"recovery-coming-soon", title:"Recovery", detail:"A dedicated recovery strategy will complete this layer", href:null, status:"Coming Soon" }],
-    },
-    ...(coachingProtocol ? [{
-      icon: MessageCircle,
-      title: "Coaching Updates",
-      subtitle: "Wednesday and Sunday",
-      tone: "primary",
-      items: [{
-        id: coachingProtocol.id,
-        title: "Coaching Updates",
-        detail: "Midweek calibration and weekly synthesis",
-        href: getOperatingPlanStrategyHref("briefings", coachingProtocol.id),
-        status: "Active",
-      }],
-    }] : []),
-  ].filter((section) => section.items.length > 0).sort((a,b)=>["Energy Strategy","Nutrition","Training","Recovery","Peptides","Supplements","Tracking","Coaching Updates"].indexOf(a.title)-["Energy Strategy","Nutrition","Training","Recovery","Peptides","Supplements","Tracking","Coaching Updates"].indexOf(b.title));
+  return buildApplicationOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol });
 }
+
+const PLAN_ICONS = Object.freeze({ energy: Activity, nutrition: Salad, training: Dumbbell, recovery: Activity, peptide: Syringe, supplement: Dumbbell, tracking: Scale, coaching: MessageCircle });
 
 export function isConcreteExecutionItem(item) {
   const id = String(item?.id ?? "");
@@ -291,11 +187,7 @@ function joinSummary(cadence,time){return [cadence,time].filter(Boolean).join(" 
 function daypart(value){return ["morning","afternoon","evening","night"].includes(value) ? value.toLowerCase() : "";}
 
 export function buildEnergyStrategyPlanItem(link) {
-  if (!link) return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the cut", href: null, status: "Build Strategy" };
-  if (link.selectedPace === "maintenance_calibration") {
-    return { id: link.protocolId, title: "Maintenance Calibration", detail: "Activity and Nutrition linked for weekly calibration", href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" };
-  }
-  return { id: link.protocolId, title: `${formatPersistence(link.selectedPace)} cut`, detail: "Activity and Nutrition linked", href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" };
+  return buildApplicationEnergyStrategyPlanItem(link);
 }
 
 export function buildActivityPlanItem(version) {
@@ -322,28 +214,10 @@ export function buildActivityPlanItem(version) {
 }
 
 export function buildTrainingPlanItem(version) {
-  const strategy = version?.trainingStrategy;
-  if (!strategy) {
-    return {
-      id: "training-protocol-create",
-      title: "Training",
-      detail: "Define weekly frequency and progression strategy",
-      href: "/profile/operating-plan/training/new",
-      status: "Create Protocol",
-    };
-  }
-
-  const weeklySessions = Object.values(strategy.weeklyFrequencies ?? {}).reduce((sum, value) => sum + Number(value), 0);
-  return {
-    id: version.protocolId,
-    title: "Maintenance Training Strategy",
-    detail: `${weeklySessions} weekly area sessions · ${formatPersistence(strategy.progression?.pace)} progression`,
-    href: getOperatingPlanStrategyHref("training", version.protocolId),
-    status: "Active",
-  };
+  return buildApplicationTrainingPlanItem(version);
 }
 
-function formatCalorieRange(nutritionContext) {
+export function formatCalorieRange(nutritionContext) {
   const range = nutritionContext?.estimatedDailyCaloricIntake;
 
   if (nutritionContext?.calibrationStrategy) {

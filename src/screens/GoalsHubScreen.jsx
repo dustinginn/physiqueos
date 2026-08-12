@@ -10,17 +10,12 @@ import {
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
 import { FounderRepositories } from "../data/repositories/founderRepositories";
-import { GoalEvaluationService } from "../domain/services/GoalEvaluationService";
-import { GoalIntelligenceService } from "../domain/services/GoalIntelligenceService";
-import { createTrainingPerformanceIntelligenceReport } from "../domain/services/TrainingPerformanceIntelligenceService";
 import { getFounderRuntimeStore } from "../data/repositories/founderRuntimeStore";
+import { createInactiveLegacyWebContext } from "../application/auth/legacyWebContext";
 import {
-  safelyGetProductionGoalTransitionEntryPointState,
-} from "../domain/services/ProductionGoalTransitionEntryPointService";
-import { resolveGoalNavigationHref } from "../domain/services/GoalNavigationRouteResolver";
-import { composeCompletedGoalPreview } from "../domain/services/CompletedGoalPreviewService";
-import { resolveActiveGoalConfidencePresentation } from "../domain/services/ActiveGoalConfidencePresentationReadService";
-import { resolveCommittedPhaseContext } from "../domain/services/FounderPhaseCorrectionService";
+  createGoalsHubReadService,
+  mapGoalSummary as mapApplicationGoalSummary,
+} from "../application/goals/GoalsHubReadService";
 
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -60,85 +55,12 @@ export default async function GoalsHubScreen({ from } = {}) {
 }
 
 export async function getGoalsHub() {
-  const user = await FounderRepositories.users.getCurrentUser();
-  const userId = user?.id;
-  const [
-    goals,
-    activeGoal,
-    dexaScans,
-    weightEntries,
-    progressPhotos,
-    protocols,
-    nutritionContext,
-    analyses,
-    canonicalEvidence,
-    briefings,
-    checkIns,
-  ] = await Promise.all([
-    FounderRepositories.goals.listGoals(userId),
-    FounderRepositories.goals.getActiveGoal(userId),
-    FounderRepositories.dexaScans.listDEXAScans(userId),
-    FounderRepositories.weights.listWeightEntries(userId),
-    FounderRepositories.progressPhotos.listPhotos(userId),
-    FounderRepositories.protocols.listActiveProtocols(userId),
-    FounderRepositories.nutritionContext.getNutritionContext(userId),
-    FounderRepositories.analyses.listAnalyses(),
-    FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
-    FounderRepositories.dailyBriefings.listDailyBriefings(userId),
-    FounderRepositories.dailyCheckIns.listCheckIns(userId),
-  ]);
-  const trainingPerformance = createTrainingPerformanceIntelligenceReport({
-    canonicalObjects: canonicalEvidence,
-  });
-  const evaluations = GoalEvaluationService.getGoalEvaluations({
-    goals,
-    dexaScans,
-    weightEntries,
-    progressPhotos,
-    protocols,
-    nutritionContext,
-    photoAnalyses: analyses,
-    trainingPerformance,
-  });
-  const intelligence = GoalIntelligenceService.getGoalIntelligence({
-    evaluations,
-    activeGoal,
-  });
-  const canonicalConfidence = activeGoal?.type === "build_lean_mass"
-    ? resolveActiveGoalConfidencePresentation({
-        activeGoal,
-        store: getFounderRuntimeStore(),
-      })
-    : null;
-  const summaries = intelligence.goals.map((summary) => {
-    const sourceGoal = goals.find((goal) => goal.id === summary.id);
-    return mapGoalSummary(
-      summary,
-      evaluations.find((item) => item.goalId === summary.id),
-      sourceGoal,
-      summary.id === activeGoal?.id ? canonicalConfidence : null
-    );
-  });
-
-  for (const goal of summaries.filter((item) => !item.navigation.available)) {
-    console.warn("[GoalNavigation] Goal detail route unavailable.", {
-      goalId: goal.id ?? null,
-      goalType: goal.goalType ?? null,
-      lifecycle: goal.lifecycleState ?? goal.status ?? null,
-      resolverCode: goal.navigation.code,
-    });
+  const { principal } = await createInactiveLegacyWebContext({ repositories: FounderRepositories });
+  const hub = await createGoalsHubReadService({ repositories: FounderRepositories, readRuntimeStore: getFounderRuntimeStore }).getGoalsHub({ principal });
+  for (const goal of hub.activeGoals.filter((item) => !item.navigation.available)) {
+    console.warn("[GoalNavigation] Goal detail route unavailable.", { goalId: goal.id ?? null, goalType: goal.goalType ?? null, lifecycle: goal.lifecycleState ?? goal.status ?? null, resolverCode: goal.navigation.code });
   }
-
-  const transitionEntry = safelyGetProductionGoalTransitionEntryPointState(
-    structuredClone(getFounderRuntimeStore())
-  );
-  const completedGoal = goals.find((goal) => goal.id === VISIBLE_ABS_GOAL_ID && goal.status === "completed");
-  const completedJourney = completedGoal ? composeCompletedGoalPreview({ goals, dexaScans, progressPhotos, briefings, currentGoal: activeGoal }) : null;
-  return {
-    activeGoals: summaries.filter((goal) => goal.id === activeGoal?.id),
-    completedGoals: completedJourney ? [{ id: completedJourney.preview.canonicalGoalId, title: completedJourney.hero.title, status: completedJourney.hero.status, dates: completedJourney.hero.dates, achievement: completedJourney.hero.achievement, href: "/goals/visible-abs" }] : [],
-    transitionEntry,
-  };
+  return { ...hub, activeGoals: hub.activeGoals.map(withWebGoalVisual) };
 }
 
 function ActiveGoals({ from, goals }) {
@@ -281,47 +203,12 @@ function SectionHeading({ title }) {
 }
 
 export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfidence) {
-  const visual = getVisualIdentity(summary);
-  const navigation = resolveGoalNavigationHref({
-    id: summary.id,
-    type: sourceGoal?.type,
-    goalType: sourceGoal?.goalType,
-    title: summary.title,
-    lifecycleState: summary.lifecycleState,
-    status: sourceGoal?.status,
-  });
-  const phase = sourceGoal?.phases?.length
-    ? resolveCommittedPhaseContext(sourceGoal).activePhase : null;
+  return withWebGoalVisual(mapApplicationGoalSummary(summary, evaluation, sourceGoal, canonicalConfidence));
+}
 
-  return {
-    ...summary,
-    status: "active",
-    title: normalizeGoalTitle(summary.title),
-    confidence: Number.isFinite(canonicalConfidence?.value)
-      ? {
-          value: canonicalConfidence.value,
-          band: canonicalConfidence.band,
-          source: canonicalConfidence.source,
-        }
-      : null,
-    goalType: sourceGoal?.type ?? sourceGoal?.goalType ?? null,
-    navigation,
-    phase: phase ? {
-      id: phase.id,
-      name: phase.name,
-      status: phase.status,
-      startedAt: phase.startedAt,
-      plannedReviewAt: phase.plannedReviewAt,
-      reviewState: phase.effectiveReviewState ?? phase.reviewState,
-    } : null,
-    statusLabel: normalizeJourneyState(
-      summary.primary
-        ? evaluation?.projection?.completionStageLabel ?? "On Track"
-        : summary.presentation?.status ?? summary.current
-    ),
-    icon: visual.icon,
-    color: visual.color,
-  };
+function withWebGoalVisual(goal) {
+  const visual = getVisualIdentity(goal);
+  return { ...goal, icon: visual.icon, color: visual.color };
 }
 
 function formatConfidence(confidence) {
@@ -341,26 +228,6 @@ function getVisualIdentity(goal) {
   }
 
   return { icon: Compass, color: "evidence" };
-}
-
-function normalizeGoalTitle(title) {
-  if (title === "Visible Abs") return "Visible Abs at Rest";
-  if (title === "Maintenance") return "Maintain 8-9%";
-  if (title === "Lean Mass") return "Preserve Lean Mass";
-
-  return title;
-}
-
-function normalizeJourneyState(state) {
-  const approvedLabels = {
-    "Visual confirmation developing": "Visual Confirmation Developing",
-    "Entering target range": "Entering Target Range",
-    "Entering Target Range": "Entering Target Range",
-    Stable: "Stable",
-    "Final Stage": "Final Stage",
-  };
-
-  return approvedLabels[state] ?? state;
 }
 
 function withReturnContext(href, from) {

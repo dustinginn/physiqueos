@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PhysiqueOS Application API",
-    "version": "1.0.0-foundation.2",
-    "description": "Inactive Phase 2 shared-platform boundary. Production-grade PostgreSQL, authentication, private-object, worker, backup, and readiness adapters exist behind explicit staging flags, but the current production authenticator deliberately denies access and the Founder JSON/file runtime remains canonical. Future mutations use Idempotency-Key, UUIDv7 commandId, canonical payload hashing, and If-Match/expectedVersion. Collections use bounded opaque cursors."
+    "version": "1.0.0-foundation.3",
+    "description": "Inactive Phase 3 shared application boundary. Versioned read-model, command, typed-destination, date, and authorized-media contracts are implemented over the still-canonical Founder JSON/file runtime. The only new HTTP surface is protected capability discovery; production authentication deliberately remains inactive and no Founder domain data is exposed."
   },
   "servers": [{ "url": "/api/v1" }],
   "paths": {
@@ -48,6 +48,22 @@
           "200": {
             "description": "Authenticated platform status",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlatformStatus" } } }
+          },
+          "401": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "operationId": "getApplicationCapabilities",
+        "summary": "Return protected shared-application contract capabilities",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+        "responses": {
+          "200": {
+            "description": "Authenticated application capabilities",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApplicationCapabilities" } } }
           },
           "401": { "$ref": "#/components/responses/Problem" },
           "503": { "$ref": "#/components/responses/Problem" }
@@ -106,6 +122,7 @@
         "properties": {
           "commandId": { "$ref": "#/components/schemas/UuidV7" },
           "idempotencyKey": { "type": "string", "minLength": 16, "maxLength": 200 },
+          "correlationId": { "type": ["string", "null"], "minLength": 8, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
           "expectedVersion": { "oneOf": [{ "$ref": "#/components/schemas/AggregateVersion" }, { "type": "null" }] },
           "payloadVersion": { "type": "string" },
           "clientOccurredAt": { "type": ["string", "null"], "format": "date-time" },
@@ -117,7 +134,7 @@
         "additionalProperties": false,
         "required": ["id", "parameters"],
         "properties": {
-          "id": { "type": "string", "enum": ["platform.status", "operation.detail"] },
+          "id": { "type": "string", "enum": ["home", "log", "check-in", "evidence.review", "evidence.detail", "goal.detail", "goals", "goal.transition", "plan", "plan.strategy", "plan.support", "priority.detail", "briefing.detail", "briefing.list", "training.session", "training.exercise", "photo.upload", "dexa.upload", "profile", "progress.stream", "platform.status", "operation.detail"] },
           "parameters": { "type": "object", "additionalProperties": true }
         }
       },
@@ -194,6 +211,54 @@
           "readiness": { "$ref": "#/components/schemas/Readiness" },
           "capabilities": { "type": "array", "items": { "$ref": "#/components/schemas/FeatureCapability" } },
           "destination": { "$ref": "#/components/schemas/Destination" }
+        }
+      },
+      "ApplicationCommandContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["commandType", "payloadVersion", "requiredPayloadFields", "expectedVersionRequired"],
+        "properties": {
+          "commandType": { "type": "string", "enum": ["weight.submit.v1", "check-in.submit.v1", "evidence-intake.create.v1", "evidence-review.edit.v1", "evidence-review.confirm.v1", "evidence-review.dispose.v1", "priority.complete.v1", "previous-day.reconcile.v1", "protocol.edit.v1", "goal.edit.v1", "goal.transition.v1", "training-session.create.v1", "training-session.correct.v1", "training-logger.complete.v1", "nutrition-evidence.confirm.v1", "photo-evidence.confirm.v1", "dexa-evidence.confirm.v1"] },
+          "payloadVersion": { "const": "1" },
+          "requiredPayloadFields": { "type": "array", "items": { "type": "string" } },
+          "expectedVersionRequired": { "type": "boolean" }
+        }
+      },
+      "ApplicationReadModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contractVersion", "model", "resourceVersion", "generatedAt", "freshThrough", "data", "intentionalDifferences", "etag"],
+        "properties": {
+          "contractVersion": { "const": "1" },
+          "model": { "type": "string", "enum": ["home.v1", "log.v1", "evidence-review.v1", "goals.v1", "operating-plan.v1", "priorities.v1", "progress.v1", "confidence.v1", "briefings.v1", "training.v1", "profile.v1"] },
+          "resourceVersion": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "freshThrough": { "type": "string", "format": "date-time" },
+          "data": {},
+          "intentionalDifferences": { "type": "array", "items": { "type": "string" } },
+          "etag": { "type": "string" }
+        }
+      },
+      "AuthorizedMediaReadDescriptor": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["objectId", "ownerUserId", "contentType", "size", "sha256", "expiresAt", "accessHandle"],
+        "properties": {
+          "objectId": { "type": "string" }, "ownerUserId": { "type": "string" }, "contentType": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 }, "sha256": { "type": ["string", "null"] },
+          "expiresAt": { "type": "string", "format": "date-time" }, "accessHandle": { "type": "string" }
+        }
+      },
+      "ApplicationCapabilities": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contractVersion", "apiVersion", "canonicalRuntime", "transportActivation", "readModels", "commands", "media", "fallbackDestination"],
+        "properties": {
+          "contractVersion": { "const": "1" }, "apiVersion": { "const": "v1" }, "build": {},
+          "canonicalRuntime": { "const": "legacy_json_file" }, "transportActivation": { "const": "inactive" },
+          "readModels": { "type": "array", "items": { "type": "string" } },
+          "commands": { "type": "array", "items": { "$ref": "#/components/schemas/ApplicationCommandContract" } },
+          "media": { "type": "object" }, "fallbackDestination": { "$ref": "#/components/schemas/Destination" }
         }
       },
       "Operation": {

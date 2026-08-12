@@ -1,42 +1,21 @@
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { createActivityProtocolBuilderService } from "../../../domain/services/ActivityProtocolBuilderService";
-import { createTrainingProtocolBuilderService } from "../../../domain/services/TrainingProtocolBuilderService";
-import { createOperatingPlanEnergyStrategyService } from "../../../domain/services/OperatingPlanEnergyStrategyService";
+import { createInactiveLegacyWebContext } from "../../../application/auth/legacyWebContext";
+import { createOperatingPlanReadService } from "../../../application/plan/OperatingPlanReadService";
 import OperatingPlanScreen from "../../../screens/OperatingPlanScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function OperatingPlanPage({ searchParams }) {
   const params = await searchParams;
-  const user = await FounderRepositories.users.getCurrentUser();
-  const activityService = createActivityProtocolBuilderService({ repositories: FounderRepositories });
-  const trainingService = createTrainingProtocolBuilderService({ repositories: FounderRepositories });
-  const energyService = createOperatingPlanEnergyStrategyService({
-    repositories: FounderRepositories,
-  });
-  const [protocols, reminders, nutritionContext, activityContext, trainingContext, energyContext, executionItems] =
-    await Promise.all([
-      FounderRepositories.protocols.listProtocols(user.id),
-      FounderRepositories.reminders.listReminders(user.id),
-      FounderRepositories.nutritionContext.getNutritionContext(user.id),
-      activityService.getBuilderContext(user.id),
-      trainingService.getBuilderContext(user.id),
-      energyService.getActiveStrategy(user.id),
-      FounderRepositories.executionItems.listExecutionItems(user.id),
-    ]);
+  const { principal } = await createInactiveLegacyWebContext({ repositories: FounderRepositories });
+  const plan = await createOperatingPlanReadService({ repositories: FounderRepositories }).getOperatingPlan({ principal });
 
   return (
     <OperatingPlanScreen
       activityActivated={params?.activity === "activated"}
-      activityProtocol={activityContext.currentVersion}
-      nutritionContext={nutritionContext}
-      protocols={protocols}
-      reminders={reminders}
+      planSections={plan.sections}
       trainingActivated={params?.training === "activated"}
-      trainingProtocol={trainingContext.currentVersion}
       energyActivated={params?.energy === "activated"}
-      energyStrategy={energyContext}
-      executionItems={executionItems}
     />
   );
 }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const goalsSource = fs.readFileSync(new URL("./GoalsHubScreen.jsx", import.meta.url), "utf8");
+const goalsApplicationSource = fs.readFileSync(new URL("../application/goals/GoalsHubReadService.js", import.meta.url), "utf8");
 const entryPage = fs.readFileSync(
   new URL("../app/goals/transition/page.js", import.meta.url),
   "utf8"
@@ -33,8 +34,8 @@ describe("Goals live transition entry point", () => {
   });
 
   it("keeps rendering and prefetch read-only", () => {
-    expect(goalsSource).toContain("safelyGetProductionGoalTransitionEntryPointState");
-    expect(goalsSource).not.toMatch(/\.save\(|markReady|activateProduction|consume/);
+    expect(goalsApplicationSource).toContain("safelyGetProductionGoalTransitionEntryPointState");
+    expect(goalsApplicationSource).not.toMatch(/\.save\(|markReady|activateProduction|consume/);
     expect(goalsSource).not.toContain("<button");
   });
 

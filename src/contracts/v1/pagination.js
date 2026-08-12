@@ -1,4 +1,4 @@
-import { ApplicationProblem } from "./problem";
+import { ApplicationProblem } from "./problem.js";
 
 const CURSOR_VERSION = 1;
 

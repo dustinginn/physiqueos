@@ -363,3 +363,31 @@ Final bounded validation: Phase 1 9 files/33 tests, Phase 2 9 files/52 tests, pe
 Founder integrity was identical before and after the final harness: `founder-seed-v2`, revision `109`, updated `2026-08-11T16:26:17.843Z`, 26,298,071 bytes, SHA-256 `11C73237AB5F8D19738762ED25C45293D539852B70442AF990A2A7266E560188`. Production `/`, `/log`, and `/api/health` returned 200. JSON/file persistence remains canonical; production evidence/auth/worker/routes do not use staging.
 
 Phase 2 classification: **accepted for provider-backed synthetic staging only**. Phase 3 is the next dependency-ordered phase but remains separately gated. Run the end-work-session task before requesting Phase 3. No Founder migration/cutover/evidence move/auth activation, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work is authorized by this acceptance.
+
+## Phase 3 application boundary â€” 2026-08-11
+
+Phase 3 was implemented on `phase3-application-boundary` from exact accepted Phase 2 checkpoint `bbb96894dde752d1ffd7e655a3e58a4aedd77f31`. The workflow inventory and contract details are canonical in `docs/PHASE3_APPLICATION_BOUNDARY.md`.
+
+Implemented pre-iOS boundary work:
+
+- principal-required versioned read envelopes for Home, Log, Evidence Review, Goals, Operating Plan, Priorities, Progress Intelligence, Confidence, generic briefings, Training and You/profile;
+- task command dispatch for weight/check-in, evidence intake/review, priority/reconciliation, protocol, Goal, TrainingSession/Logger and nutrition/photo/DEXA confirmation, using UUIDv7 identity, idempotency, expected version where mutable and correlation propagation;
+- a typed destination registry with web mapping and fail-fast unmapped-link validation;
+- an owner-local, half-open calendar-day contract with deterministic Los Angeles DST tests;
+- an owner-authorized five-minute media descriptor with path-hiding local-file and future Spaces adapters;
+- generic briefing publication/list/detail contracts, server-owned Confidence output and Training history/detail/library/recent/comparable/suggestion boundaries; and
+- bounded parity activation of Goals Hub, Log/day and Operating Plan web composition only. CSS, icons, layout and presentation formatting remain React-owned.
+
+The only new API route is protected `/api/v1/capabilities`. Production auth remains deliberately inactive, so the route returns a structured 503 and reveals neither Founder data nor canonical-runtime details to an unauthenticated request. Domain endpoints were not speculated before authenticated transport composition exists.
+
+Intentional read DTO differences are limited to stable icon keys instead of React components, typed destinations instead of raw hrefs, omission of server implementation fields, and added version/ETag/freshness metadata. Current ordering, labels, Goal/phase semantics, priority eligibility, evidence state, briefing publication behavior, Confidence source/value/explanation, Training history/comparison and date interpretation remain canonical-domain owned.
+
+Production isolation is unchanged: current production remains pinned to `dee69adb366b386d4f2e4999d688532f37fc37e8`; JSON/file data and local evidence remain canonical; no migration, PostgreSQL cutover, Spaces evidence move, auth activation or DigitalOcean staging mutation occurred. Phase 3 does not satisfy the pre-iOS exit criteria by itself. Phase 4 remains an explicit separate authorization gate.
+
+Final bounded acceptance passed 38 files / 216 tests: Phase 1 9 files/34 tests, Phase 2 9/52, Phase 3 9/44, persistence isolation 2/29, adjacent services 4/29, production Confidence parity 1/6, and extracted web regressions 4/22. Targeted lint, isolated production build, diff check, and isolated smoke passed. The isolated build returned 200 for `/`, `/log`, `/goals`, `/profile/operating-plan`, and `/api/v1/health/live`; protected capabilities returned the intended 503 while auth is inactive. Current pinned production remained 200 on `/`, `/log`, and `/api/health`.
+
+Founder integrity remained exact: revision `110`, updated `2026-08-12T02:05:50.820Z`, 26,402,081 bytes, SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D`. This is the fresh post-user-activity baseline, and no validation step mutated it.
+
+Failure disposition is complete. One generic-briefing `unknown` fallback was a deterministic new boundary defect and was corrected. React source-string tests became extraction-aware fixture corrections. Disabled PowerShell npm scripts were an environment-shell issue. A non-acceptance grouped legacy run reproduced the known 4 GB heap limit, stale protocol-reconciliation fixture text, and a current-state Retatrutide assumption; those were classified as environment/resource, unrelated pre-existing fixture, and production-state-dependent respectively. The accepted serial harness avoids that contamination. The known existing Turbopack whole-project trace warning remains. No deterministic Phase 3 product/foundation regression is unresolved.
+
+Phase 3 classification: **accepted as an additive, production-isolated application-boundary and bounded web-parity checkpoint.** This does not authorize branch push/merge, production deployment, Phase 4, persistence migration, evidence transfer, auth activation or Apple implementation. Run the end-work-session task before separately authorizing Phase 4.

@@ -1,13 +1,15 @@
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { requireResourceId } from "../../contracts/v1/identifiers.js";
 
-export function createAuthenticationPrincipal({ userId, deviceId, sessionId, scopes = [], authenticatedAt } = {}) {
+export function createAuthenticationPrincipal({ userId, deviceId, sessionId, scopes = [], authenticatedAt, authenticationMethod = null, transport = null } = {}) {
   return Object.freeze({
     userId: requireResourceId(userId, "userId"),
     deviceId: requireResourceId(deviceId, "deviceId"),
     sessionId: requireResourceId(sessionId, "sessionId"),
     scopes: Object.freeze([...new Set(scopes.map(String))]),
     authenticatedAt: authenticatedAt ?? null,
+    authenticationMethod,
+    transport,
   });
 }
 

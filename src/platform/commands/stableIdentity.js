@@ -1,4 +1,4 @@
-import { createPayloadHash } from "../../contracts/v1/canonicalJson";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 
 export function createSourceIdentity({ ownerUserId, namespace, sourceId }) {
   requirePart(ownerUserId, "ownerUserId");
