@@ -4,7 +4,7 @@ Status: living canonical transition document
 
 Last audited: 2026-08-11
 
-Foundation design decision: approved for the initial Founder-stage direction; Phase 1 is accepted and Phase 2 provider-backed synthetic staging passed on 2026-08-11. Production remains on the JSON/file runtime. Remaining production and product approvals are recorded in section 18.
+Foundation design decision: approved for the initial Founder-stage direction; Phases 1-5 are technically accepted, including live synthetic DigitalOcean provider evidence. Production remains on the JSON/file runtime and no migration is authorized. Remaining production and product approvals are recorded in section 18 and the Phase 5 packet.
 
 Implementation base revision: `a4c759fd`
 
@@ -1032,3 +1032,19 @@ Measured local work was 1.929 s snapshot copy, 1.697 s export/inventory, 2.143-2
 Production JSON/file state and local evidence remain canonical and unmoved. No production deployment, route composition, authentication, DigitalOcean resource, recurring cost, staging state, Founder data, or evidence was changed. Phase 4 is a rehearsal only and does not authorize Phase 5, production cutover, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2.
 
 Final bounded acceptance passed 38 files / 200 tests, the complete guarded PostgreSQL cycle, targeted lint, production build, isolated smoke, `git diff --check`, current production smoke, and generated-data/secret scans. Founder revision 110 and SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D` remained exact. The first smoke attempt was a deterministic harness-path defect and was corrected before the complete passing rerun; the pre-existing Turbopack filesystem trace warning remains. Run the end-work-session task before requesting Phase 5.
+
+## 38. Phase 5 production-cutover readiness checkpoint
+
+Status on 2026-08-11: **Phase 5 technical acceptance passes on local and live synthetic DigitalOcean evidence; production migration remains separately gated and is not authorized.** Work is isolated on `phase5-cutover-readiness` from exact Phase 4 checkpoint `622ba8dd8684c36107dc6c6c49bc39080eb53a4f`. The operational record, runbook, rollback matrix, checklist, and authorization packet are in `docs/PHASE5_CUTOVER_READINESS.md`.
+
+Phase 5 adds an all-42-collection synthetic runtime/package generator, additive provider media validation metadata, a DigitalOcean PostgreSQL/Spaces application composition using the same Phase 3 contracts, provider-only media/operations harnesses, strict database/bucket/owner/CA guards, and executable cutover/auth/compatibility/rollback policy tests. An AES-256-GCM application grant keeps provider URLs, paths, keys, and versions out of client DTOs and rechecks owner/expiry on server-side redemption.
+
+At scale 10 the synthetic package contains 370 canonical records and three tiny synthetic media objects. Local PostgreSQL import/validation, 17 read surfaces, all 17 commands, stale/replay/payload-drift/concurrency/duplicate/atomic-outbox/ownership protections, and isolated backup/restore passed. Package digest is `49f8f0698aeb7fd6b492472343eafbb4f454562a4af5abe31ecd88a2b42bb507`; restored database/media digest is `ed66b5062569f9f6148bcd511b62721767eab15bb0cf55f9b9ccb5cda611678a`.
+
+The hardened runbook separates persistence/media cutover from authentication. Web moves to PostgreSQL/Spaces first with auth inactive and a bounded server-only compatibility principal; recovery credential/passkey enrollment occurs only after shared-store web stability. The production artifact lifecycle is locked: stop canonical process/task, build/preflight in isolation, atomically promote, restart, and verify routes/assets/build identity/runtime ownership. Never rebuild canonical `.next` in place while an older process serves it.
+
+The provisional production write fence remains 2-5 minutes with a ten-minute hard approval boundary before first PostgreSQL write. After any accepted PostgreSQL write, JSON is never blindly restored as canonical. Web remains the first shared-state client and permanent fallback. `/api/v1` stays additive, supports current plus previous accepted native builds for at least 180 days, and keeps independent future native kill switches.
+
+Live provider acceptance passed on the existing $30.15/month staging footprint: 42 collections / 370 synthetic records, three versioned objects / 111 bytes, 17 read surfaces, 17 commands, concurrency/retry, encrypted opaque media handles, dependency readiness, real App Platform restart, and exact backup/isolated restore. Provider critical work measured about 40 seconds excluding restart and about 83 seconds including restart, supporting the 2-5 minute estimate and ten-minute hard boundary. The temporary firewall, restore database, and dump were removed; the accepted synthetic test database/objects remain. No full-access token, new Space key, paid resource, cost change, Founder upload, production deployment, auth activation, evidence move, or write fence occurred.
+
+Phase 5 is **ACCEPTED** and production migration is technically **READY for separate authorization**, not authorized. Before Phase 6: run and publish the end-work-session checkpoint; then separately accept the immutable compatibility release, name operator/abort/alert owners, verify alert delivery and production backups, and approve the migration window/go-no-go. Phase 6 must not start automatically and is the compatibility-release plus canonical-migration/stabilization scope, not Native Baseline.

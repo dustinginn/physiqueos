@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 import { register } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
-import pg from "pg";
+import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { importCanonicalPackage, validateCanonicalImport } = await import("../src/platform/migration/phase4CanonicalImport.js");
@@ -12,10 +12,10 @@ const databaseUrl = String(process.env.PHYSIQUEOS_PHASE4_DATABASE_URL ?? "").tri
 const packageRoot = process.argv[2];
 if (!databaseUrl || !packageRoot) throw new Error("PHYSIQUEOS_PHASE4_DATABASE_URL and a package directory are required.");
 const parsed = new URL(databaseUrl);
-if (!/^physiqueos_phase4_(?:test|rehearsal|restore)(?:_|$)/.test(decodeURIComponent(parsed.pathname.slice(1)))) {
-  throw new Error("Refusing Phase 4 import outside a guarded Phase 4 database.");
+if (!/^(?:physiqueos_phase4_(?:test|rehearsal|restore)|physiqueos_phase5_(?:test|restore)_provider)(?:_|$)/.test(decodeURIComponent(parsed.pathname.slice(1)))) {
+  throw new Error("Refusing canonical import outside a guarded Phase 4 rehearsal or Phase 5 provider-test database.");
 }
-const pool = new pg.Pool({ connectionString: databaseUrl, max: 2, allowExitOnIdle: true });
+const pool = createValidationPostgresPool({ connectionString: databaseUrl, maximumPoolSize: 2, applicationName: "physiqueos-canonical-import" });
 try {
   const importStarted = performance.now();
   const imported = await importCanonicalPackage({ pool, packageRoot, resetTarget: process.argv.includes("--reset") });

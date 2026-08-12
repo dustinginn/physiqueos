@@ -1,4 +1,4 @@
-export async function evaluateOperationalReadiness({ buildIdentity, environment, database, objectProvider = null, workerStore = null, workerRequired = false, maximumHeartbeatAgeMs = 120_000, clock = () => new Date() }) {
+export async function evaluateOperationalReadiness({ buildIdentity, environment, database, objectProvider = null, workerStore = null, workerRequired = false, maximumHeartbeatAgeMs = 120_000, expectedSchemaMigration = "000002_phase2_platform_operations", clock = () => new Date() }) {
   const checks = [];
   checks.push(configurationCheck(environment));
   checks.push(await safeCheck("database", async () => {
@@ -8,7 +8,7 @@ export async function evaluateOperationalReadiness({ buildIdentity, environment,
   checks.push(await safeCheck("schema", async () => {
     const result = await database.query("SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY run_on DESC, id DESC LIMIT 1");
     const name = result.rows?.[0]?.name ?? null;
-    return { ready: name === "000002_phase2_platform_operations", code: name === "000002_phase2_platform_operations" ? "SCHEMA_COMPATIBLE" : "SCHEMA_INCOMPATIBLE" };
+    return { ready: name === expectedSchemaMigration, code: name === expectedSchemaMigration ? "SCHEMA_COMPATIBLE" : "SCHEMA_INCOMPATIBLE" };
   }, "SCHEMA_UNAVAILABLE"));
   checks.push(objectProvider
     ? await safeCheck("object_storage", async () => ({ ...(await objectProvider.healthCheck()), ready: true, code: "OBJECT_STORAGE_REACHABLE" }), "OBJECT_STORAGE_UNREACHABLE")

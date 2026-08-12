@@ -4,7 +4,7 @@ import { assertKnownPhase4Collection, PHASE4_DOMAIN_TABLES } from "./phase4Domai
 import { readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
 import { createPhase4MediaObjectId } from "./phase4LocalMediaMigration.js";
 
-const GUARDED_DATABASE = /^physiqueos_phase4_(?:test|rehearsal|restore)(?:_|$)/;
+const GUARDED_DATABASE = /^(?:physiqueos_phase4_(?:test|rehearsal|restore)|physiqueos_phase5_(?:test|restore)_provider)(?:_|$)/;
 
 export async function importCanonicalPackage({ pool, packageRoot, resetTarget = false }) {
   if (!pool?.connect) throw new Error("Phase 4 import requires a PostgreSQL pool.");
@@ -245,7 +245,7 @@ async function assertGuardedDatabase(client) {
   const result = await client.query("SELECT current_database() AS database");
   const database = result.rows[0]?.database;
   if (!GUARDED_DATABASE.test(String(database ?? ""))) {
-    throw new Error("Refusing Phase 4 import/reset outside a database named physiqueos_phase4_test*, physiqueos_phase4_rehearsal*, or physiqueos_phase4_restore*.");
+    throw new Error("Refusing canonical import/reset outside a guarded Phase 4 rehearsal or Phase 5 provider-test database.");
   }
   return database;
 }

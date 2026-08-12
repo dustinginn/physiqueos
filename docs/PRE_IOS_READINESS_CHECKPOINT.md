@@ -6,7 +6,7 @@ Last audited: 2026-08-11
 
 Implementation base revision: `a4c759fd`
 
-Foundation design: Phase 1 accepted; Phase 2 provider-backed synthetic staging accepted on 2026-08-11. Production activation remains gated by the exit evidence below.
+Foundation design: Phases 1-5 technically accepted on local and live synthetic provider evidence. Production migration remains separately gated by checkpoint publication, compatibility-release acceptance, named operations/alert ownership, verified production backups, and an explicit migration-window go/no-go.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -405,3 +405,15 @@ Local timing was under three seconds for each major copy/export/import step; the
 Phase 4 classification: **accepted as a deterministic, repeatable, reversible local persistence rehearsal; production remains JSON/file canonical.** Phase 5 is not automatic. Before Phase 5, run the end-work-session task so the implementation, reports, and living documents have a preserved checkpoint. The recommended next phase is a separately approved production-cutover readiness review plus synthetic provider composition validation; it is not Apple implementation and does not itself authorize migration.
 
 Final bounded acceptance passed 38 files / 200 tests plus the guarded PostgreSQL cycle, targeted lint, production build, isolated smoke, diff check, current production smoke, and data/secret scans. Founder revision 110 remained byte-identical at SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D`; no concurrent Founder activity occurred during the final gate. `origin/main`, `origin/phase2-provider-staging`, and `origin/phase3-application-boundary` remained at their accepted commits, and no Phase 4 remote branch was published.
+
+## Phase 5 production-cutover readiness — 2026-08-11
+
+Phase 5 began on `phase5-cutover-readiness` from exact accepted Phase 4 checkpoint `622ba8dd8684c36107dc6c6c49bc39080eb53a4f`. Detailed implementation evidence, the hardened non-executed production runbook, authentication sequence, monitoring plan, backup set, rollback matrix, web/API compatibility contract, lineage recommendation, binary checklist, and authorization packet are canonical in `docs/PHASE5_CUTOVER_READINESS.md`.
+
+Local Phase 5 proof passes: a deterministic package populates all 42 collections with 370 representative synthetic records and three synthetic media objects; PostgreSQL import/validation, all 17 read surfaces, all 17 commands, replay/payload drift/atomicity/concurrency/duplicates/ownership, and isolated backup/restore reproduce exact digests. The implementation adds guarded provider composition and media/worker harnesses without changing client contracts or production composition.
+
+Live provider proof passed on the existing app, one-node PostgreSQL cluster, and private Space with synthetic data only. All 42 collections / 370 records, three versioned media objects / 111 bytes, 17 read surfaces, 17 commands, concurrency/retry, opaque authorized media, provider readiness, real web/worker restart, and isolated backup/restore passed. Clean import was 19.879 s, validation 2.193 s, media 1.910 s, reads 32 ms, commands 3.829 s, backup 2.267 s, backup plus restore 10.207 s, operational readiness 2.133 s, and the actual platform restart 42.829 s. The temporary firewall, restore database, and local dump were removed; no paid resource or key was created.
+
+Readiness classification: **Phase 5 accepted; production migration technically READY for a separate compatibility-release and migration authorization, but not authorized; significant SwiftUI remains BLOCKED.** The 2-5 minute write-fence estimate is supported and the ten-minute hard boundary remains. Production JSON/file state/evidence/auth/deployment are unchanged. No Founder data was uploaded; no production cutover, auth activation, evidence move, write fence, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.
+
+Final Phase 5 bounded validation passed 48 test files / 221 tests, targeted lint, production build, isolated smoke, and diff checks. Founder revision 110, 26,402,081 bytes, and SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D` remained exact. The known Turbopack broad-trace warning remains.

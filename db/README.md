@@ -49,3 +49,9 @@ npm run test:phase4:postgres
 ```
 
 The current local rehearsal passed fresh up, full down/reapply, two identical imports, rollback/reset, command receipt/outbox cleanup, verified database backup/restore, exact counts/IDs/state digest, and 361 local media hashes. This is not production database or backup acceptance; the production JSON/file runtime remains canonical until a separately approved cutover.
+
+## Phase 5 provider readiness
+
+Migration `000004_phase5_provider_readiness.cjs` adds provider-version metadata to canonical media and a durable synthetic validation-run record. It is additive and inactive in production. Phase 5 import/reset accepts only the prior guarded Phase 4 names or `physiqueos_phase5_test_provider*` / `physiqueos_phase5_restore_provider*`; production names remain rejected.
+
+The Phase 5 generator creates synthetic-only packages spanning all 42 collections. Live provider harnesses additionally require `PHYSIQUEOS_PHASE5_PROVIDER_ACCEPTANCE=1`, the exact logical database `physiqueos_phase5_test_provider_20260811`, strict DigitalOcean CA verification, and the accepted staging Space. Restore validation accepts only the isolated `physiqueos_phase5_restore_provider` target, which is removed after the proof. Copied Founder runtime/media must never be used. Live acceptance passed all 42 collections, opaque versioned media, source/restore digests, and zero-orphan checks.

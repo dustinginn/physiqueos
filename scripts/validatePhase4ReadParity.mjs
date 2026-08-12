@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { register } from "node:module";
 import { createHash } from "node:crypto";
-import pg from "pg";
+import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { readAndValidateCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
@@ -35,7 +35,7 @@ const legacy = createPhase3ReadModelService({
   now,
   readResourceVersion: ({ data }) => String(data?.version ?? runtime.revision ?? "1"),
 });
-const pool = new pg.Pool({ connectionString: databaseUrl, max: 2, allowExitOnIdle: true });
+const pool = createValidationPostgresPool({ connectionString: databaseUrl, maximumPoolSize: 2, applicationName: "physiqueos-read-parity" });
 try {
   const postgres = await createPhase4PostgresApplicationComposition({ pool, ownerUserId, now });
   const pendingReview = runtime.evidenceReviews.find((item) => item.status === "pending") ?? runtime.evidenceReviews[0];

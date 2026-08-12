@@ -1,5 +1,5 @@
 import { register } from "node:module";
-import pg from "pg";
+import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { createPayloadHash } = await import("../src/contracts/v1/canonicalJson.js");
@@ -15,7 +15,7 @@ const packageRoot = process.argv[2];
 if (!databaseUrl || !packageRoot) throw new Error("PHYSIQUEOS_PHASE4_DATABASE_URL and package root are required.");
 const packageData = await readAndValidateCanonicalPackage(packageRoot);
 const ownerUserId = packageData.collections.user.id;
-const pool = new pg.Pool({ connectionString: databaseUrl, max: 4, allowExitOnIdle: true });
+const pool = createValidationPostgresPool({ connectionString: databaseUrl, maximumPoolSize: 4, applicationName: "physiqueos-command-parity" });
 const now = () => new Date("2026-08-12T04:00:00.000Z");
 const principal = { userId: ownerUserId, deviceId: "phase4-device", sessionId: "phase4-session" };
 const fixtureCollections = createFixtureCollections(ownerUserId);

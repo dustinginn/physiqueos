@@ -21,5 +21,5 @@ if (command === "create") {
 
 function assertIsolatedRestoreTarget(value) {
   const database = decodeURIComponent(new URL(value).pathname.replace(/^\//, ""));
-  if (!/^physiqueos_(?:phase2_test|restore)(?:_|$)/.test(database)) throw new Error("Refusing to restore into a database that is not explicitly isolated.");
+  if (!/^(?:physiqueos_phase2_test|physiqueos_restore|physiqueos_phase4_restore|physiqueos_phase5_restore_provider)(?:_|$)/.test(database)) throw new Error("Refusing to restore into a database that is not explicitly isolated.");
 }

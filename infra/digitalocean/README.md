@@ -38,3 +38,9 @@ The managed database firewall should retain the App Platform app trusted source 
 - Final public liveness/readiness and protected operations status returned 200 with configuration, database, schema, object storage, and worker green. Missing/wrong operations auth returned 401; `/` and `/log` returned 404. DigitalOcean's ingress replaces the handler's deliberate `/api/v1/platform` 503 JSON with a provider 504/503 page; the route remains inactive and the handler contract is covered directly.
 
 The current production web runtime does not use this app, database, Space, authentication system, or worker. Staging contains synthetic data only. No Founder data/evidence was copied and no production cutover occurred.
+
+## Phase 5 bounded reuse
+
+Phase 5 reuses only these existing paid resources and does not change the $30.15/month recurring base. Its all-42-collection package is generated synthetic data; no Phase 4 Founder snapshot may be uploaded. The intended logical database is `physiqueos_phase5_test_provider_20260811` on the existing cluster, and provider media uses the existing private bucket under the synthetic owner prefix.
+
+Live Phase 5 execution passed with a short-lived custom-scope PAT limited to the existing app/database operations, the existing DPAPI-protected bucket-scoped Spaces credential, CA, and pepper. The temporary operator-IP firewall rule and isolated restore database were removed after acceptance. The retained `physiqueos_phase5_test_provider_20260811` database and three 111-byte synthetic objects are unbilled acceptance evidence. The app, one-node `db-s-1vcpu-1gb` cluster, Space, 512 MiB web, and 512 MiB worker are unchanged at the accepted $30.15/month recurring base. Do not grant Spaces-key creation, broad full access, or create a paid resource for later replay.
