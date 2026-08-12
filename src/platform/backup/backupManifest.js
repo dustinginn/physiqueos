@@ -1,4 +1,4 @@
-import { createPayloadHash } from "../../contracts/v1/canonicalJson";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 
 export const BACKUP_MANIFEST_VERSION = "1";
 

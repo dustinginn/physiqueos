@@ -4,7 +4,7 @@ Status: living canonical transition document
 
 Last audited: 2026-08-11
 
-Foundation design decision: approved for the initial Founder-stage direction; Phase 1 is accepted and Phase 2 local/provider-ready implementation reached the explicit DigitalOcean provisioning gate on 2026-08-11. Production remains on the JSON/file runtime. Remaining production and product approvals are recorded in section 18.
+Foundation design decision: approved for the initial Founder-stage direction; Phase 1 is accepted and Phase 2 provider-backed synthetic staging passed on 2026-08-11. Production remains on the JSON/file runtime. Remaining production and product approvals are recorded in section 18.
 
 Implementation base revision: `a4c759fd`
 
@@ -454,7 +454,7 @@ Engineering choices are recommendations in force for implementation planning unl
 
 Recorded Founder decisions for the Phase 1 implementation boundary (2026-08-11):
 
-- DigitalOcean is approved as the eventual provider. Founder-stage infrastructure targets approximately USD 25-35/month and must remain at or below USD 50/month without additional approval. Account ownership, region, billing-alert recipient, and named operator remain required before provisioning. Phase 1 does not provision anything.
+- DigitalOcean is approved and provider-backed synthetic staging is provisioned at USD 30.15/month under the USD 50/month ceiling. App Platform uses `sfo`; PostgreSQL and Spaces use `sfo3`. Named billing-alert and long-term operator ownership remain required before production activation.
 - Founder recovery uses a one-time high-entropy recovery credential created during enrollment and stored externally in the Founder's password manager. Consumer email/password recovery is excluded.
 - The local fallback PIN is eight digits with progressive delay. Crossing the security threshold invalidates local credentials and requires the recovery credential/re-enrollment path; it never deletes canonical Founder data.
 - The seven-day encrypted read-model cache and maximum 24-hour protected temporary media/upload retention are approved for later native implementation.
@@ -462,7 +462,7 @@ Recorded Founder decisions for the Phase 1 implementation boundary (2026-08-11):
 - Private TestFlight is approved for initial native acceptance. Final App Store distribution remains a later decision.
 - High-safety compatibility and the production web fallback are approved requirements: no native release may make an unvalidated native build mandatory or weaken the web client.
 
-These decisions supersede the corresponding approval wording in the table where they are more specific. Object-deletion retention, notification presentation policy, exact Apple Health types, iOS support floor, and the DigitalOcean account/region/operator details remain unresolved at their later implementation gates.
+These decisions supersede the corresponding approval wording in the table where they are more specific. Object-deletion retention, notification presentation policy, exact Apple Health types, iOS support floor, and named production alert/operator ownership remain unresolved at their later implementation gates.
 
 ## 19. Shared-platform architecture decision
 
@@ -807,7 +807,7 @@ Implementation checkpoint (2026-08-11): the bounded Phase 1 structural subset is
 
 ### Phase 2 — platform adapters and operations
 
-Implementation checkpoint (2026-08-11): production-grade foundation adapters are implemented and locally validated against isolated PostgreSQL 17.10, but provider-backed staging has not been provisioned or exercised. This phase is paused at the mandatory paid-resource approval gate described in section 34.
+Implementation checkpoint (2026-08-11): production-grade foundation adapters are implemented and validated locally and against provider-backed synthetic DigitalOcean staging. Phase 2 is accepted; production activation, canonical migration, evidence movement, and auth cutover remain separately gated.
 
 | Class | Work | Exit evidence |
 |---|---|---|
@@ -940,7 +940,7 @@ No architecture deviation was introduced. The only Phase 1 implementation refine
 
 ## 34. Phase 2 implementation and provisioning checkpoint
 
-Status on 2026-08-11: **local Phase 2 implementation is complete and validated; provider-backed acceptance is pending explicit provisioning approval.** The implementation started from clean accepted checkpoint `7e99af27`. No DigitalOcean resource was created, no Founder data or evidence was copied, and the production JSON/file runtime remains canonical.
+Status on 2026-08-11: **Phase 2 provider-backed synthetic staging acceptance passed.** The provider run resumed from accepted provisioning checkpoint `403107d1` on dedicated branch `phase2-provider-staging`. No Founder data or evidence was copied, and the production JSON/file runtime remains canonical.
 
 Implemented production-grade foundation adapters:
 
@@ -979,4 +979,24 @@ Final bounded acceptance passed Phase 1 (9 files / 32 tests), Phase 2 (7 files /
 
 `npm audit --omit=dev` continues to report 13 production-tree advisories (3 moderate, 10 high) in the pre-existing Next/PDF/CSS/image/CLI dependency graph. Dependency tracing does not attribute any reported advisory to the newly added AWS S3 or SimpleWebAuthn packages. No broad or major-version audit fix was applied inside this high-safety foundation patch; dependency remediation remains a separately reviewed release blocker.
 
-The next action is not Phase 3. It is explicit approval or rejection of the $30.15/month DigitalOcean staging plan. If approved, resume Phase 2 only for synthetic staging provisioning and provider-backed acceptance. Phase 3 application-boundary/domain extraction remains blocked until that staging evidence is complete.
+The next dependency-ordered phase is Phase 3 application-boundary/domain extraction, but it must not start automatically. Run the end-work-session task and obtain the separately required Phase 3 authorization first. Phase 3 must preserve the current production JSON/file runtime until its own migration/cutover gates are approved.
+
+## 35. Phase 2 provider-backed staging acceptance
+
+Provider acceptance on 2026-08-11 provisioned exactly one App Platform app in `sfo` with one 512 MiB web service and one 512 MiB worker, one PostgreSQL 17 Basic Regular 1 GiB/1 vCPU cluster in `sfo3`, and one private versioned Space in `sfo3`. The recurring base is $30.15/month, below the $50/month ceiling. Safe identifiers, active deployment, overage exposure, and operating details are recorded in `infra/digitalocean/README.md`.
+
+The final staging build is `phase2-provider-staging-5517689` from commit `55176896cb9bd2053c1092538ecbf0aa0a09eb56`. It is a foundation-only container sourced from the dedicated staging branch; `origin/main` remained `403107d14056868194b59861cc55e9f37c9ac6a1`. Encrypted runtime variables contain staging-only database/CA, bucket-scoped Spaces credentials, credential pepper, and operations token. The rendered app spec was streamed to App Platform and not persisted.
+
+Real-provider acceptance passed:
+
+- PostgreSQL fresh migration, schema/constraints/indexes/ownership, transaction/idempotency/optimistic concurrency, strict CA verification, down/reapply, restart, and isolated backup/restore;
+- synthetic enrollment/recovery/device/session/pairing, opaque ten-minute access tokens, 30-day idle and 90-day absolute refresh fields, refresh-reuse family revocation, device/session revocation, replacement recovery without canonical deletion, passkey server challenge lifecycle/owner mismatch, and ten-failure PIN recovery policy;
+- private/versioned Spaces multipart upload, owner-scoped opaque keys, actual downloaded-byte SHA-256 plus length/MIME checks, replay/concurrent completion, five-minute maximum authorized read, expired/unsigned/cross-owner denial, abort cleanup, tombstone, inventory, and restored object hashes;
+- deployed App Platform worker success, bounded retry/dead-letter, heartbeat, restart survival, lease recovery, redacted failure, and no repeat; and
+- validated rollback to the prior known-good deployment, health/provider-state preservation, and restoration to the accepted build.
+
+The provider run exposed and corrected four deterministic foundation defects before acceptance: connection-string TLS settings overriding the explicit CA, PostgreSQL command-receipt snake/camel replay mapping, PostgreSQL dead-letter timestamp inference, and trusting upload metadata rather than hashing provider bytes. It also added terminal cleanup for failed object verification and owner-scoped interrupted-upload abort. Standalone backup-manifest import resolution and an initial absent PostgreSQL executable path were harness/environment issues. No deterministic security, provider, migration, durability, or product regression remains.
+
+Final bounded validation passed Phase 1 (9 files / 33 tests), Phase 2 (9 files / 52 tests), persistence isolation (2 files / 29 tests), adjacent services (4 files / 29 tests), guarded provider PostgreSQL migration/backup/restore, targeted lint, production build, `git diff --check`, staging smoke, and deployed worker/rollback checks. `npm audit --omit=dev` remains 13 pre-existing production-tree advisories (3 moderate, 10 high, 0 critical); this provider acceptance added no dependency and no new advisory.
+
+Founder isolation remained exact at revision `109`, updated `2026-08-11T16:26:17.843Z`, size `26,298,071`, SHA-256 `11C73237AB5F8D19738762ED25C45293D539852B70442AF990A2A7266E560188`. Current production `/`, `/log`, and `/api/health` returned 200 after acceptance. Production still does not depend on staging PostgreSQL, Spaces, auth, worker, or App Platform. No production migration, cutover, evidence move, auth activation, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.

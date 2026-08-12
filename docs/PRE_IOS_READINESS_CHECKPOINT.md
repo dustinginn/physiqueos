@@ -6,7 +6,7 @@ Last audited: 2026-08-11
 
 Implementation base revision: `a4c759fd`
 
-Foundation design: Phase 1 accepted; Phase 2 local/provider-ready implementation validated on 2026-08-11 and paused at the explicit DigitalOcean provisioning gate. Production activation remains gated by the exit evidence below.
+Foundation design: Phase 1 accepted; Phase 2 provider-backed synthetic staging accepted on 2026-08-11. Production activation remains gated by the exit evidence below.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -53,7 +53,7 @@ future iOS ------/
 
 **Accepted as additive structural preparation; all shared-platform activation remains off.** Phase 1 added the versioned contract/error/identity/command layer, an initial OpenAPI 3.1 API skeleton, an explicit PostgreSQL migration, opt-in database composition, private-object ports with a deterministic test adapter, idempotency/version/transaction/outbox primitives, migration-manifest validation, and redacted observability/readiness seams.
 
-The current production web application still uses the existing canonical JSON/file runtime. No DigitalOcean resources were provisioned, no PostgreSQL database was created or contacted, no authentication gate was activated, and no evidence was moved. The new readiness endpoint reports not ready and the protected platform endpoint denies access until later production composition is deliberately supplied.
+The current production web application still uses the existing canonical JSON/file runtime. DigitalOcean staging is synthetic and independent; no authentication gate was activated on production and no Founder evidence was moved. Production composition remains inactive while the dedicated staging foundation reports provider readiness.
 
 Bounded validation on 2026-08-11 passed 15 test files / 90 tests, targeted lint, the production build, `git diff --check`, and smoke checks for `/api/health`, `/`, and `/log`. PostgreSQL/Docker was not available, so the migration has structural up/down coverage but still requires a real isolated-database integration test before activation.
 
@@ -61,13 +61,13 @@ The Windows worker environment has a 4 GB heap constraint. Unrestricted reposito
 
 ## Phase 2 local implementation and provisioning gate
 
-**Local/provider-ready implementation passed; paid staging is not provisioned.** Phase 2 added PostgreSQL adapters for every foundation table, a second ownership/security migration, inactive Founder enrollment/session/recovery/passkey flows, a Spaces-compatible private-object adapter, a durable SQL outbox worker, async operational readiness, guarded backup/restore tools, and repository-owned DigitalOcean/container configuration.
+**Local and provider-backed synthetic staging acceptance passed.** Phase 2 added PostgreSQL adapters for every foundation table, a second ownership/security migration, inactive Founder enrollment/session/recovery/passkey flows, a Spaces-compatible private-object adapter, a durable SQL outbox worker, async operational readiness, guarded backup/restore tools, and repository-owned DigitalOcean/container configuration.
 
 Real PostgreSQL 17.10 validation ran on local port `55432` against synthetic-only guarded database `physiqueos_phase2_test`. Fresh migration, schema/constraints, transactions, idempotency uniqueness, receipt/outbox atomicity, authentication and refresh-reuse revocation, object relationships, restart persistence, expired-lease recovery, non-repeat of completed work, verified `pg_dump`/`pg_restore`, full down, and re-apply passed. The final local database is an empty re-applied foundation schema and is not a canonical store.
 
 The proposed paid staging plan is App Platform `sfo` plus Managed PostgreSQL/Spaces `sfo3`: one $5 web container, one $5 worker container, one $15.15/month PostgreSQL 17 Basic Regular 1 GiB node, and one $5 Spaces Standard subscription. Base estimate: **$30.15/month**, excluding usage overages. No paid resource has been created. Explicit Founder approval is required before provisioning.
 
-Provider-backed Spaces behavior, managed backups/object backup, actual App Platform deployment/rollback, injected-secret handling, staging negative tests, and browser passkey acceptance remain pending. If the plan is approved, work resumes inside Phase 2 using synthetic staging data only; Phase 3 does not begin automatically.
+Provider-backed PostgreSQL, Spaces, App Platform deployment/rollback, encrypted-secret handling, staging negative tests, worker restart, and isolated database/object backup-restore are accepted. Browser/device passkey UX and all Apple validation remain pending. Phase 3 does not begin automatically.
 
 ## Status legend
 
@@ -82,12 +82,12 @@ Provider-backed Spaces behavior, managed backups/object backup, actual App Platf
 
 | Gate | Status | Dependency | Exit evidence | Suggested owner |
 |---|---|---|---|---|
-| 0. Decision lock | Partially complete | product/operations choices | Provider direction/cost ceiling, recovery/PIN, native cache retention, passive source remediation, TestFlight, compatibility, and web fallback are approved; account/region/operator, object-deletion policy, notification details, Health types, and iOS floor remain gated at their implementation points | Product + platform |
+| 0. Decision lock | Partially complete | product/operations choices | Provider account, regions, cost ceiling, recovery/PIN, native cache retention, passive source remediation, TestFlight, compatibility, and web fallback are approved; named alert/operator ownership, object-deletion policy, notification details, Health types, and iOS floor remain gated at their implementation points | Product + platform |
 | 1. Founder data/privacy containment | Blocked / critical | Gate 0 | no Founder records in distributable client/source artifact; credential rotation/remediation plan; privacy inventory | Security + backend |
-| 2. Authenticated identity boundary | Server lifecycle ready locally; activation blocked / critical | Gate 0 | enrollment, recovery, pairing, passkey server, opaque access/refresh, replay revocation, logout/device revoke, principal, and negative tests exist inactive; browser passkey/staging and current-web integration remain | Backend + iOS security |
-| 3. Durable canonical persistence | Foundation adapters proven locally; staging/cutover blocked / critical | Gates 0-1 | PostgreSQL 17.10 up/down/reapply, ownership, transactions, restart, backup/restore, and all foundation stores pass synthetic tests; managed staging, domain schemas/import, and rollback rehearsal remain | Backend/data |
-| 4. Private object storage | Provider adapter ready; provider exercise blocked / critical | Gates 1-2 | Spaces multipart/read/inventory adapter and ownership/replay tests exist; real private bucket/versioning, provider checksum behavior, backup/restore, and evidence migration remain | Backend/security |
-| 5. Durable downstream work | SQL worker proven locally; staging restart blocked | Gate 3 | claim/lease/retry/dead-letter/heartbeat and restart recovery pass with synthetic PostgreSQL work; managed staging worker and real domain handlers remain | Backend |
+| 2. Authenticated identity boundary | Provider staging lifecycle accepted; production activation blocked / critical | Gate 0 | synthetic enrollment/recovery/pairing/passkey server/access-refresh/revoke/PIN negatives pass on provider PostgreSQL; browser/device passkey and production-web integration remain | Backend + iOS security |
+| 3. Durable canonical persistence | Foundation provider staging accepted; domain migration/cutover blocked / critical | Gates 0-1 | PostgreSQL 17 provider up/down/reapply, ownership, transactions, restart, backup/isolated restore, semantic digest, and rollback pass; domain schemas/import and production cutover remain | Backend/data |
+| 4. Private object storage | Provider staging accepted; production evidence migration blocked / critical | Gates 1-2 | private versioned Spaces multipart/read/hash/inventory/authorization/replay/abort/tombstone and restore verification pass; evidence migration and independent backup copy remain | Backend/security |
+| 5. Durable downstream work | App Platform worker staging accepted; domain handlers blocked | Gate 3 | managed worker claim/lease/retry/dead-letter/heartbeat/restart/no-repeat pass with synthetic PostgreSQL work; real domain handlers remain | Backend |
 | 6. Native-facing contracts | Initial foundation ready; domain surface needs work | Gates 2-5 | common contracts and minimal health/platform OpenAPI are tested; bounded domain read models/commands, fixtures, change feed, and compatibility suite remain | Backend + clients |
 | 7. Presentation logic extraction | Needs work | Gate 6 design | Goals/Operating Plan/Evidence orchestration and route mapping callable without React/Next | Domain/web |
 | 8. Web cutover to shared boundary | Blocked by 2-7 | Gates 2-7 | web parity tests pass on migrated canonical store; no singleton/file path in production request flow | Web + backend |
@@ -98,7 +98,7 @@ Provider-backed Spaces behavior, managed backups/object backup, actual App Platf
 | 13. Notifications/actions | Future / Stage 2 | outbox + policy + API | generic intent engine, APNs/device tokens, suppression/action idempotency; physical-device acceptance | Backend + iOS |
 | 14. Native motion/graphs | Future / Stage 2 | Track A read models | accessibility/Reduce Motion fixtures; Xcode and device acceptance | iOS/design |
 | 15. Live Workout V1 | Future / Stage 2 | Track A + draft API + Health | complete experience, Windows preview, lifecycle/conflict/device acceptance | Domain + backend + iOS |
-| 16. Release operations | Local configuration ready; provisioning approval required | all shipping gates | container/app-spec, manual promotion, build identity, local backup/restore, and cost plan exist; provider deployment/rollback, alerts, managed restore, TestFlight checklist, fallback drill, and daily-driver acceptance remain | Release owner |
+| 16. Release operations | Provider staging deployment/rollback accepted; production release blocked | all shipping gates | foundation-only container, streamed encrypted spec, manual promotion, build identity, provider restore and rollback pass; named alerts, production fallback drill, TestFlight checklist, and daily-driver acceptance remain | Release owner |
 
 ## Critical findings that keep the gate closed
 
@@ -167,7 +167,7 @@ Exit: schema tests pass and no contract exposes repositories, runtime snapshots,
 
 ### Phase 2 — canonical platform
 
-Checkpoint: production-grade foundation adapters and local PostgreSQL durability are complete. The phase is deliberately paused before paid provisioning; provider-backed staging acceptance is still part of Phase 2 and must complete before Phase 3 extraction begins.
+Checkpoint: production-grade foundation adapters, local PostgreSQL durability, and provider-backed synthetic staging are complete. Phase 2 is accepted; Phase 3 extraction requires separate authorization and must preserve production isolation.
 
 1. Add authenticated enrollment/session/revoke/profile boundary.
 2. Add transactional database schema and uniqueness/version constraints.
@@ -324,9 +324,9 @@ The runtime checkpoint was revision `107`, size `25,964,481` bytes, modified `20
 
 The implementation did not provision infrastructure, migrate or activate PostgreSQL, activate authentication, move evidence, alter canonical persistence, cut over the web, create iOS code, or claim Apple validation. Xcode, simulator, device, HealthKit, notification, Share Extension, signing, real-database migration, provider object storage, worker restart, backup, and restore status remain unvalidated.
 
-Phase 2 supersedes the final sentence only for local foundation evidence: real isolated PostgreSQL migration, local restart/durability, and local database backup/restore are now validated. Provider-backed staging and every Apple item remain unvalidated.
+Phase 2 supersedes the final sentence for foundation evidence: real isolated PostgreSQL migration, provider-backed PostgreSQL/Spaces, App Platform web/worker, restart/durability, encrypted secrets, backup/restore, rollback, and security negatives are validated with synthetic staging data. Every Apple item remains unvalidated.
 
-Phase 2 bounded suites currently comprise Phase 1 foundation (9 files / 32 tests), Phase 2 foundation/security/operations (7 files / 42 tests), persistence isolation (2 files / 29 tests), adjacent application services (4 files / 29 tests), plus the standalone destructive-guarded PostgreSQL cycle. The reusable `npm run validate:phase2` command runs these serially with targeted lint, production build, `git diff --check`, and Founder runtime hash comparison.
+Phase 2 final bounded suites comprise Phase 1 foundation (9 files / 33 tests), Phase 2 foundation/security/operations (9 files / 52 tests), persistence isolation (2 files / 29 tests), adjacent application services (4 files / 29 tests), plus destructive-guarded PostgreSQL/provider cycles. The reusable `npm run validate:phase2` command runs these serially with targeted lint, production build, `git diff --check`, and Founder runtime hash comparison.
 
 Phase 2 encountered and resolved:
 
@@ -342,3 +342,24 @@ Phase 2 encountered and resolved:
 No deterministic product or foundation regression remains. The current Founder runtime checkpoint remains revision `107`, size `25,964,481` bytes, SHA-256 `4FBE7875B334ACAE0199AAE223729E75AC4AC89D96EA7CAF830BF9B8F69CDCA1`.
 
 Final documentation-complete acceptance confirmed that exact Founder checkpoint. The pre-existing production server continued returning 200 for `/`, `/log`, and `/api/health`. A temporary isolated server from the new production build returned 200 for those routes and `/api/v1/health/live`, while inactive `/api/v1/health/ready` and `/api/v1/platform` correctly returned 503; the temporary server was then stopped and its logs removed.
+
+## Phase 2 provider-backed staging acceptance — 2026-08-11
+
+This section supersedes earlier Phase 2 provisioning-pending statements. Provider-backed synthetic staging passed on the dedicated `phase2-provider-staging` branch; `origin/main` remained `403107d14056868194b59861cc55e9f37c9ac6a1`.
+
+- Provisioned one `sfo` App Platform app with one 512 MiB web and one 512 MiB worker, one `sfo3` PostgreSQL 17 Basic Regular 1 GiB/1 vCPU cluster, and one `sfo3` private versioned Space. Exact safe IDs and operations are in `infra/digitalocean/README.md`. Base recurring cost is $30.15/month; the $50 ceiling is intact.
+- Deployed foundation-only build `phase2-provider-staging-5517689`; final deployment `18151768-20b2-482a-adbe-169d06bd32c4` reports green configuration/database/schema/object/worker status. Product `/` and `/log` are absent in staging; operations authentication rejects missing/wrong tokens.
+- PostgreSQL migrations, schema constraints/indexes/ownership, transactions, replay/idempotency, optimistic concurrency, strict provider CA, restart, down/reapply, dump, isolated restore, and semantic verification passed.
+- Synthetic auth passed enrollment, peppered recovery, device/session/pairing, ten-minute access, 30/90-day refresh boundaries, replay-family/device/session revocation, replacement recovery without canonical deletion, passkey server lifecycle/owner negatives, and ten-failure PIN recovery. Browser/device passkey and Apple authentication were not claimed.
+- Private Spaces passed private/versioned configuration, bucket-scoped runtime credentials, opaque owner keys, multipart, actual byte-derived SHA-256/length/MIME verification, replay/concurrent completion, expired/unsigned/cross-owner denial, abort cleanup, tombstone, inventory, and restored hashes. Two intentional fixture versions remain; obsolete failed-run versions were removed.
+- The App Platform worker passed success, three-attempt bounded retry, redacted dead-letter, restart-surviving work, heartbeat recovery, lease recovery, `SKIP LOCKED`, graceful stop in the provider harness, and completed-work no-repeat.
+- Rollback validation was valid, prior deployment health/provider state remained green, and the accepted build was restored without canonical synthetic state loss.
+- Backup/restore matched database semantic digest `0969c9a7390ed775f5adb6abbdb036c4185568691b5bafce6e4d3022be945e30`, manifest digest `47fdf5ebc37394405b6bff7c4f278fa11236a81000b7293ceedd901cc811b2d9`, counts, IDs, relationships, migration metadata, inventory, and two object hashes. The local dump and temporary restore database were removed.
+
+Provider acceptance found and fixed deterministic CA override, PostgreSQL receipt mapping, PostgreSQL dead-letter typing, and metadata-trusted object checksum defects before acceptance. Failed verification now deletes the provider version and records a terminal failed intent; interrupted multipart upload has an owner-scoped abort path. The public DigitalOcean ingress translates the handler's deliberate `/api/v1/platform` 503 into a provider 504/503 page; the API remains inactive and the direct handler contract still proves the intended 503 response.
+
+Final bounded validation: Phase 1 9 files/33 tests, Phase 2 9 files/52 tests, persistence 2 files/29 tests, adjacent services 4 files/29 tests, guarded provider PostgreSQL cycles, targeted lint, production build, diff, staging/production smoke, worker restart, and rollback all passed. The known existing Turbopack whole-project trace warning remains. Production audit remains 13 pre-existing advisories (3 moderate, 10 high, 0 critical), with zero new dependencies/advisories from provider acceptance.
+
+Founder integrity was identical before and after the final harness: `founder-seed-v2`, revision `109`, updated `2026-08-11T16:26:17.843Z`, 26,298,071 bytes, SHA-256 `11C73237AB5F8D19738762ED25C45293D539852B70442AF990A2A7266E560188`. Production `/`, `/log`, and `/api/health` returned 200. JSON/file persistence remains canonical; production evidence/auth/worker/routes do not use staging.
+
+Phase 2 classification: **accepted for provider-backed synthetic staging only**. Phase 3 is the next dependency-ordered phase but remains separately gated. Run the end-work-session task before requesting Phase 3. No Founder migration/cutover/evidence move/auth activation, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work is authorized by this acceptance.

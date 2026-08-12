@@ -28,3 +28,11 @@ npm run test:phase2:postgres
 ```
 
 The backup CLI likewise refuses restore targets whose names do not begin with `physiqueos_phase2_test` or `physiqueos_restore`.
+
+## Provider-backed staging acceptance
+
+On 2026-08-11 the migrations were accepted against the `sfo3` DigitalOcean PostgreSQL 17 staging cluster. The runtime pool removes URL-level TLS controls whenever `PHYSIQUEOS_DATABASE_CA_CERT` is supplied so a provider URL cannot override strict `rejectUnauthorized: true` CA verification. Backup/restore forwards `sslmode=verify-full` and `sslrootcert` to libpq without placing credentials in process arguments.
+
+Provider acceptance uses guarded database names only. `scripts/validatePhase2ProviderStaging.mjs` requires `physiqueos_phase2_test_provider_20260811`; `scripts/validatePhase2ProviderRestore.mjs` additionally requires `physiqueos_restore_provider_20260811`. The deployed-worker probe alone requires `physiqueos_staging`. These scripts refuse non-DigitalOcean hosts and require `PHYSIQUEOS_PHASE2_PROVIDER_ACCEPTANCE=1`.
+
+The isolated restore rehearsal matched counts, IDs, ownership/session/object relationships, migration metadata, critical values, semantic digest, private-object inventory, and object hashes. Temporary dumps and the restore logical database were removed. The retained logical acceptance database contains synthetic fixtures only; the current Founder JSON/file runtime remains canonical.
