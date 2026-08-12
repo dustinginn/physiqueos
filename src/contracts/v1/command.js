@@ -1,5 +1,5 @@
-import { createUuidV7, isUuidV7 } from "./identifiers";
-import { ApplicationProblem } from "./problem";
+import { createUuidV7, isUuidV7 } from "./identifiers.js";
+import { ApplicationProblem } from "./problem.js";
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:\/-]{16,200}$/;
 

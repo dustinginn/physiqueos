@@ -20,7 +20,7 @@ export function createPrivateObjectService({ transactionRunner, provider, clock 
         intent: { id: contract.uploadId, expiresAt, providerUploadId: providerUpload.providerUploadId },
       }));
     } catch (error) {
-      await provider.abortMultipartUpload(providerUpload).catch(() => undefined);
+      await Promise.resolve(provider.abortMultipartUpload(providerUpload)).catch(() => undefined);
       throw error;
     }
     return Object.freeze({ uploadId: contract.uploadId, objectId: contract.objectId, state: "created", expiresAt: expiresAt.toISOString(), partUpload: Object.freeze({ mode: "multipart", maximumParts: 10_000 }) });
@@ -59,8 +59,8 @@ export function createPrivateObjectService({ transactionRunner, provider, clock 
     });
     if (snapshot.replay) return Object.freeze({ outcome: "replayed", objectId: snapshot.intent.object_id });
     if (snapshot.pending) return Object.freeze({ outcome: "pending", uploadId });
+    let completion = null;
     try {
-      let completion = null;
       let actual = null;
       if (snapshot.recovered) actual = await provider.inspectObject({ objectKey: snapshot.object.object_key }).catch(() => null);
       if (!actual) {
@@ -74,9 +74,28 @@ export function createPrivateObjectService({ transactionRunner, provider, clock 
       }));
       return Object.freeze({ outcome: snapshot.recovered ? "recovered" : "committed", objectId: committed.object.id, version: committed.object.version });
     } catch (error) {
-      await transactionRunner.run((transaction) => transaction.objects.releaseCompletionClaim({ intentId: uploadId, userId: actor.userId, at: clock() })).catch(() => undefined);
+      if (completion) {
+        await Promise.resolve(provider.deleteObject?.({ objectKey: snapshot.object.object_key, providerVersion: completion.providerVersion })).catch(() => undefined);
+        await transactionRunner.run((transaction) => transaction.objects.failCompletion({ intentId: uploadId, userId: actor.userId, at: clock() })).catch(() => undefined);
+      } else {
+        await transactionRunner.run((transaction) => transaction.objects.releaseCompletionClaim({ intentId: uploadId, userId: actor.userId, at: clock() })).catch(() => undefined);
+      }
       throw error;
     }
+  }
+
+  async function abortUpload({ principal, uploadId }) {
+    const actor = requireAuthenticationPrincipal(principal);
+    const snapshot = await transactionRunner.run(async (transaction) => {
+      const intent = await transaction.objects.findIntentForOwner({ intentId: uploadId, userId: actor.userId });
+      if (!intent) throw notFound();
+      if (!['created', 'uploading'].includes(intent.state)) throw new ApplicationProblem({ status: 409, code: "UPLOAD_NOT_ABORTABLE", title: "The private upload cannot be aborted." });
+      const object = await transaction.objects.findObjectForOwner({ objectId: intent.object_id, userId: actor.userId });
+      return Object.freeze({ intent, object });
+    });
+    await provider.abortMultipartUpload({ objectKey: snapshot.object.object_key, providerUploadId: snapshot.intent.provider_upload_id });
+    await transactionRunner.run((transaction) => transaction.objects.abort({ intentId: uploadId, userId: actor.userId, at: clock() }));
+    return Object.freeze({ uploadId, outcome: "aborted" });
   }
 
   async function authorizeRead({ principal, objectId }) {
@@ -101,7 +120,7 @@ export function createPrivateObjectService({ transactionRunner, provider, clock 
     });
   }
 
-  return Object.freeze({ beginUpload, authorizePart, completeUpload, authorizeRead, tombstone });
+  return Object.freeze({ beginUpload, authorizePart, completeUpload, abortUpload, authorizeRead, tombstone });
 }
 
 function verifyObject(actual, expected) {

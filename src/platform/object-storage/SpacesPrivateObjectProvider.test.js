@@ -34,4 +34,12 @@ describe("DigitalOcean Spaces private provider", () => {
     const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send: vi.fn(), destroy: vi.fn() }, sign: vi.fn() });
     await expect(provider.completeMultipartUpload({ objectKey: "private/user/object/original", providerUploadId: "upload", parts: [{ partNumber: 2, etag: "etag" }] })).rejects.toThrow("malformed");
   });
+
+  it("hashes retrieved bytes instead of trusting upload metadata", async () => {
+    const send = vi.fn()
+      .mockResolvedValueOnce({ ContentLength: 3, ContentType: "image/jpeg", Metadata: { "physiqueos-sha256": "f".repeat(64) }, ETag: '"etag"', VersionId: "version" })
+      .mockResolvedValueOnce({ Body: { async *[Symbol.asyncIterator]() { yield Buffer.from("abc"); } } });
+    const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send, destroy: vi.fn() }, sign: vi.fn() });
+    await expect(provider.inspectObject({ objectKey: "private/user/object/original" })).resolves.toMatchObject({ sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" });
+  });
 });

@@ -1,6 +1,6 @@
-import { createPayloadHash } from "../../contracts/v1/canonicalJson";
-import { ApplicationProblem } from "../../contracts/v1/problem";
-import { requireAuthenticationPrincipal } from "../auth/principal";
+import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
+import { ApplicationProblem } from "../../contracts/v1/problem.js";
+import { requireAuthenticationPrincipal } from "../auth/principal.js";
 
 export async function executeIdempotentCommand({ transactionRunner, principal, metadata, commandType, payload, handler }) {
   const actor = requireAuthenticationPrincipal(principal);

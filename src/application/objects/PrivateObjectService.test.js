@@ -12,12 +12,14 @@ describe("private object application service", () => {
   });
 
   it("rejects an upload completion whose size does not match the canonical intent", async () => {
-    const { service, objects } = setup({
+    const { service, objects, provider } = setup({
       findIntentForOwner: vi.fn().mockResolvedValue({ id: "upload", object_id: "object", user_id: "user-a", state: "uploading", expires_at: "2026-08-12T00:00:00Z", provider_upload_id: "provider" }),
       findObjectForOwner: vi.fn().mockResolvedValue({ id: "object", user_id: "user-a", state: "uploading", object_key: "private/user-a/object/original", content_type: "image/jpeg", byte_length: 10, sha256: "a".repeat(64) }),
     }, { inspectObject: vi.fn().mockResolvedValue({ byteLength: 9, contentType: "image/jpeg", sha256: "a".repeat(64) }) });
     await expect(service.completeUpload({ principal: PRINCIPAL, uploadId: "upload", parts: [{ partNumber: 1, etag: "etag" }] })).rejects.toMatchObject({ code: "OBJECT_LENGTH_MISMATCH" });
     expect(objects.completeVerified).not.toHaveBeenCalled();
+    expect(provider.deleteObject).toHaveBeenCalledWith({ objectKey: "private/user-a/object/original", providerVersion: "v1" });
+    expect(objects.failCompletion).toHaveBeenCalledOnce();
   });
 
   it("replays only an identical completion receipt", async () => {
@@ -41,6 +43,16 @@ describe("private object application service", () => {
     expect(provider.completeMultipartUpload).not.toHaveBeenCalled();
   });
 
+  it("aborts an interrupted owner-scoped multipart upload", async () => {
+    const { service, objects, provider } = setup({
+      findIntentForOwner: vi.fn().mockResolvedValue({ id: "upload", object_id: "object", user_id: "user-a", state: "uploading", provider_upload_id: "provider" }),
+      findObjectForOwner: vi.fn().mockResolvedValue({ id: "object", user_id: "user-a", object_key: "private/user-a/object/original" }),
+    });
+    await expect(service.abortUpload({ principal: PRINCIPAL, uploadId: "upload" })).resolves.toEqual({ uploadId: "upload", outcome: "aborted" });
+    expect(provider.abortMultipartUpload).toHaveBeenCalledWith({ objectKey: "private/user-a/object/original", providerUploadId: "provider" });
+    expect(objects.abort).toHaveBeenCalledOnce();
+  });
+
   it("does not run a duplicate provider completion while another claim is live", async () => {
     const { service, provider } = setup({ findIntentForOwner: vi.fn().mockResolvedValue({ id: "upload", object_id: "object", state: "completing", updated_at: "2026-08-10T23:59:00Z", expires_at: "2026-08-12T00:00:00Z" }) });
     await expect(service.completeUpload({ principal: PRINCIPAL, uploadId: "upload", parts: [{ partNumber: 1, etag: "etag" }] })).resolves.toEqual({ outcome: "pending", uploadId: "upload" });
@@ -60,11 +72,12 @@ function setup(objectOverrides = {}, providerOverrides = {}) {
   const objects = {
     createObjectAndIntent: vi.fn(), findIntentForOwner: vi.fn(), findObjectForOwner: vi.fn(), markUploading: vi.fn(),
     claimCompletion: vi.fn().mockResolvedValue({ id: "upload", object_id: "object", state: "completing", provider_upload_id: "provider" }),
-    releaseCompletionClaim: vi.fn(), completeVerified: vi.fn(), tombstone: vi.fn(), ...objectOverrides,
+    releaseCompletionClaim: vi.fn(), failCompletion: vi.fn(), abort: vi.fn(), completeVerified: vi.fn(), tombstone: vi.fn(), ...objectOverrides,
   };
   const provider = {
     beginMultipartUpload: vi.fn(), abortMultipartUpload: vi.fn(), authorizeUploadPart: vi.fn(),
     completeMultipartUpload: vi.fn().mockResolvedValue({ etag: "etag", providerVersion: "v1" }),
+    deleteObject: vi.fn(),
     inspectObject: vi.fn().mockResolvedValue({ byteLength: 10, contentType: "image/jpeg", sha256: "a".repeat(64), etag: "etag", providerVersion: "v1" }),
     authorizeRead: vi.fn().mockResolvedValue({ url: "https://temporary.invalid/read", expiresInSeconds: 300 }), ...providerOverrides,
   };

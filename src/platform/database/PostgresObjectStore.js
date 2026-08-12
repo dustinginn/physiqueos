@@ -44,6 +44,18 @@ export function createPostgresObjectStore({ query }) {
         [intentId, userId, at],
       ));
     },
+    async failCompletion({ intentId, userId, at }) {
+      return firstRow(await query(
+        "UPDATE physiqueos.upload_intents SET state = 'failed', updated_at = $3 WHERE id = $1 AND user_id = $2 AND state = 'completing' RETURNING *",
+        [intentId, userId, at],
+      ));
+    },
+    async abort({ intentId, userId, at }) {
+      return firstRow(await query(
+        "UPDATE physiqueos.upload_intents SET state = 'aborted', updated_at = $3 WHERE id = $1 AND user_id = $2 AND state IN ('created', 'uploading') RETURNING *",
+        [intentId, userId, at],
+      ));
+    },
     async completeVerified({ intentId, userId, receiptHash, providerEtag, providerVersion, verifiedAt }) {
       const intent = requiredRow(await query(
         `UPDATE physiqueos.upload_intents SET state = 'completed', completion_receipt_hash = $3,

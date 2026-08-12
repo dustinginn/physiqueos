@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it, vi } from "vitest";
 import { createPostgresTransactionRunner } from "./transaction";
 import { createFoundationPostgresAdapters } from "./foundationPostgresComposition";
+import { createPostgresCommandStore } from "./PostgresCommandStore";
 
 const require = createRequire(import.meta.url);
 const phase1 = require("../../../db/migrations/000001_shared_platform_foundation.cjs");
@@ -42,5 +43,19 @@ describe("Phase 2 PostgreSQL foundation", () => {
   it("exposes every required foundation adapter without contacting production", () => {
     const adapters = createFoundationPostgresAdapters({ query: vi.fn() });
     expect(Object.keys(adapters).sort()).toEqual(["commands", "control", "identity", "objects", "operations", "outbox", "passkeys"]);
+  });
+
+  it("maps PostgreSQL command receipts to the application replay contract", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ user_id: "user", device_id: "device", session_id: "session", command_id: "command", idempotency_key: "key", command_type: "synthetic", payload_hash: "a".repeat(64), operation_id: null, status: "committed" }] });
+    const receipt = await createPostgresCommandStore({ query }).commandReceipts.find("user", "key");
+    expect(receipt).toMatchObject({ userId: "user", commandId: "command", idempotencyKey: "key", payloadHash: "a".repeat(64), status: "committed" });
+  });
+
+  it("casts terminal outbox failure parameters for PostgreSQL", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ id: "message", status: "dead" }] });
+    const adapters = createFoundationPostgresAdapters({ query });
+    await adapters.outbox.fail({ id: "message", workerId: "worker", at: new Date(), dueAt: new Date(), errorCode: "SYNTHETIC", errorDetail: "redacted", terminal: true });
+    expect(query.mock.calls[0][0]).toContain("$3::timestamptz");
+    expect(query.mock.calls[0][0]).toContain("$7::boolean");
   });
 });

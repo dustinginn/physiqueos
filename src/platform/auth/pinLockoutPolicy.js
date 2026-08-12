@@ -1,4 +1,4 @@
-import { ApplicationProblem } from "../../contracts/v1/problem";
+import { ApplicationProblem } from "../../contracts/v1/problem.js";
 
 export const PIN_LENGTH = 8;
 export const PIN_RECOVERY_THRESHOLD = 10;

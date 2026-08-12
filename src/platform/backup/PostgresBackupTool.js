@@ -39,6 +39,7 @@ function postgresEnvironment(connectionString) {
     PGPASSWORD: decodeURIComponent(parsed.password),
     PGDATABASE: database,
     ...(parsed.searchParams.get("sslmode") ? { PGSSLMODE: parsed.searchParams.get("sslmode") } : {}),
+    ...(parsed.searchParams.get("sslrootcert") ? { PGSSLROOTCERT: parsed.searchParams.get("sslrootcert") } : {}),
   };
 }
 function executeCommand(command, args, extraEnvironment) {

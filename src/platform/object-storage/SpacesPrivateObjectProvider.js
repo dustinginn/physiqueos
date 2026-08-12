@@ -2,6 +2,7 @@ import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -10,6 +11,7 @@ import {
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHash } from "node:crypto";
 
 const MAX_READ_SECONDS = 300;
 const MAX_UPLOAD_PART_SECONDS = 900;
@@ -52,11 +54,15 @@ export function createSpacesPrivateObjectProvider(config, { client, sign = getSi
     async abortMultipartUpload({ objectKey, providerUploadId }) {
       await s3.send(new AbortMultipartUploadCommand({ Bucket: config.bucket, Key: objectKey, UploadId: providerUploadId }));
     },
+    async deleteObject({ objectKey, providerVersion = null }) {
+      await s3.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: providerVersion ?? undefined }));
+    },
     async inspectObject({ objectKey, providerVersion = null }) {
       const result = await s3.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: providerVersion ?? undefined, ChecksumMode: "ENABLED" }));
+      const content = await s3.send(new GetObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: result.VersionId ?? providerVersion ?? undefined }));
       return Object.freeze({
         byteLength: Number(result.ContentLength), contentType: result.ContentType ?? null,
-        sha256: result.ChecksumSHA256 ? Buffer.from(result.ChecksumSHA256, "base64").toString("hex") : result.Metadata?.["physiqueos-sha256"] ?? null,
+        sha256: await hashBody(content.Body),
         etag: stripQuotes(result.ETag), providerVersion: result.VersionId ?? providerVersion,
       });
     },
@@ -78,6 +84,19 @@ export function createSpacesPrivateObjectProvider(config, { client, sign = getSi
     },
     close() { s3.destroy?.(); },
   });
+}
+
+async function hashBody(body) {
+  if (!body) throw new Error("The object provider returned no object body for verification.");
+  const hash = createHash("sha256");
+  if (typeof body[Symbol.asyncIterator] === "function") {
+    for await (const chunk of body) hash.update(chunk);
+  } else if (typeof body.transformToByteArray === "function") {
+    hash.update(await body.transformToByteArray());
+  } else {
+    throw new Error("The object provider returned an unsupported object body.");
+  }
+  return hash.digest("hex");
 }
 
 export function createPrivateObjectKey(ownerUserId, objectId) {

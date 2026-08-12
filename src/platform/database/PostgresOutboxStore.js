@@ -29,9 +29,9 @@ export function createPostgresOutboxStore({ query }) {
     async fail({ id, workerId, at, dueAt, errorCode, errorDetail, terminal }) {
       return firstRow(await query(
         `UPDATE physiqueos.outbox_messages
-            SET status = CASE WHEN $7 THEN 'dead' ELSE 'pending' END,
-                due_at = CASE WHEN $7 THEN due_at ELSE $4 END,
-                dead_at = CASE WHEN $7 THEN $3 ELSE NULL END,
+            SET status = CASE WHEN $7::boolean THEN 'dead' ELSE 'pending' END,
+                due_at = CASE WHEN $7::boolean THEN due_at ELSE $4::timestamptz END,
+                dead_at = CASE WHEN $7::boolean THEN $3::timestamptz ELSE NULL::timestamptz END,
                 last_error_code = $5, last_error_detail = $6,
                 claimed_by = NULL, claim_expires_at = NULL, updated_at = $3
           WHERE id = $1 AND claimed_by = $2 AND status = 'processing' RETURNING *`,

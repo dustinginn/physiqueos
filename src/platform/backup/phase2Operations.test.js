@@ -12,6 +12,7 @@ describe("Phase 2 operational recovery", () => {
     expect(spec).not.toContain("deploy_on_push:");
     expect(spec.match(/^services:/gm)).toHaveLength(1);
     expect(spec.match(/^workers:/gm)).toHaveLength(1);
+    expect(spec).toContain("PHYSIQUEOS_WORKER_MAX_ATTEMPTS");
     expect(spec).not.toMatch(/do[pat]_v1_|postgresql:\/\/[^$]|BEGIN PRIVATE KEY/);
   });
 
@@ -27,6 +28,13 @@ describe("Phase 2 operational recovery", () => {
     const tool = createPostgresBackupTool({ execute });
     await tool.restoreBackup({ connectionString: "postgresql://secret@host/db", inputPath: "synthetic.dump" });
     expect(execute.mock.calls[0][1].join(" ")).not.toContain("secret");
+  });
+
+  it("passes strict provider TLS verification to PostgreSQL backup tools", async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const tool = createPostgresBackupTool({ execute });
+    await tool.restoreBackup({ connectionString: "postgresql://user:secret@host/db?sslmode=verify-full&sslrootcert=C%3A%5Cprovider-ca.crt", inputPath: "synthetic.dump" });
+    expect(execute.mock.calls[0][2]).toMatchObject({ PGSSLMODE: "verify-full", PGSSLROOTCERT: "C:\\provider-ca.crt" });
   });
 
   it("fails readiness closed without required configuration", async () => {
