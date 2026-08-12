@@ -1,5 +1,7 @@
 "use server";
 
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
@@ -15,6 +17,7 @@ const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function saveDEXAEvidence(formData) {
+  assertProductionLegacyCanonicalWriteAllowed({ operation: "dexa-upload" });
   const user = await FounderRepositories.users.getCurrentUser();
 
   if (!user) throw new Error("Founder user is not available.");

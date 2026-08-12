@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createFounderStoreMutationLockService } from "./FounderStoreMutationLock";
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../platform/cutover/canonicalWriteFence";
 
 export const LEGACY_FOUNDER_STORE_REVISION = 0;
 
@@ -235,6 +236,11 @@ export function createFounderStoreUnitOfWork({
                   });
                 }
               }
+
+              assertProductionLegacyCanonicalWriteAllowed({
+                operation: `founder-unit-of-work:${lockContext.operation ?? "commit"}`,
+                runtimeStorePath: filePath,
+              });
 
               let serialized;
               try {

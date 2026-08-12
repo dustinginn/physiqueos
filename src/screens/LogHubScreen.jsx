@@ -177,6 +177,7 @@ function PendingEvidenceReviews({ reviews }) {
 function formatLogError(error) {
   if (error === "empty-intake") return "Add a file or note before submitting.";
   if (error === "intake-failed") return "Your upload was saved, but PhysiqueOS could not finish reading it. Please try again.";
+  if (error === "writes-paused") return "Writes are temporarily paused for maintenance. Nothing was applied; try again after maintenance completes.";
   return "Something went wrong while saving your upload.";
 }
 

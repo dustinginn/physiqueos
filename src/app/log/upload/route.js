@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
 import { createProgressPhoto } from "../../../domain/models/progressPhoto";
 import {
   normalizeProgressPhotoPose,
@@ -26,6 +27,7 @@ export async function POST(request) {
   let recoveryContext = null;
 
   try {
+    assertProductionLegacyCanonicalWriteAllowed({ operation: "universal-evidence-upload" });
     const formData = await request.formData();
     recoveryContext = parseEvidenceRecoveryFormData(formData);
     const user = await FounderRepositories.users.getCurrentUser();
@@ -82,6 +84,9 @@ export async function POST(request) {
     }
     return NextResponse.redirect(new URL(reviewUrl, request.url), 303);
   } catch (error) {
+    if (error?.code === "CANONICAL_WRITES_PAUSED") {
+      return redirectToLog({ error: "writes-paused" }, recoveryContext);
+    }
     console.warn("[EvidenceIntake] Upload Anything route failed.", {
       error: error?.message,
       evidencePackageId: evidencePackage?.package_id ?? null,

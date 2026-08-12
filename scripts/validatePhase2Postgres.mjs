@@ -141,8 +141,12 @@ async function verifyDurabilityAcrossRestart() {
   pool = createPool();
   const result = await pool.query("SELECT (SELECT count(*) FROM physiqueos.sessions WHERE id='synthetic-session-a')::integer AS sessions, (SELECT count(*) FROM physiqueos.feature_flags WHERE key='synthetic.kill-switch')::integer AS flags, (SELECT count(*) FROM physiqueos.stored_objects WHERE id='synthetic-object')::integer AS objects, (SELECT count(*) FROM physiqueos.command_receipts WHERE id='receipt-1')::integer AS receipts, (SELECT count(*) FROM physiqueos.outbox_messages WHERE id='outbox-1')::integer AS outbox");
   assert(Object.values(result.rows[0]).every((value) => value === 1), "Foundation records did not survive a pool restart.");
-  const migrations = await pool.query("SELECT count(*)::integer AS count FROM physiqueos.physiqueos_schema_migrations");
-  assert(migrations.rows[0].count === 2, "Migration state did not survive restart.");
+  const migrations = await pool.query("SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY id");
+  const migrationNames = new Set(migrations.rows.map((row) => row.name));
+  assert(
+    migrationNames.has("000001_shared_platform_foundation") && migrationNames.has("000002_phase2_platform_operations"),
+    "Required Phase 2 migration state did not survive restart.",
+  );
   await new Promise((resolve) => setTimeout(resolve, 1_050));
   const afterRestart = createFoundationPostgresAdapters({ query: (text, values) => pool.query(text, values) });
   const recovered = await afterRestart.outbox.claimNext({ workerId: "synthetic-replacement-worker", now: new Date(), leaseExpiresAt: new Date(Date.now() + 60_000) });

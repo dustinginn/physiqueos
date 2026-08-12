@@ -109,9 +109,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         topic: "canonical.read-model.invalidate",
         dedupeKey: `command:${context.metadata.commandId}`,
         payloadVersion: "1",
-        payload: { commandId: context.metadata.commandId, collection, recordId: String(recordId) },
+        payload: {
+          commandId: context.metadata.commandId,
+          collection,
+          recordId: String(recordId),
+          ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}),
+        },
       }] : [],
     };
   }
-  function commandProvenance(context) { return { source: "phase4-application-command", commandId: context.metadata.commandId, deviceId: context.principal.deviceId }; }
+  function commandProvenance(context) { return { source: "phase4-application-command", commandId: context.metadata.commandId, deviceId: context.principal.deviceId, ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}) }; }
 }

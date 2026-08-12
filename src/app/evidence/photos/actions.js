@@ -1,5 +1,7 @@
 "use server";
 
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
@@ -37,6 +39,7 @@ import {
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function saveProgressPhotoEvidence(formData) {
+  assertProductionLegacyCanonicalWriteAllowed({ operation: "progress-photo-upload" });
   const user = await FounderRepositories.users.getCurrentUser();
 
   if (!user) throw new Error("Founder user is not available.");

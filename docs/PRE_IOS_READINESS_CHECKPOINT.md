@@ -6,7 +6,7 @@ Last audited: 2026-08-12
 
 Accepted compatibility source: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`; production build: `RmjN47V8xsq3-6jSlZh-9`
 
-Foundation design: Phases 1-6 accepted on bounded local, live synthetic provider, and production compatibility evidence. Production migration remains separately gated by checkpoint publication, named operations/alert ownership, verified production backups/retention, and an explicit migration-window go/no-go.
+Foundation design: Phases 1-6 and the executable write-fence/production-wrapper source gate are accepted on bounded local, live synthetic provider, production compatibility, and isolated migration evidence. Production migration remains separately gated by checkpoint publication/inactive deployment acceptance, verified alert/billing delivery, encrypted off-machine production backups/retention, and an explicit migration-window final go/no-go. Founder-stage operational ownership is approved.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -415,7 +415,7 @@ Local Phase 5 proof passes: a deterministic package populates all 42 collections
 
 Live provider proof passed on the existing app, one-node PostgreSQL cluster, and private Space with synthetic data only. All 42 collections / 370 records, three versioned media objects / 111 bytes, 17 read surfaces, 17 commands, concurrency/retry, opaque authorized media, provider readiness, real web/worker restart, and isolated backup/restore passed. Clean import was 19.879 s, validation 2.193 s, media 1.910 s, reads 32 ms, commands 3.829 s, backup 2.267 s, backup plus restore 10.207 s, operational readiness 2.133 s, and the actual platform restart 42.829 s. The temporary firewall, restore database, and local dump were removed; no paid resource or key was created.
 
-Readiness classification: **Phase 5 accepted; production migration technically READY for a separate compatibility-release and migration authorization, but not authorized; significant SwiftUI remains BLOCKED.** The 2-5 minute write-fence estimate is supported and the ten-minute hard boundary remains. Production JSON/file state/evidence/auth/deployment are unchanged. No Founder data was uploaded; no production cutover, auth activation, evidence move, write fence, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.
+Readiness classification: **Phase 5 rehearsal/provider evidence accepted; the later final operational audit found missing executable fence/wrapper controls, so production migration is BLOCKED and not authorized; significant SwiftUI remains BLOCKED.** The 2-5 minute estimate remains supported and the ten-minute hard boundary remains, but cannot be used until the fence is implemented and accepted. Production JSON/file state/evidence/auth/deployment are unchanged. No Founder data was uploaded; no production cutover, auth activation, evidence move, write fence, Native Baseline, SwiftUI, HealthKit, APNs, Share Extension, or Live Workout Stage 2 work occurred.
 
 Final Phase 5 bounded validation passed 48 test files / 221 tests, targeted lint, production build, isolated smoke, and diff checks. Founder revision 110, 26,402,081 bytes, and SHA-256 `8D5E31EB50AE2CC5487024C18989D0AC167BE2D2AFB353D6BAE18F7A269F453D` remained exact. The known Turbopack broad-trace warning remains.
 ## Phase 6 production compatibility checkpoint (2026-08-12)
@@ -425,3 +425,17 @@ Production now runs accepted descendant source `6f4976101cb21eb9d3a7e28ee9a960fc
 Bounded Phase 1-6, Training, Photo, ownership, persistence-isolation, lint, build, local/LAN/public routes, 24 static assets, authorized media, and fail-closed inactive-provider/auth checks pass. Full evidence and the updated migration packet are in `docs/PHASE6_COMPATIBILITY_RELEASE.md`.
 
 Readiness classification: **Phase 6 compatibility accepted; canonical migration BLOCKED pending separate named-role approval, verified alert delivery, verified production backup/retention acceptance, exact migration-window approval, and final go/no-go. Native Baseline remains blocked until a later migration plus seven accepted daily-use days.**
+
+## Final operational migration-authorization audit (2026-08-12)
+
+The evidence-backed checklist and authorization packet are in `docs/PRE_IOS_OPERATIONAL_MIGRATION_AUTHORIZATION.md`. Production, Founder revision 119, JSON/file canonical ownership, local evidence, inactive authentication, and the accepted source/build were unchanged. A fresh runtime/media/package/repository/build candidate restored exactly in isolation, and DigitalOcean staging plus its managed PostgreSQL backup were healthy.
+
+Classification remains **BLOCKED**. In addition to user approval of roles, alerts, billing, backup retention, and the exact window, the accepted source lacks the executable write-only fence and production-guarded migration/composition-switch wrapper required by its own runbook. The new private backup copies are local and unencrypted and have no verified off-machine replica. No migration or Native work may begin until those false binary gates are closed and a new published checkpoint is reviewed.
+
+## Executable write-fence checkpoint (2026-08-12)
+
+The Founder/user has approved every recommended Founder-stage operational role. The separately approved source patch now implements and isolated-accepts the durable write fence, explicit legacy/PostgreSQL epoch and composition state machine, central canonical-write interception, clear 503 maintenance behavior, epoch-bound receipts/outbox, guarded operator controls, operational status/audit, strict dry-run/execute wrapper, deterministic pre-first-write abort, and post-first-write forward-repair boundary. See `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`.
+
+Two fresh guarded PostgreSQL runs reproduced all 42 collections, 365 media objects, exact validation, 17 read surfaces, representative transactional PostgreSQL write, and post-switch smoke in about 10.6 seconds of fenced time. Import failure returned to legacy; post-first-write failure remained PostgreSQL canonical with writes paused. Production was not deployed or changed.
+
+Readiness remains **BLOCKED**, now only on the still-separate operational gates: provider alert/capacity inspection and delivered email, $40 billing alert, encrypted verified off-machine backup/key custody, retention acceptance, safety-checkpoint publication and any separately approved inactive deployment, exact migration window, and explicit final go/no-go. Do not start Phase 7 or Native work. After user acceptance of this patch, run the required End Work Session task to preserve the checkpoint.

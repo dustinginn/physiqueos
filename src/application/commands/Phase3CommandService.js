@@ -43,7 +43,7 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.CONFIRM_DEXA]: define("confirmDexaEvidence", ["reviewId"], true),
 });
 
-export function createPhase3CommandService({ transactionRunner, ports } = {}) {
+export function createPhase3CommandService({ transactionRunner, ports, writeFence = null } = {}) {
   if (!transactionRunner?.run) throw new Error("Phase 3 commands require a transaction runner.");
   return Object.freeze({
     async execute({ commandType, principal, metadata: metadataInput, payload = {} } = {}) {
@@ -62,12 +62,17 @@ export function createPhase3CommandService({ transactionRunner, ports } = {}) {
       }
       const port = ports?.[definition.port];
       if (typeof port !== "function") throw new Error(`Canonical command port ${definition.port} is not composed.`);
+      const fenceState = writeFence?.assertWriteAllowed({
+        operation: `phase3-command:${commandType}`,
+        expectedEpoch: metadata.canonicalStoreEpoch,
+      }) ?? null;
       return executeIdempotentCommand({
         transactionRunner,
         principal: actor,
         metadata,
         commandType,
         payload: structuredClone(payload),
+        canonicalStoreEpoch: fenceState?.canonicalStoreEpoch ?? metadata.canonicalStoreEpoch,
         handler: async (context) => {
           const outcome = await port(Object.freeze({ ...context, ownerUserId: actor.userId }));
           return Object.freeze({

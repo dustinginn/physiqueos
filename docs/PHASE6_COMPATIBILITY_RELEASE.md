@@ -1,6 +1,6 @@
 # Phase 6 compatibility release
 
-Status: **ACCEPTED for production compatibility against the legacy JSON/file runtime. Canonical production migration remains unapproved and BLOCKED on explicit operational approvals and backup/alert verification.**
+Status: **ACCEPTED for production compatibility against the legacy JSON/file runtime. The executable write-fence/production-wrapper source gate is now isolated-accepted; canonical production migration remains unapproved and BLOCKED on alert/billing delivery, encrypted off-machine backup/retention, checkpoint publication/deployment acceptance, exact window, and final go/no-go.**
 
 Accepted source commit: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`  
 Accepted production build: `RmjN47V8xsq3-6jSlZh-9`  
@@ -99,7 +99,7 @@ After deployment, local, LAN, and public ngrok checks each passed 20 representat
 
 ## Operational ownership recommendation
 
-For the current single-Founder system, assign the Founder/user as the one named person for migration operator, go/no-go authority, abort authority, rollback authority, alert recipient, backup-verification owner, post-cutover-validation owner, and later Native kill-switch owner. A second trusted alert/backup recipient is recommended where available, but no new organization or paid service is required. The user must explicitly approve the named assignment before migration; Phase 6 acceptance itself is not blocked by that future approval.
+For the current single-Founder system, the Founder/user is approved as the one named person for migration operator, go/no-go authority, abort authority, rollback authority, alert recipient, backup-verification owner, post-cutover-validation owner, and later Native kill-switch owner. A second trusted alert/backup recipient remains recommended where available, but no new organization or paid service is required. Role assignment does not approve a migration window or final go/no-go.
 
 ## Alert delivery requirements
 
@@ -140,7 +140,7 @@ Retain the final legacy JSON runtime, local evidence/media, encrypted copies, ma
 - Migration target: the previously accepted dedicated DigitalOcean PostgreSQL schema plus private versioned Spaces composition; exact resource IDs and secrets remain operator-only inputs.
 - Fence: expected 2-5 minutes; abort before the first PostgreSQL write if ten minutes elapse.
 - Required pre-fence state: verified encrypted legacy runtime/media snapshot, provider backup/PITR, Spaces inventory/readback, immutable rollback artifact, clean published checkpoint, named roles, and delivered alerts.
-- Operator/authority: recommend the Founder for all roles; explicit user approval remains required.
+- Operator/authority: the Founder is approved for all listed roles; window and final go/no-go approval remain separate.
 - Authentication: stays inactive throughout persistence/media migration and activates only in a later separately approved window.
 - Cost: no Phase 6 change; any production resource or capacity increase needs separate approval.
 - Failure before first PostgreSQL write: abort, restore legacy writes/build, preserve unchanged source, and reschedule.
@@ -150,7 +150,7 @@ Retain the final legacy JSON runtime, local evidence/media, encrypted copies, ma
 - Old runtime read-only gate: only after import parity, media hashes, critical commands, backup, readiness, and post-cutover smoke pass.
 - Source/private cleanup gate: only after seven accepted days, verified restore, no rollback condition, and explicit retention/privacy approval.
 
-Production migration remains unapproved. The technical implementation is ready, but the migration decision is **BLOCKED** until the user separately approves the named roles, verified alert delivery, backup/retention packet, exact migration window, and final go/no-go.
+Production migration remains unapproved. The rehearsal, compatibility, named roles, and executable safety source are accepted, but execution is **BLOCKED** until verified alert/billing delivery, encrypted/off-machine backup/retention, checkpoint publication/inactive deployment acceptance, exact migration window, and final go/no-go.
 
 ## Seven-day post-migration stabilization plan
 
@@ -161,3 +161,15 @@ Do not start this clock in Phase 6. After a separately authorized canonical migr
 Preserve the clean descendant chain. Publish `phase6-compatibility-release` and its documentation checkpoint without modifying `origin/main` or prior phase branches. After migration and stabilization, integrate the accepted descendant lineage through a separately reviewed normal fast-forward or merge if topology requires it; do not rewrite history for cosmetics.
 
 Next: commit the documentation-only Phase 6 checkpoint, run the end-work-session task, publish the dedicated branch, then return for the separate operational-role/alerts/backups/migration-window authorization. Do not start migration, Phase 7, Native Baseline, or SwiftUI automatically.
+
+## Final operational migration-authorization audit (2026-08-12)
+
+The dedicated record is `docs/PRE_IOS_OPERATIONAL_MIGRATION_AUTHORIZATION.md`. Read-only audit evidence preserved the exact source/build, healthy canonical Windows task, revision-119 Founder bytes, 365 current media files, all 42 collections, deterministic package, exact repository/runtime/application-artifact restores, live App Platform readiness, online PostgreSQL, and fresh managed backup. No product deployment, canonical write, data movement, auth activation, fence, provider resource change, or cost change occurred.
+
+The operational checklist is **BLOCKED**. The available provider token lacks monitoring/uptime/billing scopes, so policy state and delivery cannot be credited; the $40 billing warning must be enabled and confirmed by the user. The fresh backup candidate is local and unencrypted with no verified off-machine replica. Most importantly, static and test inspection of exact accepted source `6f497610...` found no executable write-only maintenance fence, legacy/shared canonical switch, or production-guarded migration wrapper. This narrowly identified safety correction was reported but not implemented or deployed. It requires separate approval and a new bounded compatibility acceptance before migration can be authorized.
+
+## Operational-safety source acceptance (2026-08-12)
+
+The separately approved follow-up implements and isolated-accepts that missing executable gate. Durable migration control, complete repository/write-commit interception, command/outbox epoch binding, guarded operator commands, deterministic composition selection, and the strict dry-run/execute wrapper are documented in `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`. Two fresh guarded PostgreSQL runs and deliberate pre-write/post-write failures passed. The Founder/user is now the approved owner for every listed Founder-stage operational role.
+
+This does not alter Phase 6 production acceptance or deploy the new capability. Production remains exact source `6f497610...`, build `RmjN47V8xsq3-6jSlZh-9`, legacy JSON/file canonical, with authentication and provider composition inactive. Migration remains blocked on alert/billing delivery, encrypted off-machine backup and retention, checkpoint publication/inactive deployment acceptance, exact window, and final go/no-go.

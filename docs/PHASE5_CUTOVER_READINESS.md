@@ -1,6 +1,6 @@
 # Phase 5 production-cutover readiness
 
-Status: **Phase 5 technical acceptance passed on local and live synthetic provider evidence. Production migration remains separately gated and is not authorized.**
+Status: **Phase 5 rehearsal/provider acceptance passed. The later executable fence/wrapper source gate is now isolated-accepted, but production migration remains BLOCKED and not authorized on the remaining operational gates.**
 
 Branch: `phase5-cutover-readiness`, based exactly on accepted Phase 4 checkpoint `622ba8dd8684c36107dc6c6c49bc39080eb53a4f`. Production remains pinned to its recovered accepted build. JSON/file state and current local evidence remain canonical.
 
@@ -184,11 +184,11 @@ Future production should not promote `origin/main` or bundle unrelated product c
 - [x] Required short-lived provider PAT was present for live validation; no broad token was required.
 - [x] Final bounded regression/build/smoke/security scans pass after live evidence and final docs.
 
-All Phase 5 technical acceptance items pass. Separate production-window prerequisites are not Phase 5 implementation defects: publish the Phase 5 checkpoint, accept an immutable compatibility deployment from this lineage, name the actual operator/abort owner/alert recipients, verify alert delivery and production backups, and grant an explicit migration-window go/no-go.
+All Phase 5 rehearsal/provider acceptance items pass. The final operational audit subsequently found that the executable production write fence and guarded migration/composition wrapper described by this runbook do not exist in the accepted source; those controls now require separate implementation and compatibility acceptance. Other production-window prerequisites remain: name the actual operator/abort owner/alert recipients, verify alert delivery and encrypted off-machine production backups, and grant an explicit migration-window go/no-go.
 
 ## Migration authorization packet
 
-- **Technically ready now?** Yes, as a synthetic-evidence-backed input to a separate production authorization. This packet does not authorize production mutation.
+- **Technically ready now?** The rehearsal/provider evidence is ready as an input, but execution is not ready until the missing production fence/wrapper controls pass acceptance. This packet does not authorize production mutation.
 - **What would change after later approval?** Canonical records move from JSON to PostgreSQL, evidence bytes move from local files to private versioned Spaces, and the web uses the shared application composition.
 - **What would not change in that window?** Product semantics, client DTOs, production Founder authentication, iOS/native features, and recurring staging cost.
 - **Write pause?** Provisional 2-5 minutes, never approved above ten minutes without a revised plan.
@@ -212,3 +212,15 @@ The separately required compatibility release is now accepted and deployed: sour
 The refreshed Founder checkpoint is revision `119`, `26,955,008` bytes, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, unchanged across deployment. Local, LAN, and public route/asset/media acceptance passed. See `docs/PHASE6_COMPATIBILITY_RELEASE.md` for complete evidence, the strengthened deployment lifecycle, ownership recommendation, exact alert actions, backup/retention recommendation, updated authorization packet, and seven-day plan.
 
 This satisfies the Phase 5 compatibility-release prerequisite but does not authorize migration. Remaining production-window gates are explicit user approval of named roles, recorded alert delivery, verified pre-cutover backups and retention, exact window, and final go/no-go.
+
+## Final operational audit correction (2026-08-12)
+
+The dedicated audit in `docs/PRE_IOS_OPERATIONAL_MIGRATION_AUTHORIZATION.md` verified fresh revision-119 runtime/media/package integrity, isolated restore, exact Phase 6 build/source, live staging readiness, online PostgreSQL, and provider backup freshness without production mutation. It also established that the compatibility source does **not** yet implement the runbook requirement at line 55: there is no executable write-only maintenance fence, production canonical-backend switch, or production-guarded migration wrapper. Phase 4/5 scripts correctly remain non-production guarded.
+
+Therefore the earlier statement that migration was technically ready is narrowed: the rehearsal and provider composition remain accepted, but execution readiness is **BLOCKED** pending separately approved fence/wrapper implementation and bounded compatibility acceptance, plus verified alerts/delivery/billing, encrypted off-machine backup custody, named roles, retention, exact window, and final go/no-go. No migration occurred.
+
+## Operational-safety source resolution (2026-08-12)
+
+The separately approved follow-up closes the missing executable source gate with durable write-fence control, canonical-store epochs, central write interception, guarded operational commands, deterministic composition selection, strict dry-run/execute orchestration, and explicit pre-first-write/post-first-write recovery behavior. Two fresh realistic isolated PostgreSQL runs and deliberate failure scenarios passed. The Founder/user is approved for every Founder-stage operational role. See `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`.
+
+The capability remains undeployed and inactive; exact Phase 6 legacy JSON/file production was restored and verified after validation, with Founder revision 119 unchanged. Migration remains blocked on alert/billing delivery, encrypted off-machine backup and retention, safety-checkpoint publication/inactive deployment acceptance, exact window, and final go/no-go.

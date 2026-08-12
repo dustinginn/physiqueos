@@ -8,6 +8,7 @@ import {
 } from "../../domain/models/progressPhotoPoseVocabulary";
 import { normalizeDailyBriefingRecords } from "./DailyBriefingHistory";
 import { createFounderStoreMutationLockService } from "./FounderStoreMutationLock";
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../platform/cutover/canonicalWriteFence";
 
 const STORE_KEY = "__PHYSIQUEOS_FOUNDER_RUNTIME_STORE__";
 const STORE_WRITE_ATTEMPTS = 6;
@@ -225,6 +226,10 @@ export function persistFounderRuntimeStore(store = getFounderRuntimeStore(), opt
   if (typeof window !== "undefined") return;
 
   const filePath = options.filePath ?? getRuntimeStorePath();
+  assertProductionLegacyCanonicalWriteAllowed({
+    operation: options.operation ?? `founder-runtime-persist:${options.mutatedCollection ?? "store"}`,
+    runtimeStorePath: filePath,
+  });
   const mutationLock = options.mutationLock ??
     createFounderStoreMutationLockService({ storePath: filePath });
   const externallyOwned = Boolean(options.lockOwnership);

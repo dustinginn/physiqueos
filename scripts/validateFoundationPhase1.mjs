@@ -5,6 +5,11 @@ import path from "node:path";
 
 const root = process.cwd();
 const runtimePath = path.join(root, "private", "founder", "runtime-store.json");
+const isolatedDist = path.join(root, ".next-phase1-validation");
+if (path.dirname(isolatedDist) !== path.resolve(root) || path.basename(isolatedDist) !== ".next-phase1-validation") {
+  throw new Error("The Phase 1 isolated validation build path escaped the repository root.");
+}
+if (fs.existsSync(isolatedDist)) throw new Error(`Refusing to overwrite existing isolated build directory: ${isolatedDist}`);
 const vitest = path.join(root, "node_modules", "vitest", "vitest.mjs");
 const eslint = path.join(root, "node_modules", "eslint", "bin", "eslint.js");
 const next = path.join(root, "node_modules", "next", "dist", "bin", "next");
@@ -19,11 +24,16 @@ const steps = [
   ["diff check", "git", ["diff", "--check"]],
 ];
 
-for (const [label, command, args] of steps) {
-  process.stdout.write(`\n[foundation-validation] ${label}\n`);
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit", windowsHide: true, timeout: 600_000 });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${label} failed with exit code ${result.status}.`);
+const childEnv = { ...process.env, NODE_OPTIONS: "--max-old-space-size=1536", PHYSIQUEOS_BUILD_DIST_DIR: ".next-phase1-validation" };
+try {
+  for (const [label, command, args] of steps) {
+    process.stdout.write(`\n[foundation-validation] ${label}\n`);
+    const result = spawnSync(command, args, { cwd: root, env: childEnv, stdio: "inherit", windowsHide: true, timeout: 600_000 });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`${label} failed with exit code ${result.status}.`);
+  }
+} finally {
+  if (fs.existsSync(isolatedDist)) fs.rmSync(isolatedDist, { recursive: true, force: true });
 }
 
 const runtimeAfter = readRuntimeCheckpoint(runtimePath);

@@ -2,9 +2,9 @@ import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 
-export async function executeIdempotentCommand({ transactionRunner, principal, metadata, commandType, payload, handler }) {
+export async function executeIdempotentCommand({ transactionRunner, principal, metadata, commandType, payload, canonicalStoreEpoch = null, handler }) {
   const actor = requireAuthenticationPrincipal(principal);
-  const payloadHash = createPayloadHash({ commandType, payloadVersion: metadata.payloadVersion, payload });
+  const payloadHash = createPayloadHash({ commandType, payloadVersion: metadata.payloadVersion, canonicalStoreEpoch, payload });
   return transactionRunner.run(async (transaction) => {
     const existing = await transaction.commandReceipts.find(actor.userId, metadata.idempotencyKey);
     if (existing) return replayReceipt(existing, payloadHash);
@@ -21,7 +21,7 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
       status: "processing",
     });
 
-    const outcome = await handler({ transaction, principal: actor, metadata, payload });
+    const outcome = await handler({ transaction, principal: actor, metadata, payload, canonicalStoreEpoch });
     for (const message of outcome?.outbox ?? []) await transaction.outbox.insert(message);
     const receipt = await transaction.commandReceipts.complete(actor.userId, metadata.idempotencyKey, {
       status: outcome?.status ?? "committed",

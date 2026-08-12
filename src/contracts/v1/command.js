@@ -3,6 +3,7 @@ import { ApplicationProblem } from "./problem.js";
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:\/-]{16,200}$/;
 const CORRELATION_ID = /^[A-Za-z0-9._:-]{8,128}$/;
+const CANONICAL_STORE_EPOCHS = new Set(["legacy-json", "migration-fence", "postgres-canonical"]);
 
 export function createCommandMetadata(input = {}, options = {}) {
   const commandId = input.commandId ?? createUuidV7(options);
@@ -13,6 +14,9 @@ export function createCommandMetadata(input = {}, options = {}) {
   if (input.correlationId != null && !CORRELATION_ID.test(String(input.correlationId))) {
     throw validationProblem("correlationId", "Correlation ID must be 8-128 safe characters.");
   }
+  if (input.canonicalStoreEpoch != null && !CANONICAL_STORE_EPOCHS.has(String(input.canonicalStoreEpoch))) {
+    throw validationProblem("canonicalStoreEpoch", "Canonical-store epoch is unsupported.");
+  }
   return Object.freeze({
     commandId,
     idempotencyKey: String(input.idempotencyKey),
@@ -21,6 +25,7 @@ export function createCommandMetadata(input = {}, options = {}) {
     payloadVersion: String(input.payloadVersion ?? "1"),
     clientOccurredAt: input.clientOccurredAt ?? null,
     clientTimeZone: input.clientTimeZone ?? null,
+    canonicalStoreEpoch: input.canonicalStoreEpoch == null ? null : String(input.canonicalStoreEpoch),
   });
 }
 

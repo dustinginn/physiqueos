@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../../../platform/cutover/canonicalWriteFence";
 import { processEvidenceIntakeSubmission } from "../../../../domain/services/EvidenceIntakeService";
 import { createEvidenceReviewService } from "../../../../domain/services/EvidenceReviewService";
 import {
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
+    assertProductionLegacyCanonicalWriteAllowed({ operation: "training-reconciliation:create" });
     const formData = await request.formData();
     const draft = parseJson(formData.get("draftJson"), "Training Logger draft");
     assertDraftForReconciliation(draft);
@@ -56,12 +58,13 @@ export async function POST(request) {
     });
     return NextResponse.json({
       error: error?.message ?? "Training Logger evidence could not be prepared.",
-    }, { status: 400 });
+    }, { status: error?.status ?? 400 });
   }
 }
 
 export async function PUT(request) {
   try {
+    assertProductionLegacyCanonicalWriteAllowed({ operation: "training-reconciliation:update" });
     const requested = await request.json();
     const draft = requested?.draft;
     assertDraftForReview(draft);
@@ -112,7 +115,7 @@ export async function PUT(request) {
     return NextResponse.json({
       code: error?.code ?? null,
       error: error?.message ?? "Training Logger Evidence Review could not be prepared.",
-    }, { status: error?.code === "APPLE_WORKOUT_ALREADY_CONSUMED" ? 409 : 400 });
+    }, { status: error?.status ?? (error?.code === "APPLE_WORKOUT_ALREADY_CONSUMED" ? 409 : 400) });
   }
 }
 

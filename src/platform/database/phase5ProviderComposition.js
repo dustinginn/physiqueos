@@ -8,9 +8,10 @@ export async function createPhase5ProviderApplicationComposition({
   objectProvider,
   mediaAccessSecret = process.env.PHYSIQUEOS_CREDENTIAL_PEPPER,
   now = () => new Date(),
+  writeFence = null,
 } = {}) {
   if (!objectProvider?.authorizeRead) throw new Error("Phase 5 provider composition requires private Spaces access.");
-  const base = await createPhase4PostgresApplicationComposition({ pool, ownerUserId, now });
+  const base = await createPhase4PostgresApplicationComposition({ pool, ownerUserId, now, writeFence });
   const catalog = createPhase5ProviderMediaCatalog({ query: (text, values) => pool.query(text, values) });
   const mediaGateway = createOpaqueSpacesMediaGateway({ provider: objectProvider, catalog, secret: mediaAccessSecret, clock: now });
   const media = createAuthorizedMediaService({

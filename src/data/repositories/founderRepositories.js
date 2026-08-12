@@ -4,6 +4,11 @@ import {
   persistFounderRuntimeStore,
 } from "./founderRuntimeStore";
 import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity";
+import {
+  CanonicalWriteDisposition,
+  classifyFounderRepositoryMethod,
+} from "../../platform/cutover/canonicalWriteSurfaceInventory";
+import { assertProductionLegacyCanonicalWriteAllowed } from "../../platform/cutover/canonicalWriteFence";
 
 const founderRuntimeStore = getFounderRuntimeStore();
 registerRuntimeTrainingExercises(founderRuntimeStore.canonicalExerciseLibrary ?? []);
@@ -20,12 +25,12 @@ function wrapRepositoriesWithRuntimeRefresh(repositories) {
   return Object.fromEntries(
     Object.entries(repositories).map(([name, repository]) => [
       name,
-      wrapRepositoryWithRuntimeRefresh(repository),
+      wrapRepositoryWithRuntimeRefresh(name, repository),
     ])
   );
 }
 
-function wrapRepositoryWithRuntimeRefresh(repository) {
+function wrapRepositoryWithRuntimeRefresh(repositoryName, repository) {
   if (!repository || typeof repository !== "object") return repository;
   if (Object.isFrozen(repository)) {
     return Object.fromEntries(
@@ -33,6 +38,7 @@ function wrapRepositoryWithRuntimeRefresh(repository) {
         property,
         typeof value === "function"
           ? (...args) => {
+              assertRepositoryWriteAllowed(repositoryName, property);
               getFounderRuntimeStore();
               registerRuntimeTrainingExercises(founderRuntimeStore.canonicalExerciseLibrary ?? []);
               return value.apply(repository, args);
@@ -49,6 +55,7 @@ function wrapRepositoryWithRuntimeRefresh(repository) {
       if (typeof value !== "function") return value;
 
       return (...args) => {
+        assertRepositoryWriteAllowed(repositoryName, property);
         getFounderRuntimeStore();
         registerRuntimeTrainingExercises(founderRuntimeStore.canonicalExerciseLibrary ?? []);
 
@@ -56,4 +63,13 @@ function wrapRepositoryWithRuntimeRefresh(repository) {
       };
     },
   });
+}
+
+function assertRepositoryWriteAllowed(repositoryName, property) {
+  const disposition = classifyFounderRepositoryMethod(repositoryName, String(property));
+  if (disposition === CanonicalWriteDisposition.CANONICAL_WRITE) {
+    assertProductionLegacyCanonicalWriteAllowed({
+      operation: `founder-repository:${repositoryName}.${String(property)}`,
+    });
+  }
 }

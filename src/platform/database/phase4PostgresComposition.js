@@ -21,6 +21,7 @@ export async function createPhase4PostgresApplicationComposition({
   now = () => new Date(),
   objectRoot = null,
   issueAccessHandle = null,
+  writeFence = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
   const query = (text, values) => pool.query(text, values);
@@ -35,7 +36,7 @@ export async function createPhase4PostgresApplicationComposition({
   });
   const transactionRunner = createPhase4TransactionRunner({ pool });
   const ports = createTransactionBoundPorts({ now });
-  const commands = createPhase3CommandService({ transactionRunner, ports });
+  const commands = createPhase3CommandService({ transactionRunner, ports, writeFence });
   const media = objectRoot && issueAccessHandle
     ? createAuthorizedMediaService({
         catalog: createPhase4MediaCatalog({ query }),

@@ -1,0 +1,223 @@
+# Pre-iOS operational migration authorization gate
+
+Audit date: 2026-08-12 (America/Los_Angeles)
+
+Classification: **BLOCKED. The executable fence/wrapper source gate is now closed, but this document does not authorize canonical production migration.**
+
+The accepted Phase 6 compatibility release remains healthy and unchanged. The Founder has approved all recommended Founder-stage operational roles, and the separately approved safety patch now implements and isolated-tests the missing write-only maintenance fence and guarded migration/composition wrapper. The final operational gate still cannot pass: DigitalOcean alert/billing configuration and delivery are not verified, the newly captured production backup candidate is local and unencrypted with no verified off-machine replica, retention/window/final go-no-go remain unapproved, and this inactive safety source has not been published or deployed.
+
+## Immutable state and lineage
+
+| Item | Verified state |
+| --- | --- |
+| Local branch / upstream | `phase6-compatibility-release` / `origin/phase6-compatibility-release`, synchronized `+0/-0` before this documentation patch |
+| Phase 6 checkpoint | `c6c01215b75bc966be43ee783c6272246a01f405` |
+| Accepted product source | `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7` |
+| Production build | `RmjN47V8xsq3-6jSlZh-9` |
+| `origin/main` | `403107d14056868194b59861cc55e9f37c9ac6a1`, unchanged |
+| Subsequent product patch | none; the only descendant between accepted product source and the checkpoint is Phase 6 documentation |
+| Migration scripts/runbook checkpoint | `c6c01215b75bc966be43ee783c6272246a01f405` |
+
+The canonical Windows task was `Running`, the canonical listener was PID 5272 under the Windows Scheduler service, runtime ownership was `canonical`, the local/LAN/public tunnel was healthy, and `/api/health` returned 200 with the exact source and build above. JSON/file persistence and current local evidence remain canonical. PostgreSQL, Spaces-backed production media, shared authentication, the production write fence, and Native work remain inactive.
+
+## Fresh Founder source
+
+The read-only audit found no user activity after the accepted Phase 6 baseline:
+
+- version `founder-seed-v2`;
+- revision `119`;
+- updated `2026-08-12T16:02:21.133Z`;
+- 26,955,008 bytes;
+- SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`.
+
+The current-copy exporter read the live runtime at capture time and proved identical before/after hashes. A future migration must repeat that capture under the final fence; revision 119 is audit evidence, not a hard-coded migration source.
+
+## Founder-stage ownership recommendation
+
+Recommend assigning **the Founder/user** as the one named migration operator, go/no-go authority, abort authority, rollback authority, primary alert recipient, backup-verification owner, post-cutover-validation owner, seven-day-stabilization owner, and later Native kill-switch owner. A second trusted alert/backup recipient is useful but optional.
+
+The user approved this assignment on 2026-08-12. The Founder/user is the named owner for every listed Founder-stage operational role. This does not authorize a migration window or final go/no-go.
+
+## DigitalOcean target and cost
+
+The existing scoped `phase5-staging` context remained valid for its intended resources. Read-only evidence showed:
+
+- App Platform app `bf57cf56-48cc-4cd6-90e4-a23ee5381741` in `sfo`, active on deployment `dd3934a7-ff2a-4184-8c00-b5fc75b95ddf`;
+- public liveness and readiness both 200 on build `phase2-provider-staging-5517689`;
+- worker component present at one 512 MiB instance and its dependency readiness represented by the green readiness endpoint;
+- PostgreSQL cluster `f544596d-594e-4aa4-a0a8-533bda0992c6` in `sfo3`, PostgreSQL 17, one `db-s-1vcpu-1gb` node, 10 GiB, status `online`;
+- managed backups at `2026-08-11T19:10:03Z` and `2026-08-12T07:10:12Z`; the latter was approximately 0.068 GB;
+- expected four logical databases only; no restore cluster or additional billed component;
+- encrypted secret key names remain present in the app specification without copying values into this record;
+- the accepted private Space remains named in runtime configuration in `sfo3`; current private/versioned behavior is accepted Phase 2/5 evidence, but a fresh direct version/inventory read was not possible with the available scoped credentials.
+
+The recurring base remains **USD 30.15/month**: $5 web, $5 worker, $15.15 database, and $5 Spaces. No resource, size, node, key, support plan, or paid monitor changed in this audit.
+
+Capacity is not freshly accepted: the current token lacks `monitoring:read`, so actual CPU, memory, and disk utilization could not be read. The cluster is online and the latest backup is small relative to 10 GiB, but that is not a substitute for the required 70% warning / 85% critical policies and current metrics.
+
+## Alert and billing gate
+
+The available token permits the previously approved app/database inspection but returns 403 for Monitoring, Uptime, and Billing. The older `physiqueos-staging` context is expired and the default context contains no token. The app spec returned by the provider contains no explicit alert array. DigitalOcean may create default failed-deployment/domain alerts, and new managed databases normally receive 90% CPU/memory/disk policies, but neither actual policy state nor recipients were observable and therefore neither is credited.
+
+Required zero-cost configuration, using the verified DigitalOcean account email as the primary recipient:
+
+1. App Platform: failed deployment and failed domain; web CPU/RAM at 70% for 10 minutes; worker CPU/RAM at 70% for 10 minutes; restart count above normal; later production readiness via an Uptime check.
+2. PostgreSQL: CPU, memory, and disk warning at 70% and critical at 85%; any availability/readiness failure blocks or fences writes.
+3. Application-native after shared activation: heartbeat older than 120 seconds, oldest outbox row older than five minutes or any dead row, backup older than 24 hours or failed verification, three critical command failures in five minutes or any integrity failure, media checksum/authorization/readback failure, and later enrollment/recovery/refresh-reuse anomalies.
+4. Billing: enable the team billing alert at **$40/month**, early enough to review before the approved $50 recurring ceiling. It is an email alert, not a spending cap.
+
+DigitalOcean does not document a general non-triggering "send test" control. Use a temporary harmless Uptime check against a deliberately unavailable synthetic URL, confirm the email receipt, then remove only that synthetic check. Do not stop production or break the database. App/database rules that cannot be safely forced remain configuration-verified rather than live-trigger-tested.
+
+The user must either complete this in the control panel or create a short-lived custom-scope token locally with `account:read`, `app:read`, `app:update`, `database:read`, `monitoring:read`, `monitoring:create`, `monitoring:update`, `uptime:read`, `uptime:create`, `uptime:update`, `uptime:delete`, and `billing:read`, then authenticate locally:
+
+```powershell
+.\.tmp\tools\doctl-current\bin\doctl.exe auth init --context operational-readiness
+```
+
+Do not paste the token into chat. Revoke it after the policy audit. Billing-alert enablement itself is a control-panel action. Record recipient, channel, test time, method, receipt confirmation, and any rule not safely trigger-tested.
+
+Current alert delivery: **not verified**. Current billing alert: **not verified**.
+
+## Fresh backup candidate and restore evidence
+
+No backup was deleted. The audit created only read-only copies:
+
+| Component | Identity / result |
+| --- | --- |
+| Repository/runtime backup | `<Documents>\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_12-36-05`; branch/checkpoint exact; bundle SHA-256 `E78C59EFE02EDD4037CF39A728DA44EF1C8F6312CC31376D6DF6B2603F0596FE`; manifest SHA-256 `57293846F3D3D6DF857F6473490BFE84CC5420E3F6D90B84734B7070D14586FF`; completeness passed |
+| Current-copy package | `.tmp/operational-readiness-20260812`; all 42 collections, zero unknown collections, migration ID `cc4903f9-6145-7b3a-8059-010a6de4ed1b`, manifest digest `7e13eadd63883fb039eb48406b6a977bb4cae2216fbdb36b6ecfaf96ef61f822` |
+| Media | 365 files, 274,094,226 bytes; every source/copy/manifest SHA-256 matched |
+| Application artifact copy | exact build/source; 2,496 files, 82,360,379 bytes; deterministic inventory digest `4131acb01e89a6a48ccebe70f30cbbc161c3dc0bd32ff07418fec7f03fbb10ac` |
+| Provider state | app/deployment/database IDs, regions, sizes, build, backup timestamps, database names, Space reference, and configuration key names only; no secret value written |
+
+Restore verification passed without touching production:
+
+- the Git bundle verified, cloned to an isolated directory, checked out exact checkpoint `c6c01215...`, passed `git fsck`, and had a clean tree;
+- the runtime restored byte-for-byte at the exact SHA-256;
+- all 365 restored media files reproduced the manifest sizes and hashes;
+- a second canonical package export was byte-identical and consumable by the Phase 4 package reader;
+- the accepted application artifact copy reproduced every file and inventory digest;
+- the most recent live provider logical backup/isolated restore remains the accepted Phase 5 proof; PostgreSQL is not production-canonical, so no Founder database restore was required or attempted here.
+
+This candidate is **not an accepted pre-migration recovery set** because the private runtime/media copies are local and unencrypted and the configured off-machine `G:` destination was unavailable. Before the fence, create an encrypted independent replica, verify it byte-for-byte, and record key custody by password-manager/provider reference only. Repeat the final runtime/media capture immediately before migration.
+
+### Measured preparation time
+
+- runtime byte copy: 22 ms; two-file hash verification: 201 ms;
+- combined runtime plus media snapshot: 1.786 s;
+- canonical manifest/package generation: 1.640 s;
+- second deterministic package proof: 1.938 s;
+- repository/runtime bundle creation: 4.210 s; verification: 483 ms; isolated clone/fsck: 11.103 s;
+- application artifact copy: 1.523 s; complete two-tree hashing/comparison: about 14.6 s;
+- isolated runtime/media restore copy: 312 ms; full hash verification completed within the 1.5 s command;
+- provider app/database/backup and public readiness checks: approximately four seconds of provider response time, excluding the blocked monitoring/billing calls.
+
+All bulk backup, hashing, package construction, artifact preservation, and provider inventory should occur before the write fence. The fence should contain only final source capture/delta, final import/readback, composition switch, smoke, and release.
+
+## Retention recommendation
+
+Retain the final pre-cutover JSON/runtime and media snapshot for at least 35 days after successful migration and until all of the following are true: seven accepted stabilization days, one verified post-cutover PostgreSQL restore, verified media/object integrity, no remaining rollback trigger, and explicit user approval of a deletion review. During stabilization never delete the legacy runtime/media snapshot, manifests, rollback artifact, reconciliation logs, or provider recovery backup. Do not remove Founder source data in this gate.
+
+This recommendation is not yet accepted by the user.
+
+## Executable fence and migration tooling resolution
+
+The final audit found no executable control in the accepted Phase 6 source. The separately approved patch now implements the missing durable state machine, central write interception, epoch-bound commands/outbox, bounded operational control, deterministic application-composition selector, strict-order dry-run/execute orchestrator, clear maintenance problem, audit/status model, and pre-first-write versus post-first-write recovery boundary.
+
+- implemented: server-only fencing intercepts classified canonical repository, runtime, unit-of-work, Phase 3 command, upload, photo, and DEXA mutations;
+- implemented: isolated tests prove reads remain enabled while writes get a bounded 503 and no file mutation;
+- implemented: canonical-store epoch binds commands, receipts, and outbox handling;
+- implemented: deterministic, idempotent activation, release, abort, status, and audit; and
+- implemented: guarded dry-run/execute wrapper and durable application-composition switch; the Phase 4/5 target guards remain intact.
+
+Two fresh realistic isolated PostgreSQL migrations and deliberate pre-write/post-write failures passed. Exact design, inventory, commands, timings, and evidence are in `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`. The capability is inactive and not deployed. Production still runs the accepted Phase 6 artifact against legacy JSON/file; any inactive-capability deployment and any later activation require separate authorization.
+
+## Rollback confirmation
+
+The current runbook distinction remains correct:
+
+| Failure point | Required response |
+| --- | --- |
+| Before any PostgreSQL canonical write | abort; remove the inactive fence when implemented; retain unchanged JSON canonical state and accepted build |
+| During import before canonical switch | abort; discard/reset only the guarded target; JSON remains canonical |
+| After import but before web switch | abort; keep legacy composition/writes; retain target for audit or reset it under guard |
+| After web switch but before any new PostgreSQL user write | stop/fence, roll compatible code/composition back to unchanged JSON, verify its exact final hash |
+| After the first new PostgreSQL canonical user write | stop/fence writes; preserve receipts/outbox; PostgreSQL remains canonical; use compatible-code rollback plus deterministic forward repair or separately reviewed reconciliation—never blindly restore stale JSON |
+
+The executable state machine and wrapper now enforce this pre-write/post-write distinction in isolated acceptance; the capability remains undeployed and inactive.
+
+## Recommended future window
+
+Recommended appointment: **Thursday, 2026-08-13, 8:30-9:15 PM America/Los_Angeles**, only if the Founder confirms all Workout Logger, evidence upload/review, weight/check-in, nutrition/activity, priority, protocol, Goal, and briefing actions are finished for the evening. Otherwise use the same 45-minute slot on the next quiet evening; do not migrate during a gym session or active upload.
+
+- 8:30-8:40: final alert/backup/target/lineage checks;
+- 8:40: announce and start the write-only fence;
+- expected fence: 2-5 minutes;
+- hard boundary: if the fence reaches ten minutes before composition switch/first accepted PostgreSQL write, abort and reopen legacy writes;
+- remainder through 9:15: smoke, user confirmation, backup/readback, observation, or pre-write rollback.
+
+Reads may remain available on the pinned legacy snapshot only after the missing fence is implemented and proven. The user should avoid every canonical write for the full announced window, not merely the expected 2-5 minute fence.
+
+## Binary operational checklist
+
+- [x] Phase 6 compatibility release accepted.
+- [x] Phase 6 checkpoint remotely preserved.
+- [x] Current production healthy.
+- [x] Current source/build/branch lineage understood; no later product patch.
+- [x] Founder approved as named migration/operator/go-no-go/abort/rollback owner.
+- [x] Founder approved as primary alert/backup/post-cutover/stabilization/kill-switch owner.
+- [ ] DigitalOcean alert configuration inspected and accepted.
+- [ ] Alert delivery received and recorded.
+- [ ] $40 billing alert enabled and verified.
+- [x] Fresh local production backup candidate captured without canonical mutation.
+- [x] Local candidate integrity verified.
+- [x] Local candidate restored in isolation.
+- [ ] Private backup encrypted with recovery-key custody recorded.
+- [ ] Off-machine replica completed and independently verified.
+- [ ] Legacy retention recommendation accepted.
+- [x] Provider app/database and public dependency readiness healthy.
+- [ ] Provider utilization/capacity alerts and current metrics verified.
+- [ ] Fresh Spaces private/versioned inventory/readback verified with authorized credentials.
+- [x] Migration package export reads the current live source and has zero unknown collections.
+- [x] Production-guarded migration/composition-switch wrapper implemented and isolated-accepted in source.
+- [x] Write-only maintenance fence implemented, isolated-tested, and inactive.
+- [x] Rollback matrix preserves the pre-write/post-write distinction.
+- [x] 2-5 minute estimate remains credible from measured copy/provider evidence.
+- [x] Ten-minute pre-write abort threshold remains current.
+- [x] No unresolved deterministic rehearsal migration defect.
+- [x] No unresolved accepted provider rehearsal defect.
+- [x] No unresolved accepted parity defect.
+- [x] No unresolved Phase 6 compatibility defect.
+- [x] No infrastructure cost increase.
+- [x] Production authentication remains separate and inactive.
+- [x] Web remains the permanent fallback.
+
+Any false item keeps production migration blocked.
+
+## Plain-language authorization packet
+
+- **Ready now?** No. The technical rehearsal, compatibility deployment, named roles, and executable fence/wrapper source gate are accepted, but alert/billing delivery, encrypted off-machine backup custody, retention, safety-checkpoint publication/deployment, exact-window approval, and final go/no-go are incomplete.
+- **What will eventually move?** All 42 canonical Founder record collections from JSON to PostgreSQL and 365 current evidence/media files (plus any later files) from local storage to private versioned Spaces, using a fresh final snapshot.
+- **What remains temporarily?** The exact legacy JSON/runtime, local media, encrypted backup, migration manifests/logs, and rollback build remain unchanged and read-only throughout stabilization.
+- **Availability?** The plan is a 2-5 minute write pause, with reads available on the pinned legacy snapshot after the accepted fence is separately deployed inactive and compatibility-verified. Reserve 45 minutes for preflight, smoke, observation, and possible pre-write rollback.
+- **User behavior?** Do not log a workout, upload/review evidence, enter check-ins/weight/nutrition/activity, complete priorities/protocols, or edit Goals/Plan during the announced window.
+- **Failure before a new PostgreSQL write?** Abort and return to the unchanged JSON source/build.
+- **Failure after a new PostgreSQL write?** Fence writes, keep PostgreSQL canonical, roll code compatibly, and repair/reconcile forward; never replace it with stale JSON.
+- **Backups?** Fresh local runtime/media/repository/build candidates and exact restore evidence exist, plus provider managed backup and accepted isolated provider restore evidence. Encryption and off-machine verification are still missing.
+- **Retention?** At least 35 days and until seven stable days, a post-cutover DB restore, media integrity, no rollback trigger, and explicit deletion review.
+- **Authority/alerts?** Founder is approved for all roles and the verified DigitalOcean account email remains the primary channel; policy state and delivery are not yet verified.
+- **Cost/auth/UI/Workout Logger?** No planned cost increase from $30.15/month; the $50 ceiling remains. Authentication stays inactive. Product UI and Workout Logger behavior do not intentionally change.
+- **Does iOS start afterward?** No. Migration begins a minimum seven accepted daily-use-day stabilization period. Native Baseline remains separately gated.
+- **What later phrase authorizes migration?** Only an explicit instruction after every checklist item is true, naming the exact checkpoint/build/window, for example: `GO: authorize the canonical production migration from the published operational checkpoint during the approved 2026-08-13 8:30-9:15 PM PT window, using the verified backup packet and ten-minute pre-write abort rule.`
+
+**Production migration is not authorized until the user gives an explicit go/no-go after reviewing the completed packet.**
+
+## Exact remaining approvals/actions
+
+1. Authorize and complete the narrowly scoped monitoring/billing audit; confirm alert email receipt and the $40 billing alert.
+2. Create/verify encrypted off-machine runtime/media/build backup custody and accept the retention recommendation.
+3. Run and publish the End Work Session checkpoint for this accepted safety source.
+4. Separately approve and compatibility-verify an inactive safety-capability deployment, including initialized inactive legacy control.
+5. Approve the exact migration window and final go/no-go only after the preceding evidence is recorded.
+
+Final classification: **BLOCKED**.
