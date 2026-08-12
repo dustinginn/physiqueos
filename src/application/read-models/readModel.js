@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { destinationFromWebHref } from "../../contracts/v1/destination.js";
+import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 
 const FORBIDDEN_KEYS = new Set([
   "absolutePath", "filePath", "filesystemPath", "localPath", "objectKey",
@@ -26,7 +27,7 @@ export function createApplicationReadModel({
     data: projected,
     intentionalDifferences: Object.freeze([...intentionalDifferences]),
   };
-  result.etag = `\"${createHash("sha256").update(JSON.stringify(result)).digest("base64url")}\"`;
+  result.etag = `\"${createHash("sha256").update(canonicalJson(result)).digest("base64url")}\"`;
   assertClientSafeReadModel(result);
   return deepFreeze(result);
 }

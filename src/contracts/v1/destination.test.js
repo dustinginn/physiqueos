@@ -15,6 +15,7 @@ describe("typed destination registry", () => {
     ["/priorities/priority-1", DestinationId.PRIORITY_DETAIL, { priorityId: "priority-1" }],
     ["/briefings/review/briefing-1", DestinationId.BRIEFING_DETAIL, { briefingId: "briefing-1" }],
     ["/briefings/review", DestinationId.BRIEFING_LIST, {}],
+    ["/briefing/daily", DestinationId.BRIEFING_LIST, {}],
     ["/progress/training/session/session-1", DestinationId.TRAINING_SESSION, { sessionId: "session-1" }],
     ["/progress/training/library/exercise-1", DestinationId.TRAINING_EXERCISE, { exerciseId: "exercise-1" }],
     ["/evidence/photos", DestinationId.PHOTO_UPLOAD, {}], ["/evidence/dexa", DestinationId.DEXA_UPLOAD, {}],

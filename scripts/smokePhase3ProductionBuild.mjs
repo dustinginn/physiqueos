@@ -6,7 +6,7 @@ const port = 3103;
 const next = path.join(root, "node_modules", "next", "dist", "bin", "next");
 const child = spawn(process.execPath, [next, "start", "-p", String(port)], {
   cwd: root,
-  env: { ...process.env, PHYSIQUEOS_BUILD_DIST_DIR: ".next-phase3-validation" },
+  env: { ...process.env, PHYSIQUEOS_BUILD_DIST_DIR: process.env.PHYSIQUEOS_BUILD_DIST_DIR ?? ".next-phase3-validation" },
   stdio: ["ignore", "pipe", "pipe"],
   windowsHide: true,
 });

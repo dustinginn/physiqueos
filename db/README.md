@@ -36,3 +36,16 @@ On 2026-08-11 the migrations were accepted against the `sfo3` DigitalOcean Postg
 Provider acceptance uses guarded database names only. `scripts/validatePhase2ProviderStaging.mjs` requires `physiqueos_phase2_test_provider_20260811`; `scripts/validatePhase2ProviderRestore.mjs` additionally requires `physiqueos_restore_provider_20260811`. The deployed-worker probe alone requires `physiqueos_staging`. These scripts refuse non-DigitalOcean hosts and require `PHYSIQUEOS_PHASE2_PROVIDER_ACCEPTANCE=1`.
 
 The isolated restore rehearsal matched counts, IDs, ownership/session/object relationships, migration metadata, critical values, semantic digest, private-object inventory, and object hashes. Temporary dumps and the restore logical database were removed. The retained logical acceptance database contains synthetic fixtures only; the current Founder JSON/file runtime remains canonical.
+
+## Phase 4 domain rehearsal
+
+Migration `000003_phase4_canonical_domains.cjs` adds inactive owner-scoped domain tables, canonical relationships, media metadata, and import-run evidence. It is consumed only by the explicit Phase 4 rehearsal composition. Production startup and current web routes do not import it.
+
+Phase 4 import/reset tools refuse databases whose names do not begin with `physiqueos_phase4_test`, `physiqueos_phase4_rehearsal`, or `physiqueos_phase4_restore`. Current-copy packages and local object roots must remain under ignored `.tmp`; copied Founder data and media must never be committed or uploaded to provider staging. The guarded destructive cycle is:
+
+```text
+PHYSIQUEOS_PHASE4_DATABASE_URL=postgresql://.../physiqueos_phase4_rehearsal_<name>
+npm run test:phase4:postgres
+```
+
+The current local rehearsal passed fresh up, full down/reapply, two identical imports, rollback/reset, command receipt/outbox cleanup, verified database backup/restore, exact counts/IDs/state digest, and 361 local media hashes. This is not production database or backup acceptance; the production JSON/file runtime remains canonical until a separately approved cutover.

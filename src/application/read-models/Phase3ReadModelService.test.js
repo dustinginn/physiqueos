@@ -23,4 +23,10 @@ describe("Phase 3 bounded read models", () => {
     const service = createPhase3ReadModelService({ loaders: { [Phase3ReadModel.HOME]: async () => ({ href: "/not-registered" }) } });
     await expect(service.home(principal)).rejects.toThrow("unmapped web destination");
   });
+
+  it("creates persistence-independent ETags for equivalent JSON object key order", async () => {
+    const left = createPhase3ReadModelService({ loaders: { [Phase3ReadModel.HOME]: async () => ({ id: "one", nested: { alpha: 1, beta: 2 } }) }, now: () => new Date("2026-08-11T12:00:00Z") });
+    const right = createPhase3ReadModelService({ loaders: { [Phase3ReadModel.HOME]: async () => ({ nested: { beta: 2, alpha: 1 }, id: "one" }) }, now: () => new Date("2026-08-11T12:00:00Z") });
+    expect((await left.home(principal)).etag).toBe((await right.home(principal)).etag);
+  });
 });

@@ -60,7 +60,7 @@ export function destinationFromWebHref(href) {
   if (path === "/") return createDestination(DestinationId.HOME);
   if (path === "/log" || path === "/log/training") return createDestination(DestinationId.LOG);
   if (path === "/goals") return createDestination(DestinationId.GOALS);
-  if (path === "/briefings/review") return createDestination(DestinationId.BRIEFING_LIST);
+  if (path === "/briefings/review" || path === "/briefing/daily") return createDestination(DestinationId.BRIEFING_LIST);
   if (path === "/profile") return createDestination(DestinationId.PROFILE);
   if (path === "/profile/operating-plan") return createDestination(DestinationId.OPERATING_PLAN);
   if (path === "/goals/transition" || path.startsWith("/goals/transition/")) return createDestination(DestinationId.GOAL_TRANSITION);
