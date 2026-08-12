@@ -54,6 +54,18 @@ describe("Training timeline navigation", () => {
     expect(href).toContain(`returnTo=${encodeURIComponent(returnTo)}`);
   });
 
+  it("returns from Workout Detail to a date-based Training Day", () => {
+    const dayHref = "/progress/training/day/2026-08-10?context=all";
+    const href = withTrainingTimelineContext(
+      "/progress/training/session/workout-1",
+      "all",
+      { returnTo: dayHref }
+    );
+    expect(href).toContain(`returnTo=${encodeURIComponent(dayHref)}`);
+    expect(resolveTrainingReturnPath({ contextId: "all", returnTo: dayHref }))
+      .toBe(dayHref);
+  });
+
   it("rejects external and nested session return destinations", () => {
     expect(isSafeTrainingReturnPath("https://example.com")).toBe(false);
     expect(

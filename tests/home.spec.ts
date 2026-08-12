@@ -3266,6 +3266,26 @@ test("Training History reporting route still works after Resistance dashboard la
   await expect(page.getByText(/Core · Hamstrings · Glutes · Walking/)).toBeVisible();
 });
 
+test("Recent Training History opens a date-level view with every active Aug 10 session", async ({
+  page,
+}) => {
+  await page.goto("http://127.0.0.1:3000/progress/training/day/2026-08-10?context=all");
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Aug 10, 2026" })).toBeVisible();
+  await expect(page.getByText("Quads · 1 strength session · 4 exercises · Walking")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Traditional Strength Training.*Quads.*4 exercises/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Outdoor Walk/ })).toHaveCount(2);
+  await expect(page.locator("main")).not.toContainText("Spider Curls");
+  await expect(page.locator("main")).not.toContainText("Cable Rope Pushdowns");
+  await expect(page.locator("main")).not.toContainText("Bicep Curl Machine");
+
+  await page.getByRole("link", { name: /Traditional Strength Training.*Quads.*4 exercises/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Traditional Strength Training" })).toBeVisible();
+  const back = page.getByRole("link", { name: "Back to parent" });
+  await expect(back).toHaveAttribute("href", /\/progress\/training\/day\/2026-08-10/);
+});
+
 test("Training drawer headers and rows use theme-safe native press styling", () => {
   const primitives = fs.readFileSync(
     "src/components/deep-page/DeepPagePrimitives.jsx",

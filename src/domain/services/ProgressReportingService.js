@@ -1130,6 +1130,7 @@ function getTrainingDays(records = []) {
     if (!days.has(dateKey)) {
       days.set(dateKey, {
         date: dateKey,
+        href: `/progress/training/day/${dateKey}`,
         id: `training-day-${dateKey}`,
         sessions: [],
       });

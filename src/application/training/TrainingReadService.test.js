@@ -28,4 +28,83 @@ describe("training shared-client boundary", () => {
     expect((await service.getExerciseLibrary({ principal, query: "EZ Bar" }))[0]).toMatchObject({ id: "ez_bar_curl", bodyRegion: "Arms" });
     expect(await service.listRecentExercises({ principal })).toEqual([{ id: "ez_bar_curl", name: "EZ Bar Curls", observedAt: "2026-08-10T17:00:00Z" }]);
   });
+
+  it("builds a platform-neutral day with distinct strength and walking sessions", async () => {
+    const records = [
+      {
+        canonicalId: "strength",
+        quality: { status: "active" },
+        payload: {
+          id: "strength-payload",
+          evidence_type: "training",
+          observed_at: "2026-08-10",
+          captured_at: "2026-08-10T07:21:00-07:00",
+          metadata: { activity_type: "Traditional Strength Training" },
+          exercises: [
+            { name: "Hack Squats", body_region: "Legs", primary_muscle_groups: ["Quads"] },
+            { name: "Leg Press", body_region: "Legs", primary_muscle_groups: ["Quads"] },
+          ],
+        },
+      },
+      {
+        canonicalId: "walk",
+        quality: { status: "active" },
+        payload: {
+          evidence_type: "training",
+          observed_at: "2026-08-10",
+          captured_at: "2026-08-10T09:00:00-07:00",
+          metadata: { activity_type: "Outdoor Walk", duration_seconds: 900, distance: 0.97, distance_unit: "mi" },
+          exercises: [],
+        },
+      },
+    ];
+    const service = createTrainingReadService({ repositories: repositories(records) });
+    const day = await service.getDay({ principal, date: "2026-08-10", timeZone: "America/Los_Angeles" });
+
+    expect(day).toMatchObject({
+      date: "2026-08-10",
+      href: "/progress/training/day/2026-08-10",
+      summary: { sessionCount: 2, strengthSessions: 1, exerciseCount: 2, hasWalking: true },
+    });
+    expect(day.sessions.map((item) => item.kind)).toEqual(["strength", "walking"]);
+    expect(day.sessions[0]).toMatchObject({ title: "Traditional Strength Training", exerciseCount: 2 });
+    expect(day.sessions[1].detail).toBe("15 min · 0.97 mi");
+  });
+
+  it("supports multiple strength sessions, one session, no sessions, and deterministic ordering", async () => {
+    const records = [
+      session("later-id", "2026-08-10", { status: "active" }),
+      session("earlier-id", "2026-08-10", { status: "active" }),
+      session("only-other-day", "2026-08-09", { status: "active" }),
+    ];
+    records[0].payload.captured_at = "2026-08-10T18:00:00Z";
+    records[1].payload.captured_at = "2026-08-10T08:00:00Z";
+    const service = createTrainingReadService({ repositories: repositories(records) });
+
+    expect((await service.getDay({ principal, date: "2026-08-10" })).sessions.map((item) => item.id))
+      .toEqual(["earlier-id", "later-id"]);
+    expect((await service.getDay({ principal, date: "2026-08-09" })).sessions).toHaveLength(1);
+    expect((await service.getDay({ principal, date: "2026-08-08" })).sessions).toHaveLength(0);
+    expect(await service.getDay({ principal, date: "2026-02-30" })).toBeNull();
+  });
+
+  it("uses local calendar semantics and excludes inactive sessions from Training Day", async () => {
+    const records = [
+      session("late-local", "2026-08-11T06:30:00Z", { status: "active" }),
+      session("retracted", "2026-08-10", { status: "superseded", disposition: "retracted_false_proving_evidence" }),
+    ];
+    const service = createTrainingReadService({ repositories: repositories(records) });
+
+    const pacificDay = await service.getDay({ principal, date: "2026-08-10", timeZone: "America/Los_Angeles" });
+    expect(pacificDay.sessions.map((item) => item.id)).toEqual(["late-local"]);
+    expect((await service.getDay({ principal, date: "2026-08-11", timeZone: "UTC" })).sessions.map((item) => item.id))
+      .toEqual(["late-local"]);
+  });
 });
+
+function repositories(records) {
+  return {
+    canonicalEvidence: { listCanonicalEvidenceObjects: async () => records },
+    users: { getUserById: async () => ({ id: "owner-one", timezone: "America/Los_Angeles" }) },
+  };
+}

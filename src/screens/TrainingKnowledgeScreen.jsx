@@ -678,36 +678,24 @@ function TrainingDayHistoryCard({ adaptHref = (href) => href, days = [] }) {
       {days.length > 0 && (
         <div className="space-y-2">
           {days.slice(0, 20).map((day) => (
-            <PressableCard className="px-3 py-2" key={day.id}>
-              <details>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-                <span className="min-w-0">
-                  <span className="block text-sm font-extrabold text-slate-950">
-                    {day.label}
+            <PressableCard
+              className="flex items-center justify-between gap-3 px-3 py-2"
+              href={adaptHref(day.href ?? `/progress/training/day/${day.date}`)}
+              key={day.id}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-extrabold text-slate-950">
+                  {day.label}
+                </span>
+                {getTrainingDaySummary(day.sessions) && (
+                  <span className="mt-0.5 block text-xs font-extrabold leading-4 text-[var(--text-secondary)]">
+                    {getTrainingDaySummary(day.sessions)}
                   </span>
-                  {getTrainingDaySummary(day.sessions) && (
-                    <span className="mt-0.5 block text-xs font-extrabold leading-4 text-[var(--text-secondary)]">
-                      {getTrainingDaySummary(day.sessions)}
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-sm font-extrabold text-[var(--primary)]">
-                  &gt;
-                </span>
-              </summary>
-              <div className="mt-2 border-t border-[var(--divider)] pt-2">
-                <InformationList>
-                  {(day.sessions ?? []).map((session) => (
-                    <InformationListItem
-                      detail={session.detail || session.value}
-                      href={adaptHref(session.href)}
-                      key={session.id}
-                      label={session.label}
-                    />
-                  ))}
-                </InformationList>
-              </div>
-              </details>
+                )}
+              </span>
+              <span className="shrink-0 text-sm font-extrabold text-[var(--primary)]">
+                &gt;
+              </span>
             </PressableCard>
           ))}
         </div>

@@ -303,6 +303,7 @@ function TrainingEvidenceReport({ evidenceContext, report }) {
   const adaptHref = evidenceContext?.adaptHref ?? ((href) => href);
   const trainingDays = (report.trainingDays ?? []).map((day) => ({
     ...day,
+    href: adaptHref(day.href ?? `/progress/training/day/${day.date}`),
     sessions: (day.sessions ?? []).map((session) => ({
       ...session,
       href: adaptHref(session.href),
@@ -311,6 +312,7 @@ function TrainingEvidenceReport({ evidenceContext, report }) {
   const latestTrainingDay = report.latestTrainingDay
     ? {
         ...report.latestTrainingDay,
+        href: adaptHref(report.latestTrainingDay.href ?? `/progress/training/day/${report.latestTrainingDay.date}`),
         sessions: (report.latestTrainingDay.sessions ?? []).map((session) => ({
           ...session,
           href: adaptHref(session.href),
@@ -349,7 +351,7 @@ function TrainingEvidenceReport({ evidenceContext, report }) {
       >
         <TrainingDayHistoryPreview
           day={trainingDays[0]}
-          href={adaptHref("/progress/training/reporting/history")}
+          href={trainingDays[0]?.href ?? adaptHref("/progress/training/reporting/history")}
         />
       </EvidenceSection>
 

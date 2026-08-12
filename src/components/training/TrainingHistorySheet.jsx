@@ -27,7 +27,7 @@ export default function TrainingHistorySheet({ days = [] }) {
           {days.map((day) => (
             <Link
               className="flex min-h-14 items-center justify-between gap-3 rounded-xl px-2 py-2.5 transition hover:bg-[var(--surface-hover)]"
-              href={day.sessions?.[0]?.href ?? "/progress/training/reporting/history"}
+              href={day.href ?? `/progress/training/day/${day.date}`}
               key={day.id}
             >
               <span className="min-w-0">

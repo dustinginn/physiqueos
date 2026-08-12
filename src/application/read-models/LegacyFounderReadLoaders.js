@@ -34,7 +34,12 @@ export function createLegacyFounderReadLoaders({ repositories, readRuntimeStore,
     [Phase3ReadModel.PROGRESS]: ({ principal, streamId = null }) => streamId ? progress.getPlaceholderReport(streamId, principal.userId) : progress.getProgressHub(principal.userId),
     [Phase3ReadModel.CONFIDENCE]: async ({ principal }) => { const activeGoal = await repositories.goals.getActiveGoal(principal.userId); return activeGoal ? resolveActiveGoalConfidencePresentation({ activeGoal, store: readRuntimeStore() }) : null; },
     [Phase3ReadModel.BRIEFINGS]: ({ principal, briefingId = null, limit }) => briefingId ? briefings.getBriefing({ principal, briefingId }) : briefings.listBriefings({ principal, limit }),
-    [Phase3ReadModel.TRAINING]: ({ principal, sessionId = null, limit }) => sessionId ? training.getSession({ principal, sessionId }) : training.listHistory({ principal, limit }),
+    [Phase3ReadModel.TRAINING]: ({ principal, sessionId = null, date = null, timeZone = null, limit }) =>
+      date
+        ? training.getDay({ principal, date, timeZone })
+        : sessionId
+          ? training.getSession({ principal, sessionId })
+          : training.listHistory({ principal, limit }),
     [Phase3ReadModel.PROFILE]: ({ principal }) => profile.getYouProfile(principal.userId),
   });
 }
