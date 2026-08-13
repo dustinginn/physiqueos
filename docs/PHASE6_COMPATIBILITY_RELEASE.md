@@ -1,6 +1,6 @@
 # Phase 6 compatibility release
 
-Status: **ACCEPTED for production compatibility against the legacy JSON/file runtime. The executable write-fence/production-wrapper source gate is now isolated-accepted; canonical production migration remains unapproved and BLOCKED on alert/billing delivery, encrypted off-machine backup/retention, checkpoint publication/deployment acceptance, exact window, and final go/no-go.**
+Status: **ACCEPTED for production compatibility against the legacy JSON/file runtime. The inactive write-fence/production-wrapper capability is now deployed and compatibility-accepted; canonical production migration remains unapproved and BLOCKED on alert/billing delivery, control-inclusive encrypted recovery coverage/retention, current provider verification, exact window, and final go/no-go.**
 
 Accepted source commit: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`  
 Accepted production build: `RmjN47V8xsq3-6jSlZh-9`  
@@ -150,7 +150,7 @@ Retain the final legacy JSON runtime, local evidence/media, encrypted copies, ma
 - Old runtime read-only gate: only after import parity, media hashes, critical commands, backup, readiness, and post-cutover smoke pass.
 - Source/private cleanup gate: only after seven accepted days, verified restore, no rollback condition, and explicit retention/privacy approval.
 
-Production migration remains unapproved. The rehearsal, compatibility, named roles, and executable safety source are accepted, but execution is **BLOCKED** until verified alert/billing delivery, encrypted/off-machine backup/retention, checkpoint publication/inactive deployment acceptance, exact migration window, and final go/no-go.
+Production migration remains unapproved. The rehearsal, compatibility, named roles, executable safety source, published checkpoint, and inactive deployment are accepted, but execution is **BLOCKED** until verified alert/billing delivery, control-inclusive encrypted recovery coverage/retention, current provider verification, exact migration window, and final go/no-go.
 
 ## Seven-day post-migration stabilization plan
 
@@ -172,4 +172,14 @@ The operational checklist is **BLOCKED**. The available provider token lacks mon
 
 The separately approved follow-up implements and isolated-accepts that missing executable gate. Durable migration control, complete repository/write-commit interception, command/outbox epoch binding, guarded operator commands, deterministic composition selection, and the strict dry-run/execute wrapper are documented in `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`. Two fresh guarded PostgreSQL runs and deliberate pre-write/post-write failures passed. The Founder/user is now the approved owner for every listed Founder-stage operational role.
 
-This does not alter Phase 6 production acceptance or deploy the new capability. Production remains exact source `6f497610...`, build `RmjN47V8xsq3-6jSlZh-9`, legacy JSON/file canonical, with authentication and provider composition inactive. Migration remains blocked on alert/billing delivery, encrypted off-machine backup and retention, checkpoint publication/inactive deployment acceptance, exact window, and final go/no-go.
+At the time of source acceptance this did not alter Phase 6 production or deploy the new capability. The later inactive-deployment addendum below supersedes that source/build status while preserving legacy JSON/file canonical behavior. Migration remains blocked on alert/billing delivery, control-inclusive encrypted recovery coverage and retention, current provider verification, exact window, and final go/no-go.
+
+## Inactive operational-safety deployment addendum (2026-08-12)
+
+The later exact published checkpoint `e3b4f4505e9c2b5598901b002271933f45c24dbf` is now the accepted production source, exposed as build `HasDoRm5cgRE0FsXZU1Uu`. It contains the accepted Phase 6 product unchanged plus the inactive safety controls. The previous Phase 6 build `RmjN47V8xsq3-6jSlZh-9` is retained as `.next.rollback-33020`.
+
+The deployment used an isolated one-time build and exact-artifact smoke, canonical stop, atomic `.next` promotion, scheduled-task restart, rollback-on-failure, and an additional restart-durability proof. Production control is version 1 `inactive / legacy-json / legacy-json`; reads and writes are enabled; there is no migration operation, fence, or PostgreSQL first write. Founder revision 119 and SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281` remained exact.
+
+Local, LAN, and public checks passed the representative 20-route product matrix, 25 current CSS/JavaScript assets with correct MIME, authorized media, exact build/source identity, and canonical task ownership. An in-app browser session was unavailable, so visual acceptance is not claimed. No migration, fence activation, canonical-store switch, evidence move, production auth activation, provider mutation, or Founder mutation occurred.
+
+The inactive-deployment gate is closed. The verified off-machine repository checkpoint exists at `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49`; the future migration recovery packet must additionally include encrypted runtime/media/control bytes and restore reconciliation. Alerts, billing, current provider capacity/Spaces inspection, retention, exact window, and final go/no-go remain separate blockers.

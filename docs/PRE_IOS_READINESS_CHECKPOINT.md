@@ -4,9 +4,9 @@ Status: active operational gate
 
 Last audited: 2026-08-12
 
-Accepted compatibility source: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`; production build: `RmjN47V8xsq3-6jSlZh-9`
+Accepted inactive-safety source: `e3b4f4505e9c2b5598901b002271933f45c24dbf`; production build: `HasDoRm5cgRE0FsXZU1Uu`; retained rollback build: `RmjN47V8xsq3-6jSlZh-9`
 
-Foundation design: Phases 1-6 and the executable write-fence/production-wrapper source gate are accepted on bounded local, live synthetic provider, production compatibility, and isolated migration evidence. Production migration remains separately gated by checkpoint publication/inactive deployment acceptance, verified alert/billing delivery, encrypted off-machine production backups/retention, and an explicit migration-window final go/no-go. Founder-stage operational ownership is approved.
+Foundation design: Phases 1-6 plus the executable write-fence/production-wrapper source, published checkpoint, and inactive production deployment are accepted on bounded local, live synthetic provider, production compatibility, and isolated migration evidence. Production migration remains separately gated by verified alert/billing delivery, current provider verification, control-inclusive encrypted recovery coverage/retention, and an explicit migration-window final go/no-go. Founder-stage operational ownership is approved.
 
 Companion decision record: `docs/PHYSIQUEOS_NATIVE_V1.md`
 
@@ -438,4 +438,14 @@ The Founder/user has approved every recommended Founder-stage operational role. 
 
 Two fresh guarded PostgreSQL runs reproduced all 42 collections, 365 media objects, exact validation, 17 read surfaces, representative transactional PostgreSQL write, and post-switch smoke in about 10.6 seconds of fenced time. Import failure returned to legacy; post-first-write failure remained PostgreSQL canonical with writes paused. Production was not deployed or changed.
 
-Readiness remains **BLOCKED**, now only on the still-separate operational gates: provider alert/capacity inspection and delivered email, $40 billing alert, encrypted verified off-machine backup/key custody, retention acceptance, safety-checkpoint publication and any separately approved inactive deployment, exact migration window, and explicit final go/no-go. Do not start Phase 7 or Native work. After user acceptance of this patch, run the required End Work Session task to preserve the checkpoint.
+At source acceptance, readiness remained **BLOCKED** on provider alert/capacity inspection and delivered email, the $40 billing alert, encrypted recovery coverage/key custody, retention, checkpoint publication/inactive deployment, exact migration window, and explicit final go/no-go. Publication and inactive deployment are now closed by the later section below; the other gates remain. Do not start Phase 7 or Native work.
+
+## Inactive operational-safety production acceptance (2026-08-12)
+
+The required End Work Session produced and published exact checkpoint `e3b4f4505e9c2b5598901b002271933f45c24dbf`. Its verified off-machine repository replica is `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49`, with bundle SHA-256 `BE6686ACE1237AFF1325D8B95B3EB01DBFA55AA42054F451FA207507E5DA0E07` and exact Founder identity snapshot. This closes the prior missing independent checkpoint-replica blocker; the final migration recovery set still requires encrypted runtime/media/control bytes and accepted retention.
+
+The exact checkpoint was built once in isolation as `HasDoRm5cgRE0FsXZU1Uu`, smoked without rebuilding, then promoted through canonical stop/atomic replace/start with automatic rollback armed. The old `RmjN47V8xsq3-6jSlZh-9` build remains at `.next.rollback-33020`. A deliberate additional canonical restart preserved the new build and control state.
+
+Production control is version 1 at `private/founder/migration-control.json`: `inactive`, `legacy-json` epoch, `legacy-json` composition, reads/writes enabled, no migration operation, no fence, and no first PostgreSQL write. JSON/file and local evidence remain canonical; PostgreSQL, Spaces, worker dependency, and authentication remain inactive/noncanonical. Founder revision 119 and SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281` remained exact across initialization, deployment, and restart.
+
+All bounded deterministic regressions, safety tests, validator isolation, targeted lint, isolated build/smoke, local/LAN/public route and asset/MIME checks, representative detail routes, and authorized media passed. An in-app browser session was unavailable, so no visual acceptance is claimed. The inactive deployment gate is **CLOSED**; production migration remains **BLOCKED** on alerts/capacity/delivery, the $40 billing alert, fresh Spaces verification, control-inclusive encrypted recovery coverage, retention, exact window, and final go/no-go. Run End Work Session after accepting these documentation changes; do not start Phase 7 or Native work.

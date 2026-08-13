@@ -2,7 +2,7 @@
 
 Implementation date: 2026-08-12 (America/Los_Angeles)
 
-Status: **IMPLEMENTED AND ACCEPTED IN SOURCE; INACTIVE AND NOT DEPLOYED. Production migration remains BLOCKED and unapproved.**
+Status: **IMPLEMENTED, DEPLOYED, AND ACCEPTED INACTIVE ON LEGACY JSON. Production migration remains BLOCKED and unapproved.**
 
 This patch closes the executable write-fence and guarded migration-wrapper defect found by the final operational audit. It does not migrate production, move evidence, enable authentication, switch canonical persistence, create infrastructure, or begin Phase 7/Native work.
 
@@ -10,7 +10,7 @@ This patch closes the executable write-fence and guarded migration-wrapper defec
 
 The Founder/user approved assignment as migration operator, go/no-go authority, abort authority, rollback authority, primary alert recipient, backup-verification owner, post-cutover-validation owner, seven-day-stabilization owner, and later Native kill-switch owner. This role approval does not approve a migration window or final go/no-go.
 
-Production remains on accepted source `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`, build `RmjN47V8xsq3-6jSlZh-9`, with JSON/file and local evidence canonical. The current audited source is Founder revision `119`, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, including the Aug 11 activity/nutrition/Workout Logger activity and Aug 12 weight. This safety source was not deployed, so it cannot affect current production behavior.
+Production now runs accepted safety source `e3b4f4505e9c2b5598901b002271933f45c24dbf`, build `HasDoRm5cgRE0FsXZU1Uu`, with JSON/file and local evidence canonical. The current audited source is Founder revision `119`, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, including the Aug 11 activity/nutrition/Workout Logger activity and Aug 12 weight. The capability is present but strictly inactive, so canonical behavior remains legacy-compatible.
 
 ## Durable server-owned control
 
@@ -112,4 +112,16 @@ The executable fence/wrapper defect is closed in accepted source. Production mig
 - approve the exact migration window and final go/no-go; and
 - publish and, only if separately approved, deploy this inactive safety checkpoint with legacy behavior verified.
 
-The role assignment is approved. Alerts, billing, off-machine backup, retention, deployment, migration window, and production migration are not approved by this patch. The next repository action after user acceptance is the required End Work Session checkpoint; it is not Phase 7.
+The role assignment and inactive deployment are approved. Alerts, billing, retention, migration window, and production migration are not approved by this patch. The next repository action after user acceptance is the required End Work Session checkpoint for this deployment documentation; it is not Phase 7.
+
+## Inactive production deployment acceptance
+
+Checkpoint `e3b4f4505e9c2b5598901b002271933f45c24dbf` was published before deployment, built once in an isolated clean clone, stamped with source identity, and accepted as build `HasDoRm5cgRE0FsXZU1Uu`. Preflight covered all 17 Phase 3 canonical commands, all 54 classified repository write methods, all nine canonical entry points, control restart durability, Phase 1-6/Training/Photo/ownership/persistence regressions, the 27-test migration-safety suite, targeted lint, diff, isolated production build, 20 routes, 25 assets/MIME types, and authorized media.
+
+The production control was initialized before code promotion at `private/founder/migration-control.json`. Its ACL permits only the production user, SYSTEM, and Administrators. It contains no credentials or Founder domain data and is outside source control and `.next`. The exact state is version 1 `inactive / legacy-json / legacy-json`, reads/writes enabled, no migration operation, no fence, and no first-write boundary. Missing/corrupt/unavailable state now fails canonical writes closed; recovery is the guarded `operateMigrationControl.mjs status` plus an explicitly reviewed restoration or repair of the tamper-evident record, never an implicit default.
+
+The canonical task stopped, the prebuilt artifact was atomically promoted, and the task restarted under Windows Scheduler ownership. Automatic rollback was armed but not invoked. The old `RmjN47V8xsq3-6jSlZh-9` build is retained at `.next.rollback-33020`. Local, LAN, and public route/asset/media acceptance passed. One additional canonical restart preserved the control file byte-for-byte and returned exact build/source with healthy routes.
+
+Founder revision 119 remained `26,955,008` bytes with SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`. No production write was fabricated; inactive write availability is proven by exact-build isolated command/write-surface tests and the unchanged enabled operational state. No in-app browser session was available, so visual acceptance is not claimed.
+
+The inactive capability exists in production without changing canonical behavior. The fence was never activated. JSON/file and current local evidence remain canonical; PostgreSQL and Spaces remain noncanonical; authentication remains inactive; no migration operation or evidence move occurred.

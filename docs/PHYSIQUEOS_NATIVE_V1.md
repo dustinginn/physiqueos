@@ -4,9 +4,9 @@ Status: living canonical transition document
 
 Last audited: 2026-08-12
 
-Foundation design decision: approved for the initial Founder-stage direction; Phases 1-6 are accepted, including live synthetic DigitalOcean provider evidence and the production compatibility release. Production remains on the JSON/file runtime and no migration is authorized. Remaining operational and migration approvals are recorded in section 39 and the Phase 6 packet.
+Foundation design decision: approved for the initial Founder-stage direction; Phases 1-6 are accepted, including live synthetic DigitalOcean provider evidence, the production compatibility release, and the inactive operational-safety deployment. Production remains on the JSON/file runtime and no migration is authorized. Remaining operational and migration approvals are recorded in sections 39-42 and the Phase 6 packet.
 
-Accepted compatibility source: `6f4976101cb21eb9d3a7e28ee9a960fcf34141c7`; production build: `RmjN47V8xsq3-6jSlZh-9`
+Accepted inactive-safety source: `e3b4f4505e9c2b5598901b002271933f45c24dbf`; production build: `HasDoRm5cgRE0FsXZU1Uu`; retained compatibility rollback: `RmjN47V8xsq3-6jSlZh-9`
 
 Authority: current production behavior remains authoritative; this document records the approved transition constraints and must change when a material decision changes.
 
@@ -1066,4 +1066,16 @@ The separately approved safety patch closes the missing source gate with a tampe
 
 The live repository inventory has zero unknown methods. While fenced, reads remain available and writes receive a structured 503 proving the request was not applied. Legacy writes fail closed after PostgreSQL selection. Two fresh guarded local PostgreSQL runs migrated all 42 collections and 365 media objects from an immutable revision-119 copy in 10.617 s and 10.528 s fenced time. An import failure returned safely to unchanged legacy; a post-first-write failure entered PostgreSQL `recovery-required` and prohibited stale-JSON rollback.
 
-The Founder/user is approved for every Founder-stage operational role. This source is inactive and was not deployed; production remains exact Phase 6 legacy JSON/file on source `6f497610...`, build `RmjN47V8xsq3-6jSlZh-9`. Production migration remains **BLOCKED** on alert/billing delivery, encrypted off-machine backup, retention, published/inactive deployment acceptance, exact window, and explicit final go/no-go. Phase 7, Native Baseline, SwiftUI, authentication, and migration did not begin.
+The Founder/user is approved for every Founder-stage operational role. At source acceptance this capability was inactive and not deployed; the later section 42 supersedes that deployment status. Production migration remained **BLOCKED** on alert/billing delivery, encrypted recovery coverage, retention, published/inactive deployment acceptance, exact window, and explicit final go/no-go. Phase 7, Native Baseline, SwiftUI, authentication, and migration did not begin.
+
+## 42. Inactive operational-safety deployment acceptance (2026-08-12)
+
+Exact published checkpoint `e3b4f4505e9c2b5598901b002271933f45c24dbf` was built in isolation and deployed as immutable build `HasDoRm5cgRE0FsXZU1Uu` through the canonical stop, atomic promote, scheduled-task restart, and rollback-on-failure lifecycle. The previous accepted build `RmjN47V8xsq3-6jSlZh-9` is retained at `.next.rollback-33020`.
+
+Production migration control is `inactive / legacy-json / legacy-json`, with reads and writes enabled, no fence ID, no migration operation, and no PostgreSQL first-write boundary. The private server-local control is `private/founder/migration-control.json`; it was initialized once before promotion and survived an additional canonical restart byte-identically. JSON/file and current local evidence remain canonical, PostgreSQL and Spaces remain noncanonical, and authentication remains inactive. No fence was activated, no migration ran, and no evidence moved.
+
+Founder revision `119`, size `26,955,008`, updated `2026-08-12T16:02:21.133Z`, and SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281` were unchanged before deployment, after deployment, and after restart. Bounded Phase 1-6, Training, Photo, ownership, persistence, migration-safety, lint, diff, isolated-build, local/LAN/public route, asset/MIME, and authorized-media checks passed. No in-app browser session was available, so no visual acceptance is claimed.
+
+The verified off-machine repository checkpoint at `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49` preserves exact commit `e3b4f450...` with verified bundle SHA-256 `BE6686ACE1237AFF1325D8B95B3EB01DBFA55AA42054F451FA207507E5DA0E07`. It closes the prior missing independent checkpoint-replica gate. It does not contain Founder runtime bytes or the newly initialized control file; the final migration recovery set must separately include encrypted runtime/media/control state and restore reconciliation evidence.
+
+The inactive-safety deployment gate is **CLOSED**. Production migration remains **BLOCKED** on provider alert/capacity inspection and delivered email, the $40 billing alert, current Spaces verification, control-inclusive encrypted recovery coverage, retention approval, the exact window, and explicit final go/no-go. Phase 7, Native Baseline, SwiftUI, authentication, and migration remain unstarted.

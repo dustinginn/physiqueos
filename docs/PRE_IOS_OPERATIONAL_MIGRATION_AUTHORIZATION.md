@@ -2,9 +2,9 @@
 
 Audit date: 2026-08-12 (America/Los_Angeles)
 
-Classification: **BLOCKED. The executable fence/wrapper source gate is now closed, but this document does not authorize canonical production migration.**
+Classification: **BLOCKED. The executable fence/wrapper source and inactive deployment gates are closed, but this document does not authorize canonical production migration.**
 
-The accepted Phase 6 compatibility release remains healthy and unchanged. The Founder has approved all recommended Founder-stage operational roles, and the separately approved safety patch now implements and isolated-tests the missing write-only maintenance fence and guarded migration/composition wrapper. The final operational gate still cannot pass: DigitalOcean alert/billing configuration and delivery are not verified, the newly captured production backup candidate is local and unencrypted with no verified off-machine replica, retention/window/final go-no-go remain unapproved, and this inactive safety source has not been published or deployed.
+The accepted inactive operational-safety release is healthy on exact source `e3b4f4505e9c2b5598901b002271933f45c24dbf`, build `HasDoRm5cgRE0FsXZU1Uu`. The Founder has approved all recommended Founder-stage operational roles, and the safety capability is deployed strictly inactive against legacy JSON/file. The final operational gate still cannot pass: DigitalOcean alert/billing configuration and delivery are not verified, current provider capacity and Spaces inventory are not freshly accepted, the control-inclusive encrypted migration recovery set and retention remain open, and the exact window/final go-no-go remain unapproved.
 
 ## Immutable state and lineage
 
@@ -130,7 +130,7 @@ The final audit found no executable control in the accepted Phase 6 source. The 
 - implemented: deterministic, idempotent activation, release, abort, status, and audit; and
 - implemented: guarded dry-run/execute wrapper and durable application-composition switch; the Phase 4/5 target guards remain intact.
 
-Two fresh realistic isolated PostgreSQL migrations and deliberate pre-write/post-write failures passed. Exact design, inventory, commands, timings, and evidence are in `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`. The capability is inactive and not deployed. Production still runs the accepted Phase 6 artifact against legacy JSON/file; any inactive-capability deployment and any later activation require separate authorization.
+Two fresh realistic isolated PostgreSQL migrations and deliberate pre-write/post-write failures passed. Exact design, inventory, commands, timings, and evidence are in `docs/PRODUCTION_WRITE_FENCE_AND_MIGRATION_WRAPPER.md`. At source acceptance the capability was inactive and not deployed; the later inactive-deployment evidence below supersedes that deployment status. Activation still requires separate authorization.
 
 ## Rollback confirmation
 
@@ -196,14 +196,14 @@ Any false item keeps production migration blocked.
 
 ## Plain-language authorization packet
 
-- **Ready now?** No. The technical rehearsal, compatibility deployment, named roles, and executable fence/wrapper source gate are accepted, but alert/billing delivery, encrypted off-machine backup custody, retention, safety-checkpoint publication/deployment, exact-window approval, and final go/no-go are incomplete.
+- **Ready now?** No. The technical rehearsal, compatibility deployment, named roles, executable fence/wrapper source, published checkpoint, and inactive deployment are accepted, but alert/billing delivery, current provider verification, control-inclusive encrypted recovery coverage, retention, exact-window approval, and final go/no-go are incomplete.
 - **What will eventually move?** All 42 canonical Founder record collections from JSON to PostgreSQL and 365 current evidence/media files (plus any later files) from local storage to private versioned Spaces, using a fresh final snapshot.
 - **What remains temporarily?** The exact legacy JSON/runtime, local media, encrypted backup, migration manifests/logs, and rollback build remain unchanged and read-only throughout stabilization.
 - **Availability?** The plan is a 2-5 minute write pause, with reads available on the pinned legacy snapshot after the accepted fence is separately deployed inactive and compatibility-verified. Reserve 45 minutes for preflight, smoke, observation, and possible pre-write rollback.
 - **User behavior?** Do not log a workout, upload/review evidence, enter check-ins/weight/nutrition/activity, complete priorities/protocols, or edit Goals/Plan during the announced window.
 - **Failure before a new PostgreSQL write?** Abort and return to the unchanged JSON source/build.
 - **Failure after a new PostgreSQL write?** Fence writes, keep PostgreSQL canonical, roll code compatibly, and repair/reconcile forward; never replace it with stale JSON.
-- **Backups?** Fresh local runtime/media/repository/build candidates and exact restore evidence exist, plus provider managed backup and accepted isolated provider restore evidence. Encryption and off-machine verification are still missing.
+- **Backups?** Fresh local runtime/media/repository/build candidates and exact restore evidence exist, plus provider managed backup and accepted isolated provider restore evidence. The published repository checkpoint has an independently verified off-machine replica; the final migration packet still needs encrypted byte-exact runtime/media/control coverage and key custody.
 - **Retention?** At least 35 days and until seven stable days, a post-cutover DB restore, media integrity, no rollback trigger, and explicit deletion review.
 - **Authority/alerts?** Founder is approved for all roles and the verified DigitalOcean account email remains the primary channel; policy state and delivery are not yet verified.
 - **Cost/auth/UI/Workout Logger?** No planned cost increase from $30.15/month; the $50 ceiling remains. Authentication stays inactive. Product UI and Workout Logger behavior do not intentionally change.
@@ -216,8 +216,22 @@ Any false item keeps production migration blocked.
 
 1. Authorize and complete the narrowly scoped monitoring/billing audit; confirm alert email receipt and the $40 billing alert.
 2. Create/verify encrypted off-machine runtime/media/build backup custody and accept the retention recommendation.
-3. Run and publish the End Work Session checkpoint for this accepted safety source.
-4. Separately approve and compatibility-verify an inactive safety-capability deployment, including initialized inactive legacy control.
+3. Include `private/founder/migration-control.json` in the encrypted migration recovery specification and prove its restore/reconciliation with the application build, migration audit, canonical data store, and provider state.
+4. Accept the 35-day retention recommendation.
 5. Approve the exact migration window and final go/no-go only after the preceding evidence is recorded.
 
 Final classification: **BLOCKED**.
+
+## Inactive safety-capability deployment evidence (2026-08-12)
+
+- source/checkpoint: `e3b4f4505e9c2b5598901b002271933f45c24dbf` on synchronized `phase6-compatibility-release`;
+- production build: `HasDoRm5cgRE0FsXZU1Uu`; prior build `RmjN47V8xsq3-6jSlZh-9` retained at `.next.rollback-33020`;
+- control: `private/founder/migration-control.json`, version 1, production, `inactive / legacy-json / legacy-json`, reads/writes enabled, one initialization audit entry, no operation/fence/first write;
+- lifecycle: isolated single build and smoke, canonical stop, atomic promote, scheduled-task start, local/public acceptance, then one additional stop/start durability proof; automatic rollback was armed and not invoked;
+- Founder integrity: revision 119, 26,955,008 bytes, SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, byte-identical before/after/restart;
+- product: 20-route local/LAN/public matrices, 25 referenced assets with correct MIME, authorized media, Evidence Review, TrainingSession, Progress, Timeline, Goals/Confidence, and inactive protected foundation routes passed; no production write was fabricated;
+- migration isolation: JSON/file and local evidence remain canonical; PostgreSQL, Spaces, authentication, and migration remain inactive/noncanonical; the fence was never activated;
+- visual evidence: no in-app browser session was available, so no visual acceptance is claimed; HTTP/rendering and static-asset acceptance passed;
+- off-machine checkpoint: verified replica `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49`, exact commit, verified bundle SHA-256 `BE6686ACE1237AFF1325D8B95B3EB01DBFA55AA42054F451FA207507E5DA0E07`.
+
+The off-machine repository checkpoint closes the prior missing independent-replica gate. Its manifest intentionally says Founder runtime bytes are not included, and it predates the production control record. Therefore the later pre-migration encrypted recovery packet must add byte-exact runtime/media/control coverage and reconcile the restored control with build identity, its tamper-evident audit, the canonical data store, and provider state. The inactive deployment gate is closed; production migration remains **BLOCKED**.

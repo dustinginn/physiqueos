@@ -190,3 +190,32 @@ and copy the exported file back to `private/founder/runtime-store.json`.
 
 Runtime restoration changes production data and must be performed only as a
 separately reviewed recovery operation.
+
+## Restore migration-control state
+
+After the inactive operational-safety deployment, the server-owned control
+record is `private/founder/migration-control.json`. It contains no secrets or
+Founder domain records, but it determines the canonical-store epoch,
+composition, and whether writes are permitted. It must not live in `.next`,
+must not be inferred from the deployed build alone, and must not be silently
+reinitialized after first deployment.
+
+Every explicitly approved operational or pre-migration backup that includes
+Founder runtime/media must also include the byte-exact control record and its
+SHA-256. Restore only while the canonical task is stopped. Verify the
+tamper-evident envelope and audit through the guarded status command, then
+reconcile all of the following before restart:
+
+- application source commit and build ID;
+- control fence state, epoch, composition, version, operation ID, and audit;
+- canonical runtime or PostgreSQL recovery identity;
+- object-provider inventory/state; and
+- whether a first PostgreSQL canonical write was ever recorded.
+
+A missing or corrupt control record fails canonical writes closed. Before any
+PostgreSQL first write, an accepted recovery may restore the exact inactive
+legacy record with matching runtime/build evidence. After a first PostgreSQL
+write, never restore an older legacy control record or silently reinitialize;
+retain PostgreSQL as canonical and use the separately reviewed forward-repair
+procedure. Control restoration is an operational state mutation and always
+requires explicit authorization.
