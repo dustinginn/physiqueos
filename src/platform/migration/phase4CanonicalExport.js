@@ -4,6 +4,10 @@ import path from "node:path";
 import { canonicalJson, createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 import { createMigrationManifest, validateMigrationSourceKeys } from "./migrationManifest.js";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import {
+  assertTrustedMigrationSourceIdentity,
+  validateSerializableMigrationSourceIdentity,
+} from "./MigrationSourceIdentity.js";
 
 export const PHASE4_PACKAGE_VERSION = "phase4-canonical-package-v1";
 
@@ -36,7 +40,7 @@ export async function captureReadOnlyFounderSnapshot({ sourceRuntimePath, source
   });
 }
 
-export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, outputRoot, repositoryRevision, normalizeRuntime = (value) => value }) {
+export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, outputRoot, sourceIdentity, normalizeRuntime = (value) => value }) {
   const sourcePath = path.resolve(runtimePath);
   const destination = path.resolve(outputRoot);
   assertSeparated(sourcePath, destination);
@@ -54,16 +58,19 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
     : [];
   const sourceSha256 = createHash("sha256").update(raw).digest("hex");
   const createdAt = new Date(runtime.updatedAt ?? runtime.importedAt).toISOString();
+  const trustedSourceIdentity = assertTrustedMigrationSourceIdentity(sourceIdentity);
+  if (
+    trustedSourceIdentity.runtime.sha256 !== sourceSha256 ||
+    trustedSourceIdentity.runtime.version !== String(runtime.version) ||
+    trustedSourceIdentity.runtime.revision !== String(runtime.revision ?? 0) ||
+    trustedSourceIdentity.runtime.updatedAt !== createdAt ||
+    trustedSourceIdentity.package.version !== PHASE4_PACKAGE_VERSION
+  ) {
+    throw new Error("Trusted migration source identity does not match the exported runtime/package.");
+  }
   const migrationId = deterministicMigrationId(sourceSha256);
   const manifest = createMigrationManifest({
-    source: {
-      importerVersion: PHASE4_PACKAGE_VERSION,
-      targetSchemaVersion: "000003",
-      repositoryRevision,
-      runtimeVersion: runtime.version,
-      runtimeRevision: runtime.revision ?? 0,
-      runtimeSha256: sourceSha256,
-    },
+    source: trustedSourceIdentity,
     collections,
     files: fileInventory,
     relationships: collectRelationships(collections, userId),
@@ -94,6 +101,7 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
   if (manifest.criticalValues?.canonicalStateDigest !== createPayloadHash(collections)) {
     throw new Error("Canonical package runtime digest mismatch.");
   }
+  validateSerializableMigrationSourceIdentity(manifest.source);
   validateMigrationSourceKeys(collections);
   const expected = new Set(FOUNDATION_SOURCE_COLLECTIONS);
   const actual = new Set(Object.keys(collections));

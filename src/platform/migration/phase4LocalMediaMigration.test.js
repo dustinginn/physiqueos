@@ -21,7 +21,15 @@ describe("Phase 4 local private-media migration", () => {
       const unsigned = {
         manifestVersion: "1", migrationId: "synthetic", createdAt: "2026-08-11T00:00:00.000Z",
         importerVersion: "phase4", targetSchemaVersion: "000003",
-        source: { repositoryRevision: "test", runtimeVersion: "test", runtimeRevision: "1", runtimeSha256: "a".repeat(64) },
+        source: {
+          identityVersion: "migration-source-identity-v1",
+          runtime: { version: "test", revision: "1", sha256: "a".repeat(64), updatedAt: "2026-08-11T00:00:00.000Z" },
+          repository: { commit: "a".repeat(40) },
+          application: { buildId: "test-build", sourceCommit: "a".repeat(40) },
+          migration: { scriptCommit: "a".repeat(40), operationId: null },
+          package: { version: "phase4-canonical-package-v1" },
+          schema: { sourceVersion: "000003" },
+        },
         collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections) },
         files: [{ relativePath: "evidence.png", size: bytes.length, sha256, mimeType: "image/png", ownerUserId: "owner", relationshipIds: [], migrationResult: "pending", validationResult: "pending" }],
         result: "pending", validationResult: "pending",

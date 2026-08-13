@@ -45,12 +45,13 @@ async function main() {
 
   const [
     { createDurableMigrationControlStore },
-    { createProductionMigrationOrchestrator },
+    { createProductionMigrationRunner },
     { createCanonicalApplicationCompositionSelector },
     { createCanonicalWriteFence },
     stateModel,
     canonicalExport,
     canonicalImport,
+    sourceIdentityModel,
     { migratePackageMediaLocally },
     { createFounderRuntimeStore },
     { createPhase4PostgresApplicationComposition, createPhase4TransactionRunner },
@@ -60,12 +61,13 @@ async function main() {
     { createPhase4CanonicalRecordStore },
   ] = await Promise.all([
     import("../src/platform/cutover/DurableMigrationControlStore.js"),
-    import("../src/platform/cutover/ProductionMigrationOrchestrator.js"),
+    import("../src/platform/cutover/ProductionMigrationRunner.js"),
     import("../src/platform/cutover/CanonicalApplicationCompositionSelector.js"),
     import("../src/platform/cutover/canonicalWriteFence.js"),
     import("../src/platform/cutover/migrationControlState.js"),
     import("../src/platform/migration/phase4CanonicalExport.js"),
     import("../src/platform/migration/phase4CanonicalImport.js"),
+    import("../src/platform/migration/MigrationSourceIdentity.js"),
     import("../src/platform/migration/phase4LocalMediaMigration.js"),
     import("../src/data/repositories/founderRuntimeStore.js"),
     import("../src/platform/database/phase4PostgresComposition.js"),
@@ -82,6 +84,7 @@ async function main() {
     correlationId: "rehearsal-control-correlation-0001",
     sourceIdentity: { commit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7", buildId: "RmjN47V8xsq3-6jSlZh-9" },
   });
+  const sourceRuntime = JSON.parse(fs.readFileSync(sourceRuntimePath, "utf8"));
   let packageData = null;
   let postgresComposition = null;
   let selector = null;
@@ -89,10 +92,14 @@ async function main() {
   const eventLog = [];
   const adapters = {
     inspectBuildIdentity: preflight("inspectBuildIdentity", () => ({ identity: { commit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7", buildId: "RmjN47V8xsq3-6jSlZh-9" } })),
-    inspectCanonicalSource: preflight("inspectCanonicalSource", () => ({ sha256: sourceHashBefore, revision: JSON.parse(fs.readFileSync(sourceRuntimePath, "utf8")).revision })),
+    inspectCanonicalSource: preflight("inspectCanonicalSource", () => ({ runtimeSha256: sourceHashBefore, runtimeRevision: sourceRuntime.revision })),
     verifyBackup: preflight("verifyBackup", () => ({ sourceSnapshotRoot, runtimeSha256: sourceHashBefore, mediaCount: countFiles(sourceMediaRoot) })),
     verifyTargetHealth: preflight("verifyTargetHealth", async () => ({ database: (await pool.query("SELECT current_database() AS name")).rows[0].name })),
-    verifyMigrationScripts: preflight("verifyMigrationScripts", async () => ({ migrationCount: Number((await pool.query("SELECT count(*)::integer AS count FROM physiqueos.physiqueos_schema_migrations")).rows[0].count) })),
+    verifyMigrationScripts: preflight("verifyMigrationScripts", async () => ({
+      migrationCount: Number((await pool.query("SELECT count(*)::integer AS count FROM physiqueos.physiqueos_schema_migrations")).rows[0].count),
+      productionRunnerWired: true,
+      providerCompositionWired: true,
+    })),
     verifyCollectionInventory: preflight("verifyCollectionInventory", () => ({ expectedCollectionCount: 42, unknownCollections: [] })),
     async captureFinalSnapshot() {
       mark("captureFinalSnapshot"); maybeFail("captureFinalSnapshot");
@@ -100,11 +107,23 @@ async function main() {
     },
     async exportCanonicalPackage() {
       mark("exportCanonicalPackage"); maybeFail("exportCanonicalPackage");
+      const sourceIdentity = await sourceIdentityModel.deriveTrustedMigrationSourceIdentity({
+        runtimePath: path.join(finalSnapshotRoot, "runtime-store.json"),
+        packageVersion: canonicalExport.PHASE4_PACKAGE_VERSION,
+        sourceSchemaVersion: "000003",
+        migrationOperationId: "revision-119-isolated-rehearsal",
+        buildIdentityProvider: sourceIdentityModel.createFixedBuildIdentityProvider({
+          repositoryCommit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7",
+          applicationBuildId: "RmjN47V8xsq3-6jSlZh-9",
+          applicationSourceCommit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7",
+          migrationScriptCommit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7",
+        }),
+      });
       return canonicalExport.exportCanonicalPackage({
         runtimePath: path.join(finalSnapshotRoot, "runtime-store.json"),
         mediaRoot: path.join(finalSnapshotRoot, "media"),
         outputRoot: packageRoot,
-        repositoryRevision: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7",
+        sourceIdentity,
         normalizeRuntime: (runtime) => createFounderRuntimeStore(runtime),
       });
     },
@@ -116,7 +135,13 @@ async function main() {
     },
     async importCanonicalPackage() {
       mark("importCanonicalPackage"); maybeFail("importCanonicalPackage");
-      return canonicalImport.importCanonicalPackage({ pool, packageRoot, resetTarget: false });
+      return canonicalImport.importCanonicalPackage({
+        pool,
+        packageRoot,
+        resetTarget: false,
+        expectedSourceIdentity: packageData.manifest.source,
+        requireMigrationOperationId: true,
+      });
     },
     async migrateMedia() {
       mark("migrateMedia"); maybeFail("migrateMedia");
@@ -198,18 +223,44 @@ async function main() {
       return { reset: true };
     },
   };
-  const wrapper = createProductionMigrationOrchestrator({ controlStore: store, adapters });
+  const backupFreshnessVerifier = {
+    async verify() {
+      mark("verifyManagedPostgresBackupFreshness");
+      return {
+        ready: true,
+        status: "PASS",
+        reason: "isolated-rehearsal-backup-current",
+        clusterId: "isolated-local-postgres",
+        clusterStatus: "online",
+        latestBackupAt: new Date().toISOString(),
+        backupAgeMs: 0,
+        backupAgeHours: 0,
+        freshnessThresholdMs: 86_400_000,
+        freshnessThresholdHours: 24,
+        providerSource: "isolated rehearsal fixture",
+        verificationTimestamp: new Date().toISOString(),
+        backupSizeGiB: null,
+        mutated: false,
+      };
+    },
+  };
+  const runner = createProductionMigrationRunner({ controlStore: store, adapters, backupFreshnessVerifier });
   try {
-    const dryRun = await wrapper.dryRun(wrapperInput());
-    const result = await wrapper.execute(wrapperInput());
+    const input = runnerInput({
+      sourceHash: sourceHashBefore,
+      sourceRevision: sourceRuntime.revision,
+      controlVersion: store.read().state.version,
+    });
+    const dryRun = await runner.dryRun(input);
+    const result = await runner.execute({ ...input, finalMigrationAuthorization: runner.expectedAuthorization(input) });
     const sourceHashAfter = hashFile(sourceRuntimePath);
     if (sourceHashAfter !== sourceHashBefore) throw safety("Immutable source snapshot changed during rehearsal.");
     const report = {
-      classification: "isolated-production-migration-wrapper-rehearsal-passed",
+      classification: "isolated-production-migration-runner-rehearsal-passed",
       database: new URL(databaseUrl).pathname.slice(1),
       sourceHashBefore,
       sourceHashAfter,
-      sourceRevision: packageData.manifest.source.runtimeRevision,
+      sourceRevision: packageData.manifest.source.runtime.revision,
       collectionCount: Object.keys(packageData.collections).length,
       mediaCount: countFiles(objectRoot),
       dryRun: { classification: dryRun.classification, totalDurationMs: dryRun.totalDurationMs },
@@ -239,16 +290,20 @@ async function main() {
   }
 }
 
-function wrapperInput() {
+function runnerInput({ sourceHash, sourceRevision, controlVersion }) {
   return {
-    mode: "isolated",
     operator: "founder",
     migrationOperationId: "revision-119-isolated-rehearsal",
     expectedMigrationId: "cc4903f9-6145-7b3a-8059-010a6de4ed1b",
     correlationId: "revision-119-rehearsal-correlation",
     commandPrefix: "revision-119-rehearsal-command",
     reason: "Isolated rehearsal against an immutable revision-119 copy.",
-    auditMetadata: { sourceRuntimeSha256: "cc4903f96145fb3a3059010a6de4ed1b9a31dd4fec3a4d6cf6a10d9ccebf4281", sourceRuntimeRevision: "119" },
+    expectedSourceCommit: "6f4976101cb21eb9d3a7e28ee9a960fcf34141c7",
+    expectedBuildId: "RmjN47V8xsq3-6jSlZh-9",
+    expectedRuntimeRevision: String(sourceRevision),
+    expectedRuntimeSha256: sourceHash,
+    expectedControlVersion: controlVersion,
+    auditMetadata: { sourceRuntimeSha256: sourceHash, sourceRuntimeRevision: String(sourceRevision) },
   };
 }
 

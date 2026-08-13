@@ -19,8 +19,8 @@ if (!databaseUrl || !packageRoot) throw new Error("PHYSIQUEOS_PHASE4_DATABASE_UR
 const packageData = await readAndValidateCanonicalPackage(packageRoot);
 const manifest = packageData.manifest;
 const runtime = {
-  version: manifest.source.runtimeVersion,
-  revision: Number(manifest.source.runtimeRevision),
+  version: manifest.source.runtime.version,
+  revision: Number(manifest.source.runtime.revision),
   updatedAt: manifest.criticalValues.sourceUpdatedAt,
   importedAt: "1970-01-01T00:00:00.000Z",
   ...packageData.collections,

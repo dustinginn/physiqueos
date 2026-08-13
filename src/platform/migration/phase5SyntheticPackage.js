@@ -3,6 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
 import { exportCanonicalPackage } from "./phase4CanonicalExport.js";
+import {
+  createFixedBuildIdentityProvider,
+  deriveTrustedMigrationSourceIdentity,
+} from "./MigrationSourceIdentity.js";
 
 export const PHASE5_SYNTHETIC_OWNER_ID = "phase5-synthetic-user";
 export const PHASE5_SYNTHETIC_REVISION = 5001;
@@ -120,7 +124,19 @@ export async function writePhase5SyntheticPackage({ outputRoot, repositoryRevisi
   ]);
   await fs.writeFile(runtimePath, `${JSON.stringify(runtime)}\n`, { flag: "wx" });
   for (const item of media) await fs.writeFile(path.join(mediaRoot, item.name), item.bytes, { flag: "wx" });
-  const exported = await exportCanonicalPackage({ runtimePath, mediaRoot, outputRoot: packageRoot, repositoryRevision });
+  const commit = String(repositoryRevision ?? "622ba8dd8684c36107dc6c6c49bc39080eb53a4f");
+  const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
+    runtimePath,
+    packageVersion: "phase4-canonical-package-v1",
+    sourceSchemaVersion: "000003",
+    buildIdentityProvider: createFixedBuildIdentityProvider({
+      repositoryCommit: commit,
+      applicationBuildId: `phase5-synthetic-${commit.slice(0, 7)}`,
+      applicationSourceCommit: commit,
+      migrationScriptCommit: commit,
+    }),
+  });
+  const exported = await exportCanonicalPackage({ runtimePath, mediaRoot, outputRoot: packageRoot, sourceIdentity });
   return Object.freeze({ ...exported, packageRoot, mediaRoot, runtime, media: media.map((item) => ({ name: item.name, byteLength: item.bytes.length, sha256: createHash("sha256").update(item.bytes).digest("hex") })) });
 }
 

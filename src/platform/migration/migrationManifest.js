@@ -1,6 +1,7 @@
 import { createPayloadHash } from "../../contracts/v1/canonicalJson";
 import { createUuidV7 } from "../../contracts/v1/identifiers";
 import { FOUNDATION_RUNTIME_METADATA_KEYS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections";
+import { validateSerializableMigrationSourceIdentity } from "./MigrationSourceIdentity.js";
 
 export const MIGRATION_MANIFEST_VERSION = "1";
 
@@ -14,14 +15,9 @@ export function createMigrationManifest({ source, collections, files = [], relat
     manifestVersion: MIGRATION_MANIFEST_VERSION,
     migrationId: options.migrationId ?? createUuidV7(options),
     createdAt,
-    importerVersion: String(source.importerVersion),
-    targetSchemaVersion: String(source.targetSchemaVersion),
-    source: {
-      repositoryRevision: String(source.repositoryRevision),
-      runtimeVersion: String(source.runtimeVersion),
-      runtimeRevision: String(source.runtimeRevision),
-      runtimeSha256: validateSha256(source.runtimeSha256, "runtimeSha256"),
-    },
+    importerVersion: String(source.package.version),
+    targetSchemaVersion: String(source.schema.sourceVersion),
+    source: structuredClone(validateSerializableMigrationSourceIdentity(source)),
     collections: entries,
     relationships: structuredClone(relationships),
     criticalValues: structuredClone(criticalValues),

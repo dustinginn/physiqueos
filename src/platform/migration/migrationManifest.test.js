@@ -45,5 +45,13 @@ function createSyntheticManifest(collections = { user: [{ id: "synthetic-user" }
 }
 
 function source() {
-  return { importerVersion: "foundation-1", targetSchemaVersion: "000001", repositoryRevision: "synthetic", runtimeVersion: "founder-seed-v2", runtimeRevision: "0", runtimeSha256: HASH };
+  return {
+    identityVersion: "migration-source-identity-v1",
+    runtime: { version: "founder-seed-v2", revision: "0", sha256: HASH, updatedAt: "2026-08-10T00:00:00.000Z" },
+    repository: { commit: "a".repeat(40) },
+    application: { buildId: "synthetic-build", sourceCommit: "b".repeat(40) },
+    migration: { scriptCommit: "c".repeat(40), operationId: null },
+    package: { version: "foundation-1" },
+    schema: { sourceVersion: "000001" },
+  };
 }

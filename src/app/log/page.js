@@ -1,6 +1,6 @@
-import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { createInactiveLegacyWebContext } from "../../application/auth/legacyWebContext";
 import { createLogReadService } from "../../application/log/LogReadService";
+import { getProductionApplicationComposition } from "../../application/composition/productionApplicationComposition";
 import LogHubScreen from "../../screens/LogHubScreen";
 import {
   parseEvidenceRecoverySearchParams,
@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function LogPage({ searchParams }) {
   const params = await searchParams;
   const recoveryContext = parseEvidenceRecoverySearchParams(params);
-  const context = await createInactiveLegacyWebContext({ repositories: FounderRepositories });
-  const log = await createLogReadService({ repositories: FounderRepositories }).getLog({
+  const composition = await getProductionApplicationComposition();
+  const context = await createInactiveLegacyWebContext({ repositories: composition.repositories });
+  const log = await createLogReadService({ repositories: composition.repositories }).getLog({
     principal: context.principal,
     timeZone: context.user.timeZone ?? context.user.timezone,
   });

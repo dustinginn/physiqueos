@@ -3,18 +3,29 @@ import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js"
 import { assertKnownPhase4Collection, PHASE4_DOMAIN_TABLES } from "./phase4DomainCollections.js";
 import { readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
 import { createPhase4MediaObjectId } from "./phase4LocalMediaMigration.js";
+import { assertMigrationSourceIdentityMatches } from "./MigrationSourceIdentity.js";
 
 const GUARDED_DATABASE = /^(?:physiqueos_phase4_(?:test|rehearsal|restore)|physiqueos_phase5_(?:test|restore)_provider)(?:_|$)/;
 
-export async function importCanonicalPackage({ pool, packageRoot, resetTarget = false }) {
+export async function importCanonicalPackage({
+  pool,
+  packageRoot,
+  resetTarget = false,
+  expectedSourceIdentity = null,
+  requireMigrationOperationId = false,
+  targetAuthorization = null,
+} = {}) {
   if (!pool?.connect) throw new Error("Phase 4 import requires a PostgreSQL pool.");
   const packageData = await readAndValidateCanonicalPackage(packageRoot);
+  if (expectedSourceIdentity) {
+    assertMigrationSourceIdentityMatches(packageData.manifest.source, expectedSourceIdentity, { requireMigrationOperationId });
+  }
   const client = await pool.connect();
   const startedAt = new Date();
   try {
     await client.query("BEGIN");
-    const database = await assertGuardedDatabase(client);
-    if (resetTarget) await resetCanonicalTarget(client);
+    const database = await assertGuardedDatabase(client, targetAuthorization);
+    if (resetTarget) await resetCanonicalTarget(client, targetAuthorization);
     const owner = validateOwner(packageData.collections);
     await upsertUser(client, owner);
     const counts = {};
@@ -36,13 +47,13 @@ export async function importCanonicalPackage({ pool, packageRoot, resetTarget = 
        ON CONFLICT (id) DO UPDATE SET
          import_digest=EXCLUDED.import_digest, result='succeeded', collection_counts=EXCLUDED.collection_counts,
          report=EXCLUDED.report, completed_at=now()`,
-      [packageData.manifest.migrationId, packageData.manifest.source.runtimeSha256,
+      [packageData.manifest.migrationId, packageData.manifest.source.runtime.sha256,
         packageData.manifest.semanticDigest, importDigest, database, JSON.stringify(counts),
         JSON.stringify({
           replaySafe: true,
           ownerUserId: owner.id,
-          runtimeVersion: packageData.manifest.source.runtimeVersion,
-          runtimeRevision: packageData.manifest.source.runtimeRevision,
+          runtimeVersion: packageData.manifest.source.runtime.version,
+          runtimeRevision: packageData.manifest.source.runtime.revision,
           sourceUpdatedAt: packageData.manifest.criticalValues.sourceUpdatedAt,
         }), startedAt]
     );
@@ -91,12 +102,12 @@ export async function loadCanonicalRuntime({ query, ownerUserId }) {
   });
 }
 
-export async function validateCanonicalImport({ pool, packageRoot }) {
+export async function validateCanonicalImport({ pool, packageRoot, targetAuthorization = null }) {
   const packageData = await readAndValidateCanonicalPackage(packageRoot);
   const owner = validateOwner(packageData.collections);
   const client = await pool.connect();
   try {
-    await assertGuardedDatabase(client);
+    await assertGuardedDatabase(client, targetAuthorization);
     const counts = {};
     const idParity = {};
     for (const entry of packageData.manifest.collections) {
@@ -127,10 +138,10 @@ export async function validateCanonicalImport({ pool, packageRoot }) {
   }
 }
 
-export async function resetCanonicalTarget(clientOrPool) {
+export async function resetCanonicalTarget(clientOrPool, targetAuthorization = null) {
   const client = clientOrPool.query ? clientOrPool : null;
   if (!client) throw new Error("A PostgreSQL query target is required.");
-  await assertGuardedDatabase(client);
+  await assertGuardedDatabase(client, targetAuthorization);
   await client.query("DELETE FROM physiqueos.canonical_relationships");
   await client.query("DELETE FROM physiqueos.canonical_media_objects");
   await client.query("DELETE FROM physiqueos.outbox_messages");
@@ -241,10 +252,14 @@ async function importMediaMetadata(client, files, ownerUserId) {
   }
 }
 
-async function assertGuardedDatabase(client) {
+async function assertGuardedDatabase(client, targetAuthorization = null) {
   const result = await client.query("SELECT current_database() AS database");
   const database = result.rows[0]?.database;
-  if (!GUARDED_DATABASE.test(String(database ?? ""))) {
+  const explicitlyAuthorized = targetAuthorization?.productionExecutionAuthorized === true &&
+    String(targetAuthorization.expectedDatabase ?? "") === String(database ?? "") &&
+    typeof targetAuthorization.migrationOperationId === "string" &&
+    targetAuthorization.migrationOperationId.length > 0;
+  if (!GUARDED_DATABASE.test(String(database ?? "")) && !explicitlyAuthorized) {
     throw new Error("Refusing canonical import/reset outside a guarded Phase 4 rehearsal or Phase 5 provider-test database.");
   }
   return database;

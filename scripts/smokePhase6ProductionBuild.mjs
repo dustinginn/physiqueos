@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { createDurableMigrationControlStore } from "../src/platform/cutover/DurableMigrationControlStore.js";
 
 const root = process.cwd();
 const port = 3106;
@@ -10,12 +11,24 @@ if (path.dirname(distPath) !== path.resolve(root)) throw new Error("Phase 6 buil
 const buildId = fs.readFileSync(path.join(distPath, "BUILD_ID"), "utf8").trim();
 const gitHead = run("git", ["rev-parse", "HEAD"]).trim();
 const next = path.join(root, "node_modules", "next", "dist", "bin", "next");
+const controlPath = path.join(root, ".tmp", `phase6-smoke-migration-control-${process.pid}.json`);
+if (path.dirname(controlPath) !== path.join(root, ".tmp") || fs.existsSync(controlPath)) {
+  throw new Error("Phase 6 smoke migration-control path is unsafe or already exists.");
+}
+createDurableMigrationControlStore({ filePath: controlPath }).initialize({
+  environment: "isolated-phase6-smoke",
+  operator: "phase6-validator",
+  commandId: `phase6-smoke-control-${process.pid}`,
+  correlationId: `phase6-smoke-${process.pid}`,
+  sourceIdentity: { commit: gitHead, buildId },
+});
 const env = {
   ...process.env,
   PHYSIQUEOS_BUILD_DIST_DIR: distDirectory,
   PHYSIQUEOS_PHASE2_STAGING_ENABLED: "0",
   PHYSIQUEOS_DATABASE_ENABLED: "0",
   PHYSIQUEOS_OBJECT_STORAGE_ENABLED: "0",
+  PHYSIQUEOS_MIGRATION_CONTROL_PATH: path.relative(root, controlPath),
 };
 const child = spawn(process.execPath, [next, "start", "-p", String(port)], {
   cwd: root,
@@ -45,6 +58,7 @@ try {
     new Promise((resolve) => child.once("exit", resolve)),
     new Promise((resolve) => setTimeout(resolve, 5_000)),
   ]);
+  fs.rmSync(controlPath, { force: true });
 }
 
 async function waitForReady(expectedBuildId) {

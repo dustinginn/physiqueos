@@ -6,6 +6,10 @@ import { register } from "node:module";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { captureReadOnlyFounderSnapshot, exportCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
+const {
+  createFilesystemBuildIdentityProvider,
+  deriveTrustedMigrationSourceIdentity,
+} = await import("../src/platform/migration/MigrationSourceIdentity.js");
 const { createFounderRuntimeStore } = await import("../src/data/repositories/founderRuntimeStore.js");
 
 const root = process.cwd();
@@ -27,11 +31,17 @@ const snapshot = await captureReadOnlyFounderSnapshot({
 });
 const copyDurationMs = performance.now() - copyStarted;
 const exportStarted = performance.now();
+const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
+  runtimePath: snapshot.runtimePath,
+  packageVersion: "phase4-canonical-package-v1",
+  sourceSchemaVersion: "000003",
+  buildIdentityProvider: createFilesystemBuildIdentityProvider({ repositoryRoot: root }),
+});
 const exported = await exportCanonicalPackage({
   runtimePath: snapshot.runtimePath,
   mediaRoot: snapshot.mediaRoot,
   outputRoot: path.join(outputRoot, "package"),
-  repositoryRevision: "694d3cac7158c3ebdbafcef6a61699be52d5937a",
+  sourceIdentity,
   normalizeRuntime: (persisted) => createFounderRuntimeStore(persisted),
 });
 const exportDurationMs = performance.now() - exportStarted;
@@ -47,6 +57,7 @@ const report = {
   copiedMediaBytes: snapshot.media.reduce((sum, item) => sum + item.size, 0),
   manifestDigest: exported.manifest.semanticDigest,
   migrationId: exported.manifest.migrationId,
+  sourceIdentity: exported.manifest.source,
   collectionCounts: Object.fromEntries(exported.manifest.collections.map((entry) => [entry.sourceCollection, entry.recordCount])),
   copyDurationMs: Math.round(copyDurationMs),
   exportDurationMs: Math.round(exportDurationMs),
