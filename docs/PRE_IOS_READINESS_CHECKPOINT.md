@@ -481,3 +481,28 @@ The real adapter dry-run then reached collection inventory and correctly exposed
 The corrected version-2 inventory classifies `operatingRhythm` as derived/noncanonical code-owned read context, `adaptiveTrustProfile` as future-only/inactive design, and standalone `milestones` as deprecated/retired. There are no optional persisted collections. Export/import covers all 39 mandatory collections, records the three exclusions deterministically, refuses unknown keys or any missing mandatory key, and never fabricates placeholders. Current revision 122 proves 39 expected/39 present, zero optional, three excluded, zero unknown, zero missing mandatory, 1,259 records, 6,612 discovered relationships, and 372 media files. Two exports were byte-identical with manifest digest `38e925320fbba23631d752bc2a06a190b9059ffb506ea9d33b9e72df406a108a` and canonical-state digest `5c4fac66c75a58da1decd1d64d82a5cc8ffbb292381bf88468c24c0262e13818`.
 
 Affected read parity preserves the Founder operating-rhythm context as an application-composition overlay and finds no production adaptive-trust or standalone-milestone reader/writer. The exact-checkpoint Windows CLI dry-run passes the revised inventory plus all prior non-mutating preflight gates. Production remains on the accepted legacy build with inactive fence, legacy JSON epoch/composition, enabled reads/writes, local canonical evidence, noncanonical PostgreSQL/Spaces, and inactive authentication. The remediation is **READY FOR INACTIVE DEPLOYMENT**, subject to separate stop/promote/start authorization; it does not authorize the final pre-fence gate or migration.
+
+## Current-lineage encrypted recovery refresh (2026-08-13)
+
+The final-gate recovery blocker is closed. The old revision-119 / 365-media
+packet remains retained but is stale and historical. The replacement captures
+revision 122 (27,428,694 bytes; SHA-256
+`92EE630BD314A6AB6D3F6F66D1B54D441BE508C91E50AB5FFD6A116A02D11D1C`),
+372 media files / 276,646,284 bytes, exact inactive control, source
+`4f82619bd03c8f20331a45e126e1cfa79f199d2d`, build
+`itQ9UXmsDRPssBzrFTPc5`, retained rollback, package-v2 tooling, current
+runbooks, and fresh secret-free provider inventory.
+
+The new encrypted local and Google Drive copies match at 769,020,390 bytes and
+SHA-256
+`E8E63CACB09F706D8CBD939E3536D3807DF070D67CC8B156448F7548D47AF741`.
+Isolated decrypt/restore passed the 6,596-file completeness manifest, every
+media hash, runtime/control, Git bundle/`fsck`/current-source reachability,
+build/rollback identities, and packet-contained migration-tool smoke. Six
+live secret values had zero exact/pattern matches. Temporary plaintext,
+decrypted, and DPAPI artifacts were removed; production remained untouched.
+
+Binary recovery status: **PASS / RECOVERY PACKET REFRESH ACCEPTED**. The final
+pre-fence gate may be rerun after the required End Work Session checkpoint and
+must freshly verify live packet alignment and managed-backup age. Phase 7 and
+Native work remain unstarted.

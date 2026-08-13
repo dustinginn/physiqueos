@@ -247,3 +247,29 @@ The source now contains the previously missing single production runner, real pr
 Exact-source manifests no longer use the historical Phase 3 revision. Trusted derivation records typed runtime, repository, application, script, package, schema, and operation identities; import rejects wrong build/commit/runtime/package/operation before database mutation. The independent provider verifier reports cluster identity/status, newest backup timestamp/age, the 24-hour threshold, PASS/BLOCKED, provider source, and verification time without credentials. Unavailable, wrong-cluster, missing, or stale metadata blocks the same runner preflight without override.
 
 Isolated acceptance is PASS, including two full runner executions, deterministic import digest, legacy/provider selection, transactional PostgreSQL write, no dual write/fallback, pre-write abort, and post-write forward repair. A replacement database-read-only PAT then verified exact DigitalOcean cluster `f544596d-594e-4aa4-a0a8-533bda0992c6` online and newest backup `2026-08-13T06:54:12.000Z`, age 13.527 hours at `2026-08-13T20:25:48.094Z`, size 0.06846476 GiB: **PASS** under the mandatory 24-hour policy. The source is not yet published/deployed, so the current production application cannot yet be credited with this live composition path. Exact window and final migration GO remain pending; no prior approval is broadened.
+
+## Current-lineage recovery refresh (2026-08-13)
+
+The revision-119 / 365-media recovery packet is historical only. A new
+credential-free packet now matches deployed source
+`4f82619bd03c8f20331a45e126e1cfa79f199d2d`, build
+`itQ9UXmsDRPssBzrFTPc5`, rollback `HasDoRm5cgRE0FsXZU1Uu`, Founder revision
+122, runtime SHA-256
+`92EE630BD314A6AB6D3F6F66D1B54D441BE508C91E50AB5FFD6A116A02D11D1C`,
+372 media files, inactive control SHA-256
+`435BCAE703BA96E984D69C45FC808CBE404128E9137D14D99D8FAC836D4D32DE`,
+and package-v2 tooling. It includes a verified Git bundle through the exact
+source, current/rollback build artifacts, runbooks, and secret-free fresh
+provider inventory.
+
+The local and off-machine encrypted copies are 769,020,390 bytes with SHA-256
+`E8E63CACB09F706D8CBD939E3536D3807DF070D67CC8B156448F7548D47AF741`.
+Isolated decrypt/restore verified all 6,596 packet files, every media hash,
+runtime/control, source reachability, both build identities, and nonmutating
+migration-tool loading. The existing password-manager secret was reused and
+the temporary DPAPI/plaintext/decrypted artifacts were removed. Production
+stayed healthy, writable, and strictly `inactive / legacy-json / legacy-json`.
+
+Recovery evidence is current enough to rerun the final pre-fence gate. That
+gate must still recheck live alignment, provider backup freshness, exact
+window, and final explicit GO. No fence or migration is authorized here.

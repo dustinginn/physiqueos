@@ -254,3 +254,31 @@ was deleted after successful restore verification.
 Immediately before final migration authorization, the production runner must independently query DigitalOcean managed-database metadata for the exact configured cluster. The verifier records cluster ID/status, newest backup timestamp, age, threshold, PASS/BLOCKED, provider source, verification timestamp, and reported size; it never records the PAT. The newest provider backup must be no older than 24 hours and the cluster must be online. Wrong cluster, provider/API failure, absent timestamp, or age greater than 24 hours is **BLOCKED** and cannot be overridden by a runner flag, uptime, readiness, a local dump, or an older document.
 
 Use a short-lived PAT with database read scope only. Do not grant database mutation, app deployment, Spaces-key, or account-wide write scopes for this check. The 2026-08-13 remediation tests prove current/stale/unavailable/wrong-cluster behavior and integrate the result into the same runner dry-run. A replacement read-only PAT verified cluster `f544596d-594e-4aa4-a0a8-533bda0992c6` online, latest backup `2026-08-13T06:54:12.000Z`, age 13.527 hours at `2026-08-13T20:25:48.094Z`, size 0.06846476 GiB: **PASS**. Backup freshness must be checked again immediately before any later final GO; this time-bounded result does not authorize fence activation.
+
+## Restore the current-lineage packet
+
+The authoritative current recovery artifact is now
+`physiqueos-migration-recovery-20260813-current-lineage.tar.age`,
+769,020,390 bytes, SHA-256
+`E8E63CACB09F706D8CBD939E3536D3807DF070D67CC8B156448F7548D47AF741`.
+Matching encrypted copies exist below
+`.tmp/migration-recovery-20260813-current-lineage` and at
+`G:\My Drive\PhysiqueOS Backups\Migration Recovery 2026-08-13 Current Lineage`.
+The older 2026-08-12 packet remains historical and must not be mistaken for
+the revision-122 migration lineage.
+
+Use the existing password-manager entry and the accepted age v1.3.1 /
+`age-plugin-batchpass` procedure. Decrypt only to a new isolated directory.
+Verify `manifests/packet-files-sha256.json`, then run the included
+`tooling/scripts/verifyRecoveryPacket.mjs` against the extracted `packet`
+directory. Verify the Git bundle and check out
+`4f82619bd03c8f20331a45e126e1cfa79f199d2d`; run `git fsck`. Confirm revision
+122, all 372 media hashes, inactive control, current build
+`itQ9UXmsDRPssBzrFTPc5`, rollback `HasDoRm5cgRE0FsXZU1Uu`, package-v2
+manifest, collection registry, runner/orchestrator, and provider inventory.
+
+Never restore over a running canonical task. Verification is nonmutating and
+does not authorize restore, fence activation, or migration. Delete the
+decrypted TAR/workspace and any temporary DPAPI passphrase file immediately
+after verification. The only continuing passphrase custody is the Founder's
+password manager.

@@ -1120,3 +1120,31 @@ Contract `founder-canonical-collections-v2` and package/manifest version 2 expli
 Revision 122 current-copy export found 39/39 required, zero optional, three excluded absent, zero unknown, zero missing mandatory, 1,259 records, 6,612 relationships, and 372 media files. Its two package exports were byte-identical. The no-placeholder rule is executable: normalization cannot manufacture a missing mandatory collection; unknown or missing mandatory input fails closed; excluded values never create package keys or rows. Founder operating-rhythm presentation parity is preserved by an explicit noncanonical composition overlay, while no current read/write path depends on adaptive trust or the retired standalone milestones collection.
 
 The exact-checkpoint build, bounded Phase 1-6/migration/persistence/security/Training/Photo validation, isolated legacy smoke, and credential-backed real Windows CLI dry-run pass. The CLI verifies recovery, current managed backup, guarded PostgreSQL, private Spaces, wiring, provider composition, corrected collection inventory, and the no-final-GO dry-run boundary without changing control or canonical state. This checkpoint is **READY FOR INACTIVE DEPLOYMENT** only. No deployment, fence, migration, persistence switch, evidence move, authentication activation, final pre-fence go/no-go, Phase 7, Native Baseline, or SwiftUI work occurred.
+
+## 47. Current-lineage encrypted recovery acceptance (2026-08-13)
+
+The prior encrypted recovery packet was correctly rejected as current evidence
+after Founder runtime/media activity and migration remediation advanced beyond
+its revision-119 lineage. A fresh read-only capture now covers revision 122,
+all 372 media files, exact inactive control, deployed source/build
+`4f82619bd03c8f20331a45e126e1cfa79f199d2d` /
+`itQ9UXmsDRPssBzrFTPc5`, retained rollback, package-v2 migration tooling,
+current runbooks, a verified source bundle, and fresh secret-free provider
+inventory.
+
+The current encrypted artifact is 769,020,390 bytes with SHA-256
+`E8E63CACB09F706D8CBD939E3536D3807DF070D67CC8B156448F7548D47AF741`.
+Its independent Google Drive copy is byte-identical. Isolated decryption
+verified all 6,596 packet files, runtime/control/media hashes, source
+reachability and `git fsck`, both build identities, and nonmutating loading of
+the production runner, orchestrator, Windows CLI loader, package-v2 exporter,
+39-required/3-excluded registry, composition selector, and provider adapters.
+No live credential or recovery passphrase was included.
+
+Temporary plaintext and decrypted artifacts plus the DPAPI passphrase copy
+were removed after verification. Production remained healthy and writable in
+inactive legacy JSON mode; there was no deployment, restart, fence, migration,
+evidence move, provider mutation, authentication activation, Phase 7, Native
+Baseline, or SwiftUI work. The recovery refresh is accepted and permits a new
+final pre-fence gate, subject to fresh live-alignment/backup checks and separate
+migration authority.

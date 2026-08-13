@@ -198,3 +198,87 @@ only on:
 The final pre-fence procedure must still repeat the read-only runtime/media/
 control capture so the migration operates on the latest legitimate Founder
 state. This document is recovery evidence, not migration authorization.
+
+## Current-lineage packet refresh (2026-08-13)
+
+The earlier revision-119 packet remains retained for historical audit, but it
+became stale after legitimate Founder activity and the accepted migration
+remediation lineage. It must not be used as the current final-gate recovery
+evidence. The replacement packet was captured read-only while production
+remained healthy and writable; no fence, restart, deployment, migration,
+canonical-store switch, evidence move, authentication activation, or provider
+mutation occurred.
+
+Current capture identity:
+
+- source/build: `4f82619bd03c8f20331a45e126e1cfa79f199d2d` /
+  `itQ9UXmsDRPssBzrFTPc5`;
+- retained rollback: `.next.rollback-22712`, source
+  `e3b4f4505e9c2b5598901b002271933f45c24dbf`, build
+  `HasDoRm5cgRE0FsXZU1Uu`;
+- Founder runtime: revision 122, updated `2026-08-13T15:11:57.160Z`,
+  27,428,694 bytes, SHA-256
+  `92EE630BD314A6AB6D3F6F66D1B54D441BE508C91E50AB5FFD6A116A02D11D1C`;
+- collections: `founder-canonical-collections-v2`, 39/39 required, zero
+  optional, three excluded, zero unknown/missing, 1,259 canonical records and
+  6,612 relationships;
+- media: 372 files / 276,646,284 bytes: 13 DEXA / 20,642,431 bytes,
+  330 evidence / 189,428,874 bytes, and 29 photos / 66,574,979 bytes;
+- control: SHA-256
+  `435BCAE703BA96E984D69C45FC808CBE404128E9137D14D99D8FAC836D4D32DE`,
+  version 1, `inactive / legacy-json / legacy-json`, reads/writes enabled, no
+  migration/fence/operation/first PostgreSQL write; and
+- package: `phase4-canonical-package-v2`, migration ID
+  `92ee630b-d314-76ab-8d3f-6f66d1b54d44`, manifest digest
+  `3d1dc15aeb95d9b03451945b7ccc6273c829120a374b966494e4735d49be18e4`.
+
+The packet contains 6,596 files including the byte-exact runtime, all media
+with SHA-256/MIME/relationship inventory, control record, package-v2 export,
+current migration/runtime source, current runbooks, provider inventory, exact
+current/rollback build artifacts, and a verified Git bundle through the
+current source. Bundle SHA-256 is
+`623751742A67009606280A3E71037BC4CD9B3867143FC7AA556527B0B22EF972`;
+isolated clone, checkout, `git fsck`, and reachability of `cbe8b321...`,
+`f3cae37...`, and `4f82619...` passed. The current build contains 2,673 files
+/ 93,380,792 bytes; rollback contains 2,509 files / 83,636,938 bytes. Neither
+contains Founder runtime or migration-control bytes.
+
+Fresh read-only provider inventory recorded the existing App Platform app,
+online PostgreSQL 17 cluster `f544596d-594e-4aa4-a0a8-533bda0992c6` in
+`sfo3`, 10,240 MiB one-node tier, latest managed backup
+`2026-08-13T06:54:12Z`, and private/versioned Space
+`physiqueos-p2-staging-20260811-b36ea183` with 5 current objects / 178 bytes,
+11 versions / 400 bytes, and zero delete markers or incomplete multipart
+uploads. Provider inventory digest is
+`9734AF7934EBB36147E15D8A66563C5447B4C64A187608E7FACD055248EB26A8`;
+no provider secret is present.
+
+The final credential scan covered all five live provider credential values
+plus the recovery passphrase across all 6,596 files / 762,741,724 bytes and
+found zero exact or high-risk pattern matches. Encryption reused the existing
+password-manager entry with `age` v1.3.1, `age-plugin-batchpass`, scrypt work
+factor 18, and authenticated ChaCha20-Poly1305 payload encryption.
+
+Current encrypted artifact:
+
+- filename: `physiqueos-migration-recovery-20260813-current-lineage.tar.age`;
+- size: **769,020,390 bytes**;
+- SHA-256:
+  **`E8E63CACB09F706D8CBD939E3536D3807DF070D67CC8B156448F7548D47AF741`**;
+- local: `.tmp/migration-recovery-20260813-current-lineage/physiqueos-migration-recovery-20260813-current-lineage.tar.age`;
+- off-machine: `G:\My Drive\PhysiqueOS Backups\Migration Recovery 2026-08-13 Current Lineage\physiqueos-migration-recovery-20260813-current-lineage.tar.age`.
+
+Local/off-machine sizes and SHA-256 match. A fresh isolated decrypt reproduced
+the 768,832,512-byte plaintext TAR exactly at SHA-256
+`B9C1AEA80DCAB8AC62D55C7421AAF825B3373C656E54E9332A21BE8574FB978F`.
+Full manifest, runtime, 372 media files, control, build/rollback, provider
+inventory, restored Git bundle, and packet-contained runner/orchestrator,
+Windows loader, exporter, collection registry, composition selector, and
+adapter loading all passed. The recovery passphrase remains password-manager
+custodied; temporary plaintext/decrypted workspaces and its temporary DPAPI
+copy were removed after verification.
+
+At closeout the live source/build/runtime/media/control remained aligned with
+this packet. This refresh is **RECOVERY PACKET REFRESH ACCEPTED**. The final
+pre-fence gate may be rerun, but it must recheck packet/live alignment and
+managed-backup freshness. It still does not authorize a fence or migration.
