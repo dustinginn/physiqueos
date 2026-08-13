@@ -2,8 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
-import { captureReadOnlyFounderSnapshot, exportCanonicalPackage, readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
+import { FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import { PHASE4_PACKAGE_VERSION, captureReadOnlyFounderSnapshot, exportCanonicalPackage, readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
 import { createFixedBuildIdentityProvider, deriveTrustedMigrationSourceIdentity } from "./MigrationSourceIdentity.js";
 import { importCanonicalPackage } from "./phase4CanonicalImport.js";
 
@@ -23,6 +23,10 @@ describe("Phase 4 deterministic copy-only export", () => {
       const second = await exportCanonicalPackage({ runtimePath: snapshot.runtimePath, mediaRoot: snapshot.mediaRoot, outputRoot: path.join(root, "package-b"), sourceIdentity });
       expect(first.manifest.semanticDigest).toBe(second.manifest.semanticDigest);
       expect(first.manifest.collections).toHaveLength(FOUNDATION_SOURCE_COLLECTIONS.length);
+      expect(first.manifest.collectionInventory.required).toMatchObject({ expectedCount: 39, presentCount: 39, missing: [] });
+      expect(first.manifest.collectionInventory.excluded.map((entry) => entry.sourceCollection)).toEqual(FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS.map((entry) => entry.sourceCollection));
+      expect(first.manifest.collectionInventory.excluded.every((entry) => entry.sourcePresent === false)).toBe(true);
+      expect(Object.keys(JSON.parse(await fs.readFile(first.runtimeFile, "utf8")))).not.toEqual(expect.arrayContaining(["operatingRhythm", "adaptiveTrustProfile", "milestones"]));
       expect(first.manifest.files[0]).toMatchObject({ relativePath: "photo.jpg", ownerUserId: "synthetic-user", mimeType: "image/jpeg" });
       await expect(readAndValidateCanonicalPackage(path.join(root, "package-a"))).resolves.toMatchObject({ manifest: { validationResult: "pending" } });
       const wrongExpectedIdentity = structuredClone(sourceIdentity);
@@ -49,6 +53,33 @@ describe("Phase 4 deterministic copy-only export", () => {
       await expect(exportCanonicalPackage({ runtimePath: runtimeFile, outputRoot: path.join(root, "package"), sourceIdentity: await identity(runtimeFile) })).rejects.toThrow("Unknown runtime source keys");
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
+
+  it("records but never exports recognized noncanonical hydrated entries", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "physiqueos-phase4-excluded-"));
+    try {
+      const runtimeFile = path.join(root, "runtime.json");
+      await fs.writeFile(runtimeFile, JSON.stringify({
+        ...syntheticRuntime(), operatingRhythm: { id: "seed-only" }, adaptiveTrustProfile: {}, milestones: [],
+      }));
+      const result = await exportCanonicalPackage({ runtimePath: runtimeFile, outputRoot: path.join(root, "package"), sourceIdentity: await identity(runtimeFile) });
+      const exported = JSON.parse(await fs.readFile(result.runtimeFile, "utf8"));
+      expect(result.manifest.collectionInventory.excluded.every((entry) => entry.sourcePresent)).toBe(true);
+      expect(exported).not.toHaveProperty("operatingRhythm");
+      expect(exported).not.toHaveProperty("adaptiveTrustProfile");
+      expect(exported).not.toHaveProperty("milestones");
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
+
+  it("fails closed instead of creating a placeholder for a missing mandatory collection", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "physiqueos-phase4-missing-"));
+    try {
+      const runtimeFile = path.join(root, "runtime.json");
+      const runtime = syntheticRuntime();
+      delete runtime.goals;
+      await fs.writeFile(runtimeFile, JSON.stringify(runtime));
+      await expect(exportCanonicalPackage({ runtimePath: runtimeFile, outputRoot: path.join(root, "package"), sourceIdentity: await identity(runtimeFile) })).rejects.toThrow("missing required collections: goals");
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
 });
 
 function syntheticRuntime() {
@@ -60,11 +91,11 @@ function syntheticRuntime() {
     goals: [{ id: "synthetic-goal", userId: "synthetic-user", status: "active", version: 1 }],
   };
 }
-function singleton(name) { return ["user", "nutritionContext", "operatingPlan", "operatingRhythm", "adaptiveTrustProfile"].includes(name); }
+function singleton(name) { return ["user", "nutritionContext", "operatingPlan"].includes(name); }
 function identity(runtimePath) {
   return deriveTrustedMigrationSourceIdentity({
     runtimePath,
-    packageVersion: "phase4-canonical-package-v1",
+    packageVersion: PHASE4_PACKAGE_VERSION,
     sourceSchemaVersion: "000003",
     buildIdentityProvider: createFixedBuildIdentityProvider({
       repositoryCommit: "d".repeat(40),

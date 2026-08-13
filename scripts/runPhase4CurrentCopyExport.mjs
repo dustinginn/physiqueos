@@ -5,7 +5,7 @@ import { performance } from "node:perf_hooks";
 import { register } from "node:module";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
-const { captureReadOnlyFounderSnapshot, exportCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
+const { captureReadOnlyFounderSnapshot, exportCanonicalPackage, PHASE4_PACKAGE_VERSION } = await import("../src/platform/migration/phase4CanonicalExport.js");
 const {
   createFilesystemBuildIdentityProvider,
   deriveTrustedMigrationSourceIdentity,
@@ -33,7 +33,7 @@ const copyDurationMs = performance.now() - copyStarted;
 const exportStarted = performance.now();
 const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
   runtimePath: snapshot.runtimePath,
-  packageVersion: "phase4-canonical-package-v1",
+  packageVersion: PHASE4_PACKAGE_VERSION,
   sourceSchemaVersion: "000003",
   buildIdentityProvider: createFilesystemBuildIdentityProvider({ repositoryRoot: root }),
 });

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
-import { exportCanonicalPackage } from "./phase4CanonicalExport.js";
+import { exportCanonicalPackage, PHASE4_PACKAGE_VERSION } from "./phase4CanonicalExport.js";
 import {
   createFixedBuildIdentityProvider,
   deriveTrustedMigrationSourceIdentity,
@@ -69,9 +69,6 @@ export function createPhase5SyntheticRuntime({ recordsPerCollection = 3 } = {}) 
     reminders: many("reminders", { title: "Synthetic reminder", localDate: "2026-08-11", occurrenceDate: "2026-08-11", dueAt: "2026-08-11T15:00:00.000Z" }),
     nutritionContext: { id: "phase5-nutrition-context", userId, version: 1, activeProtocolId: "phase5-protocols-001", estimatedDailyCaloricIntake: { min: 2200, max: 2400, unit: "kcal" }, updatedAt: timestamp },
     operatingPlan: { id: "phase5-operating-plan", userId, version: 1, status: "active", title: "Synthetic Operating Plan", goalId: "phase5-goals-001", updatedAt: timestamp },
-    operatingRhythm: { id: "phase5-operating-rhythm", userId, version: 1, timeZone: "America/Los_Angeles", morningWindow: "07:00", updatedAt: timestamp },
-    adaptiveTrustProfile: { id: "phase5-adaptive-trust", userId, version: 1, trustBand: "establishing", sampleCount: 30, updatedAt: timestamp },
-    milestones: many("milestones", { goalId: "phase5-goals-001", title: "Synthetic milestone", targetDate: "2026-09-01" }),
     progressPhotos: many("progressPhotos", { observedAt: "2026-08-10T18:00:00.000Z", localDate: "2026-08-10", view: "front", filePath: "synthetic-photo.jpg", photoSessionId: "phase5-photo-session-001" }),
     dailyCheckIns: many("dailyCheckIns", { localDate: "2026-08-11", energy: 4, recovery: 4, sleepQuality: 4 }, (index) => ({ localDate: `2026-08-${String(11 - index).padStart(2, "0")}` })),
     dailyBriefings: many("dailyBriefings", { type: "weekly", cadence: "weekly", title: "Synthetic weekly briefing", publishedAt: "2026-08-10T12:00:00.000Z", status: "published", content: { summary: "Synthetic provider validation briefing." } }),
@@ -127,7 +124,7 @@ export async function writePhase5SyntheticPackage({ outputRoot, repositoryRevisi
   const commit = String(repositoryRevision ?? "622ba8dd8684c36107dc6c6c49bc39080eb53a4f");
   const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
     runtimePath,
-    packageVersion: "phase4-canonical-package-v1",
+    packageVersion: PHASE4_PACKAGE_VERSION,
     sourceSchemaVersion: "000003",
     buildIdentityProvider: createFixedBuildIdentityProvider({
       repositoryCommit: commit,

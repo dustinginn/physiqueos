@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateManifestFile } from "../../../scripts/validateMigrationManifest.mjs";
 import { createMigrationManifest, validateMigrationSourceKeys } from "./migrationManifest";
+import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
 
 const HASH = "a".repeat(64);
 const MIGRATION_ID = "018f3f2a-7b4c-7def-8123-456789abcdef";
@@ -26,7 +27,8 @@ describe("deterministic migration manifest foundation", () => {
   it("fails closed for unknown source collections and runtime keys", () => {
     expect(() => createMigrationManifest({ source: source(), collections: { unexpectedFounderBlob: [] }, createdAt: "2026-08-10T00:00:00Z" }, { migrationId: MIGRATION_ID })).toThrow("Unknown migration source collections");
     expect(() => validateMigrationSourceKeys({ version: "founder-seed-v2", user: {}, unknownFutureCollection: [] })).toThrow("Unknown runtime source keys");
-    expect(validateMigrationSourceKeys({ version: "founder-seed-v2", revision: 1, user: {} })).toBe(true);
+    expect(() => validateMigrationSourceKeys({ version: "founder-seed-v2", revision: 1, user: {} })).toThrow("missing required collections");
+    expect(validateMigrationSourceKeys(completeRuntime())).toBe(true);
   });
 
   it("is deterministic for collection key ordering", () => {
@@ -42,6 +44,10 @@ function createSyntheticManifest(collections = { user: [{ id: "synthetic-user" }
     files: [{ relativePath: "synthetic/photo.png", size: 10, sha256: HASH, mimeType: "image/png", ownerUserId: "synthetic-user", relationshipIds: ["synthetic-goal"] }],
     relationships: [{ from: "synthetic-goal", to: "synthetic-user", type: "owned_by" }], criticalValues: { activeGoalId: "synthetic-goal" },
   }, { migrationId: MIGRATION_ID });
+}
+
+function completeRuntime() {
+  return { version: "founder-seed-v2", revision: 1, ...Object.fromEntries(FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, name === "user" ? {} : []])) };
 }
 
 function source() {

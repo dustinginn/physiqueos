@@ -51,6 +51,7 @@ async function main() {
     stateModel,
     canonicalExport,
     canonicalImport,
+    collectionContract,
     sourceIdentityModel,
     { migratePackageMediaLocally },
     { createFounderRuntimeStore },
@@ -67,6 +68,7 @@ async function main() {
     import("../src/platform/cutover/migrationControlState.js"),
     import("../src/platform/migration/phase4CanonicalExport.js"),
     import("../src/platform/migration/phase4CanonicalImport.js"),
+    import("../src/platform/migration/foundationSourceCollections.js"),
     import("../src/platform/migration/MigrationSourceIdentity.js"),
     import("../src/platform/migration/phase4LocalMediaMigration.js"),
     import("../src/data/repositories/founderRuntimeStore.js"),
@@ -100,7 +102,10 @@ async function main() {
       productionRunnerWired: true,
       providerCompositionWired: true,
     })),
-    verifyCollectionInventory: preflight("verifyCollectionInventory", () => ({ expectedCollectionCount: 42, unknownCollections: [] })),
+    verifyCollectionInventory: preflight("verifyCollectionInventory", () => {
+      const inventory = collectionContract.assertFoundationSourceInventory(sourceRuntime);
+      return { expectedCollectionCount: inventory.required.expectedCount, presentCollectionCount: inventory.required.presentCount, excludedCollections: inventory.excluded, unknownCollections: inventory.unknown };
+    }),
     async captureFinalSnapshot() {
       mark("captureFinalSnapshot"); maybeFail("captureFinalSnapshot");
       return canonicalExport.captureReadOnlyFounderSnapshot({ sourceRuntimePath, sourceMediaRoot, snapshotRoot: finalSnapshotRoot });
@@ -130,8 +135,8 @@ async function main() {
     async verifyPackage() {
       mark("verifyPackage"); maybeFail("verifyPackage");
       packageData = await canonicalExport.readAndValidateCanonicalPackage(packageRoot);
-      if (Object.keys(packageData.collections).length !== 42) throw safety("Canonical package does not contain all 42 collections.");
-      return { migrationId: packageData.manifest.migrationId, manifestDigest: packageData.manifest.manifestDigest, collectionCount: 42 };
+      if (Object.keys(packageData.collections).length !== collectionContract.FOUNDATION_SOURCE_COLLECTIONS.length) throw safety("Canonical package does not contain every required persisted collection.");
+      return { migrationId: packageData.manifest.migrationId, manifestDigest: packageData.manifest.manifestDigest, collectionCount: collectionContract.FOUNDATION_SOURCE_COLLECTIONS.length };
     },
     async importCanonicalPackage() {
       mark("importCanonicalPackage"); maybeFail("importCanonicalPackage");

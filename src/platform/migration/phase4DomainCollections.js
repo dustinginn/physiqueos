@@ -3,12 +3,9 @@ import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js"
 export const PHASE4_DOMAIN_TABLES = Object.freeze({
   user: "canonical_user_records",
   nutritionContext: "canonical_user_records",
-  operatingRhythm: "canonical_user_records",
-  adaptiveTrustProfile: "canonical_user_records",
   goals: "canonical_goal_records",
   goalTransitionDrafts: "canonical_goal_records",
   goalProtocolTransitionDrafts: "canonical_goal_records",
-  milestones: "canonical_goal_records",
   phaseReviewDecisions: "canonical_goal_records",
   phaseReviewTransactions: "canonical_goal_records",
   phaseStrategies: "canonical_goal_records",

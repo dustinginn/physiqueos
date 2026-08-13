@@ -19,7 +19,8 @@ export async function createProductionMigrationEnvironment({ env = process.env }
     canonicalExport,
     canonicalImport,
     sourceIdentityModel,
-    { FOUNDATION_SOURCE_COLLECTIONS },
+    { FOUNDATION_SOURCE_COLLECTIONS, inspectFoundationSourceInventory, assertFoundationSourceInventory },
+    { founderOperatingRhythm },
     { createFounderRuntimeStore },
     { createSeedRepositories },
     { createLegacyFounderReadLoaders },
@@ -40,6 +41,7 @@ export async function createProductionMigrationEnvironment({ env = process.env }
     import("../src/platform/migration/phase4CanonicalImport.js"),
     import("../src/platform/migration/MigrationSourceIdentity.js"),
     import("../src/platform/migration/foundationSourceCollections.js"),
+    import("../src/data/founderSeed/operatingRhythm.js"),
     import("../src/data/repositories/founderRuntimeStore.js"),
     import("../src/data/repositories/createSeedRepositories.js"),
     import("../src/application/read-models/LegacyFounderReadLoaders.js"),
@@ -103,10 +105,18 @@ export async function createProductionMigrationEnvironment({ env = process.env }
     },
     async verifyCollectionInventory() {
       const runtime = JSON.parse((await fs.readFile(runtimePath, "utf8")).replace(/^\uFEFF/, ""));
-      const unknown = Object.keys(runtime).filter((key) => !new Set(["version", "revision", "lastCommitId", "updatedAt", "importedAt", ...FOUNDATION_SOURCE_COLLECTIONS]).has(key));
-      const missing = FOUNDATION_SOURCE_COLLECTIONS.filter((key) => !(key in runtime));
-      if (unknown.length || missing.length) throw new Error(`Canonical collection inventory failed (unknown=${unknown.join(",")}; missing=${missing.join(",")}).`);
-      return pass({ expectedCollectionCount: FOUNDATION_SOURCE_COLLECTIONS.length, unknownCollections: [], missingCollections: [] });
+      assertFoundationSourceInventory(runtime);
+      const inventory = inspectFoundationSourceInventory(runtime);
+      return pass({
+        collectionContractVersion: inventory.contractVersion,
+        expectedCollectionCount: inventory.required.expectedCount,
+        presentCollectionCount: inventory.required.presentCount,
+        optionalPresentCount: inventory.optional.presentCount,
+        optionalAbsentCount: inventory.optional.absent.length,
+        excludedCollections: inventory.excluded,
+        unknownCollections: inventory.unknown,
+        missingCollections: inventory.required.missing,
+      });
     },
     async captureFinalSnapshot({ input }) {
       paths = operationPaths(input.migrationOperationId);
@@ -162,7 +172,10 @@ export async function createProductionMigrationEnvironment({ env = process.env }
       return canonicalImport.validateCanonicalImport({ pool, packageRoot: paths.package, targetAuthorization: productionTargetAuthorization(input) });
     },
     async verifyReadParity() {
-      const runtime = { version: packageData.manifest.source.runtime.version, revision: Number(packageData.manifest.source.runtime.revision), updatedAt: packageData.manifest.source.runtime.updatedAt, ...packageData.collections };
+      const canonicalRuntime = { version: packageData.manifest.source.runtime.version, revision: Number(packageData.manifest.source.runtime.revision), updatedAt: packageData.manifest.source.runtime.updatedAt, ...packageData.collections };
+      const runtime = ownerUserId === founderOperatingRhythm.userId
+        ? { ...canonicalRuntime, operatingRhythm: founderOperatingRhythm }
+        : canonicalRuntime;
       const repositories = createSeedRepositories(runtime);
       const legacy = createPhase3ReadModelService({ loaders: createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime }) });
       providerComposition ??= await createPhase5ProviderApplicationComposition({ pool, ownerUserId, objectProvider, mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER") });

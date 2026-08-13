@@ -1,11 +1,14 @@
 import { createPayloadHash } from "../../contracts/v1/canonicalJson";
 import { createUuidV7 } from "../../contracts/v1/identifiers";
-import { FOUNDATION_RUNTIME_METADATA_KEYS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections";
+import {
+  FOUNDATION_SOURCE_COLLECTIONS,
+  assertFoundationSourceInventory,
+} from "./foundationSourceCollections";
 import { validateSerializableMigrationSourceIdentity } from "./MigrationSourceIdentity.js";
 
-export const MIGRATION_MANIFEST_VERSION = "1";
+export const MIGRATION_MANIFEST_VERSION = "2";
 
-export function createMigrationManifest({ source, collections, files = [], relationships = [], criticalValues = {}, createdAt }, options = {}) {
+export function createMigrationManifest({ source, collections, collectionInventory = null, files = [], relationships = [], criticalValues = {}, createdAt }, options = {}) {
   const sourceKeys = Object.keys(collections ?? {});
   const unknown = sourceKeys.filter((key) => !FOUNDATION_SOURCE_COLLECTIONS.includes(key));
   if (unknown.length) throw new Error(`Unknown migration source collections: ${unknown.sort().join(", ")}`);
@@ -18,6 +21,7 @@ export function createMigrationManifest({ source, collections, files = [], relat
     importerVersion: String(source.package.version),
     targetSchemaVersion: String(source.schema.sourceVersion),
     source: structuredClone(validateSerializableMigrationSourceIdentity(source)),
+    collectionInventory: collectionInventory == null ? null : structuredClone(collectionInventory),
     collections: entries,
     relationships: structuredClone(relationships),
     criticalValues: structuredClone(criticalValues),
@@ -29,9 +33,7 @@ export function createMigrationManifest({ source, collections, files = [], relat
 }
 
 export function validateMigrationSourceKeys(sourceObject) {
-  const allowed = new Set([...FOUNDATION_RUNTIME_METADATA_KEYS, ...FOUNDATION_SOURCE_COLLECTIONS]);
-  const unknown = Object.keys(sourceObject ?? {}).filter((key) => !allowed.has(key));
-  if (unknown.length) throw new Error(`Unknown runtime source keys: ${unknown.sort().join(", ")}`);
+  assertFoundationSourceInventory(sourceObject);
   return true;
 }
 

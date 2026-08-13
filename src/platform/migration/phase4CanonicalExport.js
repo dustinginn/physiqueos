@@ -3,13 +3,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson, createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 import { createMigrationManifest, validateMigrationSourceKeys } from "./migrationManifest.js";
-import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import {
+  FOUNDATION_COLLECTION_CONTRACT_VERSION,
+  FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS,
+  FOUNDATION_SOURCE_COLLECTIONS,
+  inspectFoundationSourceInventory,
+} from "./foundationSourceCollections.js";
 import {
   assertTrustedMigrationSourceIdentity,
   validateSerializableMigrationSourceIdentity,
 } from "./MigrationSourceIdentity.js";
 
-export const PHASE4_PACKAGE_VERSION = "phase4-canonical-package-v1";
+export const PHASE4_PACKAGE_VERSION = "phase4-canonical-package-v2";
 
 export async function captureReadOnlyFounderSnapshot({ sourceRuntimePath, sourceMediaRoot, snapshotRoot, mediaInclude = () => true }) {
   const runtimeSource = path.resolve(sourceRuntimePath);
@@ -47,9 +52,10 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
   const raw = await fs.readFile(sourcePath);
   const parsed = JSON.parse(raw.toString("utf8"));
   validateMigrationSourceKeys(parsed);
+  const collectionInventory = inspectFoundationSourceInventory(parsed);
   const runtime = normalizeRuntime(structuredClone(parsed));
   const collections = Object.fromEntries(
-    FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, structuredClone(runtime[name] ?? null)])
+    FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, structuredClone(runtime[name])])
   );
   const userId = String(runtime.user?.id ?? "").trim();
   if (!userId) throw new Error("Canonical export requires a Founder user identity.");
@@ -72,6 +78,7 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
   const manifest = createMigrationManifest({
     source: trustedSourceIdentity,
     collections,
+    collectionInventory,
     files: fileInventory,
     relationships: collectRelationships(collections, userId),
     criticalValues: {
@@ -103,10 +110,22 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
   }
   validateSerializableMigrationSourceIdentity(manifest.source);
   validateMigrationSourceKeys(collections);
+  if (manifest.manifestVersion !== "2" || manifest.collectionInventory?.contractVersion !== FOUNDATION_COLLECTION_CONTRACT_VERSION) {
+    throw new Error("Canonical package collection inventory contract is missing or unsupported.");
+  }
+  const expectedExcluded = FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS.map(({ sourceCollection, classification, canonicalOwner }) => ({ sourceCollection, classification, canonicalOwner }));
+  const actualExcluded = (manifest.collectionInventory.excluded ?? []).map(({ sourceCollection, classification, canonicalOwner }) => ({ sourceCollection, classification, canonicalOwner }));
+  if (canonicalJson(actualExcluded) !== canonicalJson(expectedExcluded)) throw new Error("Canonical package excluded collection classifications do not match the active contract.");
+  if (manifest.collectionInventory.required?.expectedCount !== FOUNDATION_SOURCE_COLLECTIONS.length || manifest.collectionInventory.required?.missing?.length) {
+    throw new Error("Canonical package required collection inventory is incomplete.");
+  }
+  if (manifest.collectionInventory.unknown?.length) throw new Error("Canonical package inventory contains unknown source collections.");
   const expected = new Set(FOUNDATION_SOURCE_COLLECTIONS);
   const actual = new Set(Object.keys(collections));
   const missing = [...expected].filter((name) => !actual.has(name));
   if (missing.length) throw new Error(`Canonical package is missing required collections: ${missing.join(", ")}`);
+  const extra = [...actual].filter((name) => !expected.has(name));
+  if (extra.length) throw new Error(`Canonical package contains noncanonical collections: ${extra.join(", ")}`);
   return Object.freeze({ root, manifest, collections });
 }
 

@@ -1,4 +1,5 @@
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import { founderOperatingRhythm } from "../../data/founderSeed/operatingRhythm.js";
 import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity.js";
 import { createPhase3ReadModelService } from "../../application/read-models/Phase3ReadModelService.js";
 import { createLegacyFounderReadLoaders } from "../../application/read-models/LegacyFounderReadLoaders.js";
@@ -25,7 +26,8 @@ export async function createPhase4PostgresApplicationComposition({
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
   const query = (text, values) => pool.query(text, values);
-  const runtime = await loadCanonicalRuntime({ query, ownerUserId });
+  const canonicalRuntime = await loadCanonicalRuntime({ query, ownerUserId });
+  const runtime = addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId);
   registerRuntimeTrainingExercises(runtime.canonicalExerciseLibrary ?? []);
   const repositories = createSeedRepositories(runtime);
   const loaders = createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime, now });
@@ -53,6 +55,11 @@ export async function createPhase4PostgresApplicationComposition({
     media,
     runtime,
   });
+}
+
+export function addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId) {
+  if (ownerUserId !== founderOperatingRhythm.userId) return canonicalRuntime;
+  return Object.freeze({ ...canonicalRuntime, operatingRhythm: founderOperatingRhythm });
 }
 
 export function createPhase4TransactionRunner({ pool }) {

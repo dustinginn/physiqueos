@@ -3,7 +3,7 @@ import path from "node:path";
 import { register } from "node:module";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
-const { exportCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
+const { exportCanonicalPackage, PHASE4_PACKAGE_VERSION } = await import("../src/platform/migration/phase4CanonicalExport.js");
 const {
   createFilesystemBuildIdentityProvider,
   deriveTrustedMigrationSourceIdentity,
@@ -18,7 +18,7 @@ if (![snapshotRoot, firstPackage, secondPackage].every((value) => value.startsWi
 await fs.rm(secondPackage, { recursive: true, force: true });
 const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
   runtimePath: path.join(snapshotRoot, "runtime-store.json"),
-  packageVersion: "phase4-canonical-package-v1",
+  packageVersion: PHASE4_PACKAGE_VERSION,
   sourceSchemaVersion: "000003",
   buildIdentityProvider: createFilesystemBuildIdentityProvider({ repositoryRoot: process.cwd() }),
 });

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { canonicalJson, createPayloadHash } from "../../contracts/v1/canonicalJson.js";
-import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import { FOUNDATION_SOURCE_COLLECTIONS, inspectFoundationSourceInventory } from "./foundationSourceCollections.js";
 import { migratePackageMediaLocally } from "./phase4LocalMediaMigration.js";
 
 describe("Phase 4 local private-media migration", () => {
@@ -19,17 +19,18 @@ describe("Phase 4 local private-media migration", () => {
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const collections = Object.fromEntries(FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, name === "user" ? { id: "owner" } : []]));
       const unsigned = {
-        manifestVersion: "1", migrationId: "synthetic", createdAt: "2026-08-11T00:00:00.000Z",
-        importerVersion: "phase4", targetSchemaVersion: "000003",
+        manifestVersion: "2", migrationId: "synthetic", createdAt: "2026-08-11T00:00:00.000Z",
+        importerVersion: "phase4-canonical-package-v2", targetSchemaVersion: "000003",
         source: {
           identityVersion: "migration-source-identity-v1",
           runtime: { version: "test", revision: "1", sha256: "a".repeat(64), updatedAt: "2026-08-11T00:00:00.000Z" },
           repository: { commit: "a".repeat(40) },
           application: { buildId: "test-build", sourceCommit: "a".repeat(40) },
           migration: { scriptCommit: "a".repeat(40), operationId: null },
-          package: { version: "phase4-canonical-package-v1" },
+          package: { version: "phase4-canonical-package-v2" },
           schema: { sourceVersion: "000003" },
         },
+        collectionInventory: inspectFoundationSourceInventory(collections),
         collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections) },
         files: [{ relativePath: "evidence.png", size: bytes.length, sha256, mimeType: "image/png", ownerUserId: "owner", relationshipIds: [], migrationResult: "pending", validationResult: "pending" }],
         result: "pending", validationResult: "pending",

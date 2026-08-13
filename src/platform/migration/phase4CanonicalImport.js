@@ -311,4 +311,4 @@ function normalizeVersion(value) {
 function nullable(value) { return value == null || value === "" ? null : String(value); }
 function calendarDate(value) { const text = nullable(value); return text && /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null; }
 function dateTime(value) { const text = nullable(value); return text && !Number.isNaN(Date.parse(text)) ? new Date(text).toISOString() : null; }
-function isSingletonCollection(name) { return ["user", "nutritionContext", "operatingPlan", "operatingRhythm", "adaptiveTrustProfile"].includes(name); }
+function isSingletonCollection(name) { return ["user", "nutritionContext", "operatingPlan"].includes(name); }

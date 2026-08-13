@@ -46,7 +46,14 @@ const finalImport = await importCanonicalPackage({ pool, packageRoot, resetTarge
 await validateCanonicalImport({ pool, packageRoot });
 const migrations = await pool.query("SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY name");
 await pool.end();
-if (migrations.rows.length !== 3) throw new Error("Phase 4 migration down/up/reapply did not retain all three migrations.");
+const expectedMigrations = fs.readdirSync(path.join(root, "db", "migrations"))
+  .filter((name) => /^\d+_.+\.cjs$/.test(name))
+  .map((name) => name.replace(/\.cjs$/, ""))
+  .sort();
+const actualMigrations = migrations.rows.map((row) => row.name).sort();
+if (JSON.stringify(actualMigrations) !== JSON.stringify(expectedMigrations)) {
+  throw new Error(`Phase 4 migration down/up/reapply mismatch (expected=${expectedMigrations.join(",")}; actual=${actualMigrations.join(",")}).`);
+}
 process.stdout.write(`\n[phase4-postgres] PASS migrations=up/down/reapply digest=${finalImport.importDigest}\n`);
 
 function assertGuarded(value) {
