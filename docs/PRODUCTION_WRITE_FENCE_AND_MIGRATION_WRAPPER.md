@@ -125,3 +125,11 @@ The canonical task stopped, the prebuilt artifact was atomically promoted, and t
 Founder revision 119 remained `26,955,008` bytes with SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`. No production write was fabricated; inactive write availability is proven by exact-build isolated command/write-surface tests and the unchanged enabled operational state. No in-app browser session was available, so visual acceptance is not claimed.
 
 The inactive capability exists in production without changing canonical behavior. The fence was never activated. JSON/file and current local evidence remain canonical; PostgreSQL and Spaces remain noncanonical; authentication remains inactive; no migration operation or evidence move occurred.
+
+## Operational-readiness gate closure
+
+The later non-migration readiness patch accepted provider alerting and the control-inclusive recovery set; exact evidence is in `docs/ENCRYPTED_MIGRATION_RECOVERY.md`. App/worker and database alerts are enabled to the Founder email, actual Uptime email delivery was confirmed, the $40 billing alert is Founder-attested active, current staging/Space/database readiness is accepted, and recurring cost remains $30.15/month.
+
+The encrypted packet reconciles source checkpoint `c55141dd53dabf3d0d7da2b82ec50f8beaae8b5e`, production build `HasDoRm5cgRE0FsXZU1Uu`, rollback `RmjN47V8xsq3-6jSlZh-9`, runtime SHA `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, and control SHA `435BCAE703BA96E984D69C45FC808CBE404128E9137D14D99D8FAC836D4D32DE`. All 365 media hashes and 402 packet entries passed isolated restore. Matching local/off-machine encrypted copies have SHA-256 `D6C4729FA33D83B9A5A080323CB64E143E61839D2F0B0B6D3FE96A1848C93E48`.
+
+These results close the alert/capacity/recovery bullets in the earlier remaining-gates list. The Founder accepted the complete 35-day minimum retention policy and its exit conditions on 2026-08-13; future deletion remains separately review-gated. Migration remains **BLOCKED** on exact-window approval and separate final go/no-go. The final pre-fence capture must refresh current runtime/media/control bytes. No fence, migration, composition switch, production auth, or evidence move occurred in this gate.

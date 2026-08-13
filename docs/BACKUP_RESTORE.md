@@ -219,3 +219,32 @@ write, never restore an older legacy control record or silently reinitialize;
 retain PostgreSQL as canonical and use the separately reviewed forward-repair
 procedure. Control restoration is an operational state mutation and always
 requires explicit authorization.
+
+## Restore the encrypted migration recovery packet
+
+The accepted pre-migration artifact and exact evidence are recorded in
+`docs/ENCRYPTED_MIGRATION_RECOVERY.md`. Its filename is
+`physiqueos-migration-recovery-20260812.tar.age`, size 577,876,390 bytes,
+SHA-256 `D6C4729FA33D83B9A5A080323CB64E143E61839D2F0B0B6D3FE96A1848C93E48`.
+Matching encrypted copies exist locally below `.tmp` and in the established
+`G:\My Drive\PhysiqueOS Backups\Migration Recovery 2026-08-12` location.
+
+Use official `age` v1.3.1 or a compatible later release with
+`age-plugin-batchpass`. Retrieve the unique passphrase from the Founder's
+password-manager entry `PhysiqueOS migration recovery 2026-08-12`; never put
+it in Git, a manifest, DigitalOcean environment, command line, or plaintext
+file. Decrypt and extract only into a new isolated directory, then:
+
+1. verify `manifests/packet-files-sha256.json` in full;
+2. verify the runtime/control hashes against the completeness record;
+3. verify all entries in `manifests/media-sha256.json`;
+4. run `git bundle verify` and confirm checkpoint `c55141dd53dabf3d0d7da2b82ec50f8beaae8b5e` is recoverable;
+5. confirm accepted build `HasDoRm5cgRE0FsXZU1Uu` and rollback build `RmjN47V8xsq3-6jSlZh-9`;
+6. confirm the migration manifest, script identities, provider inventory, and recovery instructions exist; and
+7. delete the decrypted temporary workspace after verification.
+
+Never restore over a running canonical task. Recovery verification does not
+authorize production restoration, fence activation, migration, or canonical
+composition change. The secret's only continuing custody location is the
+Founder's password manager; the temporary DPAPI copy used for packet creation
+was deleted after successful restore verification.

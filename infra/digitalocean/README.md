@@ -47,6 +47,18 @@ Live Phase 5 execution passed with a short-lived custom-scope PAT limited to the
 
 ## Operational-readiness observation (2026-08-12)
 
-The existing `phase5-staging` context still reads the accepted app and database. App deployment `dd3934a7-ff2a-4184-8c00-b5fc75b95ddf` was active; public liveness/readiness returned 200; PostgreSQL was online; managed backups existed at `2026-08-11T19:10:03Z` and `2026-08-12T07:10:12Z`. Resource topology and the $30.15 monthly base were unchanged.
+During the earlier audit, the `phase5-staging` context could still read the accepted app and database. App deployment `dd3934a7-ff2a-4184-8c00-b5fc75b95ddf` was active; public liveness/readiness returned 200; PostgreSQL was online; managed backups existed at `2026-08-11T19:10:03Z` and `2026-08-12T07:10:12Z`. Resource topology and the $30.15 monthly base were unchanged.
 
-The token deliberately lacks Monitoring, Uptime, and Billing scopes, so current alert policies, utilization, billing alert, and delivery recipient could not be verified. Do not broaden this context silently. Complete the bounded policy audit with the scope list and user-only receipt confirmation in `docs/PRE_IOS_OPERATIONAL_MIGRATION_AUTHORIZATION.md`, then revoke the temporary context. No alert, resource, key, database, object, or recurring cost changed during this observation.
+That token deliberately lacked Monitoring, Uptime, and Billing scopes, so the earlier observation could not verify alert policies, utilization, billing alert, or delivery recipient. The later bounded audit below supersedes that limitation. No alert, resource, key, database, object, or recurring cost changed during the earlier observation.
+
+## Operational alert and capacity acceptance (2026-08-12)
+
+The later narrow audit supersedes the observation limitation above. Eight App Platform alerts are enabled to the Founder account email: deployment/domain failure and, for both `web` and `worker`, CPU/memory greater than 70% for 10 minutes plus restart count greater than 0.5 for 5 minutes. Alert-only deployment `e707a930-4a71-426d-a1f3-2d713917144b` is active and readiness remained 200.
+
+The managed database has one enabled alert each for CPU, memory, and disk greater than 70% for 10 minutes. It remains online on the one-node PostgreSQL 17 `db-s-1vcpu-1gb` / 10,240 MiB plan; the latest observed managed backup is 0.0683214 GiB at `2026-08-12T07:10:12Z`. Its trusted source remains only App Platform app `bf57cf56-48cc-4cd6-90e4-a23ee5381741`. The operator did not add an IP or weaken the firewall solely to scrape raw metrics.
+
+One credited Uptime check monitors staging `/api/v1/health/ready` from `us_east` and `us_west`, alerting the Founder email after two minutes globally down. Before repurposing, the same check targeted a harmless `.invalid` endpoint; both regions became down and the Founder confirmed actual email receipt. Both regions were up after the permanent readiness target was installed. DigitalOcean documents one monthly Uptime-check credit; no second check or recurring charge was added.
+
+The Founder completed the user-only Billing control and attested that the account-email alert is active at $40/month. The alert is an early warning, not a cap. Resource topology and recurring base remain exactly $30.15/month. Fresh bucket-scoped inspection proved versioning enabled, anonymous bucket/object access denied, authenticated object readback successful, 5 live objects / 178 bytes, 11 versions / 400 bytes, zero delete markers, and zero incomplete multipart uploads. No provider object or Founder data was mutated. Full acceptance is in `docs/ENCRYPTED_MIGRATION_RECOVERY.md`.
+
+After final verification, the revoked and short-lived operational-readiness contexts were removed from the workstation. Local context removal does not revoke a PAT; revoke the two successful short-lived operational-readiness PATs in the DigitalOcean control panel after accepting this patch.

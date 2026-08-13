@@ -4,7 +4,7 @@ Status: living canonical transition document
 
 Last audited: 2026-08-12
 
-Foundation design decision: approved for the initial Founder-stage direction; Phases 1-6 are accepted, including live synthetic DigitalOcean provider evidence, the production compatibility release, and the inactive operational-safety deployment. Production remains on the JSON/file runtime and no migration is authorized. Remaining operational and migration approvals are recorded in sections 39-42 and the Phase 6 packet.
+Foundation design decision: approved for the initial Founder-stage direction; Phases 1-6 are accepted, including live synthetic DigitalOcean provider evidence, the production compatibility release, inactive operational-safety deployment, provider observability, and encrypted recovery acceptance. Production remains on the JSON/file runtime and no migration is authorized. Remaining approvals are recorded in sections 39-43 and the Phase 6 packet.
 
 Accepted inactive-safety source: `e3b4f4505e9c2b5598901b002271933f45c24dbf`; production build: `HasDoRm5cgRE0FsXZU1Uu`; retained compatibility rollback: `RmjN47V8xsq3-6jSlZh-9`
 
@@ -1076,6 +1076,23 @@ Production migration control is `inactive / legacy-json / legacy-json`, with rea
 
 Founder revision `119`, size `26,955,008`, updated `2026-08-12T16:02:21.133Z`, and SHA-256 `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281` were unchanged before deployment, after deployment, and after restart. Bounded Phase 1-6, Training, Photo, ownership, persistence, migration-safety, lint, diff, isolated-build, local/LAN/public route, asset/MIME, and authorized-media checks passed. No in-app browser session was available, so no visual acceptance is claimed.
 
-The verified off-machine repository checkpoint at `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49` preserves exact commit `e3b4f450...` with verified bundle SHA-256 `BE6686ACE1237AFF1325D8B95B3EB01DBFA55AA42054F451FA207507E5DA0E07`. It closes the prior missing independent checkpoint-replica gate. It does not contain Founder runtime bytes or the newly initialized control file; the final migration recovery set must separately include encrypted runtime/media/control state and restore reconciliation evidence.
+The verified off-machine repository checkpoint at `G:\My Drive\PhysiqueOS Backups\PhysiqueOS_Backup_2026-08-12_16-40-49` preserves exact commit `e3b4f450...` with verified bundle SHA-256 `BE6686ACE1237AFF1325D8B95B3EB01DBFA55AA42054F451FA207507E5DA0E07`. It closes the prior missing independent checkpoint-replica gate. The later section 43 supersedes its intentional lack of Founder runtime/control bytes with a separate encrypted recovery archive and restore proof.
 
-The inactive-safety deployment gate is **CLOSED**. Production migration remains **BLOCKED** on provider alert/capacity inspection and delivered email, the $40 billing alert, current Spaces verification, control-inclusive encrypted recovery coverage, retention approval, the exact window, and explicit final go/no-go. Phase 7, Native Baseline, SwiftUI, authentication, and migration remain unstarted.
+The inactive-safety deployment gate is **CLOSED**. The later section 43 closes provider alert/capacity/delivery, billing, Spaces, encrypted recovery, and retention. Production migration remains **BLOCKED** on the exact window and explicit final go/no-go. Phase 7, Native Baseline, SwiftUI, authentication, and migration remain unstarted.
+
+## 43. Provider observability and encrypted recovery acceptance (2026-08-12)
+
+The later operational-readiness patch closes the provider-alert, delivery, billing, capacity-warning, Spaces, encrypted-recovery, off-machine-replica, restore, and key-custody gates. Eight App Platform alerts, three PostgreSQL 70%/10-minute alerts, and one credited two-region staging-readiness Uptime alert are active to the Founder account email. A harmless global-down signal produced an email the Founder confirmed receiving. The Founder attested that the user-only $40 billing alert is active. Recurring base remains $30.15/month.
+
+Fresh Spaces inspection proved versioning enabled, anonymous bucket/object reads denied, authenticated readback successful, five live objects / 178 bytes, 11 versions / 400 bytes, and no incomplete multipart upload. PostgreSQL remains online on the one-node 10 GiB plan with green readiness and a latest 0.0683214 GiB managed backup. The app-only database firewall was preserved; no operator trusted source was added.
+
+The 577,876,390-byte `age`-encrypted recovery archive has SHA-256 `D6C4729FA33D83B9A5A080323CB64E143E61839D2F0B0B6D3FE96A1848C93E48`. Local and independent `G:` copies match. Isolated decryption verified 402 packet entries, all 365 media hashes, revision-119 runtime, inactive control, repository checkpoint `c55141dd53dabf3d0d7da2b82ec50f8beaae8b5e`, accepted build, rollback build, migration package, scripts, and runbooks. Plaintext workspaces and the temporary DPAPI secret were deleted; the primary recovery secret exists only in the Founder's password manager. See `docs/ENCRYPTED_MIGRATION_RECOVERY.md`.
+
+The Founder explicitly approved the complete 35-day minimum retention policy
+and all listed exit conditions on 2026-08-13. This does not authorize later
+deletion, which still requires its own explicit review. Production and Founder
+state were not mutated: JSON/file and local evidence remain canonical, the
+fence remains inactive, reads/writes remain enabled, and PostgreSQL/Spaces/auth
+remain noncanonical/inactive. Migration is **BLOCKED only on exact-window
+approval and a separate final go/no-go**. Phase 7, Native Baseline, and SwiftUI
+remain unstarted.
