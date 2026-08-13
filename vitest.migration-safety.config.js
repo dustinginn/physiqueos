@@ -18,6 +18,7 @@ export default defineConfig({
       "src/data/repositories/ProductionRepositoryFacade.test.js",
       "scripts/ValidationBuildIsolation.test.js",
       "scripts/ProductionMigrationRemediationWiring.test.js",
+      "scripts/ProductionMigrationEntrypoint.test.js",
       "src/platform/migration/ProductionSpacesMediaMigration.test.js",
     ],
     fileParallelism: false,

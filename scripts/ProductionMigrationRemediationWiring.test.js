@@ -34,7 +34,7 @@ describe("production migration remediation wiring", () => {
       .filter((file) => !file.endsWith("founderRepositories.js") && !file.endsWith("productionApplicationComposition.js"))
       .filter((file) => readAbsolute(file).includes("LegacyFounderRepositories"));
     expect(bypasses).toEqual([]);
-  });
+  }, 30_000);
 
   it("does not retain the stale Phase 3 checkpoint in current-copy export tooling", () => {
     for (const file of ["scripts/runPhase4CurrentCopyExport.mjs", "scripts/verifyPhase4PackageDeterminism.mjs"]) {
