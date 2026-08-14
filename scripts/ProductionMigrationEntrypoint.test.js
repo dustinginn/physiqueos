@@ -118,6 +118,16 @@ describe("production migration CLI Windows entrypoint", () => {
       },
     });
   });
+
+  it("fails with the explicit provider-boundary code instead of attempting DigitalOcean PostgreSQL from Windows", async () => {
+    const { assertTrustedProviderExecutionBoundary } = await import("./productionMigrationEnvironmentAdapters.mjs");
+    const databaseConfig = { connectionString: "postgresql://example.invalid@private.db.ondigitalocean.com:25060/target" };
+    expect(() => assertTrustedProviderExecutionBoundary(databaseConfig, {})).toThrow(expect.objectContaining({ code: "MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED" }));
+    expect(() => assertTrustedProviderExecutionBoundary(databaseConfig, {
+      PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY: "digitalocean-app-platform",
+      PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED: "1",
+    })).not.toThrow();
+  });
 });
 
 function temporaryDirectory(prefix) {

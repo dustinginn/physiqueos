@@ -1148,3 +1148,52 @@ evidence move, provider mutation, authentication activation, Phase 7, Native
 Baseline, or SwiftUI work. The recovery refresh is accepted and permits a new
 final pre-fence gate, subject to fresh live-alignment/backup checks and separate
 migration authority.
+
+## 48. Provider-side production dry-run execution boundary (2026-08-13)
+
+The final pre-fence gate correctly rejected a Windows-hosted provider check: the
+managed PostgreSQL firewall trusts only App Platform app
+`bf57cf56-48cc-4cd6-90e4-a23ee5381741`, so the operator host timed out rather
+than proving target health. The firewall remains unchanged. Production
+provider checks are now designed as a control-plane/provider-plane operation:
+Windows validates the live build, Founder runtime, migration control,
+collection contract, rollback artifact, and encrypted packet; it submits only
+those nonsecret identities to a protected App Platform endpoint. A durable
+PostgreSQL migration-run/outbox record is then claimed by the existing worker,
+which invokes the accepted `ProductionMigrationRunner` and
+`ProductionMigrationOrchestrator` inside the network boundary already trusted
+by PostgreSQL and Spaces.
+
+The remote command is fixed to `dryRun=true`, has an explicit operation and
+correlation ID, exact operator/environment/source/build/runtime/control/
+recovery identities, canonical payload fingerprinting, exact-replay
+idempotency, payload-drift rejection, and no arbitrary command field. The
+existing operations bearer token protects submit and status. Ordinary product
+sessions and anonymous requests have no access; product authentication remains
+inactive. Database, Spaces, provider-API, and recovery secrets remain encrypted
+server environment variables and are neither accepted in the request nor
+returned in status or logs.
+
+The deployment attestation pins Founder revision `122`, runtime SHA-256
+`92EE630BD314A6AB6D3F6F66D1B54D441BE508C91E50AB5FFD6A116A02D11D1C`,
+and 372 media files / 276,646,284 bytes with deterministic inventory SHA-256
+`5BED8E9231031F10F58AA189116E7054F2CE2CA2607D30C4D7AE2F987D715391`.
+The Windows client recomputes these live; any later legitimate Founder/runtime
+or media activity blocks the remote request until recovery evidence and the
+provider attestation are refreshed together.
+
+The worker performs private PostgreSQL connectivity, exact cluster-host and
+PostgreSQL-17/schema checks, DigitalOcean backup freshness under 24 hours,
+private/versioned Spaces and incomplete-multipart checks, provider composition
+construction, package-v2/manifest-v2 availability, and the 39-required/
+3-excluded contract through the same accepted runner. Target database counts
+and Space inventory are digested before and after; any change fails the dry-run.
+The provider control store is immutable and throws on transition. Windows
+direct use of the production adapter against a DigitalOcean host now fails with
+`MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED` and never silently falls back
+to a direct connection.
+
+This capability is source-only until a separately authorized App Platform
+compatibility deployment and synthetic remote rehearsal complete. Deployment
+must not add a paid component, weaken the firewall, enable the fence, import
+Founder data, move evidence, select PostgreSQL, or activate authentication.

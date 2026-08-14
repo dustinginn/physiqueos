@@ -55,6 +55,42 @@ services:
         scope: RUN_TIME
         type: SECRET
         value: ${OPERATIONS_TOKEN}
+      - key: PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY
+        scope: RUN_TIME
+        value: digitalocean-app-platform
+      - key: PHYSIQUEOS_MIGRATION_OPERATOR_ID
+        scope: RUN_TIME
+        value: ${MIGRATION_OPERATOR_ID}
+      - key: PHYSIQUEOS_EXPECTED_PRODUCTION_SOURCE_COMMIT
+        scope: RUN_TIME
+        value: ${EXPECTED_PRODUCTION_SOURCE_COMMIT}
+      - key: PHYSIQUEOS_EXPECTED_PRODUCTION_BUILD_ID
+        scope: RUN_TIME
+        value: ${EXPECTED_PRODUCTION_BUILD_ID}
+      - key: PHYSIQUEOS_EXPECTED_FOUNDER_REVISION
+        scope: RUN_TIME
+        value: ${EXPECTED_FOUNDER_REVISION}
+      - key: PHYSIQUEOS_EXPECTED_FOUNDER_SHA256
+        scope: RUN_TIME
+        value: ${EXPECTED_FOUNDER_SHA256}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_COUNT
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_COUNT}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_BYTES
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_BYTES}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_INVENTORY_SHA256
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_INVENTORY_SHA256}
+      - key: PHYSIQUEOS_EXPECTED_ROLLBACK_SOURCE_COMMIT
+        scope: RUN_TIME
+        value: ${EXPECTED_ROLLBACK_SOURCE_COMMIT}
+      - key: PHYSIQUEOS_EXPECTED_ROLLBACK_BUILD_ID
+        scope: RUN_TIME
+        value: ${EXPECTED_ROLLBACK_BUILD_ID}
       - key: PHYSIQUEOS_BUILD_ID
         scope: RUN_AND_BUILD_TIME
         value: ${BUILD_ID}
@@ -82,6 +118,86 @@ workers:
         scope: RUN_TIME
         type: SECRET
         value: ${DATABASE_CA_CERT}
+      - key: PHYSIQUEOS_MIGRATION_DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: ${MIGRATION_DATABASE_URL}
+      - key: PHYSIQUEOS_OBJECT_STORAGE_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_SPACES_REGION
+        scope: RUN_TIME
+        value: ${SPACES_REGION}
+      - key: PHYSIQUEOS_SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: ${SPACES_ENDPOINT}
+      - key: PHYSIQUEOS_SPACES_BUCKET
+        scope: RUN_TIME
+        value: ${SPACES_BUCKET}
+      - key: PHYSIQUEOS_SPACES_ACCESS_KEY_ID
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SPACES_ACCESS_KEY_ID}
+      - key: PHYSIQUEOS_SPACES_SECRET_ACCESS_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: ${SPACES_SECRET_ACCESS_KEY}
+      - key: PHYSIQUEOS_CREDENTIAL_PEPPER
+        scope: RUN_TIME
+        type: SECRET
+        value: ${CREDENTIAL_PEPPER}
+      - key: DIGITALOCEAN_ACCESS_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+        value: ${DATABASE_READ_TOKEN}
+      - key: PHYSIQUEOS_DATABASE_CLUSTER_ID
+        scope: RUN_TIME
+        value: ${DATABASE_CLUSTER_ID}
+      - key: PHYSIQUEOS_CANONICAL_OWNER_USER_ID
+        scope: RUN_TIME
+        value: ${CANONICAL_OWNER_USER_ID}
+      - key: PHYSIQUEOS_MIGRATION_RECOVERY_SHA256
+        scope: RUN_TIME
+        value: ${MIGRATION_RECOVERY_SHA256}
+      - key: PHYSIQUEOS_MIGRATION_CONTROL_SHA256
+        scope: RUN_TIME
+        value: ${MIGRATION_CONTROL_SHA256}
+      - key: PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED
+        scope: RUN_TIME
+        value: "1"
+      - key: PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY
+        scope: RUN_TIME
+        value: digitalocean-app-platform
+      - key: PHYSIQUEOS_MIGRATION_OPERATOR_ID
+        scope: RUN_TIME
+        value: ${MIGRATION_OPERATOR_ID}
+      - key: PHYSIQUEOS_EXPECTED_PRODUCTION_SOURCE_COMMIT
+        scope: RUN_TIME
+        value: ${EXPECTED_PRODUCTION_SOURCE_COMMIT}
+      - key: PHYSIQUEOS_EXPECTED_PRODUCTION_BUILD_ID
+        scope: RUN_TIME
+        value: ${EXPECTED_PRODUCTION_BUILD_ID}
+      - key: PHYSIQUEOS_EXPECTED_FOUNDER_REVISION
+        scope: RUN_TIME
+        value: ${EXPECTED_FOUNDER_REVISION}
+      - key: PHYSIQUEOS_EXPECTED_FOUNDER_SHA256
+        scope: RUN_TIME
+        value: ${EXPECTED_FOUNDER_SHA256}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_COUNT
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_COUNT}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_BYTES
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_BYTES}
+      - key: PHYSIQUEOS_EXPECTED_MEDIA_INVENTORY_SHA256
+        scope: RUN_TIME
+        value: ${EXPECTED_MEDIA_INVENTORY_SHA256}
+      - key: PHYSIQUEOS_EXPECTED_ROLLBACK_SOURCE_COMMIT
+        scope: RUN_TIME
+        value: ${EXPECTED_ROLLBACK_SOURCE_COMMIT}
+      - key: PHYSIQUEOS_EXPECTED_ROLLBACK_BUILD_ID
+        scope: RUN_TIME
+        value: ${EXPECTED_ROLLBACK_BUILD_ID}
       - key: PHYSIQUEOS_BUILD_ID
         scope: RUN_AND_BUILD_TIME
         value: ${BUILD_ID}

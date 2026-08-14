@@ -74,6 +74,7 @@ export function createDigitalOceanManagedPostgresBackupFreshnessVerifier({
       reason,
       clusterId: String(cluster?.id ?? expectedClusterId),
       clusterStatus: String(cluster?.status ?? "unknown"),
+      connectionHost: String(cluster?.connection?.host ?? cluster?.private_connection?.host ?? "") || null,
       latestBackupAt: latestBackupAt?.toISOString() ?? null,
       backupAgeMs: ageMs,
       backupAgeHours: ageMs == null ? null : Number((ageMs / 3_600_000).toFixed(3)),

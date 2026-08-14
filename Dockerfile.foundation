@@ -9,8 +9,14 @@ ENV NODE_ENV=production PORT=8080
 COPY --from=dependencies /app/package.json /app/package-lock.json ./
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY src/contracts ./src/contracts
+COPY src/application ./src/application
+COPY src/data ./src/data
+COPY src/domain ./src/domain
+COPY src/fixtures ./src/fixtures
+COPY src/navigation ./src/navigation
+COPY src/presentation ./src/presentation
 COPY src/platform ./src/platform
-COPY scripts/runFoundationWeb.mjs scripts/runFoundationWorker.mjs ./scripts/
+COPY scripts/runFoundationWeb.mjs scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs ./scripts/
 USER node
 EXPOSE 8080
 CMD ["node", "scripts/runFoundationWeb.mjs"]

@@ -506,3 +506,30 @@ Binary recovery status: **PASS / RECOVERY PACKET REFRESH ACCEPTED**. The final
 pre-fence gate may be rerun after the required End Work Session checkpoint and
 must freshly verify live packet alignment and managed-backup age. Phase 7 and
 Native work remain unstarted.
+
+## Provider execution-boundary remediation (2026-08-13)
+
+The final live gate was blocked because the production dry-run was launched
+from Windows while PostgreSQL correctly trusted App Platform only. The timeout
+was an execution-location defect, not a database-health defect, and no operator
+IP was added. Source now supplies a protected one-shot remote dry-run command,
+durable operation/outbox execution by the existing App Platform worker,
+protected polling status, and a Windows control client. The worker delegates to
+the accepted production runner/orchestrator and performs private PostgreSQL,
+backup, Spaces, provider-composition, package, and collection-contract checks.
+
+The request schema permits identities and hashes only, enforces Founder as the
+configured operator and production as the environment, rejects execution/final
+GO and unknown fields, and binds retries to a SHA-256 payload fingerprint.
+Provider secrets remain server-side. Direct production-provider validation
+from Windows fails with `MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED`.
+Database and Space inventories must be identical before and after the remote
+run. Unit/synthetic coverage proves authentication, idempotency, payload-drift
+rejection, worker replay, client reconnect/polling, identity mismatch, no
+control transition, and no provider mutation.
+
+The source does not change the current readiness verdict by itself. The
+capability must be deployed inertly to the existing no-cost-increase App
+Platform footprint and exercised against the accepted synthetic target before
+the final production pre-fence gate can be rerun. Production remains healthy,
+writable, and canonical on legacy JSON; no migration is authorized.

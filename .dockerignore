@@ -6,6 +6,8 @@ node_modules
 !.env.example
 private
 data
+!src/data
+!src/data/**
 backups
 screenshots
 test-results
@@ -14,3 +16,5 @@ playwright-report
 *.log
 *.dump
 *.backup
+**/*.test.js
+**/*.test.jsx

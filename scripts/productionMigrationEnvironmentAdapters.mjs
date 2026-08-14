@@ -57,6 +57,7 @@ export async function createProductionMigrationEnvironment({ env = process.env }
   const databaseConfig = readDatabaseConfig(env);
   const spacesConfig = readSpacesConfig(env);
   if (!databaseConfig.enabled || !spacesConfig.enabled) throw new Error("Production migration environment requires explicit PostgreSQL and Spaces configuration.");
+  assertTrustedProviderExecutionBoundary(databaseConfig, env);
   const pool = createPostgresPool(databaseConfig);
   const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
   const ownerUserId = required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
@@ -309,3 +310,15 @@ function pass(value = {}) { return Object.freeze({ ready: true, mutated: false, 
 function digestJson(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function sha256(value) { const candidate = value.toLowerCase(); if (!/^[a-f0-9]{64}$/.test(candidate)) throw new Error("Recovery SHA-256 is invalid."); return candidate; }
 function required(value, field) { const candidate = String(value ?? "").trim(); if (!candidate) throw new Error(`${field} is required.`); return candidate; }
+
+export function assertTrustedProviderExecutionBoundary(databaseConfig, env) {
+  let hostname;
+  try { hostname = new URL(databaseConfig.connectionString).hostname.toLowerCase(); }
+  catch { return; }
+  if (!hostname.endsWith(".ondigitalocean.com")) return;
+  if (env.PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY === "digitalocean-app-platform"
+    && env.PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED === "1") return;
+  const error = new Error("Production provider checks must execute inside the approved DigitalOcean App Platform boundary; use the remote dry-run control client.");
+  error.code = "MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED";
+  throw error;
+}

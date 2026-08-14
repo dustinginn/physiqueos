@@ -52,6 +52,28 @@ describe("foundation-only HTTP server", () => {
     expect(response.status).toBe(500);
     expect(JSON.stringify(await response.json())).not.toContain("secret");
   });
+
+  it("protects the bounded remote dry-run submit/status surface and never accepts arbitrary methods", async () => {
+    const migrationDryRun = {
+      submit: async (payload) => ({ status: 202, body: { operationId: payload.operationId, state: "queued", finalClassification: "PENDING" } }),
+      status: async (operationId) => ({ status: 200, body: { operationId, state: "succeeded", finalClassification: "READY" } }),
+    };
+    const base = await listen(createFoundationRequestHandler({ getReadiness: async () => readiness, buildIdentity, operationsToken, migrationDryRun }));
+    const route = `${base}/api/v1/operations/production-migration-dry-runs`;
+    expect((await fetch(route, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(401);
+    expect((await fetch(route, { method: "POST", headers: { authorization: "Bearer wrong", "content-type": "application/json" }, body: "{}" })).status).toBe(401);
+    const submitted = await fetch(route, {
+      method: "POST",
+      headers: { authorization: `Bearer ${operationsToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ operationId: "remote-dry-run-0001" }),
+    });
+    expect(submitted.status).toBe(202);
+    expect(await submitted.json()).toMatchObject({ operationId: "remote-dry-run-0001", state: "queued" });
+    const status = await fetch(`${route}/remote-dry-run-0001`, { headers: { authorization: `Bearer ${operationsToken}` } });
+    expect(status.status).toBe(200);
+    expect(await status.json()).toMatchObject({ state: "succeeded", finalClassification: "READY" });
+    expect((await fetch(`${route}/remote-dry-run-0001`, { method: "DELETE", headers: { authorization: `Bearer ${operationsToken}` } })).status).toBe(405);
+  });
 });
 
 async function listen(handler) {

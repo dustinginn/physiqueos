@@ -273,3 +273,46 @@ stayed healthy, writable, and strictly `inactive / legacy-json / legacy-json`.
 Recovery evidence is current enough to rerun the final pre-fence gate. That
 gate must still recheck live alignment, provider backup freshness, exact
 window, and final explicit GO. No fence or migration is authorized here.
+
+## Provider-side dry-run authorization boundary (2026-08-13)
+
+The previous final gate did not reach READY because its real production CLI
+attempted private PostgreSQL connectivity from the Windows control plane. The
+accepted firewall intentionally permits only App Platform app
+`bf57cf56-48cc-4cd6-90e4-a23ee5381741`; it remains unchanged and the operator
+workstation remains untrusted for database connections.
+
+The remediation separates responsibilities without adding a second migration
+implementation. Windows captures and validates live production source/build,
+Founder revision/hash, inactive migration-control state/digest, current
+encrypted recovery checksum, rollback identity, and the 39/3 collection
+contract. It submits those nonsecret expectations with explicit operation,
+correlation, operator, and environment identities. The authenticated App
+Platform worker loads the same `ProductionMigrationRunner` and orchestrator and
+performs all provider-dependent checks using encrypted server environment
+credentials. The status contract returns only state, timestamps, identities,
+redacted check summaries, backup age, worker heartbeat, no-mutation proof,
+failure code, and final dry-run classification.
+
+The current provider attestation is revision `122`, runtime SHA-256
+`92EE630BD314A6AB6D3F6F66D1B54D441BE508C91E50AB5FFD6A116A02D11D1C`,
+372 media files / 276,646,284 bytes, and media-inventory SHA-256
+`5BED8E9231031F10F58AA189116E7054F2CE2CA2607D30C4D7AE2F987D715391`.
+The control client hashes every live media file and the protected endpoint
+fails closed if runtime/media lineage no longer matches the provider-pinned
+recovery state.
+
+The remote operation cannot carry a final migration authorization and its
+server-side adapters cannot call any execution-stage operation. It cannot
+activate the fence, pause writes, create a canonical PostgreSQL write, import
+Founder data, upload production media, switch composition, or activate
+authentication. A migration-run audit row and outbox message are the only expected
+noncanonical audit effects. Same-ID/same-payload requests replay status;
+same-ID/different-payload requests fail closed.
+
+Before another final GO/NO-GO, a separately authorized inert App Platform
+deployment must prove authenticated submit/status, worker execution, private
+target connectivity, fresh backup metadata, private/versioned Space checks,
+provider composition, durable restart/reconnect behavior, and unchanged target
+inventories against synthetic data. That rehearsal is not a migration and does
+not replace the later exact final user authorization.

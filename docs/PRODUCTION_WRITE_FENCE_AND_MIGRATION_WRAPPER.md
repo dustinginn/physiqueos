@@ -157,3 +157,39 @@ The later non-migration readiness patch accepted provider alerting and the contr
 The encrypted packet reconciles source checkpoint `c55141dd53dabf3d0d7da2b82ec50f8beaae8b5e`, production build `HasDoRm5cgRE0FsXZU1Uu`, rollback `RmjN47V8xsq3-6jSlZh-9`, runtime SHA `CC4903F96145FB3A3059010A6DE4ED1B9A31DD4FEC3A4D6CF6A10D9CCEBF4281`, and control SHA `435BCAE703BA96E984D69C45FC808CBE404128E9137D14D99D8FAC836D4D32DE`. All 365 media hashes and 402 packet entries passed isolated restore. Matching local/off-machine encrypted copies have SHA-256 `D6C4729FA33D83B9A5A080323CB64E143E61839D2F0B0B6D3FE96A1848C93E48`.
 
 These results close the alert/capacity/recovery bullets in the earlier remaining-gates list. The Founder accepted the complete 35-day minimum retention policy and its exit conditions on 2026-08-13; future deletion remains separately review-gated. Migration remains **BLOCKED** on exact-window approval and separate final go/no-go. The final pre-fence capture must refresh current runtime/media/control bytes. No fence, migration, composition switch, production auth, or evidence move occurred in this gate.
+
+## Provider-side production dry-run transport (2026-08-13)
+
+The production runner remains authoritative, but its provider-dependent
+preflight must execute inside DigitalOcean App Platform. The Windows operator
+client is a control plane only. It validates local production/runtime/control/
+recovery/rollback identities, then submits a typed request to
+`POST /api/v1/operations/production-migration-dry-runs` and polls the protected
+`GET /api/v1/operations/production-migration-dry-runs/:operationId` status.
+Both routes require the existing operations bearer token; no credential is
+placed in a URL.
+
+The web process writes an idempotent `production-migration-dry-run` migration-run audit
+and matching `operations.production-migration-dry-run` outbox message in one
+foundation-database transaction. The existing worker claims the durable
+message, so client disconnects and expired leases do not lose work. Exact
+replay returns the existing operation; changed payload under the same ID is
+rejected. Worker success/failure and a redacted result are durable and safe to
+poll after restart.
+
+Inside the worker, a thin provider environment supplies nonmutating adapters to
+the accepted `ProductionMigrationRunner`. Its control store is immutable and
+throws on every transition. All execution-stage adapters throw
+`REMOTE_DRY_RUN_EXECUTION_FORBIDDEN`. Before/after target database counts and
+Space inventory digests must match. The runner must still validate source/build,
+runtime attestation, recovery/control digests, backup freshness, target health,
+provider composition, package-v2 tooling, and the 39-required/3-excluded
+inventory before returning its no-final-GO READY boundary.
+
+`scripts/runRemoteProductionMigrationDryRun.mjs` is the Windows control client.
+The older direct adapter now rejects DigitalOcean production-provider targets
+outside `PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY=digitalocean-app-platform` with
+`MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED`; a timeout is no longer the
+expected control flow. Local isolated databases remain available to explicit
+synthetic rehearsal. The remote capability is inert until separately deployed
+and explicitly invoked; it never auto-runs at web or worker startup.

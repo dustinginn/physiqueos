@@ -27,6 +27,7 @@
     "test:migration-safety": "vitest --config vitest.migration-safety.config.js run",
     "test:migration-remediation": "vitest --config vitest.migration-safety.config.js run && vitest --config vitest.phase4.config.js run",
     "migration:production": "node scripts/runProductionMigration.mjs",
+    "migration:production:remote-dry-run": "node scripts/runRemoteProductionMigrationDryRun.mjs",
     "worker:foundation": "node scripts/runFoundationWorker.mjs",
     "backup:foundation": "node scripts/foundationBackup.mjs",
     "infra:digitalocean:render": "node infra/digitalocean/renderAppSpec.mjs",

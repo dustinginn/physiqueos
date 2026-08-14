@@ -55,3 +55,29 @@ The current local rehearsal passed fresh up, full down/reapply, two identical im
 Migration `000004_phase5_provider_readiness.cjs` adds provider-version metadata to canonical media and a durable synthetic validation-run record. It is additive and inactive in production. Phase 5 import/reset accepts only the prior guarded Phase 4 names or `physiqueos_phase5_test_provider*` / `physiqueos_phase5_restore_provider*`; production names remain rejected.
 
 The Phase 5 generator creates synthetic-only packages spanning all 42 collections. Live provider harnesses additionally require `PHYSIQUEOS_PHASE5_PROVIDER_ACCEPTANCE=1`, the exact logical database `physiqueos_phase5_test_provider_20260811`, strict DigitalOcean CA verification, and the accepted staging Space. Restore validation accepts only the isolated `physiqueos_phase5_restore_provider` target, which is removed after the proof. Copied Founder runtime/media must never be used. Live acceptance passed all 42 collections, opaque versioned media, source/restore digests, and zero-orphan checks.
+
+## Provider-side production dry-run operations
+
+The existing `physiqueos.migration_runs`, `physiqueos.outbox_messages`, and
+`physiqueos.worker_heartbeats` tables provide the durable transport for the
+bounded App Platform dry-run. The web process inserts one
+`production-migration-dry-run` migration-run audit record and one
+`operations.production-migration-dry-run` outbox message transactionally.
+Operation ID plus a canonical SHA-256 payload fingerprint provides idempotency:
+an exact retry returns current status; payload drift fails closed. Worker lease
+expiry provides restart recovery, and terminal status remains pollable after a
+client disconnect.
+
+This audit transport lives in the foundation logical database. Provider checks
+use a distinct, explicitly configured migration-target connection on the same
+accepted cluster. Dry-run uses SELECT/read-only provider operations and records
+before/after counts for canonical domain, relationship, media, import, and
+migration tables. Any count or Space-inventory digest change fails the
+operation. No new schema or paid database is required.
+
+Direct production-provider use of `scripts/runProductionMigration.mjs` from a
+Windows host is rejected with
+`MIGRATION_PROVIDER_EXECUTION_BOUNDARY_REQUIRED`. Use
+`scripts/runRemoteProductionMigrationDryRun.mjs` as the authenticated control
+client. It does not require or transmit a database URL/password, Spaces key,
+DigitalOcean PAT, recovery passphrase, or private key.

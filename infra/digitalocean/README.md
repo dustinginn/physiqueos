@@ -21,7 +21,7 @@ Pricing was reverified on 2026-08-11 against DigitalOcean's [App Platform pricin
 
 The app uses the public Git source branch `phase2-provider-staging`; automatic deploy-on-push remains disabled. `origin/main` was not modified. The accepted runtime build is commit `55176896cb9bd2053c1092538ecbf0aa0a09eb56`, exposed as build ID `phase2-provider-staging-5517689`. Active acceptance deployment: `18151768-20b2-482a-adbe-169d06bd32c4`.
 
-`Dockerfile.foundation` packages only the shared contracts/platform foundation and the web/worker runners. It does not copy the Next product, Founder seed/runtime modules, or private files. Product routes are absent from the staging image. Public liveness/readiness are minimal; deeper status requires the operations bearer token.
+`Dockerfile.foundation` packages the shared contracts/platform foundation, the application/domain/repository modules required to construct the accepted provider composition, and the web/worker runners. It does not copy the Next product, private Founder runtime/media, generated migration packages, or private files; source tests are excluded from the image. Product routes are absent from the staging image. Public liveness/readiness are minimal; deeper status requires the operations bearer token.
 
 Database connection/CA, bucket-scoped Spaces credentials, credential pepper, and operations token are DigitalOcean encrypted runtime variables. The app spec is rendered directly to `doctl apps update --spec -`; no plaintext rendered spec is retained. Operator copies are ignored, Windows DPAPI-protected files under `.tmp/digitalocean`, not source. Never commit, print, or copy them into docs. Rotate/revoke the short-lived provisioning API token after handoff.
 
@@ -68,3 +68,37 @@ After final verification, the revoked and short-lived operational-readiness cont
 The production migration runner now reads DigitalOcean API v2 cluster and backup metadata for the exact configured PostgreSQL cluster. It requires online status and a newest managed backup age of at most 24 hours, returns only nonsecret evidence, and blocks on unavailable/stale/missing/wrong-cluster metadata. Database uptime, staging readiness, the encrypted recovery packet, and prior documentation are not substitutes for this provider timestamp.
 
 The check requires only a short-lived database-read PAT supplied as `DIGITALOCEAN_ACCESS_TOKEN` to the one operator process; it is never written to a manifest or result. Do not grant app/database mutation or broader provider scope. After the former context returned HTTP 401, a replacement read-only PAT verified exact cluster `f544596d-594e-4aa4-a0a8-533bda0992c6` (`physiqueos-p2-staging-pg`, PostgreSQL 17, `sfo3`) online and latest managed backup `2026-08-13T06:54:12.000Z`, age 13.527 hours at `2026-08-13T20:25:48.094Z`, size 0.06846476 GiB: **PASS** under the 24-hour rule. No DigitalOcean resource, database, backup, firewall, app, alert, object, or billing state was changed by this verification.
+
+## Provider-side production migration dry-run boundary
+
+Production provider validation must run in the existing App Platform boundary,
+not from the Windows operator workstation. Cluster
+`f544596d-594e-4aa4-a0a8-533bda0992c6` continues to trust only app
+`bf57cf56-48cc-4cd6-90e4-a23ee5381741`; do not add an operator IP. The existing
+web service is the authenticated control endpoint and the existing worker is
+the durable executor. No service, worker, database cluster, load balancer, or
+other paid component is added, so the recurring base remains approximately
+`$30.15/month`.
+
+The web service receives only nonsecret expected identities. The worker alone
+receives the separate migration-target database URL, bucket-scoped Spaces
+credential, credential pepper, narrow database-read PAT, cluster ID, accepted
+recovery/control checksums, and canonical synthetic owner. These remain
+DigitalOcean encrypted runtime variables. The narrow PAT requires database
+read only; do not grant app/database mutation, Spaces-key creation, or broad
+account access. The recovery passphrase and private Founder data never enter
+App Platform.
+
+The rendered spec enables the bounded feature on web and worker with
+`PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY=digitalocean-app-platform`. Web uses the
+foundation database for operation/outbox audit durability. Worker uses
+`PHYSIQUEOS_MIGRATION_DATABASE_URL` for the accepted migration target and the
+existing Space for read-only verification. Source/build and expected Windows
+production identity are pinned as nonsecret environment variables. No command
+runs at startup; only an authenticated typed outbox message invokes a dry-run.
+
+Deployment and synthetic rehearsal remain separately gated. Use the existing
+app with automatic deploy disabled, render the spec directly to the provider,
+verify liveness/readiness and wrong-token rejection, then submit one synthetic
+operation and prove worker/status/replay/reconnect/no-mutation behavior. Never
+place provider credentials in the Windows client or request payload.
