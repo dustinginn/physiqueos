@@ -7,11 +7,7 @@ import {
   getLocalDateKey,
   resolveLocalTimeZone,
 } from "../../../domain/utils/localDate";
-import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../data/repositories/founderRuntimeStore";
-import { createFounderStoreUnitOfWork } from "../../../data/repositories/FounderStoreUnitOfWork";
+import { loadApplicationRuntimeBindings } from "../../../application/runtime/ApplicationCanonicalRuntime";
 import { createRecoveryCheckInIngestionService } from "../../../domain/services/RecoveryCheckInIngestionService";
 import { createMorningCheckInPersistenceService } from "../../../domain/services/MorningCheckInPersistenceService";
 import {
@@ -47,11 +43,11 @@ export async function saveStructuredRecoveryCheckIn(formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) throw new Error("Founder user is not available.");
   const now = new Date();
-  const liveStore = getFounderRuntimeStore();
+  const bindings = await loadApplicationRuntimeBindings();
   const service = createRecoveryCheckInIngestionService({
-    unitOfWork: createFounderStoreUnitOfWork({
-      filePath: resolveFounderRuntimeStorePath(),
-      liveStore,
+    unitOfWork: bindings.createUnitOfWork({
+      filePath: bindings.runtimeStorePath,
+      liveStore: bindings.liveStore,
       binding: {
         storeIdentity: "founder_runtime_store",
         storeKind: "production",
@@ -108,10 +104,9 @@ export async function saveMorningCheckIn(formData) {
     formData,
     user.preferences?.defaultWeighInContext
   );
-  const liveStore = getFounderRuntimeStore();
+  const bindings = await loadApplicationRuntimeBindings();
   const service = createMorningCheckInPersistenceService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore,
+    ...bindings,
     now: () => now,
   });
   const result = await service.save({

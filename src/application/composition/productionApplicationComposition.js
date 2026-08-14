@@ -11,6 +11,7 @@ import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js"
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
 import { createCanonicalWriteFence } from "../../platform/cutover/canonicalWriteFence.js";
 import { CanonicalCompositionMode, CanonicalStoreEpoch } from "../../platform/cutover/migrationControlState.js";
+import { createPostgresCombinedRuntimeAuthorityStore } from "../../platform/cutover/PostgresCombinedRuntimeAuthorityStore.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -27,8 +28,12 @@ export function getProductionApplicationCompositionRuntime(env = process.env) {
 }
 
 export async function getProductionApplicationComposition(env = process.env) {
-  if (env.NEXT_PHASE === "phase-production-build") {
+  if (env.NEXT_PHASE === "phase-production-build" && env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
     return createLegacyComposition({ controlStore: buildTimeLegacyControlStore() });
+  }
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {
+    if (env.NEXT_PHASE === "phase-production-build") throw providerBuildAccessError();
+    return createPostgresComposition({ controlStore: null, env, providerFullRuntime: true });
   }
   return getProductionApplicationCompositionRuntime(env).resolve();
 }
@@ -65,7 +70,7 @@ function createLegacyComposition({ controlStore }) {
   });
 }
 
-async function createPostgresComposition({ controlStore, env }) {
+async function createPostgresComposition({ controlStore, env, providerFullRuntime = false }) {
   if (!providerRuntime) {
     const databaseConfig = readDatabaseConfig(env);
     const spacesConfig = readSpacesConfig(env);
@@ -77,25 +82,43 @@ async function createPostgresComposition({ controlStore, env }) {
     const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
     providerRuntime = Object.freeze({ pool, objectProvider, ownerUserId });
   }
-  const writeFence = createCanonicalWriteFence({
+  const compatibilityMode = providerFullRuntime && env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
+  const authorityStore = providerFullRuntime && !compatibilityMode
+    ? createPostgresCombinedRuntimeAuthorityStore({
+        pool: providerRuntime.pool,
+        environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+      })
+    : null;
+  const writeFence = controlStore ? createCanonicalWriteFence({
     controlStore,
     requiredCompositionMode: CanonicalCompositionMode.POSTGRES,
     expectedCanonicalStoreEpoch: CanonicalStoreEpoch.POSTGRES_CANONICAL,
-  });
+  }) : null;
   const composition = await createPhase5ProviderApplicationComposition({
     pool: providerRuntime.pool,
     ownerUserId: providerRuntime.ownerUserId,
     objectProvider: providerRuntime.objectProvider,
     mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
     writeFence,
+    authorityStore,
+    migrationOperationId: env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+    compatibilityMode,
   });
   return Object.freeze({
     ...composition,
     kind: "production-postgres-spaces",
     canonicalStoreEpoch: CanonicalStoreEpoch.POSTGRES_CANONICAL,
     compositionMode: CanonicalCompositionMode.POSTGRES,
-    repositoryPersistence: "snapshot-read-only; writes use commands.execute",
+    repositoryPersistence: "transactional-postgres-repository-and-command-ports",
+    objectProvider: providerRuntime.objectProvider,
+    authorityStore,
   });
+}
+
+function providerBuildAccessError() {
+  const error = new Error("Provider product data cannot be resolved during image build.");
+  error.code = "PROVIDER_BUILD_DATA_ACCESS_FORBIDDEN";
+  return error;
 }
 
 function required(value, field) {

@@ -79,6 +79,11 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
     source: trustedSourceIdentity,
     collections,
     collectionInventory,
+    applicationContext: {
+      operatingRhythm: runtime.operatingRhythm ?? null,
+      adaptiveTrustProfile: runtime.adaptiveTrustProfile ?? null,
+      retiredMilestones: runtime.milestones ?? [],
+    },
     files: fileInventory,
     relationships: collectRelationships(collections, userId),
     criticalValues: {
@@ -86,6 +91,11 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
       activeGoalIds: (collections.goals ?? []).filter((goal) => goal?.status === "active").map((goal) => String(goal.id)).sort(),
       sourceUpdatedAt: runtime.updatedAt,
       canonicalStateDigest: createPayloadHash(collections),
+      applicationContextDigest: createPayloadHash({
+        operatingRhythm: runtime.operatingRhythm ?? null,
+        adaptiveTrustProfile: runtime.adaptiveTrustProfile ?? null,
+        retiredMilestones: runtime.milestones ?? [],
+      }),
       packageVersion: PHASE4_PACKAGE_VERSION,
     },
     createdAt,
@@ -107,6 +117,14 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
   if (createPayloadHash(unsigned) !== semanticDigest) throw new Error("Canonical package manifest digest mismatch.");
   if (manifest.criticalValues?.canonicalStateDigest !== createPayloadHash(collections)) {
     throw new Error("Canonical package runtime digest mismatch.");
+  }
+  const applicationContext = manifest.applicationContext ?? {
+    operatingRhythm: null,
+    adaptiveTrustProfile: null,
+    retiredMilestones: [],
+  };
+  if (manifest.criticalValues?.applicationContextDigest !== createPayloadHash(applicationContext)) {
+    throw new Error("Canonical package application-context digest mismatch.");
   }
   validateSerializableMigrationSourceIdentity(manifest.source);
   validateMigrationSourceKeys(collections);

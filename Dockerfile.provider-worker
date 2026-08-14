@@ -1,0 +1,16 @@
+FROM node:24-alpine AS dependencies
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production PHYSIQUEOS_PROVIDER_FULL_RUNTIME=1
+COPY --from=dependencies /app/package.json /app/package-lock.json ./
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY src ./src
+COPY scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs ./scripts/
+RUN rm -rf /app/src/data/founderSeed /app/src/fixtures /app/src/stories \
+ && test ! -e /app/src/data/founderSeed
+USER node
+CMD ["node", "scripts/runFoundationWorker.mjs"]

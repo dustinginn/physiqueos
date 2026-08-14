@@ -282,3 +282,8 @@ does not authorize restore, fence activation, or migration. Delete the
 decrypted TAR/workspace and any temporary DPAPI passphrase file immediately
 after verification. The only continuing passphrase custody is the Founder's
 password manager.
+## Combined-cutover recovery rule
+
+The combined architecture adds runtime-authority and transfer-receipt records to the material that must be backed up and restore-validated. A pre-first-provider-write abort may return to the unchanged final Windows snapshot only when the authority record proves no provider canonical write. After the marker exists, PostgreSQL/private Spaces remain canonical: restore into an isolated target, validate schema/authority/domain/media/outbox parity, then repair or promote a schema-compatible provider build. Never resume stale Windows JSON writes.
+
+The final recovery packet is refreshed only after the full provider compatibility deployment is accepted. See `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md` for artifact and sequencing requirements.

@@ -3,14 +3,14 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
-import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
 import { createProgressPhoto } from "../../../domain/models/progressPhoto";
 import {
   normalizeProgressPhotoPose,
   normalizeProgressPhotoView,
 } from "../../../domain/models/progressPhotoPoseVocabulary";
 import { reconcileEvidencePackageIntoCanonicalHistory } from "../../../domain/services/CanonicalEvidenceService";
-import { processEvidenceIntakeSubmission } from "../../../domain/services/EvidenceIntakeService";
+import { createStoredEvidenceArtifactDescriptor, processEvidenceIntakeSubmission } from "../../../domain/services/EvidenceIntakeService";
+import { assertApplicationUploadEntryAllowed, storeApplicationUpload } from "../../../application/media/ApplicationUploadService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 import { resolvePhotoSessionGoalRelationship } from "../../../domain/services/PhotoSessionMetadataService";
 import {
@@ -27,7 +27,7 @@ export async function POST(request) {
   let recoveryContext = null;
 
   try {
-    assertProductionLegacyCanonicalWriteAllowed({ operation: "universal-evidence-upload" });
+    assertApplicationUploadEntryAllowed({ operation: "universal-evidence-upload" });
     const formData = await request.formData();
     recoveryContext = parseEvidenceRecoveryFormData(formData);
     const user = await FounderRepositories.users.getCurrentUser();
@@ -61,6 +61,31 @@ export async function POST(request) {
           executionItems,
           goals,
         }),
+      },
+      storeArtifact: async ({ capturedAt, observedDate, file, index, submissionId }) => {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const artifactId = `artifact_${submissionId}_${index + 1}`;
+        const stored = await storeApplicationUpload({
+          ownerUserId: user.id,
+          bytes: buffer,
+          contentType: file.type || "application/octet-stream",
+          originalFilename: file.name || `upload-${index + 1}.bin`,
+          legacyDirectory: path.join("private", "founder", "evidence", "uploads"),
+          legacyPrefix: `${submissionId}-${index + 1}`,
+          category: "evidencePackages",
+          relationshipId: submissionId,
+          artifactId,
+        });
+        return createStoredEvidenceArtifactDescriptor({
+          artifactId,
+          buffer,
+          capturedAt,
+          file,
+          id: artifactId,
+          observedDate,
+          relativePath: stored.reference,
+          safeName: file.name || `upload-${index + 1}.bin`,
+        });
       },
     });
     evidencePackage = {
@@ -210,6 +235,12 @@ async function saveProgressPhotosFromEvidencePackage({ evidencePackage, userId }
 }
 
 function isValidStoredImage(relativePath) {
+  if (
+    process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" &&
+    /^media:\/\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(relativePath)
+  ) {
+    return true;
+  }
   try {
     const absolutePath = getSafePrivatePath(relativePath);
     if (!absolutePath) return false;

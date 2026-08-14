@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { getFounderRuntimeStore, resolveFounderRuntimeStorePath } from "../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { createSupplementStrategyManagementService } from "../../../../../domain/services/SupplementStrategyManagementService";
 import { buildSupplementProvenance, readSupplementFormValues, supplementManagementMessage } from "../../../../../domain/services/SupplementStrategyFormService";
 
@@ -13,8 +13,7 @@ export async function addSupplement(_priorState, formData) {
   const user = await FounderRepositories.users.getCurrentUser();
   const slug = values.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "supplement";
   const result = await createSupplementStrategyManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   }).create({
     ...values,
     userId: user.id,

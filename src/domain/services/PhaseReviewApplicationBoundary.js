@@ -20,6 +20,7 @@ export function createPhaseReviewApplicationBoundary({
   now = () => new Date(),
   binding = { storeIdentity: "phase_review_isolated_store", storeKind: "test_only",
     isolated: true, productionAllowed: false },
+  readPersistedBytes = () => fs.readFileSync(runtimeStorePath),
 } = {}) {
   if (!runtimeStorePath || !liveStore || typeof readPersistedStore !== "function" ||
       typeof createUnitOfWork !== "function" || !lockService?.acquire ||
@@ -55,7 +56,7 @@ export function createPhaseReviewApplicationBoundary({
     let endingRevision = null;
     let errorCode = null;
     try {
-      const baselineBytes = fs.readFileSync(runtimeStorePath);
+      const baselineBytes = await readPersistedBytes();
       const baseline = await readPersistedStore();
       startingRevision = Number(baseline.revision ?? 0);
       const authorized = authorizePhaseReviewRequest({ store: baseline, request, actor, now });
@@ -87,7 +88,7 @@ export function createPhaseReviewApplicationBoundary({
         const verification = verifyPhaseReviewPostCommit({ before: baseline,
           after: candidate, decision: authorized.decision, result });
         endingRevision = verification.endingRevision;
-        if (dryRun && !fs.readFileSync(runtimeStorePath).equals(baselineBytes)) {
+        if (dryRun && !Buffer.from(await readPersistedBytes()).equals(Buffer.from(baselineBytes))) {
           const error = new Error("Dry run changed persisted Founder-store bytes.");
           error.code = "PHASE_REVIEW_DRY_RUN_PERSISTENCE_DETECTED";
           throw error;

@@ -1,8 +1,5 @@
 "use server";
 
-import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
-
-import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -10,6 +7,7 @@ import { createDEXAScan } from "../../../domain/models/dexaScan";
 import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
 import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { assertApplicationUploadEntryAllowed, storeApplicationUpload } from "../../../application/media/ApplicationUploadService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
@@ -17,7 +15,7 @@ const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function saveDEXAEvidence(formData) {
-  assertProductionLegacyCanonicalWriteAllowed({ operation: "dexa-upload" });
+  assertApplicationUploadEntryAllowed({ operation: "dexa-upload" });
   const user = await FounderRepositories.users.getCurrentUser();
 
   if (!user) throw new Error("Founder user is not available.");
@@ -36,11 +34,15 @@ export async function saveDEXAEvidence(formData) {
     inferDateFromFilename(file.name) ??
     getTodayKey();
   const createdAt = new Date().toISOString();
-  const rawReportPath = await storePrivateUpload({
-    directory: path.join("private", "founder", "dexa", "uploads"),
+  const rawReportPath = (await storeApplicationUpload({
+    ownerUserId: user.id,
     file,
-    prefix: `dexa-${measuredAt}`,
-  });
+    legacyDirectory: path.join("private", "founder", "dexa", "uploads"),
+    legacyPrefix: `dexa-${measuredAt}`,
+    category: "dexaScans",
+    relationshipId: `dexa:${measuredAt}`,
+    artifactId: `dexa:${createdAt}`,
+  })).reference;
   const existingScans = await FounderRepositories.dexaScans.listDEXAScans(user.id);
   const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
     userId: user.id,
@@ -165,19 +167,6 @@ export async function saveDEXAEvidence(formData) {
   redirect("/briefing/daily");
 }
 
-async function storePrivateUpload({ directory, file, prefix }) {
-  const extension = path.extname(file.name || "").toLowerCase() || ".pdf";
-  const safeName = `${sanitizeFileName(prefix)}-${Date.now()}${extension}`;
-  const relativePath = path.join(directory, safeName);
-  const absolutePath = path.join(process.cwd(), relativePath);
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-  await fs.writeFile(absolutePath, buffer);
-
-  return relativePath.replaceAll("\\", "/");
-}
-
 function normalizeOptionalText(value) {
   const text = String(value ?? "").trim();
 
@@ -199,8 +188,4 @@ function inferDateFromFilename(fileName = "") {
 
 function getTodayKey() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function sanitizeFileName(value) {
-  return String(value).replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
 }

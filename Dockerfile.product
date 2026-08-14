@@ -1,0 +1,36 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    PHYSIQUEOS_PROVIDER_FULL_RUNTIME=1 \
+    NEXT_PHASE=phase-production-build
+ARG PHYSIQUEOS_BUILD_ID=provider-product-local
+ARG PHYSIQUEOS_GIT_SHA=unknown
+ENV PHYSIQUEOS_BUILD_ID=$PHYSIQUEOS_BUILD_ID \
+    PHYSIQUEOS_GIT_SHA=$PHYSIQUEOS_GIT_SHA
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build -- --webpack
+RUN rm -rf .next/standalone/src/data/founderSeed .next/standalone/src/data/seed \
+    .next/standalone/src/fixtures .next/standalone/src/features/dashboard \
+    .next/standalone/src/lib/mockData.js .next/standalone/src/models/UserProfile.js \
+ && rm -f public/mockup-home.png
+RUN test ! -e .next/standalone/private \
+ && test ! -e .next/standalone/logs \
+ && test ! -e .next/standalone/src/data/founderSeed \
+ && test ! -e .next/standalone/src/fixtures \
+ && test ! -e public/mockup-home.png
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PHYSIQUEOS_PROVIDER_FULL_RUNTIME=1 \
+    PORT=8080 \
+    HOSTNAME=0.0.0.0
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+USER node
+EXPOSE 8080
+CMD ["node", "server.js"]

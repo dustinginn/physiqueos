@@ -53,10 +53,12 @@ export function createProductionGoalTransitionActivationService({
   createCoordinator = createGoalTransitionActivationCoordinator,
   stagedRepositoryFactory = createActivationStagedRepositories,
 } = {}) {
-  const canonicalPath = resolveFounderRuntimeStorePath({
-    cwd: process.cwd(),
-    env: { ...process.env, PHYSIQUEOS_RUNTIME_STORE_PATH: runtimeStorePath },
-  });
+  const canonicalPath = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
+    ? runtimeStorePath
+    : resolveFounderRuntimeStorePath({
+        cwd: process.cwd(),
+        env: { ...process.env, PHYSIQUEOS_RUNTIME_STORE_PATH: runtimeStorePath },
+      });
 
   return Object.freeze({
     async createFinalReview({ founderUserId, transitionId }) {

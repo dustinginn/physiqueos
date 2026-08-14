@@ -221,3 +221,8 @@ operation/fence/first PostgreSQL canonical write, and authentication inactive.
 Only the noncanonical durable audit record was created. The result permits a
 new final pre-fence gate after repository closeout; it is not final GO and does
 not authorize any migration action.
+## Combined-cutover fence amendment (2026-08-13)
+
+The fence remains Windows-owned from activation through the exact final snapshot and durable provider-prepared acknowledgement. It blocks every canonical command and upload completion while allowing only the approved maintenance-read contract. Provider import and media copy do not transfer authority by themselves.
+
+The combined runtime-authority state machine and PostgreSQL first-provider-write marker now govern the handoff. Before the marker, an abort may restore Windows authority only after proving the final Windows snapshot/control are unchanged and that no provider canonical write exists. Once a real command commits its canonical PostgreSQL mutation with that marker, Windows rollback is prohibited; recovery keeps App Platform/PostgreSQL canonical and uses compatible provider code plus forward repair. Full sequencing and injected-failure cases are in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`.

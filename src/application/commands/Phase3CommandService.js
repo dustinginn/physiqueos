@@ -62,7 +62,7 @@ export function createPhase3CommandService({ transactionRunner, ports, writeFenc
       }
       const port = ports?.[definition.port];
       if (typeof port !== "function") throw new Error(`Canonical command port ${definition.port} is not composed.`);
-      const fenceState = writeFence?.assertWriteAllowed({
+      const fenceState = await writeFence?.assertWriteAllowed({
         operation: `phase3-command:${commandType}`,
         expectedEpoch: metadata.canonicalStoreEpoch,
       }) ?? null;

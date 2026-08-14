@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-provider-check*/
 /.next.failed-*/
 /.next.rollback-*/
 /out/

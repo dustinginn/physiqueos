@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { validateExecutionItem } from "../../../../../domain/models/executionItem";
 import {
   createProgressPhotosExecutionScheduleService,
@@ -51,8 +48,7 @@ export async function saveFoamRollingSupport(context, _previousState, formData) 
   }
 
   const result = await createRecurringSupportManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   }).save({
     protocolId: protocol.id,
     protocolCategory: "recovery",
@@ -129,10 +125,17 @@ export async function saveExecutionItem(previousState, submittedFormData) {
 
 export async function saveProgressPhotosExecution(formData, {
   repositories = FounderRepositories,
-  runtimeStorePath = resolveFounderRuntimeStorePath(),
-  liveStore = getFounderRuntimeStore(),
+  runtimeStorePath = null,
+  liveStore = null,
+  createUnitOfWork = null,
   createService = createProgressPhotosExecutionScheduleService,
 } = {}) {
+  if (!runtimeStorePath || !liveStore || !createUnitOfWork) {
+    const bindings = await loadApplicationRuntimeBindings();
+    runtimeStorePath ??= bindings.runtimeStorePath;
+    liveStore ??= bindings.liveStore;
+    createUnitOfWork ??= bindings.createUnitOfWork;
+  }
   const existing = await repositories.executionItems.getExecutionItemById(
     PROGRESS_PHOTOS_ID,
   );
@@ -147,7 +150,7 @@ export async function saveProgressPhotosExecution(formData, {
   const cadence = String(formData.get("cadence"));
   const timeChoice = String(formData.get("timeChoice") || "");
 
-  return createService({ runtimeStorePath, liveStore }).save({
+  return createService({ runtimeStorePath, liveStore, createUnitOfWork }).save({
     protocolId: String(formData.get("protocolId")),
     expectedCurrentVersionId: String(formData.get("expectedCurrentVersionId")),
     expectedRevision: Number(formData.get("expectedRevision")),

@@ -6,6 +6,7 @@ import { createGoalPlanningInput } from "../models/goalPlanningInput";
 import { buildGoalEditDraft, GoalEditSection, normalizeGoalEditSectionIdentifier, sourceRevision } from "./GoalEditDraftService";
 import { diffGoalPlans } from "./GoalPlanDiffService";
 import { assessOverallGoalCompleteness } from "./GoalOutcomeInterpretationService";
+import { createApplicationRuntimeBindings } from "../../application/runtime/ApplicationCanonicalRuntime.js";
 
 export const GOAL_PLAN_UPDATE_COMMAND_VERSION = "goal_plan_update_v1";
 export const GOAL_PLAN_REVIEW_TOKEN_VERSION = "goal_plan_review_v1";
@@ -112,7 +113,9 @@ export function createGoalPlanUpdateService({
   });
 }
 
-export const ProductionGoalPlanUpdateService = createGoalPlanUpdateService();
+export const ProductionGoalPlanUpdateService = createGoalPlanUpdateService(
+  createApplicationRuntimeBindings()
+);
 
 function validateToken(record, command, clock) {
   if (!record?.token) return { code: "REVIEW_TOKEN_INVALID", message: "Final-review token is invalid." };

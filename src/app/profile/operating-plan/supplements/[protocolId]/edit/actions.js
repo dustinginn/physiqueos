@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../../data/repositories/founderRepositories";
-import { getFounderRuntimeStore, resolveFounderRuntimeStorePath } from "../../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { createSupplementStrategyManagementService } from "../../../../../../domain/services/SupplementStrategyManagementService";
 import { buildSupplementProvenance, readSupplementFormValues, supplementManagementMessage } from "../../../../../../domain/services/SupplementStrategyFormService";
 import { getLocalDateKey } from "../../../../../../domain/utils/localDate";
@@ -12,8 +12,7 @@ export async function saveSupplementStrategy(context, _priorState, formData) {
   const values = readSupplementFormValues(formData, ["name", "purpose", "role", "goalId"]);
   const user = await FounderRepositories.users.getCurrentUser();
   const result = await createSupplementStrategyManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   }).edit({
     ...context,
     ...values,

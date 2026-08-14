@@ -23,7 +23,7 @@ import {
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
 import { resolveUserFacingObjectLanguage } from "./UserFacingObjectLanguageService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
-import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import {
   resolveActiveGoalConfidencePresentation,
 } from "./ActiveGoalConfidencePresentationReadService";
@@ -45,7 +45,7 @@ export function createDailyBriefingService({
   repositories,
   now = () => new Date(),
   scheduledComposer = null,
-  confidenceStoreResolver = () => getFounderRuntimeStore(),
+  confidenceStoreResolver = loadApplicationCanonicalRuntime,
 }) {
   async function composeDailyBriefing(userId, trigger = {}, options = {}) {
     const user = userId
@@ -505,7 +505,7 @@ export function createDailyBriefingService({
         const confidence = await resolveDailyCanonicalConfidence({
           repositories,
           userId: resolvedUserId,
-          store: confidenceStoreResolver(),
+          store: await confidenceStoreResolver(),
         });
         return {
           ...normalizeDailyBriefingForPresentation(scheduled.briefing, confidence),
@@ -527,7 +527,7 @@ export function createDailyBriefingService({
       const confidence = await resolveDailyCanonicalConfidence({
         repositories,
         userId: resolvedUserId,
-        store: confidenceStoreResolver(),
+        store: await confidenceStoreResolver(),
       });
       return {
         ...normalizeDailyBriefingForPresentation(artifact.briefing, confidence),

@@ -344,3 +344,8 @@ This evidence authorizes repeating the final pre-fence decision process after
 the repository checkpoint. It does not constitute final GO and does not
 authorize fence activation, write pause, import, canonical PostgreSQL writes,
 evidence movement, authentication activation, or migration execution.
+## Authorization invalidation and replacement model (2026-08-13)
+
+Every prior persistence-only migration authorization is permanently invalidated. The next possible production authorization must bind the combined runtime and persistence transition described in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`. In addition to the existing Founder, media, control, database, Spaces, recovery, source/build, retention, and no-writes fields, it must bind the exact full provider deployment/source/build, runtime-authority tuple, routing target, worker handoff, measured write-pause range, pre-first-provider-write abort rule, and post-first-write provider-canonical recovery rule.
+
+This source patch is not that authorization. A compatibility deployment, provider acceptance, recovery refresh, and new final preflight remain separate required stages.

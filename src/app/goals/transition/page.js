@@ -1,4 +1,4 @@
-import { getFounderRuntimeStore } from "../../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../../application/runtime/ApplicationCanonicalRuntime";
 import { ProductionGoalTransitionRepositories } from "../../../data/repositories/productionGoalTransitionRepositories";
 import { createProductionGoalTransitionDraftService } from "../../../domain/services/ProductionGoalTransitionDraftService";
 import GoalTransitionPreviewScreen from "../../../screens/GoalTransitionPreviewScreen";
@@ -14,15 +14,16 @@ export const dynamic = "force-dynamic";
 export default async function LiveGoalTransitionPage({ searchParams }) {
   const query = await searchParams;
   const user = await ProductionGoalTransitionRepositories.users.getCurrentUser();
+  const runtime = await loadApplicationCanonicalRuntime();
   const draft = await createProductionGoalTransitionDraftService({
     repositories: ProductionGoalTransitionRepositories,
-    readStore: () => structuredClone(getFounderRuntimeStore()),
+    readStore: () => structuredClone(runtime),
   }).getOrCreateFresh({
     userId: user.id,
     sourceGoalId: "goal_visible_abs_at_rest",
   });
   const resumeDestination = getProductionGoalTransitionResumeDestination(
-    structuredClone(getFounderRuntimeStore()),
+    structuredClone(await loadApplicationCanonicalRuntime()),
     draft.id
   );
   if (resumeDestination !== "/goals/transition") redirect(resumeDestination);

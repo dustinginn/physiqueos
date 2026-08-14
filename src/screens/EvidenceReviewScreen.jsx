@@ -814,7 +814,7 @@ function EvidenceRecoveryContextFields({ context }) {
     <input name="returnTo" type="hidden" value={context.returnTo}/>
   </>;
 }
-function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
+function privateEvidenceUrl(value) { if (!value) return null; const media=String(value).match(/^media:\/\/([0-9a-f-]+)$/i);return media?`/api/private-evidence/media/${media[1]}`:`/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
 function hasIncompletePhotoSet(object) { return object.evidence_type === "photo_session" && (object.photos ?? []).filter((photo) => photo.active !== false).some((photo) => !getCanonicalProgressPhotoCategory(photo)); }
 function hasIncompletePhotoSessionMetadata(object) { return object.evidence_type === "photo_session" && (object.captureMetadata?.status === "needs_review" || object.goalRelationship?.status === "needs_review"); }
 function hasCommitFailure(review) { return ["commit_failed", "partially_committed"].includes(review.status); }

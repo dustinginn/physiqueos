@@ -3,10 +3,12 @@ import {
   getFounderRuntimeStore,
   persistFounderRuntimeStore,
 } from "./founderRuntimeStore";
+import { FounderRepositories } from "./founderRepositories";
 
-const store = getFounderRuntimeStore();
+const isProviderFullRuntime = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1";
+const store = isProviderFullRuntime ? null : getFounderRuntimeStore();
 
-export const ProductionGoalTransitionRepositories = createSeedRepositories(store, {
+export const ProductionGoalTransitionRepositories = isProviderFullRuntime ? FounderRepositories : createSeedRepositories(store, {
   onChange: (mutatedCollection) => persistFounderRuntimeStore(store, {
     mutatedCollection,
     reason: "production goal transition draft persistence",

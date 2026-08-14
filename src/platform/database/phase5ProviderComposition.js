@@ -1,6 +1,7 @@
 import { createAuthorizedMediaService } from "../../application/media/AuthorizedMediaService.js";
 import { createPhase4PostgresApplicationComposition } from "./phase4PostgresComposition.js";
 import { createOpaqueSpacesMediaGateway } from "../object-storage/OpaqueSpacesMediaGateway.js";
+import { createProviderCanonicalUploadService } from "../../application/media/ProviderCanonicalUploadService.js";
 
 export async function createPhase5ProviderApplicationComposition({
   pool,
@@ -9,9 +10,14 @@ export async function createPhase5ProviderApplicationComposition({
   mediaAccessSecret = process.env.PHYSIQUEOS_CREDENTIAL_PEPPER,
   now = () => new Date(),
   writeFence = null,
+  authorityStore = null,
+  migrationOperationId = null,
+  compatibilityMode = true,
 } = {}) {
   if (!objectProvider?.authorizeRead) throw new Error("Phase 5 provider composition requires private Spaces access.");
-  const base = await createPhase4PostgresApplicationComposition({ pool, ownerUserId, now, writeFence });
+  const base = await createPhase4PostgresApplicationComposition({
+    pool, ownerUserId, now, writeFence, authorityStore, migrationOperationId, compatibilityMode,
+  });
   const catalog = createPhase5ProviderMediaCatalog({ query: (text, values) => pool.query(text, values) });
   const mediaGateway = createOpaqueSpacesMediaGateway({ provider: objectProvider, catalog, secret: mediaAccessSecret, clock: now });
   const media = createAuthorizedMediaService({
@@ -19,11 +25,15 @@ export async function createPhase5ProviderApplicationComposition({
     delivery: mediaGateway,
     clock: now,
   });
+  const uploads = createProviderCanonicalUploadService({
+    pool, objectProvider, authorityStore, migrationOperationId, compatibilityMode, now,
+  });
   return Object.freeze({
     ...base,
     kind: "phase5-provider-synthetic",
     media,
     mediaGateway,
+    uploads,
   });
 }
 

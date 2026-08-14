@@ -42,9 +42,9 @@ export const monthlyPreviewFixtures = {
       },
     ],
     progressPhotos: [
-      { id: "photo-06-05", capturedAt: "2026-06-05", view: "front", imagePath: "private/founder/photos/2026-06-05-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
-      { id: "photo-06-26", capturedAt: "2026-06-26", view: "front", imagePath: "private/founder/photos/2026-06-26-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
-      { id: "photo-07-16-observed", capturedAt: "2026-07-16", view: "front", imagePath: "private/founder/photos/2026-07-16-front.JPEG", source: { type: "photo", name: "Observed fixture" }, isSynthetic: false },
+      { id: "photo-06-05", capturedAt: "2026-06-05", view: "front", imagePath: "synthetic/monthly-preview/2026-06-05-front.jpeg", source: { type: "photo", name: "Synthetic Historical Progress Photos" } },
+      { id: "photo-06-26", capturedAt: "2026-06-26", view: "front", imagePath: "synthetic/monthly-preview/2026-06-26-front.jpeg", source: { type: "photo", name: "Synthetic Historical Progress Photos" } },
+      { id: "photo-07-16-observed", capturedAt: "2026-07-16", view: "front", imagePath: "synthetic/monthly-preview/2026-07-16-front.jpeg", source: { type: "photo", name: "Observed synthetic fixture" }, isSynthetic: true },
     ],
     energyContinuations: [
       { id: "real-energy-06-07", date: "2026-06-07", balance: -820, estimatedIntake: 2470, estimatedExpenditure: 3290, source: "real" },
@@ -120,7 +120,7 @@ export const monthlyPreviewFixtures = {
           id: "photo-07-31",
           capturedAt: "2026-07-31",
           view: "front",
-          imagePath: "private/founder/photos/2026-07-31-front.JPEG",
+          imagePath: "synthetic/monthly-preview/2026-07-31-front.jpeg",
           source: { type: "photo", name: "preview_fixture" },
         }),
       ],
@@ -147,9 +147,9 @@ export const monthlyPreviewFixtures = {
     ],
     dexaScans: [],
     progressPhotos: [
-      { id: "ord-photo-06-07", capturedAt: "2026-06-07", view: "front", imagePath: "private/founder/photos/2026-06-07-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
-      { id: "ord-photo-06-18", capturedAt: "2026-06-18", view: "front", imagePath: "private/founder/photos/2026-06-18-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
-      { id: "ord-photo-06-28", capturedAt: "2026-06-28", view: "front", imagePath: "private/founder/photos/2026-06-28-front.JPEG", source: { type: "photo", name: "Founder Historical Progress Photos" } },
+      { id: "ord-photo-06-07", capturedAt: "2026-06-07", view: "front", imagePath: "synthetic/monthly-preview/2026-06-07-front.jpeg", source: { type: "photo", name: "Synthetic Historical Progress Photos" } },
+      { id: "ord-photo-06-18", capturedAt: "2026-06-18", view: "front", imagePath: "synthetic/monthly-preview/2026-06-18-front.jpeg", source: { type: "photo", name: "Synthetic Historical Progress Photos" } },
+      { id: "ord-photo-06-28", capturedAt: "2026-06-28", view: "front", imagePath: "synthetic/monthly-preview/2026-06-28-front.jpeg", source: { type: "photo", name: "Synthetic Historical Progress Photos" } },
     ],
     energyContinuations: [
       { id: "ord-energy-06-05", date: "2026-06-05", balance: -340, estimatedIntake: 2380, estimatedExpenditure: 2720, source: "real" },

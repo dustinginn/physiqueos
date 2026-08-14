@@ -18,7 +18,7 @@ import {
   createWeeklyPreparedCommit,
   WeeklyPersistenceOutcome,
 } from "./WeeklyBriefingPersistenceService";
-import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePresentationService";
 import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
@@ -336,7 +336,7 @@ export function createFounderWeeklyNarrativeService({repositories,now=()=>new Da
     repositories,
     now,
     weeklyPersistence: weeklyPersistence??createFounderWeeklyBriefingPersistenceService({now}),
-    confidenceStoreResolver: confidenceStoreResolver??(()=>getFounderRuntimeStore()),
+    confidenceStoreResolver: confidenceStoreResolver??loadApplicationCanonicalRuntime,
     cadenceLifecycle: cadenceLifecycle ??
       createPICadenceBriefingLifecycleService({ publicationService: publication, now }),
   });
@@ -485,7 +485,7 @@ async function buildWeeklyArtifact({repositories,userId,now,persist,reason=null,
   const confidence=resolveActiveGoalConfidencePresentation({
     activeGoal:goal,
     activePhase,
-    store:confidenceStoreResolver(),
+    store:await confidenceStoreResolver(),
   });
   const goalConfidence=createBriefingGoalConfidenceBlock(confidence,{capturedAt:generatedAt});
   if(goalConfidence)narrative={...narrative,goalConfidence};

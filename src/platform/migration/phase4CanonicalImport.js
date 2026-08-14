@@ -28,6 +28,7 @@ export async function importCanonicalPackage({
     if (resetTarget) await resetCanonicalTarget(client, targetAuthorization);
     const owner = validateOwner(packageData.collections);
     await upsertUser(client, owner);
+    await upsertApplicationContext(client, owner.id, packageData.manifest.applicationContext);
     const counts = {};
     for (const collection of FOUNDATION_SOURCE_COLLECTIONS) {
       const source = packageData.collections[collection];
@@ -39,6 +40,7 @@ export async function importCanonicalPackage({
     }
     await importRelationships(client, packageData.manifest.relationships ?? [], owner.id, packageData.collections);
     await importMediaMetadata(client, packageData.manifest.files ?? [], owner.id);
+    await upsertRuntimeMetadata(client, owner.id, packageData);
     const importDigest = await createDatabaseSemanticDigest(client, owner.id);
     await client.query(
       `INSERT INTO physiqueos.phase4_import_runs
@@ -91,15 +93,48 @@ export async function loadCanonicalRuntime({ query, ownerUserId }) {
     `SELECT report,source_sha256 FROM physiqueos.phase4_import_runs
      WHERE result='succeeded' ORDER BY completed_at DESC LIMIT 1`
   );
+  const applicationContext = await query(
+    `SELECT operating_rhythm,adaptive_trust_profile,retired_milestones
+       FROM physiqueos.canonical_application_context WHERE owner_user_id=$1`,
+    [ownerUserId],
+  );
+  const runtimeMetadata = await query(
+    `SELECT runtime_version,revision,last_command_id,updated_at,imported_at
+       FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
+    [ownerUserId],
+  );
+  const context = applicationContext.rows[0] ?? {};
+  const canonicalMetadata = runtimeMetadata.rows[0] ?? {};
   const report = metadata.rows[0]?.report ?? {};
   return Object.freeze({
-    version: report.runtimeVersion ?? "founder-seed-v2",
-    revision: Number(report.runtimeRevision ?? 0),
-    importedAt: new Date(0).toISOString(),
-    updatedAt: report.sourceUpdatedAt ?? new Date(0).toISOString(),
+    version: canonicalMetadata.runtime_version ?? report.runtimeVersion ?? "founder-seed-v2",
+    revision: Number(canonicalMetadata.revision ?? report.runtimeRevision ?? 0),
+    lastCommitId: canonicalMetadata.last_command_id ?? null,
+    importedAt: canonicalMetadata.imported_at?.toISOString?.() ?? canonicalMetadata.imported_at ?? new Date(0).toISOString(),
+    updatedAt: canonicalMetadata.updated_at?.toISOString?.() ?? canonicalMetadata.updated_at ?? report.sourceUpdatedAt ?? new Date(0).toISOString(),
     ...runtime,
+    operatingRhythm: context.operating_rhythm ?? null,
+    adaptiveTrustProfile: context.adaptive_trust_profile ?? null,
+    milestones: context.retired_milestones ?? [],
     phase4Import: metadata.rows[0] ?? null,
   });
+}
+
+async function upsertApplicationContext(client, ownerUserId, context = {}) {
+  await client.query(
+    `INSERT INTO physiqueos.canonical_application_context
+      (owner_user_id,operating_rhythm,adaptive_trust_profile,retired_milestones)
+     VALUES ($1,$2::jsonb,$3::jsonb,$4::jsonb)
+     ON CONFLICT (owner_user_id) DO UPDATE SET
+       operating_rhythm=EXCLUDED.operating_rhythm,
+       adaptive_trust_profile=EXCLUDED.adaptive_trust_profile,
+       retired_milestones=EXCLUDED.retired_milestones,
+       version=physiqueos.canonical_application_context.version+1,
+       updated_at=now()`,
+    [ownerUserId, JSON.stringify(context?.operatingRhythm ?? null),
+      JSON.stringify(context?.adaptiveTrustProfile ?? null),
+      JSON.stringify(context?.retiredMilestones ?? [])],
+  );
 }
 
 export async function validateCanonicalImport({ pool, packageRoot, targetAuthorization = null }) {
@@ -132,7 +167,15 @@ export async function validateCanonicalImport({ pool, packageRoot, targetAuthori
     if (sourceDigest !== packageData.manifest.criticalValues.canonicalStateDigest) {
       throw new Error("Imported canonical state semantic digest does not match the package.");
     }
-    return Object.freeze({ valid: true, ownerUserId: owner.id, counts, idParity, importDigest, sourceDigest });
+    const applicationContextDigest = createPayloadHash({
+      operatingRhythm: runtime.operatingRhythm ?? null,
+      adaptiveTrustProfile: runtime.adaptiveTrustProfile ?? null,
+      retiredMilestones: runtime.milestones ?? [],
+    });
+    if (applicationContextDigest !== packageData.manifest.criticalValues.applicationContextDigest) {
+      throw new Error("Imported canonical application context does not match the package.");
+    }
+    return Object.freeze({ valid: true, ownerUserId: owner.id, counts, idParity, importDigest, sourceDigest, applicationContextDigest });
   } finally {
     client.release();
   }
@@ -148,6 +191,8 @@ export async function resetCanonicalTarget(clientOrPool, targetAuthorization = n
   await client.query("DELETE FROM physiqueos.command_receipts");
   await client.query("DELETE FROM physiqueos.operations");
   await client.query("DELETE FROM physiqueos.worker_heartbeats");
+  await client.query("DELETE FROM physiqueos.canonical_runtime_metadata");
+  await client.query("DELETE FROM physiqueos.canonical_application_context");
   for (const table of [...new Set(Object.values(PHASE4_DOMAIN_TABLES))]) {
     await client.query(`DELETE FROM physiqueos.${table}`);
   }
@@ -169,7 +214,26 @@ export async function createDatabaseSemanticDigest(queryTarget, ownerUserId) {
     `SELECT id,evidence_collection,evidence_record_id,content_type,byte_length,sha256,storage_key,state,version
      FROM physiqueos.canonical_media_objects WHERE owner_user_id=$1 ORDER BY id`, [ownerUserId]
   );
-  return createPayloadHash({ rows, media: media.rows });
+  const applicationContext = await queryTarget.query(
+    `SELECT operating_rhythm,adaptive_trust_profile,retired_milestones
+       FROM physiqueos.canonical_application_context WHERE owner_user_id=$1`, [ownerUserId]
+  );
+  return createPayloadHash({ rows, media: media.rows, applicationContext: applicationContext.rows[0] ?? null });
+}
+
+async function upsertRuntimeMetadata(client, ownerUserId, packageData) {
+  await client.query(
+    `INSERT INTO physiqueos.canonical_runtime_metadata
+      (owner_user_id,revision,runtime_version,source_runtime_sha256,package_digest,source_updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (owner_user_id) DO UPDATE SET
+       revision=EXCLUDED.revision,runtime_version=EXCLUDED.runtime_version,
+       source_runtime_sha256=EXCLUDED.source_runtime_sha256,package_digest=EXCLUDED.package_digest,
+       source_updated_at=EXCLUDED.source_updated_at,version=physiqueos.canonical_runtime_metadata.version+1,updated_at=now()`,
+    [ownerUserId, Number(packageData.manifest.source.runtime.revision), packageData.manifest.source.runtime.version,
+      packageData.manifest.source.runtime.sha256, packageData.manifest.semanticDigest,
+      packageData.manifest.source.runtime.updatedAt],
+  );
 }
 
 async function upsertUser(client, owner) {

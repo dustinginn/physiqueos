@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { getFounderRuntimeStore, resolveFounderRuntimeStorePath } from "../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { buildRecurringSupportDraftFromFormData, createRecurringSupportManagementService } from "../../../../../domain/services/RecurringSupportManagementService";
 import { MORNING_WEIGH_IN_EXECUTION_ID, MORNING_WEIGH_IN_REMINDER_ID } from "../../../../../domain/services/TrackingSupportService";
 
@@ -25,8 +25,7 @@ export async function saveMorningWeighInSupport(context, _previousState, formDat
     return { message: "This Support schedule changed while you were editing it. Review the latest version and try again." };
   }
   const result = await createRecurringSupportManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   }).save({
     protocolId: protocol.id,
     protocolCategory: protocol.category,

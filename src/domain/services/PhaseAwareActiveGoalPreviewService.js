@@ -3,7 +3,7 @@ import { resolveHomeGoalTrajectory } from "./HomeGoalTrajectoryService";
 import { createGoalTrainingProgress } from "./GoalTrainingProgressService";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
-import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
 
 export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {
@@ -18,10 +18,11 @@ export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRep
     repositories.nutritionContext.getNutritionContext(user.id),
     repositories.progressPhotos.listPhotos(user.id),
   ]);
-  return composePhaseAwareActiveGoalPreview({ user, goal, dexaScans, protocols, canonicalEvidence, checkIns, nutritionContext, progressPhotos, currentDate });
+  const store = await loadApplicationCanonicalRuntime();
+  return composePhaseAwareActiveGoalPreview({ user, goal, dexaScans, protocols, canonicalEvidence, checkIns, nutritionContext, progressPhotos, currentDate, store });
 }
 
-export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [], protocols = [], canonicalEvidence = [], checkIns = [], nutritionContext = null, progressPhotos = [], currentDate = new Date() }) {
+export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [], protocols = [], canonicalEvidence = [], checkIns = [], nutritionContext = null, progressPhotos = [], currentDate = new Date(), store = {} }) {
   if (!goal || goal.status !== "active" || goal.type !== "build_lean_mass") throw new Error("The active Build Lean Mass goal is unavailable.");
   goal = projectFounderBuildLeanMassPhaseCorrection(goal);
   const timeZone = user?.timeZone ?? "America/Los_Angeles";
@@ -35,7 +36,7 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /8.?9%|body fat/i.test(item)) ?? "Maintain approximately 8–9% body fat.";
   const overallGoalConfidence = resolveActiveGoalConfidencePresentation({
     activeGoal: goal,
-    store: getFounderRuntimeStore(),
+    store,
   });
   const trainingProgress = createGoalTrainingProgress({ goal, phase: goal.phases.find((item)=>item.id===active.phaseId), canonicalObjects: canonicalEvidence, currentDate, timeZone });
   const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The final cut measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Maintenance phase activated", body: "The journey began by establishing a reliable maintenance baseline." }, { date: active.calculatedPlannedReviewDate, title: "Planned phase review", body: "Evidence will determine readiness for the Lean Mass Build phase." }, { date: upcoming.targetDate, title: "Goal destination", body: "A future DEXA will measure progress toward the 10 lb lean-mass target." }];

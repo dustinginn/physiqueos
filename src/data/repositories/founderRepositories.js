@@ -10,11 +10,21 @@ import {
 } from "../../platform/cutover/canonicalWriteSurfaceInventory";
 import { assertProductionLegacyCanonicalWriteAllowed } from "../../platform/cutover/canonicalWriteFence";
 
-const founderRuntimeStore = getFounderRuntimeStore();
-registerRuntimeTrainingExercises(founderRuntimeStore.canonicalExerciseLibrary ?? []);
+const isProviderFullRuntime = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1";
+const founderRuntimeStore = isProviderFullRuntime ? createEmptyRuntimeStore() : getFounderRuntimeStore();
+if (!isProviderFullRuntime) {
+  registerRuntimeTrainingExercises(founderRuntimeStore.canonicalExerciseLibrary ?? []);
+}
 
 const founderRepositories = createSeedRepositories(founderRuntimeStore, {
-  onChange: (mutatedCollection) => persistFounderRuntimeStore(founderRuntimeStore, { mutatedCollection }),
+  onChange: (mutatedCollection) => {
+    if (isProviderFullRuntime) {
+      const error = new Error("Provider repository placeholders cannot persist legacy state.");
+      error.code = "PROVIDER_LEGACY_RUNTIME_FORBIDDEN";
+      throw error;
+    }
+    persistFounderRuntimeStore(founderRuntimeStore, { mutatedCollection });
+  },
 });
 
 export const LegacyFounderRepositories = wrapRepositoriesWithRuntimeRefresh(
@@ -128,4 +138,17 @@ function assertRepositoryWriteAllowed(repositoryName, property) {
       operation: `founder-repository:${repositoryName}.${String(property)}`,
     });
   }
+}
+
+function createEmptyRuntimeStore() {
+  return {
+    user: null,
+    goals: [],
+    weightEntries: [],
+    dexaScans: [],
+    protocols: [],
+    milestones: [],
+    dailyCheckIns: [],
+    analyses: [],
+  };
 }

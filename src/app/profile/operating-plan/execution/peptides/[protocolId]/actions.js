@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../../data/repositories/founderRepositories";
-import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../../application/runtime/ApplicationCanonicalRuntime";
 import {
   buildPeptideExecutionDraftFromFormData,
   buildPeptideSupportDraftFromFormData,
@@ -64,8 +61,7 @@ export async function savePeptideExecution(context, _state, formData) {
   }
 
   const result = await createPeptideExecutionManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   }).save({
     protocolId: protocol.id,
     userId: user.id,

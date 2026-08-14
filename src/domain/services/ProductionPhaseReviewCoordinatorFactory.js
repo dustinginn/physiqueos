@@ -16,16 +16,39 @@ import { InterpretationEngine } from "../interpretation/InterpretationEngine";
 import { ForecastEngine } from "../forecast/ForecastEngine";
 import { NarrativeEngine } from "../narrative/NarrativeEngine";
 import { projectNumericConfidence } from "../confidence/NumericConfidenceProjectionService";
+import { canonicalJson } from "../../contracts/v1/canonicalJson";
+import { loadApplicationRuntimeBindings } from "../../application/runtime/ApplicationCanonicalRuntime";
 
 export const PRODUCTION_PHASE_REVIEW_COORDINATOR_FACTORY_VERSION =
   "production_phase_review_coordinator_factory_v1";
 
 export function createProductionPhaseReviewCoordinatorFactory() {
-  const runtimeStorePath = resolveFounderRuntimeStorePath();
-  const liveStore = getFounderRuntimeStore();
+  const provider = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1";
+  if (provider) return createProviderFactory();
+  const bindings = null;
+  const runtimeStorePath = bindings?.runtimeStorePath ?? resolveFounderRuntimeStorePath();
+  const liveStore = bindings?.liveStore ?? getFounderRuntimeStore();
   return assemble({ runtimeStorePath, liveStore,
+    readPersistedStore: bindings?.readPersistedStore,
+    createUnitOfWork: bindings?.createUnitOfWork,
+    lockService: provider ? providerLockService : null,
+    readPersistedBytes: provider
+      ? async () => Buffer.from(canonicalJson(await bindings.readPersistedStore()))
+      : null,
     actorResolver: async () => FounderRepositories.users.getCurrentUser(),
     binding: { storeIdentity: "founder_runtime_store", storeKind: "production",
+      isolated: false, productionAllowed: true } });
+}
+
+async function createProviderFactory() {
+  const bindings = await loadApplicationRuntimeBindings();
+  return assemble({ runtimeStorePath: bindings.runtimeStorePath, liveStore: bindings.liveStore,
+    readPersistedStore: bindings.readPersistedStore,
+    createUnitOfWork: bindings.createUnitOfWork,
+    lockService: providerLockService,
+    readPersistedBytes: async () => Buffer.from(canonicalJson(await bindings.readPersistedStore())),
+    actorResolver: async () => FounderRepositories.users.getCurrentUser(),
+    binding: { storeIdentity: "founder_runtime_store", storeKind: "postgres-canonical",
       isolated: false, productionAllowed: true } });
 }
 
@@ -43,8 +66,9 @@ export function createIsolatedProductionShapedPhaseReviewCoordinatorFactory({
       storeKind: "temporary_clone", isolated: true, productionAllowed: false } });
 }
 
-function assemble({ runtimeStorePath, liveStore, actorResolver, now = () => new Date(), binding }) {
-  const lockService = createFounderStoreMutationLockService({ storePath: runtimeStorePath });
+function assemble({ runtimeStorePath, liveStore, actorResolver, now = () => new Date(), binding,
+  readPersistedStore = null, createUnitOfWork = null, lockService = null, readPersistedBytes = null }) {
+  lockService ??= createFounderStoreMutationLockService({ storePath: runtimeStorePath });
   const acceptanceService = createPhaseActivationPackageAcceptanceService();
   const required = [runtimeStorePath, liveStore, lockService, acceptanceService,
     createStartingForecastContext, adaptProductionGoalToCanonicalContract,
@@ -56,8 +80,9 @@ function assemble({ runtimeStorePath, liveStore, actorResolver, now = () => new 
     runtimeStorePath,
     liveStore,
     lockService,
-    readPersistedStore: () => JSON.parse(fs.readFileSync(runtimeStorePath, "utf8")),
-    createUnitOfWork: (options) => createFounderStoreUnitOfWork(options),
+    readPersistedStore: readPersistedStore ?? (() => JSON.parse(fs.readFileSync(runtimeStorePath, "utf8"))),
+    createUnitOfWork: createUnitOfWork ?? ((options) => createFounderStoreUnitOfWork(options)),
+    ...(readPersistedBytes ? { readPersistedBytes } : {}),
     acceptanceService,
     actorResolver,
     now,
@@ -89,3 +114,18 @@ function assemble({ runtimeStorePath, liveStore, actorResolver, now = () => new 
     }),
   });
 }
+
+const providerLockState = new Map();
+const providerLockService = Object.freeze({
+  async acquire(context = {}) {
+    const key = context.goalId ?? "phase-review";
+    if (providerLockState.has(key)) throw Object.assign(new Error("Phase Review is already in progress."), { code: "PHASE_REVIEW_LOCKED" });
+    const ownership = Object.freeze({ key, token: `${Date.now()}:${Math.random()}` });
+    providerLockState.set(key, ownership);
+    return ownership;
+  },
+  async release(ownership) {
+    if (ownership && providerLockState.get(ownership.key)?.token === ownership.token) providerLockState.delete(ownership.key);
+  },
+  inspect() { return Object.freeze({ active: providerLockState.size > 0, count: providerLockState.size }); },
+});

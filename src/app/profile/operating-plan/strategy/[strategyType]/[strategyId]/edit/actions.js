@@ -3,10 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { FounderRepositories } from "../../../../../../../data/repositories/founderRepositories";
-import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { createActiveProtocolSuccessorService } from "../../../../../../../domain/services/ActiveProtocolSuccessorService";
 import {
   buildStrategySuccessorPayload,
@@ -45,13 +42,12 @@ export async function saveStrategy(context, _priorState, formData) {
     });
     if (!model || !goal) return { message: "These coaching settings are not available right now." };
     const requested = buildCoachingUpdatesRequest(formData, model);
-    const liveStore = getFounderRuntimeStore();
+    const bindings = await loadApplicationRuntimeBindings();
     const photoRecurrence = context.coachingContext?.photoRecurrence;
     const photoContext = context.coachingContext?.photo;
     if (!photoRecurrence || !photoContext) return { message: "The Progress Photos schedule is unavailable. Reload and try again." };
     const result = await createCoachingUpdatesStrategyManagementService({
-      runtimeStorePath: resolveFounderRuntimeStorePath(),
-      liveStore,
+      ...bindings,
     }).save({
       expectedRevision: context.coachingContext.expectedRevision,
       expectedSemanticDigest: context.coachingContext.expectedSemanticDigest,
@@ -102,10 +98,9 @@ export async function saveStrategy(context, _priorState, formData) {
   const built = buildStrategySuccessorPayload({ form: formData, protocol, strategyType, version });
   if (!built.valid) return { message: built.outcome ? strategyEditorMessage(built.outcome) : built.error };
   const goalId = protocol.currentGoalIds?.[0];
-  const liveStore = getFounderRuntimeStore();
+  const bindings = await loadApplicationRuntimeBindings();
   const result = await createActiveProtocolSuccessorService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore,
+    ...bindings,
   }).createSuccessor({
     protocolId,
     expectedCurrentVersionId,

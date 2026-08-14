@@ -31,6 +31,7 @@ export async function processEvidenceIntakeSubmission({
   typedEvidence = null,
   userId = "founder",
   photoSessionContext = null,
+  storeArtifact = storeEvidenceArtifact,
 } = {}) {
   const capturedAt = new Date().toISOString();
   const observedDate = normalizeDateKey(evidenceDate) ?? getLocalDateKey(capturedAt);
@@ -40,12 +41,13 @@ export async function processEvidenceIntakeSubmission({
   );
   const storedArtifacts = await Promise.all(
     uploadFiles.map((file, index) =>
-      storeEvidenceArtifact({
+      storeArtifact({
         capturedAt,
         observedDate,
         file,
         index,
         submissionId,
+        userId,
       })
     )
   );
@@ -896,6 +898,7 @@ async function storeEvidenceArtifact({
   file,
   index,
   submissionId,
+  userId,
 }) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const extension =
@@ -915,20 +918,42 @@ async function storeEvidenceArtifact({
     .join("private", "founder", "evidence", "uploads", safeName)
     .replaceAll("\\", "/");
   const mimeType = file.type || inferMimeTypeFromName(file.name);
-  const originalCaptureMetadata = isImageMimeType(mimeType)
-    ? extractOriginalImageCaptureMetadata(buffer, { mimeType })
-    : null;
 
   await fs.mkdir(uploadDirectory, { recursive: true });
   await fs.writeFile(absolutePath, buffer);
 
+  return createStoredEvidenceArtifactDescriptor({
+    buffer,
+    capturedAt,
+    file,
+    id: `artifact_${submissionId}_${index + 1}`,
+    mimeType,
+    observedDate,
+    relativePath,
+    safeName,
+  });
+}
+
+export function createStoredEvidenceArtifactDescriptor({
+  buffer,
+  capturedAt,
+  file,
+  id,
+  mimeType = file?.type || inferMimeTypeFromName(file?.name),
+  observedDate,
+  relativePath,
+  safeName = "upload.bin",
+}) {
+  const originalCaptureMetadata = isImageMimeType(mimeType)
+    ? extractOriginalImageCaptureMetadata(buffer, { mimeType })
+    : null;
   return {
     buffer,
     dataUrl: isImageMimeType(mimeType)
       ? `data:${mimeType || "image/png"};base64,${buffer.toString("base64")}`
       : null,
     fileName: file.name || safeName,
-    id: `artifact_${submissionId}_${index + 1}`,
+    id,
     mimeType,
     observedDate,
     originalCaptureMetadata,

@@ -101,3 +101,8 @@ audit record is noncanonical. The worker reached the managed public TLS
 hostname from App Platform while the cluster firewall remained restricted to
 the sole App trusted source; direct workstation database access remains
 forbidden.
+## Combined runtime authority migration
+
+Migration `000005_combined_runtime_authority.cjs` adds the durable runtime-authority state, immutable transition audit, one-time transfer receipts, canonical runtime metadata, and application context required by the combined App Platform/PostgreSQL/Spaces cutover. Provider canonical commands verify the exact authority tuple and record the first-provider-write boundary in the same PostgreSQL transaction as the domain mutation. Worker polling uses the same authority record.
+
+These tables do not make PostgreSQL production-canonical merely by being migrated or populated with synthetic data. Compatibility mode remains restricted to accepted isolated databases. Production authority changes only under the future exact combined authorization and phase protocol in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`; the firewall remains App-Platform-only and no workstation access is required.

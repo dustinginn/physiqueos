@@ -99,7 +99,7 @@ export function createSeedRepositories(seedPack, options = {}) {
       snapshots: seedPack.goalConfidenceSnapshots ?? [],
       history: seedPack.goalConfidenceHistory ?? [],
       continuitySeeds: seedPack.goalConfidenceContinuitySeeds ?? [],
-    }),
+    }, { allowStagedMutations: options.allowStagedMutations === true }),
     canonicalEvidence: createCanonicalEvidenceRepository(
       seedPack.canonicalEvidenceObjects ?? [],
       { ...options, evidencePackages }

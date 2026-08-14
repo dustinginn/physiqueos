@@ -1,5 +1,3 @@
-import { seedUser } from "../seed/user";
-
 export function createUserRepository(user = null, options = {}) {
   return {
     async getCurrentUser() {
@@ -27,4 +25,6 @@ export function createUserRepository(user = null, options = {}) {
   };
 }
 
-export const UserRepository = createUserRepository(seedUser);
+// Compatibility only. Runtime compositions inject the canonical user and a
+// deployable module must not pull a tracked Founder seed into its graph.
+export const UserRepository = createUserRepository(null);

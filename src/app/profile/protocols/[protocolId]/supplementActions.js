@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
-import { getFounderRuntimeStore, resolveFounderRuntimeStorePath } from "../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import { createSupplementStrategyManagementService } from "../../../../domain/services/SupplementStrategyManagementService";
 import { getLocalDateKey } from "../../../../domain/utils/localDate";
 
@@ -16,8 +16,7 @@ export async function restoreSupplement(context) {
 async function changeLifecycle(method, context) {
   const user = await FounderRepositories.users.getCurrentUser();
   const service = createSupplementStrategyManagementService({
-    runtimeStorePath: resolveFounderRuntimeStorePath(),
-    liveStore: getFounderRuntimeStore(),
+    ...(await loadApplicationRuntimeBindings()),
   });
   const result = await service[method]({
     ...context,

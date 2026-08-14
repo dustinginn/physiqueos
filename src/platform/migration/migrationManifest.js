@@ -8,7 +8,7 @@ import { validateSerializableMigrationSourceIdentity } from "./MigrationSourceId
 
 export const MIGRATION_MANIFEST_VERSION = "2";
 
-export function createMigrationManifest({ source, collections, collectionInventory = null, files = [], relationships = [], criticalValues = {}, createdAt }, options = {}) {
+export function createMigrationManifest({ source, collections, collectionInventory = null, applicationContext = null, files = [], relationships = [], criticalValues = {}, createdAt }, options = {}) {
   const sourceKeys = Object.keys(collections ?? {});
   const unknown = sourceKeys.filter((key) => !FOUNDATION_SOURCE_COLLECTIONS.includes(key));
   if (unknown.length) throw new Error(`Unknown migration source collections: ${unknown.sort().join(", ")}`);
@@ -22,6 +22,7 @@ export function createMigrationManifest({ source, collections, collectionInvento
     targetSchemaVersion: String(source.schema.sourceVersion),
     source: structuredClone(validateSerializableMigrationSourceIdentity(source)),
     collectionInventory: collectionInventory == null ? null : structuredClone(collectionInventory),
+    applicationContext: normalizeApplicationContext(applicationContext),
     collections: entries,
     relationships: structuredClone(relationships),
     criticalValues: structuredClone(criticalValues),
@@ -30,6 +31,21 @@ export function createMigrationManifest({ source, collections, collectionInvento
     validationResult: "pending",
   };
   return Object.freeze({ ...manifest, semanticDigest: createPayloadHash(manifest) });
+}
+
+function normalizeApplicationContext(value) {
+  if (value == null) return Object.freeze({
+    operatingRhythm: null,
+    adaptiveTrustProfile: null,
+    retiredMilestones: Object.freeze([]),
+  });
+  const retiredMilestones = value.retiredMilestones ?? value.milestones ?? [];
+  if (!Array.isArray(retiredMilestones)) throw new Error("Migration application-context retired milestones must be an array.");
+  return Object.freeze({
+    operatingRhythm: value.operatingRhythm == null ? null : structuredClone(value.operatingRhythm),
+    adaptiveTrustProfile: value.adaptiveTrustProfile == null ? null : structuredClone(value.adaptiveTrustProfile),
+    retiredMilestones: Object.freeze(structuredClone(retiredMilestones)),
+  });
 }
 
 export function validateMigrationSourceKeys(sourceObject) {

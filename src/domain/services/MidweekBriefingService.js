@@ -13,7 +13,7 @@ import { adaptMidweekPISelection } from "./MidweekPINarrativeCandidateService";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
 import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
-import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
 import { createBriefingGoalConfidenceBlock } from "./BriefingGoalConfidencePresentationService";
 import {
@@ -44,13 +44,13 @@ export function createFounderMidweekBriefingService({
     createCanonicalBriefingConfidencePublicationService({ now });
   return createMidweekBriefingService({
     repositories, now, midweekPersistence,
-    confidenceStoreResolver: confidenceStoreResolver ?? (() => getFounderRuntimeStore()),
+    confidenceStoreResolver: confidenceStoreResolver ?? loadApplicationCanonicalRuntime,
     cadenceLifecycle: cadenceLifecycle ??
       createPICadenceBriefingLifecycleService({ publicationService: publication, now }),
   });
 }
 
-export function createMidweekBriefingService({ repositories, now = () => new Date(), confidenceStoreResolver = () => getFounderRuntimeStore(), midweekPersistence = null, cadenceLifecycle = null } = {}) {
+export function createMidweekBriefingService({ repositories, now = () => new Date(), confidenceStoreResolver = loadApplicationCanonicalRuntime, midweekPersistence = null, cadenceLifecycle = null } = {}) {
   const service = {
     async generateForCurrentWindow({
       userId,
@@ -225,7 +225,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
         briefing.id = id;
         briefing.persistence = { artifactPersisted: true, threadsPersisted: true, lifecycleAdvanced: true };
         briefing.openCoachingThreads = briefing.openCoachingThreads.map((thread) => ({ ...thread, lifecycle: { ...thread.lifecycle, persisted: true } }));
-        const confidence = resolveActiveGoalConfidencePresentation({ activeGoal: goal, store: confidenceStoreResolver() });
+        const confidence = resolveActiveGoalConfidencePresentation({ activeGoal: goal, store: await confidenceStoreResolver() });
         if (confidence.canonicalSeries) briefing.goalConfidence =
           createMidweekGoalConfidenceBlock(confidence, { capturedAt: generatedAt });
         let artifact = {
@@ -352,7 +352,7 @@ export function createMidweekBriefingService({ repositories, now = () => new Dat
       }
       const confidence = resolveActiveGoalConfidencePresentation({
         activeGoal: goal,
-        store: confidenceStoreResolver(),
+        store: await confidenceStoreResolver(),
       });
       const capturedAt = now().toISOString();
       const goalConfidence = createMidweekGoalConfidenceBlock(confidence, { capturedAt });

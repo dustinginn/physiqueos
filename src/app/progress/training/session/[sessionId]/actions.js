@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
 import { createTrainingSessionCorrectionEvidencePackage } from "../../../../../domain/services/EvidenceCorrectionService";
-import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import {
   createCanonicalEvidenceConfirmationCommitService,
 } from "../../../../../domain/services/CanonicalEvidenceConfirmationCommitService";
@@ -74,8 +71,7 @@ export async function addTrainingSessionCorrection(formData) {
         },
       };
       const result = await createCanonicalEvidenceConfirmationCommitService({
-        runtimeStorePath: resolveFounderRuntimeStorePath(),
-        liveStore: getFounderRuntimeStore(),
+        ...(await loadApplicationRuntimeBindings()),
         enableEnergyConfidenceEnqueue: false,
       }).commitConfirmedEvidencePackage(evidencePackage, user.id);
       if (result.committed !== true && result.outcome !== "source_matched") {

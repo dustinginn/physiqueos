@@ -5,6 +5,7 @@ import { createProductionGoalTransitionActivationService } from "../../../../dom
 import {
   projectProductionGoalTransitionActivationResult,
 } from "../../../../domain/services/ProductionGoalTransitionActivationResult";
+import { loadApplicationRuntimeBindings } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 
 export async function activateProductionGoalTransition({
   transitionId,
@@ -16,7 +17,11 @@ export async function activateProductionGoalTransition({
     return { ok: false, error: "Trusted founder context is required." };
   }
   try {
-    const result = await createProductionGoalTransitionActivationService().activate({
+    const bindings = await loadApplicationRuntimeBindings();
+    const result = await createProductionGoalTransitionActivationService({
+      ...bindings,
+      readLiveStore: bindings.readPersistedStore,
+    }).activate({
       founderUserId: user.id,
       transitionId,
       finalReviewToken,

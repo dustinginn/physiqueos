@@ -40,9 +40,9 @@ import {
   TrainingPerformanceEventPersistenceOutcome,
 } from "../../../../domain/services/TrainingPerformanceEventPersistenceService";
 import {
-  getFounderRuntimeStore,
-  resolveFounderRuntimeStorePath,
-} from "../../../../data/repositories/founderRuntimeStore";
+  loadApplicationCanonicalRuntime,
+  loadApplicationRuntimeBindings,
+} from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import {
   createCanonicalEvidenceConfirmationCommitService,
 } from "../../../../domain/services/CanonicalEvidenceConfirmationCommitService";
@@ -426,8 +426,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       const scopedResult = atomicPhotoCommitAlreadyPersisted
         ? createPersistedPhotoCommitResult(committedPackage)
         : await createCanonicalEvidenceConfirmationCommitService({
-          runtimeStorePath: resolveFounderRuntimeStorePath(),
-          liveStore: getFounderRuntimeStore(),
+          ...(await loadApplicationRuntimeBindings()),
           enableEnergyConfidenceEnqueue:
             energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
         }).commitConfirmedEvidencePackage(committedPackage, user.id, {
@@ -581,8 +580,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         finalizedAt: trainingAnalysis.createdAt,
       };
       const persistence = await createTrainingPerformanceEventPersistenceService({
-        runtimeStorePath: resolveFounderRuntimeStorePath(),
-        liveStore: getFounderRuntimeStore(),
+        ...(await loadApplicationRuntimeBindings()),
       }).persistEventBatch(events, lowerLevelEnabled ? {
         batchId,
         batch,
@@ -644,6 +642,9 @@ function createHandlers({ evidencePackage, reviewId, user }) {
       ) {
         throw new Error(`Training performance-event persistence failed: ${persistence.outcome}`);
       }
+      const confidenceRuntime = lowerLevelEnabled
+        ? await loadApplicationCanonicalRuntime()
+        : null;
       return {
         status: "completed",
         outcome: persistence.outcome,
@@ -652,7 +653,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         performanceEventBatchId: persistence.batch?.id ?? null,
         lowerLevelWorkIds: lowerLevelEnabled
           ? resolvedTrainingSessions.map(({ canonicalSession }) =>
-              getFounderRuntimeStore().piTrainingConfidenceWorkItems
+              confidenceRuntime.piTrainingConfidenceWorkItems
                 ?.find((work) =>
                   work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
                   work.performanceEventBatchId === batchId
@@ -668,7 +669,7 @@ function createHandlers({ evidencePackage, reviewId, user }) {
     },
     briefing: async ({ results }) => {
       const eligible = results.event_eligibility?.eligible ?? [];
-      const eventPreferences = resolveEventBriefingPreferencesFromStore(getFounderRuntimeStore());
+      const eventPreferences = resolveEventBriefingPreferencesFromStore(await loadApplicationCanonicalRuntime());
       const briefable = filterEligibleEventBriefingTypes(eligible, eventPreferences);
       const artifacts = [];
       const photoSessionIds = [];

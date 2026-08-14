@@ -1241,3 +1241,10 @@ pre-fence GO/NO-GO may now be repeated after the required repository
 checkpoint. It does not grant final GO, migration execution, a write pause,
 Founder import, canonical-store switch, evidence movement, authentication
 activation, Phase 7, Native Baseline, or SwiftUI work.
+## 43. Combined provider-runtime and persistence architecture revision (2026-08-13)
+
+The persistence-only and App-Platform-first/legacy-persistence sequences are superseded. The selected pre-iOS architecture is one coordinated transition from the Windows full product plus legacy JSON/media to the App Platform full Next.js product plus authority-gated worker plus PostgreSQL/private Spaces. The reason is structural: Windows cannot consume the App-Platform-only database target, while App Platform cannot safely host canonical JSON/media on ephemeral disk. No bridge, temporary durable legacy store, dual writer, or shadow canonical client database is introduced.
+
+The source now contains a full provider product image/spec, PostgreSQL-backed complete Founder runtime composition, transactionally authority-gated mutations, private versioned media upload/read composition, a durable runtime-authority state machine, transfer receipts, worker gating, and a combined rehearsal orchestrator. Provider mode fails closed rather than falling back to the Founder file runtime. Web and future iOS remain peer clients of the same application/API boundary, PostgreSQL state, and private media ownership model.
+
+The authoritative design, phase sequence, one-time fenced transfer, routing/control/worker handoff, first-provider-write boundary, rollback rules, security model, timing gate, cost, and future authorization sequence are in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`. This checkpoint does not deploy the product image, change public routing, activate a fence, migrate Founder data/media, alter authentication, or begin iOS work. The previous final migration GO is permanently invalid.

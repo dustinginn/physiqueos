@@ -4,7 +4,7 @@ import { createStrategyEditorModel } from "../../../../../../../domain/services/
 import { createCoachingUpdatesReadService } from "../../../../../../../domain/services/CoachingUpdatesReadService";
 import { resolveCoachingUpdatesGoalCadencePolicy } from "../../../../../../../domain/services/CoachingUpdatesGoalCadencePolicyService";
 import { createCoachingUpdatesEditorModel } from "../../../../../../../domain/services/CoachingUpdatesEditorService";
-import { getFounderRuntimeStore } from "../../../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { createFounderRuntimeSemanticDigest } from "../../../../../../../domain/services/FounderRuntimeSemanticDigest";
 import { getFounderStoreRevision } from "../../../../../../../data/repositories/FounderStoreUnitOfWork";
 import { createProgressPhotosExecutionHydrationModel } from "../../../../../../../domain/services/ProgressPhotosExecutionScheduleService";
@@ -25,7 +25,7 @@ export default async function StrategyEditPage({ params }) {
   let model;
   let coachingContext;
   if (strategyType === "briefings") {
-    const store = getFounderRuntimeStore();
+    const store = await loadApplicationCanonicalRuntime();
     const photoHydration = createProgressPhotosExecutionHydrationModel(store);
     const dexaItem = store.executionItems?.find((item) => item.id === DEXA_APPOINTMENT_ID);
     const [readModel, goal] = await Promise.all([

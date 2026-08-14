@@ -7,6 +7,7 @@ import { normalizeGoalPhaseCollection, resolveGoalPhases } from "../models/goalP
 import { sourceRevision } from "./GoalEditDraftService";
 import { diffGoalPhases } from "./GoalPhaseDiffService";
 import { goalPlanFingerprint } from "./GoalPlanUpdateService";
+import { createApplicationRuntimeBindings } from "../../application/runtime/ApplicationCanonicalRuntime.js";
 
 export const GOAL_PHASE_UPDATE_COMMAND_VERSION = "goal_phase_update_v1";
 export const GOAL_PHASE_REVIEW_TOKEN_VERSION = "goal_phase_review_v1";
@@ -81,7 +82,9 @@ export function createGoalPhasePersistenceService({
   });
 }
 
-export const ProductionGoalPhasePersistenceService = createGoalPhasePersistenceService();
+export const ProductionGoalPhasePersistenceService = createGoalPhasePersistenceService(
+  createApplicationRuntimeBindings()
+);
 export function phaseFingerprint(phases) { return goalPlanFingerprint(phases ?? []); }
 
 function validateLiveGoal(goal, userId, expectedRevision, expectedPhaseFingerprint) {

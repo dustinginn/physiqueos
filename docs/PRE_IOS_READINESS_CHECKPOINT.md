@@ -574,3 +574,8 @@ No final GO is granted. Fence activation, migration execution, write pause,
 Founder import, PostgreSQL canonical write, Spaces production-evidence move,
 authentication activation, Phase 7, and Native implementation remain
 unauthorized.
+## Combined architecture checkpoint (2026-08-13)
+
+The former persistence-first checkpoint is superseded by the combined App Platform runtime plus PostgreSQL/Spaces cutover architecture in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`. Readiness now means readiness to deploy the exact full provider product in a **non-authoritative compatibility state**, not readiness to migrate production.
+
+Before any new final GO, the exact checkpoint must be preserved, isolated-built, separately deployed for provider-backed full-product acceptance, capacity and combined timing measured, the recovery packet refreshed/restored, and a fresh drift-sensitive preflight completed. Windows/legacy JSON/local media remain authoritative and writable in the meantime; production control remains inactive and authentication remains inactive. The old GO and its inherited write-pause estimate cannot be reused.

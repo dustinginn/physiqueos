@@ -1,7 +1,5 @@
 "use server";
 
-import { assertProductionLegacyCanonicalWriteAllowed } from "../../../platform/cutover/canonicalWriteFence";
-
 import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
@@ -24,6 +22,7 @@ import {
   synthesizePhotoSessionObservations,
 } from "../../../domain/services/PhotoSessionService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { assertApplicationUploadEntryAllowed, storeApplicationUpload } from "../../../application/media/ApplicationUploadService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
 import { createProvisionalPhotoSession } from "../../../domain/services/ProvisionalPhotoSessionService";
 import {
@@ -39,7 +38,7 @@ import {
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function saveProgressPhotoEvidence(formData) {
-  assertProductionLegacyCanonicalWriteAllowed({ operation: "progress-photo-upload" });
+  assertApplicationUploadEntryAllowed({ operation: "progress-photo-upload" });
   const user = await FounderRepositories.users.getCurrentUser();
 
   if (!user) throw new Error("Founder user is not available.");
@@ -105,7 +104,15 @@ export async function saveProgressPhotoEvidence(formData) {
     captureArtifacts.push({
       originalCaptureMetadata: extractOriginalImageCaptureMetadata(buffer, { mimeType: file.type }),
     });
-    const storedPath = await storePrivateUpload({ directory: path.join("private", "founder", "photos", "uploads"), file, prefix: `${capturedAt}-${identity.poseId}` });
+    const storedPath = (await storeApplicationUpload({
+      ownerUserId: user.id,
+      file,
+      legacyDirectory: path.join("private", "founder", "photos", "uploads"),
+      legacyPrefix: `${capturedAt}-${identity.poseId}`,
+      category: "progressPhotos",
+      relationshipId: `photo-session:${capturedAt}`,
+      artifactId: `photo:${uploadedAt}:${index}`,
+    })).reference;
     provisionalPhotos.push({
       id: `provisional_photo_${uploadedAt.replace(/\D/g, "")}_${index}`,
       storage_path: storedPath, source_hash: sourceHash, active: true,
@@ -492,19 +499,6 @@ function getMimeType(filePath = "") {
   return "image/jpeg";
 }
 
-async function storePrivateUpload({ directory, file, prefix }) {
-  const extension = path.extname(file.name || "").toLowerCase() || ".jpg";
-  const safeName = `${sanitizeFileName(prefix)}-${Date.now()}${extension}`;
-  const relativePath = path.join(directory, safeName);
-  const absolutePath = path.join(process.cwd(), relativePath);
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-  await fs.writeFile(absolutePath, buffer);
-
-  return relativePath.replaceAll("\\", "/");
-}
-
 function getNearestDexaScanId(scans, dateKey) {
   const target = new Date(`${dateKey}T00:00:00`).getTime();
 
@@ -569,8 +563,4 @@ function normalizeReturnTo(value) {
   }
 
   return null;
-}
-
-function sanitizeFileName(value) {
-  return String(value).replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
 }

@@ -10,6 +10,8 @@ import { createStructuredLogger } from "../src/platform/observability/structured
 import { createPostgresProviderMigrationDryRunStore } from "../src/platform/cutover/PostgresProviderMigrationDryRunStore.js";
 import { createProviderMigrationDryRunWorkerHandler } from "../src/platform/cutover/ProviderMigrationDryRunWorker.js";
 import { PROVIDER_MIGRATION_DRY_RUN_TOPIC } from "../src/platform/cutover/ProviderMigrationDryRunContract.js";
+import { createPostgresCombinedRuntimeAuthorityStore } from "../src/platform/cutover/PostgresCombinedRuntimeAuthorityStore.js";
+import { createAuthorityGatedWorker } from "../src/platform/jobs/AuthorityGatedWorker.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
@@ -66,11 +68,23 @@ const worker = createDurableOutboxWorker({
   logger,
   maximumAttempts: readMaximumAttempts(process.env.PHYSIQUEOS_WORKER_MAX_ATTEMPTS),
 });
+const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
+  ? createAuthorityGatedWorker({
+      worker,
+      authorityStore: createPostgresCombinedRuntimeAuthorityStore({
+        pool,
+        environment: required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+      }),
+      heartbeat: adapters.outbox.heartbeat,
+      workerId: worker.workerId,
+      buildId: buildIdentity.buildId,
+    })
+  : worker;
 
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
 
 try {
-  await runWorkerLoop({ worker, signal: controller.signal });
+  await runWorkerLoop({ worker: effectiveWorker, signal: controller.signal });
 } catch (error) {
   logger.error("worker.crashed", { code: error?.code ?? "WORKER_CRASHED" });
   process.exitCode = 1;

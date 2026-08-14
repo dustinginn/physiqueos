@@ -99,4 +99,4 @@ function poseId(photo) { return photo?.poseId ?? `${photo?.view ?? ""}-${photo?.
 function formatNumber(value, digits) { return Number.isFinite(value) ? value.toFixed(digits) : "—"; }
 function formatMetric(value, unit) { return Number.isFinite(value) ? `${value.toFixed(1)}${unit === "%" ? "" : " "}${unit}` : "—"; }
 function formatDate(value) { if (!value) return "—"; const [year, month, day] = value.split("-").map(Number); return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
-function privateEvidenceUrl(value) { if (!value) return null; return `/api/private-evidence/${String(value).replace(/^private[\\/]/, "").replaceAll("\\", "/")}`; }
+function privateEvidenceUrl(value) { if (!value) return null; const media=String(value).match(/^media:\/\/([0-9a-f-]+)$/i);return media?`/api/private-evidence/media/${media[1]}`:`/api/private-evidence/${String(value).replace(/^private[\\/]/, "").replaceAll("\\", "/")}`; }

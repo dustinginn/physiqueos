@@ -4,7 +4,7 @@ import { createDEXAEventNarrativeService } from "../../../../domain/services/DEX
 import DEXAEventBriefingScreen from "../../../../screens/DEXAEventBriefingScreen";
 import PhaseReviewCard from "../../../../components/goals/PhaseReviewCard";
 import { submitProductionPhaseReviewDecision } from "./actions";
-import { getFounderRuntimeStore } from "../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import { resolvePhaseReviewArtifactRead } from
   "../../../../domain/services/PhaseReviewArtifactReadService";
 
@@ -16,7 +16,7 @@ export default async function DEXAEventPage({ params }) {
     .getByScanId({ userId: user.id, scanId });
   if (!artifact) notFound();
   const phaseReviewRead = resolvePhaseReviewArtifactRead({ artifact,
-    decisionHistory: getFounderRuntimeStore().phaseReviewDecisions ?? [] });
+    decisionHistory: (await loadApplicationCanonicalRuntime()).phaseReviewDecisions ?? [] });
   return <DEXAEventBriefingScreen
     narrative={artifact.briefing.dexaEventNarrative}
     phaseReview={phaseReviewRead

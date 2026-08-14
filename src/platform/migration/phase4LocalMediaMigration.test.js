@@ -18,6 +18,7 @@ describe("Phase 4 local private-media migration", () => {
       await fs.writeFile(path.join(source, "evidence.png"), bytes);
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const collections = Object.fromEntries(FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, name === "user" ? { id: "owner" } : []]));
+      const applicationContext = { operatingRhythm: null, adaptiveTrustProfile: null, retiredMilestones: [] };
       const unsigned = {
         manifestVersion: "2", migrationId: "synthetic", createdAt: "2026-08-11T00:00:00.000Z",
         importerVersion: "phase4-canonical-package-v2", targetSchemaVersion: "000003",
@@ -31,7 +32,8 @@ describe("Phase 4 local private-media migration", () => {
           schema: { sourceVersion: "000003" },
         },
         collectionInventory: inspectFoundationSourceInventory(collections),
-        collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections) },
+        applicationContext,
+        collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections), applicationContextDigest: createPayloadHash(applicationContext) },
         files: [{ relativePath: "evidence.png", size: bytes.length, sha256, mimeType: "image/png", ownerUserId: "owner", relationshipIds: [], migrationResult: "pending", validationResult: "pending" }],
         result: "pending", validationResult: "pending",
       };

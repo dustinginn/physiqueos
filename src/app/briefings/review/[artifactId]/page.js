@@ -11,7 +11,7 @@ import { resolveBriefingReviewArtifact } from "../../../../domain/services/Brief
 import { prepareWeeklyBriefingReviewPresentation } from "../../../../domain/services/WeeklyBriefingReviewPresentationService";
 import { prepareMidweekBriefingReviewPresentation } from "../../../../domain/services/MidweekBriefingPresentationService";
 import PhaseReviewCard from "../../../../components/goals/PhaseReviewCard";
-import { getFounderRuntimeStore } from "../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationCanonicalRuntime } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import { resolvePhaseReviewArtifactRead } from
   "../../../../domain/services/PhaseReviewArtifactReadService";
 
@@ -30,7 +30,7 @@ export default async function BriefingReviewPage({ params, searchParams }) {
   if (artifact.briefing?.photoEventNarrative) return <PhotoEventBriefingScreen narrative={artifact.briefing.photoEventNarrative}/>;
   if (artifact.briefing?.dexaEventNarrative) {
     const review = resolvePhaseReviewArtifactRead({ artifact,
-      decisionHistory: getFounderRuntimeStore().phaseReviewDecisions ?? [] });
+      decisionHistory: (await loadApplicationCanonicalRuntime()).phaseReviewDecisions ?? [] });
     return <DEXAEventBriefingScreen narrative={artifact.briefing.dexaEventNarrative}
       phaseReview={review?.readOnly
         ? <PhaseReviewCard readOnly review={review.review}/> : null}/>;

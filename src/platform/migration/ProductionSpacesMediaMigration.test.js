@@ -52,6 +52,7 @@ async function packageFixture() {
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   await fs.writeFile(path.join(mediaRoot, "evidence.png"), bytes);
   const collections = Object.fromEntries(FOUNDATION_SOURCE_COLLECTIONS.map((name) => [name, name === "user" ? { id: "owner" } : []]));
+  const applicationContext = { operatingRhythm: null, adaptiveTrustProfile: null, retiredMilestones: [] };
   const unsigned = {
     manifestVersion: "2", migrationId: "synthetic", createdAt: "2026-08-13T00:00:00.000Z",
     importerVersion: "phase4-canonical-package-v2", targetSchemaVersion: "000003",
@@ -63,7 +64,8 @@ async function packageFixture() {
       package: { version: "phase4-canonical-package-v2" }, schema: { sourceVersion: "000003" },
     },
     collectionInventory: inspectFoundationSourceInventory(collections),
-    collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections) },
+    applicationContext,
+    collections: [], relationships: [], criticalValues: { canonicalStateDigest: createPayloadHash(collections), applicationContextDigest: createPayloadHash(applicationContext) },
     files: [{ relativePath: "evidence.png", size: bytes.length, sha256, mimeType: "image/png", ownerUserId: "owner", relationshipIds: [], migrationResult: "pending", validationResult: "pending" }],
     result: "pending", validationResult: "pending",
   };

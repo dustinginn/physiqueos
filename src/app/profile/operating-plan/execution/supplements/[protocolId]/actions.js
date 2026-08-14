@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { FounderRepositories } from "../../../../../../data/repositories/founderRepositories";
-import { getFounderRuntimeStore, resolveFounderRuntimeStorePath } from "../../../../../../data/repositories/founderRuntimeStore";
+import { loadApplicationRuntimeBindings } from "../../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { buildSupplementSupportDraftFromFormData, createSupplementSupportManagementService } from "../../../../../../domain/services/SupplementSupportManagementService";
 
 export async function saveSupplementExecution(context, _priorState, formData) {
@@ -25,7 +25,7 @@ export async function saveSupplementExecution(context, _priorState, formData) {
     return{message:"This supplement schedule changed while you were editing it. Review the latest version and try again.",values:draft};
   }
   const goalId=version.goalLinks?.[0]?.goalId??protocol.currentGoalIds?.[0];
-  const result=await createSupplementSupportManagementService({runtimeStorePath:resolveFounderRuntimeStorePath(),liveStore:getFounderRuntimeStore()}).save({...context,expectedRevision:existing?.executionRevision??null,supplementVersionId:version.id,goalId,userId:user.id,draft,author:{type:"user",id:user.id,displayName:user.name??user.displayName??"Founder"}});
+  const result=await createSupplementSupportManagementService({...await loadApplicationRuntimeBindings()}).save({...context,expectedRevision:existing?.executionRevision??null,supplementVersionId:version.id,goalId,userId:user.id,draft,author:{type:"user",id:user.id,displayName:user.name??user.displayName??"Founder"}});
   if(result.outcome!=="success")return{message:message(result,draft),values:draft};
   const authoritative=await FounderRepositories.executionItems.getExecutionItemById(result.executionId);
   if(!authoritative||authoritative.protocolRootId!==context.protocolId||authoritative.executionRevision!==result.executionRevision){

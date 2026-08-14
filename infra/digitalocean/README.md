@@ -134,3 +134,10 @@ must import its DPAPI artifact as a `PSCredential` and read the protected
 password field; treating the object as the bearer string causes 401. Never log
 the extracted token. This acceptance does not enable any startup operation,
 fence, migration, canonical write, evidence movement, or product auth.
+## Full-product compatibility target (source-only)
+
+`Dockerfile.product`, `Dockerfile.provider-worker`, and `app.product.template.yaml` define the combined architecture's full Next.js web service and authority-gated worker. Render it with `PHYSIQUEOS_APP_SPEC_VARIANT=product`; the renderer derives required inputs from the selected template and must stream secret-bearing output or place it only in an ignored, bounded temporary file.
+
+The target reuses the existing one 512 MiB web, one 512 MiB worker, Managed PostgreSQL, and private/versioned Space, so the proposed base remains $30.15/month. The database firewall remains exactly App-Platform-only. Compatibility mode is non-authoritative, restricted to isolated provider-safe data, and cannot enable public canonical writes or claim provider authority. No product-spec deployment or provider mutation occurred in the architecture patch; deployment requires separate authorization after checkpoint publication.
+
+The full authority, routing, worker, transfer, first-write, and rollback model is documented in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`.

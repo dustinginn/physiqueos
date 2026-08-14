@@ -1,4 +1,3 @@
-import { founderAnalyses } from "../founderSeed/analyses";
 import { latestByDate } from "./repositoryUtils";
 
 export function createAnalysisRepository(analyses = [], options = {}) {
@@ -58,7 +57,9 @@ export function createAnalysisRepository(analyses = [], options = {}) {
   };
 }
 
-export const AnalysisRepository = createAnalysisRepository(founderAnalyses);
+// This compatibility export must never pull Founder records into a deployable
+// module graph. Canonical compositions inject their own data explicitly.
+export const AnalysisRepository = createAnalysisRepository([]);
 
 function hasSameEvidenceTarget(left, right) {
   const leftEvidenceIds = normalizeList(left.evidenceIds);

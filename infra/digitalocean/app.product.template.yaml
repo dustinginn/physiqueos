@@ -1,0 +1,60 @@
+name: physiqueos-foundation-staging
+region: ${DIGITALOCEAN_REGION}
+services:
+  - name: web
+    dockerfile_path: Dockerfile.product
+    git:
+      repo_clone_url: ${GIT_REPOSITORY_URL}
+      branch: ${GIT_BRANCH}
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 8080
+    health_check:
+      http_path: /api/v1/health/live
+    envs:
+      - { key: PHYSIQUEOS_PROVIDER_FULL_RUNTIME, scope: RUN_AND_BUILD_TIME, value: "1" }
+      - { key: PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE, scope: RUN_TIME, value: ${PROVIDER_COMPATIBILITY_MODE} }
+      - { key: PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, scope: RUN_TIME, value: ${RUNTIME_AUTHORITY_ENVIRONMENT} }
+      - { key: PHYSIQUEOS_MIGRATION_OPERATION_ID, scope: RUN_TIME, value: ${MIGRATION_OPERATION_ID} }
+      - { key: PHYSIQUEOS_CANONICAL_OWNER_USER_ID, scope: RUN_TIME, value: ${CANONICAL_OWNER_USER_ID} }
+      - { key: PHYSIQUEOS_DATABASE_ENABLED, scope: RUN_TIME, value: "1" }
+      - { key: PHYSIQUEOS_DATABASE_URL, scope: RUN_TIME, type: SECRET, value: ${PROVIDER_DATABASE_URL} }
+      - { key: PHYSIQUEOS_DATABASE_CA_CERT, scope: RUN_TIME, type: SECRET, value: ${DATABASE_CA_CERT} }
+      - { key: PHYSIQUEOS_OBJECT_STORAGE_ENABLED, scope: RUN_TIME, value: "1" }
+      - { key: PHYSIQUEOS_SPACES_REGION, scope: RUN_TIME, value: ${SPACES_REGION} }
+      - { key: PHYSIQUEOS_SPACES_ENDPOINT, scope: RUN_TIME, value: ${SPACES_ENDPOINT} }
+      - { key: PHYSIQUEOS_SPACES_BUCKET, scope: RUN_TIME, value: ${SPACES_BUCKET} }
+      - { key: PHYSIQUEOS_SPACES_ACCESS_KEY_ID, scope: RUN_TIME, type: SECRET, value: ${SPACES_ACCESS_KEY_ID} }
+      - { key: PHYSIQUEOS_SPACES_SECRET_ACCESS_KEY, scope: RUN_TIME, type: SECRET, value: ${SPACES_SECRET_ACCESS_KEY} }
+      - { key: PHYSIQUEOS_CREDENTIAL_PEPPER, scope: RUN_TIME, type: SECRET, value: ${CREDENTIAL_PEPPER} }
+      - { key: PHYSIQUEOS_OPERATIONS_TOKEN, scope: RUN_TIME, type: SECRET, value: ${OPERATIONS_TOKEN} }
+      - { key: PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED, scope: RUN_TIME, value: "0" }
+      - { key: PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY, scope: RUN_TIME, value: digitalocean-app-platform }
+      - { key: PHYSIQUEOS_BUILD_ID, scope: RUN_AND_BUILD_TIME, value: ${BUILD_ID} }
+      - { key: PHYSIQUEOS_GIT_SHA, scope: RUN_AND_BUILD_TIME, value: ${GIT_SHA} }
+workers:
+  - name: worker
+    dockerfile_path: Dockerfile.provider-worker
+    git:
+      repo_clone_url: ${GIT_REPOSITORY_URL}
+      branch: ${GIT_BRANCH}
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    envs:
+      - { key: PHYSIQUEOS_PROVIDER_FULL_RUNTIME, scope: RUN_TIME, value: "1" }
+      - { key: PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, scope: RUN_TIME, value: ${RUNTIME_AUTHORITY_ENVIRONMENT} }
+      - { key: PHYSIQUEOS_DATABASE_ENABLED, scope: RUN_TIME, value: "1" }
+      - { key: PHYSIQUEOS_DATABASE_URL, scope: RUN_TIME, type: SECRET, value: ${PROVIDER_DATABASE_URL} }
+      - { key: PHYSIQUEOS_DATABASE_CA_CERT, scope: RUN_TIME, type: SECRET, value: ${DATABASE_CA_CERT} }
+      - { key: PHYSIQUEOS_OBJECT_STORAGE_ENABLED, scope: RUN_TIME, value: "1" }
+      - { key: PHYSIQUEOS_SPACES_REGION, scope: RUN_TIME, value: ${SPACES_REGION} }
+      - { key: PHYSIQUEOS_SPACES_ENDPOINT, scope: RUN_TIME, value: ${SPACES_ENDPOINT} }
+      - { key: PHYSIQUEOS_SPACES_BUCKET, scope: RUN_TIME, value: ${SPACES_BUCKET} }
+      - { key: PHYSIQUEOS_SPACES_ACCESS_KEY_ID, scope: RUN_TIME, type: SECRET, value: ${SPACES_ACCESS_KEY_ID} }
+      - { key: PHYSIQUEOS_SPACES_SECRET_ACCESS_KEY, scope: RUN_TIME, type: SECRET, value: ${SPACES_SECRET_ACCESS_KEY} }
+      - { key: PHYSIQUEOS_CREDENTIAL_PEPPER, scope: RUN_TIME, type: SECRET, value: ${CREDENTIAL_PEPPER} }
+      - { key: PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED, scope: RUN_TIME, value: "0" }
+      - { key: PHYSIQUEOS_BUILD_ID, scope: RUN_AND_BUILD_TIME, value: ${BUILD_ID} }
+      - { key: PHYSIQUEOS_GIT_SHA, scope: RUN_AND_BUILD_TIME, value: ${GIT_SHA} }
+      - { key: PHYSIQUEOS_WORKER_ID, scope: RUN_TIME, value: ${WORKER_ID} }
+      - { key: PHYSIQUEOS_WORKER_MAX_ATTEMPTS, scope: RUN_TIME, value: "3" }

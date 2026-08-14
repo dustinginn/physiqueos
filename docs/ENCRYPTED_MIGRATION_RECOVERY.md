@@ -282,3 +282,8 @@ At closeout the live source/build/runtime/media/control remained aligned with
 this packet. This refresh is **RECOVERY PACKET REFRESH ACCEPTED**. The final
 pre-fence gate may be rerun, but it must recheck packet/live alignment and
 managed-backup freshness. It still does not authorize a fence or migration.
+## Future combined-cutover refresh
+
+The current encrypted packet remains recovery evidence for the current Windows/legacy authority but is not sufficient for a future combined cutover. Do not replace it during this architecture patch. After the exact full-provider compatibility deployment is accepted, create and restore-test a new packet containing the final fenced Windows JSON/media/control state, combined source, provider source/build/spec and compatible rollback, Windows current/rollback builds, transfer tools/receipts, runtime-authority state, PostgreSQL/Spaces inventories, routing configuration, and the combined runbooks.
+
+The refreshed packet remains encrypted and replicated off-machine for at least 35 days and until every approved exit condition passes. After the first provider canonical write it supports provider-compatible rollback and forward repair; it never authorizes restoring stale JSON as canonical.

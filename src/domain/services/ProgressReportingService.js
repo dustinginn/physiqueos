@@ -2705,6 +2705,9 @@ function getLocalDateKey(value = new Date(), timeZone = DEFAULT_TIME_ZONE) {
 function getPrivateEvidenceHref(relativePath) {
   if (!relativePath) return null;
 
+  const media = String(relativePath).match(/^media:\/\/([0-9a-f-]+)$/i);
+  if (media) return `/api/private-evidence/media/${media[1]}`;
+
   return `/api/private-evidence/${String(relativePath).replace(/^private\//, "")}`;
 }
 
