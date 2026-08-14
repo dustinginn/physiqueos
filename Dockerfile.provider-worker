@@ -6,15 +6,15 @@ RUN npm ci --omit=dev
 FROM dependencies AS artifact
 COPY src ./src
 COPY scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs \
-    scripts/scanProviderArtifact.mjs scripts/collectProviderWorkerArtifact.mjs ./scripts/
+    scripts/scanProviderArtifact.mjs scripts/collectProviderWorkerArtifact.mjs \
+    scripts/collectProviderWorkerDependencies.mjs ./scripts/
 RUN node scripts/collectProviderWorkerArtifact.mjs /worker
+RUN node scripts/collectProviderWorkerDependencies.mjs /worker
 RUN node scripts/scanProviderArtifact.mjs /worker
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PHYSIQUEOS_PROVIDER_FULL_RUNTIME=1
-COPY --from=dependencies /app/package.json /app/package-lock.json ./
-COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=artifact /worker ./
 RUN node scripts/scanProviderArtifact.mjs /app
 USER node

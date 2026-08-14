@@ -62,6 +62,17 @@ describe("provider artifact privacy scanner", () => {
       code: "PROVIDER_ARTIFACT_PRIVACY_REJECTED",
     });
   });
+
+  it("rejects a complete private key while allowing parser marker constants", async () => {
+    const parserRoot = await fixture({ "parser.js": 'const marker = "-----BEGIN PRIVATE KEY-----";' });
+    await expect(scanProviderArtifact({ roots: [parserRoot] })).resolves.toMatchObject({ status: "PASS" });
+    const keyRoot = await fixture({
+      "key.pem": "-----BEGIN PRIVATE KEY-----\nQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=\n-----END PRIVATE KEY-----\n",
+    });
+    await expect(scanProviderArtifact({ roots: [keyRoot] })).rejects.toMatchObject({
+      code: "PROVIDER_ARTIFACT_PRIVACY_REJECTED",
+    });
+  });
 });
 
 function fsSync(relativePath) {
