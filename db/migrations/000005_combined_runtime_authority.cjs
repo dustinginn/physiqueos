@@ -75,6 +75,7 @@ CREATE TABLE physiqueos.canonical_runtime_metadata (
   source_runtime_sha256 char(64) NOT NULL CHECK (source_runtime_sha256 ~ '^[0-9a-f]{64}$'),
   package_digest char(64) NOT NULL CHECK (package_digest ~ '^[0-9a-f]{64}$'),
   source_updated_at timestamptz NOT NULL,
+  imported_at timestamptz NOT NULL DEFAULT now(),
   last_command_id text,
   version bigint NOT NULL DEFAULT 1 CHECK (version > 0),
   updated_at timestamptz NOT NULL DEFAULT now()

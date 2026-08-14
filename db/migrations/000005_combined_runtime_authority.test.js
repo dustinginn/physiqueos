@@ -11,4 +11,8 @@ describe("combined runtime-authority migration", () => {
     expect(migration.UP_SQL).toContain("canonical_runtime_metadata");
     expect(migration.UP_SQL).toContain("canonical_application_context");
   });
+
+  it("creates every canonical runtime metadata field consumed by provider reads", () => {
+    expect(migration.UP_SQL).toContain("imported_at timestamptz NOT NULL DEFAULT now()");
+  });
 });
