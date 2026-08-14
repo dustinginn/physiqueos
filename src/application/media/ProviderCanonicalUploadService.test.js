@@ -81,6 +81,35 @@ describe("provider canonical uploads", () => {
     expect(objectProvider.beginMultipartUpload).not.toHaveBeenCalled();
     expect(database.canonicalMedia).toHaveLength(0);
   });
+
+  it("commits a verified upload under an explicitly accepted compatibility authority", async () => {
+    const database = fakeDatabase();
+    const objectProvider = fakeObjectProvider();
+    const assertCompatibilityAccess = vi.fn(async () => ({ outcome: "accepted" }));
+    const service = createProviderCanonicalUploadService({
+      pool: database.pool,
+      objectProvider,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess },
+      fetchImpl: async () => new Response(null, { status: 200, headers: { etag: '"etag"' } }),
+      now: () => new Date("2026-08-14T02:00:00.000Z"),
+    });
+
+    await expect(service.store({
+      ownerUserId: "phase5-synthetic-user",
+      bytes: Buffer.from("verified-private-media"),
+      contentType: "image/jpeg",
+      originalFilename: "compatibility.jpg",
+      category: "progressPhotos",
+      relationshipId: "session-1",
+    })).resolves.toMatchObject({ reference: expect.stringMatching(/^media:\/\//) });
+
+    expect(assertCompatibilityAccess).toHaveBeenCalledTimes(2);
+    expect(database.canonicalMedia).toHaveLength(1);
+    expect(database.outbox).toHaveLength(1);
+    expect(objectProvider.deleteObject).not.toHaveBeenCalled();
+  });
 });
 
 function fakeObjectProvider() {

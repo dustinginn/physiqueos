@@ -78,7 +78,8 @@ export function createProviderCanonicalUploadService({
         const commandId = `media:${intent.uploadId}`;
         await commitVerifiedUpload({
           pool, authorityStore, migrationOperationId, compatibilityMode, intent, begun, completed,
-          commandId, sha256, contentType, originalFilename, category, relationshipId, artifactId, now,
+          requireCompatibilityAuthority, commandId, sha256, contentType, originalFilename, category,
+          relationshipId, artifactId, now,
         });
         return Object.freeze({
           objectId: intent.objectId,
@@ -129,7 +130,8 @@ async function createUploadRows({ pool, intent, begun, originalFilename, now }) 
 
 async function commitVerifiedUpload({
   pool, authorityStore, migrationOperationId, compatibilityMode, intent, begun, completed,
-  commandId, sha256, contentType, originalFilename, category, relationshipId, artifactId, now,
+  requireCompatibilityAuthority, commandId, sha256, contentType, originalFilename, category,
+  relationshipId, artifactId, now,
 }) {
   const client = await pool.connect();
   try {
