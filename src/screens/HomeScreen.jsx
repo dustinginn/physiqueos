@@ -4,11 +4,14 @@ import NextBestAction from "../components/cards/NextBestAction";
 import HomeBriefingCardStack from "../components/cards/HomeBriefingCardStack";
 import GoalsCard from "../components/cards/GoalsCard";
 import TodaysFocusCard from "../components/cards/TodaysFocusCard";
-import { HomeBriefingService } from "../domain/services/HomeBriefingService";
+import { createInactiveLegacyWebContext } from "../application/auth/legacyWebContext";
+import { getProductionApplicationComposition } from "../application/composition/productionApplicationComposition";
 import { completeHomePriority } from "../app/actions";
 
 export default async function HomeScreen() {
-  const briefing = await HomeBriefingService.getHomeBriefing();
+  const composition = await getProductionApplicationComposition();
+  const { principal } = await createInactiveLegacyWebContext({ repositories: composition.repositories });
+  const briefing = (await composition.readModels.home(principal)).data;
 
   return (
     <main className="app-surface relative min-h-screen overflow-x-hidden">

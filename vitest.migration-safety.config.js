@@ -38,6 +38,7 @@ export default defineConfig({
       "src/platform/migration/phase4CanonicalExport.test.js",
       "src/platform/database/phase4PostgresComposition.test.js",
       "src/platform/database/PostgresFounderRepositoryFacade.test.js",
+      "src/screens/HomeProviderCompositionWiring.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,
