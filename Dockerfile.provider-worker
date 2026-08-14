@@ -9,8 +9,13 @@ ENV NODE_ENV=production PHYSIQUEOS_PROVIDER_FULL_RUNTIME=1
 COPY --from=dependencies /app/package.json /app/package-lock.json ./
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY src ./src
-COPY scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs ./scripts/
+COPY scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs scripts/scanProviderArtifact.mjs ./scripts/
 RUN rm -rf /app/src/data/founderSeed /app/src/fixtures /app/src/stories \
- && test ! -e /app/src/data/founderSeed
+    /app/tmp /app/.tmp /app/private /app/screenshots /app/test-results /app/playwright-report \
+ && test ! -e /app/src/data/founderSeed \
+ && test ! -e /app/tmp \
+ && test ! -e /app/.tmp \
+ && test ! -e /app/private
+RUN node scripts/scanProviderArtifact.mjs /app
 USER node
 CMD ["node", "scripts/runFoundationWorker.mjs"]

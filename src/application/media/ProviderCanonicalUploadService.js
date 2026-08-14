@@ -12,6 +12,7 @@ export function createProviderCanonicalUploadService({
   authorityStore = null,
   migrationOperationId = null,
   compatibilityMode = false,
+  requireCompatibilityAuthority = false,
   fetchImpl = globalThis.fetch,
   now = () => new Date(),
 } = {}) {
@@ -21,9 +22,15 @@ export function createProviderCanonicalUploadService({
   if (!compatibilityMode && !authorityStore?.claimCanonicalWriteBoundary) {
     throw new Error("Canonical provider uploads require durable runtime authority.");
   }
+  if (compatibilityMode && requireCompatibilityAuthority && !authorityStore?.assertCompatibilityAccess) {
+    throw new Error("Compatibility provider uploads require durable compatibility authority.");
+  }
 
   return Object.freeze({
     async store({ ownerUserId, bytes, contentType, originalFilename, category, relationshipId, artifactId = null }) {
+      if (compatibilityMode && (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess)) {
+        await assertCompatibilitySession(pool, authorityStore);
+      }
       const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
       validateUpload({ ownerUserId, buffer, contentType, originalFilename, category, relationshipId });
       const sha256 = createHash("sha256").update(buffer).digest("hex");
@@ -128,7 +135,12 @@ async function commitVerifiedUpload({
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${intent.ownerUserId}`]);
-    if (compatibilityMode) await assertCompatibilityTarget(client);
+    if (compatibilityMode) {
+      const databaseName = await assertCompatibilityTarget(client);
+      if (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess) {
+        await authorityStore.assertCompatibilityAccess({ client, databaseName });
+      }
+    }
     else await authorityStore.claimCanonicalWriteBoundary({ client, migrationOperationId, commandId });
     const objects = createPostgresObjectStore({ query: (text, values) => client.query(text, values) });
     const at = now().toISOString();
@@ -163,7 +175,7 @@ async function commitVerifiedUpload({
        ON CONFLICT (topic,dedupe_key) DO NOTHING`,
       [`outbox:${commandId}`, intent.ownerUserId, `media:${intent.uploadId}`, JSON.stringify({
         commandId, objectId: intent.objectId, category, relationshipId: String(relationshipId),
-        canonicalStoreEpoch: "postgres-canonical",
+        canonicalStoreEpoch: compatibilityMode ? "provider-compatibility-noncanonical" : "postgres-canonical",
       })],
     );
     await client.query("COMMIT");
@@ -185,11 +197,24 @@ async function markUploadFailed(pool, intent, now) {
 
 async function assertCompatibilityTarget(client) {
   const result = await client.query("SELECT current_database() AS database");
-  if (!GUARDED_COMPATIBILITY_DATABASE.test(String(result.rows[0]?.database ?? ""))) {
+  const databaseName = String(result.rows[0]?.database ?? "");
+  if (!GUARDED_COMPATIBILITY_DATABASE.test(databaseName)) {
     const error = new Error("Compatibility uploads are restricted to the isolated Phase 5 provider database.");
     error.code = "PROVIDER_COMPATIBILITY_TARGET_REJECTED";
     throw error;
   }
+  return databaseName;
+}
+
+async function assertCompatibilitySession(pool, authorityStore) {
+  const result = await pool.query("SELECT current_database() AS database");
+  const databaseName = String(result.rows[0]?.database ?? "");
+  if (!GUARDED_COMPATIBILITY_DATABASE.test(databaseName)) {
+    const error = new Error("Compatibility uploads are restricted to the isolated Phase 5 provider database.");
+    error.code = "PROVIDER_COMPATIBILITY_TARGET_REJECTED";
+    throw error;
+  }
+  await authorityStore.assertCompatibilityAccess({ databaseName });
 }
 
 function validateUpload({ ownerUserId, buffer, contentType, originalFilename, category, relationshipId }) {

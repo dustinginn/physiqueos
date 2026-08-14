@@ -141,3 +141,11 @@ fence, migration, canonical write, evidence movement, or product auth.
 The target reuses the existing one 512 MiB web, one 512 MiB worker, Managed PostgreSQL, and private/versioned Space, so the proposed base remains $30.15/month. The database firewall remains exactly App-Platform-only. Compatibility mode is non-authoritative, restricted to isolated provider-safe data, and cannot enable public canonical writes or claim provider authority. No product-spec deployment or provider mutation occurred in the architecture patch; deployment requires separate authorization after checkpoint publication.
 
 The full authority, routing, worker, transfer, first-write, and rollback model is documented in `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md`.
+
+## Full-product compatibility remediation (2026-08-14)
+
+The product and worker Docker builds now exclude root `tmp` as well as `.tmp`, `private`, screenshots, logs, recovery material, and test output. Product standalone tracing carries the same exclusions. Both images invoke `scripts/scanProviderArtifact.mjs`, which rejects forbidden paths, Founder runtime/control filenames, recovery archives, credential-bearing database URIs, supplied private values/owner identifiers, and supplied production file hashes. The previously tracked Founder-derived Playwright runtime, private briefing PNG, and disposable render logs were removed from the current branch only; history was not rewritten.
+
+The compatibility spec supplies `PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE=1` and the exact guarded database name to both web and worker. Both require a durable `provider-compatibility-nonauthoritative` authority row in an explicit compatibility environment. The tuple preserves Windows public/canonical authority and forbids production writes, combined execution, production operation binding, and a first-provider-write marker. `scripts/initializeProviderCompatibility.mjs` is the idempotent fail-closed initializer after schema `000005` exists.
+
+Do not apply the migration or initializer until the exact live app spec, encrypted-variable names, alerts, topology, and rollback specification have been independently read with narrow App Platform read authorization. This source remediation does not change the existing $30.15/month footprint, firewall, app, database, Space, or deployment.

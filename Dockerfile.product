@@ -14,8 +14,16 @@ RUN npm run build -- --webpack
 RUN rm -rf .next/standalone/src/data/founderSeed .next/standalone/src/data/seed \
     .next/standalone/src/fixtures .next/standalone/src/features/dashboard \
     .next/standalone/src/lib/mockData.js .next/standalone/src/models/UserProfile.js \
+    .next/standalone/tmp .next/standalone/.tmp .next/standalone/private \
+    .next/standalone/screenshots .next/standalone/test-results \
+    .next/standalone/playwright-report .next/standalone/backups \
+    .next/standalone/runtime-exports \
  && rm -f public/mockup-home.png
+RUN node scripts/scanProviderArtifact.mjs .next/standalone public .next/static
 RUN test ! -e .next/standalone/private \
+ && test ! -e .next/standalone/tmp \
+ && test ! -e .next/standalone/.tmp \
+ && test ! -e .next/standalone/screenshots \
  && test ! -e .next/standalone/logs \
  && test ! -e .next/standalone/src/data/founderSeed \
  && test ! -e .next/standalone/src/fixtures \
@@ -31,6 +39,12 @@ ENV NODE_ENV=production \
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+RUN rm -rf /app/tmp /app/.tmp /app/private /app/screenshots /app/test-results \
+    /app/playwright-report /app/backups /app/runtime-exports \
+ && test ! -e /app/tmp \
+ && test ! -e /app/.tmp \
+ && test ! -e /app/private \
+ && test ! -e /app/screenshots
 USER node
 EXPOSE 8080
 CMD ["node", "server.js"]

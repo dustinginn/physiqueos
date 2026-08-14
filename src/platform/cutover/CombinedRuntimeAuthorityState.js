@@ -7,8 +7,52 @@ export const RuntimeAuthority = Object.freeze({
   CUTOVER_IN_PROGRESS: "combined-cutover-in-progress",
   PROVIDER_PREPARED: "provider-prepared",
   PROVIDER: "provider-authoritative",
+  COMPATIBILITY: "provider-compatibility-nonauthoritative",
   RECOVERY_REQUIRED: "recovery-required",
 });
+
+export function createCompatibilityRuntimeAuthorityState({
+  environment,
+  providerSource,
+  target,
+  now = new Date().toISOString(),
+} = {}) {
+  requiredCompatibilityEnvironment(environment);
+  requiredSource(providerSource, "providerSource");
+  requiredTarget(target);
+  requiredCompatibilityDatabase(target.databaseName);
+  return freeze({
+    schemaVersion: COMBINED_RUNTIME_AUTHORITY_SCHEMA_VERSION,
+    version: 1,
+    environment,
+    authority: RuntimeAuthority.COMPATIBILITY,
+    publicRuntimeAuthority: "windows",
+    migrationControlAuthority: "windows",
+    workerAuthority: "compatibility",
+    canonicalStoreEpoch: "legacy-json",
+    compositionMode: "postgres",
+    writesEnabled: false,
+    readsEnabled: true,
+    compatibilityWritesEnabled: true,
+    productionWritesAllowed: false,
+    combinedExecutionAllowed: false,
+    migrationOperationId: null,
+    authorizationFingerprint: null,
+    fenceId: null,
+    finalSnapshot: null,
+    providerAcknowledgement: null,
+    windowsSource: null,
+    providerSource: sanitizeSource(providerSource),
+    target: freeze(structuredClone(target)),
+    routingTarget: null,
+    firstProviderCanonicalWriteAt: null,
+    firstProviderCommandId: null,
+    createdAt: now,
+    updatedAt: now,
+    lastAction: "initialized-provider-compatibility",
+    reason: "Isolated provider compatibility state is non-authoritative for production.",
+  });
+}
 
 export const RuntimeAuthorityAction = Object.freeze({
   BEGIN_CUTOVER: "begin-combined-cutover",
@@ -194,6 +238,9 @@ export function validateCombinedRuntimeAuthorityState(value) {
     requireState(value.publicRuntimeAuthority === "windows", "Windows authority requires Windows public routing.");
     requireState(value.canonicalStoreEpoch === "legacy-json" && value.compositionMode === "legacy-json", "Windows authority requires legacy canonical persistence.");
   }
+  if (value.authority === RuntimeAuthority.COMPATIBILITY) {
+    assertCompatibilityRuntimeAuthorityState(value);
+  }
   if ([RuntimeAuthority.PROVIDER, RuntimeAuthority.RECOVERY_REQUIRED].includes(value.authority)) {
     requireState(value.publicRuntimeAuthority === "provider", "Provider authority requires provider public routing.");
     requireState(value.migrationControlAuthority === "provider", "Provider authority requires provider migration control.");
@@ -206,6 +253,31 @@ export function validateCombinedRuntimeAuthorityState(value) {
   if (value.authority === RuntimeAuthority.RECOVERY_REQUIRED) {
     requireState(value.writesEnabled === false && value.workerAuthority === "paused", "Recovery-required state must pause writes and worker effects.");
   }
+  return value;
+}
+
+export function assertCompatibilityRuntimeAuthorityState(value, {
+  environment = value?.environment,
+  databaseName = value?.target?.databaseName,
+} = {}) {
+  if (!value || value.schemaVersion !== COMBINED_RUNTIME_AUTHORITY_SCHEMA_VERSION || value.authority !== RuntimeAuthority.COMPATIBILITY) {
+    throw authorityError("RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED", "Provider compatibility requires the explicit non-authoritative compatibility state.");
+  }
+  requiredCompatibilityEnvironment(environment);
+  requireState(value.environment === environment, "Compatibility authority environment does not match the configured environment.");
+  requiredCompatibilityDatabase(databaseName);
+  requireState(value.target?.databaseName === databaseName, "Compatibility authority database does not match the configured database.");
+  requireState(value.publicRuntimeAuthority === "windows", "Compatibility state cannot own public routing.");
+  requireState(value.migrationControlAuthority === "windows", "Compatibility state cannot own production migration control.");
+  requireState(value.workerAuthority === "compatibility", "Compatibility state requires compatibility-scoped worker authority.");
+  requireState(value.canonicalStoreEpoch === "legacy-json", "Compatibility state must preserve the production legacy canonical epoch.");
+  requireState(value.compositionMode === "postgres", "Compatibility state uses only the isolated PostgreSQL composition.");
+  requireState(value.writesEnabled === false && value.productionWritesAllowed === false, "Compatibility state cannot enable production writes.");
+  requireState(value.readsEnabled === true && value.compatibilityWritesEnabled === true, "Compatibility state must explicitly enable isolated compatibility access.");
+  requireState(value.combinedExecutionAllowed === false, "Compatibility state cannot execute a combined cutover.");
+  requireState(value.migrationOperationId == null && value.authorizationFingerprint == null && value.fenceId == null, "Compatibility state cannot bind a production migration operation.");
+  requireState(value.finalSnapshot == null && value.providerAcknowledgement == null && value.routingTarget == null, "Compatibility state cannot carry production handoff evidence.");
+  requireState(value.firstProviderCanonicalWriteAt == null && value.firstProviderCommandId == null, "Compatibility state cannot record a provider production write boundary.");
   return value;
 }
 
@@ -268,6 +340,19 @@ function requiredAcknowledgement(value, current) {
 function requiredTarget(value) {
   if (!value || typeof value !== "object") throw authorityError("RUNTIME_AUTHORITY_INPUT_INVALID", "target is required.");
   for (const field of ["databaseClusterId", "databaseName", "spacesBucket"]) required(value[field], `target.${field}`);
+}
+
+function requiredCompatibilityEnvironment(value) {
+  required(value, "environment");
+  if (!/^compatibility(?:[-/]|$)/i.test(String(value))) {
+    throw authorityError("RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED", "Compatibility authority requires an explicit compatibility environment.");
+  }
+}
+
+function requiredCompatibilityDatabase(value) {
+  if (!/^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/.test(String(value ?? ""))) {
+    throw authorityError("RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED", "Compatibility authority requires an isolated Phase 5 provider database.");
+  }
 }
 
 function requiredSource(value, field) {

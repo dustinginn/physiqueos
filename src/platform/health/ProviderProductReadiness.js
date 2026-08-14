@@ -1,4 +1,5 @@
 import { getProductionApplicationComposition } from "../../application/composition/productionApplicationComposition.js";
+import { assertCompatibilityRuntimeAuthorityState } from "../cutover/CombinedRuntimeAuthorityState.js";
 
 export async function getProviderProductReadiness() {
   const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
@@ -11,9 +12,14 @@ export async function getProviderProductReadiness() {
     if (!user?.id || user.id !== composition.ownerUserId || objectStorage?.reachable !== true) {
       return result("not-ready", compatibilityMode, "PROVIDER_PRODUCT_DEPENDENCY_REJECTED");
     }
-    if (!compatibilityMode) {
-      const authority = await composition.authorityStore?.read?.();
-      const state = authority?.state;
+    const authority = await composition.authorityStore?.read?.();
+    const state = authority?.state;
+    if (compatibilityMode) {
+      assertCompatibilityRuntimeAuthorityState(state, {
+        environment: process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT,
+        databaseName: process.env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME,
+      });
+    } else {
       if (!state || !["provider-prepared", "provider-authoritative", "recovery-required"].includes(state.authority)) {
         return result("not-ready", false, "PROVIDER_RUNTIME_AUTHORITY_UNAVAILABLE");
       }
@@ -33,6 +39,11 @@ function result(status, compatibilityMode, code) {
     persistence: compatibilityMode ? "postgres-compatibility" : "postgres-canonical",
     objectStorage: "private-spaces",
     compatibilityMode,
+    ...(compatibilityMode ? {
+      authoritative: false,
+      productionWritesAllowed: false,
+      combinedExecutionAllowed: false,
+    } : {}),
     ...(code ? { code } : {}),
   });
 }

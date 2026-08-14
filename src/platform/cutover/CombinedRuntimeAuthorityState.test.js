@@ -3,6 +3,8 @@ import {
   RuntimeAuthority,
   RuntimeAuthorityAction,
   applyCombinedRuntimeAuthorityTransition,
+  assertCompatibilityRuntimeAuthorityState,
+  createCompatibilityRuntimeAuthorityState,
   createInitialCombinedRuntimeAuthorityState,
 } from "./CombinedRuntimeAuthorityState.js";
 
@@ -16,6 +18,51 @@ const target = { databaseClusterId: "cluster", databaseName: "canonical", spaces
 const authorizationFingerprint = "1".repeat(64);
 
 describe("combined runtime authority", () => {
+  it("models provider compatibility as an explicit non-authoritative state with no production transition", () => {
+    const state = createCompatibilityRuntimeAuthorityState({
+      environment: "compatibility-nonproduction",
+      providerSource,
+      target: { ...target, databaseName: "physiqueos_phase5_test_provider_20260811" },
+      now: "2026-08-14T00:00:00.000Z",
+    });
+    expect(assertCompatibilityRuntimeAuthorityState(state)).toMatchObject({
+      authority: RuntimeAuthority.COMPATIBILITY,
+      publicRuntimeAuthority: "windows",
+      migrationControlAuthority: "windows",
+      workerAuthority: "compatibility",
+      canonicalStoreEpoch: "legacy-json",
+      compositionMode: "postgres",
+      writesEnabled: false,
+      productionWritesAllowed: false,
+      combinedExecutionAllowed: false,
+      firstProviderCanonicalWriteAt: null,
+    });
+    for (const action of Object.values(RuntimeAuthorityAction)) {
+      expect(() => transition(state, action, {
+        migrationOperationId: "operation", commandId: "command", authorizationFingerprint,
+        fenceId: "fence", finalSnapshot: snapshot, providerSource, target, routingTarget: "provider.example",
+      })).toThrow();
+    }
+  });
+
+  it("rejects compatibility tuples that resemble production authority", () => {
+    const state = createCompatibilityRuntimeAuthorityState({
+      environment: "compatibility-nonproduction",
+      providerSource,
+      target: { ...target, databaseName: "physiqueos_phase5_test_provider_20260811" },
+    });
+    expect(() => assertCompatibilityRuntimeAuthorityState({ ...state, publicRuntimeAuthority: "provider" }))
+      .toThrow(/cannot own public routing/i);
+    expect(() => createCompatibilityRuntimeAuthorityState({
+      environment: "production", providerSource,
+      target: { ...target, databaseName: "physiqueos_phase5_test_provider_20260811" },
+    })).toThrow(/explicit compatibility environment/i);
+    expect(() => createCompatibilityRuntimeAuthorityState({
+      environment: "compatibility-nonproduction", providerSource,
+      target: { ...target, databaseName: "defaultdb" },
+    })).toThrow(/isolated Phase 5 provider database/i);
+  });
+
   it("binds the fenced snapshot, provider acknowledgement, authority transfer, and first-write boundary", () => {
     let state = createInitialCombinedRuntimeAuthorityState({ environment: "isolated", windowsSource, now: "2026-08-14T00:00:00.000Z" });
     state = transition(state, RuntimeAuthorityAction.BEGIN_CUTOVER, {

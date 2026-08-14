@@ -1,10 +1,12 @@
 import {
   RuntimeAuthority,
+  assertCompatibilityRuntimeAuthorityState,
   RuntimeAuthorityAction,
   applyCombinedRuntimeAuthorityTransition,
   combinedRuntimeAuthorityCommandFingerprint,
   validateCombinedRuntimeAuthorityState,
 } from "./CombinedRuntimeAuthorityState.js";
+import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 
 export function createPostgresCombinedRuntimeAuthorityStore({ pool, environment } = {}) {
   if (!pool?.connect || !pool?.query) throw new Error("PostgreSQL runtime authority requires a pool.");
@@ -19,6 +21,9 @@ export function createPostgresCombinedRuntimeAuthorityStore({ pool, environment 
         await client.query("BEGIN");
         const existing = await readRow(client, environment, { forUpdate: true });
         if (existing) {
+          if (!sameInitialization(existing, initialState)) {
+            throw storeError("RUNTIME_AUTHORITY_INITIALIZATION_CONFLICT", "Existing runtime authority does not match the requested initialization state.");
+          }
           await client.query("COMMIT");
           return Object.freeze({ state: existing, outcome: "already-initialized" });
         }
@@ -109,7 +114,22 @@ export function createPostgresCombinedRuntimeAuthorityStore({ pool, environment 
       assertProviderWriteAllowed(current, migrationOperationId);
       return current;
     },
+
+    async assertCompatibilityAccess({ client = null, databaseName } = {}) {
+      const current = await requireCurrent(client ?? pool, environment, { forUpdate: Boolean(client) });
+      return assertCompatibilityRuntimeAuthorityState(current, { environment, databaseName });
+    },
   });
+}
+
+function sameInitialization(existing, expected) {
+  const normalize = (value) => {
+    const copy = structuredClone(value);
+    delete copy.createdAt;
+    delete copy.updatedAt;
+    return canonicalJson(copy);
+  };
+  return normalize(existing) === normalize(expected);
 }
 
 function assertProviderWriteAllowed(state, migrationOperationId) {

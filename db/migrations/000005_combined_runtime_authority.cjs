@@ -4,7 +4,7 @@ CREATE TABLE physiqueos.combined_runtime_authority (
   version bigint NOT NULL CHECK (version > 0),
   authority text NOT NULL CHECK (authority IN (
     'windows-legacy-authoritative', 'combined-cutover-in-progress', 'provider-prepared',
-    'provider-authoritative', 'recovery-required'
+    'provider-authoritative', 'provider-compatibility-nonauthoritative', 'recovery-required'
   )),
   migration_operation_id text,
   authorization_fingerprint char(64),
@@ -13,7 +13,7 @@ CREATE TABLE physiqueos.combined_runtime_authority (
   composition_mode text NOT NULL CHECK (composition_mode IN ('legacy-json', 'postgres')),
   public_runtime_authority text NOT NULL CHECK (public_runtime_authority IN ('windows', 'provider')),
   migration_control_authority text NOT NULL CHECK (migration_control_authority IN ('windows', 'provider')),
-  worker_authority text NOT NULL CHECK (worker_authority IN ('windows', 'paused', 'provider')),
+  worker_authority text NOT NULL CHECK (worker_authority IN ('windows', 'paused', 'provider', 'compatibility')),
   writes_enabled boolean NOT NULL,
   reads_enabled boolean NOT NULL,
   first_provider_canonical_write_at timestamptz,

@@ -9,6 +9,8 @@ describe("PostgreSQL Founder repository facade", () => {
       pool: database.pool,
       ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
       compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess: vi.fn(async () => ({ authority: "provider-compatibility-nonauthoritative" })) },
       now: () => new Date("2026-08-14T01:00:00.000Z"),
       createCommandId: () => "repository-command-1",
     });
@@ -22,6 +24,25 @@ describe("PostgreSQL Founder repository facade", () => {
     expect(database.outbox).toHaveLength(1);
     expect(database.outbox[0]).toMatchObject({ commandId: "repository-command-1", collections: ["goals"] });
     expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
+  });
+
+  it("requires durable compatibility authority and rejects authority drift before an isolated write", async () => {
+    const database = fakeDatabase();
+    expect(() => createPostgresFounderRepositoryFacade({
+      pool: database.pool, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID, compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+    })).toThrow(/durable compatibility authority/i);
+    const assertCompatibilityAccess = vi.fn(async () => {
+      throw Object.assign(new Error("production authority rejected"), { code: "RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED" });
+    });
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: database.pool, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID, compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess },
+    });
+    await expect(repositories.goals.updateGoal("phase5-goals-001", { title: "Rejected" }))
+      .rejects.toMatchObject({ code: "RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED" });
+    expect(database.transactions).toEqual(["BEGIN", "ROLLBACK"]);
   });
 
   it("claims the first provider boundary inside the same transaction before a canonical write", async () => {

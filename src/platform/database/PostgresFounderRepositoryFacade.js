@@ -17,11 +17,15 @@ export function createPostgresFounderRepositoryFacade({
   authorityStore = null,
   migrationOperationId = null,
   compatibilityMode = false,
+  requireCompatibilityAuthority = false,
   now = () => new Date(),
   createCommandId = () => randomUUID(),
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("PostgreSQL Founder repositories require a pool.");
   if (!String(ownerUserId ?? "").trim()) throw new Error("PostgreSQL Founder repositories require an owner.");
+  if (compatibilityMode && requireCompatibilityAuthority && !authorityStore?.assertCompatibilityAccess) {
+    throw new Error("Provider compatibility repositories require durable compatibility authority.");
+  }
   if (!compatibilityMode && !authorityStore?.claimCanonicalWriteBoundary) {
     throw new Error("Provider canonical repositories require durable runtime authority.");
   }
@@ -46,7 +50,7 @@ export function createPostgresFounderRepositoryFacade({
     }
 
     return executePostgresFounderRuntimeMutation({
-      pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode, now,
+      pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority, now,
       commandId: createCommandId({ repositoryName, methodName, args }),
       operation: `${repositoryName}.${methodName}`,
       mutate(runtime) {
@@ -63,6 +67,7 @@ export async function executePostgresFounderRuntimeMutation({
   authorityStore = null,
   migrationOperationId = null,
   compatibilityMode = false,
+  requireCompatibilityAuthority = false,
   now = () => new Date(),
   commandId = randomUUID(),
   operation = "application-runtime-mutation",
@@ -74,7 +79,12 @@ export async function executePostgresFounderRuntimeMutation({
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${ownerUserId}`]);
-    if (compatibilityMode) await assertCompatibilityTarget(client);
+    if (compatibilityMode) {
+      const databaseName = await assertCompatibilityTarget(client);
+      if (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess) {
+        await authorityStore.assertCompatibilityAccess({ client, databaseName });
+      }
+    }
     else if (authorityStore) await authorityStore.claimCanonicalWriteBoundary({ client, migrationOperationId, commandId });
     else throw Object.assign(new Error("Canonical runtime authority is required."), { code: "CANONICAL_RUNTIME_AUTHORITY_REQUIRED" });
 
@@ -116,6 +126,7 @@ async function assertCompatibilityTarget(client) {
     error.code = "PROVIDER_COMPATIBILITY_TARGET_REJECTED";
     throw error;
   }
+  return database;
 }
 
 async function replaceCollection(client, { ownerUserId, collection, source }) {

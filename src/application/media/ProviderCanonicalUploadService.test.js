@@ -55,6 +55,32 @@ describe("provider canonical uploads", () => {
     })).rejects.toThrow(/catalog failed/);
     expect(objectProvider.deleteObject).toHaveBeenCalledWith({ objectKey: expect.any(String), providerVersion: "version-1" });
   });
+
+  it("rejects compatibility authority drift before creating an object or upload row", async () => {
+    const database = fakeDatabase();
+    const objectProvider = fakeObjectProvider();
+    const service = createProviderCanonicalUploadService({
+      pool: database.pool,
+      objectProvider,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: {
+        assertCompatibilityAccess: vi.fn(async () => {
+          throw Object.assign(new Error("authority drift"), { code: "RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED" });
+        }),
+      },
+    });
+    await expect(service.store({
+      ownerUserId: "phase5-synthetic-user",
+      bytes: Buffer.from("verified-private-media"),
+      contentType: "image/jpeg",
+      originalFilename: "front.jpg",
+      category: "progressPhotos",
+      relationshipId: "session-1",
+    })).rejects.toMatchObject({ code: "RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED" });
+    expect(objectProvider.beginMultipartUpload).not.toHaveBeenCalled();
+    expect(database.canonicalMedia).toHaveLength(0);
+  });
 });
 
 function fakeObjectProvider() {
@@ -75,6 +101,7 @@ function fakeDatabase({ failCatalog = false } = {}) {
   const query = vi.fn(async (sql, values = []) => {
     const normalized = String(sql).replace(/\s+/g, " ").trim();
     if (["BEGIN", "COMMIT", "ROLLBACK"].includes(normalized) || normalized.includes("pg_advisory_xact_lock")) return { rows: [], rowCount: 0 };
+    if (normalized === "SELECT current_database() AS database") return { rows: [{ database: "physiqueos_phase5_test_provider_20260811" }], rowCount: 1 };
     if (normalized.startsWith("INSERT INTO physiqueos.stored_objects")) {
       objectId = values[0];
       return { rows: [{ id: objectId, user_id: values[1], state: "created", version: 1 }], rowCount: 1 };

@@ -13,10 +13,11 @@ export async function createPhase5ProviderApplicationComposition({
   authorityStore = null,
   migrationOperationId = null,
   compatibilityMode = true,
+  requireCompatibilityAuthority = false,
 } = {}) {
   if (!objectProvider?.authorizeRead) throw new Error("Phase 5 provider composition requires private Spaces access.");
   const base = await createPhase4PostgresApplicationComposition({
-    pool, ownerUserId, now, writeFence, authorityStore, migrationOperationId, compatibilityMode,
+    pool, ownerUserId, now, writeFence, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority,
   });
   const catalog = createPhase5ProviderMediaCatalog({ query: (text, values) => pool.query(text, values) });
   const mediaGateway = createOpaqueSpacesMediaGateway({ provider: objectProvider, catalog, secret: mediaAccessSecret, clock: now });
@@ -26,7 +27,7 @@ export async function createPhase5ProviderApplicationComposition({
     clock: now,
   });
   const uploads = createProviderCanonicalUploadService({
-    pool, objectProvider, authorityStore, migrationOperationId, compatibilityMode, now,
+    pool, objectProvider, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority, now,
   });
   return Object.freeze({
     ...base,

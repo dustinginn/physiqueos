@@ -12,6 +12,7 @@ import { createSpacesPrivateObjectProvider } from "../../platform/object-storage
 import { createCanonicalWriteFence } from "../../platform/cutover/canonicalWriteFence.js";
 import { CanonicalCompositionMode, CanonicalStoreEpoch } from "../../platform/cutover/migrationControlState.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "../../platform/cutover/PostgresCombinedRuntimeAuthorityStore.js";
+import { assertCompatibilityRuntimeAuthorityState } from "../../platform/cutover/CombinedRuntimeAuthorityState.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -83,12 +84,24 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     providerRuntime = Object.freeze({ pool, objectProvider, ownerUserId });
   }
   const compatibilityMode = providerFullRuntime && env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
-  const authorityStore = providerFullRuntime && !compatibilityMode
+  const authorityStore = providerFullRuntime
     ? createPostgresCombinedRuntimeAuthorityStore({
         pool: providerRuntime.pool,
         environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
       })
     : null;
+  if (compatibilityMode) {
+    const expectedDatabaseName = required(env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME");
+    const database = await providerRuntime.pool.query("SELECT current_database() AS database");
+    if (database.rows[0]?.database !== expectedDatabaseName) {
+      throw Object.assign(new Error("Provider compatibility database identity does not match."), { code: "PROVIDER_COMPATIBILITY_TARGET_REJECTED" });
+    }
+    const state = (await authorityStore.read()).state;
+    assertCompatibilityRuntimeAuthorityState(state, {
+      environment: env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT,
+      databaseName: expectedDatabaseName,
+    });
+  }
   const writeFence = controlStore ? createCanonicalWriteFence({
     controlStore,
     requiredCompositionMode: CanonicalCompositionMode.POSTGRES,
@@ -101,17 +114,21 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
     writeFence,
     authorityStore,
-    migrationOperationId: env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+    migrationOperationId: compatibilityMode ? null : env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
     compatibilityMode,
+    requireCompatibilityAuthority: compatibilityMode,
   });
   return Object.freeze({
     ...composition,
-    kind: "production-postgres-spaces",
-    canonicalStoreEpoch: CanonicalStoreEpoch.POSTGRES_CANONICAL,
+    kind: compatibilityMode ? "provider-postgres-spaces-compatibility" : "production-postgres-spaces",
+    canonicalStoreEpoch: compatibilityMode ? CanonicalStoreEpoch.LEGACY_JSON : CanonicalStoreEpoch.POSTGRES_CANONICAL,
     compositionMode: CanonicalCompositionMode.POSTGRES,
     repositoryPersistence: "transactional-postgres-repository-and-command-ports",
     objectProvider: providerRuntime.objectProvider,
     authorityStore,
+    compatibilityMode,
+    productionWritesAllowed: compatibilityMode ? false : undefined,
+    combinedExecutionAllowed: compatibilityMode ? false : undefined,
   });
 }
 

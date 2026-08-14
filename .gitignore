@@ -68,6 +68,7 @@ node_modules/
 !/logs/.gitkeep
 /screenshots/*.png
 /screenshots/**/*.png
+/tmp/
 /tmp/**/*.log
 /PhysiqueOS_Backup_*/
 /.backup-validation*/

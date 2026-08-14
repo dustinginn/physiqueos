@@ -138,3 +138,11 @@ The mandatory sequence is:
 8. Execute the production combined cutover.
 
 The prior migration GO is permanently invalid. No compatibility deployment, production fence, production transfer/import, route switch, authentication activation, or iOS implementation is authorized by this runbook.
+
+## Compatibility remediation checkpoint (2026-08-14)
+
+Predeployment artifact inspection found that repository-root `tmp` was distinct from ignored `.tmp`: Next standalone tracing copied a tracked Founder-derived Playwright runtime and a private rendered briefing into the product artifact. The current branch removes those four private/generated `tmp` files in a normal forward change, ignores root `tmp`, excludes it from the Docker context and output tracing, prunes forbidden roots in both runtime images, and runs an independent final-artifact scanner. Historical commits are unchanged; any history-rewrite decision is separate and is not authorized here.
+
+Compatibility authority is now an explicit durable `provider-compatibility-nonauthoritative` state in migration `000005`. It preserves Windows public, migration-control, and legacy canonical authority; disables production writes and combined execution; has no production operation or first-write boundary; and permits only the guarded Phase 5 test/restore databases. Web, worker, repository commands, and media completion revalidate that exact tuple. Production-authoritative behavior continues to require the original strict handoff tuple.
+
+This source checkpoint alone does not apply `000005`, initialize the provider database, import synthetic data, change the app specification, or deploy. Those steps remain gated on independent read access to the current App Platform specification and a separately verified noncanonical provider preparation path.

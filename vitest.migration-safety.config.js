@@ -6,6 +6,9 @@ export default defineConfig({
     include: [
       "src/platform/cutover/migrationControlState.test.js",
       "src/platform/cutover/CombinedRuntimeAuthorityState.test.js",
+      "src/platform/cutover/ProviderCompatibilityAuthorityInitializer.test.js",
+      "src/platform/cutover/PostgresCombinedRuntimeAuthorityStore.test.js",
+      "db/migrations/000005_combined_runtime_authority.test.js",
       "src/platform/cutover/CombinedAppPlatformCutoverOrchestrator.test.js",
       "src/platform/cutover/PostgresCombinedTransferReceiptStore.test.js",
       "src/platform/jobs/AuthorityGatedWorker.test.js",
@@ -24,6 +27,7 @@ export default defineConfig({
       "src/application/runtime/ApplicationCanonicalRuntime.test.js",
       "src/data/repositories/ProductionRepositoryFacade.test.js",
       "scripts/ValidationBuildIsolation.test.js",
+      "scripts/scanProviderArtifact.test.js",
       "scripts/ProductionMigrationRemediationWiring.test.js",
       "scripts/ProductionMigrationEntrypoint.test.js",
       "scripts/RemoteProductionMigrationDryRunClient.test.js",

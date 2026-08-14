@@ -21,6 +21,21 @@ const buildIdentity = readBuildIdentity();
 const logger = createStructuredLogger({ buildIdentity });
 const adapters = createFoundationPostgresAdapters({ query: (text, values) => pool.query(text, values) });
 const controller = new AbortController();
+const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
+const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
+  ? required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT")
+  : null;
+const compatibilityDatabaseName = compatibilityMode
+  ? required(process.env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME")
+  : null;
+if (compatibilityMode) {
+  const database = await pool.query("SELECT current_database() AS database");
+  if (database.rows[0]?.database !== compatibilityDatabaseName) {
+    const error = new Error("Worker compatibility database identity does not match.");
+    error.code = "PROVIDER_COMPATIBILITY_TARGET_REJECTED";
+    throw error;
+  }
+}
 
 const handlers = Object.freeze({
   "foundation.synthetic": async ({ messageId }) => logger.info("foundation.synthetic", { messageId }),
@@ -73,11 +88,14 @@ const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
       worker,
       authorityStore: createPostgresCombinedRuntimeAuthorityStore({
         pool,
-        environment: required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+        environment: authorityEnvironment,
       }),
       heartbeat: adapters.outbox.heartbeat,
       workerId: worker.workerId,
       buildId: buildIdentity.buildId,
+      compatibilityMode,
+      compatibilityEnvironment: authorityEnvironment,
+      compatibilityDatabaseName,
     })
   : worker;
 

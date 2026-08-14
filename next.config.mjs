@@ -19,7 +19,17 @@ const nextConfig = {
     outputFileTracingExcludes: {
       "/*": [
         "private/**/*",
+        "tmp/**/*",
+        ".tmp/**/*",
         "logs/**/*",
+        "screenshots/**/*",
+        "test-results/**/*",
+        "playwright-report/**/*",
+        "backups/**/*",
+        "runtime-exports/**/*",
+        "**/.env*",
+        "**/*.dump",
+        "**/*.backup",
         ".next*/**/*",
         "src/data/founderSeed/**/*",
         "src/data/seed/**/*",

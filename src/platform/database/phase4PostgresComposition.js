@@ -28,6 +28,7 @@ export async function createPhase4PostgresApplicationComposition({
   authorityStore = null,
   migrationOperationId = null,
   compatibilityMode = true,
+  requireCompatibilityAuthority = false,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
   const query = (text, values) => pool.query(text, values);
@@ -40,6 +41,7 @@ export async function createPhase4PostgresApplicationComposition({
     authorityStore,
     migrationOperationId,
     compatibilityMode,
+    requireCompatibilityAuthority,
     now,
   });
   const loaders = createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime, now });
@@ -49,7 +51,7 @@ export async function createPhase4PostgresApplicationComposition({
     readResourceVersion: ({ data }) => String(data?.version ?? runtime.revision ?? "1"),
   });
   const transactionRunner = createPhase4TransactionRunner({ pool });
-  const ports = createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode });
+  const ports = createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority });
   const commands = createPhase3CommandService({ transactionRunner, ports, writeFence });
   const media = objectRoot && issueAccessHandle
     ? createAuthorizedMediaService({
@@ -70,7 +72,7 @@ export async function createPhase4PostgresApplicationComposition({
     loadRuntime: () => loadCanonicalRuntime({ query, ownerUserId }),
     mutateRuntime: ({ commandId, operation, expectedRuntime, mutate }) =>
       executePostgresFounderRuntimeMutation({
-        pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode,
+        pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority,
         now, commandId, operation, expectedRuntime, mutate,
       }),
   });
@@ -97,16 +99,20 @@ export function createPhase4TransactionRunner({ pool }) {
   });
 }
 
-function createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode }) {
+function createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority }) {
   return Object.freeze(Object.fromEntries(CANONICAL_PERSISTENCE_PORT_NAMES.map((name) => [
     name,
     async (context) => {
       if (compatibilityMode) {
         const result = await context.transaction.client.query("SELECT current_database() AS database");
-        if (!/^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/.test(String(result.rows[0]?.database ?? ""))) {
+        const databaseName = String(result.rows[0]?.database ?? "");
+        if (!/^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/.test(databaseName)) {
           const error = new Error("Compatibility commands are restricted to the isolated Phase 5 provider database.");
           error.code = "PROVIDER_COMPATIBILITY_TARGET_REJECTED";
           throw error;
+        }
+        if (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess) {
+          await authorityStore.assertCompatibilityAccess({ client: context.transaction.client, databaseName });
         }
       } else if (authorityStore) {
         await authorityStore.claimCanonicalWriteBoundary({
