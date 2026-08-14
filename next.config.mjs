@@ -33,7 +33,6 @@ const nextConfig = {
         "**/.env*",
         "**/*.dump",
         "**/*.backup",
-        ".next*/**/*",
         "src/data/founderSeed/**/*",
         "src/data/seed/**/*",
         "src/fixtures/**/*",

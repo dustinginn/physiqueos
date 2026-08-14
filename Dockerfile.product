@@ -11,6 +11,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build -- --webpack
+RUN test -f .next/standalone/.next/server/webpack-runtime.js
 RUN rm -rf .next/standalone/src/data/founderSeed .next/standalone/src/data/seed \
     .next/standalone/src/fixtures .next/standalone/src/features/dashboard \
     .next/standalone/src/lib/mockData.js .next/standalone/src/models/UserProfile.js \

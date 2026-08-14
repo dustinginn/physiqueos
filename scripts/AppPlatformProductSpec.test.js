@@ -2,6 +2,8 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const template = fs.readFileSync("infra/digitalocean/app.product.template.yaml", "utf8");
+const dockerfile = fs.readFileSync("Dockerfile.product", "utf8");
+const nextConfig = fs.readFileSync("next.config.mjs", "utf8");
 
 describe("full-product App Platform specification", () => {
   it("preserves the accepted app, component topology, health check and alerts", () => {
@@ -23,5 +25,10 @@ describe("full-product App Platform specification", () => {
     expect(template.match(/PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED[^\n]*value: "0"/g)).toHaveLength(2);
     expect(template).not.toContain("DIGITALOCEAN_ACCESS_TOKEN");
     expect(template).not.toContain("PHYSIQUEOS_MIGRATION_DATABASE_URL");
+  });
+
+  it("retains the Next server runtime required by standalone route modules", () => {
+    expect(nextConfig).not.toContain('".next*/**/*"');
+    expect(dockerfile).toContain("test -f .next/standalone/.next/server/webpack-runtime.js");
   });
 });
