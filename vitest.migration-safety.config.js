@@ -29,6 +29,7 @@ export default defineConfig({
       "scripts/ValidationBuildIsolation.test.js",
       "scripts/scanProviderArtifact.test.js",
       "scripts/collectProviderWorkerArtifact.test.js",
+      "scripts/AppPlatformProductSpec.test.js",
       "scripts/ProductionMigrationRemediationWiring.test.js",
       "scripts/ProductionMigrationEntrypoint.test.js",
       "scripts/RemoteProductionMigrationDryRunClient.test.js",

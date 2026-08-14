@@ -1,5 +1,8 @@
 name: physiqueos-foundation-staging
 region: ${DIGITALOCEAN_REGION}
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
 services:
   - name: web
     dockerfile_path: Dockerfile.product
@@ -11,6 +14,10 @@ services:
     http_port: 8080
     health_check:
       http_path: /api/v1/health/live
+    alerts:
+      - { rule: CPU_UTILIZATION, operator: GREATER_THAN, value: 70, window: TEN_MINUTES }
+      - { rule: MEM_UTILIZATION, operator: GREATER_THAN, value: 70, window: TEN_MINUTES }
+      - { rule: RESTART_COUNT, operator: GREATER_THAN, value: 0.5, window: FIVE_MINUTES }
     envs:
       - { key: PHYSIQUEOS_PROVIDER_FULL_RUNTIME, scope: RUN_AND_BUILD_TIME, value: "1" }
       - { key: PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE, scope: RUN_TIME, value: ${PROVIDER_COMPATIBILITY_MODE} }
@@ -41,6 +48,10 @@ workers:
       branch: ${GIT_BRANCH}
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
+    alerts:
+      - { rule: CPU_UTILIZATION, operator: GREATER_THAN, value: 70, window: TEN_MINUTES }
+      - { rule: MEM_UTILIZATION, operator: GREATER_THAN, value: 70, window: TEN_MINUTES }
+      - { rule: RESTART_COUNT, operator: GREATER_THAN, value: 0.5, window: FIVE_MINUTES }
     envs:
       - { key: PHYSIQUEOS_PROVIDER_FULL_RUNTIME, scope: RUN_TIME, value: "1" }
       - { key: PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE, scope: RUN_TIME, value: ${PROVIDER_COMPATIBILITY_MODE} }

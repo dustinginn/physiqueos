@@ -15,4 +15,9 @@ describe("validation build isolation", () => {
     expect(source).toContain(`PHYSIQUEOS_BUILD_DIST_DIR: "${isolatedDirectory}"`);
     expect(source).toContain("fs.rmSync(isolatedDist, { recursive: true, force: true })");
   });
+
+  it("uses the isolated Next build path for Phase 6", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "scripts", "validatePhase6Compatibility.mjs"), "utf8");
+    expect(source).toContain('[next, "build"]');
+  });
 });
