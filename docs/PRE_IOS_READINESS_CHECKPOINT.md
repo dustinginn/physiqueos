@@ -533,3 +533,44 @@ capability must be deployed inertly to the existing no-cost-increase App
 Platform footprint and exercised against the accepted synthetic target before
 the final production pre-fence gate can be rerun. Production remains healthy,
 writable, and canonical on legacy JSON; no migration is authorized.
+
+## Provider-side dry-run live acceptance (2026-08-13)
+
+The source-only boundary is now deployed and accepted. DigitalOcean deployment
+`0d27de79-169a-4fda-a16c-ad868d46b7e4` runs exact checkpoint
+`73c612a539ba056e5dd3b0634a80859f83910787` as
+`provider-dry-run-73c612a` on the existing one-web/one-worker topology. The
+operations 401 was not a server mismatch or revoked credential: the local
+DPAPI artifact is a `PSCredential`, and the token must be read from its
+protected password field. Correct loading returned 200 while wrong, missing,
+stale, and ordinary product credentials remained rejected. No secret value is
+recorded here.
+
+Operation `phase6-provider-dry-run-20260814-0330` was submitted once, claimed
+durably by the worker, and finished `succeeded` / `READY`. Provider-side checks
+proved PostgreSQL 17.10 and schema `000004_phase5_provider_readiness` in
+`physiqueos_phase5_test_provider_20260811`, current managed backup
+`2026-08-13T06:54:12Z` at age 19.759 hours, and the private/versioned `sfo3`
+Space with zero incomplete multipart uploads. The app has no VPC, so the final
+database URL uses the provider's public TLS authority from inside App Platform;
+access remains restricted by the unchanged sole App trusted-source firewall
+rule. Earlier wrong-database, unavailable-private-host, and passwordless-API-URI
+attempts failed closed and did not change canonical state.
+
+No-mutation verification passed with identical before/after digest
+`d388cca324ed6f45044c6f3256d485e5bc1fb09b5ef9b2507fa62d5d4fc312ae`.
+Founder revision 122, 372-media inventory, inactive migration control, recovery
+packet, production source/build, legacy JSON canonical mode, and inactive
+authentication remained exact. Post-run local and LAN checks passed the full
+20-route matrix, 25 current CSS/JavaScript assets and MIME types, authorized
+media, and exact production health identity. The previously accepted public
+path was not retransmitted during this closeout because the execution
+environment blocked sending Founder-facing pages/media through the external
+tunnel; this is a privacy constraint, not a product or migration defect.
+
+Classification: **PROVIDER-SIDE DRY-RUN ACCEPTED — READY TO REPEAT FINAL
+PRE-FENCE GATE** after End Work Session preserves these documentation changes.
+No final GO is granted. Fence activation, migration execution, write pause,
+Founder import, PostgreSQL canonical write, Spaces production-evidence move,
+authentication activation, Phase 7, and Native implementation remain
+unauthorized.

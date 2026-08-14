@@ -316,3 +316,31 @@ target connectivity, fresh backup metadata, private/versioned Space checks,
 provider composition, durable restart/reconnect behavior, and unchanged target
 inventories against synthetic data. That rehearsal is not a migration and does
 not replace the later exact final user authorization.
+
+### Live provider-side dry-run evidence (2026-08-13)
+
+The bounded capability is active but inert on App Platform deployment
+`0d27de79-169a-4fda-a16c-ad868d46b7e4`, source
+`73c612a539ba056e5dd3b0634a80859f83910787`, provider build
+`provider-dry-run-73c612a`. The prior operations-auth 401 was caused by loading
+the DPAPI-protected `PSCredential` incorrectly on Windows; using its protected
+password field restored the intended bearer value. The server secret was not
+rotated or weakened, and all negative authentication cases still reject.
+
+One authorized invocation, `phase6-provider-dry-run-20260814-0330`, completed
+`succeeded` / `READY` through the durable web/outbox/worker path. It proved the
+accepted PostgreSQL cluster, PostgreSQL 17.10, migration level
+`000004_phase5_provider_readiness`, logical database
+`physiqueos_phase5_test_provider_20260811`, a 19.759-hour managed backup,
+private/versioned Spaces, current worker/build identity, provider composition,
+package/manifest v2, 39 required and three excluded collections, and no dual
+write. The database endpoint is the managed public TLS hostname reached only
+from the App Platform app; the database firewall remains exactly App-only.
+
+The canonical before/after digest matched at
+`d388cca324ed6f45044c6f3256d485e5bc1fb09b5ef9b2507fa62d5d4fc312ae`.
+The only durable change was the allowed noncanonical operation/audit record.
+This evidence authorizes repeating the final pre-fence decision process after
+the repository checkpoint. It does not constitute final GO and does not
+authorize fence activation, write pause, import, canonical PostgreSQL writes,
+evidence movement, authentication activation, or migration execution.

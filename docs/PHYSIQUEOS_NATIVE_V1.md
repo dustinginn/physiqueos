@@ -1197,3 +1197,47 @@ This capability is source-only until a separately authorized App Platform
 compatibility deployment and synthetic remote rehearsal complete. Deployment
 must not add a paid component, weaken the firewall, enable the fence, import
 Founder data, move evidence, select PostgreSQL, or activate authentication.
+
+## 49. Provider-side production dry-run live acceptance (2026-08-13)
+
+Checkpoint `73c612a539ba056e5dd3b0634a80859f83910787` is deployed on
+DigitalOcean App Platform as provider build `provider-dry-run-73c612a`.
+Deployment `0d27de79-169a-4fda-a16c-ad868d46b7e4` retains one 512 MiB web
+component and one 512 MiB worker, the existing alerts, and the existing
+$30.15/month resource topology. The capability remains inert at startup and
+can be reached only through the authenticated fixed dry-run operation.
+
+The operations-authentication incident was a workstation credential-loading
+error: the accepted DPAPI file contains a `PSCredential`, with the bearer token
+in its protected password field. Loading the object as though it were a scalar
+produced the observed 401. Correct extraction authenticated successfully;
+missing, wrong, stale, and ordinary product credentials remained 401. No token
+rotation, authentication weakening, or product-authentication activation was
+required.
+
+Exactly one accepted operation,
+`phase6-provider-dry-run-20260814-0330`, ran from the existing App Platform
+worker and reached terminal `succeeded` / `READY`. It verified PostgreSQL
+17.10, schema `000004_phase5_provider_readiness`, logical database
+`physiqueos_phase5_test_provider_20260811`, the 39-required/3-excluded
+collection contract, package/manifest v2, worker health, and private/versioned
+Spaces with zero incomplete multipart uploads. The database connection uses
+the provider's TLS public hostname from App Platform because this app has no
+VPC; the managed-database firewall still has exactly one trusted source, app
+`bf57cf56-48cc-4cd6-90e4-a23ee5381741`. No workstation rule or broader source
+was added.
+
+The independently read managed backup was `2026-08-13T06:54:12Z`, 19.759
+hours old at remote verification, size 0.06846476 GiB, and passed the 24-hour
+rule. The canonical target/Space digest was identical before and after:
+`d388cca324ed6f45044c6f3256d485e5bc1fb09b5ef9b2507fa62d5d4fc312ae`.
+Founder revision 122 and its runtime/media/control/recovery identities remained
+exact. Production remains fence-inactive, `legacy-json` epoch and composition,
+reads/writes enabled, no migration operation or first PostgreSQL canonical
+write, local evidence canonical, and production authentication inactive.
+
+This closes the provider-side dry-run acceptance gate only. The final
+pre-fence GO/NO-GO may now be repeated after the required repository
+checkpoint. It does not grant final GO, migration execution, a write pause,
+Founder import, canonical-store switch, evidence movement, authentication
+activation, Phase 7, Native Baseline, or SwiftUI work.

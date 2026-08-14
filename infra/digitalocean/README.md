@@ -102,3 +102,35 @@ app with automatic deploy disabled, render the spec directly to the provider,
 verify liveness/readiness and wrong-token rejection, then submit one synthetic
 operation and prove worker/status/replay/reconnect/no-mutation behavior. Never
 place provider credentials in the Windows client or request payload.
+
+## Live provider-side dry-run acceptance (2026-08-13)
+
+The provider boundary is now accepted on deployment
+`0d27de79-169a-4fda-a16c-ad868d46b7e4`, checkpoint
+`73c612a539ba056e5dd3b0634a80859f83910787`, build
+`provider-dry-run-73c612a`. The app still has one 512 MiB web and one 512 MiB
+worker component, automatic deploy remains disabled, alerts/topology are
+unchanged, and no paid resource was added.
+
+The migration target secret is a DPAPI-sourced application credential stored
+only as an encrypted worker variable. Its URI preserves the provider authority,
+encoded application username/password, port, and query and selects only
+`physiqueos_phase5_test_provider_20260811`. The app has no VPC, so the working
+authority is the managed PostgreSQL public TLS hostname. The cluster firewall
+still contains exactly one trusted source: this App Platform app. Do not add a
+workstation IP or print/render the URI.
+
+Operation `phase6-provider-dry-run-20260814-0330` completed once as
+`succeeded` / `READY`. It verified PostgreSQL 17.10, schema
+`000004_phase5_provider_readiness`, backup `2026-08-13T06:54:12Z` at age
+19.759 hours, the private/versioned `sfo3` Space, zero incomplete multipart
+uploads, worker health, package/manifest v2, and an unchanged before/after
+canonical digest. Earlier connection/schema attempts failed closed; their only
+permitted effect was noncanonical operations audit state. Preserve this exact
+spec until a separately authorized change.
+
+The operations credential itself did not require rotation. The workstation
+must import its DPAPI artifact as a `PSCredential` and read the protected
+password field; treating the object as the bearer string causes 401. Never log
+the extracted token. This acceptance does not enable any startup operation,
+fence, migration, canonical write, evidence movement, or product auth.

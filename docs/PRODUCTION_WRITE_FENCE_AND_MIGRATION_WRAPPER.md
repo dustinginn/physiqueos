@@ -193,3 +193,31 @@ outside `PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY=digitalocean-app-platform` with
 expected control flow. Local isolated databases remain available to explicit
 synthetic rehearsal. The remote capability is inert until separately deployed
 and explicitly invoked; it never auto-runs at web or worker startup.
+
+## Provider-side dry-run accepted live (2026-08-13)
+
+Exact source `73c612a539ba056e5dd3b0634a80859f83910787` is running as
+provider build `provider-dry-run-73c612a` on App Platform deployment
+`0d27de79-169a-4fda-a16c-ad868d46b7e4`. The web endpoint accepted the correct
+operations principal after the Windows client correctly extracted the token
+from its DPAPI-protected `PSCredential`; negative credentials remained 401.
+The worker then claimed exactly one typed dry-run operation,
+`phase6-provider-dry-run-20260814-0330`, and reused the production runner and
+orchestrator to terminal `READY`.
+
+Live evidence includes PostgreSQL 17.10 at migration
+`000004_phase5_provider_readiness`, the accepted migration logical database,
+fresh managed backup age 19.759 hours, private/versioned Spaces, healthy worker,
+39-required/3-excluded inventory, and unchanged provider topology. Because the
+app has no VPC, the worker uses the managed public TLS authority; the cluster
+still trusts only the exact App Platform app and no workstation source was
+added. The canonical database/Space digest remained
+`d388cca324ed6f45044c6f3256d485e5bc1fb09b5ef9b2507fa62d5d4fc312ae`
+before and after.
+
+The wrapper never crossed the authorization boundary: migration control is
+still inactive with legacy JSON canonical, reads and writes enabled, no
+operation/fence/first PostgreSQL canonical write, and authentication inactive.
+Only the noncanonical durable audit record was created. The result permits a
+new final pre-fence gate after repository closeout; it is not final GO and does
+not authorize any migration action.

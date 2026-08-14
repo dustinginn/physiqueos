@@ -81,3 +81,23 @@ Windows host is rejected with
 `scripts/runRemoteProductionMigrationDryRun.mjs` as the authenticated control
 client. It does not require or transmit a database URL/password, Spaces key,
 DigitalOcean PAT, recovery passphrase, or private key.
+
+### Live provider dry-run evidence (2026-08-13)
+
+App Platform operation `phase6-provider-dry-run-20260814-0330` reached terminal
+`succeeded` / `READY` against guarded logical database
+`physiqueos_phase5_test_provider_20260811`. The worker verified PostgreSQL
+17.10 and latest schema `000004_phase5_provider_readiness`, then exercised the
+accepted production runner/orchestrator in `dryRun=true` mode. It found all 39
+required collections, the three explicit exclusions, zero missing/unknown
+collections, no unknown or unfenced write surface, and current package/manifest
+version 2.
+
+Canonical database and Space inventory digest
+`d388cca324ed6f45044c6f3256d485e5bc1fb09b5ef9b2507fa62d5d4fc312ae`
+was identical before and after. No schema migration, import, canonical domain
+write, or evidence move occurred. The allowed durable migration-run/outbox
+audit record is noncanonical. The worker reached the managed public TLS
+hostname from App Platform while the cluster firewall remained restricted to
+the sole App trusted source; direct workstation database access remains
+forbidden.
