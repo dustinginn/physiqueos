@@ -8,6 +8,7 @@ describe("Home provider composition wiring", () => {
     expect(source).toContain("getProductionApplicationComposition");
     expect(source).toContain("createInactiveLegacyWebContext");
     expect(source).toContain("composition.readModels.home(principal)");
+    expect(source).toContain("adaptApplicationReadModelToLegacyWeb");
     expect(source).not.toContain("HomeBriefingService.getHomeBriefing");
   });
 });
