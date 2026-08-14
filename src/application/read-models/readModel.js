@@ -37,6 +37,7 @@ export function projectClientSafeValue(value) {
   if (!value || typeof value !== "object") return value;
   const output = {};
   for (const [key, child] of Object.entries(value)) {
+    if (child === undefined) continue;
     if (FORBIDDEN_KEYS.has(key)) continue;
     if (key === "href" && typeof child === "string") {
       const destination = destinationFromWebHref(child);
