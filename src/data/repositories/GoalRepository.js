@@ -1,4 +1,3 @@
-import { seedGoals } from "../seed/goals";
 import { byUserId } from "./repositoryUtils";
 
 export function createGoalRepository(goals = [], options = {}) {
@@ -49,4 +48,4 @@ export function createGoalRepository(goals = [], options = {}) {
   };
 }
 
-export const GoalRepository = createGoalRepository(seedGoals);
+export const GoalRepository = createGoalRepository([]);

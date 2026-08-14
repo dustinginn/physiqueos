@@ -17,7 +17,8 @@ RUN rm -rf .next/standalone/src/data/founderSeed .next/standalone/src/data/seed 
     .next/standalone/tmp .next/standalone/.tmp .next/standalone/private \
     .next/standalone/screenshots .next/standalone/test-results \
     .next/standalone/playwright-report .next/standalone/backups \
-    .next/standalone/runtime-exports \
+    .next/standalone/runtime-exports .next/standalone/scripts \
+    .next/standalone/tests \
  && rm -f public/mockup-home.png
 RUN node scripts/scanProviderArtifact.mjs .next/standalone public .next/static
 RUN test ! -e .next/standalone/private \

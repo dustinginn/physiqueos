@@ -1,4 +1,3 @@
-import { seedDailyCheckIns } from "../seed/dailyCheckIns";
 import { byDateRange, byUserId } from "./repositoryUtils";
 
 export function createDailyCheckInRepository(dailyCheckIns = [], options = {}) {
@@ -49,4 +48,4 @@ export function createDailyCheckInRepository(dailyCheckIns = [], options = {}) {
 }
 
 export const DailyCheckInRepository =
-  createDailyCheckInRepository(seedDailyCheckIns);
+  createDailyCheckInRepository([]);

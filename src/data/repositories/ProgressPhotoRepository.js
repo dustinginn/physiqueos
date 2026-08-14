@@ -1,4 +1,3 @@
-import { seedProgressPhotos } from "../seed/progressPhotos";
 import { byDateRange, byUserId } from "./repositoryUtils";
 
 export function createProgressPhotoRepository(progressPhotos = [], options = {}) {
@@ -49,7 +48,7 @@ export function createProgressPhotoRepository(progressPhotos = [], options = {})
 }
 
 export const ProgressPhotoRepository =
-  createProgressPhotoRepository(seedProgressPhotos);
+  createProgressPhotoRepository([]);
 
 function getDateKey(value) {
   return value?.slice(0, 10) ?? "";

@@ -27,6 +27,8 @@ const nextConfig = {
         "playwright-report/**/*",
         "backups/**/*",
         "runtime-exports/**/*",
+        "scripts/**/*",
+        "tests/**/*",
         "**/.env*",
         "**/*.dump",
         "**/*.backup",

@@ -1,5 +1,4 @@
 import { ProtocolStatus } from "../../domain/models/protocol";
-import { seedProtocols } from "../seed/protocols";
 import { byUserId } from "./repositoryUtils";
 
 export function createProtocolRepository(protocols = [], options = {}) {
@@ -58,4 +57,4 @@ export function createProtocolRepository(protocols = [], options = {}) {
   };
 }
 
-export const ProtocolRepository = createProtocolRepository(seedProtocols);
+export const ProtocolRepository = createProtocolRepository([]);

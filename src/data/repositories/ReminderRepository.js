@@ -1,4 +1,3 @@
-import { seedReminders } from "../seed/reminders";
 import { byUserId } from "./repositoryUtils";
 
 export function createReminderRepository(reminders = [], options = {}) {
@@ -58,4 +57,4 @@ export function createReminderRepository(reminders = [], options = {}) {
   };
 }
 
-export const ReminderRepository = createReminderRepository(seedReminders);
+export const ReminderRepository = createReminderRepository([]);

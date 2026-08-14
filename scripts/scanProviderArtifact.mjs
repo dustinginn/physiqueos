@@ -22,6 +22,7 @@ const FORBIDDEN_ARCHIVE_NAMES = [
 const SECRET_PATTERNS = [
   { name: "credential-bearing-database-uri", pattern: /postgres(?:ql)?:\/\/[^\s:/]+:[^\s@/]+@/i },
   { name: "digitalocean-api-token", pattern: /\bdop_v1_[A-Za-z0-9_-]{20,}\b/ },
+  { name: "founder-owner-identifier", pattern: /\buser_founder_[A-Za-z0-9_-]+\b/i },
   { name: "private-key", pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
 ];
 

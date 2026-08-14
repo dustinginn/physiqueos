@@ -1,4 +1,3 @@
-import { seedWeightEntries } from "../seed/weights";
 import { byDateRange, byUserId, latestByDate } from "./repositoryUtils";
 
 export function createWeightRepository(weightEntries = [], options = {}) {
@@ -68,7 +67,7 @@ export function createWeightRepository(weightEntries = [], options = {}) {
   };
 }
 
-export const WeightRepository = createWeightRepository(seedWeightEntries);
+export const WeightRepository = createWeightRepository([]);
 
 function getDateKey(value) {
   return value?.slice(0, 10) ?? "";

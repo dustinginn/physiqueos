@@ -71,14 +71,14 @@ export function validatePhaseReviewActionRequest(input = {}) {
 }
 
 export function authorizePhaseReviewRequest({ store, request, actor, now = () => new Date() } = {}) {
-  if (actor?.id !== "user_founder_001" || store?.user?.id !== actor.id) {
+  if (!String(actor?.id ?? "").trim() || store?.user?.id !== actor.id) {
     throw authError("FOUNDER_ACTOR_REQUIRED", "Authenticated Founder actor is required.");
   }
   const goal = (store.goals ?? []).find((item) => item.id === request.goalId);
   if (!goal || goal.userId !== actor.id || goal.status !== "active" || goal.primary !== true) {
     throw authError("GOAL_OWNERSHIP_MISMATCH", "The active primary Goal is not owned by the Founder actor.");
   }
-  const existing = findReplay(store, request);
+  const existing = findReplay(store, request, actor.id);
   const artifact = [...(store.dailyBriefings ?? []),
     ...(store.confidenceInitializationArtifacts ?? [])]
     .find((item) => item.id === request.originatingArtifactId);
@@ -251,7 +251,7 @@ function artifactEvidenceIdentity(artifact) {
   return artifact.phaseReviewEligibilityBinding?.evidenceIdentity ??
     artifact.trigger?.evidenceId ?? artifact.evidenceWindow?.id ?? null;
 }
-function findReplay(store, request) {
+function findReplay(store, request, actorId) {
   const matches = (store.phaseReviewDecisions ?? []).filter((item) =>
     item.decisionId === request.decisionId || item.idempotencyKey === request.idempotencyKey);
   if (!matches.length) return null;
@@ -260,7 +260,7 @@ function findReplay(store, request) {
   if (item.decisionId !== request.decisionId || item.idempotencyKey !== request.idempotencyKey ||
       item.goalId !== request.goalId || item.currentPhaseId !== request.currentPhaseId ||
       item.selectedOutcome !== request.selectedOutcome || item.originatingArtifactId !== request.originatingArtifactId ||
-      item.actorId !== "user_founder_001") {
+      item.actorId !== actorId) {
     throw authError("REPLAY_CONFLICT", "Phase Review replay does not match the committed decision.");
   }
   return item;

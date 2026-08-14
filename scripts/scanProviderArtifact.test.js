@@ -55,6 +55,13 @@ describe("provider artifact privacy scanner", () => {
       roots: [root], forbiddenValues: [secret], founderOwnerIdentifiers: [owner], forbiddenSha256: [forbiddenHash],
     })).rejects.toMatchObject({ code: "PROVIDER_ARTIFACT_PRIVACY_REJECTED" });
   });
+
+  it("rejects Founder owner identifiers without a supplied value", async () => {
+    const root = await fixture({ "server.js": 'const owner = "user_founder_synthetic";' });
+    await expect(scanProviderArtifact({ roots: [root] })).rejects.toMatchObject({
+      code: "PROVIDER_ARTIFACT_PRIVACY_REJECTED",
+    });
+  });
 });
 
 function fsSync(relativePath) {

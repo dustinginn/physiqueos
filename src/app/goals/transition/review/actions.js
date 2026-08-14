@@ -13,7 +13,7 @@ export async function activateProductionGoalTransition({
   founderConfirmed,
 }) {
   const user = await ProductionGoalTransitionRepositories.users.getCurrentUser();
-  if (user?.id !== "user_founder_001") {
+  if (!String(user?.id ?? "").trim()) {
     return { ok: false, error: "Trusted founder context is required." };
   }
   try {

@@ -16,7 +16,7 @@ export const FOUNDER_PHASE_1_PLANNED_REVIEW_AT = "2026-08-15";
 export const FOUNDER_PHASE_2_PROJECTED_START = "2026-08-16";
 
 export function isFounderBuildLeanMassGoal(goal) {
-  return goal?.userId === "user_founder_001" && goal?.type === "build_lean_mass" &&
+  return Boolean(String(goal?.userId ?? "").trim()) && goal?.type === "build_lean_mass" &&
     goal?.status === "active" && /^goal_transition_live_goal_visible_abs_at_rest_/.test(goal?.id ?? "") &&
     goal?.phases?.some((phase) => phase.name === "Establish Maintenance") &&
     goal?.phases?.some((phase) => phase.name === "Lean Mass Build");

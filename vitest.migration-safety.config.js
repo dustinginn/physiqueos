@@ -28,6 +28,7 @@ export default defineConfig({
       "src/data/repositories/ProductionRepositoryFacade.test.js",
       "scripts/ValidationBuildIsolation.test.js",
       "scripts/scanProviderArtifact.test.js",
+      "scripts/collectProviderWorkerArtifact.test.js",
       "scripts/ProductionMigrationRemediationWiring.test.js",
       "scripts/ProductionMigrationEntrypoint.test.js",
       "scripts/RemoteProductionMigrationDryRunClient.test.js",

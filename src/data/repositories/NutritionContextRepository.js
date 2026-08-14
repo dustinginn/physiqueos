@@ -1,4 +1,3 @@
-import { seedNutritionContext } from "../seed/nutritionContext";
 
 export function createNutritionContextRepository(nutritionContext = null, options = {}) {
   return {
@@ -35,4 +34,4 @@ export function createNutritionContextRepository(nutritionContext = null, option
 }
 
 export const NutritionContextRepository =
-  createNutritionContextRepository(seedNutritionContext);
+  createNutritionContextRepository(null);

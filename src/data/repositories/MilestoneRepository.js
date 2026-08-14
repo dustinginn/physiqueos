@@ -1,4 +1,3 @@
-import { seedMilestones } from "../seed/milestones";
 import { byUserId } from "./repositoryUtils";
 
 export function createMilestoneRepository(milestones = []) {
@@ -21,4 +20,4 @@ export function createMilestoneRepository(milestones = []) {
   };
 }
 
-export const MilestoneRepository = createMilestoneRepository(seedMilestones);
+export const MilestoneRepository = createMilestoneRepository([]);

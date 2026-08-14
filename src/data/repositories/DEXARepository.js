@@ -1,4 +1,3 @@
-import { seedDEXAScans } from "../seed/dexaScans";
 import { byUserId, latestByDate } from "./repositoryUtils";
 import { selectValidDexaScans } from "../../domain/services/DEXAReadModelAdapter";
 
@@ -44,4 +43,4 @@ export function createDEXARepository(dexaScans = [], options = {}) {
   };
 }
 
-export const DEXARepository = createDEXARepository(seedDEXAScans);
+export const DEXARepository = createDEXARepository([]);

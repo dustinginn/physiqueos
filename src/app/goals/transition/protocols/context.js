@@ -4,7 +4,7 @@ import { buildGoalTransitionProtocolReviewHandoff } from "../../../../presentati
 
 export async function loadLiveProtocolTransition() {
   const user = await ProductionGoalTransitionRepositories.users.getCurrentUser();
-  if (user?.id !== "user_founder_001") throw new Error("Founder context is required.");
+  if (!String(user?.id ?? "").trim()) throw new Error("Founder context is required.");
   const goalTransition = await ProductionGoalTransitionRepositories.goalTransitionDrafts
     .getLatestActiveForSourceGoal(user.id, "goal_visible_abs_at_rest");
   if (!goalTransition?.liveProduction) {

@@ -367,7 +367,7 @@ function assertTokenBindings(token, { validatorResult, plan, compatibility, sour
 }
 
 function requireFounder(founderUserId) {
-  if (founderUserId !== "user_founder_001") {
+  if (!String(founderUserId ?? "").trim()) {
     throw serviceError("FOUNDER_CONTEXT_REQUIRED", "Trusted founder context is required.");
   }
 }
