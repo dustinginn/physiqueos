@@ -269,12 +269,25 @@ function validateCandidate({ baseline, candidate, decision, finalized = null }) 
     if (current.status !== "completed" || next.status !== "active" ||
         goal.currentPhaseId !== next.id || strategy.length !== 1 || trajectory.length !== 1 ||
         snapshots.length !== 1 || artifacts.length !== 1) return { valid: false };
-    const acceptedStrategy = (baseline.phaseStrategies ?? []).find((item) =>
-      item.id === strategy[0].id);
-    const acceptedTrajectory = (baseline.phaseExpectedTrajectories ?? []).find((item) =>
-      item.id === trajectory[0].id);
+    const acceptedStrategy = decision.phaseEstablishment?.strategy ??
+      (baseline.phaseStrategies ?? []).find((item) => item.id === strategy[0].id);
+    const acceptedTrajectory = decision.phaseEstablishment?.trajectory ??
+      (baseline.phaseExpectedTrajectories ?? []).find((item) => item.id === trajectory[0].id);
     if (!same(strategy[0], acceptedStrategy) || !same(trajectory[0], acceptedTrajectory)) {
       return { valid: false };
+    }
+    if (decision.phaseEstablishment) {
+      const protocol = (candidate.protocols ?? []).find((item) =>
+        item.phaseId === decision.nextPhaseId && item.phaseStrategyId === strategy[0].id &&
+        item.currentVersionId);
+      const version = (candidate.protocolVersions ?? []).find((item) =>
+        item.id === protocol?.currentVersionId && item.phaseId === decision.nextPhaseId &&
+        item.confirmation?.decisionId === decision.decisionId);
+      if (!protocol || !version ||
+          !same(version.change?.reviewedChanges?.caloricIntakeTarget,
+            decision.phaseEstablishment.executionTargets.caloricIntake) ||
+          !same(version.change?.reviewedChanges?.activityExpenditureTarget,
+            decision.phaseEstablishment.executionTargets.activityExpenditure)) return { valid: false };
     }
   } else {
     if (!isActivePhaseStatus(current.status) || current.plannedReviewAt !== decision.selectedReviewAt ||
@@ -290,12 +303,14 @@ function validateCandidate({ baseline, candidate, decision, finalized = null }) 
   for (const root of PROTECTED_HISTORY) {
     if (!same(baseline[root] ?? [], candidate[root] ?? [])) return { valid: false };
   }
-  for (const root of ["protocols", "protocolVersions"]) {
-    if (!same(baseline[root] ?? [], candidate[root] ?? [])) return { valid: false };
-  }
-  for (const root of ["phaseStrategies", "phaseExpectedTrajectories"]) {
-    if (!same(baseline[root] ?? [], candidate[root] ?? [])) return { valid: false };
-  }
+  if (decision.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE) {
+    if (!isPrefix(baseline.phaseStrategies ?? [], candidate.phaseStrategies ?? []) ||
+        !isPrefix(baseline.phaseExpectedTrajectories ?? [], candidate.phaseExpectedTrajectories ?? []) ||
+        !isPrefix(baseline.protocolVersions ?? [], candidate.protocolVersions ?? [])) return { valid: false };
+  } else if (!same(baseline.phaseStrategies ?? [], candidate.phaseStrategies ?? []) ||
+      !same(baseline.phaseExpectedTrajectories ?? [], candidate.phaseExpectedTrajectories ?? []) ||
+      !same(baseline.protocols ?? [], candidate.protocols ?? []) ||
+      !same(baseline.protocolVersions ?? [], candidate.protocolVersions ?? [])) return { valid: false };
   for (const root of ["phaseReviewDecisions", "phaseReviewTransactions"]) {
     if (!isPrefix(baseline[root] ?? [], candidate[root] ?? [])) return { valid: false };
   }

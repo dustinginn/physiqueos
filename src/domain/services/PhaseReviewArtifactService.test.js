@@ -39,6 +39,29 @@ describe("Phase Review artifact generation and read model", () => {
     }] })).toMatchObject({ readOnly: true, review: { eligible: false, unresolved: false,
       actionRequest: null } });
   });
+
+  it("re-evaluates an unconsumed review without rewriting its published recommendation", () => {
+    const generated = createPhaseReviewArtifactPackage({ context: context() });
+    const artifact = { id: "artifact", trigger: { evidenceType: "dexa", evidenceId: "scan" },
+      briefing: { phaseReview: generated.presentation, dexaEventNarrative: { interpretation: {
+        opening: "Measured lean tissue increased 0.8 lb. One scan cannot prove maintenance.",
+        fatLoss: "Body fat is below your chosen 8–9% range.",
+        supportingEvidence: "Training stayed productive and evidence remained stable.",
+      }, goalConfidence: { primaryReason: "Continued observation is required." } } },
+      phaseReviewAuthorization: generated.authorization,
+      phaseReviewEligibilityBinding: generated.binding };
+    const goal = { id: "goal", timeline: { targetDate: "2026-10-31" },
+      guardrails: [{ text: "Maintain 8–9% body fat." }], phases: context().activeGoal.phases };
+    const result = resolvePhaseReviewArtifactRead({ artifact, store: { revision: 8,
+      goals: [goal], dexaScans: [{ id: "scan", measuredAt: "2026-08-15",
+        bodyFatPercentage: 7.6 }] }, asOf: "2026-08-15" });
+    expect(result.review).toMatchObject({ originalRecommendation: "continue_current_phase",
+      recommendation: "begin_next_phase", actionRequest: { expectedStoreRevision: 8 },
+      currentRecommendation: { evidenceConclusion: "sufficiently_resolved_to_proceed",
+        guardrail: { status: "below", deviationMagnitude: "slight",
+          exactMembershipPreserved: true } } });
+    expect(artifact.briefing.phaseReview.recommendation).toBe("continue_current_phase");
+  });
 });
 
 function context() { const phase = { id: "p1", goalId: "goal", name: "Current", order: 0,

@@ -7,6 +7,8 @@ import { submitProductionPhaseReviewDecision } from "./actions";
 import { loadApplicationCanonicalRuntime } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import { resolvePhaseReviewArtifactRead } from
   "../../../../domain/services/PhaseReviewArtifactReadService";
+import { projectDEXAEventNarrativePresentation } from
+  "../../../../domain/services/DEXAEventNarrativePresentationService";
 
 export const dynamic = "force-dynamic";
 export default async function DEXAEventPage({ params }) {
@@ -15,10 +17,11 @@ export default async function DEXAEventPage({ params }) {
   const artifact = await createDEXAEventNarrativeService({ repositories: FounderRepositories })
     .getByScanId({ userId: user.id, scanId });
   if (!artifact) notFound();
-  const phaseReviewRead = resolvePhaseReviewArtifactRead({ artifact,
-    decisionHistory: (await loadApplicationCanonicalRuntime()).phaseReviewDecisions ?? [] });
+  const store = await loadApplicationCanonicalRuntime();
+  const phaseReviewRead = resolvePhaseReviewArtifactRead({ artifact, store,
+    decisionHistory: store.phaseReviewDecisions ?? [] });
   return <DEXAEventBriefingScreen
-    narrative={artifact.briefing.dexaEventNarrative}
+    narrative={projectDEXAEventNarrativePresentation(artifact.briefing.dexaEventNarrative)}
     phaseReview={phaseReviewRead
       ? <PhaseReviewCard readOnly={phaseReviewRead.readOnly} review={phaseReviewRead.review}
           submitDecision={phaseReviewRead.readOnly ? null : submitProductionPhaseReviewDecision}/>

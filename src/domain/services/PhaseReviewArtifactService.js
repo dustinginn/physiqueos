@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { evaluatePhaseReviewEligibility } from "./PhaseReviewEligibilityService";
+import { deriveGoalAwarePhaseReviewInputs, evaluateGoalAwarePhaseReview } from
+  "./GoalAwarePhaseReviewRecommendationService";
 
 export function createPhaseReviewArtifactPackage({ context, forecastAssessment,
   narrativeAssessment, confidenceAssessment } = {}) {
@@ -10,7 +12,7 @@ export function createPhaseReviewArtifactPackage({ context, forecastAssessment,
   const phase = context.activePhase;
   const nextPhase = (goal?.phases ?? []).find((item) =>
     Number(item.order) === Number(phase.order) + 1) ?? null;
-  const recommendation = recommend({ forecastAssessment, narrativeAssessment, nextPhase });
+  const recommendation = recommend({ forecastAssessment, narrativeAssessment, nextPhase, context });
   const artifactId = context.currentArtifact?.id ?? context.currentArtifact?.artifactId;
   const milestone = context.reviewMilestone;
   const approvalId = `phase_review_approval|${milestone.unresolvedReviewId}|${artifactId}`;
@@ -32,6 +34,7 @@ export function createPhaseReviewArtifactPackage({ context, forecastAssessment,
     recommendationLabel: recommendation.presentationOutcome === "begin_next_phase"
       ? `Begin ${nextPhase?.name ?? "Next Phase"}` : `Continue ${phase.name}`,
     explanation: recommendation.explanation,
+    currentRecommendation: recommendation.decisionModel,
     currentPhase: { id: phase.id, name: phase.name,
       shortName: `Phase ${Number(phase.order ?? 0) + 1}` },
     nextPhase: nextPhase ? { id: nextPhase.id, name: nextPhase.name,
@@ -53,6 +56,8 @@ export function createPhaseReviewArtifactPackage({ context, forecastAssessment,
     recommendedOutcome: recommendation.authorizationOutcome,
     recommendedDuration: recommendation.authorizationOutcome === "extend_current_phase" ? 14 : null,
     recommendedReviewAt: null, rationale: recommendation.explanation,
+    phaseReadinessConclusion: recommendation.decisionModel?.evidenceConclusion ?? null,
+    recommendationFingerprint: recommendation.decisionModel?.fingerprint ?? null,
     decisionSource: "canonical_phase_review_milestone",
     originatingForecastId: forecastAssessment?.id ?? null,
     originatingInterpretationId: forecastAssessment?.structuredInterpretationId ?? null,
@@ -78,16 +83,23 @@ export function createPhaseReviewArtifactPackage({ context, forecastAssessment,
   return deepFreeze({ eligibility, presentation, authorization, binding });
 }
 
-function recommend({ forecastAssessment, narrativeAssessment, nextPhase }) {
+function recommend({ forecastAssessment, narrativeAssessment, nextPhase, context }) {
   const coaching = narrativeAssessment?.recommendedCoachingDirection?.state;
-  const continueCurrent = !nextPhase || ["strategy_review_recommended",
-    "prepare_adjustment", "continue_calibration"].includes(coaching) ||
-    ["forecast_at_risk", "forecast_unlikely"].includes(forecastAssessment?.goalForecastStatus);
-  return { presentationOutcome: continueCurrent ? "continue_current_phase" : "begin_next_phase",
-    authorizationOutcome: continueCurrent ? "extend_current_phase" : "begin_next_phase",
-    explanation: narrativeAssessment?.recommendedCoachingDirection?.text ??
-      (continueCurrent ? "Current evidence supports extending this phase before deciding again." :
-        "Current evidence supports beginning the next planned phase.") };
+  const inputs = deriveGoalAwarePhaseReviewInputs({ goal: context.activeGoal, phase: context.activePhase,
+      nextPhase, artifact: context.currentArtifact, canonicalScan: context.currentEvidence ?? null,
+      asOf: String(context.currentDate ?? new Date().toISOString()).slice(0, 10) });
+  const derived = evaluateGoalAwarePhaseReview({
+    ...inputs,
+    forecastStatus: forecastAssessment?.goalForecastStatus,
+    phaseEvidenceConclusion: narrativeAssessment?.phaseReadinessConclusion ??
+      (coaching === "stay_the_course" ? "sufficiently_resolved_to_proceed" : "unresolved"),
+    evidenceTrend: narrativeAssessment?.evidenceTrend ??
+      (["strategy_review_recommended", "prepare_adjustment"].includes(coaching) ? "unstable" : inputs.evidenceTrend),
+  });
+  return { presentationOutcome: derived.presentationRecommendation,
+    authorizationOutcome: derived.recommendation,
+    explanation: derived.explanation,
+    decisionModel: derived };
 }
 function lineage(milestone, forecast, narrative) {
   return [...milestone.lineage,

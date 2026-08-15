@@ -468,7 +468,9 @@ function leanMassMeaning({ leanState, leanDelta, guardrail, phaseCalibration }) 
       ? "Lean tissue moved up, but body fat also moved beyond the range you chose."
       : guardrail.status === "within" || guardrail.status === "near_boundary"
         ? "Lean tissue moved up while body fat stayed within the range you chose."
-        : "Lean tissue moved up, but we cannot yet judge body fat against a clear target range.";
+        : guardrail.status === "below"
+          ? `Lean tissue moved up while body fat remained below the exact ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% Guardrail you chose.`
+          : "Lean tissue moved up, but a canonical body-fat Guardrail is unavailable.";
     return `Measured lean tissue increased ${format(Math.abs(leanDelta))} lb. ${qualification} That is encouraging, but one scan cannot prove how much of the change is new muscle.`;
   }
   if (leanState === "decreased") {

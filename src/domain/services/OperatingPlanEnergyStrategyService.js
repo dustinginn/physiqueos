@@ -1,5 +1,6 @@
 const RECOGNIZED_MODES = new Map([
   ["maintenance calibration", "maintenance_calibration"],
+  ["phase execution", "phase_execution"],
 ]);
 
 export function createOperatingPlanEnergyStrategyService({ repositories }) {
@@ -38,7 +39,7 @@ export function resolveActiveOperatingPlanEnergyStrategy({
   const activeGoal = activeGoals[0];
   if (!activeGoal) return null;
 
-  const matches = protocols.filter(
+  const candidates = protocols.filter(
     (protocol) =>
       protocol.userId === userId &&
       protocol.status === "active" &&
@@ -46,6 +47,10 @@ export function resolveActiveOperatingPlanEnergyStrategy({
       protocolSupportsGoal(protocol, activeGoal.id) &&
       recognizedMode(protocol.effectiveStrategy?.mode)
   );
+  const phaseBound = activeGoal.activePhaseStrategyId ? candidates.filter((protocol) =>
+    protocol.phaseStrategyId === activeGoal.activePhaseStrategyId &&
+    (!activeGoal.currentPhaseId || protocol.phaseId === activeGoal.currentPhaseId)) : [];
+  const matches = phaseBound.length ? phaseBound : candidates.filter((protocol) => !protocol.phaseStrategyId);
 
   if (matches.length > 1) {
     throw new Error(
@@ -72,6 +77,10 @@ export function resolveActiveOperatingPlanEnergyStrategy({
       protocol.effectiveStrategy.calorieStrategy ?? null,
     activityStrategy:
       protocol.effectiveStrategy.activityStrategy ?? null,
+    ...(protocol.effectiveStrategy.caloricIntakeTarget ? { caloricIntakeTarget: protocol.effectiveStrategy.caloricIntakeTarget } : {}),
+    ...(protocol.effectiveStrategy.activityExpenditureTarget ? { activityExpenditureTarget: protocol.effectiveStrategy.activityExpenditureTarget } : {}),
+    ...(protocol.phaseId ?? protocol.effectiveStrategy.phaseId ? { phaseId: protocol.phaseId ?? protocol.effectiveStrategy.phaseId } : {}),
+    ...(protocol.phaseStrategyId ?? protocol.effectiveStrategy.phaseStrategyId ? { phaseStrategyId: protocol.phaseStrategyId ?? protocol.effectiveStrategy.phaseStrategyId } : {}),
     effectiveDate: protocol.activatedAt ?? protocol.startDate ?? null,
     provenance: protocol.activationProvenance
       ? {

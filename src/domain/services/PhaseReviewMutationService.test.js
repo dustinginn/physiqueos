@@ -12,7 +12,7 @@ describe("Phase Review mutation compatibility boundary", () => {
       participants: createCanonicalPhaseReviewParticipants(),
     });
     expect(service.version).toBe("phase_review_commit_coordinator_v1");
-    expect(service.participantNames).toHaveLength(8);
+    expect(service.participantNames).toHaveLength(9);
   });
 
   it("rejects the legacy opaque callback participant path", () => {

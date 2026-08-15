@@ -66,6 +66,12 @@ describe("production Phase Review boundary full-Founder simulation", () => {
     expect(begun.confidenceInitializationArtifacts.some((item) =>
       item.occurrenceId === beginRequest.decisionId)).toBe(true);
     expect(protectedFingerprints(begun)).toEqual(protectedBefore);
+    expect(begun.protocolVersions.slice(0, simulated.protocolVersions.length))
+      .toEqual(simulated.protocolVersions);
+    expect(begun.protocolVersions.at(-1)).toMatchObject({ phaseId: begunGoal.currentPhaseId,
+      confirmation: { decisionId: beginRequest.decisionId },
+      change: { reviewedChanges: { caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+        activityExpenditureTarget: { value: 800, unit: "kcal/day" } } } });
     expect(await beginFactory.execute(beginRequest)).toMatchObject({ ok: true,
       committed: true, idempotent: true });
     expect(beginFactory.inspectLock().exists).toBe(false);
@@ -97,6 +103,8 @@ describe("production Phase Review boundary full-Founder simulation", () => {
     expect(extended.confidenceInitializationArtifacts).toEqual(simulated.confidenceInitializationArtifacts);
     expect(extended.goalConfidenceHistory).toEqual(simulated.goalConfidenceHistory);
     expect(protectedFingerprints(extended)).toEqual(protectedBefore);
+    expect(extended.protocols).toEqual(simulated.protocols);
+    expect(extended.protocolVersions).toEqual(simulated.protocolVersions);
     expect(extendFactory.inspectLock().exists).toBe(false);
 
     expect(fs.readFileSync(productionPath).equals(productionBefore)).toBe(true);
@@ -176,7 +184,9 @@ function requestFor(store, outcome) {
     milestoneId: milestone.milestoneId,
     unresolvedReviewId: milestone.unresolvedReviewId,
     approvalId: "phase-review-production-boundary-simulation-approval",
-    approvalToken: "simulation-secret" };
+    approvalToken: "simulation-secret",
+    caloricIntakeTarget: outcome === "begin_next_phase" ? { value: 2800, unit: "kcal/day" } : null,
+    activityExpenditureTarget: outcome === "begin_next_phase" ? { value: 800, unit: "kcal/day" } : null };
 }
 function accept(service, type, draft, idempotencyKey) {
   const ready = service[`submit${type}ForReview`](draft, { expectedRevision: 0 });
@@ -186,7 +196,7 @@ function accept(service, type, draft, idempotencyKey) {
       actorId: "user_founder_001" } }).record;
 }
 function protectedFingerprints(store) { return Object.fromEntries([
-  "protocols", "protocolVersions", "executionItems", "dailyBriefings", "canonicalEvidenceObjects",
+  "executionItems", "dailyBriefings", "canonicalEvidenceObjects",
   "evidencePackages", "dexaScans", "progressPhotos", "goalTransitionDrafts",
   "goalProtocolTransitionDrafts",
 ].map((key) => [key, sha256(Buffer.from(JSON.stringify(store[key] ?? [])))])); }

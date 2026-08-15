@@ -18,6 +18,12 @@ function safeMessage(code) {
   if (code === "PHASE_REVIEW_ACTION_EXPECTED_REVISION_MISMATCH") {
     return "This Phase Review is out of date. Refresh before deciding; nothing was changed.";
   }
+  if (code === "PHASE_REVIEW_RECOMMENDATION_STALE") {
+    return "This recommendation changed. Refresh before deciding; nothing was changed.";
+  }
+  if (code === "PHASE_REVIEW_ESTABLISHMENT_REQUIRED") {
+    return "Confirm both next-phase targets before authorizing. Nothing was changed.";
+  }
   if (code === "PHASE_REVIEW_EXPLICIT_APPROVAL_REQUIRED" ||
       code === "PHASE_REVIEW_ARTIFACT_INELIGIBLE") {
     return "This Phase Review is not authorized for a decision. Nothing was changed.";

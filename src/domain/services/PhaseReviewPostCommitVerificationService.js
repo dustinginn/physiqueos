@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 export const PHASE_REVIEW_POST_COMMIT_VERIFICATION_VERSION =
   "phase_review_post_commit_verification_v1";
 
-const PROTECTED = Object.freeze(["protocols", "protocolVersions", "dailyBriefings",
+const PROTECTED = Object.freeze(["dailyBriefings",
   "canonicalEvidenceObjects", "evidencePackages", "dexaScans", "progressPhotos"]);
 
 export function verifyPhaseReviewPostCommit({ before, after, decision, result } = {}) {
@@ -12,9 +12,6 @@ export function verifyPhaseReviewPostCommit({ before, after, decision, result } 
   const failures = [];
   check(Number(after?.revision ?? 0) === expectedRevision, "STORE_REVISION_INVALID");
   for (const key of PROTECTED) check(same(before[key] ?? [], after[key] ?? []), `${key.toUpperCase()}_REWRITTEN`);
-  check(same(before.phaseStrategies ?? [], after.phaseStrategies ?? []), "ACCEPTED_STRATEGY_MUTATED");
-  check(same(before.phaseExpectedTrajectories ?? [], after.phaseExpectedTrajectories ?? []),
-    "ACCEPTED_TRAJECTORY_MUTATED");
   const goal = after.goals?.find((item) => item.id === decision.goalId);
   const current = goal?.phases?.find((item) => item.id === decision.currentPhaseId);
   const next = goal?.phases?.find((item) => item.id === decision.nextPhaseId);
@@ -42,6 +39,17 @@ export function verifyPhaseReviewPostCommit({ before, after, decision, result } 
     check((after.confidenceInitializationArtifacts ?? []).some((item) =>
       item.occurrenceId === decision.decisionId && item.phaseId === next?.id),
     "STARTING_FORECAST_MISSING");
+    check(!decision.phaseEstablishment || (after.protocolVersions ?? []).some((item) =>
+      item.confirmation?.decisionId === decision.decisionId && item.phaseId === next?.id &&
+      same(item.change?.reviewedChanges?.caloricIntakeTarget,
+        decision.phaseEstablishment?.executionTargets?.caloricIntake) &&
+      same(item.change?.reviewedChanges?.activityExpenditureTarget,
+        decision.phaseEstablishment?.executionTargets?.activityExpenditure)),
+    "PHASE_EXECUTION_TARGETS_MISSING");
+    check((before.phaseStrategies ?? []).every((item, index) =>
+      same(item, after.phaseStrategies?.[index])), "PRIOR_STRATEGY_HISTORY_CHANGED");
+    check((before.phaseExpectedTrajectories ?? []).every((item, index) =>
+      same(item, after.phaseExpectedTrajectories?.[index])), "PRIOR_TRAJECTORY_HISTORY_CHANGED");
   } else {
     check(current?.status === "active", "CURRENT_PHASE_NOT_ACTIVE");
     check(current?.plannedReviewAt === decision.selectedReviewAt, "EXTENSION_DATE_INVALID");
@@ -54,6 +62,12 @@ export function verifyPhaseReviewPostCommit({ before, after, decision, result } 
       "CONFIDENCE_HISTORY_CHANGED_ON_EXTENSION");
     check(same(before.confidenceInitializationArtifacts ?? [],
       after.confidenceInitializationArtifacts ?? []), "STARTING_FORECAST_CREATED_ON_EXTENSION");
+    check(same(before.phaseStrategies ?? [], after.phaseStrategies ?? []), "STRATEGY_CHANGED_ON_EXTENSION");
+    check(same(before.phaseExpectedTrajectories ?? [], after.phaseExpectedTrajectories ?? []),
+      "TRAJECTORY_CHANGED_ON_EXTENSION");
+    check(same(before.protocols ?? [], after.protocols ?? []) &&
+      same(before.protocolVersions ?? [], after.protocolVersions ?? []),
+    "EXECUTION_TARGETS_CHANGED_ON_EXTENSION");
   }
   if (failures.length) {
     const error = new Error(`Critical Phase Review post-commit verification failed: ${failures.join(", ")}.`);

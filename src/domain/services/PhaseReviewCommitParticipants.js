@@ -20,6 +20,7 @@ export const PhaseReviewParticipantName = Object.freeze({
   NEXT_PHASE: "next_phase",
   STRATEGY: "strategy",
   EXPECTED_TRAJECTORY: "expected_trajectory",
+  EXECUTION_TARGETS: "execution_targets",
   STARTING_FORECAST: "starting_forecast",
   READ_MODELS: "read_models",
 });
@@ -31,6 +32,7 @@ export const PHASE_REVIEW_PARTICIPANT_ORDER = Object.freeze([
   PhaseReviewParticipantName.NEXT_PHASE,
   PhaseReviewParticipantName.STRATEGY,
   PhaseReviewParticipantName.EXPECTED_TRAJECTORY,
+  PhaseReviewParticipantName.EXECUTION_TARGETS,
   PhaseReviewParticipantName.STARTING_FORECAST,
   PhaseReviewParticipantName.READ_MODELS,
 ]);
@@ -182,7 +184,8 @@ export function createCanonicalPhaseReviewParticipants({
       prepare: ({ baseline, decision }) => {
         const records = baseline.phaseStrategies ?? [];
         if (!isBegin(decision)) return { mode: "retain", fingerprint: JSON.stringify(records) };
-        const accepted = records.filter((item) => item.goalId === decision.goalId &&
+        const embedded = decision.phaseEstablishment?.strategy;
+        const accepted = embedded ? [embedded] : records.filter((item) => item.goalId === decision.goalId &&
           item.phaseId === decision.nextPhaseId && item.status === "accepted");
         if (accepted.length !== 1) {
           fail("ACCEPTED_STRATEGY_REQUIRED", "Exactly one accepted Phase Strategy is required.");
@@ -195,13 +198,17 @@ export function createCanonicalPhaseReviewParticipants({
         if (accepted[0].revision !== decision.expectedStrategyRevision) {
           fail("STRATEGY_REVISION_MISMATCH", "The accepted Phase Strategy revision changed.");
         }
-        return { mode: "activate", accepted: structuredClone(accepted[0]) };
+        if (embedded && records.some((item) => item.id === embedded.id)) {
+          fail("STRATEGY_ID_CONFLICT", "The Phase Strategy identity already exists.");
+        }
+        return { mode: embedded ? "create_and_activate" : "activate", accepted: structuredClone(accepted[0]) };
       },
       validate: ({ prepared }) => prepared.mode === "retain" ||
         prepared.accepted?.status === "accepted",
       commit: ({ stagedState, decision, prepared }) => {
         if (prepared.mode === "retain") return;
         const records = stagedState.phaseStrategies ??= [];
+        if (prepared.mode === "create_and_activate") records.push(structuredClone(prepared.accepted));
         const accepted = requiredRecord(records, prepared.accepted.id, "Accepted Strategy");
         if (JSON.stringify(accepted) !== JSON.stringify(prepared.accepted)) {
           fail("ACCEPTED_STRATEGY_MUTATED", "Accepted Strategy content changed during activation.");
@@ -215,7 +222,8 @@ export function createCanonicalPhaseReviewParticipants({
       prepare: ({ baseline, decision }) => {
         const records = baseline.phaseExpectedTrajectories ?? [];
         if (!isBegin(decision)) return { mode: "retain", fingerprint: JSON.stringify(records) };
-        const accepted = records.filter((item) => item.goalId === decision.goalId &&
+        const embedded = decision.phaseEstablishment?.trajectory;
+        const accepted = embedded ? [embedded] : records.filter((item) => item.goalId === decision.goalId &&
           item.phaseId === decision.nextPhaseId && item.status === "accepted");
         if (accepted.length !== 1) {
           fail("ACCEPTED_TRAJECTORY_REQUIRED", "Exactly one accepted Phase Expected Trajectory is required.");
@@ -228,13 +236,17 @@ export function createCanonicalPhaseReviewParticipants({
         if (accepted[0].revision !== decision.expectedTrajectoryRevision) {
           fail("TRAJECTORY_REVISION_MISMATCH", "The accepted Phase Expected Trajectory revision changed.");
         }
-        return { mode: "activate", accepted: structuredClone(accepted[0]) };
+        if (embedded && records.some((item) => item.id === embedded.id)) {
+          fail("TRAJECTORY_ID_CONFLICT", "The Expected Trajectory identity already exists.");
+        }
+        return { mode: embedded ? "create_and_activate" : "activate", accepted: structuredClone(accepted[0]) };
       },
       validate: ({ prepared }) => prepared.mode === "retain" ||
         prepared.accepted?.status === "accepted",
       commit: ({ stagedState, decision, prepared }) => {
         if (prepared.mode === "retain") return;
         const records = stagedState.phaseExpectedTrajectories ??= [];
+        if (prepared.mode === "create_and_activate") records.push(structuredClone(prepared.accepted));
         const accepted = requiredRecord(records, prepared.accepted.id, "Accepted Expected Trajectory");
         if (JSON.stringify(accepted) !== JSON.stringify(prepared.accepted)) {
           fail("ACCEPTED_TRAJECTORY_MUTATED", "Accepted Expected Trajectory content changed during activation.");
@@ -247,6 +259,50 @@ export function createCanonicalPhaseReviewParticipants({
           plannedReviewAt: accepted.plannedReviewAt ?? goal.timeline?.plannedReviewAt ?? null,
           nextMilestoneAt: accepted.nextMilestoneAt ?? null,
         };
+      },
+    }),
+    participant(PhaseReviewParticipantName.EXECUTION_TARGETS, {
+      prepare: ({ baseline, decision }) => {
+        if (!isBegin(decision)) return { mode: "retain" };
+        const targets = decision.phaseEstablishment?.executionTargets;
+        if (!targets?.caloricIntake || !targets?.activityExpenditure) return { mode: "retain_legacy" };
+        const candidates = (baseline.protocols ?? []).filter((protocol) =>
+          protocol.status === "active" && (protocol.protocolType === "energy" || protocol.category === "energy") &&
+          supportsGoal(protocol, decision.goalId));
+        if (candidates.length !== 1) fail("ENERGY_PROTOCOL_REQUIRED", "Exactly one active Goal Energy protocol is required.");
+        const protocol = structuredClone(candidates[0]);
+        const versions = (baseline.protocolVersions ?? []).filter((item) => item.protocolId === protocol.id);
+        const nextVersion = Math.max(0, ...versions.map((item) => Number(item.versionNumber ?? 0))) + 1;
+        const versionId = `${protocol.id}_v${nextVersion}`;
+        if ((baseline.protocolVersions ?? []).some((item) => item.id === versionId)) {
+          fail("ENERGY_VERSION_CONFLICT", "The next Energy protocol version identity already exists.");
+        }
+        return { mode: "version", protocolId: protocol.id, expectedCurrentVersionId: protocol.currentVersionId,
+          version: { id: versionId, protocolId: protocol.id, versionNumber: nextVersion,
+            status: "active", effectiveAt: effectiveStart(decision), activatedAt: decision.decidedAt,
+            goalLinks: [{ goalId: decision.goalId, relationship: "supports" }],
+            phaseId: decision.nextPhaseId, strategyId: decision.phaseEstablishment.strategy.id,
+            confirmation: { authority: "authorized_phase_review", decisionId: decision.decisionId },
+            change: { reason: "Activate user-authorized phase execution targets.",
+              previousVersionId: protocol.currentVersionId ?? null,
+              reviewedChanges: phaseExecutionStrategy(decision) } },
+          effectiveStrategy: phaseExecutionStrategy(decision) };
+      },
+      validate: ({ prepared }) => ["retain", "retain_legacy"].includes(prepared.mode) ||
+        (prepared.mode === "version" && Boolean(prepared.protocolId && prepared.version?.id)),
+      commit: ({ stagedState, decision, prepared }) => {
+        if (["retain", "retain_legacy"].includes(prepared.mode)) return;
+        const protocol = requiredRecord(stagedState.protocols ?? [], prepared.protocolId, "Energy protocol");
+        if (protocol.currentVersionId !== prepared.expectedCurrentVersionId) {
+          fail("ENERGY_PROTOCOL_STALE", "The active Energy protocol changed during transition.");
+        }
+        stagedState.protocolVersions ??= [];
+        stagedState.protocolVersions.push(structuredClone(prepared.version));
+        protocol.currentVersionId = prepared.version.id;
+        protocol.effectiveStrategy = structuredClone(prepared.effectiveStrategy);
+        protocol.phaseId = decision.nextPhaseId;
+        protocol.phaseStrategyId = decision.phaseEstablishment.strategy.id;
+        protocol.updatedAt = decision.decidedAt;
       },
     }),
     participant(PhaseReviewParticipantName.STARTING_FORECAST, {
@@ -340,6 +396,7 @@ export function createCanonicalPhaseReviewParticipants({
         decisionId: decision.decisionId,
         strategyId: preparedByName.get(PhaseReviewParticipantName.STRATEGY).accepted?.id ?? null,
         expectedTrajectoryId: preparedByName.get(PhaseReviewParticipantName.EXPECTED_TRAJECTORY).accepted?.id ?? null,
+        executionProtocolVersionId: preparedByName.get(PhaseReviewParticipantName.EXECUTION_TARGETS).version?.id ?? null,
         startingForecastAssessmentId: preparedByName.get(PhaseReviewParticipantName.STARTING_FORECAST)
           .confidenceAssessment?.id ?? null,
       }),
@@ -364,6 +421,7 @@ export function createCanonicalPhaseReviewParticipants({
           strategyId: prepared.strategyId ?? goal.activePhaseStrategyId ?? null,
           expectedTrajectoryId: prepared.expectedTrajectoryId ?? goal.activeExpectedTrajectoryId ?? null,
           startingForecastAssessmentId: prepared.startingForecastAssessmentId,
+          executionProtocolVersionId: prepared.executionProtocolVersionId,
           forecastTiming: {
             phaseId: activePhase?.id ?? null,
             reviewAt: activePhase?.plannedReviewAt ?? null,
@@ -529,6 +587,26 @@ function effectiveStart(decision) {
 }
 function isBegin(decision) {
   return decision.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE;
+}
+function supportsGoal(protocol, goalId) {
+  return [...(protocol.currentGoalIds ?? []), ...(protocol.relatedGoalIds ?? []),
+    ...(protocol.goalIds ?? []), ...(protocol.goalLinks ?? []).map((item) => item.goalId)]
+    .includes(goalId);
+}
+function phaseExecutionStrategy(decision) {
+  const targets = decision.phaseEstablishment.executionTargets;
+  return {
+    mode: "Phase Execution",
+    phaseId: decision.nextPhaseId,
+    phaseStrategyId: decision.phaseEstablishment.strategy.id,
+    caloricIntakeTarget: structuredClone(targets.caloricIntake),
+    activityExpenditureTarget: structuredClone(targets.activityExpenditure),
+    evaluationCadence: targets.evaluationCadence,
+    adjustmentMethod: targets.adjustmentMethod,
+    signals: ["Weight trend", "Nutrition", "Activity", "Training performance",
+      "Recovery", "Body composition"],
+    uncertainty: "The targets remain reviewable as new evidence arrives",
+  };
 }
 function legacyMilestone(phase, decision) {
   return createPhaseReviewMilestone({

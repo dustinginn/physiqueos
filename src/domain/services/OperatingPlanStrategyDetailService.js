@@ -59,12 +59,14 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     ...common,
     eyebrow: "Energy Strategy",
     title: strategy.mode ?? protocol.name,
-    purpose: `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
+    purpose: strategy.mode === "Phase Execution"
+      ? `Apply the user-authorized intake and activity targets for the current Goal phase while monitoring response and Guardrails.`
+      : `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
     sections: [
       field("Current Energy Phase", energyPhase(strategy.mode)),
-      field("Caloric Intake", label(strategy.calorieStrategy)),
-      field("Activity Target", label(strategy.activityStrategy)),
-      field("Calibration Approach", calibrationApproach(strategy)),
+      field("Caloric Intake", targetLabel(strategy.caloricIntakeTarget) ?? label(strategy.calorieStrategy)),
+      field("Activity Target", targetLabel(strategy.activityExpenditureTarget) ?? label(strategy.activityStrategy)),
+      field(strategy.mode === "Phase Execution" ? "Monitoring Approach" : "Calibration Approach", calibrationApproach(strategy)),
     ],
   };
   if (strategyType === "nutrition") return {
@@ -134,9 +136,11 @@ function energyPhase(mode) {
 }
 function calibrationApproach(strategy) {
   const cadence = label(strategy.evaluationCadence);
-  const adjustment = strategy.adjustmentSize ? `${label(strategy.adjustmentSize)} adjustments` : null;
+  const adjustment = strategy.adjustmentSize ? `${label(strategy.adjustmentSize)} adjustments` :
+    strategy.adjustmentMethod ? label(strategy.adjustmentMethod) : null;
   return [cadence, adjustment].filter(Boolean).join(" \u00B7 ") || null;
 }
+function targetLabel(value){return Number.isFinite(Number(value?.value))?`${Number(value.value).toLocaleString("en-US")} ${value.unit}`:null}
 function macroPhilosophy(strategy) {
   if (strategy.trainingDayFlexibility && strategy.restDayFlexibility) {
     return "Flexible across training and rest days";

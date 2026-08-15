@@ -38,8 +38,8 @@ describe("Phase 2 Starting Forecast input package", () => {
       acceptedStrategy, acceptedTrajectory, decision });
     expect(one).toEqual(two);
     expect(one.inputFingerprint).toBe(two.inputFingerprint);
-    expect(one.goalBaseline).toMatchObject({ observedOn: "2026-07-18",
-      bodyFatPercentage: 7.7, leanMass: { value: 147.5 }, fatMass: { value: 12.8 },
+    expect(one.goalBaseline).toMatchObject({ observedOn: "2026-08-15",
+      bodyFatPercentage: 7.6, leanMass: { value: 148.3 }, fatMass: { value: 12.8 },
       rawEvidenceIncluded: false });
     expect(one.goalContract.strategyHypothesis).toEqual(acceptedStrategy.strategyHypothesis);
     expect(one.goalContract.expectedTrajectory).toEqual(acceptedTrajectory.expectedTrajectory);

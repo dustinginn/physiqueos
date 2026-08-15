@@ -100,6 +100,20 @@ describe("Operating Plan active Energy Strategy resolver", () => {
     );
   });
 
+  it("prefers the active phase-bound strategy and exposes its execution targets", () => {
+    const goal = { ...activeGoal, currentPhaseId: "phase-2", activePhaseStrategyId: "strategy-2" };
+    const result = resolveActiveOperatingPlanEnergyStrategy({ goals: [goal], userId,
+      protocols: [energy(), energy({ id: "phase-energy", phaseId: "phase-2",
+        phaseStrategyId: "strategy-2", currentVersionId: "phase-energy-v2",
+        effectiveStrategy: { mode: "Phase Execution", evaluationCadence: "weekly",
+          caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+          activityExpenditureTarget: { value: 800, unit: "kcal/day" } } })] });
+    expect(result).toMatchObject({ protocolId: "phase-energy", selectedPace: "phase_execution",
+      phaseId: "phase-2", phaseStrategyId: "strategy-2",
+      caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+      activityExpenditureTarget: { value: 800, unit: "kcal/day" } });
+  });
+
   it.each(["planned", "archived", "paused", "superseded"])(
     "does not treat a %s protocol as active",
     (status) => {

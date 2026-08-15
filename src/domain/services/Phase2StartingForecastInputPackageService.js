@@ -25,11 +25,17 @@ export function createPhase2StartingForecastInputPackage({
       acceptedTrajectory.revision !== decision.expectedTrajectoryRevision) {
     throw incomplete("accepted_record_revision_mismatch");
   }
-  const baselineScan = (store.dexaScans ?? []).find((item) =>
-    (item.measuredAt ?? item.date) === "2026-07-18");
+  const sourceEvidenceId = decision.phaseEstablishment?.lineage?.sourceEvidenceId ?? null;
+  const decisionDate = decision.decidedAt?.slice(0, 10);
+  const baselineScan = (store.dexaScans ?? []).find((item) => item.id === sourceEvidenceId) ??
+    [...(store.dexaScans ?? [])].filter((item) => {
+      const observed = item.measuredAt ?? item.date;
+      return observed && (!decisionDate || observed <= decisionDate);
+    }).sort((a, b) => String(a.measuredAt ?? a.date).localeCompare(String(b.measuredAt ?? b.date))).at(-1) ?? null;
+  const baselineObservedOn = baselineScan?.measuredAt ?? baselineScan?.date ?? null;
   const goalBaseline = baselineScan ? {
     baselineId: baselineScan.id,
-    observedOn: "2026-07-18",
+    observedOn: baselineObservedOn,
     kind: "canonical_dexa_summary",
     bodyFatPercentage: number(baselineScan.bodyFatPercentage),
     leanMass: normalizedMass(baselineScan.leanMass),
@@ -68,7 +74,7 @@ export function createPhase2StartingForecastInputPackage({
     decision.projectedNextPhaseStart ?? nextLocalDay(decision.decidedAt.slice(0, 10));
   const remainingDays = daysBetween(activationDate, targetDate);
   const semanticGaps = [
-    ...(goalBaseline ? [] : ["july_18_goal_baseline_missing"]),
+    ...(goalBaseline ? [] : ["phase_boundary_goal_baseline_missing"]),
     ...(latestConfidenceContext ? [] : ["latest_canonical_confidence_context_missing"]),
     ...(executionRefs.length ? [] : ["historical_execution_references_missing"]),
     "true_maintenance_intake_remains_calibration_dependent",
@@ -97,6 +103,7 @@ export function createPhase2StartingForecastInputPackage({
     goalContract,
     acceptedStrategy: structuredClone(acceptedStrategy),
     acceptedExpectedTrajectory: structuredClone(acceptedTrajectory),
+    executionTargets: structuredClone(decision.phaseEstablishment?.executionTargets ?? null),
     activePhase: { goalId: goal.id, phaseId: activePhase.id, status: activePhase.status,
       startedAt: activationDate },
     priorHistory: { goals: priorGoals, phases: priorPhases },
@@ -112,6 +119,7 @@ export function createPhase2StartingForecastInputPackage({
       originatingArtifactId: decision.originatingArtifactId,
       originatingForecastId: decision.originatingForecastId,
       originatingInterpretationId: decision.originatingInterpretationId,
+      sourceEvidenceId,
     },
     remainingGoalTimeline: { activationDate, targetDate, remainingDays,
       derivation: "actual_activation_to_goal_target_inclusive_exclusive_day_delta" },

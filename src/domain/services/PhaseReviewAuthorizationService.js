@@ -7,6 +7,9 @@ import { validatePhaseExpectedTrajectory } from "../models/phaseExpectedTrajecto
 import { createPhase2StartingForecastInputPackage } from
   "./Phase2StartingForecastInputPackageService";
 import { evaluatePhaseReviewEligibility } from "./PhaseReviewEligibilityService";
+import { createAuthorizedPhaseEstablishment } from "./PhaseEstablishmentService";
+import { deriveGoalAwarePhaseReviewInputs, evaluateGoalAwarePhaseReview } from
+  "./GoalAwarePhaseReviewRecommendationService";
 
 export const PHASE_REVIEW_AUTHORIZATION_VERSION = "phase_review_authorization_v1";
 export const PhaseReviewAuthorizationErrorCode = Object.freeze({
@@ -23,6 +26,8 @@ export const PhaseReviewAuthorizationErrorCode = Object.freeze({
   ACCEPTED_TRAJECTORY_REQUIRED: "PHASE_REVIEW_ACTION_ACCEPTED_TRAJECTORY_REQUIRED",
   STARTING_FORECAST_INCOMPLETE: "PHASE_REVIEW_STARTING_FORECAST_INCOMPLETE",
   REPLAY_CONFLICT: "PHASE_REVIEW_ACTION_REPLAY_CONFLICT",
+  ESTABLISHMENT_REQUIRED: "PHASE_REVIEW_ESTABLISHMENT_REQUIRED",
+  RECOMMENDATION_STALE: "PHASE_REVIEW_RECOMMENDATION_STALE",
 });
 
 const REQUEST_KEYS = new Set(["goalId", "currentPhaseId", "decisionId", "selectedOutcome",
@@ -30,6 +35,9 @@ const REQUEST_KEYS = new Set(["goalId", "currentPhaseId", "decisionId", "selecte
   "idempotencyKey", "originatingArtifactId", "approvalId", "approvalToken"]);
 REQUEST_KEYS.add("milestoneId");
 REQUEST_KEYS.add("unresolvedReviewId");
+REQUEST_KEYS.add("caloricIntakeTarget");
+REQUEST_KEYS.add("activityExpenditureTarget");
+REQUEST_KEYS.add("recommendationFingerprint");
 
 export function validatePhaseReviewActionRequest(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input) ||
@@ -55,10 +63,21 @@ export function validatePhaseReviewActionRequest(input = {}) {
     approvalToken: required(input.approvalToken, "approvalToken"),
     milestoneId: required(input.milestoneId, "milestoneId"),
     unresolvedReviewId: required(input.unresolvedReviewId, "unresolvedReviewId"),
+    caloricIntakeTarget: input.caloricIntakeTarget == null ? null : executionTarget(input.caloricIntakeTarget, "caloricIntakeTarget"),
+    activityExpenditureTarget: input.activityExpenditureTarget == null ? null : executionTarget(input.activityExpenditureTarget, "activityExpenditureTarget"),
+    recommendationFingerprint: input.recommendationFingerprint == null ? null : required(input.recommendationFingerprint, "recommendationFingerprint"),
   };
   if (selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE &&
       (request.selectedDuration || request.selectedReviewAt)) {
     throw authError("REQUEST_INVALID", "Begin cannot include extension fields.");
+  }
+  if (selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE &&
+      (!request.caloricIntakeTarget || !request.activityExpenditureTarget)) {
+    throw authError("ESTABLISHMENT_REQUIRED", "Begin requires caloric intake and activity expenditure targets.");
+  }
+  if (selectedOutcome === PhaseReviewUserDecision.EXTEND_CURRENT_PHASE &&
+      (request.caloricIntakeTarget || request.activityExpenditureTarget)) {
+    throw authError("REQUEST_INVALID", "An extension cannot establish next-phase execution targets.");
   }
   if (selectedOutcome === PhaseReviewUserDecision.EXTEND_CURRENT_PHASE &&
       !["1_week", "2_weeks", "3_weeks", "custom"].includes(request.selectedDuration)) {
@@ -147,25 +166,43 @@ export function authorizePhaseReviewRequest({ store, request, actor, now = () =>
         eligibility.designatedEvidenceIdentity !== artifactEvidenceIdentity(artifact))) {
     throw authError("ARTIFACT_INELIGIBLE", "Artifact no longer satisfies the unresolved review milestone.");
   }
-  if (eligibility.expectedPhaseRevision !== request.expectedPhaseRevision ||
-      eligibility.expectedStoreRevision !== request.expectedStoreRevision) {
+  if (eligibility.expectedPhaseRevision !== request.expectedPhaseRevision) {
     throw authError("EXPECTED_REVISION_MISMATCH", "Approval is not bound to the expected revisions.");
   }
   const next = goal.phases?.find((item) => Number(item.order) === Number(current.order) + 1) ?? null;
+  const evidenceId = artifact.trigger?.scanId ?? artifact.trigger?.evidenceId ??
+    eligibilityBinding.evidenceIdentity ?? null;
+  const canonicalScan = (store.dexaScans ?? []).find((item) => item.id === evidenceId) ?? null;
+  const currentRecommendation = evaluateGoalAwarePhaseReview(deriveGoalAwarePhaseReviewInputs({
+    goal, phase: current, nextPhase: next, artifact, canonicalScan,
+    extensionDays: eligibility.recommendedDuration ?? 14,
+    asOf: now().toISOString().slice(0, 10),
+  }));
+  if (request.recommendationFingerprint &&
+      request.recommendationFingerprint !== currentRecommendation.fingerprint) {
+    throw authError("RECOMMENDATION_STALE", "The Goal-aware Phase Review recommendation changed. Refresh before deciding.");
+  }
   const originalReview = current.originalPlannedReviewAt ??
     current.reviewMilestone?.originatingMilestoneAt ?? current.plannedReviewAt;
   let selectedReviewAt = null;
   let projectedNextPhaseStart = null;
   let expectedStrategyRevision = null;
   let expectedTrajectoryRevision = null;
+  let phaseEstablishment = null;
+  const decidedAt = now().toISOString();
   if (request.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE) {
     if (!next || next.status !== "planned" || next.startedAt || next.startDate) {
       throw authError("LIFECYCLE_INELIGIBLE", "The next phase is not planned and unstarted.");
     }
-    const strategy = exactlyOneAccepted(store.phaseStrategies, request.goalId, next.id,
-      "ACCEPTED_STRATEGY_REQUIRED");
-    const trajectory = exactlyOneAccepted(store.phaseExpectedTrajectories, request.goalId, next.id,
-      "ACCEPTED_TRAJECTORY_REQUIRED");
+    phaseEstablishment = createAuthorizedPhaseEstablishment({ goal, currentPhase: current,
+      nextPhase: next, actorId: actor.id, decisionId: request.decisionId,
+      idempotencyKey: request.idempotencyKey, decidedAt,
+      projectedStart: addLocalDays(decidedAt.slice(0, 10), 1),
+      caloricIntakeTarget: request.caloricIntakeTarget,
+      activityExpenditureTarget: request.activityExpenditureTarget,
+      sourceArtifactId: artifact.id, sourceEvidenceId: evidenceId });
+    const strategy = phaseEstablishment.strategy;
+    const trajectory = phaseEstablishment.trajectory;
     try { validatePhaseStrategy(strategy, { expectedGoalId: goal.id, expectedPhaseId: next.id }); }
     catch (error) { throw authError("ACCEPTED_STRATEGY_REQUIRED", error.message); }
     try { validatePhaseExpectedTrajectory(trajectory, { expectedGoalId: goal.id, expectedPhaseId: next.id }); }
@@ -178,9 +215,9 @@ export function authorizePhaseReviewRequest({ store, request, actor, now = () =>
       const inputPackage = createPhase2StartingForecastInputPackage({ store, goal: prospective,
         activePhase: prospective.phases.find((item) => item.id === next.id),
         acceptedStrategy: strategy, acceptedTrajectory: trajectory,
-        decision: decisionBase({ request, eligibility, actor, current, next, originalReview,
+        decision: decisionBase({ request, eligibility, currentRecommendation, actor, current, next, originalReview,
           projectedNextPhaseStart, expectedStrategyRevision, expectedTrajectoryRevision,
-          decidedAt: now().toISOString() }) });
+          phaseEstablishment, decidedAt }) });
       if (!inputPackage.goalBaseline || !inputPackage.latestConfidenceContext) {
         throw new Error("Starting Forecast baseline or canonical Confidence context is missing.");
       }
@@ -195,26 +232,27 @@ export function authorizePhaseReviewRequest({ store, request, actor, now = () =>
     }
     projectedNextPhaseStart = selectedReviewAt;
   }
-  const decidedAt = now().toISOString();
-  const decision = decisionBase({ request, eligibility, actor, current, next, originalReview,
+  const decision = decisionBase({ request, eligibility, currentRecommendation, actor, current, next, originalReview,
     selectedReviewAt, projectedNextPhaseStart, expectedStrategyRevision,
-    expectedTrajectoryRevision, decidedAt });
+    expectedTrajectoryRevision, phaseEstablishment, decidedAt });
   return deepFreeze({ replay: false, decision,
     authorization: authorization(decision, actor.id), artifactId: artifact.id });
 }
 
-function decisionBase({ request, eligibility, actor, current, next, originalReview,
+function decisionBase({ request, eligibility, currentRecommendation = null, actor, current, next, originalReview,
   selectedReviewAt = null, projectedNextPhaseStart, expectedStrategyRevision,
-  expectedTrajectoryRevision, decidedAt }) {
+  expectedTrajectoryRevision, phaseEstablishment = null, decidedAt }) {
   return {
     decisionId: request.decisionId, goalId: request.goalId,
     milestoneId: request.milestoneId, unresolvedReviewId: request.unresolvedReviewId,
     currentPhaseId: current.id, nextPhaseId: next?.id ?? null,
     originalPlannedReviewAt: originalReview,
-    recommendedOutcome: eligibility.recommendedOutcome,
+    recommendedOutcome: currentRecommendation?.recommendation ?? eligibility.recommendedOutcome,
     recommendedDuration: eligibility.recommendedDuration ?? null,
     recommendedReviewAt: eligibility.recommendedReviewAt ?? null,
-    rationale: eligibility.rationale ?? "Authorized Phase Review artifact recommendation.",
+    rationale: currentRecommendation?.explanation ?? eligibility.rationale ?? "Authorized Phase Review artifact recommendation.",
+    phaseReadinessConclusion: currentRecommendation?.evidenceConclusion ?? null,
+    recommendationFingerprint: currentRecommendation?.fingerprint ?? null,
     selectedOutcome: request.selectedOutcome,
     selectedDuration: request.selectedOutcome === "extend_current_phase" ? request.selectedDuration : null,
     selectedReviewAt,
@@ -233,6 +271,7 @@ function decisionBase({ request, eligibility, actor, current, next, originalRevi
     expectedCurrentPhaseRevision: request.expectedPhaseRevision,
     expectedStrategyRevision,
     expectedTrajectoryRevision,
+    phaseEstablishment: phaseEstablishment ? structuredClone(phaseEstablishment) : null,
     actorId: actor.id,
   };
 }
@@ -299,5 +338,6 @@ function integer(value, field) { const parsed = Number(value); if (!Number.isSaf
 function date(value, field) { if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
     new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) !== value)
   throw authError("REQUEST_INVALID", `${field} must be YYYY-MM-DD.`); return value; }
+function executionTarget(value, field) { const amount = Number(value?.value); if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !["value", "unit"].includes(key)) || !Number.isInteger(amount) || value.unit !== "kcal/day") throw authError("REQUEST_INVALID", `${field} must be a whole-number kcal/day target.`); return Object.freeze({ value: amount, unit: "kcal/day" }); }
 function deepFreeze(value) { if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze); return Object.freeze(value); }

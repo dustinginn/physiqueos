@@ -41,6 +41,8 @@ describe("server-only Phase Review application boundary", () => {
       "PHASE_REVIEW_GOAL_OWNERSHIP_MISMATCH"],
     ["stale store revision", (fixture) => ({ ...fixture.request, expectedStoreRevision: 6 }),
       "PHASE_REVIEW_ACTION_EXPECTED_REVISION_MISMATCH"],
+    ["stale Goal-aware recommendation", (fixture) => ({ ...fixture.request,
+      recommendationFingerprint: "sha256_stale" }), "PHASE_REVIEW_RECOMMENDATION_STALE"],
   ])("fails closed for %s", async (_name, arrange, code) => {
     const fixture = createFixture();
     const before = fs.readFileSync(fixture.file);
@@ -59,13 +61,12 @@ describe("server-only Phase Review application boundary", () => {
   });
 
   it.each([
-    ["Strategy", (store) => { store.phaseStrategies = []; },
-      "PHASE_REVIEW_ACTION_ACCEPTED_STRATEGY_REQUIRED"],
-    ["trajectory", (store) => { store.phaseExpectedTrajectories = []; },
-      "PHASE_REVIEW_ACTION_ACCEPTED_TRAJECTORY_REQUIRED"],
-  ])("requires an accepted %s before Begin", async (_name, arrange, code) => {
-    const fixture = createFixture({ arrange });
-    expect(await fixture.boundary.dryRun(fixture.request)).toMatchObject({ ok: false, code });
+    ["caloric target", (request) => ({ ...request, caloricIntakeTarget: null })],
+    ["activity target", (request) => ({ ...request, activityExpenditureTarget: null })],
+  ])("requires a confirmed %s before Begin", async (_name, arrange) => {
+    const fixture = createFixture();
+    expect(await fixture.boundary.dryRun(arrange(fixture.request))).toMatchObject({ ok: false,
+      code: "PHASE_REVIEW_ESTABLISHMENT_REQUIRED" });
     expect(fixture.lock.inspect().exists).toBe(false);
   });
 
@@ -246,7 +247,11 @@ function store() {
     phaseReviewDecisions: [], phaseReviewTransactions: [],
     phaseStrategies: [strategy(goalId)], phaseExpectedTrajectories: [trajectory(goalId)],
     phaseLifecycleReadModels: [], executionItems: [{ id: "execution-history", goalId }],
-    protocols: [{ id: "protocol" }], protocolVersions: [{ id: "protocol-version" }],
+    protocols: [{ id: "protocol", userId: "user_founder_001", protocolType: "energy",
+      category: "energy", status: "active", currentGoalIds: [goalId],
+      currentVersionId: "protocol-version", effectiveStrategy: { mode: "Maintenance Calibration" } }],
+    protocolVersions: [{ id: "protocol-version", protocolId: "protocol", versionNumber: 1,
+      status: "active" }],
     goalConfidenceSnapshots: [{ id: "snapshot", goalId, phaseId: "p1",
       currentAssessmentId: "confidence-p1", currentScore: 50, scoreBand: "uncertain",
       schemaVersion: "goal_confidence_snapshot_v2", evidenceCutoff: "2026-08-15T18:00:00.000Z" }],
@@ -319,7 +324,9 @@ function request() { return { goalId: "goal", currentPhaseId: "p1", decisionId: 
   selectedOutcome: "begin_next_phase", selectedDuration: null, selectedReviewAt: null,
   expectedPhaseRevision: 0, expectedStoreRevision: 7, idempotencyKey: "decision",
   originatingArtifactId: "artifact", approvalId: "approval", approvalToken: "secret",
-  milestoneId: "milestone", unresolvedReviewId: "review" }; }
+  milestoneId: "milestone", unresolvedReviewId: "review",
+  caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+  activityExpenditureTarget: { value: 800, unit: "kcal/day" } }; }
 function milestone(goalId, phaseId) { return { schemaVersion: "phase_review_milestone_v1",
   milestoneId: "milestone", goalId, phaseId, milestoneType: "planned_phase_review",
   reviewType: "phase_completion_review", requiredEvidence: [], eligibleArtifactTypes: ["dexa_event"],
@@ -329,7 +336,8 @@ function milestone(goalId, phaseId) { return { schemaVersion: "phase_review_mile
   resolvedReviewId: null, decisionRequired: true, recommendationRequired: true,
   consumed: false, lineage: [{ type: "test", id: "milestone" }], revision: 0 }; }
 function extendRequest(value) { return { ...value, selectedOutcome: "extend_current_phase",
-  selectedDuration: "1_week", selectedReviewAt: null }; }
+  selectedDuration: "1_week", selectedReviewAt: null,
+  caloricIntakeTarget: null, activityExpenditureTarget: null }; }
 function read(file) { return JSON.parse(fs.readFileSync(file, "utf8")); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function allFiles(directory) { return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

@@ -60,6 +60,10 @@ export function createPhaseReviewDecision(input = {}) {
       ? nonNegativeInteger(input.expectedStrategyRevision, "expectedStrategyRevision") : null,
     expectedTrajectoryRevision: selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE
       ? nonNegativeInteger(input.expectedTrajectoryRevision, "expectedTrajectoryRevision") : null,
+    phaseReadinessConclusion: input.phaseReadinessConclusion == null ? null : required(input.phaseReadinessConclusion, "phaseReadinessConclusion"),
+    recommendationFingerprint: input.recommendationFingerprint == null ? null : required(input.recommendationFingerprint, "recommendationFingerprint"),
+    phaseEstablishment: selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE && input.phaseEstablishment
+      ? normalizePhaseEstablishment(input.phaseEstablishment) : null,
     actorId: required(input.actorId, "actorId"),
   };
   if (selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE && !decision.nextPhaseId) {
@@ -70,6 +74,20 @@ export function createPhaseReviewDecision(input = {}) {
     throw new TypeError("An extension review date must follow the original planned review.");
   }
   return deepFreeze(decision);
+}
+
+function normalizePhaseEstablishment(value) {
+  if (!value || value.schemaVersion !== "phase_establishment_v1" ||
+      value.strategy?.status !== "accepted" || value.trajectory?.status !== "accepted") {
+    throw new TypeError("An accepted Phase establishment package is required to begin the next phase.");
+  }
+  for (const target of [value.executionTargets?.caloricIntake,
+    value.executionTargets?.activityExpenditure]) {
+    if (!Number.isInteger(target?.value) || target.unit !== "kcal/day") {
+      throw new TypeError("Phase establishment execution targets are invalid.");
+    }
+  }
+  return structuredClone(value);
 }
 
 export function extensionDurationDays(selection) {

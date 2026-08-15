@@ -131,6 +131,7 @@ describe("Phase Review Commit Coordinator", () => {
     expect(result).toMatchObject({ status: "failed", committed: false,
       reasonCode: "INJECTED_STARTING_FORECAST_FAILURE" });
     expect(result.rollbackEvents).toEqual([
+      PhaseReviewParticipantName.EXECUTION_TARGETS,
       PhaseReviewParticipantName.EXPECTED_TRAJECTORY,
       PhaseReviewParticipantName.STRATEGY,
       PhaseReviewParticipantName.NEXT_PHASE,
@@ -158,7 +159,7 @@ describe("Phase Review Commit Coordinator", () => {
       authorization: authorization(decision),
     });
     expect(result).toMatchObject({ status: "failed", committed: false, reasonCode: code });
-    expect(result.rollbackEvents).toHaveLength(8);
+    expect(result.rollbackEvents).toHaveLength(9);
     expect(fs.readFileSync(fixture.file)).toEqual(before);
   });
 
