@@ -141,8 +141,14 @@ export function snapshotDirectory(directory, { boundedContent = false } = {}) {
   const root = path.resolve(directory);
   const hash = createHash("sha256");
   let fileCount = 0;
+  let linkCount = 0;
   let totalBytes = 0;
-  walk(root, root, (file, stat, relative) => {
+  walk(root, root, (file, stat, relative, linkTarget) => {
+    if (linkTarget !== null) {
+      linkCount += 1;
+      hash.update(`LINK\0${relative}\0${linkTarget}\0${stat.mtimeMs}\0`);
+      return;
+    }
     fileCount += 1;
     totalBytes += stat.size;
     hash.update(`${relative}\0${stat.size}\0${stat.mtimeMs}\0`);
@@ -166,6 +172,7 @@ export function snapshotDirectory(directory, { boundedContent = false } = {}) {
     buildId: readStamp(root, "BUILD_ID"),
     sourceCommit: readStamp(root, "SOURCE_COMMIT"),
     fileCount,
+    linkCount,
     totalBytes,
     identitySha256: hash.digest("hex").toUpperCase(),
   });
@@ -206,10 +213,11 @@ function walk(root, directory, visitor) {
     const full = path.join(directory, entry.name);
     const stat = fs.lstatSync(full);
     if (stat.isSymbolicLink()) {
-      fail(PROVIDER_BUILD_ERROR.REPARSE_PATH_FORBIDDEN, `Protected identity traversal refuses reparse paths: ${full}`);
+      visitor(full, stat, path.relative(root, full).split(path.sep).join("/"), fs.readlinkSync(full));
+      continue;
     }
     if (stat.isDirectory()) walk(root, full, visitor);
-    else if (stat.isFile()) visitor(full, stat, path.relative(root, full).split(path.sep).join("/"));
+    else if (stat.isFile()) visitor(full, stat, path.relative(root, full).split(path.sep).join("/"), null);
   }
 }
 

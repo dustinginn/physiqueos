@@ -99,6 +99,16 @@ describe("provider build canonical-root guard", () => {
       ".next.release-999", ".next.recovery-extra",
     ]));
   });
+
+  it("snapshots retained recovery links as immutable metadata without following them", () => {
+    const fixture = createFixture();
+    const recovery = path.join(fixture.canonical, ".next.failed-overwrite-13560");
+    const target = path.join(fixture.root, "dependency-target");
+    fs.mkdirSync(target);
+    fs.symlinkSync(target, path.join(recovery, "dependency-link"), process.platform === "win32" ? "junction" : "dir");
+    const identity = captureWindowsBuildIdentity(fixture.canonical);
+    expect(identity.recovery[".next.failed-overwrite-13560"].linkCount).toBe(1);
+  });
 });
 
 describe("isolated provider preflight lifecycle contract", () => {
