@@ -132,6 +132,7 @@ describe("isolated provider preflight lifecycle contract", () => {
     expect(captureWindowsBuildIdentity(fixture.canonical)).toEqual(before);
     expect(fs.existsSync(path.join(fixture.isolated, ".provider-next", "BUILD_ID"))).toBe(true);
     expect(fs.existsSync(path.join(fixture.canonical, ".provider-next"))).toBe(false);
+    expect(fs.existsSync(path.join(result.artifactRoot, "web", "screenshots"))).toBe(false);
   });
 
   it("fails high-severity when a build runner mutates protected Windows state and never repairs it", async () => {
@@ -226,6 +227,8 @@ function createSyntheticNextBuild(destination) {
   fs.mkdirSync(path.join(destination, "static"), { recursive: true });
   fs.writeFileSync(path.join(destination, "BUILD_ID"), "provider-next-test");
   fs.writeFileSync(path.join(destination, "standalone", "server.js"), "safe");
+  fs.mkdirSync(path.join(destination, "standalone", "screenshots"));
+  fs.writeFileSync(path.join(destination, "standalone", "screenshots", "private.png"), "forbidden");
   fs.writeFileSync(path.join(destination, "static", "asset.js"), "safe");
   fs.writeFileSync(path.join(destination, "routes-manifest.json"), JSON.stringify({ staticRoutes: [{ page: "/" }] }));
 }

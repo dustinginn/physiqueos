@@ -80,12 +80,25 @@ export async function runIsolatedProviderBuild({
 }
 
 function assembleWebArtifact({ sourceRoot, distRoot, distDir, webRoot }) {
-  copyTree(path.join(distRoot, "standalone"), webRoot);
+  copyTree(path.join(distRoot, "standalone"), webRoot, providerWebFilter);
   const publicRoot = path.join(sourceRoot, "public");
   if (fs.existsSync(publicRoot)) {
     copyTree(publicRoot, path.join(webRoot, "public"), (relative) => relative !== "mockup-home.png");
   }
   copyTree(path.join(distRoot, "static"), path.join(webRoot, path.basename(distDir), "static"));
+}
+
+function providerWebFilter(relative) {
+  const normalized = relative.replaceAll("\\", "/");
+  const root = normalized.split("/")[0].toLowerCase();
+  if (new Set([
+    ".tmp", "backups", "logs", "playwright-report", "private", "runtime-exports",
+    "screenshots", "scripts", "test-results", "tests", "tmp",
+  ]).has(root)) return false;
+  if (/^\.env(?:\.|$)/i.test(path.basename(normalized))) return false;
+  if (/^src\/(?:data\/(?:founderSeed|seed)|fixtures)(?:\/|$)/i.test(normalized)) return false;
+  if (/^src\/(?:features\/dashboard|lib\/mockData\.js|models\/UserProfile\.js)$/i.test(normalized)) return false;
+  return true;
 }
 
 function copyTree(source, destination, filter = () => true, relativeRoot = "") {
