@@ -149,7 +149,7 @@ describe("reprocessPendingReviewInPlace", () => {
 
     const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
 
-    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("pending-review-parser-v4");
+    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("pending-review-parser-v5");
     expect(result).toMatchObject({ changed: true, idempotent: false });
     expect(result.review.reprocessing.version).toBe(PENDING_REVIEW_REPROCESS_VERSION);
     expect(result.review.reprocessing.sourceArtifactFingerprint).toBe(previousSourceFingerprint);

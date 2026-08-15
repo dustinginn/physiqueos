@@ -75,15 +75,20 @@ MUSCLE BALANCE REPORT
 `;
 
 describe("BodySpec PDF interpretation", () => {
-  it("loads the Node geometry dependency before PDF.js in a standalone-like runtime", async () => {
-    const previous = globalThis.DOMMatrix;
+  it("loads Node geometry and fake-worker dependencies before PDF.js in a bundled runtime", async () => {
+    const previousMatrix = globalThis.DOMMatrix;
+    const previousWorker = globalThis.pdfjsWorker;
     Reflect.deleteProperty(globalThis, "DOMMatrix");
+    Reflect.deleteProperty(globalThis, "pdfjsWorker");
     try {
       await preparePdfJsTextExtractionRuntime();
       expect(typeof globalThis.DOMMatrix).toBe("function");
+      expect(globalThis.pdfjsWorker?.WorkerMessageHandler).toBeTruthy();
     } finally {
-      if (previous) globalThis.DOMMatrix = previous;
+      if (previousMatrix) globalThis.DOMMatrix = previousMatrix;
       else Reflect.deleteProperty(globalThis, "DOMMatrix");
+      if (previousWorker) globalThis.pdfjsWorker = previousWorker;
+      else Reflect.deleteProperty(globalThis, "pdfjsWorker");
     }
   });
 

@@ -6,7 +6,7 @@ import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerc
 
 // Increment intentionally when a parser correction should make retained pending
 // evidence eligible for one new bounded interpretation.
-export const PENDING_REVIEW_REPROCESS_VERSION = "pending-review-parser-v4";
+export const PENDING_REVIEW_REPROCESS_VERSION = "pending-review-parser-v5";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {

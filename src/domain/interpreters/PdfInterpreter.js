@@ -4,21 +4,29 @@ import { assertValidDexaScan } from "../services/DEXAContract";
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
-export const BODYSPEC_PDF_INTERPRETER_VERSION = "bodyspec-pdf-v3";
+export const BODYSPEC_PDF_INTERPRETER_VERSION = "bodyspec-pdf-v4";
 export const PDF_TEXT_EXTRACTION_ENGINE = "pdfjs-dist@6.1.200";
 
 export async function preparePdfJsTextExtractionRuntime() {
-  if (typeof globalThis.DOMMatrix === "function") return;
+  if (typeof globalThis.DOMMatrix !== "function") {
+    const geometryModule = await import("@napi-rs/canvas/geometry.js");
+    const DOMMatrixImplementation =
+      geometryModule.DOMMatrix ?? geometryModule.default?.DOMMatrix;
 
-  const geometryModule = await import("@napi-rs/canvas/geometry.js");
-  const DOMMatrixImplementation =
-    geometryModule.DOMMatrix ?? geometryModule.default?.DOMMatrix;
+    if (typeof DOMMatrixImplementation !== "function") {
+      throw new Error("PDF.js DOMMatrix support is unavailable.");
+    }
 
-  if (typeof DOMMatrixImplementation !== "function") {
-    throw new Error("PDF.js DOMMatrix support is unavailable.");
+    globalThis.DOMMatrix = DOMMatrixImplementation;
   }
 
-  globalThis.DOMMatrix = DOMMatrixImplementation;
+  if (!globalThis.pdfjsWorker?.WorkerMessageHandler) {
+    const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    if (!workerModule.WorkerMessageHandler) {
+      throw new Error("PDF.js worker support is unavailable.");
+    }
+    globalThis.pdfjsWorker = workerModule;
+  }
 }
 
 export async function extractPdfText(buffer) {
