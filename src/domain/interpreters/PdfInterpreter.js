@@ -4,6 +4,22 @@ import { assertValidDexaScan } from "../services/DEXAContract";
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
+export const BODYSPEC_PDF_INTERPRETER_VERSION = "bodyspec-pdf-v3";
+export const PDF_TEXT_EXTRACTION_ENGINE = "pdfjs-dist@6.1.200";
+
+export async function preparePdfJsTextExtractionRuntime() {
+  if (typeof globalThis.DOMMatrix === "function") return;
+
+  const geometryModule = await import("@napi-rs/canvas/geometry.js");
+  const DOMMatrixImplementation =
+    geometryModule.DOMMatrix ?? geometryModule.default?.DOMMatrix;
+
+  if (typeof DOMMatrixImplementation !== "function") {
+    throw new Error("PDF.js DOMMatrix support is unavailable.");
+  }
+
+  globalThis.DOMMatrix = DOMMatrixImplementation;
+}
 
 export async function extractPdfText(buffer) {
   if (!buffer?.length) {
@@ -11,6 +27,7 @@ export async function extractPdfText(buffer) {
   }
 
   try {
+    await preparePdfJsTextExtractionRuntime();
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const document = await getDocument({
       data: new Uint8Array(buffer),
@@ -102,6 +119,8 @@ export async function interpretPdfEvidence(evidence = {}) {
       },
       provenance: {
         extraction_engine: "pdfjs-dist",
+        extraction_engine_version: PDF_TEXT_EXTRACTION_ENGINE,
+        interpreter_version: BODYSPEC_PDF_INTERPRETER_VERSION,
         fixture: false,
         source_artifact_refs: [artifact.fileName],
       },
@@ -140,10 +159,8 @@ export async function interpretPdfEvidence(evidence = {}) {
 }
 
 export function parseBodySpecDexaText(text = "") {
-  const normalized = String(text).replace(/\u00a0/g, " ");
-  const measuredHeader = normalized.match(
-    /Measured Date[\s\S]{0,180}?\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])\/(20\d{2})\b/i
-  );
+  const normalized = normalizeBodySpecText(text);
+  const measuredHeader = findMeasuredDate(normalized);
   if (!measuredHeader) {
     return failed("BodySpec measured date was not found.");
   }
@@ -273,7 +290,7 @@ export function createDexaEvidencePackageFromScans(scans, { diagnostics = [] } =
     detected_evidence_objects: scans.length ? [{ evidence_type: "dexa_scan", canonical_name: "DEXAScan", count: scans.length }] : [],
     detected_evidence_type_confidence: scans.length ? "high" : "low",
     captured_at: capturedAt,
-    interpreter: { name: "PhysiqueOS BodySpec PDF Interpreter", version: "bodyspec-pdf-v2", provider: "internal", model: null },
+    interpreter: { name: "PhysiqueOS BodySpec PDF Interpreter", version: BODYSPEC_PDF_INTERPRETER_VERSION, provider: "internal", model: null },
     quality: {
       extraction_confidence: scans.length ? "high" : "low",
       interpreter_confidence: scans.length ? "high" : "low",
@@ -321,6 +338,27 @@ function section(text, start, end) {
   if (from < 0) return "";
   const to = text.toUpperCase().indexOf(end.toUpperCase(), from + start.length);
   return text.slice(from, to < 0 ? undefined : to);
+}
+function normalizeBodySpecText(text) {
+  return String(text)
+    .normalize("NFKC")
+    .replace(/[\u00a0\u2007\u202f]/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\t ]+/g, " ");
+}
+function findMeasuredDate(text) {
+  const summaryIndex = text.toUpperCase().indexOf("SUMMARY RESULTS");
+  const preSummary = summaryIndex >= 0 ? text.slice(0, summaryIndex) : text;
+  const measuredDateHeader = /(?:^|\n)[^\n]*\bMeasured\s+Date\b[^\n]*(?:\n|$)/gi;
+  const headers = [...preSummary.matchAll(measuredDateHeader)];
+  const header = headers.at(-1);
+  if (!header) return null;
+  const candidateBlock = preSummary.slice(header.index, header.index + 500);
+  const dates = [...candidateBlock.matchAll(
+    /\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])\/((?:19|20)\d{2})\b/g
+  )];
+  if (/\bBirth\s+Date\b/i.test(header[0]) && dates.length < 2) return null;
+  return dates.at(-1) ?? null;
 }
 function dateRegex(month, day, year) {
   return `0?${Number(month)}\\/0?${Number(day)}\\/${year}`;

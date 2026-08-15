@@ -149,7 +149,7 @@ describe("reprocessPendingReviewInPlace", () => {
 
     const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
 
-    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("training-pending-review-parser-v3");
+    expect(PENDING_REVIEW_REPROCESS_VERSION).toBe("pending-review-parser-v4");
     expect(result).toMatchObject({ changed: true, idempotent: false });
     expect(result.review.reprocessing.version).toBe(PENDING_REVIEW_REPROCESS_VERSION);
     expect(result.review.reprocessing.sourceArtifactFingerprint).toBe(previousSourceFingerprint);
@@ -466,6 +466,98 @@ Skull crushers
     state.review.commitProgress = { canonical_commit: { status: "completed" } };
     await expect(createPendingEvidenceReviewReprocessingService({ repositories: state.repositories }).reprocessPendingReviewInPlace(REVIEW_ID)).rejects.toMatchObject({ code: "REVIEW_ALREADY_APPLIED" });
     expect(state.changes).toHaveLength(0);
+  });
+
+  it("refuses to overwrite a DEXA candidate the user already corrected", async () => {
+    const state = fixture();
+    state.review.interpretedEvidence.evidence_objects = [{
+      id: "dexa_review_candidate",
+      evidence_type: "dexa_scan",
+      measuredAt: "2032-02-14",
+      parser_confidence: "user_corrected",
+    }];
+    await expect(
+      createPendingEvidenceReviewReprocessingService({ repositories: state.repositories })
+        .reprocessPendingReviewInPlace(REVIEW_ID)
+    ).rejects.toMatchObject({ code: "DEXA_REPROCESS_USER_CORRECTIONS_PRESENT" });
+    expect(state.changes).toHaveLength(0);
+  });
+
+  it("reprocesses a dedicated DEXA review from its retained source without creating a package", async () => {
+    const reviewId = "evidence_review_dexa_pending";
+    const packageId = "dexa_submission_review";
+    const sourceArtifact = {
+      id: "private/founder/dexa/uploads/report.pdf",
+      kind: "pdf",
+      storage_path: "private/founder/dexa/uploads/report.pdf",
+    };
+    const review = {
+      id: reviewId,
+      userId: "founder",
+      source: "dedicated_dexa",
+      status: "pending",
+      createdAt: "2032-02-14T10:00:00.000Z",
+      updatedAt: "2032-02-14T10:00:00.000Z",
+      interpretedEvidence: {
+        package_id: packageId,
+        provenance: { source_artifacts: [sourceArtifact] },
+        evidence_objects: [{
+          id: "dexa_unresolved",
+          evidence_type: "dexa_scan",
+          measuredAt: null,
+          parser_confidence: "low",
+        }],
+      },
+      evidenceTypes: ["dexa_scan"],
+      confirmation: null,
+      commitProgress: {},
+      itemDecisions: {},
+    };
+    const changes = [];
+    const repositories = {
+      evidenceReviews: createEvidenceReviewRepository([review], {
+        onChange: (name) => changes.push(name),
+      }),
+      evidencePackages: createEvidencePackageRepository([]),
+      canonicalEvidence: { listCanonicalEvidenceObjects: vi.fn(async () => []) },
+    };
+    const reinterpret = vi.fn(async () => ({
+      package_id: "temporary_dexa_package",
+      quality: { status: "rich" },
+      provenance: { source_artifacts: [sourceArtifact] },
+      evidence_objects: [{
+        id: "dexa_parsed",
+        evidence_type: "dexa_scan",
+        measuredAt: "2032-02-14",
+        observed_at: "2032-02-14",
+        parser_confidence: "high",
+      }],
+    }));
+
+    const result = await createPendingEvidenceReviewReprocessingService({
+      repositories,
+      reinterpret,
+      now: clock(),
+    }).reprocessPendingReviewInPlace(reviewId);
+
+    expect(result.review).toMatchObject({
+      id: reviewId,
+      status: "pending",
+      confirmation: null,
+      interpretedEvidence: {
+        package_id: packageId,
+        evidence_objects: [{
+          measuredAt: "2032-02-14",
+          parser_confidence: "high",
+        }],
+      },
+    });
+    expect(reinterpret).toHaveBeenCalledWith(expect.objectContaining({
+      evidencePackage: expect.objectContaining({ package_id: packageId }),
+      review: expect.objectContaining({ id: reviewId }),
+    }));
+    expect(await repositories.evidencePackages.getEvidencePackageById(packageId)).toBeNull();
+    expect(changes).toEqual(["evidenceReviews", "evidenceReviews"]);
   });
 
   it("rejects missing packages and active claims", async () => {

@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractPdfText, interpretPdfEvidence, parseBodySpecDexaText } from "./PdfInterpreter";
+import {
+  BODYSPEC_PDF_INTERPRETER_VERSION,
+  PDF_TEXT_EXTRACTION_ENGINE,
+  extractPdfText,
+  interpretPdfEvidence,
+  parseBodySpecDexaText,
+  preparePdfJsTextExtractionRuntime,
+} from "./PdfInterpreter";
 
 const retainedPdf = path.join(
   process.cwd(),
@@ -38,7 +45,88 @@ Total 1.238 0.4 0.4
 MUSCLE BALANCE REPORT
 `;
 
+const SYNTHETIC_CURRENT_BODY_SPEC_TEXT = `
+Report Generated 3/1/2032
+Client Sex Birth Date Intake Height Intake Weight Measured Date
+Synthetic Person Female 6/7/2004 68.0 in. 180.0 lbs. 2/14/2032
+SUMMARY    RESULTS
+This table provides an overview of total body composition.
+Bone Mineral
+Measured Date Total Body Fat % Total Mass (lbs) Fat Tissue (lbs) Lean Tissue (lbs)
+Content (BMC)
+2/14/2032   14.2%   180.4   25.6   147.2   7.6
+1/10/2032   14.8%   179.9   26.6   145.7   7.6
+REGIONAL ASSESSMENT
+Region % Fat Total Mass Fat Mass Lean Mass BMC
+Arms 13.0% 25.0 3.3 20.6 1.1
+Legs 16.0% 62.0 9.9 49.1 3.0
+Trunk 13.0% 83.0 10.8 70.0 2.2
+Android 12.4% 11.0 1.4 9.4 0.2
+Gynoid 15.6% 27.0 4.2 22.1 0.7
+Total 14.2% 180.4 25.6 147.2 7.6
+SUPPLEMENTAL    RESULTS
+Resting Metabolic Rate (RMR) Android (A) Gynoid (G) A/G Ratio
+1,888 cal/day   12.4%   15.6%   0.79
+VAT BONE REPORT
+Mass (lbs) 0.22
+Volume (in 3) 6.44
+Total 1.250 0.5 0.7
+MUSCLE BALANCE REPORT
+`;
+
 describe("BodySpec PDF interpretation", () => {
+  it("loads the Node geometry dependency before PDF.js in a standalone-like runtime", async () => {
+    const previous = globalThis.DOMMatrix;
+    Reflect.deleteProperty(globalThis, "DOMMatrix");
+    try {
+      await preparePdfJsTextExtractionRuntime();
+      expect(typeof globalThis.DOMMatrix).toBe("function");
+    } finally {
+      if (previous) globalThis.DOMMatrix = previous;
+      else Reflect.deleteProperty(globalThis, "DOMMatrix");
+    }
+  });
+
+  it("parses the current BodySpec layout without confusing birth or report dates for the scan date", () => {
+    const result = parseBodySpecDexaText(SYNTHETIC_CURRENT_BODY_SPEC_TEXT);
+    expect(result).toMatchObject({
+      status: "complete",
+      measuredAt: "2032-02-14",
+      values: {
+        totalMass: { value: 180.4, unit: "lb" },
+        bodyFatPercentage: 14.2,
+        fatMass: { value: 25.6, unit: "lb" },
+        leanMass: { value: 147.2, unit: "lb" },
+        boneMineralContent: { value: 7.6, unit: "lb" },
+        restingMetabolicRate: { value: 1888, unit: "kcal/day" },
+        visceralAdiposeTissue: {
+          mass: { value: 0.22, unit: "lb" },
+          volume: { value: 6.44, unit: "in3" },
+        },
+      },
+    });
+  });
+
+  it("keeps the measured date unknown when a demographic header has only a birth date", () => {
+    const result = parseBodySpecDexaText(`
+Client Sex Birth Date Intake Height Intake Weight Measured Date
+Synthetic Person Female 6/7/2004 68.0 in. 180.0 lbs.
+SUMMARY RESULTS
+6/7/2004 14.2 180.4 25.6 147.2 7.6
+REGIONAL ASSESSMENT
+`);
+    expect(result).toMatchObject({ status: "failed", measuredAt: null });
+  });
+
+  it("normalizes Unicode spacing but rejects unrelated numeric text", () => {
+    const normalized = parseBodySpecDexaText(
+      SYNTHETIC_CURRENT_BODY_SPEC_TEXT.replaceAll(" ", "\u202f")
+    );
+    expect(normalized.measuredAt).toBe("2032-02-14");
+    expect(parseBodySpecDexaText("Invoice 2/14/2032 total 180.4 reference 1888"))
+      .toMatchObject({ status: "failed", values: null });
+  });
+
   it("selects the report date and current summary rather than the historical row", () => {
     const result = parseBodySpecDexaText(SCRUBBED_BODY_SPEC_TEXT);
     expect(result.status).toBe("complete");
@@ -101,5 +189,9 @@ describe("BodySpec PDF interpretation", () => {
       },
     });
     expect(result.scan.provenance).toMatchObject({ extraction_engine: "pdfjs-dist", fixture: false });
+    expect(result.scan.provenance).toMatchObject({
+      extraction_engine_version: PDF_TEXT_EXTRACTION_ENGINE,
+      interpreter_version: BODYSPEC_PDF_INTERPRETER_VERSION,
+    });
   });
 });

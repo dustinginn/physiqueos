@@ -1,5 +1,9 @@
 import { createDEXAScan } from "../models/dexaScan";
-import { interpretPdfEvidence } from "../interpreters/PdfInterpreter";
+import {
+  BODYSPEC_PDF_INTERPRETER_VERSION,
+  PDF_TEXT_EXTRACTION_ENGINE,
+  interpretPdfEvidence,
+} from "../interpreters/PdfInterpreter";
 
 export const MAX_DEXA_PDF_BYTES = 50 * 1024 * 1024;
 
@@ -120,6 +124,8 @@ function createUnresolvedCandidate({ capturedAt, originalFileName, sourcePath, s
     },
     provenance: {
       extraction_engine: "pdfjs-dist",
+      extraction_engine_version: PDF_TEXT_EXTRACTION_ENGINE,
+      interpreter_version: BODYSPEC_PDF_INTERPRETER_VERSION,
       fixture: false,
       source_artifact_refs: [sourcePath],
     },

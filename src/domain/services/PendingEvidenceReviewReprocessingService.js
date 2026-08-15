@@ -6,7 +6,7 @@ import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerc
 
 // Increment intentionally when a parser correction should make retained pending
 // evidence eligible for one new bounded interpretation.
-export const PENDING_REVIEW_REPROCESS_VERSION = "training-pending-review-parser-v3";
+export const PENDING_REVIEW_REPROCESS_VERSION = "pending-review-parser-v4";
 
 export class PendingEvidenceReviewReprocessError extends Error {
   constructor(code, message) {
@@ -26,8 +26,10 @@ export function createPendingEvidenceReviewReprocessingService({
     async reprocessPendingReviewInPlace(reviewId) {
       const review = await repositories.evidenceReviews.getReviewById(reviewId);
       assertEligibleReview(review);
+      assertNoUserCorrectedDexaCandidate(review);
       const packageId = review.interpretedEvidence?.package_id;
-      const evidencePackage = await repositories.evidencePackages.getEvidencePackageById(packageId);
+      const persistedPackage = await repositories.evidencePackages.getEvidencePackageById(packageId);
+      const evidencePackage = persistedPackage ?? resolveDedicatedDexaSourcePackage(review);
       if (!evidencePackage) fail("PACKAGE_NOT_FOUND", "The evidence package for this review was not found.");
       if (evidencePackage.package_id !== packageId) fail("PACKAGE_LINK_MISMATCH", "The review and evidence package linkage is inconsistent.");
       assertRetainedSources(evidencePackage);
@@ -281,6 +283,29 @@ function assertEligibleReview(review) {
   if (review.reprocessing?.status === "in_progress") fail("REPROCESS_IN_PROGRESS", "This evidence review is already being reprocessed.");
   if (/historical|immutable/i.test(review.source ?? "")) fail("REVIEW_IMMUTABLE", "Historical or immutable evidence reviews cannot be reprocessed in place.");
   if (!review.interpretedEvidence?.package_id) fail("PACKAGE_LINK_MISSING", "The evidence review does not reference an evidence package.");
+}
+
+function assertNoUserCorrectedDexaCandidate(review) {
+  const correctedDexa = (review.interpretedEvidence?.evidence_objects ?? []).find(
+    (object) =>
+      ["dexa_scan", "dexa", "body_composition"].includes(object.evidence_type) &&
+      object.parser_confidence === "user_corrected"
+  );
+  if (correctedDexa) {
+    fail(
+      "DEXA_REPROCESS_USER_CORRECTIONS_PRESENT",
+      "Reprocessing cannot replace DEXA measurements that the user already corrected."
+    );
+  }
+}
+
+function resolveDedicatedDexaSourcePackage(review) {
+  if (review.source !== "dedicated_dexa") return null;
+  if (review.interpretedEvidence?.package_id &&
+      Array.isArray(review.interpretedEvidence?.provenance?.source_artifacts)) {
+    return structuredClone(review.interpretedEvidence);
+  }
+  return null;
 }
 
 function assertRetainedSources(evidencePackage) {
