@@ -169,6 +169,24 @@ describe("isolated provider preflight lifecycle contract", () => {
     expect(guardSource).not.toMatch(/spawn(?:Sync)?\s*\(/);
     expect(guardSource).not.toContain("deployPhysiqueOS.ps1");
   });
+
+  it("refuses a shared dependency junction before launching the real Next build", async () => {
+    const fixture = createFixture({ gitIsolated: true });
+    const shared = path.join(fixture.root, "shared-node-modules");
+    fs.mkdirSync(shared);
+    fs.symlinkSync(shared, path.join(fixture.isolated, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+    const runtime = runtimeIdentity(fixture.canonical);
+    await expect(runIsolatedProviderBuild({
+      canonicalRoot: fixture.canonical,
+      isolatedRoot: fixture.isolated,
+      sourceCommit: fixture.commit,
+      providerBuildId: "compat-test",
+      distDir: ".provider-next",
+      artifactDir: ".provider-artifacts",
+      runtimeReader: async () => runtime,
+    })).rejects.toMatchObject({ code: "PROVIDER_BUILD_TOOLCHAIN_REPARSE_FORBIDDEN" });
+    expect(fs.existsSync(path.join(fixture.isolated, ".provider-next"))).toBe(false);
+  });
 });
 
 function createFixture({ gitIsolated = false } = {}) {

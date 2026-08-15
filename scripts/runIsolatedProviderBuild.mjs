@@ -103,7 +103,7 @@ function copyTree(source, destination, filter = () => true, relativeRoot = "") {
 }
 
 function runNextBuild({ sourceRoot, canonicalRoot, isolatedRoot, sourceCommit, providerBuildId, distDir }) {
-  const next = resolveNextCli(sourceRoot, canonicalRoot);
+  const next = resolveNextCli(sourceRoot);
   const result = spawnSync(process.execPath, [next, "build", "--webpack"], {
     cwd: sourceRoot,
     env: {
@@ -162,12 +162,15 @@ function git(cwd, args) {
   return result.stdout.trim();
 }
 
-function resolveNextCli(sourceRoot, canonicalRoot) {
-  for (const root of [sourceRoot, canonicalRoot]) {
-    const candidate = path.join(root, "node_modules", "next", "dist", "bin", "next");
-    if (fs.existsSync(candidate)) return candidate;
+function resolveNextCli(sourceRoot) {
+  const dependencyRoot = path.join(sourceRoot, "node_modules");
+  if (fs.existsSync(dependencyRoot) && fs.lstatSync(dependencyRoot).isSymbolicLink()) {
+    throw coded("PROVIDER_BUILD_TOOLCHAIN_REPARSE_FORBIDDEN",
+      "The isolated provider checkout must have a physical node_modules tree, not a junction or symbolic link.");
   }
-  throw coded("PROVIDER_BUILD_TOOLCHAIN_MISSING", "The pinned Next CLI is unavailable.");
+  const candidate = path.join(dependencyRoot, "next", "dist", "bin", "next");
+  if (fs.existsSync(candidate)) return candidate;
+  throw coded("PROVIDER_BUILD_TOOLCHAIN_MISSING", "The pinned Next CLI is unavailable inside the isolated checkout.");
 }
 
 function assertIsolatedOutput(sourceRoot, artifactRoot, distRoot) {
