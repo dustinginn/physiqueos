@@ -14,6 +14,7 @@ describe("typed destination registry", () => {
     ["/profile/protocols/protocol-1?from=operating-plan", DestinationId.OPERATING_PLAN_SUPPORT, { supportType: "protocol", supportId: "protocol-1" }],
     ["/priorities/priority-1", DestinationId.PRIORITY_DETAIL, { priorityId: "priority-1" }],
     ["/briefings/review/briefing-1", DestinationId.BRIEFING_DETAIL, { briefingId: "briefing-1" }],
+    ["/briefings/dexa/canonical-scan-1", DestinationId.BRIEFING_DETAIL, { briefingId: "canonical-scan-1", briefingType: "dexa" }],
     ["/briefings/review", DestinationId.BRIEFING_LIST, {}],
     ["/briefing/daily", DestinationId.BRIEFING_LIST, {}],
     ["/progress/training/session/session-1", DestinationId.TRAINING_SESSION, { sessionId: "session-1" }],
@@ -30,6 +31,9 @@ describe("typed destination registry", () => {
   it("maps destinations back to current web routes", () => {
     expect(destinationToWebHref(createDestination(DestinationId.TRAINING_SESSION, { sessionId: "session 1" }))).toBe("/progress/training/session/session%201");
     expect(destinationToWebHref(createDestination(DestinationId.OPERATING_PLAN_SUPPORT, { supportType: "tracking", supportId: "current" }))).toBe("/profile/operating-plan/tracking");
+    expect(destinationToWebHref(destinationFromWebHref("/briefings/dexa/canonical-scan-1"))).toBe("/briefings/dexa/canonical-scan-1");
+    expect(destinationToWebHref(destinationFromWebHref("/briefings/review/briefing-1"))).toBe("/briefings/review/briefing-1");
+    expect(destinationToWebHref(destinationFromWebHref("/briefings/dexa/canonical-scan-1"))).not.toBe("/briefings/review/canonical-scan-1");
   });
 
   it("rejects unknown and incomplete destinations", () => {

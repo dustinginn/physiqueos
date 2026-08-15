@@ -66,6 +66,13 @@ export function destinationFromWebHref(href) {
   if (path === "/goals/transition" || path.startsWith("/goals/transition/")) return createDestination(DestinationId.GOAL_TRANSITION);
   if (path === "/evidence/photos") return createDestination(DestinationId.PHOTO_UPLOAD);
   if (path === "/evidence/dexa") return createDestination(DestinationId.DEXA_UPLOAD);
+  const dexaBriefing = path.match(/^\/briefings\/dexa\/([^/]+)$/);
+  if (dexaBriefing) {
+    return createDestination(DestinationId.BRIEFING_DETAIL, {
+      briefingId: decodeURIComponent(dexaBriefing[1]),
+      briefingType: "dexa",
+    });
+  }
   const protocol = path.match(/^\/profile\/protocols\/([^/]+)$/);
   if (protocol) return createDestination(DestinationId.OPERATING_PLAN_SUPPORT, { supportType: "protocol", supportId: decodeURIComponent(protocol[1]) });
   const support = path.match(/^\/profile\/operating-plan\/(?!strategy\/)([^/]+)(?:\/(.+))?$/);
@@ -78,7 +85,7 @@ export function destinationFromWebHref(href) {
     [/^\/profile\/operating-plan\/strategy\/([^/]+)\/([^/]+)$/, DestinationId.OPERATING_PLAN_STRATEGY, ["strategyType", "strategyId"]],
     [/^\/priorities\/([^/]+)$/, DestinationId.PRIORITY_DETAIL, "priorityId"],
     [/^\/briefings\/review\/([^/]+)$/, DestinationId.BRIEFING_DETAIL, "briefingId"],
-    [/^\/briefings\/(?:weekly|midweek|monthly|dexa|photo)(?:\/([^/]+))?$/, DestinationId.BRIEFING_DETAIL, "briefingId"],
+    [/^\/briefings\/(?:weekly|midweek|monthly|photo)(?:\/([^/]+))?$/, DestinationId.BRIEFING_DETAIL, "briefingId"],
     [/^\/progress\/training\/session\/([^/]+)$/, DestinationId.TRAINING_SESSION, "sessionId"],
     [/^\/progress\/training\/library\/(?:.*\/)?([^/]+)$/, DestinationId.TRAINING_EXERCISE, "exerciseId"],
     [/^\/progress(?:\/(.+))?$/, DestinationId.PROGRESS_STREAM, "streamId"],
@@ -111,7 +118,10 @@ export function destinationToWebHref(destination) {
         ? `/profile/protocols/${segment(parameters.supportId)}`
         : `/profile/operating-plan/${segment(parameters.supportType)}${parameters.supportId === "current" ? "" : `/${encodePath(parameters.supportId)}`}`;
     case DestinationId.PRIORITY_DETAIL: return `/priorities/${segment(parameters.priorityId)}`;
-    case DestinationId.BRIEFING_DETAIL: return `/briefings/review/${segment(parameters.briefingId)}`;
+    case DestinationId.BRIEFING_DETAIL:
+      return parameters.briefingType === "dexa"
+        ? `/briefings/dexa/${segment(parameters.briefingId)}`
+        : `/briefings/review/${segment(parameters.briefingId)}`;
     case DestinationId.BRIEFING_LIST: return "/briefings/review";
     case DestinationId.TRAINING_SESSION: return `/progress/training/session/${segment(parameters.sessionId)}`;
     case DestinationId.TRAINING_EXERCISE: return `/progress/training/library/${segment(parameters.exerciseId)}`;
