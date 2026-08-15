@@ -8,6 +8,14 @@ function canonicalSession(date = "2026-07-11") {
 }
 
 describe("CanonicalPhotoSessionReadService", () => {
+  it("routes migrated canonical media references through the private evidence boundary", () => {
+    const canonical = canonicalSession("2026-08-14");
+    const objectId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
+    canonical.payload.photos[0].storage_path = `media://${objectId}`;
+    const session = createPhotoSessionReadModels({ canonicalObjects: [canonical] })[0];
+    expect(session.views.find((view) => view.canonicalViewId === "front").imageUrl).toBe(`/api/private-evidence/media/${objectId}`);
+  });
+
   it("prefers the stable canonical session identity when duplicate records share the same assets", () => {
     const stable = canonicalSession("2026-07-18");
     stable.canonicalId = "photo_session_user_founder_001_2026-07-18";

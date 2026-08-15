@@ -12,6 +12,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "node:crypto";
+import { requirePrivateMediaObjectId } from "../../contracts/v1/mediaIdentifiers.js";
 
 const MAX_READ_SECONDS = 300;
 const MAX_UPLOAD_PART_SECONDS = 900;
@@ -100,8 +101,14 @@ async function hashBody(body) {
 }
 
 export function createPrivateObjectKey(ownerUserId, objectId) {
-  if (!/^[A-Za-z0-9._:-]+$/.test(ownerUserId) || !/^[A-Za-z0-9._:-]+$/.test(objectId)) throw new Error("Private object identity is invalid.");
-  return `private/${ownerUserId}/${objectId}/original`;
+  if (!/^[A-Za-z0-9._:-]+$/.test(ownerUserId)) throw new Error("Private object identity is invalid.");
+  let acceptedObjectId;
+  try {
+    acceptedObjectId = requirePrivateMediaObjectId(objectId);
+  } catch {
+    throw new Error("Private object identity is invalid.");
+  }
+  return `private/${ownerUserId}/${acceptedObjectId}/original`;
 }
 
 function normalizeParts(parts) {

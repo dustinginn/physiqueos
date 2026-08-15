@@ -7,6 +7,7 @@ export default defineConfig({
       "scripts/deployPhysiqueOS.test.js",
       "scripts/providerBuildSafety.test.js",
       "src/app/api/health/route.test.js",
+      "src/app/api/private-evidence/[...path]/route.test.js",
       "src/application/media/AuthorizedMediaService.test.js",
       "src/application/read-models/Phase3ReadModelService.test.js",
       "src/application/read-models/WebParityComposition.test.js",

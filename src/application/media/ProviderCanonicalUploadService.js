@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
+import { createPrivateMediaReference } from "../../contracts/v1/mediaIdentifiers.js";
 import { createUploadIntent } from "../../platform/object-storage/privateObjectContracts.js";
 import { createPostgresObjectStore } from "../../platform/database/PostgresObjectStore.js";
 
@@ -83,7 +84,7 @@ export function createProviderCanonicalUploadService({
         });
         return Object.freeze({
           objectId: intent.objectId,
-          reference: `media://${intent.objectId}`,
+          reference: createPrivateMediaReference(intent.objectId),
           contentType,
           byteLength: buffer.length,
           sha256,

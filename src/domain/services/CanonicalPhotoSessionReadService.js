@@ -1,5 +1,6 @@
 import { getProgressPhotoCategoryId, getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabulary";
 import { composeGalleryInterpretation } from "./GalleryInterpretationService";
+import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
 
 const POSE_ORDER = ["front-relaxed", "back-relaxed", "back-flexed", "side-relaxed", "left-side-relaxed", "right-side-relaxed", "front-flexed"];
 const INACTIVE = new Set(["duplicate", "superseded", "inactive"]);
@@ -329,7 +330,7 @@ function createSessionFingerprint(assets) { const keys=assets.map((asset)=>stabl
 function stableAssetKey(pathValue,hashes=[]) { const hash=(hashes??[]).find(Boolean);if(hash)return `hash:${hash}`;return pathValue?`path:${String(pathValue).toLowerCase().replaceAll("\\","/")}`:null; }
 function hashText(value) { let hash=2166136261;for(const char of String(value)){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(36); }
 function mostCommon(values) { const counts=new Map();values.forEach((value)=>counts.set(value,(counts.get(value)??0)+1));return [...counts.entries()].sort((left,right)=>right[1]-left[1]||left[0].localeCompare(right[0]))[0]?.[0]??null; }
-function privateHref(value) { if (!value) return null; const media=String(value).match(/^media:\/\/([0-9a-f-]+)$/i);return media?`/api/private-evidence/media/${media[1]}`:`/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
+function privateHref(value) { if (!value) return null; const mediaId=parsePrivateMediaReference(value);if(mediaId)return `/api/private-evidence/media/${mediaId}`;if(String(value).startsWith("media://"))return null;return `/api/private-evidence/${String(value).replace(/^private[\\/]/i, "").replaceAll("\\", "/")}`; }
 function dateKey(value) { return String(value ?? "").slice(0, 10); }
 function formatDate(value) { if (!value) return "Pending"; const [year, month, day] = dateKey(value).split("-").map(Number); return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
 function unique(values) { return [...new Set(values.filter(Boolean))]; }

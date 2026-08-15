@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { isPrivateMediaObjectId } from "../../../../contracts/v1/mediaIdentifiers.js";
 
 const MIME_TYPES = {
   ".jpeg": "image/jpeg",
@@ -19,7 +20,7 @@ export async function GET(_request, { params }) {
   const requestedPath = path.join(privateRoot, ...pathParts);
   const resolvedPath = path.resolve(requestedPath);
 
-  if (!resolvedPath.startsWith(path.resolve(privateRoot))) {
+  if (!isWithinRoot(privateRoot, resolvedPath)) {
     return new NextResponse("Not found", { status: 404 });
   }
 
@@ -40,7 +41,7 @@ export async function GET(_request, { params }) {
 
 async function providerMediaResponse(pathParts, request) {
   const objectId = pathParts.length === 2 && pathParts[0] === "media" ? String(pathParts[1]) : null;
-  if (!objectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(objectId)) {
+  if (!isPrivateMediaObjectId(objectId)) {
     return new NextResponse("Not found", { status: 404 });
   }
   try {
@@ -62,4 +63,9 @@ async function providerMediaResponse(pathParts, request) {
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }
+}
+
+function isWithinRoot(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }

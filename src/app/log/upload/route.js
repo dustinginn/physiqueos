@@ -17,6 +17,7 @@ import {
   appendEvidenceRecoveryContext,
   parseEvidenceRecoveryFormData,
 } from "../../../domain/services/EvidenceRecoveryContext";
+import { parsePrivateMediaReference } from "../../../contracts/v1/mediaIdentifiers.js";
 
 export const runtime = "nodejs";
 
@@ -237,7 +238,7 @@ async function saveProgressPhotosFromEvidencePackage({ evidencePackage, userId }
 function isValidStoredImage(relativePath) {
   if (
     process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" &&
-    /^media:\/\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(relativePath)
+    parsePrivateMediaReference(relativePath)
   ) {
     return true;
   }

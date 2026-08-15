@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { requirePrivateMediaObjectId } from "../../contracts/v1/mediaIdentifiers.js";
 import { readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
 
 export async function migratePackageMediaLocally({ packageRoot, snapshotMediaRoot, objectRoot }) {
@@ -68,7 +69,7 @@ export function createPhase4MediaCatalog({ query }) {
 
 export function createPhase4MediaObjectId(entry) {
   const pathHash = createHash("sha256").update(entry.relativePath).digest("hex");
-  return `media-${entry.sha256.slice(0, 32)}-${pathHash.slice(0, 12)}`;
+  return requirePrivateMediaObjectId(`media-${entry.sha256.slice(0, 32)}-${pathHash.slice(0, 12)}`);
 }
 
 function confinedPath(root, relative) {

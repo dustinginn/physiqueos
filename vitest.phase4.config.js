@@ -10,6 +10,7 @@ export default defineConfig({
       "src/platform/database/phase4PostgresComposition.test.js",
       "src/platform/migration/MigrationSourceIdentity.test.js",
       "src/platform/migration/phase4LocalMediaMigration.test.js",
+      "src/contracts/v1/mediaIdentifiers.test.js",
       "src/application/commands/CanonicalPersistenceCommandPorts.test.js",
       "src/platform/database/phase4PersistenceSecurity.test.js",
     ],

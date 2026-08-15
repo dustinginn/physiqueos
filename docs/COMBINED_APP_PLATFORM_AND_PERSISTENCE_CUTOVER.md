@@ -80,6 +80,8 @@ New provider uploads use a durable intent and private multipart upload. The serv
 
 Existing migrated objects are accepted only when the final inventory validates count, bytes, MIME, SHA-256, owner, logical media ID, object version, and no public ACL. Clients see `media://` logical references and short opaque application handles. The server redeems them, rechecks owner/expiry, and proxies a signed private read without revealing object keys.
 
+Canonical private-media object IDs are opaque values in either the current migrated form `media-<32 lowercase hex>-<12 lowercase hex>` or the retained UUID form used by provider uploads and legacy records. A provider-backed boot acceptance exposed an obsolete UUID-only check in the private-evidence route; the route and directly related media-reference consumers now use the shared identifier contract. This additive alignment does not accept storage keys or paths: traversal encodings, separators, URLs, control characters, extra route segments, and malformed or overlong values remain rejected before owner-scoped lookup, while ownership and opaque-handle redemption remain mandatory authorization steps.
+
 ## Worker handoff
 
 The Windows/background producer is drained before final capture. The provider worker may run in compatibility mode but cannot poll the production outbox until the exact authority tuple is provider-authoritative. Authority-gated polling, durable leases, idempotent handlers, retry/dead-letter rules, and dedupe prevent duplicate canonical effects. The first provider worker heartbeat and outbox health are readiness requirements. Failure after handoff pauses work or enters `recovery-required`; it never restarts a stale Windows consumer.

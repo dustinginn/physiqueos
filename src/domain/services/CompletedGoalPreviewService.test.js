@@ -66,4 +66,15 @@ describe("CompletedGoalPreviewService", () => {
     const fallback = resolveCompletedGoalPhoto({ goalPhotos: progressPhotos, goalId: "goal_visible_abs_at_rest", completionDate: "2026-07-18" });
     expect(fallback).toEqual({ date: "2026-07-11", href: "/api/private-evidence/founder/photos/july-11.jpeg", evidenceId: "july-11" });
   });
+
+  it("routes migrated canonical media references without exposing provider keys", () => {
+    const objectId = "media-a3a031ce26f383ba894e2bed8caff41b-b160b460356d";
+    const result = resolveCompletedGoalPhoto({
+      goalPhotos: [{ id: "exact", date: "2026-07-18", imagePath: `media://${objectId}`, view: "front", pose: "relaxed" }],
+      goalId: "goal_visible_abs_at_rest",
+      completionDate: "2026-07-18",
+    });
+    expect(result.href).toBe(`/api/private-evidence/media/${objectId}`);
+    expect(result.href).not.toContain("private/");
+  });
 });

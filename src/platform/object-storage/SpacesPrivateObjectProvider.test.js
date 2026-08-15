@@ -3,6 +3,7 @@ import { createPrivateObjectKey, createSpacesPrivateObjectProvider } from "./Spa
 import { readSpacesConfig } from "./spacesConfig";
 
 const CONFIG = { enabled: true, region: "sfo3", endpoint: "https://sfo3.digitaloceanspaces.com", bucket: "synthetic-private", accessKeyId: "synthetic", secretAccessKey: "synthetic-secret" };
+const OBJECT_ID = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
 
 describe("DigitalOcean Spaces private provider", () => {
   it("fails closed when provider configuration is enabled but incomplete", () => {
@@ -11,15 +12,16 @@ describe("DigitalOcean Spaces private provider", () => {
   });
 
   it("creates only opaque owner-scoped private keys", () => {
-    expect(createPrivateObjectKey("user-1", "object-1")).toBe("private/user-1/object-1/original");
-    expect(() => createPrivateObjectKey("../owner", "object")).toThrow("identity is invalid");
+    expect(createPrivateObjectKey("user-1", OBJECT_ID)).toBe(`private/user-1/${OBJECT_ID}/original`);
+    expect(() => createPrivateObjectKey("../owner", OBJECT_ID)).toThrow("identity is invalid");
+    expect(() => createPrivateObjectKey("owner", "private/owner/object/original")).toThrow("identity is invalid");
   });
 
   it("initiates multipart uploads without a public ACL", async () => {
     const send = vi.fn().mockResolvedValue({ UploadId: "provider-upload" });
     const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send, destroy: vi.fn() }, sign: vi.fn() });
-    const result = await provider.beginMultipartUpload({ ownerUserId: "user", objectId: "object", contentType: "image/jpeg", expectedSha256: "a".repeat(64) });
-    expect(result).toMatchObject({ objectKey: "private/user/object/original", providerUploadId: "provider-upload" });
+    const result = await provider.beginMultipartUpload({ ownerUserId: "user", objectId: OBJECT_ID, contentType: "image/jpeg", expectedSha256: "a".repeat(64) });
+    expect(result).toMatchObject({ objectKey: `private/user/${OBJECT_ID}/original`, providerUploadId: "provider-upload" });
     expect(send.mock.calls[0][0].input).not.toHaveProperty("ACL");
   });
 

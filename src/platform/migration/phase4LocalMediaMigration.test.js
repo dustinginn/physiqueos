@@ -4,10 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { canonicalJson, createPayloadHash } from "../../contracts/v1/canonicalJson.js";
+import { isPrivateMediaObjectId } from "../../contracts/v1/mediaIdentifiers.js";
 import { FOUNDATION_SOURCE_COLLECTIONS, inspectFoundationSourceInventory } from "./foundationSourceCollections.js";
-import { migratePackageMediaLocally } from "./phase4LocalMediaMigration.js";
+import { createPhase4MediaObjectId, migratePackageMediaLocally } from "./phase4LocalMediaMigration.js";
 
 describe("Phase 4 local private-media migration", () => {
+  it("cannot generate a canonical media ID rejected by the private media contract", () => {
+    const objectId = createPhase4MediaObjectId({
+      relativePath: "founder/photos/synthetic-front.png",
+      sha256: "1fadfe2c43970a9c6268b3b9f3ef4c3f".padEnd(64, "0"),
+    });
+    expect(objectId).toMatch(/^media-[0-9a-f]{32}-[0-9a-f]{12}$/);
+    expect(isPrivateMediaObjectId(objectId)).toBe(true);
+  });
+
   it("copies immutable bytes to opaque owner-scoped keys without changing the source", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "physiqueos-phase4-media-"));
     try {
