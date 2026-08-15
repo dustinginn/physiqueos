@@ -56,7 +56,11 @@ function briefingHref(artifact) {
   if (type === "weekly") return "/briefings/weekly";
   if (type === "midweek") return "/briefings/midweek/preview";
   if (type === "monthly") return `/briefings/monthly/${encodeURIComponent(artifact.id)}`;
-  if (type === "dexa_event") return `/briefings/dexa/${encodeURIComponent(artifact.trigger?.scanId ?? artifact.id)}`;
+  if (type === "dexa_event") {
+    const scanId = artifact.trigger?.scanId ?? artifact.trigger?.evidenceId ??
+      artifact.briefing?.dexaEventNarrative?.scanId ?? artifact.id;
+    return `/briefings/dexa/${encodeURIComponent(scanId)}`;
+  }
   if (type === "photo_event") return `/briefings/photo/${encodeURIComponent(artifact.trigger?.sessionId ?? artifact.id)}`;
   return `/briefings/review/${encodeURIComponent(artifact.id)}`;
 }

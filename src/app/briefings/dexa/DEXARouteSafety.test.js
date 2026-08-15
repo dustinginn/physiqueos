@@ -4,7 +4,7 @@ const direct = fs.readFileSync(new URL("./[scanId]/page.js", import.meta.url), "
 const preview = fs.readFileSync(new URL("./preview/[scanId]/page.js", import.meta.url), "utf8");
 const historical = fs.readFileSync(new URL("../review/[artifactId]/page.js", import.meta.url), "utf8");
 describe("DEXA briefing routes", () => {
-  it("direct route reads a persisted final without generating", () => { expect(direct).toContain("getByScanId"); expect(direct).not.toMatch(/\.generate\(|\.preview\(/); });
+  it("direct route reads only the persisted scan identity and 404s unknown scans", () => { expect(direct).toContain("getByScanId"); expect(direct).toContain(".getByScanId({ userId: user.id, scanId })"); expect(direct).toContain("if (!artifact) notFound()"); expect(direct).not.toMatch(/\.generate\(|\.preview\(/); });
   it("wires only an artifact-backed canonical Phase Review into production", () => {
     expect(direct).toContain("resolvePhaseReviewArtifactRead");
     expect(direct).toContain("phaseReviewRead.readOnly");
