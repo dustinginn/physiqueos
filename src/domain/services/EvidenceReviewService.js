@@ -15,6 +15,7 @@ import {
   normalizeTrainingExerciseRelationshipGroups,
 } from "../models/trainingExerciseRelationship";
 import { normalizeReviewedPhotoSessionMetadata } from "./PhotoSessionMetadataService";
+import { applyDexaReviewMeasurements } from "./DexaPdfIntakeService";
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
@@ -278,6 +279,37 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       if (!(review.interpretedEvidence?.evidence_objects ?? []).some((item) => item.id === itemId)) throw new Error("Evidence review item is unavailable.");
       return repositories.evidenceReviews.updateReview(id, {
         itemDecisions: { ...(review.itemDecisions ?? {}), [itemId]: { included: Boolean(included), decidedAt: now().toISOString(), decidedBy } },
+      });
+    },
+    async setDexaMeasurements(id, {
+      evidenceObjectId,
+      expectedUpdatedAt,
+      measurements,
+      updatedBy,
+    }) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("DEXA_REVIEW_NOT_EDITABLE", "This DEXA review cannot be edited.");
+      }
+      if (!expectedUpdatedAt || review.updatedAt !== expectedUpdatedAt) {
+        throw reviewError("REVIEW_STALE", "This evidence review changed. Reload it before saving DEXA corrections.");
+      }
+      let matched = 0;
+      const interpretedEvidence = {
+        ...review.interpretedEvidence,
+        evidence_objects: (review.interpretedEvidence?.evidence_objects ?? []).map((object) => {
+          if (object.id !== evidenceObjectId || !["dexa_scan", "dexa", "body_composition"].includes(object.evidence_type)) return object;
+          matched += 1;
+          return applyDexaReviewMeasurements(object, measurements);
+        }),
+      };
+      if (matched !== 1) throw reviewError("DEXA_EVIDENCE_UNAVAILABLE", "The DEXA scan is no longer available in this review.");
+      if (typeof repositories.evidenceReviews.updateReviewIfCurrent !== "function") {
+        throw reviewError("REVIEW_STALE_PROTECTION_UNAVAILABLE", "DEXA correction is temporarily unavailable.");
+      }
+      return repositories.evidenceReviews.updateReviewIfCurrent(id, expectedUpdatedAt, {
+        interpretedEvidence,
+        dexaMeasurementEditing: { updatedAt: now().toISOString(), updatedBy },
       });
     },
     async setPhotoPose(id, {

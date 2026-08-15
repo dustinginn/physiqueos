@@ -30,10 +30,11 @@ import {
   suggestCanonicalTrainingMuscleGroup,
 } from "../domain/models/trainingMuscleGroupIdentity";
 import { parsePrivateMediaReference } from "../contracts/v1/mediaIdentifiers";
+import { validateDexaScan } from "../domain/services/DEXAContract";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, dexaEditOutcome = null, dexaMeasurementsAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const [nutritionDispositions, setNutritionDispositions] = useState(() =>
@@ -95,6 +96,9 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   const blockingStructuralIssues = presentation.items.filter((item) =>
     item.included && (item.structuralReviewIssues ?? []).length > 0
   );
+  const blockingDexaIssues = presentation.items.filter((item) =>
+    item.included && item.type === "dexa" && !validateDexaScan(item.object, { production: true }).valid
+  );
   const toggleItem = (item) => {
     setItemDecisions((current) =>
       toggleEvidenceReviewItemDecision(current, item.object.id, item.included)
@@ -116,7 +120,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} photoSessionMetadataAction={photoSessionMetadataAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} dexaMeasurementsAction={dexaMeasurementsAction} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} photoSessionMetadataAction={photoSessionMetadataAction} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -164,6 +168,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           {blockingPhotoSessionMetadata && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review the shared photo-session details before saving.</p>}
           {blockingExercises.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">{blockingExercises.length} exercise {blockingExercises.length === 1 ? "identity needs" : "identities need"} details before this workout can be saved.</p>}
           {blockingStructuralIssues.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review or remove the unresolved Superset structure before saving.</p>}
+          {blockingDexaIssues.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Review the required DEXA measurements before saving.</p>}
           {blockingNutrition.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">Choose how to update the existing Nutrition Day before saving.</p>}
           {blockedNutritionInvariant.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">This date has conflicting active Nutrition records and needs repair before another update can be saved.</p>}
         </Card>
@@ -174,13 +179,15 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
           <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
           {canEdit || canContinue ? (
-            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue || blockingPhotoSessionMetadata))} retry={canContinue} savingLabel={experience.savingLabel} />
+            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingDexaIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue || blockingPhotoSessionMetadata))} retry={canContinue} savingLabel={experience.savingLabel} />
           ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
         </form>
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
         {reprocessOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">Review updated from the original evidence.</p></Card>}
         {reprocessOutcome === "current" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">No newer interpretation is available.</p></Card>}
         {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Re-read failed. Your previous review is still intact.</p></Card>}
+        {dexaEditOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">DEXA measurements updated. Review them once more before saving.</p></Card>}
+        {dexaEditOutcome === "stale" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">This review changed before the DEXA correction was saved. Review the current values and try again.</p></Card>}
         {canEdit && <div className="mt-3 grid grid-cols-2 gap-3">
           <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] px-3 text-center text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={recoveryContext?.returnTo ?? "/log"}>Save and return later</Link>
           <DiscardReviewControl action={discardAction} recoveryContext={recoveryContext} reviewId={review.id} />
@@ -190,7 +197,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, photoSessionMetadataAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, dexaMeasurementsAction, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, photoSessionMetadataAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -203,6 +210,10 @@ function EvidenceCard({ canEdit, exerciseRelationshipAction, exerciseVariantActi
       </div>
 
       {item.metrics.length > 0 && <dl className="grid grid-cols-2 gap-3">{item.metrics.map((metric) => <div className="rounded-xl bg-[var(--surface-muted)] p-3" key={metric.label}><dt className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{metric.label}</dt><dd className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{metric.value}</dd></div>)}</dl>}
+
+      {item.type === "dexa" && canEdit && dexaMeasurementsAction && (
+        <DexaMeasurementEditor action={dexaMeasurementsAction} item={item} recoveryContext={recoveryContext} review={review} />
+      )}
 
       {item.strengthSetDetails?.length > 0 && (
         <RecordedStrengthSetDetails exercises={item.strengthSetDetails} />
@@ -662,6 +673,53 @@ function NewExerciseCard({ action, canonicalExercises, exercise, recoveryContext
 
 function ReviewField({ className, defaultValue, label, name, required = true }) {
   return <label className="block text-sm font-extrabold text-[var(--text-primary)]">{label}<input className={className} defaultValue={defaultValue ?? ""} name={name} required={required} /></label>;
+}
+
+function DexaMeasurementEditor({ action, item, recoveryContext, review }) {
+  const object = item.object;
+  const metadata = object.metadata ?? {};
+  const value = (key) => metadata[key] ?? object[key]?.value ?? object[key] ?? "";
+  const inputClassName = "mt-1 min-h-11 w-full rounded-xl border border-[var(--divider)] bg-white px-3 text-base font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-100";
+  const issueCount = validateDexaScan(object, { production: true }).issues.length;
+  return (
+    <form action={action} className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4">
+      <input name="reviewId" type="hidden" value={review.id} />
+      <input name="evidenceObjectId" type="hidden" value={object.id} />
+      <input name="expectedUpdatedAt" type="hidden" value={review.updatedAt} />
+      <EvidenceRecoveryContextFields context={recoveryContext} />
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Review PDF measurements</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">Correct anything the PDF reader missed. Required values must be complete before the scan can be saved.</p>
+        </div>
+        {issueCount > 0 && <span className="shrink-0 rounded-full bg-[var(--surface-warning)] px-2.5 py-1 text-[10px] font-extrabold text-[var(--text-primary)]">Needs review</span>}
+      </div>
+      {review.interpretedEvidence?.review_metadata?.duplicateCandidate && (
+        <p className="mt-3 rounded-xl bg-[var(--surface-warning)] p-3 text-xs font-bold leading-5 text-[var(--text-primary)]">This PDF has the same scan date as existing DEXA history. Verify that you chose the intended report.</p>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <DexaReviewField className={`${inputClassName} col-span-2`} defaultValue={object.measuredAt ?? object.observed_at} label="Scan date" name="measuredAt" type="date" />
+        <DexaReviewField className={inputClassName} defaultValue={value("totalMass")} label="Total mass (lb)" name="totalMass" />
+        <DexaReviewField className={inputClassName} defaultValue={value("bodyFatPercentage")} label="Body fat (%)" name="bodyFatPercentage" />
+        <DexaReviewField className={inputClassName} defaultValue={value("fatMass")} label="Fat tissue (lb)" name="fatMass" />
+        <DexaReviewField className={inputClassName} defaultValue={value("leanMass")} label="Lean tissue (lb)" name="leanMass" />
+        <DexaReviewField className={inputClassName} defaultValue={value("boneMineralContent")} label="Bone mineral (lb)" name="boneMineralContent" />
+        <DexaReviewField className={inputClassName} defaultValue={value("restingMetabolicRate")} label="RMR (kcal/day)" name="restingMetabolicRate" required={false} />
+        <DexaReviewField className={inputClassName} defaultValue={metadata.vatMass ?? object.visceralAdiposeTissue?.mass?.value} label="VAT mass (lb)" name="vatMass" required={false} />
+        <DexaReviewField className={inputClassName} defaultValue={metadata.vatVolume ?? object.visceralAdiposeTissue?.volume?.value} label="VAT volume (in³)" name="vatVolume" required={false} />
+      </div>
+      <DexaMeasurementButton />
+    </form>
+  );
+}
+
+function DexaReviewField({ className, defaultValue, label, name, required = true, type = "number" }) {
+  return <label className={type === "date" ? "col-span-2 text-xs font-extrabold text-[var(--text-secondary)]" : "text-xs font-extrabold text-[var(--text-secondary)]"}>{label}<input className={className} defaultValue={defaultValue ?? ""} inputMode={type === "number" ? "decimal" : undefined} name={name} required={required} step={type === "number" ? "0.01" : undefined} type={type} /></label>;
+}
+
+function DexaMeasurementButton() {
+  const { pending } = useFormStatus();
+  return <button className="mt-4 min-h-12 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:opacity-50" disabled={pending} type="submit">{pending ? "Updating measurements…" : "Update measurements"}</button>;
 }
 
 function ExerciseResolutionButton() {

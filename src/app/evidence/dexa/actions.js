@@ -1,191 +1,71 @@
 "use server";
 
 import path from "node:path";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createDEXAScan } from "../../../domain/models/dexaScan";
-import { createAnalysisFromEvidence } from "../../../domain/services/AnalysisService";
-import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import { FounderRepositories } from "../../../data/repositories/founderRepositories";
 import { assertApplicationUploadEntryAllowed, storeApplicationUpload } from "../../../application/media/ApplicationUploadService";
 import { createEvidenceReviewService } from "../../../domain/services/EvidenceReviewService";
-
-const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
-const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
-const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
+import {
+  createDexaPdfReviewPackage,
+  validateDexaPdfUpload,
+} from "../../../domain/services/DexaPdfIntakeService";
 
 export async function saveDEXAEvidence(formData) {
-  assertApplicationUploadEntryAllowed({ operation: "dexa-upload" });
+  try {
+    assertApplicationUploadEntryAllowed({ operation: "dexa-upload" });
+  } catch (error) {
+    if (error?.code === "CANONICAL_WRITES_PAUSED") redirect("/evidence/dexa?error=writes-paused");
+    throw error;
+  }
   const user = await FounderRepositories.users.getCurrentUser();
 
   if (!user) throw new Error("Founder user is not available.");
-  if (formData.get("confirmed") !== "on") {
-    throw new Error("DEXA values must be confirmed before saving.");
-  }
 
   const file = formData.get("dexaPdf");
 
   if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
-    throw new Error("DEXA PDF is required.");
+    redirect("/evidence/dexa?error=missing-pdf");
   }
 
-  const measuredAt =
-    normalizeOptionalText(formData.get("measuredAt")) ??
-    inferDateFromFilename(file.name) ??
-    getTodayKey();
   const createdAt = new Date().toISOString();
+  const submissionId = `dexa_submission_${createdAt.replace(/\D/g, "")}`;
+  let bytes;
+  try {
+    bytes = validateDexaPdfUpload({
+      bytes: Buffer.from(await file.arrayBuffer()),
+      fileName: file.name,
+      mimeType: file.type,
+    });
+  } catch (error) {
+    if (error?.code === "DEXA_PDF_TOO_LARGE") redirect("/evidence/dexa?error=pdf-too-large");
+    if (error?.code === "DEXA_PDF_INVALID") redirect("/evidence/dexa?error=invalid-pdf");
+    redirect("/evidence/dexa?error=missing-pdf");
+  }
   const rawReportPath = (await storeApplicationUpload({
     ownerUserId: user.id,
-    file,
+    bytes,
+    contentType: "application/pdf",
+    originalFilename: file.name,
     legacyDirectory: path.join("private", "founder", "dexa", "uploads"),
-    legacyPrefix: `dexa-${measuredAt}`,
+    legacyPrefix: submissionId,
     category: "dexaScans",
-    relationshipId: `dexa:${measuredAt}`,
-    artifactId: `dexa:${createdAt}`,
+    relationshipId: submissionId,
+    artifactId: submissionId,
   })).reference;
   const existingScans = await FounderRepositories.dexaScans.listDEXAScans(user.id);
+  const evidencePackage = await createDexaPdfReviewPackage({
+    bytes,
+    capturedAt: createdAt,
+    existingScans,
+    originalFileName: file.name,
+    sourcePath: rawReportPath,
+    submissionId,
+    userId: user.id,
+  });
   const review = await createEvidenceReviewService({ repositories: FounderRepositories }).stage({
     userId: user.id,
     source: "dedicated_dexa",
-    evidencePackage: {
-      package_id: `dexa_review_${createdAt.replace(/\D/g, "")}`,
-      review_metadata: { duplicateCandidate: existingScans.some((item) => item.measuredAt === measuredAt) },
-      evidence_objects: [{
-        id: `dexa_${measuredAt}`,
-        evidence_type: "dexa_scan",
-        observed_at: measuredAt,
-        source_file: rawReportPath,
-        parser_confidence: "user_entered",
-        metadata: {
-          totalMass: normalizeOptionalNumber(formData.get("totalMass")),
-          bodyFatPercentage: normalizeOptionalNumber(formData.get("bodyFatPercentage")),
-          fatMass: normalizeOptionalNumber(formData.get("fatMass")),
-          leanMass: normalizeOptionalNumber(formData.get("leanMass")),
-          boneMineralContent: normalizeOptionalNumber(formData.get("boneMineralContent")),
-          restingMetabolicRate: normalizeOptionalNumber(formData.get("restingMetabolicRate")),
-          vatMass: normalizeOptionalNumber(formData.get("vatMass")),
-          vatVolume: normalizeOptionalNumber(formData.get("vatVolume")),
-        },
-      }],
-    },
+    evidencePackage,
   });
   redirect(`/evidence/review/${review.id}`);
-
-  /* Legacy confirmed-commit path retained temporarily below for extraction into the shared committer. */
-  const scan = createDEXAScan({
-    id: `dexa_${measuredAt.replaceAll("-", "_")}_${Date.now()}`,
-    userId: user.id,
-    measuredAt,
-    relatedGoalIds: [BODY_FAT_GOAL_ID, LEAN_MASS_GOAL_ID, VISIBLE_ABS_GOAL_ID],
-    provider: "BodySpec",
-    totalMass: {
-      value: normalizeOptionalNumber(formData.get("totalMass")),
-      unit: "lb",
-    },
-    bodyFatPercentage: normalizeOptionalNumber(formData.get("bodyFatPercentage")),
-    fatMass: {
-      value: normalizeOptionalNumber(formData.get("fatMass")),
-      unit: "lb",
-    },
-    leanMass: {
-      value: normalizeOptionalNumber(formData.get("leanMass")),
-      unit: "lb",
-    },
-    boneMineralContent: {
-      value: normalizeOptionalNumber(formData.get("boneMineralContent")),
-      unit: "lb",
-    },
-    restingMetabolicRate: {
-      value: normalizeOptionalNumber(formData.get("restingMetabolicRate")),
-      unit: "kcal/day",
-    },
-    visceralAdiposeTissue: {
-      mass: {
-        value: normalizeOptionalNumber(formData.get("vatMass")),
-        unit: "lb",
-      },
-      volume: {
-        value: normalizeOptionalNumber(formData.get("vatVolume")),
-        unit: "in3",
-      },
-    },
-    sourceFileId: rawReportPath,
-    rawReportPath,
-    source: {
-      type: "dexa",
-      name: "BodySpec",
-      externalId: null,
-      importedAt: createdAt,
-      confidence: "high",
-      notes: "Founder-confirmed DEXA PDF upload. Unknown measurements remain null.",
-    },
-    fieldProvenance: {
-      imported: ["rawReportPath"],
-      computed: [],
-      confirmed: [
-        "measuredAt",
-        "totalMass",
-        "bodyFatPercentage",
-        "fatMass",
-        "leanMass",
-        "boneMineralContent",
-        "restingMetabolicRate",
-        "visceralAdiposeTissue",
-      ],
-    },
-    createdAt,
-    updatedAt: createdAt,
-  });
-
-  await FounderRepositories.dexaScans.addDEXAScan(scan);
-  const analysis = createAnalysisFromEvidence({
-    id: scan.id,
-    type: "dexa",
-    createdAt,
-    analysisId: `analysis_dexa_${createdAt.replace(/\D/g, "")}`,
-    confidenceBefore: 0.72,
-    confidenceAfter: 0.8,
-  });
-
-  await FounderRepositories.analyses.createAnalysis(analysis);
-  await createDailyBriefingService({
-    repositories: FounderRepositories,
-  }).generateEventBriefing({
-    userId: user.id,
-    trigger: {
-      evidenceId: scan.id,
-      evidenceType: "dexa",
-      analysisId: analysis.id,
-    },
-  });
-
-  revalidatePath("/");
-  revalidatePath("/briefing/daily");
-  revalidatePath("/progress");
-  revalidatePath("/progress/dexa");
-  revalidatePath("/timeline");
-  redirect("/briefing/daily");
-}
-
-function normalizeOptionalText(value) {
-  const text = String(value ?? "").trim();
-
-  return text.length > 0 ? text : null;
-}
-
-function normalizeOptionalNumber(value) {
-  const text = String(value ?? "").trim();
-  if (!text) return null;
-
-  const number = Number(text);
-
-  return Number.isFinite(number) ? number : null;
-}
-
-function inferDateFromFilename(fileName = "") {
-  return fileName.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
-}
-
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10);
 }

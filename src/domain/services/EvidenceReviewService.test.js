@@ -238,6 +238,53 @@ describe("EvidenceReviewService photo session metadata", () => {
   });
 });
 
+describe("EvidenceReviewService DEXA correction", () => {
+  it("persists corrected measurements with optimistic concurrency", async () => {
+    const state = reviewFixture();
+    state.review.interpretedEvidence.evidence_objects[0] = {
+      id: "dexa_candidate",
+      evidence_type: "dexa_scan",
+      measuredAt: "2026-08-15",
+      observed_at: "2026-08-15",
+      sourceFileId: "private/founder/dexa/uploads/report.pdf",
+      provenance: { extraction_engine: "pdfjs-dist", fixture: false, source_artifact_refs: ["private/founder/dexa/uploads/report.pdf"] },
+    };
+    await createEvidenceReviewService({ repositories: repositories(state) })
+      .setDexaMeasurements(state.review.id, {
+        evidenceObjectId: "dexa_candidate",
+        expectedUpdatedAt: state.review.updatedAt,
+        measurements: {
+          measuredAt: "2026-08-15",
+          totalMass: "168.3",
+          bodyFatPercentage: "7.6",
+          fatMass: "12.8",
+          leanMass: "148.3",
+          boneMineralContent: "7.2",
+        },
+        updatedBy: "founder",
+      });
+    expect(state.review.interpretedEvidence.evidence_objects[0]).toMatchObject({
+      totalMass: { value: 168.3, unit: "lb" },
+      bodyFatPercentage: 7.6,
+      boneMineralContent: { value: 7.2, unit: "lb" },
+      parser_confidence: "user_corrected",
+    });
+  });
+
+  it("rejects a stale DEXA edit without mutation", async () => {
+    const state = reviewFixture();
+    state.review.interpretedEvidence.evidence_objects[0] = { id: "dexa_candidate", evidence_type: "dexa_scan" };
+    const before = structuredClone(state.review);
+    await expect(createEvidenceReviewService({ repositories: repositories(state) })
+      .setDexaMeasurements(state.review.id, {
+        evidenceObjectId: "dexa_candidate",
+        expectedUpdatedAt: "stale",
+        measurements: {},
+      })).rejects.toMatchObject({ code: "REVIEW_STALE" });
+    expect(state.review).toEqual(before);
+  });
+});
+
 function repositories(state) {
   return {
     evidenceReviews: {

@@ -153,6 +153,22 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain('aria-live="assertive"');
   });
 
+  it("edits DEXA extraction in Evidence Review and blocks invalid canonicalization", () => {
+    expect(screen).toContain("Review PDF measurements");
+    expect(screen).toContain('name="measuredAt"');
+    expect(screen).toContain('name="totalMass"');
+    expect(screen).toContain('name="bodyFatPercentage"');
+    expect(screen).toContain('name="fatMass"');
+    expect(screen).toContain('name="leanMass"');
+    expect(screen).toContain('name="boneMineralContent"');
+    expect(screen).toContain('name="restingMetabolicRate"');
+    expect(screen).toContain('name="vatMass"');
+    expect(screen).toContain('name="vatVolume"');
+    expect(screen).toContain("blockingDexaIssues");
+    expect(page).toContain("updateEvidenceReviewDexaMeasurements");
+    expect(actions).toContain("mergeAuthoritativeDexaScans");
+  });
+
   it("renders Superset review as one editable structure without exposing internal ids", () => {
     expect(screen).toContain("Superset needs review");
     expect(screen).toContain("Save Superset");

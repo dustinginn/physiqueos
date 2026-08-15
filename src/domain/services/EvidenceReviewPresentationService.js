@@ -308,7 +308,26 @@ function formatFoodServing(food = {}) {
 
 function presentDexa(object, common) {
   const metadata = object.metadata ?? {};
-  return { ...common, title: "DEXA", noun: "DEXA scan", metrics: compact([metric("Weight", unit(metadata.totalMass, "lb")), metric("Lean mass", unit(metadata.leanMass, "lb")), metric("Fat mass", unit(metadata.fatMass, "lb")), metric("Body fat", unit(metadata.bodyFatPercentage, "%")), metric("Source", common.sourceLabel)]) };
+  const value = (key) => metadata[key] ?? object[key]?.value ?? object[key] ?? null;
+  const vatMass = metadata.vatMass ?? object.visceralAdiposeTissue?.mass?.value ?? null;
+  const vatVolume = metadata.vatVolume ?? object.visceralAdiposeTissue?.volume?.value ?? null;
+  const originalFileName = object.source?.originalFileName ?? null;
+  return {
+    ...common,
+    title: "DEXA",
+    noun: "DEXA scan",
+    metrics: [
+      metricOrUnknown("Total mass", unit(value("totalMass"), "lb")),
+      metricOrUnknown("Body fat", unit(value("bodyFatPercentage"), "%")),
+      metricOrUnknown("Fat tissue", unit(value("fatMass"), "lb")),
+      metricOrUnknown("Lean tissue", unit(value("leanMass"), "lb")),
+      metricOrUnknown("Bone mineral", unit(value("boneMineralContent"), "lb")),
+      metricOrUnknown("RMR", unit(value("restingMetabolicRate"), "kcal/day")),
+      metricOrUnknown("VAT mass", unit(vatMass, "lb")),
+      metricOrUnknown("VAT volume", unit(vatVolume, "in³")),
+      metric("PDF", originalFileName),
+    ].filter(Boolean),
+  };
 }
 
 function presentPhotos(object, common) {
@@ -362,6 +381,7 @@ function unit(value, suffix) { const number = finite(value); return number == nu
 function formatNumber(value) { return Number(value).toLocaleString("en-US", { maximumFractionDigits: 1 }); }
 function finite(value) { if (value == null || value === "") return null; const number = Number(value); return Number.isFinite(number) ? number : null; }
 function metric(label, value) { return value ? { label, value } : null; }
+function metricOrUnknown(label, value) { return { label, value: value ?? "Needs review" }; }
 function compact(values) { return values.filter(Boolean); }
 function unique(values) { return [...new Set(values.filter(Boolean).map(String))]; }
 function labelize(value) { return String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()); }

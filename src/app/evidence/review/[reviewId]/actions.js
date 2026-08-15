@@ -121,6 +121,7 @@ export async function confirmEvidenceReview(formData) {
   catch { throw new Error("The evidence selection is invalid."); }
   evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
   evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
+  evidencePackage = mergeAuthoritativeDexaScans(evidencePackage, review.interpretedEvidence);
   evidencePackage = mergeAuthoritativeNutritionDays(
     evidencePackage,
     review.interpretedEvidence,
@@ -274,6 +275,45 @@ export async function updateEvidenceReviewItemDecision(formData) {
   revalidatePath(`/evidence/review/${reviewId}`);
 }
 
+export async function updateEvidenceReviewDexaMeasurements(formData) {
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const user = await FounderRepositories.users.getCurrentUser();
+  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const recoveryContext = resolveRecoveryContext(review, formData);
+  try {
+    await createEvidenceReviewService({ repositories: FounderRepositories }).setDexaMeasurements(reviewId, {
+      evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      measurements: {
+        measuredAt: formData.get("measuredAt"),
+        totalMass: formData.get("totalMass"),
+        bodyFatPercentage: formData.get("bodyFatPercentage"),
+        fatMass: formData.get("fatMass"),
+        leanMass: formData.get("leanMass"),
+        boneMineralContent: formData.get("boneMineralContent"),
+        restingMetabolicRate: formData.get("restingMetabolicRate"),
+        vatMass: formData.get("vatMass"),
+        vatVolume: formData.get("vatVolume"),
+      },
+      updatedBy: user.id,
+    });
+  } catch (error) {
+    if (error?.code === "REVIEW_STALE") {
+      return redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?dexa=stale`,
+        recoveryContext
+      ));
+    }
+    throw error;
+  }
+  revalidatePath(`/evidence/review/${reviewId}`);
+  redirect(appendEvidenceRecoveryContext(
+    `/evidence/review/${reviewId}?dexa=updated`,
+    recoveryContext
+  ));
+}
+
 export async function updateEvidenceReviewPhotoPose(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
   const user = await FounderRepositories.users.getCurrentUser();
@@ -350,6 +390,20 @@ function mergeAuthoritativeTrainingSessions(submitted = {}, authoritative = {}) 
       (trainingLoggerReview || training.get(item.id)?.exercises?.some((exercise) => exercise.provisionalExercise))
         ? structuredClone(training.get(item.id))
         : item
+    ),
+  };
+}
+
+function mergeAuthoritativeDexaScans(submitted = {}, authoritative = {}) {
+  const scans = new Map(
+    (authoritative.evidence_objects ?? [])
+      .filter((item) => ["dexa_scan", "dexa", "body_composition"].includes(item.evidence_type))
+      .map((item) => [item.id, item])
+  );
+  return {
+    ...submitted,
+    evidence_objects: (submitted.evidence_objects ?? []).map((item) =>
+      scans.has(item.id) ? structuredClone(scans.get(item.id)) : item
     ),
   };
 }
@@ -1046,7 +1100,7 @@ export async function discardEvidenceReview(formData) {
     revalidatePath(recoveryContext.returnTo);
     redirect(recoveryContext.returnTo);
   }
-  redirect(`/evidence/review/${reviewId}?discarded=1`);
+  redirect("/log?review=discarded");
 }
 
 function resolveRecoveryContext(review, formData) {

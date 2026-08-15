@@ -64,6 +64,7 @@ function reconstructPageText(items = []) {
 export async function interpretPdfEvidence(evidence = {}) {
   const artifacts = normalizePdfArtifacts(evidence);
   const scans = [];
+  const reviewCandidates = [];
   const diagnostics = [];
 
   for (const artifact of artifacts) {
@@ -75,7 +76,7 @@ export async function interpretPdfEvidence(evidence = {}) {
 
     const parsed = parseBodySpecDexaText(extraction.text);
     diagnostics.push(...parsed.diagnostics.map((message) => ({ fileName: artifact.fileName, message })));
-    if (parsed.status !== "complete") continue;
+    if (parsed.status === "failed") continue;
 
     const now = artifact.capturedAt ?? new Date().toISOString();
     const scan = createDEXAScan({
@@ -109,23 +110,32 @@ export async function interpretPdfEvidence(evidence = {}) {
       createdAt: now,
       updatedAt: now,
     });
-    assertValidDexaScan(scan, { production: true });
-    scans.push(scan);
+    reviewCandidates.push(scan);
+    try {
+      assertValidDexaScan(scan, { production: true });
+      scans.push(scan);
+    } catch (error) {
+      diagnostics.push({
+        fileName: artifact.fileName,
+        message: `BodySpec extraction needs human correction: ${String(error?.message ?? error)}`,
+      });
+    }
   }
 
   const evidencePackage = createDexaEvidencePackageFromScans(scans, { diagnostics });
   return {
     sourceId: evidence.id ?? "",
     sourceType: "pdf",
-    detectedEvidenceType: scans.length ? "dexa" : "unknown",
-    detectedSourceApplication: scans.length ? "BodySpec" : null,
-    status: scans.length ? "interpreted" : "failed",
-    confidence: scans.length ? "high" : "low",
+    detectedEvidenceType: reviewCandidates.length ? "dexa" : "unknown",
+    detectedSourceApplication: reviewCandidates.length ? "BodySpec" : null,
+    status: scans.length ? "interpreted" : reviewCandidates.length ? "partial" : "failed",
+    confidence: scans.length ? "high" : reviewCandidates.length ? "moderate" : "low",
     scan: scans[0] ?? null,
     scans,
+    reviewCandidates,
     evidenceObjects: evidencePackage.evidence_objects,
     evidencePackage,
-    extractedFields: { scanCount: scans.length },
+    extractedFields: { scanCount: scans.length, reviewCandidateCount: reviewCandidates.length },
   };
 }
 
@@ -148,36 +158,44 @@ export function parseBodySpecDexaText(text = "") {
   const precedingBmc = summaryIndex > 0 && /^\d+(?:\.\d+)?$/.test(summaryLines[summaryIndex - 1])
     ? Number(summaryLines[summaryIndex - 1])
     : null;
-  if (summaryNumbers.length < 4 || (summaryNumbers.length < 5 && precedingBmc === null)) {
+  if (summaryIndex < 0 || summaryNumbers.length === 0) {
     return failed(`Current summary row for ${measuredAt} was not found.`);
   }
   const [bodyFat, totalMass, fatMass, leanMass] = summaryNumbers;
   const bmc = summaryNumbers[4] ?? precedingBmc;
   const supplementalSection = section(normalized, "SUPPLEMENTAL RESULTS", "MUSCLE BALANCE REPORT");
   const rmrValues = [...supplementalSection.matchAll(/\b(\d{1,2},\d{3}|\d{4})\s*cal\/day\b/gi)];
-  if (rmrValues.length === 0) {
-    return failed("Resting metabolic rate table was not found.");
-  }
   const regions = parseRegionalAssessment(normalized);
   const supplemental = parseSupplemental(supplementalSection);
+  const required = { bodyFat, totalMass, fatMass, leanMass, bmc };
+  const missing = Object.entries(required)
+    .filter(([, value]) => !Number.isFinite(value))
+    .map(([key]) => key);
 
   return {
-    status: "complete",
+    status: missing.length ? "partial" : "complete",
     measuredAt,
     values: {
-      totalMass: mass(totalMass),
-      bodyFatPercentage: number(bodyFat),
-      fatMass: mass(fatMass),
-      leanMass: mass(leanMass),
-      boneMineralContent: mass(bmc),
-      restingMetabolicRate: mass(rmrValues[0][1].replace(",", ""), "kcal/day"),
+      ...(Number.isFinite(totalMass) ? { totalMass: mass(totalMass) } : {}),
+      ...(Number.isFinite(bodyFat) ? { bodyFatPercentage: number(bodyFat) } : {}),
+      ...(Number.isFinite(fatMass) ? { fatMass: mass(fatMass) } : {}),
+      ...(Number.isFinite(leanMass) ? { leanMass: mass(leanMass) } : {}),
+      ...(Number.isFinite(bmc) ? { boneMineralContent: mass(bmc) } : {}),
+      ...(rmrValues.length
+        ? { restingMetabolicRate: mass(rmrValues[0][1].replace(",", ""), "kcal/day") }
+        : {}),
       regionalAssessment: regions,
       ...supplemental,
     },
-    limitations: [],
+    limitations: [
+      ...(missing.length ? [`Missing required BodySpec summary fields: ${missing.join(", ")}.`] : []),
+      ...(rmrValues.length ? [] : ["Resting metabolic rate was not extracted."]),
+    ],
     diagnostics: [
       `Selected current BodySpec summary row for ${measuredAt}.`,
       "Historical comparison rows were excluded by matching the report measured-date header.",
+      ...(missing.length ? [`Human correction is required for: ${missing.join(", ")}.`] : []),
+      ...(rmrValues.length ? [] : ["Resting metabolic rate was not found and remains unknown."]),
     ],
   };
 }
