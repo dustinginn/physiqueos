@@ -160,6 +160,7 @@ $uptimeSeconds = if ($process -and $process.startedAt) { [math]::Floor(((Get-Dat
     installed = if ($taskQuery.status -eq "readable") { [bool]$task } else { $null }
     queryStatus = $taskQuery.status
     matchesCanonicalDefinition = $taskMatches
+    workingDirectory = if ($task -and $task.Actions.Count -eq 1) { $task.Actions[0].WorkingDirectory } else { $null }
     state = $taskState
     lastRunTime = if ($taskInfo) { $taskInfo.LastRunTime.ToString("o") } else { $null }
     lastTaskResult = if ($taskInfo) { $taskInfo.LastTaskResult } else { $null }

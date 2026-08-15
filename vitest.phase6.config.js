@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "scripts/deployPhysiqueOS.test.js",
+      "scripts/providerBuildSafety.test.js",
       "src/app/api/health/route.test.js",
       "src/application/media/AuthorizedMediaService.test.js",
       "src/application/read-models/Phase3ReadModelService.test.js",

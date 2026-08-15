@@ -155,3 +155,28 @@ Narrow App Platform read authorization independently verified the active rollbac
 The product template preserves the eight live alerts while replacing only the source/runtime and compatibility configuration. It retains topology, ingress, health, region, and the $30.15/month footprint; removes the worker's migration-only database URL and provider API token; and retains only the encrypted database, CA, Spaces, pepper, and web operations secrets required by the full runtime. No firewall, database binding, Space, domain, or routing-authority change is part of the proposal.
 
 `Dockerfile.provider-worker` now collects only the worker's reachable local graph and its five-entry installed production dependency closure, omitting package documentation/examples and substituting fail-closed provider runtime/control modules before scanning. Both provider images reject forbidden roots, credential signatures, recovery material, and `user_founder_*` owner identifiers; web tracing also excludes non-runtime scripts and tests.
+
+## Required isolated provider build workflow
+
+Never run a provider full-runtime Next build from the canonical Windows checkout. `next.config.mjs` now rejects that root before compilation, including junction/symlink aliases, and requires the isolation identities used by the container or the committed preflight wrapper. The local workflow is:
+
+1. Create a fresh detached checkout at the exact checkpoint; do not copy or link canonical `.next` or any recovery directory into it.
+2. Invoke `npm run provider:build:isolated -- --canonical-root <canonical-root> --isolated-root <detached-checkout> --source-commit <40-character-commit> --provider-build-id <identity> --dist-dir .provider-next-<identity> --artifact-dir .provider-artifacts-<identity>`.
+3. Preserve the emitted Next build ID, web/worker inventories and SHA-256 values, route/static counts, zero-violation scan, and identical before/after Windows identity result.
+4. Obtain separate authorization before transmitting any artifact or changing App Platform.
+
+The wrapper may read the canonical status script and protected artifact metadata. It cannot stop/start the Windows task, stage or promote `.next`, invoke `deployPhysiqueOS.ps1`, restore a fallback, delete recovery evidence, render/change a live provider spec, or deploy. Provider deployment/rollback tooling is App-Platform-only and must be separately authorized.
+
+Entrypoint classification is closed as follows:
+
+| Entrypoint | Classification | Boundary |
+| --- | --- | --- |
+| `provider:build:isolated` / `runIsolatedProviderBuild.mjs` | Safe isolated provider preflight | Exact checkout, destination, Windows identity, recovery, and privacy guards |
+| `Dockerfile.product` through App Platform | Safe isolated provider build | Container `/app` declares its isolated identity; no Windows filesystem exists |
+| `Dockerfile.provider-worker` | Internal-only provider worker image | Does not run Next build; deterministic worker collector and scanner only |
+| Generic `npm run build` / `next build` | Windows/validation-only unless provider mode is absent | Provider mode at canonical root is rejected by Next configuration |
+| `deployPhysiqueOS.ps1` | Windows-only deployment/recovery | Stops first and owns canonical promotion/rollback; forbidden to provider tooling |
+| Phase 1–6 validation builders | Safe internal validation | Use their named noncanonical `.next-phase*-validation` directories and do not enable provider full runtime |
+| `renderAppSpec.mjs` | Internal-only provider specification renderer | Renders a spec; it does not build, call Windows lifecycle, or deploy |
+
+No unknown provider full-runtime build entrypoint remains in the source-controlled repository. Historical documentation that mentions generic `npm run build` describes the stopped Windows lifecycle, not provider preflight.

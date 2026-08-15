@@ -287,3 +287,7 @@ password manager.
 The combined architecture adds runtime-authority and transfer-receipt records to the material that must be backed up and restore-validated. A pre-first-provider-write abort may return to the unchanged final Windows snapshot only when the authority record proves no provider canonical write. After the marker exists, PostgreSQL/private Spaces remain canonical: restore into an isolated target, validate schema/authority/domain/media/outbox parity, then repair or promote a schema-compatible provider build. Never resume stale Windows JSON writes.
 
 The final recovery packet is refreshed only after the full provider compatibility deployment is accepted. See `docs/COMBINED_APP_PLATFORM_AND_PERSISTENCE_CUTOVER.md` for artifact and sequencing requirements.
+
+## Build-time recovery-directory protection
+
+Provider build and preflight are not recovery operations. They must use the isolated-provider wrapper and may not write, rename, stage into, promote from, prune, or delete canonical `.next` or any `.next.rollback-*`, `.next.release-*`, `.next.failed-*`, `.next.fallback-*`, staging, or recovery directory. The wrapper discovers these directories dynamically, adds the retained `.next.rollback-22712`, `.next.fallback-stage-13560`, and `.next.failed-overwrite-13560` paths explicitly, and compares their metadata inventories before and after preflight. A difference is a blocking lifecycle-isolation incident; preflight must not attempt repair. Restoration remains a separately authorized Windows recovery action.

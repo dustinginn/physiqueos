@@ -30,6 +30,7 @@
     "migration:production:remote-dry-run": "node scripts/runRemoteProductionMigrationDryRun.mjs",
     "provider:compatibility:initialize": "node scripts/initializeProviderCompatibility.mjs",
     "provider:artifact:scan": "node scripts/scanProviderArtifact.mjs",
+    "provider:build:isolated": "node scripts/runIsolatedProviderBuild.mjs",
     "worker:foundation": "node scripts/runFoundationWorker.mjs",
     "backup:foundation": "node scripts/foundationBackup.mjs",
     "infra:digitalocean:render": "node infra/digitalocean/renderAppSpec.mjs",
