@@ -45,11 +45,13 @@ function Test-HttpEndpoint {
         [int]$TimeoutSeconds = 10
     )
 
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
     try {
         $Response = Invoke-WebRequest `
             -Uri $Url `
             -UseBasicParsing `
             -TimeoutSec $TimeoutSeconds
+        $Stopwatch.Stop()
 
         return [pscustomobject]@{
             Url         = $Url
@@ -57,18 +59,95 @@ function Test-HttpEndpoint {
             StatusCode  = $Response.StatusCode
             ContentType = $Response.Headers["Content-Type"]
             Content     = $Response.Content
+            ElapsedMs   = $Stopwatch.ElapsedMilliseconds
+            Error       = $null
         }
     }
     catch {
+        $Stopwatch.Stop()
+        $StatusCode = $null
+        $ContentType = $null
+        $Content = $null
+        $Response = $_.Exception.Response
+        if ($Response) {
+            try {
+                if ($Response.StatusCode) {
+                    $StatusCode = [int]$Response.StatusCode
+                }
+            }
+            catch {}
+            try {
+                $ContentType = $Response.Headers["Content-Type"]
+            }
+            catch {}
+            try {
+                if ($Response.Content) {
+                    $Content = $Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                }
+                elseif ($Response.GetResponseStream) {
+                    $Reader = New-Object System.IO.StreamReader($Response.GetResponseStream())
+                    try { $Content = $Reader.ReadToEnd() } finally { $Reader.Dispose() }
+                }
+            }
+            catch {}
+        }
+        if (-not $Content -and $_.ErrorDetails -and $_.ErrorDetails.Message) {
+            $Content = $_.ErrorDetails.Message
+        }
         return [pscustomobject]@{
             Url         = $Url
             Success     = $false
-            StatusCode  = $null
-            ContentType = $null
-            Content     = $null
+            StatusCode  = $StatusCode
+            ContentType = $ContentType
+            Content     = $Content
+            ElapsedMs   = $Stopwatch.ElapsedMilliseconds
             Error       = $_.Exception.Message
         }
     }
+}
+
+function Format-HttpFailure {
+    param([Parameter(Mandatory = $true)]$Result)
+
+    $Status = if ($null -ne $Result.StatusCode) { "HTTP $($Result.StatusCode)" } else { "no HTTP status" }
+    $ContentType = if ($Result.ContentType) { [string]$Result.ContentType } else { "unknown content type" }
+    $ErrorText = if ($Result.Error) { [string]$Result.Error } else { "no transport error" }
+    $BodyEvidence = if ($Result.Content) {
+        $Bytes = [Text.Encoding]::UTF8.GetBytes([string]$Result.Content)
+        $Sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            $Digest = ([BitConverter]::ToString($Sha256.ComputeHash($Bytes))).Replace("-", "")
+        }
+        finally {
+            $Sha256.Dispose()
+        }
+        "body bytes $($Bytes.Length), SHA-256 $Digest"
+    }
+    else {
+        "no response body"
+    }
+    return "$Status after $($Result.ElapsedMs) ms; $ContentType; $ErrorText; $BodyEvidence"
+}
+
+
+function Wait-ForApplicationPage {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [int]$MaximumAttempts = 3,
+        [int]$TimeoutSeconds = 10
+    )
+
+    $LastResult = $null
+    for ($Attempt = 1; $Attempt -le $MaximumAttempts; $Attempt += 1) {
+        $LastResult = Test-HttpEndpoint -Url $Url -TimeoutSeconds $TimeoutSeconds
+        if ($LastResult.Success) {
+            return $LastResult
+        }
+        Write-Host "Application page attempt $Attempt failed: $(Format-HttpFailure -Result $LastResult)"
+        if ($Attempt -lt $MaximumAttempts) { Start-Sleep -Seconds 2 }
+    }
+
+    throw "The local application did not return HTTP 200 after $MaximumAttempts attempts. Last result: $(Format-HttpFailure -Result $LastResult)"
 }
 
 function Wait-ForHealth {
@@ -213,6 +292,139 @@ function Promote-IsolatedBuild {
     Write-Host "Previous build retained at: $RollbackBuildPath"
 }
 
+function Get-BuildIdentity {
+    param([Parameter(Mandatory = $true)][string]$BuildPath)
+
+    $BuildIdPath = Join-Path $BuildPath "BUILD_ID"
+    $SourceCommitPath = Join-Path $BuildPath "SOURCE_COMMIT"
+    if (-not (Test-Path -LiteralPath $BuildIdPath -PathType Leaf)) {
+        throw "Build identity is missing from '$BuildPath'."
+    }
+    if (-not (Test-Path -LiteralPath $SourceCommitPath -PathType Leaf)) {
+        throw "Source identity is missing from '$BuildPath'."
+    }
+    return [pscustomobject]@{
+        BuildId = (Get-Content -LiteralPath $BuildIdPath -Raw).Trim()
+        SourceCommit = (Get-Content -LiteralPath $SourceCommitPath -Raw).Trim()
+    }
+}
+
+function Assert-HealthIdentity {
+    param(
+        [Parameter(Mandatory = $true)]$HealthResult,
+        [Parameter(Mandatory = $true)][string]$BuildId,
+        [Parameter(Mandatory = $true)][string]$SourceCommit,
+        [string]$Context = "runtime"
+    )
+
+    try {
+        $HealthIdentity = $HealthResult.Content | ConvertFrom-Json
+    }
+    catch {
+        throw "The $Context health endpoint did not return a valid build identity document."
+    }
+    if ($HealthIdentity.buildId -ne $BuildId) {
+        throw "The $Context health build '$($HealthIdentity.buildId)' does not match expected build '$BuildId'."
+    }
+    if ($HealthIdentity.gitHead -ne $SourceCommit) {
+        throw "The $Context health source '$($HealthIdentity.gitHead)' does not match expected source '$SourceCommit'."
+    }
+    return $HealthIdentity
+}
+
+function Assert-ReferencedStaticAssets {
+    param(
+        [Parameter(Mandatory = $true)]$PageResult,
+        [Parameter(Mandatory = $true)][string]$BaseUrl
+    )
+
+    $AssetPaths = @([regex]::Matches(
+        $PageResult.Content,
+        '(?:href|src)="(?<path>/_next/static/[^"]+)"'
+    ) | ForEach-Object {
+        $_.Groups["path"].Value
+    } | Sort-Object -Unique)
+    if ($AssetPaths.Count -eq 0) {
+        throw "The application page did not reference any Next.js static assets."
+    }
+    $AssetResults = foreach ($AssetPath in $AssetPaths) {
+        $AssetResult = Test-HttpEndpoint -Url "$BaseUrl$AssetPath"
+        $ExpectedContentType = if ($AssetPath -match '\.css(?:\?|$)') {
+            '^text/css(?:;|$)'
+        }
+        elseif ($AssetPath -match '\.js(?:\?|$)') {
+            '^(?:application|text)/javascript(?:;|$)'
+        }
+        else {
+            $null
+        }
+        [pscustomobject]@{
+            Status = $AssetResult.StatusCode
+            ContentType = $AssetResult.ContentType
+            Path = $AssetPath
+            Success = [bool]($AssetResult.Success -and $ExpectedContentType -and
+                $AssetResult.ContentType -match $ExpectedContentType)
+            Failure = if ($AssetResult.Success) { $null } else { Format-HttpFailure -Result $AssetResult }
+        }
+    }
+    $FailedAssets = @($AssetResults | Where-Object { -not $_.Success })
+    $AssetResults | Select-Object Status, ContentType, Path | Format-Table -AutoSize | Out-Host
+    if ($FailedAssets.Count -gt 0) {
+        $FailureSummary = ($FailedAssets | ForEach-Object { "$($_.Path): $($_.Failure)" }) -join "; "
+        throw "$($FailedAssets.Count) referenced static asset(s) failed status or content-type validation. $FailureSummary"
+    }
+    return $AssetResults
+}
+
+function Get-VerifiedRuntimeStatus {
+    $RuntimeStatusJson = & powershell.exe `
+        -NoProfile `
+        -ExecutionPolicy Bypass `
+        -File $StatusScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "The runtime status script failed with exit code $LASTEXITCODE."
+    }
+    $RuntimeStatus = $RuntimeStatusJson | ConvertFrom-Json
+    if ($RuntimeStatus.overallState -ne "healthy") {
+        throw "Runtime status is '$($RuntimeStatus.overallState)' instead of 'healthy'."
+    }
+    if (-not $RuntimeStatus.listener -or -not $RuntimeStatus.listener.pid) {
+        throw "Runtime status did not identify one canonical listener."
+    }
+    return $RuntimeStatus
+}
+
+function Assert-ProductionRuntime {
+    param(
+        [Parameter(Mandatory = $true)][string]$BuildId,
+        [Parameter(Mandatory = $true)][string]$SourceCommit,
+        [Nullable[int]]$PreviousListenerPid = $null,
+        [string]$Context = "production"
+    )
+
+    $HealthResult = Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60
+    $HealthIdentity = Assert-HealthIdentity -HealthResult $HealthResult -BuildId $BuildId `
+        -SourceCommit $SourceCommit -Context $Context
+    $PageResult = Wait-ForApplicationPage -Url $LocalUrl
+    $AssetResults = @(Assert-ReferencedStaticAssets -PageResult $PageResult -BaseUrl $LocalUrl)
+    $RuntimeStatus = Get-VerifiedRuntimeStatus
+    if ($null -ne $PreviousListenerPid -and [int]$RuntimeStatus.listener.pid -eq [int]$PreviousListenerPid) {
+        throw "The $Context listener PID $PreviousListenerPid was not replaced after the canonical stop/start boundary."
+    }
+    $PublicResult = Test-HttpEndpoint -Url $PublicUrl -TimeoutSeconds 15
+    if (-not $PublicResult.Success) {
+        throw "The $Context public application failed: $(Format-HttpFailure -Result $PublicResult)"
+    }
+    return [pscustomobject]@{
+        Health = $HealthResult
+        HealthIdentity = $HealthIdentity
+        Page = $PageResult
+        Assets = $AssetResults
+        RuntimeStatus = $RuntimeStatus
+        Public = $PublicResult
+    }
+}
+
 try {
     Write-Step "PhysiqueOS Production Deployment"
 
@@ -327,11 +539,7 @@ try {
 
     Write-Step "5. Verifying the application page"
 
-    $PageResult = Test-HttpEndpoint -Url $LocalUrl
-
-    if (-not $PageResult.Success) {
-        throw "The local application did not return HTTP 200."
-    }
+    $PageResult = Wait-ForApplicationPage -Url $LocalUrl
 
     Write-Host "Application page: HTTP $($PageResult.StatusCode)"
 
@@ -408,7 +616,7 @@ try {
         -TimeoutSeconds 15
 
     if (-not $PublicResult.Success) {
-        throw "The public ngrok URL did not return HTTP 200: $PublicUrl"
+        throw "The public ngrok URL failed: $(Format-HttpFailure -Result $PublicResult)"
     }
 
     Write-Host "Public application: HTTP $($PublicResult.StatusCode)"
@@ -429,29 +637,66 @@ catch {
     if ($UsesIsolatedSource -and $ReplacementPromoted -and (Test-Path -LiteralPath $RollbackBuildPath)) {
         Write-Host "Attempting automatic rollback to the previous production build."
         try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StopScript | Out-Null
-            $CurrentBuildPath = Join-Path $RepoRoot ".next"
-            if (Test-Path -LiteralPath $CurrentBuildPath) {
-                Move-Item -LiteralPath $CurrentBuildPath -Destination $FailedBuildPath
+            if (Test-Path -LiteralPath $FailedBuildPath) {
+                throw "Failed-build preservation path already exists: $FailedBuildPath"
             }
-            Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript | Out-Null
+            $RollbackIdentity = Get-BuildIdentity -BuildPath $RollbackBuildPath
+            $AttemptedListenerPid = $null
+            try {
+                $AttemptedStatus = Get-VerifiedRuntimeStatus
+                $AttemptedListenerPid = [int]$AttemptedStatus.listener.pid
+            }
+            catch {
+                Write-Host "Attempted runtime identity capture was unavailable before rollback: $($_.Exception.Message)"
+            }
+
+            Invoke-ProductionStop
+            $CurrentBuildPath = Join-Path $RepoRoot ".next"
+            if (-not (Test-Path -LiteralPath $CurrentBuildPath -PathType Container)) {
+                throw "The attempted canonical build disappeared before failed-build preservation."
+            }
+            Move-Item -LiteralPath $CurrentBuildPath -Destination $FailedBuildPath
+            try {
+                Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath
+            }
+            catch {
+                if (-not (Test-Path -LiteralPath $CurrentBuildPath) -and (Test-Path -LiteralPath $FailedBuildPath)) {
+                    Move-Item -LiteralPath $FailedBuildPath -Destination $CurrentBuildPath
+                }
+                throw
+            }
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript
             if ($LASTEXITCODE -ne 0) { throw "The rollback runtime did not start." }
-            Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60 | Out-Null
-            Write-Host "Previous production build restored successfully."
+            $RuntimeStopped = $false
+            $RollbackAcceptance = Assert-ProductionRuntime `
+                -BuildId $RollbackIdentity.BuildId `
+                -SourceCommit $RollbackIdentity.SourceCommit `
+                -PreviousListenerPid $AttemptedListenerPid `
+                -Context "restored rollback"
+            Write-Host "Previous production build restored and fully accepted."
+            Write-Host "Restored build identity: $($RollbackAcceptance.HealthIdentity.buildId)"
+            Write-Host "Restored source identity: $($RollbackAcceptance.HealthIdentity.gitHead)"
+            Write-Host "Restored listener PID: $($RollbackAcceptance.RuntimeStatus.listener.pid)"
         }
         catch {
-            Write-Host "Automatic rollback failed: $($_.Exception.Message)"
+            Write-Host "Automatic rollback failed acceptance: $($_.Exception.Message)"
         }
     }
     elseif ($UsesIsolatedSource -and $RuntimeStopped) {
         try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript | Out-Null
-            Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60 | Out-Null
-            Write-Host "Previous production runtime restarted successfully."
+            $CurrentIdentity = Get-BuildIdentity -BuildPath (Join-Path $RepoRoot ".next")
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $StartScript
+            if ($LASTEXITCODE -ne 0) { throw "The previous production runtime did not start." }
+            $RuntimeStopped = $false
+            $RestartAcceptance = Assert-ProductionRuntime `
+                -BuildId $CurrentIdentity.BuildId `
+                -SourceCommit $CurrentIdentity.SourceCommit `
+                -Context "restarted previous production"
+            Write-Host "Previous production runtime restarted and fully accepted."
+            Write-Host "Restarted listener PID: $($RestartAcceptance.RuntimeStatus.listener.pid)"
         }
         catch {
-            Write-Host "Previous production runtime restart failed: $($_.Exception.Message)"
+            Write-Host "Previous production runtime restart failed acceptance: $($_.Exception.Message)"
         }
     }
     Write-Host ""

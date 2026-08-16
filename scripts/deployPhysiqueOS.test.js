@@ -38,6 +38,22 @@ describe("canonical deployment lifecycle", () => {
     expect(script).toContain("does not match canonical repository HEAD");
     expect(script).toContain("does not match promoted build");
     expect(script).toContain("does not match deployment source");
+    expect(script).toContain("does not match expected build");
+    expect(script).toContain("does not match expected source");
+  });
+
+  it("retains the exact HTTP failure evidence and bounds initial page retries", () => {
+    const probe = functionBlock("Test-HttpEndpoint", "Format-HttpFailure");
+    expect(probe).toContain("StatusCode  = $StatusCode");
+    expect(probe).toContain("Content     = $Content");
+    expect(probe).toContain("ElapsedMs   = $Stopwatch.ElapsedMilliseconds");
+    expect(probe).toContain("$_.ErrorDetails.Message");
+    expect(script).toContain("SHA-256 $Digest");
+    expect(script).not.toContain("$Normalized.Substring(0, 512)");
+    const pageWait = functionBlock("Wait-ForApplicationPage", "Wait-ForHealth");
+    expect(pageWait).toContain("$MaximumAttempts = 3");
+    expect(pageWait).toContain("Format-HttpFailure -Result $LastResult");
+    expect(script).toContain("$PageResult = Wait-ForApplicationPage -Url $LocalUrl");
   });
 
   it("requires successful CSS and JavaScript responses with correct content types", () => {
@@ -46,9 +62,42 @@ describe("canonical deployment lifecycle", () => {
     expect(script).toContain("failed status or content-type validation");
   });
 
-  it("retains automatic rollback after artifact promotion", () => {
-    expect(script).toContain("Attempting automatic rollback to the previous production build.");
-    expect(script).toContain("Previous production build restored successfully.");
+  it("makes rollback use the canonical stop boundary before moving either build", () => {
+    const rollback = finalCatch();
+    const identity = rollback.indexOf("Get-BuildIdentity -BuildPath $RollbackBuildPath");
+    const stop = rollback.indexOf("Invoke-ProductionStop");
+    const preserve = rollback.indexOf("Move-Item -LiteralPath $CurrentBuildPath -Destination $FailedBuildPath");
+    const restore = rollback.indexOf("Move-Item -LiteralPath $RollbackBuildPath -Destination $CurrentBuildPath");
+    const start = rollback.indexOf("-File $StartScript");
+    expect(identity).toBeGreaterThan(-1);
+    expect(stop).toBeGreaterThan(identity);
+    expect(preserve).toBeGreaterThan(stop);
+    expect(restore).toBeGreaterThan(preserve);
+    expect(start).toBeGreaterThan(restore);
+    expect(rollback).not.toContain("-File $StopScript | Out-Null");
+  });
+
+  it("accepts rollback only after a new exact canonical runtime serves Home and assets", () => {
+    const acceptance = functionBlock("Assert-ProductionRuntime", null);
+    expect(acceptance).toContain("Assert-HealthIdentity");
+    expect(acceptance).toContain("Wait-ForApplicationPage");
+    expect(acceptance).toContain("Assert-ReferencedStaticAssets");
+    expect(acceptance).toContain("Get-VerifiedRuntimeStatus");
+    expect(acceptance).toContain("listener PID $PreviousListenerPid was not replaced");
+    expect(acceptance).toContain("$PublicResult = Test-HttpEndpoint");
+    const rollback = finalCatch();
+    expect(rollback).toContain("-BuildId $RollbackIdentity.BuildId");
+    expect(rollback).toContain("-SourceCommit $RollbackIdentity.SourceCommit");
+    expect(rollback).toContain("-PreviousListenerPid $AttemptedListenerPid");
+    expect(rollback).toContain("Previous production build restored and fully accepted.");
+    expect(rollback).not.toContain("Wait-ForHealth -Url $HealthUrl -MaximumWaitSeconds 60 | Out-Null");
+  });
+
+  it("fully accepts a previous runtime restart when promotion never happened", () => {
+    const rollback = finalCatch();
+    expect(rollback).toContain("$CurrentIdentity = Get-BuildIdentity");
+    expect(rollback).toContain("$RestartAcceptance = Assert-ProductionRuntime");
+    expect(rollback).toContain("Previous production runtime restarted and fully accepted.");
   });
 });
 
@@ -58,4 +107,19 @@ function between(start, end) {
   expect(startIndex).toBeGreaterThan(-1);
   expect(endIndex).toBeGreaterThan(startIndex);
   return script.slice(startIndex, endIndex);
+}
+
+function functionBlock(name, nextName) {
+  const start = script.indexOf(`function ${name} {`);
+  expect(start).toBeGreaterThan(-1);
+  if (!nextName) return script.slice(start, script.indexOf("\ntry {", start));
+  const end = script.indexOf(`function ${nextName} {`, start);
+  expect(end).toBeGreaterThan(start);
+  return script.slice(start, end);
+}
+
+function finalCatch() {
+  const start = script.lastIndexOf("\ncatch {");
+  expect(start).toBeGreaterThan(-1);
+  return script.slice(start);
 }
