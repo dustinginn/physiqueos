@@ -12,6 +12,7 @@ import {
   FORECAST_PRODUCTION_ENGINE_VERSION,
 } from "./ForecastRuntimeContract";
 import { evaluateForecastTimeline } from "./ForecastTimelineService";
+import { evaluateGoalAttainability } from "./GoalAttainabilityService";
 import { semanticHash, uniqueStrings } from "./forecastRuntimeUtils";
 
 const INPUT_KEYS = new Set([
@@ -31,11 +32,15 @@ export function createForecastEngine({ runtimeMode = "shadow" } = {}) {
       const timeline = evaluateForecastTimeline(
         normalized.goalContract, normalized.structuredInterpretation);
       const milestoneForecasts = evaluateForecastMilestones(normalized);
+      const goalAttainability = evaluateGoalAttainability({
+        goalContract: normalized.goalContract, timeline,
+      });
       const interpretationSemanticFingerprint =
         createInterpretationSemanticFingerprint(
-          normalized.structuredInterpretation);
+          normalized.structuredInterpretation, normalized.goalContract,
+          timeline, goalAttainability);
       const evaluated = evaluateGoalForecast({
-        ...normalized, timeline, milestoneForecasts,
+        ...normalized, timeline, milestoneForecasts, goalAttainability,
       });
       const evaluation = stabilizeForecastForUnchangedInterpretation({
         evaluation: evaluated,
@@ -190,17 +195,20 @@ function normalizePreviousForecastContext(value) {
   });
 }
 
-function createInterpretationSemanticFingerprint(interpretation) {
+function createInterpretationSemanticFingerprint(interpretation, goalContract,
+  timeline, goalAttainability) {
   return `sha256_${semanticHash({
     objectives: interpretation.objectiveEvaluation.conclusions.map((item) => ({
       objectiveId: item.objectiveId,
       status: item.status,
       expectationRef: item.expectationRef,
       elapsedTimeAdequacy: item.elapsedTimeAdequacy,
+      observedResult: item.observedResult,
     })),
     guardrails: interpretation.guardrailEvaluation.conclusions.map((item) => ({
       guardrailId: item.guardrailId,
       status: item.status,
+      observedResult: item.observedResult,
     })),
     strategyStatus: interpretation.strategyValidation.status,
     agreementStatus: interpretation.evidenceReconciliation.agreementStatus,
@@ -222,6 +230,10 @@ function createInterpretationSemanticFingerprint(interpretation) {
       evidenceCapability: interpretation.nextDecisiveEvidence.evidenceCapability,
       decisionBoundary: interpretation.nextDecisiveEvidence.decisionBoundary,
     },
+    quantitativeProgress: goalContract.quantitativeProgress ?? null,
+    expectedTrajectory: goalContract.expectedTrajectory ?? null,
+    timeline,
+    goalAttainability,
   })}`;
 }
 
@@ -287,12 +299,15 @@ function normalizeGoalContract(value = {}) {
       objectiveId: item.objectiveId,
       required: item.required !== false,
       trajectoryRef: item.trajectoryRef ?? null,
+      target: structuredClone(item.target ?? null),
     })),
     guardrails: value.guardrails.map((item) => ({
       guardrailId: item.guardrailId,
       required: item.required !== false,
+      constraint: structuredClone(item.constraint ?? null),
     })),
     timeline: value.timeline ?? {},
+    quantitativeProgress: value.quantitativeProgress ?? null,
     expectedTrajectory: value.expectedTrajectory ?? { segments: [] },
     milestones: value.milestones ?? [],
     successCriteria: value.successCriteria ?? null,

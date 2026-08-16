@@ -25,11 +25,11 @@ export function createGoalInitializationForecastService({
       const existing = (baseline.store.goalConfidenceSnapshots ?? []).find((item) =>
         item.goalId === activeGoal.id && item.phaseId === activePhase.id);
       if (existing) return failure("goal_confidence_series_already_initialized");
-      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
-        activePhase,
-      });
       const artifactId = `goal_initialization|${occurrenceId}`;
       const cutoff = iso(activatedAt);
+      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
+        activePhase, canonicalStore: baseline.store, asOf: cutoff,
+      });
       const artifact = {
         id: artifactId,
         artifactType: "goal_initialization",

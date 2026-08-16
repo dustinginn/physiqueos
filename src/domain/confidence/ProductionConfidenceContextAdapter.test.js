@@ -18,12 +18,15 @@ describe("production Confidence V2 context adapters", () => {
       objectives: [{ measurement: { metricOrCapability: "lean_mass_change_lb" },
         completionThreshold: { operator: "gte", value: 10 } }],
       guardrails: [{ monitoredMetricOrCapability: "body_fat_pct",
-        warningThreshold: { operator: "gt", value: 9 },
-        violationThreshold: { operator: "gt", value: 11 } }],
+        constraint: { kind: "bounded_range", min: 8, max: 9 },
+        warningThreshold: { operator: "outside", min: 8, max: 9 },
+        violationThreshold: { operator: "outside", min: 6, max: 11 } }],
     });
     expect(contract.relevantEvidence.entries.every((item) =>
       item.appliesTo.objectiveRefs.length || item.appliesTo.guardrailRefs.length ||
       item.appliesTo.hypothesisRefs.length)).toBe(true);
+    expect(contract.expectedTrajectory.segments).toEqual([]);
+    expect(contract.quantitativeProgress.status).toBe("unavailable");
   });
 
   it("normalizes a real DEXA comparison into Goal-readable measurements", () => {

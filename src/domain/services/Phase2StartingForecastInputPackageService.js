@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createStartingForecastContext } from "../confidence/StartingForecastService";
-import { adaptProductionGoalToCanonicalContract } from
+import { adaptDEXAEventToEvidenceDescriptors,
+  adaptProductionGoalToCanonicalContract } from
   "../confidence/ProductionConfidenceContextAdapter";
 import { validatePhaseStrategy } from "../models/phaseStrategy";
 import { validatePhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
@@ -27,20 +28,20 @@ export function createPhase2StartingForecastInputPackage({
   }
   const sourceEvidenceId = decision.phaseEstablishment?.lineage?.sourceEvidenceId ?? null;
   const decisionDate = decision.decidedAt?.slice(0, 10);
-  const baselineScan = (store.dexaScans ?? []).find((item) => item.id === sourceEvidenceId) ??
+  const phaseBaselineScan = (store.dexaScans ?? []).find((item) => item.id === sourceEvidenceId) ??
     [...(store.dexaScans ?? [])].filter((item) => {
       const observed = item.measuredAt ?? item.date;
       return observed && (!decisionDate || observed <= decisionDate);
     }).sort((a, b) => String(a.measuredAt ?? a.date).localeCompare(String(b.measuredAt ?? b.date))).at(-1) ?? null;
-  const baselineObservedOn = baselineScan?.measuredAt ?? baselineScan?.date ?? null;
-  const goalBaseline = baselineScan ? {
-    baselineId: baselineScan.id,
+  const baselineObservedOn = phaseBaselineScan?.measuredAt ?? phaseBaselineScan?.date ?? null;
+  const phaseBoundaryBaseline = phaseBaselineScan ? {
+    baselineId: phaseBaselineScan.id,
     observedOn: baselineObservedOn,
     kind: "canonical_dexa_summary",
-    bodyFatPercentage: number(baselineScan.bodyFatPercentage),
-    leanMass: normalizedMass(baselineScan.leanMass),
-    fatMass: normalizedMass(baselineScan.fatMass),
-    sourceRef: baselineScan.id,
+    bodyFatPercentage: number(phaseBaselineScan.bodyFatPercentage),
+    leanMass: normalizedMass(phaseBaselineScan.leanMass),
+    fatMass: normalizedMass(phaseBaselineScan.fatMass),
+    sourceRef: phaseBaselineScan.id,
     rawEvidenceIncluded: false,
   } : null;
   const executionRefs = (store.executionItems ?? []).filter((item) =>
@@ -73,8 +74,27 @@ export function createPhase2StartingForecastInputPackage({
   const activationDate = activePhase.startedAt ?? activePhase.startDate ??
     decision.projectedNextPhaseStart ?? nextLocalDay(decision.decidedAt.slice(0, 10));
   const remainingDays = daysBetween(activationDate, targetDate);
+  const goalContract = adaptProductionGoalToCanonicalContract(goal, {
+    activePhase,
+    strategyHypothesis: acceptedStrategy.strategyHypothesis,
+    expectedTrajectory: acceptedTrajectory.expectedTrajectory,
+    canonicalStore: store,
+    asOf: decision.decidedAt,
+  });
+  const progress = goalContract.quantitativeProgress;
+  const goalBaseline = progress?.baseline ? {
+    baselineId: progress.baseline.sourceRef,
+    observedOn: progress.baseline.observedOn,
+    kind: progress.baseline.sourceType,
+    metric: progress.metric,
+    value: progress.baseline.value,
+    unit: progress.baseline.unit,
+    derivation: progress.baseline.derivation,
+    rawEvidenceIncluded: false,
+  } : null;
   const semanticGaps = [
-    ...(goalBaseline ? [] : ["phase_boundary_goal_baseline_missing"]),
+    ...(goalBaseline ? [] : ["goal_baseline_missing"]),
+    ...(phaseBoundaryBaseline ? [] : ["phase_activation_baseline_missing"]),
     ...(latestConfidenceContext ? [] : ["latest_canonical_confidence_context_missing"]),
     ...(executionRefs.length ? [] : ["historical_execution_references_missing"]),
     "true_maintenance_intake_remains_calibration_dependent",
@@ -90,14 +110,12 @@ export function createPhase2StartingForecastInputPackage({
     strategyQuality: "strong",
     experience: priorGoals.length || executionRefs.length ? "experienced_user" : "new_user",
     priorGoalRefs: priorGoals.map((item) => item.goalId),
-    historyRefs: [...executionRefs, ...(goalBaseline ? [goalBaseline.baselineId] : [])],
+    historyRefs: [...executionRefs, ...(goalBaseline?.baselineId ? [goalBaseline.baselineId] : []),
+      ...(phaseBoundaryBaseline?.baselineId ? [phaseBoundaryBaseline.baselineId] : [])],
     missingInformation: semanticGaps,
   });
-  const goalContract = adaptProductionGoalToCanonicalContract(goal, {
-    activePhase,
-    strategyHypothesis: acceptedStrategy.strategyHypothesis,
-    expectedTrajectory: acceptedTrajectory.expectedTrajectory,
-  });
+  const startingEvidenceDescriptors = phaseBaselineScan
+    ? adaptDEXAEventToEvidenceDescriptors({ scan: phaseBaselineScan, priorScan: null }) : [];
   const result = {
     schemaVersion: PHASE_2_STARTING_FORECAST_INPUT_VERSION,
     goalContract,
@@ -109,6 +127,22 @@ export function createPhase2StartingForecastInputPackage({
     priorHistory: { goals: priorGoals, phases: priorPhases },
     historicalExecutionRefs: executionRefs,
     goalBaseline,
+    phaseBoundaryBaseline,
+    goalProgress: progress ? {
+      status: progress.status,
+      metric: progress.metric,
+      cumulativeProgress: progress.cumulativeProgress,
+      requiredProgress: progress.requiredProgress,
+      remainingGap: progress.remainingGap,
+      progressFraction: progress.progressFraction,
+      currentMeasurementRef: progress.current?.sourceRef ?? null,
+    } : null,
+    currentGuardrailState: phaseBoundaryBaseline ? {
+      bodyFatPercentage: phaseBoundaryBaseline.bodyFatPercentage,
+      sourceRef: phaseBoundaryBaseline.sourceRef,
+      observedOn: phaseBoundaryBaseline.observedOn,
+    } : null,
+    startingEvidenceDescriptors,
     latestConfidenceContext,
     phaseReviewDecisionLineage: {
       decisionId: decision.decisionId,

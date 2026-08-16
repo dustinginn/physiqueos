@@ -33,11 +33,11 @@ export function createPICadenceBriefingLifecycleService({
         .getCurrent({ goalId: activeGoal.id, phaseId: activePhase.id });
       if (!current.assessment) return typed("canonical_predecessor_required",
         "Cadence Confidence requires a canonical predecessor.");
-      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
-        activePhase,
-      });
       const cutoff = artifact.evidenceCutoff ??
         `${artifact.evidenceWindow.endDate}T23:59:59.999Z`;
+      const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
+        activePhase, canonicalStore: baseline.store, asOf: cutoff,
+      });
       const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({
         artifact, piEnvelope,
       });

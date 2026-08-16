@@ -340,7 +340,7 @@ export function createCanonicalPhaseReviewParticipants({
             elapsedTimeAdequacy: "not_started",
             refs: context.historyRefs,
           },
-          evidenceDescriptors: [],
+          evidenceDescriptors: inputPackage.startingEvidenceDescriptors,
           previousCanonicalAssessment: null,
           publicationCutoff: decision.decidedAt,
           finalizedAt: decision.decidedAt,

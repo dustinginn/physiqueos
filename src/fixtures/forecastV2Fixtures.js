@@ -10,6 +10,7 @@ export function createForecastV2Fixture({
   interpretationInput.goalContract.timeline = {
     startDate: "2026-07-01",
     targetCompletionDate: "2026-12-31",
+    constraintType: "firm",
   };
   interpretationInput.goalContract.milestones = [
     {

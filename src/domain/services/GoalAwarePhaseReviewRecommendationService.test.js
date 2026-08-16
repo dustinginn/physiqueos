@@ -19,6 +19,14 @@ describe("Goal-aware Phase Review recommendation", () => {
     expect(evaluateGoalAwarePhaseReview({ ...base, remainingGoalDays: 30,
       guardrailDeviationMagnitude: "material" }).recommendation).toBe("extend_current_phase");
   });
+  it("can begin when the Goal is behind pace and further delay is costly", () => {
+    expect(evaluateGoalAwarePhaseReview({ ...base, forecastStatus: "forecast_at_risk" })
+      .recommendation).toBe("begin_next_phase");
+  });
+  it("continues when a behind-pace Goal also has material safety risk", () => {
+    expect(evaluateGoalAwarePhaseReview({ ...base, forecastStatus: "forecast_at_risk",
+      forecastSafetyRisk: "material" }).recommendation).toBe("extend_current_phase");
+  });
   it("continues when unstable evidence keeps information valuable", () => {
     expect(evaluateGoalAwarePhaseReview({ ...base, evidenceTrend: "unstable" })
       .recommendation).toBe("extend_current_phase");

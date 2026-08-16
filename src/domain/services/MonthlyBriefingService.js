@@ -224,7 +224,8 @@ async function prepareMonthlyOccurrence({
   }
   return {
     artifact, activePhase, baseline, current, existing, generatedAt, goal,
-    goalContract: adaptProductionGoalToCanonicalContract(goal, { activePhase }),
+    goalContract: adaptProductionGoalToCanonicalContract(goal, { activePhase,
+      canonicalStore: baseline.store, asOf: window.cutoff }),
     userId, window,
   };
 }

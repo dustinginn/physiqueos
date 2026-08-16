@@ -12,9 +12,11 @@ export function evaluateGoalForecast({
   structuredInterpretation,
   timeline,
   milestoneForecasts,
+  goalAttainability = null,
 } = {}) {
   const objectiveForecasts = createObjectiveForecasts({
     goalContract, structuredInterpretation, timeline, milestoneForecasts,
+    goalAttainability,
   });
   const guardrailForecasts = createGuardrailForecasts({
     goalContract, structuredInterpretation, milestoneForecasts,
@@ -32,6 +34,9 @@ export function evaluateGoalForecast({
     timeline,
     milestoneForecasts,
   });
+  const decisionSupport = createDecisionSupport({
+    goalForecastStatus, goalAttainability, guardrailForecasts,
+  });
   return {
     goalForecastStatus,
     forecastDirection: directionFor(goalForecastStatus),
@@ -39,12 +44,15 @@ export function evaluateGoalForecast({
     objectiveForecasts,
     guardrailForecasts,
     trajectoryForecast: {
-      status: trajectoryStatus(
+      status: attainabilityTrajectoryStatus(goalAttainability) ?? trajectoryStatus(
         structuredInterpretation.objectiveEvaluation.aggregateStatus),
       expectationRefs: uniqueStrings(structuredInterpretation.objectiveEvaluation
         .conclusions.map((item) => item.expectationRef)),
       timelinePhase: timeline.phase,
-      rationale: `trajectory_${structuredInterpretation.objectiveEvaluation.aggregateStatus}`,
+      rationale: goalAttainability?.rationale ??
+        `trajectory_${structuredInterpretation.objectiveEvaluation.aggregateStatus}`,
+      goalAttainability: structuredClone(goalAttainability),
+      decisionSupport,
     },
   };
 }
@@ -58,14 +66,11 @@ export function createForecastExplanation({
 } = {}) {
   const supportingFactors = [];
   const limitingFactors = [];
-  if (["ahead", "on_track"].includes(
-    structuredInterpretation.objectiveEvaluation.aggregateStatus)) {
-    supportingFactors.push(
-      `objective_${structuredInterpretation.objectiveEvaluation.aggregateStatus}`);
-  } else {
-    limitingFactors.push(
-      `objective_${structuredInterpretation.objectiveEvaluation.aggregateStatus}`);
-  }
+  evaluation.objectiveForecasts.forEach((item) => {
+    const target = ["ahead", "feasible"].includes(item.forecastState)
+      ? supportingFactors : limitingFactors;
+    target.push(`objective_${item.forecastState}:${item.objectiveId}`);
+  });
   if (structuredInterpretation.guardrailEvaluation.aggregateStatus === "clear") {
     supportingFactors.push("guardrails_clear");
   } else {
@@ -105,6 +110,14 @@ export function createForecastExplanation({
   if (["overdue", "unknown", "not_started"].includes(timeline.phase)) {
     limitingFactors.push(`timeline_${timeline.phase}`);
   }
+  const attainability = evaluation.trajectoryForecast?.goalAttainability;
+  if (attainability?.status === "assessed") {
+    const target = ["ahead", "on_expected_trajectory"].includes(attainability.paceState)
+      ? supportingFactors : limitingFactors;
+    target.push(`attainability_${attainability.paceState}`);
+  } else if (attainability?.rationale) {
+    limitingFactors.push(`attainability_${attainability.rationale}`);
+  }
   return {
     primarySupportingFactors: uniqueStrings(supportingFactors),
     primaryLimitingFactors: uniqueStrings(limitingFactors),
@@ -118,6 +131,7 @@ export function createForecastExplanation({
 
 function createObjectiveForecasts({
   goalContract, structuredInterpretation, timeline, milestoneForecasts,
+  goalAttainability,
 }) {
   const definitions = new Map((goalContract.objectives ?? [])
     .map((item) => [item.objectiveId, item]));
@@ -126,7 +140,7 @@ function createObjectiveForecasts({
     required: definitions.get(item.objectiveId)?.required !== false,
     interpretationStatus: item.status,
     observedResult: structuredClone(item.observedResult ?? null),
-    forecastState: ({
+    forecastState: attainabilityState({ item, goalContract, goalAttainability }) ?? ({
       ahead: ObjectiveForecastState.AHEAD,
       on_track: ObjectiveForecastState.FEASIBLE,
       uncertain: ObjectiveForecastState.UNCERTAIN,
@@ -138,8 +152,55 @@ function createObjectiveForecasts({
     milestoneRefs: milestoneForecasts.filter((milestone) =>
       milestone.objectiveRefs.includes(item.objectiveId))
       .map((milestone) => milestone.milestoneId),
-    rationale: `objective_forecast_${item.status}`,
+    rationale: goalContract.quantitativeProgress ?
+      `objective_goal_attainability_${goalAttainability?.paceState ?? "unassessable"}` :
+      `objective_forecast_${item.status}`,
   })).sort((left, right) => left.objectiveId.localeCompare(right.objectiveId));
+}
+
+function attainabilityState({ item, goalContract, goalAttainability }) {
+  if (!goalContract.quantitativeProgress ||
+      item.objectiveId !== goalAttainability?.objectiveId &&
+      goalAttainability?.objectiveId != null) return null;
+  if (goalAttainability?.status !== "assessed") return ObjectiveForecastState.UNCERTAIN;
+  if (goalAttainability.outlook === "unlikely") return ObjectiveForecastState.UNLIKELY;
+  if (goalAttainability.outlook === "at_risk") return ObjectiveForecastState.AT_RISK;
+  if (goalAttainability.paceState === "ahead") return ObjectiveForecastState.AHEAD;
+  return ObjectiveForecastState.FEASIBLE;
+}
+
+function createDecisionSupport({ goalForecastStatus, goalAttainability,
+  guardrailForecasts }) {
+  const materialGuardrail = guardrailForecasts.some((item) =>
+    ["at_risk", "unlikely_respected"].includes(item.forecastState) ||
+    item.observedResult?.deviationMagnitude === "material");
+  const slightGuardrail = guardrailForecasts.some((item) =>
+    item.observedResult?.deviationMagnitude === "slight");
+  const unknownGuardrail = guardrailForecasts.some((item) => item.required &&
+    (!item.observedResult || item.observedResult.rangeMembership === "unknown"));
+  const guardrailCapacity = materialGuardrail ? "constrained" : unknownGuardrail
+    ? "unknown" : slightGuardrail ? "available_with_monitoring" :
+      guardrailForecasts.length ? "available" : "unknown";
+  const behind = goalAttainability?.status === "assessed" &&
+    ["positive_but_behind", "stalled", "regressing"].includes(
+      goalAttainability.paceState);
+  const strategyResponseSignal = behind && ["available", "available_with_monitoring"]
+    .includes(guardrailCapacity) ? "strategy_adjustment_available" :
+    behind && guardrailCapacity === "constrained" ? "strategy_adjustment_constrained" :
+      behind ? "strategy_adjustment_unresolved" :
+      "no_trajectory_pressure";
+  const goalReviewSignal = goalForecastStatus === "forecast_unlikely" ||
+    behind && guardrailCapacity === "constrained" ? "goal_review_becoming_relevant" :
+      behind ? "watch_trajectory" : "no_goal_review_needed";
+  return {
+    trajectoryPressure: behind ? "behind_expected_pace" :
+      goalAttainability?.status === "assessed" ? "within_expected_pace" : "unknown",
+    guardrailCapacity,
+    strategyResponseSignal,
+    goalReviewSignal,
+    goalContractChangesRequireAuthorization: true,
+    automaticGoalRevisionAllowed: false,
+  };
 }
 
 function createGuardrailForecasts({
@@ -245,6 +306,16 @@ function trajectoryStatus(status) {
     behind: "below_expected_trajectory",
     contradicted: "trajectory_contradicted",
   })[status];
+}
+
+function attainabilityTrajectoryStatus(value) {
+  if (value?.status !== "assessed") return null;
+  return ({ ahead: "ahead_of_expected_trajectory",
+    on_expected_trajectory: "matching_expected_trajectory",
+    positive_but_behind: "below_expected_trajectory",
+    stalled: "below_expected_trajectory",
+    regressing: "trajectory_contradicted",
+    unassessable: "trajectory_unresolved" })[value.paceState] ?? null;
 }
 
 function bandRationale(band) {

@@ -61,6 +61,7 @@ export function evaluateInterpretationGuardrails({
         !measurement && weakMeasurement ? "guardrail_weak_signal" :
           !measurement ? "guardrail_measurement_missing" :
           `guardrail_${status}`;
+    const boundary = evaluateGuardrailBoundary(measurement?.value, guardrail.constraint);
     return {
       guardrailId: guardrail.guardrailId,
       status,
@@ -70,6 +71,9 @@ export function evaluateInterpretationGuardrails({
         value: weakMeasurement.value,
         unit: weakMeasurement.unit ?? null,
         observedAt: weakMeasurement.observedAt,
+        rangeMembership: boundary.membership,
+        deviation: boundary.deviation,
+        deviationMagnitude: boundary.magnitude,
       } : null,
       evidenceRefs,
       rationale,
@@ -83,6 +87,33 @@ export function evaluateInterpretationGuardrails({
       severity[right.status] - severity[left.status])[0].status
     : GuardrailStatus.CLEAR;
   return { aggregateStatus, conclusions };
+}
+
+function evaluateGuardrailBoundary(value, constraint) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || !constraint) {
+    return { membership: "unknown", deviation: null, magnitude: "unknown" };
+  }
+  if (constraint.kind === "bounded_range" &&
+      Number.isFinite(Number(constraint.min)) && Number.isFinite(Number(constraint.max))) {
+    const min = Number(constraint.min);
+    const max = Number(constraint.max);
+    const deviation = number < min ? min - number : number > max ? number - max : 0;
+    const span = Math.max(0.000001, max - min);
+    return {
+      membership: deviation === 0 ? "inside" : number < min ? "below" : "above",
+      deviation: Number(deviation.toFixed(3)),
+      magnitude: deviation === 0 ? "none" : deviation <= span ? "slight" : "material",
+    };
+  }
+  const inside = evaluatePredicate(number, constraint);
+  return {
+    membership: inside === true ? "inside" : inside === false
+      ? constraint.kind === "minimum" ? "below" :
+        constraint.kind === "maximum" ? "above" : "outside" : "unknown",
+    deviation: null,
+    magnitude: inside === false ? "material" : inside === true ? "none" : "unknown",
+  };
 }
 
 function evaluateObjective({

@@ -9,9 +9,12 @@ export const PHASE_READINESS_CONCLUSIONS = Object.freeze({
 
 export function evaluateGoalAwarePhaseReview(input = {}) {
   const hasNextPhase = Boolean(input.nextPhaseId);
+  // Goal-outcome pressure is not itself a safety concern. A Goal can be behind
+  // pace while beginning the next adjustable phase is still the safer response
+  // to the cost of further delay. Only explicit safety evidence may veto that.
   const safetyConcern = input.guardrailDeviationMagnitude === "material" ||
-    input.evidenceTrend === "worsening" || input.forecastStatus === "forecast_at_risk" ||
-    input.forecastStatus === "forecast_unlikely" || input.phaseEvidenceConclusion === "contradicted";
+    input.evidenceTrend === "worsening" || input.forecastSafetyRisk === "material" ||
+    input.phaseEvidenceConclusion === "contradicted";
   const explicitReady = input.phaseEvidenceConclusion === "conclusively_satisfied" ||
     input.phaseEvidenceConclusion === "sufficiently_resolved_to_proceed";
   const bounded = input.uncertainty === "bounded" || input.uncertainty === "low";

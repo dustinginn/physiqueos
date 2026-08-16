@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createCanonicalDurabilityPeriod } from
   "../interpretation/EvidenceDurabilityService";
 import { resolveCommittedPhaseContext } from "../services/FounderPhaseCorrectionService";
+import { deriveCanonicalGoalProgress } from "./GoalProgressContextService";
 
 export const PRODUCTION_GOAL_CONTRACT_ADAPTER_VERSION =
   "production_goal_contract_adapter_v2";
@@ -12,10 +13,18 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
   activePhase = null,
   strategyHypothesis: acceptedStrategyHypothesis = null,
   expectedTrajectory: acceptedExpectedTrajectory = null,
+  canonicalStore = null,
+  asOf = null,
 } = {}) {
   const phaseContext = resolveCommittedPhaseContext(goal);
   goal = phaseContext.goal;
   activePhase ??= phaseContext.activePhase;
+  const acceptedStrategy = acceptedStrategyHypothesis ?? acceptedPhaseStrategy(
+    canonicalStore, goal.id, activePhase?.id)?.strategyHypothesis ?? null;
+  const acceptedTrajectoryRecord = acceptedExpectedTrajectory ? null :
+    acceptedPhaseTrajectory(canonicalStore, goal.id, activePhase?.id);
+  const acceptedTrajectory = acceptedExpectedTrajectory ??
+    acceptedTrajectoryRecord?.expectedTrajectory ?? null;
   if (!goal.id || !goal.target?.metric || !goal.target?.direction) {
     throw incomplete("canonical_goal_objective_incomplete");
   }
@@ -53,8 +62,8 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
     goal.targetDate ?? null;
   const strategyVersion = goal.updatedAt ?? goal.activatedAt ??
     activePhase?.updatedAt ?? "legacy_unversioned";
-  const strategyHypothesis = acceptedStrategyHypothesis ?
-    structuredClone(acceptedStrategyHypothesis) : {
+  const strategyHypothesis = acceptedStrategy ?
+    structuredClone(acceptedStrategy) : {
     hypothesisId: `hypothesis|${goal.id}|current_strategy`,
     strategyRef: {
       strategyId: `strategy|${goal.id}|${machine(goal.openingApproach?.value ?? "active")}`,
@@ -70,6 +79,12 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
     expectedValidationTimeline: { startDate, targetDate },
     requiredExecutionExposure: activePhase?.duration ?? null,
   };
+  const quantitativeProgress = deriveCanonicalGoalProgress({
+    goal, canonicalStore, activePhase, asOf,
+  });
+  const normalizedTrajectory = acceptedTrajectory ? normalizeExpectedTrajectory({
+    trajectory: acceptedTrajectory, activePhase, objectiveId,
+  }) : { segments: [] };
   const contract = {
     contractVersion: "goal_contract_v2_production_adapter_v1",
     contractId: `goal_contract|${goal.id}|${hash({
@@ -104,6 +119,7 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
     guardrails,
     objectiveEvaluationPolicy: { aggregateRule: "all_required" },
     timeline: { startDate, targetCompletionDate: targetDate,
+      constraintType: timelineConstraint(goal.timeline),
       currentPhase: activePhase ? { phaseId: activePhase.id,
         semanticPurpose: machine(activePhase.purpose ?? activePhase.name),
         status: activePhase.status,
@@ -113,14 +129,8 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
         reviewMilestone: activePhase.reviewMilestone ?
           structuredClone(activePhase.reviewMilestone) : null,
         completionDecisionRequired: activePhase.completionDecisionRequired !== false } : null },
-    expectedTrajectory: acceptedExpectedTrajectory ?
-      structuredClone(acceptedExpectedTrajectory) : { segments: [{
-      segmentId: `trajectory|${goal.id}|active_goal`,
-      startBoundary: startDate,
-      endBoundary: targetDate,
-      measurableChangeExpectation: "expected",
-      expectedObjectiveRanges: expectedRange({ goal, objectiveId, startDate, targetDate }),
-    }] },
+    quantitativeProgress,
+    expectedTrajectory: normalizedTrajectory,
     strategyHypothesis,
     relevantEvidence: { entries: evidenceEntries },
     successCriteria: { type: "all_required_objectives_and_guardrails" },
@@ -131,13 +141,14 @@ export function adaptProductionGoalToCanonicalContract(goal = {}, {
       sourceType: "production_goal_adapter",
       adapterVersion: PRODUCTION_GOAL_CONTRACT_ADAPTER_VERSION,
       sourceIds: [goal.id, ...(activePhase?.id ? [activePhase.id] : [])],
-      inputFingerprint: `sha256_${hash(goal)}`,
+      inputFingerprint: `sha256_${hash({ goal, quantitativeProgress,
+        expectedTrajectory: normalizedTrajectory })}`,
       missingMetadata: guardrails.filter((item) => !item.warningThreshold ||
         !item.violationThreshold).map((item) =>
         `guardrail_thresholds:${item.guardrailId}`),
       inferredMetadata: ["objective_metric_normalization",
-        ...(acceptedStrategyHypothesis ? [] : ["strategy_hypothesis_from_goal"]),
-        ...(acceptedExpectedTrajectory ? [] : ["expected_trajectory_from_goal"]),
+        ...(acceptedStrategy ? [] : ["strategy_hypothesis_from_goal"]),
+        ...(acceptedTrajectory ? [] : ["authorized_expected_trajectory_unavailable"]),
       ],
     },
   };
@@ -551,14 +562,21 @@ function adaptGuardrail(item, goalId) {
         /weight gain|gain gradual/i.test(item.text ?? "") ? "body_weight_change_lb" : null;
   const explicit = item.operator && Number.isFinite(Number(item.value))
     ? { operator: item.operator, value: Number(item.value) } : null;
+  const span = bodyFat ? bodyFat.max - bodyFat.min : null;
   return {
     guardrailId: item.id ?? `guardrail|${goalId}|${hash(item).slice(0, 12)}`,
     description: item.description ?? item.text ?? null,
     monitoredMetricOrCapability: metric,
     measurementSourceRefs: [], evaluationWindow: null,
-    warningThreshold: explicit ?? (bodyFat ? { operator: "gt", value: bodyFat.max } : null),
-    pressureThreshold: bodyFat ? { operator: "gt", value: bodyFat.max + 1 } : null,
-    violationThreshold: explicit ?? (bodyFat ? { operator: "gt", value: bodyFat.max + 2 } : null),
+    constraint: bodyFat ? { kind: "bounded_range", min: bodyFat.min,
+      max: bodyFat.max, unit: "percent" } : explicit ?
+      acceptedConstraint(explicit, item.unit) : null,
+    warningThreshold: explicit ?? (bodyFat ? { operator: "outside",
+      min: bodyFat.min, max: bodyFat.max } : null),
+    pressureThreshold: bodyFat ? { operator: "outside",
+      min: bodyFat.min - span, max: bodyFat.max + span } : null,
+    violationThreshold: explicit ?? (bodyFat ? { operator: "outside",
+      min: bodyFat.min - (span * 2), max: bodyFat.max + (span * 2) } : null),
     associatedEvidenceMapRefs: [], consequence: null, required: true,
   };
 }
@@ -568,11 +586,46 @@ function allEvidence(goal) {
     ...(goal.progressMeasurement?.explanatorySignals ?? [])]
     .filter((item) => item?.id && item?.evidenceType && item.accepted !== false);
 }
-function expectedRange({ goal, objectiveId, startDate, targetDate }) {
-  const amount = Number(goal.target?.amount);
-  if (!Number.isFinite(amount) || !startDate || !targetDate) return [];
-  return [{ expectationId: `expectation|${objectiveId}|goal_window`, objectiveRef: objectiveId,
-    min: 0, max: amount, unit: goal.target.unit ?? null }];
+function acceptedPhaseStrategy(store, goalId, phaseId) {
+  const matches = (store?.phaseStrategies ?? []).filter((item) =>
+    item.goalId === goalId && item.phaseId === phaseId && item.status === "accepted");
+  return matches.length === 1 ? matches[0] : null;
+}
+function acceptedPhaseTrajectory(store, goalId, phaseId) {
+  const matches = (store?.phaseExpectedTrajectories ?? []).filter((item) =>
+    item.goalId === goalId && item.phaseId === phaseId && item.status === "accepted");
+  return matches.length === 1 ? matches[0] : null;
+}
+function normalizeExpectedTrajectory({ trajectory, activePhase, objectiveId }) {
+  const startedOn = String(activePhase?.startedAt ?? activePhase?.startDate ?? "").slice(0, 10);
+  return {
+    ...structuredClone(trajectory),
+    segments: (trajectory?.segments ?? []).map((segment) => ({
+      ...structuredClone(segment),
+      progressScope: segment.progressScope ?? "phase",
+      startBoundary: segment.startBoundary === "actual_activation"
+        ? startedOn || null : segment.startBoundary,
+      expectedObjectiveRanges: (segment.expectedObjectiveRanges ?? []).map((range) => ({
+        ...structuredClone(range),
+        objectiveRef: range.objectiveRef ?? objectiveId,
+      })),
+    })),
+  };
+}
+function timelineConstraint(timeline = {}) {
+  const flexibility = String(timeline.flexibility ?? "").toLowerCase();
+  if (["firm", "adaptive", "aspirational", "review_only"].includes(flexibility)) {
+    return flexibility;
+  }
+  if (["target_date", "event_date"].includes(timeline.mode)) return "firm";
+  if (["open_ended", "completion_criteria"].includes(timeline.mode)) return "adaptive";
+  return "unknown";
+}
+function acceptedConstraint(predicate, unit) {
+  const inverse = { gt: "lte", gte: "lt", lt: "gte", lte: "gt" }[predicate.operator];
+  return { kind: ["gt", "gte"].includes(predicate.operator) ? "maximum" :
+    ["lt", "lte"].includes(predicate.operator) ? "minimum" : "predicate",
+  operator: inverse ?? predicate.operator, value: predicate.value, unit: unit ?? null };
 }
 function threshold(direction, value) {
   return Number.isFinite(Number(value))

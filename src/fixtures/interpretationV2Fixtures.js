@@ -19,6 +19,8 @@ export function createInterpretationV2Fixture(overrides = {}) {
       guardrails: [{
         guardrailId: "guardrail_body_fat",
         monitoredMetricOrCapability: "body_fat_pct",
+        constraint: { kind: "bounded_range", min: 8, max: 10,
+          unit: "percent" },
         warningThreshold: { operator: "gt", value: 10 },
         pressureThreshold: { operator: "gt", value: 11 },
         violationThreshold: { operator: "gt", value: 12 },

@@ -46,7 +46,7 @@ export default function AnalysisScreen({ analysis }) {
               {
                 label: formatConfidenceChange(analysis),
                 detail:
-                  "Confidence describes PhysiqueOS model certainty, not your chance of success.",
+                  "Confidence is a conservative Goal Forecast index, not a statistical chance of success.",
               },
             ]}
           />

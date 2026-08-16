@@ -108,7 +108,7 @@ describe("ForecastEngine", () => {
     });
   });
 
-  it("does not move the Forecast when only milestone time advances", () => {
+  it("lets newly overdue required milestone timing pressure the Forecast", () => {
     const arrangeGoalContract = (goal) => {
       goal.relevantEvidence.entries[0].appliesTo.milestoneRefs = [];
       goal.milestones[0].timing.expectedDateOrWindow = "2026-08-05";
@@ -126,11 +126,11 @@ describe("ForecastEngine", () => {
     });
 
     expect(later.milestoneForecasts[0].status).toBe("overdue_unresolved");
-    expect(later.goalForecastStatus).toBe(first.goalForecastStatus);
-    expect(later.confidenceBand).toBe(first.confidenceBand);
+    expect(later.goalForecastStatus).toBe("forecast_at_risk");
+    expect(later.confidenceBand).toBe("low");
     expect(later.movement).toMatchObject({
-      direction: "no_meaningful_change",
-      rationale: "interpretation_semantics_unchanged",
+      direction: "decrease",
+      rationale: "forecast_and_band_materially_weakened",
     });
   });
 
@@ -225,6 +225,73 @@ describe("ForecastEngine", () => {
     });
   });
 
+  it("classifies positive cumulative progress as behind when the remaining gap exceeds the authorized envelope", () => {
+    const result = forecast({
+      arrangeGoalContract(goal) {
+        attachProgress(goal, { required: 10, progress: 1 });
+        goal.expectedTrajectory.segments[0].progressScope = "phase";
+        goal.expectedTrajectory.segments[0].expectedObjectiveRanges[0] = {
+          ...goal.expectedTrajectory.segments[0].expectedObjectiveRanges[0],
+          min: 0, max: 3,
+        };
+      },
+    });
+    expect(result).toMatchObject({
+      goalForecastStatus: "forecast_at_risk",
+      confidenceBand: "low",
+      trajectoryForecast: { goalAttainability: {
+        paceState: "positive_but_behind",
+        remainingFeasibility: "outside_expected_envelope",
+        remainingGoalGap: 9,
+      }, decisionSupport: {
+        strategyResponseSignal: "strategy_adjustment_available",
+        goalReviewSignal: "watch_trajectory",
+      } },
+    });
+  });
+
+  it("makes Goal magnitude matter without using an ambition label", () => {
+    const run = (required) => forecast({ arrangeGoalContract(goal) {
+      attachProgress(goal, { required, progress: 2 });
+      goal.expectedTrajectory.segments[0].progressScope = "phase";
+      goal.expectedTrajectory.segments[0].expectedObjectiveRanges[0].max = 3;
+    } });
+    expect(run(3).goalForecastStatus).toBe("on_forecast");
+    expect(run(10).goalForecastStatus).toBe("forecast_at_risk");
+  });
+
+  it("keeps strong evidence separate from poor outlook and weak evidence separate from favorable appearance", () => {
+    const poorOutlook = forecast({ arrangeGoalContract(goal) {
+      attachProgress(goal, { required: 10, progress: 1 });
+      goal.expectedTrajectory.segments[0].progressScope = "phase";
+      goal.expectedTrajectory.segments[0].expectedObjectiveRanges[0].max = 3;
+    } });
+    expect(poorOutlook.confidenceBand).toBe("low");
+
+    const weakEvidence = forecast({
+      arrangeGoalContract(goal) {
+        attachProgress(goal, { required: 3, progress: 2 });
+        goal.expectedTrajectory.segments[0].progressScope = "phase";
+        goal.expectedTrajectory.segments[0].expectedObjectiveRanges[0].max = 3;
+      },
+      arrangeInterpretationInput(input) {
+        input.evidenceDescriptors[1].quality.provenanceIntegrity = "unknown";
+      },
+    });
+    expect(weakEvidence.goalForecastStatus).toBe("forecast_uncertain");
+    expect(weakEvidence.confidenceBand).toBe("developing");
+  });
+
+  it("uses unknown instead of an optimistic trajectory when authorization is missing", () => {
+    const result = forecast({ arrangeGoalContract(goal) {
+      attachProgress(goal, { required: 10, progress: 1 });
+      goal.expectedTrajectory.segments = [];
+    } });
+    expect(result).toMatchObject({ goalForecastStatus: "forecast_uncertain",
+      trajectoryForecast: { goalAttainability: { status: "unassessable",
+        rationale: "authorized_expected_trajectory_unavailable" } } });
+  });
+
   it("rejects raw evidence and every non-contract top-level input", () => {
     const fixture = createForecastV2Fixture();
     expect(() => ForecastEngine.forecast({
@@ -305,6 +372,19 @@ function forecastWithDurability(priorPeriods) {
       };
     },
   });
+}
+
+function attachProgress(goal, { required, progress }) {
+  goal.quantitativeProgress = {
+    status: "available", kind: "quantitative", metric: "generic_metric",
+    direction: "increase", unit: "units", cumulativeProgress: progress,
+    requiredProgress: required, remainingGap: Math.max(0, required - progress),
+    progressFraction: progress / required,
+    baseline: { sourceRef: "goal-baseline" },
+    current: { sourceRef: "goal-current" },
+    phase: { phaseId: "phase-generic", cumulativeProgress: progress,
+      baseline: { sourceRef: "phase-baseline" } },
+  };
 }
 
 function historicalPeriod(number) {

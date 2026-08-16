@@ -524,7 +524,7 @@ Preferred user-facing language:
 * `Supporting Objectives` only when explaining internal goal architecture
 * `Progress Photos` for user-facing uploads/history
 * `Visual Evidence` for interpreted photo evidence inside intelligence architecture
-* `Confidence` for model certainty, not success probability
+* `Confidence` for the conservative Goal Forecast confidence index, not a statistically calibrated success probability
 * `Progress` for movement toward a goal
 
 Do not rename stable user-facing labels unless the current label is clearly inconsistent with these terms.

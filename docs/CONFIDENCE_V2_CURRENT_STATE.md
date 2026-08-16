@@ -12,6 +12,12 @@ Confidence follows one canonical pipeline:
 
 The Goal Contract defines success and guardrails. Interpretation converts evidence into score-free conclusions. Forecast projects the Goal outcome; Narrative explains that projection; the numeric projection is finalized into a canonical assessment. Only an authorized publisher may persist that assessment. Presentation read services supply current or historical canonical state to rendering surfaces; those surfaces do not recalculate or publish Confidence.
 
+Confidence is a conservative ordinal Goal Forecast confidence index: the latest briefing-owned projection of Goal success under the current Strategy, planned timeline, Guardrails, and available evidence. It is not a statistically calibrated probability and it is not merely evidence or model certainty. Forecast owns Goal-outcome status; numeric Confidence remains a bounded projection of Forecast.
+
+For quantitative Goals, the production Goal Contract carries a versioned progress context when canonical lineage can establish it: Goal baseline, current observation, cumulative progress, remaining gap, and phase-boundary progress. Forecast also receives explicit elapsed and remaining runway. An authorized Goal- or phase-owned Expected Trajectory supplies the response envelope. Missing baseline, unclear completion timing, or missing authorized trajectory remains uncertain; the runtime does not substitute the former broad `0 -> full target` optimistic fallback.
+
+Range Guardrails preserve exact lower and upper membership. Deviation magnitude informs Forecast pressure without changing range truth. Forecast may expose downstream decision context that distinguishes Strategy adjustment capacity from emerging Goal-review pressure, but it neither chooses a Goal-specific lever nor revises a Goal Contract automatically.
+
 ## Publication ownership
 
 The authorized publishers are exactly:

@@ -37,10 +37,10 @@ export function createPIPhotoEventLifecycleService({ publicationService,
         .getCurrent({ goalId: goal.id, phaseId: phase.id });
       if (!current.assessment) return typed("canonical_predecessor_required",
         "Photo Confidence requires a canonical predecessor.");
-      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
-        activePhase: phase,
-      });
       const cutoff = iso(session.capturedAt ?? session.captureDate ?? session.date);
+      const goalContract = adaptProductionGoalToCanonicalContract(goal, {
+        activePhase: phase, canonicalStore: baseline.store, asOf: cutoff,
+      });
       const result = await finalizer.finalize({
         publisherType: "photo_event_briefing", userId: artifact.userId,
         occurrenceId: artifact.id, artifactId: artifact.id,
