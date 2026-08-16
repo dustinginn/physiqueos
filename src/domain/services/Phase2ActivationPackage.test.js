@@ -32,6 +32,20 @@ describe("canonical Founder Phase 2 activation package", () => {
       repeatValidationRequired: true,
     });
     expect(drafts.trajectory.guardrailTrajectory.independentFromObjective).toBe(true);
+    expect(drafts.strategy.domains.energy).toMatchObject({
+      monitoringCadence: "weekly",
+      strategicReviewCadence: "monthly",
+      strategicReviewAnchor: "dexa_body_composition",
+      adjustmentAuthorization: "user_required",
+      automaticAdjustmentAllowed: false,
+    });
+    expect(drafts.trajectory.timeline).toMatchObject({
+      projectedStartRule: "review_milestone_boundary",
+      projectedStart: "2026-08-15",
+    });
+    expect(drafts.trajectory.milestones.find((item) =>
+      item.type === "first_phase_cadence_review")?.expectedTiming)
+      .toEqual({ mode: "strategic_review_cadence", cadence: "monthly", anchor: "dexa_body_composition" });
     expect(drafts.trajectory.expectedTrajectory.segments.every((segment) =>
       segment.expectedObjectiveRanges.every((range) => range.min <= range.max))).toBe(true);
     expect(drafts.strategy.sourceLineage.map((item) => item.field)).toEqual(
@@ -105,9 +119,42 @@ describe("canonical Founder Phase 2 activation package", () => {
 function fixture() {
   const store = JSON.parse(fs.readFileSync(productionPath, "utf8"));
   const sourceGoal = store.goals.find(isFounderBuildLeanMassGoal);
-  const goal = projectFounderBuildLeanMassPhaseCorrection(sourceGoal);
+  const goal = restorePlannedGoal(projectFounderBuildLeanMassPhaseCorrection(sourceGoal));
   const phase = goal.phases.find((item) => item.id === goal.projectedNextPhaseId) ??
     goal.phases.find((item) => item.name === "Lean Mass Build");
   return { store, goal, phase, drafts: createFounderPhase2ActivationPackageDrafts({
     store, goal, phase, createdAt: "2026-08-02T12:00:00.000Z" }) };
+}
+
+function restorePlannedGoal(goal) {
+  const current = goal.phases.find((item) => item.name === "Establish Maintenance");
+  const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
+  Object.assign(current, {
+    status: "active",
+    completedAt: null,
+    completionDecisionId: null,
+    reviewState: "due",
+    revision: 0,
+    reviewMilestone: {
+      ...current.reviewMilestone,
+      consumed: false,
+      resolvedReviewId: null,
+      revision: 0,
+    },
+  });
+  Object.assign(phase, {
+    status: "planned",
+    startDate: null,
+    startedAt: null,
+    projectedNextPhaseStart: "2026-08-15",
+    reviewState: "scheduled",
+    revision: 0,
+  });
+  goal.currentPhaseId = current.id;
+  goal.projectedNextPhaseId = phase.id;
+  goal.timeline = { ...goal.timeline, currentPhaseId: current.id,
+    projectedNextPhaseStart: "2026-08-15" };
+  goal.activePhaseStrategyId = null;
+  goal.activeExpectedTrajectoryId = null;
+  return goal;
 }

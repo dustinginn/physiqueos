@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { formatGoalStartDate } from "./goalStartDate";
 
 describe("Goal start-date presentation", () => {
-  it("presents the canonical UTC date instant in the app timezone", () => {
-    expect(formatGoalStartDate("2026-07-20")).toBe("July 19, 2026");
+  it("presents date-only domain values without a timezone shift", () => {
+    expect(formatGoalStartDate("2026-07-20")).toBe("July 20, 2026");
   });
 
   it("fails closed for absent or malformed values", () => {

@@ -1,3 +1,5 @@
+import { resolvePhaseTransitionDate } from "./PhaseTransitionDatePolicy";
+
 export const PHASE_REVIEW_PREVIEW_VERSION = "phase_review_preview_v1";
 export const PHASE_REVIEW_RECOMMENDATIONS = Object.freeze({
   BEGIN_NEXT_PHASE: "begin_next_phase",
@@ -60,15 +62,16 @@ export function projectPhaseReviewSelection(review, selection = {}) {
   }
   const selectedOutcome = selection.selectedOutcome ?? review.recommendation;
   if (selectedOutcome === PHASE_REVIEW_RECOMMENDATIONS.BEGIN_NEXT_PHASE) {
+    const transition = resolvePhaseTransitionDate({ reviewMilestoneDate: review.originalReviewDate });
     return Object.freeze({
       selectedOutcome: "begin_next_phase",
       selectedDurationDays: null,
       customReviewDate: null,
       recommendedReviewDate: review.originalReviewDate,
       selectedReviewDate: review.originalReviewDate,
-      projectedNextPhaseStart: review.originalReviewDate,
+      projectedNextPhaseStart: transition.effectiveDate,
       projectedNextPhaseReview: addDays(
-        review.originalReviewDate,
+        transition.effectiveDate,
         review.nextPhaseReviewIntervalDays
       ),
     });

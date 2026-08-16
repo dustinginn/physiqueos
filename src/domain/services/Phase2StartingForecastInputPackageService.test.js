@@ -17,7 +17,7 @@ const productionPath = path.resolve(process.cwd(), "private/founder/runtime-stor
 describe("Phase 2 Starting Forecast input package", () => {
   it("is deterministic, accepted-only, lineage-complete, and excludes raw or V1 semantics", () => {
     const store = JSON.parse(fs.readFileSync(productionPath, "utf8"));
-    const goal = projectFounderBuildLeanMassPhaseCorrection(store.goals.find(isFounderBuildLeanMassGoal));
+    const goal = plannedGoalForStartingForecast(store);
     const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
     const drafts = createFounderPhase2ActivationPackageDrafts({ store, goal, phase,
       createdAt: "2026-08-02T12:00:00.000Z" });
@@ -30,8 +30,8 @@ describe("Phase 2 Starting Forecast input package", () => {
     activeGoal.phases.find((item) => item.id !== phase.id).status = "completed";
     activeGoal.phases.find((item) => item.id !== phase.id).completedAt = "2026-08-15T19:00:00.000Z";
     activePhase.status = "active";
-    activePhase.startedAt = "2026-08-16";
-    activePhase.startDate = "2026-08-16";
+    activePhase.startedAt = "2026-08-15";
+    activePhase.startDate = "2026-08-15";
     activeGoal.currentPhaseId = activePhase.id;
     const decision = decisionFor(activeGoal, activePhase, acceptedStrategy, acceptedTrajectory);
     const one = createPhase2StartingForecastInputPackage({ store, goal: activeGoal, activePhase,
@@ -56,7 +56,7 @@ describe("Phase 2 Starting Forecast input package", () => {
     expect(one.goalContract.expectedTrajectory.segments.every((item) =>
       item.progressScope === "phase")).toBe(true);
     expect(one.goalContract.expectedTrajectory.segments[0].startBoundary)
-      .toBe("2026-08-16");
+      .toBe("2026-08-15");
     expect(one.goalContract.provenance.inferredMetadata).not.toContain("strategy_hypothesis_from_goal");
     expect(one.goalContract.provenance.inferredMetadata).not.toContain("expected_trajectory_from_goal");
     expect(one.exclusions).toEqual(expect.objectContaining({ rawEvidenceRecords: true,
@@ -68,10 +68,10 @@ describe("Phase 2 Starting Forecast input package", () => {
 
   it("fails closed for draft records and stale accepted revisions", () => {
     const store = JSON.parse(fs.readFileSync(productionPath, "utf8"));
-    const goal = projectFounderBuildLeanMassPhaseCorrection(store.goals.find(isFounderBuildLeanMassGoal));
+    const goal = plannedGoalForStartingForecast(store);
     const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
     const drafts = createFounderPhase2ActivationPackageDrafts({ store, goal, phase });
-    const activePhase = { ...phase, status: "active", startedAt: "2026-08-16" };
+    const activePhase = { ...phase, status: "active", startedAt: "2026-08-15" };
     expect(() => createPhase2StartingForecastInputPackage({ store, goal, activePhase,
       acceptedStrategy: drafts.strategy, acceptedTrajectory: drafts.trajectory,
       decision: { ...decisionFor(goal, activePhase, drafts.strategy, drafts.trajectory),
@@ -192,10 +192,47 @@ function accept(service, type, draft) {
     authorization: { authorized: true, scope: "phase_activation_package_acceptance",
       recordId: ready.id, actorId: "user_founder_001" } }).record;
 }
+function plannedGoalForStartingForecast(store) {
+  const source = store.goals.find(isFounderBuildLeanMassGoal);
+  const goal = structuredClone(projectFounderBuildLeanMassPhaseCorrection(source));
+  const current = goal.phases.find((item) => item.name === "Establish Maintenance");
+  const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
+  current.status = "active";
+  current.completedAt = null;
+  current.completionDecisionId = null;
+  current.reviewState = "due";
+  current.revision = 0;
+  current.reviewMilestone = {
+    ...current.reviewMilestone,
+    consumed: false,
+    resolvedReviewId: null,
+    revision: 0,
+  };
+  phase.status = "planned";
+  phase.startDate = null;
+  phase.startedAt = null;
+  phase.projectedNextPhaseStart = "2026-08-15";
+  phase.reviewState = "scheduled";
+  phase.revision = 0;
+  goal.currentPhaseId = current.id;
+  goal.projectedNextPhaseId = phase.id;
+  goal.activePhaseStrategyId = null;
+  goal.activeExpectedTrajectoryId = null;
+  goal.timeline = {
+    ...goal.timeline,
+    currentPhaseId: current.id,
+    currentPhaseStartedAt: current.startedAt,
+    projectedNextPhaseStart: "2026-08-15",
+    activePhaseStrategyId: null,
+    activeExpectedTrajectoryId: null,
+  };
+  store.goals.splice(store.goals.findIndex((item) => item.id === source.id), 1, goal);
+  return goal;
+}
 function decisionFor(goal, phase, strategy, trajectory) {
   return { decisionId: "phase-review-decision", idempotencyKey: "phase-review-decision",
     actorId: "user_founder_001", decidedAt: "2026-08-15T19:00:00.000Z",
-    projectedNextPhaseStart: "2026-08-16", expectedStrategyRevision: strategy.revision,
+    projectedNextPhaseStart: "2026-08-15", expectedStrategyRevision: strategy.revision,
     expectedTrajectoryRevision: trajectory.revision, reasoningLineage: [{ id: "reason", type: "review" }],
     originatingArtifactId: "dexa-briefing", originatingForecastId: "forecast",
     originatingInterpretationId: "interpretation", goalId: goal.id, nextPhaseId: phase.id };

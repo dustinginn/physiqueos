@@ -16,8 +16,8 @@ describe("HomeGoalTrajectoryService", () => {
   it("resolves the complete destination and documented fixed-duration convention", () => {
     const result = resolveHomeGoalTrajectory({ activeGoal: goal, currentDate: "2026-07-21T12:00:00Z", timeZone: "America/Los_Angeles" });
     expect(result.overallGoal).toMatchObject({ targetDescription: "Build 10 lb of lean mass", journeyStartDate: "2026-07-20", overallTargetDate: "2026-10-31", destinationCompleteness: "complete" });
-    expect(result.activePhase).toMatchObject({ phaseName: "Establish Maintenance", calculatedPlannedReviewDate: "2026-08-17", totalPlannedDays: 28, elapsedDays: 1, remainingDays: 27, friendlyTimeline: "About 4 weeks remaining" });
-    expect(result.dateConvention).toBe("explicit_planned_review_then_legacy_timing_fallback");
+    expect(result.activePhase).toMatchObject({ phaseName: "Establish Maintenance", calculatedPlannedReviewDate: "2026-08-17", totalPlannedDays: 28, elapsedDays: 1, remainingDays: 27, friendlyTimeline: "4 weeks remaining" });
+    expect(result.dateConvention).toBe("explicit_planned_review_then_fixed_duration_fallback");
     expect(result.upcomingPhases[0]).toMatchObject({ phaseName: "Lean Mass Build", timelineProgressPercentage: 0, sequencingNote: "Begins after an authorized prior-phase decision" });
     expect(Object.isFrozen(result)).toBe(true);
   });
@@ -97,11 +97,27 @@ describe("HomeGoalTrajectoryService", () => {
     expect(afterFallback).toMatchObject({ remainingDays: 0, timelineProgressState: "review_due" });
   });
 
-  it("handles target-date active phases only when a start date exists", () => {
+  it("keeps the Goal target distinct from a phase review date", () => {
     const target = structuredClone(goal); target.phases[0] = { ...target.phases[0], timingMode: "target_date", duration: null, targetDate: "2026-08-17" };
-    expect(resolveHomeGoalTrajectory({ activeGoal: target, currentDate: "2026-08-03T12:00:00Z" }).activePhase.timelineProgressPercentage).toBe(50);
+    const active = resolveHomeGoalTrajectory({ activeGoal: target, currentDate: "2026-08-03T12:00:00Z" }).activePhase;
+    expect(active.timelineProgressPercentage).toBeNull();
+    expect(active.calculatedPlannedReviewDate).toBeNull();
+    expect(active.friendlyTimeline).toBe("2 weeks to goal target");
     target.phases[0].startDate = null;
     expect(resolveHomeGoalTrajectory({ activeGoal: target }).activePhase.timelineProgressPercentage).toBeNull();
+  });
+
+  it("never reduces a 76-day Goal runway to about four weeks", () => {
+    const target = structuredClone(goal);
+    target.phases = [{ ...target.phases[1], status: "active", startDate: "2026-08-15",
+      startedAt: "2026-08-15", strategicReviewCadence: "monthly",
+      strategicReviewAnchor: "dexa_body_composition" }];
+    const active = resolveHomeGoalTrajectory({ activeGoal: target,
+      currentDate: "2026-08-16T12:00:00Z" }).activePhase;
+    expect(active).toMatchObject({ calculatedPlannedReviewDate: null,
+      remainingDays: null, timelineProgressPercentage: null,
+      friendlyTimeline: "11 weeks to goal target",
+      progressLabel: "Monthly strategic review · DEXA aligned" });
   });
 
   it("uses completed and skipped semantics without treating skipped as success", () => {
@@ -133,6 +149,26 @@ describe("HomeGoalTrajectoryService", () => {
     expect(result).toMatchObject({ progressType: "outcome", metric: "lean_mass", baselineValue: 147.5, baselineDate: "2026-07-18", latestValue: 150, latestDate: "2026-08-20", changeValue: 2.5, targetAmount: 10, rawProgressPercentage: 25, clampedProgressPercentage: 25, evidenceSource: "DEXA", status: "measured" });
   });
 
+  it("keeps cumulative Goal progress visible in the active outcome-owning final phase", () => {
+    const finalGoal = structuredClone(goal);
+    finalGoal.currentPhaseId = "p2";
+    finalGoal.phases = [
+      { ...finalGoal.phases[0], status: "completed" },
+      { ...finalGoal.phases[1], status: "active", startDate: "2026-08-15",
+        startedAt: "2026-08-15", strategicReviewCadence: "monthly" },
+    ];
+    const result = resolveHomeGoalTrajectory({ activeGoal: finalGoal,
+      currentDate: "2026-08-16T12:00:00Z",
+      dexaScans: [scan("2026-07-18", 147.5), scan("2026-08-15", 148.3)] });
+    expect(result.activePhase.progress).toMatchObject({ baselineDate: "2026-07-18",
+      baselineValue: 147.5, latestDate: "2026-08-15", latestValue: 148.3,
+      changeValue: 0.8, targetAmount: 10, presentationLabel: "0.8 of 10 lb gained" });
+    expect(result.overallGoal.goalBaseline).toEqual({ date: "2026-07-18",
+      value: 147.5, unit: "lb" });
+    expect(result.activePhase.phaseBaseline).toEqual({ date: "2026-08-15",
+      leanMass: { value: 148.3, unit: "lb" } });
+    expect(result.activePhase.presentationTone).toBe("green");
+  });
   it("does not use scale weight, invalid DEXA, or target-date elapsed time", () => {
     const result = resolveHomeGoalTrajectory({ activeGoal: goal, currentDate: "2026-09-20T12:00:00Z", dexaScans: [{ measuredAt: "2026-07-18", weight: { value: 180, unit: "lb" } }] });
     expect(result.phases[1].progress).toMatchObject({ progressType: "unavailable", status: "baseline_unavailable", clampedProgressPercentage: null });

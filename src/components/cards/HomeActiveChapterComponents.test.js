@@ -16,7 +16,7 @@ describe("Home active chapter components", () => {
       goalLabel: "Build Lean Mass",
       headline: "Establish Maintenance",
       mode: "phase_trajectory",
-      primaryTimeline: "About 4 weeks remaining",
+      primaryTimeline: "4 weeks remaining",
       plannedReviewDate: "2026-08-17",
       supportLine: "We're establishing the baseline.",
       supportingMetrics: [],
@@ -24,7 +24,7 @@ describe("Home active chapter components", () => {
 
     expect(html).toContain("lucide-dumbbell");
     expect(html).toContain("View why goal confidence is 39 percent");
-    expect(html).toContain("About 4 weeks remaining");
+    expect(html).toContain("4 weeks remaining");
     expect(html).toContain("Planned review: August 17");
     expect(html).not.toMatch(/Maintenance Calibration|Calibration in progress|Projected Finish|Days Remaining|Unavailable/);
   });

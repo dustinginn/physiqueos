@@ -34,6 +34,7 @@ describe("Phase Review coordinator production safety", () => {
     const simulated = structuredClone(productionStore);
     simulated.goals.splice(simulated.goals.findIndex((item) => item.id === sourceGoal.id),
       1, structuredClone(repair.candidate));
+    const planned = restorePlannedGoal(simulated, repair.goalId);
     simulated.phaseReviewDecisions ??= [];
     simulated.phaseReviewTransactions ??= [];
     simulated.phaseStrategies = [];
@@ -47,8 +48,7 @@ describe("Phase Review coordinator production safety", () => {
     const simulationBefore = fs.readFileSync(simulationPath);
     const liveStore = structuredClone(simulated);
     memory.checkpoint("temporary_live_store_created");
-    const first = repair.candidate.phases.find((item) => item.name === "Establish Maintenance");
-    const second = repair.candidate.phases.find((item) => item.name === "Lean Mass Build");
+    const { first, second } = planned;
     const decision = {
       decisionId: "simulation-founder-begin-phase-2",
       goalId: repair.goalId,
@@ -62,7 +62,7 @@ describe("Phase Review coordinator production safety", () => {
       selectedOutcome: "begin_next_phase",
       selectedDuration: null,
       selectedReviewAt: null,
-      projectedNextPhaseStart: "2026-08-16",
+      projectedNextPhaseStart: "2026-08-15",
       decidedAt: "2026-08-15T19:00:00.000Z",
       decisionSource: "production_safety_simulation",
       originatingArtifactId: "simulation-artifact",
@@ -106,6 +106,48 @@ describe("Phase Review coordinator production safety", () => {
       temporaryStoreInstances: 1, exactByteComparisons: 2 });
   }, 120000);
 });
+
+function restorePlannedGoal(store, goalId) {
+  const goal = store.goals.find((item) => item.id === goalId);
+  const [first, second] = goal.phases;
+  Object.assign(first, {
+    status: "active",
+    completedAt: null,
+    completionDecisionId: null,
+    reviewState: "due",
+    revision: 0,
+    reviewMilestone: {
+      ...(first.reviewMilestone ?? {}),
+      consumed: false,
+      resolvedAt: null,
+      decisionId: null,
+      revision: 0,
+    },
+  });
+  Object.assign(second, {
+    status: "planned",
+    startDate: null,
+    startedAt: null,
+    projectedNextPhaseStart: "2026-08-15",
+    reviewState: "scheduled",
+    revision: 0,
+  });
+  Object.assign(goal, {
+    currentPhaseId: first.id,
+    projectedNextPhaseId: second.id,
+    activePhaseStrategyId: null,
+    activeExpectedTrajectoryId: null,
+    timeline: {
+      ...(goal.timeline ?? {}),
+      currentPhaseId: first.id,
+      projectedNextPhaseId: second.id,
+      projectedNextPhaseStart: "2026-08-15",
+      activePhaseStrategyId: null,
+      activeExpectedTrajectoryId: null,
+    },
+  });
+  return { first, second };
+}
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");

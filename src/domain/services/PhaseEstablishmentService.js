@@ -2,6 +2,14 @@ import { createHash } from "node:crypto";
 import { createPhaseStrategy } from "../models/phaseStrategy";
 import { createPhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
 
+export const PHASE_EXECUTION_CADENCE = Object.freeze({
+  monitoringCadence: "weekly",
+  strategicReviewCadence: "monthly",
+  strategicReviewAnchor: "dexa_body_composition",
+  adjustmentAuthorization: "user_required",
+  automaticAdjustmentAllowed: false,
+});
+
 export function createAuthorizedPhaseEstablishment({ goal, currentPhase, nextPhase, actorId,
   decisionId, idempotencyKey, decidedAt, projectedStart, caloricIntakeTarget,
   activityExpenditureTarget, sourceArtifactId, sourceEvidenceId = null } = {}) {
@@ -31,7 +39,13 @@ export function createAuthorizedPhaseEstablishment({ goal, currentPhase, nextPha
     purpose: { supportLeanMassGain: true, protectBodyFatGuardrail: true,
       avoidUnnecessarilyAggressiveSurplus: true, preserveGoalRunway: true },
     domains: {
-      energy: { intent: "execute_user_authorized_phase_targets", adjustmentLogic: "small_reviewed_changes", fixedCaloriePrescription: false },
+      energy: { intent: "execute_user_authorized_phase_targets",
+        adjustmentLogic: "reviewed_changes_only", fixedCaloriePrescription: false,
+        monitoringCadence: PHASE_EXECUTION_CADENCE.monitoringCadence,
+        strategicReviewCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+        strategicReviewAnchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor,
+        adjustmentAuthorization: PHASE_EXECUTION_CADENCE.adjustmentAuthorization,
+        automaticAdjustmentAllowed: PHASE_EXECUTION_CADENCE.automaticAdjustmentAllowed },
       nutrition: { intent: "support_phase_objective", executionTargetOwnedBy: "energy_protocol" },
       training: { intent: "progress_toward_phase_objective", interpretationRule: "multi_session_evidence_required" },
       activity: { intent: "hold_a_reviewable_expenditure_baseline", executionTargetOwnedBy: "energy_protocol" },
@@ -61,8 +75,10 @@ export function createAuthorizedPhaseEstablishment({ goal, currentPhase, nextPha
     trajectoryId, goalId: goal.id, phaseId: nextPhase.id, ...accepted(trajectoryId),
     sourceLineage: [lineage("timeline", "goal.timeline"), lineage("objectiveTrajectory", "goal.target"),
       lineage("guardrailTrajectory", "goal.guardrails"), lineage("milestones", "nextPhase")],
-    timeline: { projectedStartRule: "first_full_execution_day_after_authorized_transition",
-      projectedStart, goalTargetDate: targetDate, preActivationEvidenceOwnership: "none" },
+    timeline: { projectedStartRule: "review_milestone_boundary",
+      projectedStart, goalTargetDate: targetDate, preActivationEvidenceOwnership: "none",
+      strategicReviewCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+      strategicReviewAnchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor },
     objectiveTrajectory: { direction: goal.target?.direction ?? "improve", partialProgressHasValue: true,
       fullTargetIsPromise: false, repeatValidationRequired: true },
     guardrailTrajectory: { acceptedRange: guardrail ?? { state: "not_structured" }, independentFromObjective: true },
@@ -70,7 +86,9 @@ export function createAuthorizedPhaseEstablishment({ goal, currentPhase, nextPha
     trainingTrajectory: { expectation: "monitor_repeated_performance", isolatedRegressionInvalidatesStrategy: false },
     milestones: [
       milestone("phase_starting_forecast", { mode: "on_activation" }, "initialize phase forecast", ["accepted_strategy", "accepted_execution_targets"], ["phase_starting_prior"], false, false),
-      milestone("first_phase_cadence_review", { mode: "first_cadence_after_activation" }, "review early response", ["weight", "nutrition", "activity", "training", "recovery"], ["early_response"], true, false),
+      milestone("first_phase_cadence_review", { mode: "strategic_review_cadence",
+        cadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+        anchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor }, "review accumulated response", ["weight", "nutrition", "activity", "training", "recovery", "body_composition"], ["early_response"], true, false),
       milestone("first_post_transition_photo_event", { mode: "next_qualifying_event" }, "add visual context", ["comparable_photos"], ["visual_change"], true, false),
       milestone("objective_comparison", { mode: "next_qualifying_objective_evidence" }, "measure objective response", [goal.target?.metric ?? "objective_evidence"], ["objective_change"], true, false),
       milestone("mid_phase_review", { mode: "midpoint_of_activation_and_target" }, "review strategy and runway", ["objective_and_supporting_evidence"], ["trajectory_feasibility"], true, false),
@@ -85,7 +103,11 @@ export function createAuthorizedPhaseEstablishment({ goal, currentPhase, nextPha
   return deepFreeze({
     schemaVersion: "phase_establishment_v1", strategy, trajectory,
     executionTargets: { caloricIntake: calories, activityExpenditure: activity,
-      evaluationCadence: "weekly", adjustmentMethod: "reviewed_small_changes" },
+      evaluationCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+      monitoringCadence: PHASE_EXECUTION_CADENCE.monitoringCadence,
+      strategicReviewCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+      strategicReviewAnchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor,
+      adjustmentMethod: "user_authorized_reviewed_changes", automaticAdjustmentAllowed: false },
     lineage: { sourceArtifactId, sourceEvidenceId, decisionId, currentPhaseId: currentPhase.id,
       nextPhaseId: nextPhase.id, actorId, authorizedAt: decidedAt },
   });

@@ -1,15 +1,16 @@
 import {
   CanonicalGoalPhaseStatus,
   PhaseReviewState,
-  addLocalDays,
   canonicalPhaseRevision,
   isActivePhaseStatus,
 } from "../models/canonicalGoalPhase";
 import { PhaseReviewUserDecision } from "../models/phaseReviewDecision";
+import { ProtocolVersionStatus } from "../models/protocolVersion";
 import { createPhaseReviewMilestone } from "../models/phaseReviewMilestone";
 import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { validatePhaseStrategy } from "../models/phaseStrategy";
 import { validatePhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
+import { resolvePhaseTransitionDate } from "./PhaseTransitionDatePolicy";
 import { createPhase2StartingForecastInputPackage } from
   "./Phase2StartingForecastInputPackageService";
 
@@ -168,6 +169,10 @@ export function createCanonicalPhaseReviewParticipants({
           phase.startedAt = start;
           phase.startDate = start;
           phase.projectedNextPhaseStart = null;
+          phase.strategicReviewCadence = decision.phaseEstablishment?.executionTargets?.strategicReviewCadence ?? null;
+          phase.strategicReviewAnchor = decision.phaseEstablishment?.executionTargets?.strategicReviewAnchor ?? null;
+          phase.monitoringCadence = decision.phaseEstablishment?.executionTargets?.monitoringCadence ?? null;
+          phase.automaticStrategyAdjustmentAllowed = false;
           phase.reviewState = phase.plannedReviewAt ?
             PhaseReviewState.SCHEDULED : PhaseReviewState.NOT_REQUIRED;
         } else {
@@ -277,7 +282,15 @@ export function createCanonicalPhaseReviewParticipants({
         if ((baseline.protocolVersions ?? []).some((item) => item.id === versionId)) {
           fail("ENERGY_VERSION_CONFLICT", "The next Energy protocol version identity already exists.");
         }
-        return { mode: "version", protocolId: protocol.id, expectedCurrentVersionId: protocol.currentVersionId,
+        const previousVersion = versions.find((item) => item.id === protocol.currentVersionId);
+        if (!previousVersion || previousVersion.status !== ProtocolVersionStatus.ACTIVE ||
+            previousVersion.endedAt) {
+          fail("ENERGY_CURRENT_VERSION_INVALID",
+            "The current Energy protocol version must be active before replacement.");
+        }
+        return { mode: "version", protocolId: protocol.id,
+          expectedCurrentVersionId: protocol.currentVersionId,
+          previousVersionId: previousVersion.id,
           version: { id: versionId, protocolId: protocol.id, versionNumber: nextVersion,
             status: "active", effectiveAt: effectiveStart(decision), activatedAt: decision.decidedAt,
             goalLinks: [{ goalId: decision.goalId, relationship: "supports" }],
@@ -297,6 +310,15 @@ export function createCanonicalPhaseReviewParticipants({
           fail("ENERGY_PROTOCOL_STALE", "The active Energy protocol changed during transition.");
         }
         stagedState.protocolVersions ??= [];
+        const previous = requiredRecord(stagedState.protocolVersions ?? [],
+          prepared.previousVersionId, "Previous Energy protocol version");
+        if (previous.status !== ProtocolVersionStatus.ACTIVE || previous.endedAt) {
+          fail("ENERGY_CURRENT_VERSION_INVALID",
+            "The previous Energy protocol version changed during transition.");
+        }
+        previous.status = ProtocolVersionStatus.SUPERSEDED;
+        previous.endedAt = effectiveStart(decision);
+        previous.supersededByVersionId = prepared.version.id;
         stagedState.protocolVersions.push(structuredClone(prepared.version));
         protocol.currentVersionId = prepared.version.id;
         protocol.effectiveStrategy = structuredClone(prepared.effectiveStrategy);
@@ -583,7 +605,9 @@ function requiredRecord(records, id, label) {
   return record;
 }
 function effectiveStart(decision) {
-  return decision.projectedNextPhaseStart ?? addLocalDays(decision.decidedAt.slice(0, 10), 1);
+  return decision.projectedNextPhaseStart ?? resolvePhaseTransitionDate({
+    reviewMilestoneDate: decision.originalPlannedReviewAt,
+  }).effectiveDate;
 }
 function isBegin(decision) {
   return decision.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE;
@@ -601,8 +625,13 @@ function phaseExecutionStrategy(decision) {
     phaseStrategyId: decision.phaseEstablishment.strategy.id,
     caloricIntakeTarget: structuredClone(targets.caloricIntake),
     activityExpenditureTarget: structuredClone(targets.activityExpenditure),
-    evaluationCadence: targets.evaluationCadence,
+    evaluationCadence: targets.strategicReviewCadence ?? targets.evaluationCadence,
+    monitoringCadence: targets.monitoringCadence,
+    strategicReviewCadence: targets.strategicReviewCadence,
+    strategicReviewAnchor: targets.strategicReviewAnchor,
     adjustmentMethod: targets.adjustmentMethod,
+    automaticAdjustmentAllowed: targets.automaticAdjustmentAllowed === true,
+    adjustmentAuthorization: "user_required",
     signals: ["Weight trend", "Nutrition", "Activity", "Training performance",
       "Recovery", "Body composition"],
     uncertainty: "The targets remain reviewable as new evidence arrives",

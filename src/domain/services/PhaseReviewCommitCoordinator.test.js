@@ -33,7 +33,7 @@ describe("Phase Review Commit Coordinator", () => {
       plannedReviewAt: "2026-08-15", completionDecisionId: decision.decisionId,
     });
     expect(stored.goals[0].phases[1]).toMatchObject({
-      status: "active", startedAt: "2026-08-16", projectedNextPhaseStart: null,
+      status: "active", startedAt: "2026-08-15", projectedNextPhaseStart: null,
     });
     expect(stored.goals[0]).toMatchObject({
       currentPhaseId: "p2", projectedNextPhaseId: null,
@@ -142,6 +142,60 @@ describe("Phase Review Commit Coordinator", () => {
     expect(fs.readFileSync(fixture.file)).toEqual(before);
   });
 
+  it("rolls back Energy supersession when a later transition participant fails", async () => {
+    const participants = replaceParticipant(createCanonicalPhaseReviewParticipants(),
+      PhaseReviewParticipantName.STARTING_FORECAST, {
+        async prepare() {
+          const error = new Error("injected post-Energy failure");
+          error.code = "INJECTED_POST_ENERGY_FAILURE";
+          throw error;
+        },
+      });
+    const fixture = createFixture({
+      participants,
+      arrangeStore(store) {
+        store.protocols[0] = {
+          ...store.protocols[0],
+          protocolType: "energy",
+          currentVersionId: "protocol-version-1",
+          effectiveStrategy: { mode: "Maintenance Calibration" },
+        };
+        store.protocolVersions[0] = {
+          ...store.protocolVersions[0],
+          versionNumber: 1,
+          status: "active",
+          effectiveAt: "2026-07-19",
+          endedAt: null,
+        };
+      },
+    });
+    const strategy = fixture.liveStore.phaseStrategies.find((item) => item.id === "strategy-p2");
+    const trajectory = fixture.liveStore.phaseExpectedTrajectories.find((item) =>
+      item.id === "trajectory-p2");
+    fixture.liveStore.phaseStrategies = fixture.liveStore.phaseStrategies.filter((item) => item.id !== strategy.id);
+    fixture.liveStore.phaseExpectedTrajectories = fixture.liveStore.phaseExpectedTrajectories.filter((item) => item.id !== trajectory.id);
+    fs.writeFileSync(fixture.file, JSON.stringify(fixture.liveStore));
+    const decision = beginDecision();
+    decision.phaseEstablishment = {
+      schemaVersion: "phase_establishment_v1",
+      strategy,
+      trajectory,
+      executionTargets: {
+        caloricIntake: { value: 2500, unit: "kcal/day" },
+        activityExpenditure: { value: 800, unit: "kcal/day" },
+      },
+    };
+    const before = fs.readFileSync(fixture.file);
+    const result = await fixture.coordinator.commit(decision, {
+      authorization: authorization(decision),
+    });
+    expect(result).toMatchObject({ status: "failed", committed: false,
+      reasonCode: "INJECTED_POST_ENERGY_FAILURE" });
+    expect(fs.readFileSync(fixture.file)).toEqual(before);
+    expect(fixture.liveStore.protocolVersions).toEqual([
+      expect.objectContaining({ id: "protocol-version-1", status: "active", endedAt: null }),
+    ]);
+  });
   it.each([
     ["validate", { async validate() { return false; } },
       "PHASE_REVIEW_PARTICIPANT_READ_MODELS_VALIDATE_FAILED"],
@@ -311,7 +365,7 @@ function store() {
       currentPhaseId: "p1",
       projectedNextPhaseId: "p2",
       timeline: { startDate: "2026-07-19", targetDate: "2026-10-31",
-        currentPhaseId: "p1", projectedNextPhaseStart: "2026-08-16" },
+        currentPhaseId: "p1", projectedNextPhaseStart: "2026-08-15" },
       phases: [
         { id: "p1", goalId, name: "Establish Maintenance", purpose: "Establish maintenance.",
           order: 0, status: "active", startedAt: "2026-07-19", startDate: "2026-07-19",
@@ -320,7 +374,7 @@ function store() {
           successCriteria: [] },
         { id: "p2", goalId, name: "Lean Mass Build", purpose: "Build lean mass.",
           order: 1, status: "planned", startedAt: null, startDate: null,
-          projectedNextPhaseStart: "2026-08-16", plannedReviewAt: "2026-10-15",
+          projectedNextPhaseStart: "2026-08-15", plannedReviewAt: "2026-10-15",
           targetDate: "2026-10-31", timingMode: "target_date",
           completionDecisionRequired: true, reviewState: "scheduled", revision: 0,
           successCriteria: [] },
@@ -364,7 +418,7 @@ function strategyHypothesis(strategyId) {
     expectedResponses: [{ responseId: "response_training_exposure" }],
     validationConditions: [],
     falsificationConditions: [],
-    expectedValidationTimeline: { startDate: "2026-08-16", targetDate: "2026-10-31" },
+    expectedValidationTimeline: { startDate: "2026-08-15", targetDate: "2026-10-31" },
     requiredExecutionExposure: null,
   };
 }
@@ -414,7 +468,7 @@ function acceptedTrajectoryRecord(goalId, id = "trajectory-p2") {
     milestones: ["phase_starting_forecast", "first_phase_cadence_review",
       "first_post_transition_photo_event", "objective_comparison", "mid_phase_review",
       "final_goal_assessment"].map(milestone),
-    expectedTrajectory: expectedTrajectory(id, "2026-08-16", "2026-10-31") });
+    expectedTrajectory: expectedTrajectory(id, "2026-08-15", "2026-10-31") });
 }
 
 function beginDecision(overrides = {}) {

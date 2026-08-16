@@ -50,7 +50,7 @@ describe("production Phase Review boundary full-Founder simulation", () => {
     memory.checkpoint("begin_dry_run_completed");
     expect(beginDryRun).toMatchObject({ ok: true, dryRun: true, committed: false,
       plannedMutation: { nextPhase: { status: "active",
-        projectedOrActualStart: "2026-08-16" }, startingForecastPlanned: true } });
+        projectedOrActualStart: "2026-08-15" }, startingForecastPlanned: true } });
     expect(fs.readFileSync(beginPath).equals(beforeDryRun)).toBe(true);
     const protectedBefore = protectedFingerprints(simulated);
     const begin = await beginFactory.execute(beginRequest);
@@ -62,16 +62,23 @@ describe("production Phase Review boundary full-Founder simulation", () => {
     expect(begunGoal.phases.find((item) => item.id === beginRequest.currentPhaseId).status)
       .toBe("completed");
     expect(begunGoal.phases.find((item) => item.id === begunGoal.currentPhaseId))
-      .toMatchObject({ status: "active", startedAt: "2026-08-16" });
+      .toMatchObject({ status: "active", startedAt: "2026-08-15" });
     expect(begun.confidenceInitializationArtifacts.some((item) =>
       item.occurrenceId === beginRequest.decisionId)).toBe(true);
     expect(protectedFingerprints(begun)).toEqual(protectedBefore);
-    expect(begun.protocolVersions.slice(0, simulated.protocolVersions.length))
-      .toEqual(simulated.protocolVersions);
-    expect(begun.protocolVersions.at(-1)).toMatchObject({ phaseId: begunGoal.currentPhaseId,
+    const currentVersion = begun.protocolVersions.at(-1);
+    expect(currentVersion).toMatchObject({ phaseId: begunGoal.currentPhaseId,
       confirmation: { decisionId: beginRequest.decisionId },
       change: { reviewedChanges: { caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
         activityExpenditureTarget: { value: 800, unit: "kcal/day" } } } });
+    const previousVersion = begun.protocolVersions.find((item) =>
+      item.id === currentVersion.change.previousVersionId);
+    expect(previousVersion).toMatchObject({ status: "superseded", endedAt: "2026-08-15",
+      supersededByVersionId: currentVersion.id });
+    const energyProtocol = begun.protocols.find((item) => item.id === currentVersion.protocolId);
+    expect(energyProtocol.currentVersionId).toBe(currentVersion.id);
+    expect(begun.protocolVersions.filter((item) => item.protocolId === energyProtocol.id &&
+      item.status === "active" && !item.endedAt)).toHaveLength(1);
     expect(await beginFactory.execute(beginRequest)).toMatchObject({ ok: true,
       committed: true, idempotent: true });
     expect(beginFactory.inspectLock().exists).toBe(false);
@@ -127,7 +134,7 @@ function prepareSimulation(store) {
   store.phaseExpectedTrajectories = [];
   store.phaseLifecycleReadModels = [];
   const goal = store.goals.find((item) => item.id === repair.goalId);
-  const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
+  const { current, phase } = restorePreTransitionSimulation(store, goal);
   const drafts = createFounderPhase2ActivationPackageDrafts({ store, goal, phase,
     createdAt: "2026-08-02T12:00:00.000Z" });
   const acceptance = createPhaseActivationPackageAcceptanceService({
@@ -136,7 +143,6 @@ function prepareSimulation(store) {
     "accept-founder-phase-2-strategy-v1"));
   store.phaseExpectedTrajectories.push(accept(acceptance, "Trajectory", drafts.trajectory,
     "accept-founder-phase-2-trajectory-v1"));
-  const current = goal.phases.find((item) => item.name === "Establish Maintenance");
   const milestone = current.reviewMilestone;
   store.dailyBriefings ??= [];
   store.dailyBriefings.push({ id: "phase-review-production-boundary-simulation-artifact",
@@ -167,6 +173,68 @@ function prepareSimulation(store) {
       recommendedReviewAt: null, rationale: "Temporary-clone Phase Review authorization.",
       decisionSource: "production_boundary_simulation", expiresAt: "2026-08-16T00:00:00.000Z" } });
   return store;
+}
+function restorePreTransitionSimulation(store, goal) {
+  const current = goal.phases.find((item) => item.name === "Establish Maintenance");
+  const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
+  current.status = "active";
+  current.completedAt = null;
+  current.completionDecisionId = null;
+  current.lastReviewedAt = null;
+  current.reviewState = "due";
+  current.revision = 0;
+  current.reviewMilestone = {
+    ...current.reviewMilestone,
+    consumed: false,
+    resolvedReviewId: null,
+    revision: 0,
+  };
+  phase.status = "planned";
+  phase.startDate = null;
+  phase.startedAt = null;
+  phase.reviewState = "scheduled";
+  phase.revision = 0;
+  delete phase.monitoringCadence;
+  delete phase.strategicReviewCadence;
+  delete phase.strategicReviewAnchor;
+  delete phase.automaticStrategyAdjustmentAllowed;
+  goal.currentPhaseId = current.id;
+  goal.projectedNextPhaseId = phase.id;
+  goal.activePhaseStrategyId = null;
+  goal.activeExpectedTrajectoryId = null;
+  goal.timeline = {
+    ...goal.timeline,
+    currentPhaseId: current.id,
+    currentPhaseStartedAt: current.startedAt,
+    projectedNextPhaseStart: phase.projectedNextPhaseStart ?? "2026-08-16",
+    activePhaseStrategyId: null,
+    activeExpectedTrajectoryId: null,
+  };
+  store.goalConfidenceSnapshots = (store.goalConfidenceSnapshots ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  store.goalConfidenceHistory = (store.goalConfidenceHistory ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  store.confidenceInitializationArtifacts = (store.confidenceInitializationArtifacts ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  const energy = (store.protocols ?? []).find((protocol) =>
+    protocol.status === "active" && (protocol.protocolType === "energy" ||
+      protocol.category === "energy") && protocol.currentVersionId);
+  const currentVersion = (store.protocolVersions ?? []).find((item) =>
+    item.id === energy?.currentVersionId);
+  const previousVersion = (store.protocolVersions ?? []).find((item) =>
+    item.id === currentVersion?.change?.previousVersionId);
+  if (energy && currentVersion && previousVersion) {
+    energy.currentVersionId = previousVersion.id;
+    energy.effectiveStrategy = structuredClone(previousVersion.change?.reviewedChanges ?? {});
+    energy.phaseId = current.id;
+    energy.phaseStrategyId = null;
+    previousVersion.status = "active";
+    previousVersion.endedAt = null;
+    delete previousVersion.supersededByVersionId;
+    store.protocolVersions = store.protocolVersions.filter((item) =>
+      item.id !== currentVersion.id);
+  }
+  return { current, phase };
 }
 function requestFor(store, outcome) {
   const goal = store.goals.find(isFounderBuildLeanMassGoal);

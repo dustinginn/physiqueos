@@ -18,7 +18,7 @@ export function createOperatingPlanStrategyDetailService({ repositories }) {
       );
       if (!protocol) return null;
       const version = protocol.currentVersionId
-        ? await repositories.protocolVersions.getCurrentVersion(protocol.id)
+        ? await repositories.protocolVersions.getVersionById(protocol.currentVersionId)
         : null;
       return composeOperatingPlanStrategyDetail({
         goals, nutritionContext, protocol, strategyType, version,
@@ -34,6 +34,8 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     : protocol.effectiveStrategy ?? nutritionContext?.calibrationStrategy ?? {};
   const goalId = protocol.currentGoalIds?.[0] ?? protocol.relatedGoalIds?.[0] ?? version?.goalLinks?.[0]?.goalId;
   const goal = goals.find((item) => item.id === goalId);
+  const currentPhase = goal?.phases?.find((item) => item.id ===
+    (goal.currentPhaseId ?? goal.timeline?.currentPhaseId)) ?? null;
   const coachingUpdates = strategyType === "briefings"
     ? resolveCoachingUpdatesReadModel({
       protocol,
@@ -48,7 +50,7 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     : null;
   const common = {
     goal: goal?.title ? `Your ${goalLabel(goal.title)}` : null,
-    startedDate: formatGoalStartDate(goal?.timeline?.startDate),
+    startedDate: formatGoalStartDate(version?.effectiveAt ?? protocol.activatedAt ?? goal?.timeline?.startDate),
     status: "Active",
     editHref: ["briefings", "nutrition", "training"].includes(strategyType)
       ? `${getOperatingPlanStrategyHref(strategyType, protocol.id)}/edit`
@@ -66,7 +68,11 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
       field("Current Energy Phase", energyPhase(strategy.mode)),
       field("Caloric Intake", targetLabel(strategy.caloricIntakeTarget) ?? label(strategy.calorieStrategy)),
       field("Activity Target", targetLabel(strategy.activityExpenditureTarget) ?? label(strategy.activityStrategy)),
-      field(strategy.mode === "Phase Execution" ? "Monitoring Approach" : "Calibration Approach", calibrationApproach(strategy)),
+      ...(strategy.mode === "Phase Execution" ? [
+        field("Evidence Monitoring", monitoringCadence(strategy)),
+        field("Strategic Review", strategicReviewCadence(strategy)),
+        field("Strategy Changes", "User authorized"),
+      ] : [field("Calibration Approach", calibrationApproach(strategy))]),
     ],
   };
   if (strategyType === "nutrition") return {
@@ -106,8 +112,9 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
       field("Weekly Structure", weekly ? `${weekly} area sessions` : null),
       field("Training Focus", list(training.physiquePriorities)),
       field("Progression", label(training.progression?.pace)),
-      field("Current Phase", label(training.nutritionPhase ?? version?.phaseContext?.label)),
-    ],
+      field("Current Goal Phase", currentPhase?.name ?? null),
+      field("Training Context", "Goal-level strategy"),
+    ].filter(Boolean),
   };
 }
 
@@ -129,9 +136,11 @@ function goalReference(goal) {
 }
 function energyPhase(mode) {
   const value = String(mode ?? "").toLowerCase();
-  if (value.includes("cut")) return "Cut";
-  if (value.includes("bulk") || value.includes("gain")) return "Bulk";
-  if (value.includes("maintenance") || value.includes("maintain")) return "Maintain";
+  const phases = new Map([["cut", "Cut"], ["cutting", "Cut"], ["bulk", "Bulk"],
+    ["bulking", "Bulk"], ["gain", "Bulk"], ["maintenance", "Maintain"],
+    ["maintain", "Maintain"], ["maintenance calibration", "Maintain"],
+    ["phase execution", "Phase execution"]]);
+  if (phases.has(value)) return phases.get(value);
   return label(mode);
 }
 function calibrationApproach(strategy) {
@@ -141,6 +150,17 @@ function calibrationApproach(strategy) {
   return [cadence, adjustment].filter(Boolean).join(" \u00B7 ") || null;
 }
 function targetLabel(value){return Number.isFinite(Number(value?.value))?`${Number(value.value).toLocaleString("en-US")} ${value.unit}`:null}
+function monitoringCadence(strategy) {
+  const cadence = label(strategy.monitoringCadence ?? "weekly");
+  return cadence ? `${cadence} evidence review` : null;
+}
+function strategicReviewCadence(strategy) {
+  const cadence = label(strategy.strategicReviewCadence ?? strategy.evaluationCadence);
+  const anchor = strategy.strategicReviewAnchor === "dexa_body_composition"
+    ? "DEXA and body composition aligned" : label(strategy.strategicReviewAnchor);
+  return [cadence, anchor].filter(Boolean).join(" · ") || null;
+}
+
 function macroPhilosophy(strategy) {
   if (strategy.trainingDayFlexibility && strategy.restDayFlexibility) {
     return "Flexible across training and rest days";

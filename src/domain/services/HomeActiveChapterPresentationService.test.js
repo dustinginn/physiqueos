@@ -7,7 +7,7 @@ describe("Home active Build Lean Mass chapter", () => {
   it("derives phase-aware Home presentation without mutating the goal", () => {
     const input = structuredClone(goal);
     const result = deriveHomeActiveChapterPresentation({ activeGoal: input, goals: [input], currentDate: "2026-07-21T12:00:00Z", timeZone: "UTC", evidenceSummary: { nutritionConsistent: true, trainingConsistent: true } });
-    expect(result.hero).toMatchObject({ goalIcon: "dumbbell", headline: "Establish Maintenance", confidenceState: "Early confidence", primaryTimeline: "About 4 weeks remaining", plannedReviewDate: "2026-08-17", mode: "phase_trajectory" });
+    expect(result.hero).toMatchObject({ goalIcon: "dumbbell", headline: "Establish Maintenance", confidenceState: "Early confidence", primaryTimeline: "4 weeks remaining", plannedReviewDate: "2026-08-17", mode: "phase_trajectory" });
     expect(result.hero.confidence).toBeGreaterThan(0);
     expect(result.hero.supportingMetrics).toEqual([{ label: "Current phase", value: "Establish Maintenance", icon: "phase" }]);
     expect(result.goals).toHaveLength(1);

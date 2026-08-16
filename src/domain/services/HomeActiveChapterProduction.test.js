@@ -16,10 +16,11 @@ describe("production-shaped Home active chapter read", () => {
     expect(model.hero).toMatchObject({
       goalLabel: "Build Lean Mass",
       goalIcon: "dumbbell",
-      headline: "Establish Maintenance",
-      confidenceState: "Developing",
+      headline: "Lean Mass Build",
+      confidenceState: "Moderate",
       mode: "phase_trajectory",
-      plannedReviewDate: "2026-08-15",
+      phaseTone: "green",
+      plannedReviewDate: null,
     });
     expect(model.goals).toHaveLength(1);
     expect(model.goals[0]).toMatchObject({
@@ -29,8 +30,13 @@ describe("production-shaped Home active chapter read", () => {
       href: "/goals/build-lean-mass",
       presentation: { mode: "phase_trajectory_goal" },
     });
-    expect(model.goals[0].presentation.trajectory.phases[1].progress).toMatchObject({ progressType: "outcome", baselineValue: 147.5, baselineDate: "2026-07-18", latestValue: null, targetAmount: 10, status: "awaiting_follow_up", clampedProgressPercentage: 0, evidenceSource: "DEXA" });
-    expect(model.latestAnalysis.sectionLabel).toMatch(/Midweek Briefing|Weekly Briefing|Monthly Briefing|Previous Chapter Briefing/);
+    expect(model.goals[0].presentation.trajectory.phases[1]).toMatchObject({
+      status: "active", presentationTone: "green",
+      phaseBaseline: { date: "2026-08-15", leanMass: { value: 148.3, unit: "lb" } },
+      progress: { progressType: "outcome", baselineValue: 147.5,
+        baselineDate: "2026-07-18", latestValue: 148.3, latestDate: "2026-08-15",
+        changeValue: 0.8, targetAmount: 10, evidenceSource: "DEXA" } });
+    expect(model.latestAnalysis.sectionLabel).toMatch(/Event Briefing|Midweek Briefing|Weekly Briefing|Monthly Briefing|Previous Chapter Briefing/);
     expect(JSON.stringify(model)).not.toMatch(/Projected Finish: Unavailable|Days Remaining: Unavailable|Pending → Pending|0% complete/i);
 
     expect(JSON.parse(after).revision).toBe(store.revision);

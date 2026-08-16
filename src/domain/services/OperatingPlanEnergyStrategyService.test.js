@@ -181,10 +181,10 @@ describe("Operating Plan active Energy Strategy resolver", () => {
 
     expect(result).toMatchObject({
       isConfigured: true,
-      mode: "Maintenance Calibration",
-      selectedPace: "maintenance_calibration",
+      mode: "Phase Execution",
+      selectedPace: "phase_execution",
       status: "active",
     });
-    expect(fs.readFileSync(storePath)).toEqual(before);
+    expect(fs.readFileSync(storePath).equals(before)).toBe(true);
   }, 30000);
 });

@@ -8,20 +8,21 @@ import HomeConfidenceDetail from "./HomeConfidenceDetail";
 const goalIcons = { dumbbell: Dumbbell, target: Target };
 const metricIcons = { calendar: Calendar, phase: Compass };
 
-export default function HomeHeroCard({ actionHref, actionLabel, confidence, confidenceDetail, confidenceState, daysRemaining, goalIcon = "target", goalLabel, headline, mode = "active", plannedReviewDate, primaryTimeline, projectedFinish, schedulerMessage, supportLine, supportingMetrics = [] }) {
+export default function HomeHeroCard({ actionHref, actionLabel, confidence, confidenceDetail, confidenceState, daysRemaining, goalIcon = "target", goalLabel, headline, mode = "active", phaseTone = "neutral", plannedReviewDate, primaryTimeline, projectedFinish, schedulerMessage, supportLine, supportingMetrics = [] }) {
   const GoalIcon = goalIcons[goalIcon] ?? Target;
+  const phaseGreen = mode === "phase_trajectory" && phaseTone === "green";
 
   return (
-    <Card as="section" data-testid="home-hero" padding="sm" className="overflow-hidden bg-gradient-to-br from-[color-mix(in_srgb,var(--primary)_7%,var(--surface-elevated))] to-[var(--surface-elevated)]">
+    <Card as="section" data-testid="home-hero" padding="sm" className={`overflow-hidden bg-gradient-to-br ${phaseGreen ? "from-emerald-500/[.09] to-[var(--surface-elevated)]" : "from-[color-mix(in_srgb,var(--primary)_7%,var(--surface-elevated))] to-[var(--surface-elevated)]"}`}>
       <SectionTitle title="Trajectory" />
       <div className="mt-2.5 grid grid-cols-[minmax(0,1fr)_82px] items-center gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <IconBadge icon={GoalIcon} color={goalIcon === "dumbbell" ? "effort" : "primary"} size="xs" className="shrink-0 rounded-full" />
+            <IconBadge icon={GoalIcon} color={phaseGreen ? "success" : goalIcon === "dumbbell" ? "effort" : "primary"} size="xs" className="shrink-0 rounded-full" />
             <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--primary)]">{goalLabel}</p>
           </div>
           <h1 className="mt-1.5 text-[18px] font-extrabold leading-[1.15] text-[var(--text-primary)]">{headline}</h1>
-          {mode === "phase_trajectory" && <p className="mt-1.5 text-[15px] font-extrabold leading-5 text-[var(--primary)]">{primaryTimeline}</p>}
+          {mode === "phase_trajectory" && <p className={`mt-1.5 text-[15px] font-extrabold leading-5 ${phaseGreen ? "text-emerald-700 dark:text-emerald-300" : "text-[var(--primary)]"}`}>{primaryTimeline}</p>}
           {mode === "phase_trajectory" && plannedReviewDate && <p className="mt-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">Planned review: {formatDate(plannedReviewDate)}</p>}
           <p className="mt-1.5 text-[12px] font-medium leading-4 text-[var(--text-secondary)]">{supportLine}</p>
         </div>

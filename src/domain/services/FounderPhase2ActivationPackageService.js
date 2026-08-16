@@ -1,5 +1,7 @@
 import { createPhaseStrategy } from "../models/phaseStrategy";
 import { createPhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
+import { PHASE_EXECUTION_CADENCE } from "./PhaseEstablishmentService";
+import { resolvePhaseTransitionDate } from "./PhaseTransitionDatePolicy";
 
 export const FOUNDER_PHASE_2_ACTIVATION_PACKAGE_VERSION =
   "founder_lean_mass_phase_2_activation_package_v1";
@@ -8,6 +10,11 @@ export function createFounderPhase2ActivationPackageDrafts({
   store, goal, phase, createdAt = "2026-08-02T12:00:00.000Z",
 } = {}) {
   validateCanonicalInputs(goal, phase);
+  const currentPhase = goal.phases?.find((item) => item.status === "active");
+  const projectedStart = resolvePhaseTransitionDate({
+    reviewMilestoneDate: currentPhase?.reviewMilestone?.earliestEligibleDate ??
+      phase.projectedNextPhaseStart,
+  }).effectiveDate;
   const transition = (store?.goalTransitionDrafts ?? []).find((item) =>
     item.status === "applied" && item.primaryObjective?.id === goal.id);
   if (!transition) throw incomplete("applied_goal_transition_required");
@@ -74,6 +81,11 @@ export function createFounderPhase2ActivationPackageDrafts({
         intent: "move_from_maintenance_calibration_to_controlled_surplus_when_supported",
         adjustmentLogic: "make_small_reversible_changes_from_weight_dexa_photo_training_and_body_fat_pressure",
         fixedCaloriePrescription: false,
+        monitoringCadence: PHASE_EXECUTION_CADENCE.monitoringCadence,
+        strategicReviewCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+        strategicReviewAnchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor,
+        adjustmentAuthorization: PHASE_EXECUTION_CADENCE.adjustmentAuthorization,
+        automaticAdjustmentAllowed: PHASE_EXECUTION_CADENCE.automaticAdjustmentAllowed,
         reviewSignals: ["weight_trend", "dexa_composition", "qualifying_photo_change",
           "multi_session_training_response", "body_fat_pressure"],
         confidencePolicy: "daily_evidence_is_context_not_a_direct_confidence_trigger",
@@ -106,6 +118,9 @@ export function createFounderPhase2ActivationPackageDrafts({
         cadenceTypes: ["midweek", "weekly", "monthly", "dexa_event", "qualifying_photo_event"],
         twiceWeeklyAnchor: ["wednesday", "sunday"],
         confidencePolicy: "confidence_v2_changes_only_through_authorized_briefing_publication",
+        strategicReviewCadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+        strategicReviewAnchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor,
+        strategyChangesRequireUserAuthorization: true,
       },
       peptides: {
         intent: "preserve_existing_accepted_protocol_strategy_without_new_claims",
@@ -172,8 +187,8 @@ export function createFounderPhase2ActivationPackageDrafts({
       goalLine("expectedTrajectory", "target"),
     ],
     timeline: {
-      projectedStartRule: "first_full_execution_day_after_authorized_phase_1_completion",
-      projectedStart: phase.projectedNextPhaseStart ?? "2026-08-16",
+      projectedStartRule: "review_milestone_boundary",
+      projectedStart,
       goalTargetDate: targetDate,
       elapsedWindowRule: "derive_from_actual_activation_date",
       remainingWindowRule: "derive_from_actual_activation_date_to_goal_target",
@@ -228,8 +243,10 @@ function milestones({ trajectoryId, goalId, targetDate }) {
       "initialize_phase_specific_confidence_without_phase_2_outcome_evidence",
       ["accepted_strategy", "accepted_expected_trajectory", "prior_history_references"],
       ["starting_prior_for_phase_2"], false, false),
-    item("first_phase_cadence_review", { mode: "first_midweek_or_weekly_after_activation" },
-      "assess_initial_execution_and_response_context",
+    item("first_phase_cadence_review", { mode: "strategic_review_cadence",
+      cadence: PHASE_EXECUTION_CADENCE.strategicReviewCadence,
+      anchor: PHASE_EXECUTION_CADENCE.strategicReviewAnchor },
+      "review_accumulated_execution_and_response_context",
       ["weight_trend", "training_trend", "nutrition_and_recovery_context"],
       ["early_execution_adequacy"], true, false),
     item("first_post_transition_photo_event", { mode: "next_qualifying_scheduled_event_after_activation" },

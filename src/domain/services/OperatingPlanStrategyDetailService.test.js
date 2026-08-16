@@ -16,7 +16,7 @@ describe("Operating Plan strategy detail", () => {
     expect(result).toMatchObject({
       title: "Maintenance Calibration",
       goal: "Your Build Lean Mass goal",
-      startedDate: "July 19, 2026",
+      startedDate: "July 23, 2026",
       status: "Active",
     });
     expect(result.sections).toEqual([
@@ -52,7 +52,7 @@ describe("Operating Plan strategy detail", () => {
       strategyType: "briefings",
       protocol: { ...base, category: "briefings", effectiveStrategy: { cadence: "Twice weekly", days: ["Wednesday", "Sunday"] } },
     });
-    expect(result).toMatchObject({ eyebrow: "Coaching Updates", startedDate: "July 19, 2026" });
+    expect(result).toMatchObject({ eyebrow: "Coaching Updates", startedDate: "July 23, 2026" });
     expect(result.sections).toEqual(expect.arrayContaining([
       { label: "Midweek Calibration", value: "Wednesday" },
       { label: "Weekly Synthesis", value: "Sunday" },
@@ -63,7 +63,11 @@ describe("Operating Plan strategy detail", () => {
 
   it("presents authoritative Training structure and priorities", () => {
     const result = composeOperatingPlanStrategyDetail({
-      goals: [goal], strategyType: "training", protocol: { ...base, name: "Maintenance Training Strategy" },
+      goals: [{ ...goal, currentPhaseId: "p2", phases: [
+        { id: "p1", name: "Establish Maintenance", status: "completed" },
+        { id: "p2", name: "Lean Mass Build", status: "active" },
+      ] }],
+      strategyType: "training", protocol: { ...base, name: "Maintenance Training Strategy" },
       version: { effectiveAt: "2026-07-11", goalLinks: [{ goalId: "goal" }], intent: { summary: "Preserve lean mass through the end of the cut." }, trainingStrategy: { weeklyFrequencies: { arms: 2, back: 1 }, physiquePriorities: ["arms", "core"], progression: { pace: "moderate" }, nutritionPhase: "maintenance" } },
     });
     expect(result.title).toBe("Build Lean Mass Training");
@@ -71,12 +75,40 @@ describe("Operating Plan strategy detail", () => {
       { label: "Weekly Structure", value: "3 area sessions" },
       { label: "Training Focus", value: "Arms, Core" },
       { label: "Progression", value: "Moderate" },
-      { label: "Current Phase", value: "Maintenance" },
+      { label: "Current Goal Phase", value: "Lean Mass Build" },
+      { label: "Training Context", value: "Goal-level strategy" },
     ]);
     expect(result.purpose).toContain("your Build Lean Mass goal");
     expect(result.purpose).not.toMatch(/cut|preserve lean mass/i);
   });
 
+
+  it("uses the protocol version date and never classifies Phase Execution as Cut", () => {
+    const result = composeOperatingPlanStrategyDetail({
+      goals: [{ ...goal, currentPhaseId: "p2", phases: [
+        { id: "p1", name: "Establish Maintenance", status: "completed" },
+        { id: "p2", name: "Lean Mass Build", status: "active" },
+      ] }],
+      strategyType: "energy",
+      protocol: { ...base, currentVersionId: "v2", effectiveStrategy: {
+        mode: "Phase Execution",
+        caloricIntakeTarget: { value: 2500, unit: "kcal/day" },
+        activityExpenditureTarget: { value: 800, unit: "kcal/day" },
+        monitoringCadence: "weekly",
+        strategicReviewCadence: "monthly",
+        strategicReviewAnchor: "dexa_body_composition",
+      } },
+      version: { id: "v2", effectiveAt: "2026-08-15" },
+    });
+    expect(result.startedDate).toBe("August 15, 2026");
+    expect(result.sections).toEqual(expect.arrayContaining([
+      { label: "Current Energy Phase", value: "Phase execution" },
+      { label: "Evidence Monitoring", value: "Weekly evidence review" },
+      { label: "Strategic Review", value: "Monthly · DEXA and body composition aligned" },
+      { label: "Strategy Changes", value: "User authorized" },
+    ]));
+    expect(JSON.stringify(result)).not.toMatch(/\bCut\b/);
+  });
   it("uses stable IDs and returns no fabricated detail when unavailable", () => {
     expect(getOperatingPlanStrategyHref("energy", "protocol_energy")).toBe("/profile/operating-plan/strategy/energy/protocol_energy");
     expect(getOperatingPlanStrategyHref("nutrition", null)).toBeNull();

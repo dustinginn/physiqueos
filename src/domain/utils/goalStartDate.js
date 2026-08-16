@@ -1,6 +1,6 @@
 export function formatGoalStartDate(
   value,
-  { locale = "en-US", timeZone = "America/Los_Angeles" } = {},
+  { locale = "en-US" } = {},
 ) {
   const dateKey = String(value ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
@@ -9,7 +9,7 @@ export function formatGoalStartDate(
   return instant.toLocaleDateString(locale, {
     day: "numeric",
     month: "long",
-    timeZone,
+    timeZone: "UTC",
     year: "numeric",
   });
 }

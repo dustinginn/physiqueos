@@ -29,6 +29,7 @@ describe("Founder Phase 2 production-shaped activation simulation", () => {
     const simulated = source;
     simulated.goals.splice(simulated.goals.findIndex((item) => item.id === sourceGoal.id),
       1, structuredClone(repair.candidate));
+    restorePreTransitionSimulation(simulated, repair.goalId);
     simulated.phaseReviewDecisions ??= [];
     simulated.phaseReviewTransactions ??= [];
     simulated.phaseStrategies = [];
@@ -124,7 +125,7 @@ describe("Founder Phase 2 production-shaped activation simulation", () => {
     expect(storedGoal.phases.find((item) => item.id === first.id)).toMatchObject({
       status: "completed", completionDecisionId: decision.decisionId });
     expect(storedGoal.phases.find((item) => item.id === second.id)).toMatchObject({
-      status: "active", startedAt: "2026-08-16" });
+      status: "active", startedAt: "2026-08-15" });
     expect(storedGoal).toMatchObject({ activePhaseStrategyId: acceptedStrategy.id,
       activeExpectedTrajectoryId: acceptedTrajectory.id, currentPhaseId: second.id });
     expect(JSON.stringify(stored.phaseStrategies.find((item) => item.id === acceptedStrategy.id)))
@@ -144,6 +145,70 @@ describe("Founder Phase 2 production-shaped activation simulation", () => {
   }, 180000);
 });
 
+function restorePreTransitionSimulation(store, goalId) {
+  const goal = store.goals.find((item) => item.id === goalId);
+  const current = goal.phases.find((item) => item.name === "Establish Maintenance");
+  const phase = goal.phases.find((item) => item.name === "Lean Mass Build");
+  Object.assign(current, {
+    status: "active",
+    completedAt: null,
+    completionDecisionId: null,
+    lastReviewedAt: null,
+    reviewState: "due",
+    revision: 0,
+    reviewMilestone: {
+      ...current.reviewMilestone,
+      consumed: false,
+      resolvedReviewId: null,
+      revision: 0,
+    },
+  });
+  Object.assign(phase, {
+    status: "planned",
+    startDate: null,
+    startedAt: null,
+    projectedNextPhaseStart: "2026-08-15",
+    reviewState: "scheduled",
+    revision: 0,
+  });
+  goal.currentPhaseId = current.id;
+  goal.projectedNextPhaseId = phase.id;
+  goal.activePhaseStrategyId = null;
+  goal.activeExpectedTrajectoryId = null;
+  goal.timeline = {
+    ...goal.timeline,
+    currentPhaseId: current.id,
+    currentPhaseStartedAt: current.startedAt,
+    projectedNextPhaseStart: "2026-08-15",
+    activePhaseStrategyId: null,
+    activeExpectedTrajectoryId: null,
+  };
+  store.goalConfidenceSnapshots = (store.goalConfidenceSnapshots ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  store.goalConfidenceHistory = (store.goalConfidenceHistory ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  store.confidenceInitializationArtifacts = (store.confidenceInitializationArtifacts ?? [])
+    .filter((item) => item.phaseId !== phase.id);
+  const energy = (store.protocols ?? []).find((protocol) =>
+    protocol.status === "active" && (protocol.protocolType === "energy" ||
+      protocol.category === "energy") && protocol.currentVersionId);
+  const replacement = (store.protocolVersions ?? []).find((item) =>
+    item.id === energy?.currentVersionId);
+  const previous = (store.protocolVersions ?? []).find((item) =>
+    item.id === replacement?.change?.previousVersionId);
+  if (energy && replacement && previous) {
+    energy.currentVersionId = previous.id;
+    energy.effectiveStrategy = structuredClone(previous.change?.reviewedChanges ?? {});
+    energy.phaseId = current.id;
+    energy.phaseStrategyId = null;
+    previous.status = "active";
+    previous.endedAt = null;
+    delete previous.supersededByVersionId;
+    store.protocolVersions = store.protocolVersions.filter((item) =>
+      item.id !== replacement.id);
+  }
+}
+
 function coordinatorFor({ simulationPath, liveStore, participants }) {
   return createPhaseReviewCommitCoordinator({ runtimeStorePath: simulationPath, liveStore,
     readPersistedStore: () => JSON.parse(fs.readFileSync(simulationPath, "utf8")), participants,
@@ -158,7 +223,7 @@ function beginDecision({ goal, first, second }) {
     recommendedOutcome: "begin_next_phase", recommendedDuration: null,
     recommendedReviewAt: null, rationale: "Temporary-clone simulation only.",
     selectedOutcome: "begin_next_phase", selectedDuration: null, selectedReviewAt: null,
-    projectedNextPhaseStart: "2026-08-16", decidedAt: "2026-08-15T19:00:00.000Z",
+    projectedNextPhaseStart: "2026-08-15", decidedAt: "2026-08-15T19:00:00.000Z",
     decisionSource: "production_shaped_simulation", originatingArtifactId: "simulation-artifact",
     originatingForecastId: "simulation-forecast", originatingInterpretationId: "simulation-interpretation",
     confidenceAssessmentId: "simulation-confidence",

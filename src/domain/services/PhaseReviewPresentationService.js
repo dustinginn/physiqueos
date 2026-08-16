@@ -1,4 +1,6 @@
+import { resolvePhaseTransitionDate } from "./PhaseTransitionDatePolicy";
 export const PHASE_REVIEW_RECOMMENDATIONS = Object.freeze({
+
   BEGIN_NEXT_PHASE: "begin_next_phase",
   CONTINUE_CURRENT_PHASE: "continue_current_phase",
 });
@@ -8,6 +10,7 @@ export function projectPhaseReviewSelection(review, selection = {}) {
     throw new Error("Phase Review projection requires a canonical presentation contract.");
   }
   const selectedOutcome = selection.selectedOutcome ?? review.recommendation;
+    const transition = resolvePhaseTransitionDate({ reviewMilestoneDate: review.originalReviewDate });
   if (selectedOutcome === PHASE_REVIEW_RECOMMENDATIONS.BEGIN_NEXT_PHASE) {
     return Object.freeze({
       selectedOutcome,
@@ -15,8 +18,8 @@ export function projectPhaseReviewSelection(review, selection = {}) {
       customReviewDate: null,
       recommendedReviewDate: review.originalReviewDate,
       selectedReviewDate: review.originalReviewDate,
-      projectedNextPhaseStart: review.originalReviewDate,
-      projectedNextPhaseReview: addDays(review.originalReviewDate,
+      projectedNextPhaseStart: transition.effectiveDate,
+      projectedNextPhaseReview: addDays(transition.effectiveDate,
         review.nextPhaseReviewIntervalDays),
     });
   }

@@ -66,6 +66,7 @@ export function deriveHomeActiveChapterPresentation({
       primaryTimeline: trajectory.activePhase?.friendlyTimeline ?? "Timeline not established",
       plannedReviewDate: trajectory.activePhase?.calculatedPlannedReviewDate ?? null,
       supportLine: trajectory.activePhase?.purpose ?? "Phase details are unavailable.",
+      phaseTone: trajectory.activePhase?.presentationTone ?? "neutral",
       confidenceDetail: canonicalDetail ?? {
         qualitativeLevel: trajectory.confidence.qualitativeLevel,
         supportingFactors: trajectory.confidence.supportingFactors,
@@ -86,13 +87,14 @@ export function deriveHomeActiveChapterPresentation({
       title: activeGoal.title,
       primary: true,
       icon: "dumbbell",
-      color: "effort",
+      color: trajectory.activePhase?.presentationTone === "green" ? "success" : "effort",
       href: "/goals/build-lean-mass",
       presentation: {
         mode: "phase_trajectory_goal",
         trajectory,
         guardrail,
         additionalGuardrails: trajectory.overallGoal.sharedGuardrails.filter((item) => item !== guardrail),
+        activePhaseTone: trajectory.activePhase?.presentationTone ?? "neutral",
       },
     }],
     briefingCard: markPreviousChapterBriefing({

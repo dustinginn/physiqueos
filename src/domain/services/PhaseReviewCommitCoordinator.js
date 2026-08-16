@@ -308,7 +308,7 @@ function validateCandidate({ baseline, candidate, decision, finalized = null }) 
   if (decision.selectedOutcome === PhaseReviewUserDecision.BEGIN_NEXT_PHASE) {
     if (!isPrefix(baseline.phaseStrategies ?? [], candidate.phaseStrategies ?? []) ||
         !isPrefix(baseline.phaseExpectedTrajectories ?? [], candidate.phaseExpectedTrajectories ?? []) ||
-        !isPrefix(baseline.protocolVersions ?? [], candidate.protocolVersions ?? [])) return { valid: false };
+        !protocolVersionsRespectDecision(baseline, candidate, decision)) return { valid: false };
   } else if (!same(baseline.phaseStrategies ?? [], candidate.phaseStrategies ?? []) ||
       !same(baseline.phaseExpectedTrajectories ?? [], candidate.phaseExpectedTrajectories ?? []) ||
       !same(baseline.protocols ?? [], candidate.protocols ?? []) ||
@@ -328,6 +328,31 @@ function validateCandidate({ baseline, candidate, decision, finalized = null }) 
     return { valid: false };
   }
   return { valid: true };
+}
+function protocolVersionsRespectDecision(beforeStore, afterStore, decision) {
+  if (!decision.phaseEstablishment?.executionTargets) {
+    return same(beforeStore.protocolVersions ?? [], afterStore.protocolVersions ?? []) &&
+      same(beforeStore.protocols ?? [], afterStore.protocols ?? []);
+  }
+  return isProtocolVersionReplacement(beforeStore, afterStore, decision);
+}
+
+function isProtocolVersionReplacement(beforeStore, afterStore, decision) {
+  const before = beforeStore.protocolVersions ?? [];
+  const after = afterStore.protocolVersions ?? [];
+  if (after.length !== before.length + 1) return false;
+  const previousId = decision.phaseEstablishment?.executionTargets
+    ? after.at(-1)?.change?.previousVersionId : null;
+  return before.every((item, index) => {
+    if (item.id !== previousId) return same(item, after[index]);
+    const replacement = after[index];
+    return replacement.id === item.id && replacement.status === "superseded" &&
+      replacement.endedAt === decision.projectedNextPhaseStart &&
+      replacement.supersededByVersionId === after.at(-1)?.id &&
+      Object.entries(item).every(([key, value]) => ["status", "endedAt",
+        "supersededByVersionId"].includes(key) || same(value, replacement[key]));
+  }) && after.at(-1)?.status === "active" &&
+    after.at(-1)?.change?.previousVersionId === previousId;
 }
 
 function expectedPhaseMatches(store, decision) {

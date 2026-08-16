@@ -10,6 +10,7 @@ import { evaluatePhaseReviewEligibility } from "./PhaseReviewEligibilityService"
 import { createAuthorizedPhaseEstablishment } from "./PhaseEstablishmentService";
 import { deriveGoalAwarePhaseReviewInputs, evaluateGoalAwarePhaseReview } from
   "./GoalAwarePhaseReviewRecommendationService";
+import { resolvePhaseTransitionDate } from "./PhaseTransitionDatePolicy";
 
 export const PHASE_REVIEW_AUTHORIZATION_VERSION = "phase_review_authorization_v1";
 export const PhaseReviewAuthorizationErrorCode = Object.freeze({
@@ -194,10 +195,13 @@ export function authorizePhaseReviewRequest({ store, request, actor, now = () =>
     if (!next || next.status !== "planned" || next.startedAt || next.startDate) {
       throw authError("LIFECYCLE_INELIGIBLE", "The next phase is not planned and unstarted.");
     }
+    const transition = resolvePhaseTransitionDate({
+      reviewMilestoneDate: originalReview,
+    });
     phaseEstablishment = createAuthorizedPhaseEstablishment({ goal, currentPhase: current,
       nextPhase: next, actorId: actor.id, decisionId: request.decisionId,
       idempotencyKey: request.idempotencyKey, decidedAt,
-      projectedStart: addLocalDays(decidedAt.slice(0, 10), 1),
+      projectedStart: transition.effectiveDate,
       caloricIntakeTarget: request.caloricIntakeTarget,
       activityExpenditureTarget: request.activityExpenditureTarget,
       sourceArtifactId: artifact.id, sourceEvidenceId: evidenceId });
@@ -209,7 +213,7 @@ export function authorizePhaseReviewRequest({ store, request, actor, now = () =>
     catch (error) { throw authError("ACCEPTED_TRAJECTORY_REQUIRED", error.message); }
     expectedStrategyRevision = strategy.revision;
     expectedTrajectoryRevision = trajectory.revision;
-    projectedNextPhaseStart = addLocalDays(now().toISOString().slice(0, 10), 1);
+    projectedNextPhaseStart = transition.effectiveDate;
     const prospective = prospectiveGoal(goal, current, next, projectedNextPhaseStart, now().toISOString());
     try {
       const inputPackage = createPhase2StartingForecastInputPackage({ store, goal: prospective,

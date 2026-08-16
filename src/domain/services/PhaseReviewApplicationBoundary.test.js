@@ -185,7 +185,7 @@ describe("server-only Phase Review application boundary", () => {
     expect(result).toMatchObject({ ok: true, dryRun: true, committed: false,
       startingRevision: 7, endingRevision: 7, candidateRevision: 8,
       plannedMutation: { selectedOutcome: "begin_next_phase",
-        nextPhase: { status: "active", projectedOrActualStart: "2026-08-16" },
+        nextPhase: { status: "active", projectedOrActualStart: "2026-08-15" },
         startingForecastPlanned: true, protectedCollectionsChanged: false } });
     expect(fs.readFileSync(fixture.file)).toEqual(before);
     expect(fixture.liveStore).toEqual(JSON.parse(before.toString("utf8")));
@@ -214,7 +214,7 @@ describe("server-only Phase Review application boundary", () => {
     const stored = read(fixture.file);
     expect(stored.goals[0].phases).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "p1", status: "completed" }),
-      expect.objectContaining({ id: "p2", status: "active", startedAt: "2026-08-16" }),
+      expect.objectContaining({ id: "p2", status: "active", startedAt: "2026-08-15" }),
     ]));
     expect(stored.phaseStrategies[0].status).toBe("accepted");
     expect(stored.phaseExpectedTrajectories[0].status).toBe("accepted");

@@ -1,10 +1,9 @@
-export const PHASE_DATE_ARITHMETIC_CONVENTION="explicit_planned_review_then_legacy_timing_fallback";
+export const PHASE_DATE_ARITHMETIC_CONVENTION="explicit_planned_review_then_fixed_duration_fallback";
 
 export function phaseTimingSnapshot(phase={}){return deepFreeze({timingMode:phase.timingMode??null,startDate:phase.startDate??null,targetDate:phase.targetDate??null,duration:phase.duration?structuredClone(phase.duration):null})}
 
 export function expectedPhaseReviewDate(phase={}){
  if(validDate(phase.plannedReviewAt))return phase.plannedReviewAt;
- if(phase.timingMode==="target_date")return validDate(phase.targetDate)?phase.targetDate:null;
  if(phase.timingMode!=="fixed_duration"||!validDate(phase.startDate)||!validDuration(phase.duration))return null;
  const date=new Date(`${phase.startDate}T12:00:00Z`),{value,unit}=phase.duration;
  if(unit==="days")date.setUTCDate(date.getUTCDate()+value);

@@ -10,7 +10,7 @@ describe("Build Lean Mass phase-aware production", () => {
     const before = fs.readFileSync(storePath, "utf8");
     // Keep the production contract stable as wall-clock time advances toward review day.
     const result = await getPhaseAwareActiveGoalPreview({
-      currentDate: new Date("2026-08-02T12:00:00.000Z"),
+      currentDate: new Date("2026-08-16T12:00:00.000Z"),
     });
     const after = fs.readFileSync(storePath, "utf8");
 
@@ -19,24 +19,24 @@ describe("Build Lean Mass phase-aware production", () => {
       title: "Build Lean Mass",
       status: "Active Goal",
       destination: "Build 10 lb of lean mass by October 31, 2026",
-      confidence: "59% confidence",
-      confidenceBand: "Developing",
+      confidence: "62% confidence",
+      confidenceBand: "Moderate",
       editHref: expect.stringMatching(/^\/goals\/.+\/edit$/),
     });
     expect(result.journey).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           name: "Establish Maintenance",
-          status: "Active",
-          color: "orange",
-          progress: "13 days remaining",
+          status: "Completed",
+          color: "neutral",
+          progress: "Completed",
         }),
         expect.objectContaining({
           name: "Lean Mass Build",
-          status: "Planned",
+          status: "Active",
           color: "green",
-          progress: "0 of 10 lb measured",
-          support: "Awaiting next DEXA",
+          progress: "0.8 of 10 lb gained",
+          support: "11 weeks to goal target",
         }),
       ])
     );
@@ -50,13 +50,7 @@ describe("Build Lean Mass phase-aware production", () => {
       fatMass: "12.8 lb",
       weight: "167.4 lb",
     });
-    expect(result.trainingProgress).toMatchObject({
-      periodStart: "2026-07-19",
-      periodEnd: "2026-08-15",
-      reviewDate: "2026-08-15",
-      readinessState: "waiting_for_evidence",
-      checkpointEligibility: false,
-    });
+    expect(result.trainingProgress).toBeNull();
     expect(result.turningPoints).not.toContainEqual(
       expect.objectContaining({ title: "Four-week training review" })
     );

@@ -31,6 +31,14 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   const active = trajectory.activePhase;
   const upcoming = trajectory.upcomingPhases[0] ?? null;
   const baseline = [...dexaScans].filter((scan) => (scan.measuredAt ?? scan.date) <= trajectory.overallGoal.journeyStartDate).sort((a,b)=>String(a.measuredAt??a.date).localeCompare(String(b.measuredAt??b.date))).at(-1);
+  const acceptedStrategy = (store.phaseStrategies ?? []).find((item) =>
+    item.id === goal.activePhaseStrategyId && item.phaseId === active.phaseId) ?? null;
+  const strategicReviewCadence = acceptedStrategy?.domains?.energy?.strategicReviewCadence ??
+    active.strategicReviewCadence ?? null;
+  const strategicReviewAnchor = acceptedStrategy?.domains?.energy?.strategicReviewAnchor ??
+    active.strategicReviewAnchor ?? null;
+  const phaseNarrative = currentPhaseNarrative({ active, upcoming, strategicReviewCadence,
+    strategicReviewAnchor });
   const protocolTypes = new Set(protocols.map((item) => String(item.protocolType ?? item.type ?? item.category ?? "").toLowerCase()));
   const strategy = ["Energy", "Nutrition", "Activity", "Training", "Coaching Updates", "Peptide", "Supplement"].map((label) => ({ label, active: [...protocolTypes].some((type) => type.includes(label.toLowerCase().replace(" updates", ""))) }));
   const guardrail = trajectory.overallGoal.sharedGuardrails.find((item) => /8.?9%|body fat/i.test(item)) ?? "Maintain approximately 8–9% body fat.";
@@ -38,18 +46,28 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
     activeGoal: goal,
     store,
   });
-  const trainingProgress = createGoalTrainingProgress({ goal, phase: goal.phases.find((item)=>item.id===active.phaseId), canonicalObjects: canonicalEvidence, currentDate, timeZone });
-  const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The accepted measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Goal journey activated", body: "The journey began with its first planned phase." }, { date: active.calculatedPlannedReviewDate, title: "Planned phase review", body: upcoming ? `Evidence will determine readiness for ${upcoming.phaseName}.` : "Evidence will determine progress and the appropriate Goal decision." }, { date: upcoming?.targetDate ?? trajectory.overallGoal.overallTargetDate, title: "Goal destination", body: `Future evidence will measure progress toward ${trajectory.overallGoal.targetDescription}.` }];
-  if(trainingProgress.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
+  const trainingProgress = active.calculatedPlannedReviewDate
+    ? createGoalTrainingProgress({ goal, phase: goal.phases.find((item)=>item.id===active.phaseId),
+      canonicalObjects: canonicalEvidence, currentDate, timeZone })
+    : null;
+  const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The accepted measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Goal journey activated", body: "The journey began with its first planned phase." },
+    ...(active.calculatedPlannedReviewDate ? [{ date: active.calculatedPlannedReviewDate,
+      title: "Planned phase review", body: upcoming ? `Evidence will determine readiness for ${upcoming.phaseName}.` : "Evidence will determine progress and the appropriate goal decision." }] : []),
+    { date: upcoming?.targetDate ?? trajectory.overallGoal.overallTargetDate, title: "Goal destination", body: `Future evidence will measure progress toward ${trajectory.overallGoal.targetDescription}.` }];
+  if(trainingProgress?.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
   turningPoints.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.title.localeCompare(b.title));
   return {
     hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% confidence`, confidenceBand: overallGoalConfidence.label, confidenceDetail: overallGoalConfidence.explanation, confidenceSource: overallGoalConfidence.source, confidenceMovement: overallGoalConfidence.movement, confidenceDelta: overallGoalConfidence.delta, confidenceAssessmentId: overallGoalConfidence.assessmentId, editHref: `/goals/${goal.id}/edit` },
-    journey: [phaseCard(active, "orange"), ...trajectory.upcomingPhases.map((phase) => phaseCard(phase, "green"))],
-    currentPhase: { title: active.phaseName, purpose: active.purpose, week: active.progress.presentationLabel, review: formatLongDate(active.calculatedPlannedReviewDate), evidence: "Daily weight, energy balance, recovery, and training performance establish whether maintenance is repeatable.", readiness: "Early evidence is accumulating. The phase remains active until maintenance is stable enough to support a deliberate surplus." },
+    journey: trajectory.phases.map((phase) => phaseCard(phase)),
+    currentPhase: { title: active.phaseName, purpose: active.purpose,
+      progress: active.progress.presentationLabel, review: phaseNarrative.review,
+      evidence: phaseNarrative.evidence, readiness: phaseNarrative.readiness,
+      color: active.presentationTone },
     next: upcoming ? { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "Authoritative outcome evidence measures Goal progress.", lead: "Supporting evidence guides day-to-day execution.", guardrail } : null,
-    readiness: ["Maintenance intake is repeatable without a persistent deficit.", "Body weight and energy trends are stable enough to set a controlled surplus.", "Training performance and recovery support progressive work.", "The planned phase review confirms readiness to begin the lean-mass build."],
+    readiness: upcoming ? ["The current phase objective is sufficiently resolved.", "Goal and guardrail evidence support the next planned phase.", "The next strategy remains reviewable and user-authorized."] : [],
     guardrail: { title: guardrail.replace(/[.]$/u, ""), scope: "Applies across every phase", body: "DEXA remains authoritative for body composition. Scale weight provides context between scans, but does not replace it." },
-    evidence: { dexa: { date: baseline?.measuredAt ?? baseline?.date, bodyFat: metric(baseline?.bodyFatPercentage, "%"), leanMass: mass(baseline?.leanMass), fatMass: mass(baseline?.fatMass), weight: mass(baseline?.totalMass) }, support: "Weight and energy evidence help interpret execution and recovery between DEXA measurements." },
+    evidence: { dexa: { date: baseline?.measuredAt ?? baseline?.date, bodyFat: metric(baseline?.bodyFatPercentage, "%"), leanMass: mass(baseline?.leanMass), fatMass: mass(baseline?.fatMass), weight: mass(baseline?.totalMass) },
+      phaseBaseline: active.phaseBaseline, support: "Weight and energy evidence help interpret execution and recovery between DEXA measurements." },
     trainingProgress,
     turningPoints,
     strategy,
@@ -57,7 +75,26 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   };
 }
 
-function phaseCard(phase, color) { return { name: phase.phaseName, status: phase.status === "active" ? "Active" : "Planned", dates: phase.status === "active" ? `Started ${formatShortDate(phase.startDate)} · Planned review ${formatShortDate(phase.calculatedPlannedReviewDate)}` : `Projected · Target ${formatShortDate(phase.targetDate)}`, progress: phase.progress.presentationLabel, support: phase.progress.status === "awaiting_follow_up" ? "Awaiting next DEXA" : phase.friendlyTimeline, percentage: phase.progress.clampedProgressPercentage ?? phase.timelineProgressPercentage ?? 0, color }; }
+function phaseCard(phase) {
+  const status = phase.status === "active" ? "Active" : phase.status === "completed" ? "Completed" : "Planned";
+  const dates = phase.status === "active"
+    ? `Started ${formatShortDate(phase.startDate)} · ${phase.strategicReviewCadence === "monthly" ? "Monthly review" : "Evidence-led review"}`
+    : phase.status === "completed" ? `Started ${formatShortDate(phase.startDate)} · Completed`
+      : `Projected · Target ${formatShortDate(phase.targetDate)}`;
+  return { name: phase.phaseName, number: Number(phase.order ?? 0) + 1, status, dates,
+    progress: phase.progress.presentationLabel,
+    support: phase.progress.status === "awaiting_follow_up" ? "Awaiting next DEXA" : phase.friendlyTimeline,
+    percentage: phase.progress.clampedProgressPercentage ?? phase.timelineProgressPercentage ?? 0,
+    color: phase.presentationTone };
+}
+function currentPhaseNarrative({ upcoming, strategicReviewCadence, strategicReviewAnchor }) {
+  if (upcoming) return { review: "Evidence-led", evidence: "Current evidence shows whether this phase objective is sufficiently resolved.", readiness: "The next phase begins only after a recommendation and explicit user authorization." };
+  const monthly = strategicReviewCadence === "monthly";
+  const aligned = strategicReviewAnchor === "dexa_body_composition";
+  return { review: monthly ? `Monthly${aligned ? " · DEXA aligned" : ""}` : "Evidence-led",
+    evidence: "Weekly evidence monitors intake, activity, training, recovery, and body-composition response to the active targets.",
+    readiness: "Evidence accumulates toward goal review. Any strategy change remains user-authorized." };
+}
 function mass(value) { return Number.isFinite(value?.value) ? `${value.value.toFixed(1)} ${value.unit}` : "—"; }
 function metric(value, unit) { return Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—"; }
 function formatLongDate(value) { return formatDate(value, { month: "long", day: "numeric", year: "numeric" }); }

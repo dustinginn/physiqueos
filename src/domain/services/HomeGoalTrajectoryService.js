@@ -29,13 +29,18 @@ export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = ne
     hasPhaseOutcomeEvidence: Boolean(evidenceSummary.phaseOutcomeEvidence),
   });
 
-  const phaseResults = ordered.map((phase) => phaseSummary(phase, today, outcomeProgressForPhase({ activeGoal: correctedGoal, phase, dexaScans, journeyStartDate })));
+  const phaseResults = ordered.map((phase) => phaseSummary(phase, today,
+    outcomeProgressForPhase({ activeGoal: correctedGoal, phase, dexaScans, journeyStartDate }),
+    phaseBaselineForPhase(phase, dexaScans)));
+  const goalProgress = phaseResults.find((phase) => phase.progress?.progressType === "outcome")?.progress ?? null;
   return freeze({
     overallGoal: {
       goalId: correctedGoal.id,
       goalName: correctedGoal.title ?? correctedGoal.name ?? "Current Goal",
       goalOutcome: correctedGoal.primaryOutcome ?? null,
       targetDescription,
+      goalBaseline: goalProgress?.baselineDate ? { date: goalProgress.baselineDate,
+        value: goalProgress.baselineValue, unit: goalProgress.unit } : null,
       journeyStartDate,
       overallTargetDate,
       sharedGuardrails: (correctedGoal.guardrails ?? []).filter((item) => item.accepted !== false).map((item) => item.text).filter(Boolean),
@@ -44,6 +49,7 @@ export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = ne
       overallDaysRemaining: overallRange?.remainingDays ?? null,
     },
     activePhase: phaseResults.find((phase) => isActivePhaseStatus(phase.status)) ?? activePhase,
+    goalProgress,
     upcomingPhases: phaseResults.filter((phase) => isPlannedPhaseStatus(phase.status)),
     phases: phaseResults,
     confidence,
@@ -55,7 +61,7 @@ export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = ne
   });
 }
 
-function phaseSummary(phase, today, outcomeProgress = null) {
+function phaseSummary(phase, today, outcomeProgress = null, phaseBaseline = null) {
   const plannedReviewDate = expectedPhaseReviewDate(phase);
   const timeline = isPlannedPhaseStatus(phase.status)
     ? upcomingTimeline(phase, plannedReviewDate)
@@ -69,8 +75,12 @@ function phaseSummary(phase, today, outcomeProgress = null) {
     phaseName: phase.name,
     purpose: phase.purpose ?? null,
     status: phase.status,
+    presentationTone: phasePresentationTone(phase),
+    phaseBaseline,
     order: phase.order,
     timingMode: phase.timingMode ?? null,
+    strategicReviewCadence: phase.strategicReviewCadence ?? null,
+    strategicReviewAnchor: phase.strategicReviewAnchor ?? null,
     startDate: validDate(phase.startDate) ? phase.startDate : null,
     duration: phase.duration ? structuredClone(phase.duration) : null,
     targetDate: validDate(phase.targetDate) ? phase.targetDate : null,
@@ -103,7 +113,8 @@ export function resolveDexaOutcomeProgress({ target, journeyStartDate, dexaScans
 }
 
 function outcomeProgressForPhase({ activeGoal, phase, dexaScans, journeyStartDate }) {
-  const ownsOverallOutcome = activeGoal?.target?.type === "numeric_change" && phase.status !== "active" && phase.targetDate && phase.targetDate === activeGoal.target.targetDate;
+  const ownsOverallOutcome = activeGoal?.target?.type === "numeric_change" &&
+    phase.targetDate && phase.targetDate === activeGoal.target.targetDate;
   return ownsOverallOutcome ? resolveDexaOutcomeProgress({ target: activeGoal.target, journeyStartDate, dexaScans }) : null;
 }
 
@@ -115,11 +126,31 @@ function plannedProgress(phase, timeline) {
 function outcomeResult({ status, baseline = null, latest = null, changeValue = null, targetAmount = null, rawProgressPercentage = null, clampedProgressPercentage = null, evidenceCount = 0, warnings = [], presentationLabel }) {
   return { progressType: status === "unsupported_target" || status === "baseline_unavailable" ? "unavailable" : "outcome", metric: "lean_mass", baselineValue: baseline?.value ?? null, baselineDate: baseline?.date ?? null, latestValue: latest?.value ?? null, latestDate: latest?.date ?? null, changeValue, targetAmount, unit: "lb", rawProgressPercentage, clampedProgressPercentage, evidenceSource: "DEXA", evidenceCount, status, warnings, presentationLabel };
 }
+function phaseBaselineForPhase(phase, dexaScans) {
+  if (!validDate(phase.startDate)) return null;
+  const scan = dexaScans.map(normalizeDexa).filter(Boolean)
+    .filter((item) => item.date <= phase.startDate).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  return scan ? { date: scan.date, leanMass: { value: scan.value, unit: "lb" } } : null;
+}
+
+function phasePresentationTone(phase) {
+  if (phase.status === "active") return Number(phase.order ?? 0) > 0 ? "green" : "orange";
+  if (phase.status === "completed") return "neutral";
+  return isPlannedPhaseStatus(phase.status) ? "green" : "neutral";
+}
 
 function normalizeDexa(scan) { const date = scan?.measuredAt ?? scan?.date, value = scan?.leanMass?.value; return validDate(date) && Number.isFinite(value) && scan?.leanMass?.unit === "lb" ? { date, value: Number(value) } : null; }
 
 function activeTimeline(phase, end, today) {
-  if (!validDate(phase.startDate) || !validDate(end)) return { valid: false, progressState: "unavailable", friendlyTimeline: "Timeline not established", warnings: ["Active phase requires a valid start and review date."] };
+  if (!validDate(phase.startDate)) return { valid: false, progressState: "unavailable", friendlyTimeline: "Timeline not established", warnings: ["Active phase requires a valid start date."] };
+  if (!validDate(end)) {
+    const runway = validDate(phase.targetDate) ? daysBetween(today, phase.targetDate) : null;
+    return { valid: true, progressPercentage: null, progressState: "active",
+      friendlyTimeline: Number.isFinite(runway) ? goalRunway(runway) : "Evidence-led phase",
+      progressLabel: phase.strategicReviewCadence === "monthly"
+        ? "Monthly strategic review · DEXA aligned" : "Review cadence established separately",
+      warnings: [] };
+  }
   const range = dateRange(phase.startDate, end, today);
   if (!range || range.totalDays <= 0) return { valid: false, progressState: "unavailable", friendlyTimeline: "Timeline not established", warnings: ["Active phase timeline is invalid."] };
   const progressPercentage = Math.round((range.elapsedDays / range.totalDays) * 100);
@@ -159,7 +190,8 @@ function confidenceSummary({ evidenceSummary, timelineValid, ambitious, hasPhase
   };
 }
 
-function countdown(days) { if (days === 1) return "Planned review tomorrow"; if (days <= 7) return "Planned review this week"; if (days >= 25) return "About 4 weeks remaining"; if (days >= 14) return `${Math.ceil(days / 7)} weeks remaining`; return `${days} days remaining`; }
+function goalRunway(days) { if (days <= 0) return "Goal target window reached"; if (days < 14) return `${days} days to goal target`; return `${Math.ceil(days / 7)} weeks to goal target`; }
+function countdown(days) { if (days === 1) return "Planned review tomorrow"; if (days <= 7) return "Planned review this week"; if (days >= 14) return `${Math.ceil(days / 7)} weeks remaining`; return `${days} days remaining`; }
 function isAmbitious(goal) { return goal.target?.metric === "lean_mass" && Number(goal.target?.amount) >= 10; }
 function localDate(value, timeZone) { const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(value instanceof Date ? value : new Date(value)); const pick = (type) => parts.find((part) => part.type === type)?.value; return `${pick("year")}-${pick("month")}-${pick("day")}`; }
 function dateRange(start, end, today) { if (!validDate(start) || !validDate(end) || !validDate(today)) return null; const totalDays = daysBetween(start, end); if (totalDays < 0) return null; return { totalDays, elapsedDays: clamp(daysBetween(start, today), 0, totalDays), remainingDays: clamp(daysBetween(today, end), 0, totalDays) }; }
