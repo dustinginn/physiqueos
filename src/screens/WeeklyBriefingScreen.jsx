@@ -39,6 +39,7 @@ export default function WeeklyBriefingScreen({ narrative, reconciliation = null 
         confidence={presentation.hero.confidence && <BriefingConfidenceAnchor
           confidence={presentation.hero.confidence}
           testId="weekly-confidence"
+          topBorder={false}
         />}
         icon={Sparkles}
         label={presentation.hero.eyebrow}

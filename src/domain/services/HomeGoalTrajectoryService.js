@@ -135,7 +135,10 @@ function phaseBaselineForPhase(phase, dexaScans) {
 
 function phasePresentationTone(phase) {
   if (phase.status === "active") return Number(phase.order ?? 0) > 0 ? "green" : "orange";
-  if (phase.status === "completed") return "neutral";
+  // Completed remains a distinct, positive "gold" tone rather than a desaturated/neutral
+  // one — completion is communicated by the Completed label and completed-state copy, not
+  // by graying the phase out.
+  if (phase.status === "completed") return "gold";
   return isPlannedPhaseStatus(phase.status) ? "green" : "neutral";
 }
 

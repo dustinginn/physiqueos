@@ -14,6 +14,8 @@ import PhaseReviewCard from "../../../../components/goals/PhaseReviewCard";
 import { loadApplicationCanonicalRuntime } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import { resolvePhaseReviewArtifactRead } from
   "../../../../domain/services/PhaseReviewArtifactReadService";
+import { resolveWeeklyBriefingPhaseBoundary } from
+  "../../../../domain/services/WeeklyBriefingPhaseBoundaryReadService";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +38,17 @@ export default async function BriefingReviewPage({ params, searchParams }) {
         ? <PhaseReviewCard readOnly review={review.review}/> : null}/>;
   }
   if (artifact.briefing?.weeklyNarrative) {
+    const canonicalStore = await loadApplicationCanonicalRuntime();
+    const weeklyGoalId = artifact.briefing.weeklyNarrative.context?.activeGoal?.id ??
+      artifact.briefing.weeklyNarrative.context?.activeGoalSummary?.id ?? null;
+    const weeklyGoal = (canonicalStore.goals ?? []).find((item) => item.id === weeklyGoalId) ?? null;
+    const phaseBoundary = resolveWeeklyBriefingPhaseBoundary({ artifact, goal: weeklyGoal });
     const narrative = await prepareWeeklyBriefingReviewPresentation({
       artifact,
       repositories: FounderRepositories,
       userId: user.id,
       timeZone: user.timeZone,
+      phaseBoundary,
     });
     return <WeeklyBriefingScreen narrative={narrative}/>;
   }

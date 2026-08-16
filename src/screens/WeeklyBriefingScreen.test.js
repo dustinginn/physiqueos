@@ -60,6 +60,11 @@ describe("WeeklyBriefingScreen canonical presentation boundary", () => {
     expect(source).toContain("presentation.bodyComposition &&");
   });
 
+  it("removes the thin divider directly beneath the WEEKLY BRIEFING header row without dropping either header text", () => {
+    expect(source).toContain('testId="weekly-confidence"');
+    expect(source).toMatch(/testId="weekly-confidence"\s*\n\s*topBorder=\{false\}/);
+  });
+
   it("reserves semantic status colors for their canonical meanings", () => {
     expect(source).toContain('tone === "success"');
     expect(source).toContain('tone === "warning"');

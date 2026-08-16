@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPINarrativeAssessment } from "./PINarrativeAssessmentService";
+import { expectInternalDomainNamesNatural } from "../presentation/proseCapitalization";
 
 const observations = [
   { id: "t2", domain: "training", status: "plateauing", subject: { type: "training_category", id: "back" } },
@@ -55,19 +56,98 @@ describe("PINarrativeAssessmentService", () => {
     expect(result.overallConclusion.summary).toMatch(/supports the current fat-loss direction/i);
     expect(result.overallConclusion.summary).not.toMatch(/maintenance-calorie decision/i);
   });
-});
 
-function expectInternalDomainNamesNatural(values) {
-  for (const copy of values.filter(Boolean)) {
-    for (const domain of ["Training", "Energy", "Weight", "Photos", "Goal", "Recovery", "Activity"]) {
-      const matches = [...copy.matchAll(new RegExp(`\\b${domain}\\b`, "g"))];
-      for (const match of matches) {
-        const prefix = copy.slice(0, match.index).trimEnd();
-        expect(
-          prefix === "" || /[.!?]$/.test(prefix),
-          `${domain} should only be capitalized at the start of a sentence: ${copy}`
-        ).toBe(true);
-      }
-    }
-  }
-}
+  describe("phaseBoundary (read-only, additive context)", () => {
+    const phaseBoundary = { phaseName: "Lean Mass Build", strategicReviewCadence: "monthly", strategicReviewAnchor: "dexa_body_composition" };
+    const observationsWithWeight = [...observations, { id: "w1", domain: "weight", direction: "stable", explanationData: { absoluteChange: -1.3 } }];
+    const input = { observations: observationsWithWeight, goal: { id: "g", type: "build_lean_mass" }, phase: { id: "p", type: "establish_maintenance" }, operatingState: "calibration" };
+
+    it("preserves the evidence facts, headline, decision, and primary finding when a phase boundary is present", () => {
+      const withoutBoundary = createPINarrativeAssessment(input);
+      const withBoundary = createPINarrativeAssessment({ ...input, phaseBoundary });
+      // The headline and the underlying decision/primary-finding classification are pure
+      // evidence facts and stay identical — only trailing strategic wording changes.
+      expect(withBoundary.overallConclusion.headline).toEqual(withoutBoundary.overallConclusion.headline);
+      expect(withBoundary.decision.type).toEqual(withoutBoundary.decision.type);
+      expect(withBoundary.primaryFinding).toEqual(withoutBoundary.primaryFinding);
+      // Energy/Weight/summary numeric facts stay identical — only their trailing strategic wording changes.
+      const numericFields = (item) => ({ domain: item.domain, status: item.status, direction: item.direction,
+        evidenceBasis: item.evidenceBasis, claimReferences: item.claimReferences });
+      expect(withBoundary.domainConclusions.map(numericFields)).toEqual(withoutBoundary.domainConclusions.map(numericFields));
+    });
+
+    it("preserves the Energy Balance evidence while replacing the stale another-full-week wording", () => {
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      const energy = result.domainConclusions.find((item) => item.domain === "energy");
+      expect(energy.explanation).toMatch(/6 of 7 days/);
+      expect(energy.explanation).not.toMatch(/let's get one more complete week/i);
+      expect(energy.explanation).toMatch(/Phase Review/);
+      expectInternalDomainNamesNatural([energy.explanation]);
+    });
+
+    it("preserves the Weight Context evidence without implying Phase 1 must continue until maintenance is perfectly proven", () => {
+      const withoutBoundary = createPINarrativeAssessment(input);
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      const weight = result.domainConclusions.find((item) => item.domain === "weight");
+      const weightWithout = withoutBoundary.domainConclusions.find((item) => item.domain === "weight");
+      expect(weight.explanation).toContain(weightWithout.explanation);
+      expect(weight.explanation).toMatch(/authorized moving forward/);
+      expectInternalDomainNamesNatural([weight.explanation]);
+    });
+
+    it("no longer blindly requires another calibration week in Coach's Take", () => {
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      expect(result.coachTake.recommendation).not.toMatch(/hold off on a larger calorie change until another complete week/i);
+      expect(result.coachTake.recommendation).toMatch(/not conclusively proven/i);
+      expect(result.coachTake.recommendation).toMatch(/sufficiently bounded/i);
+      expect(result.coachTake.recommendation).toMatch(/user authorized Lean Mass Build/);
+      expect(result.coachTake.recommendation).toMatch(/monthly.*DEXA\/body-composition aligned/);
+    });
+
+    it("does not claim the weekly briefing itself authorized the transition", () => {
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      expect(result.coachTake.recommendation).toMatch(/PI recommended review, and the user authorized/);
+    });
+
+    it("reflects active Phase 2 in Into Next Week without prescribing an automatic Strategy mutation", () => {
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      expect(result.coachTake.actions.some((item) => /Execute the authorized Lean Mass Build strategy/.test(item))).toBe(true);
+      expect(result.coachTake.actions.some((item) => /Monitor weekly evidence/.test(item))).toBe(true);
+      expect(result.coachTake.actions.join(" ")).not.toMatch(/increase.*calories|automatically|without.*authoriz/i);
+      expect(result.coachTake.actions.join(" ")).toMatch(/user-authorized/);
+    });
+
+    it("leaves other weeks (no phaseBoundary) completely unaffected", () => {
+      const result = createPINarrativeAssessment(input);
+      expect(result.coachTake.recommendation).toMatch(/hold off on a larger calorie change until another complete week/i);
+    });
+
+    it("reads with natural prose capitalization", () => {
+      const result = createPINarrativeAssessment({ ...input, phaseBoundary });
+      expectInternalDomainNamesNatural([result.coachTake.recommendation, ...result.coachTake.actions]);
+    });
+
+    it("replaces the stale another-week clause in the top-level summary while preserving the underlying counts", () => {
+      const withoutBoundary = createPINarrativeAssessment(input);
+      expect(withoutBoundary.overallConclusion.summary).toMatch(/complete another week of food and activity data before making a larger calorie adjustment/);
+      const withBoundary = createPINarrativeAssessment({ ...input, phaseBoundary });
+      expect(withBoundary.overallConclusion.summary).not.toMatch(/complete another week/);
+      expect(withBoundary.overallConclusion.summary).toMatch(/2 of 3 training areas improved/);
+      expect(withBoundary.overallConclusion.summary).toMatch(/6 of 7 days/);
+      expect(withBoundary.overallConclusion.summary).toMatch(/Phase Review weighed that alongside DEXA/);
+      expect(withBoundary.overallConclusion.summary).toMatch(/authorized moving into Lean Mass Build/);
+      expectInternalDomainNamesNatural([withBoundary.overallConclusion.summary]);
+    });
+
+    it("does not call the Phase 2 starting DEXA the Goal's starting point in weekly Body Composition", () => {
+      const bodyComposition = { measuredAt: "2026-08-15" };
+      const withoutBoundary = createPINarrativeAssessment({ ...input, goal: { id: "g", type: "build_lean_mass" }, bodyComposition });
+      expect(withoutBoundary.bodyCompositionConclusion.explanation).toMatch(/starting point for this goal/);
+      const withBoundary = createPINarrativeAssessment({ ...input, goal: { id: "g", type: "build_lean_mass" }, bodyComposition, phaseBoundary });
+      expect(withBoundary.bodyCompositionConclusion.explanation).not.toMatch(/starting point for this goal/);
+      expect(withBoundary.bodyCompositionConclusion.explanation).toMatch(/not the goal's original baseline/);
+      expect(withBoundary.bodyCompositionConclusion.explanation).toMatch(/Lean Mass Build starting observation/);
+      expectInternalDomainNamesNatural([withBoundary.bodyCompositionConclusion.explanation]);
+    });
+  });
+});

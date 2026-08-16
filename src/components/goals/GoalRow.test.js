@@ -29,3 +29,29 @@ describe("GoalRow terminal layout", () => {
     expect(html).toContain("min-w-[92px]");
   });
 });
+
+describe("GoalRow phase-trajectory colors", () => {
+  const trajectory = {
+    overallGoal: { targetDescription: "Build 10 lb of lean mass", overallTargetDate: "2026-10-31" },
+    phases: [
+      { phaseId: "p1", phaseName: "Establish Maintenance", status: "completed", order: 0, presentationTone: "gold", progress: { progressType: "unavailable", presentationLabel: "Completed" } },
+      { phaseId: "p2", phaseName: "Lean Mass Build", status: "active", order: 1, presentationTone: "green", progress: { progressType: "outcome", clampedProgressPercentage: 8, presentationLabel: "0.8 of 10 lb gained" } },
+    ],
+  };
+
+  it("keeps a completed phase gold, not desaturated, on Home", () => {
+    const html = renderToStaticMarkup(React.createElement(GoalRow, {
+      title: "Build Lean Mass", presentation: { mode: "phase_trajectory_goal", trajectory }, href: "/goals/build-lean-mass",
+    }));
+    // The completed Phase 1 badge/accent uses the shared gold token, not the neutral/gray one.
+    expect(html).toMatch(/style="color:#C9971A">Phase 1/);
+    expect(html).not.toMatch(/style="color:var\(--text-muted\)">Phase 1/);
+  });
+
+  it("keeps an active later phase green on Home", () => {
+    const html = renderToStaticMarkup(React.createElement(GoalRow, {
+      title: "Build Lean Mass", presentation: { mode: "phase_trajectory_goal", trajectory }, href: "/goals/build-lean-mass",
+    }));
+    expect(html).toContain("#3BC35B");
+  });
+});

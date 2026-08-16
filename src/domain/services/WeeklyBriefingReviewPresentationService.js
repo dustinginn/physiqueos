@@ -5,12 +5,14 @@ export async function prepareWeeklyBriefingReviewPresentation({
   repositories,
   userId,
   timeZone,
+  phaseBoundary = null,
 }) {
   const presented = await adaptWeeklyArtifactForPresentation({
     artifact,
     repositories,
     userId,
     timeZone,
+    phaseBoundary,
   });
   return presented.briefing.weeklyNarrative;
 }

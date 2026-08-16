@@ -14,18 +14,26 @@ export function createPINarrativeAssessment({
   confidence = null,
   priorAssessment = null,
   bodyComposition = null,
+  // Read-only, additive context: when a live phase transition began right after this week's
+  // evidence window closed, this describes it. It never changes the evidence conclusion
+  // (overallConclusion/domain summaries below) — only the strategic recommendation and
+  // "into next week" actions, which are allowed to reflect what is now known to have
+  // happened next.
+  phaseBoundary = null,
 } = {}) {
   const orderedObservations = [...observations].sort(byId);
   const orderedClaims = [...claims].sort(byId);
   const training = summarizeTraining(orderedObservations);
-  const energy = summarizeEnergy(orderedObservations);
-  const weight = summarizeWeight(orderedObservations);
+  const energy = summarizeEnergy(orderedObservations, phaseBoundary);
+  const weight = summarizeWeight(orderedObservations, phaseBoundary);
   const photos = summarizePhotos(orderedObservations);
   const goalType = goal.type ?? goal.goalType ?? goal.semanticGoalType ?? "unknown";
   const calibration = operatingState === "calibration" || phase.type === "establish_maintenance" || phase.name === "Establish Maintenance";
   const overall = training.breadth === "constructive" && energy.direction === "below"
     ? calibration
-      ? `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure, so keep training steady and complete another week of food and activity data before making a larger calorie adjustment.`
+      ? phaseBoundary
+        ? `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure; Phase Review weighed that alongside DEXA and other evidence and the user authorized moving into ${phaseBoundary.phaseName ?? "the next phase"}.`
+        : `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure, so keep training steady and complete another week of food and activity data before making a larger calorie adjustment.`
       : goalType.includes("fat")
         ? `${training.improvingCount} of the ${training.reviewedCount} training areas reviewed improved this week, while the available food and activity records kept intake below estimated expenditure in a way that supports the current fat-loss direction.`
         : `${training.improvingCount} of the ${training.reviewedCount} training areas reviewed improved this week, while the available food and activity records still placed intake below estimated expenditure.`
@@ -42,23 +50,27 @@ export function createPINarrativeAssessment({
   const bodyCompositionConclusion = summarizeBodyComposition({
     bodyComposition,
     goal,
+    phaseBoundary,
   });
   const coachTake = {
     biggestTakeaway:
       training.breadth === "constructive" && energy.direction === "below"
         ? "Training progressed across most reviewed areas, while calories still appeared below maintenance."
         : training.explanation || energy.explanation,
-    recommendation:
-      decision === "continue_and_calibrate"
+    recommendation: phaseBoundary
+      ? phaseBoundaryRecommendation(phaseBoundary)
+      : decision === "continue_and_calibrate"
         ? "Keep the current training plan and hold off on a larger calorie change until another complete week of food and activity data is available."
         : recommendation,
-    actions: [
-      "Continue progressing the current training plan.",
-      "Log both food and activity every day.",
-      training.plateauing.includes("Back")
-        ? "Give back extra attention and reassess whether intake is moving closer to maintenance."
-        : nextObservation,
-    ],
+    actions: phaseBoundary
+      ? phaseBoundaryActions(phaseBoundary)
+      : [
+          "Continue progressing the current training plan.",
+          "Log both food and activity every day.",
+          training.plateauing.includes("Back")
+            ? "Give back extra attention and reassess whether intake is moving closer to maintenance."
+            : nextObservation,
+        ],
   };
   const confidenceExplanation =
     training.breadth === "constructive" && energy.completeness === "partial"
@@ -136,7 +148,7 @@ function summarizeTraining(items) {
       headline: constructive ? "Training progressed across most areas." : "Training direction is still forming.",
     });
 }
-function summarizeEnergy(items) {
+function summarizeEnergy(items, phaseBoundary = null) {
   const balance = items.find((item) => item.domain === "energy" && item.kind === "energy_balance");
   const coverage = items.find((item) => item.domain === "energy" && item.kind === "paired_day_coverage");
   const average = balance?.explanationData?.currentAverage;
@@ -156,9 +168,14 @@ function summarizeEnergy(items) {
   const balanceSentence = below
     ? `Those days averaged ${Math.abs(Math.round(average))} calories below estimated expenditure, which still looks low for maintenance.`
     : "The available days do not show a clear difference between intake and estimated expenditure.";
+  const belowMaintenanceClause = phaseBoundary
+    ? `The trend pointed below maintenance; that evidence, weighed during Phase Review, supported the authorized transition into a controlled ${phaseBoundary.phaseName ?? "next phase"} energy strategy.`
+    : partial
+      ? "The trend still points below maintenance, but let's get one more complete week before adjusting calories."
+      : "The next complete week will make the calorie decision clearer.";
   return conclusion("energy", balance ? "observed" : "unavailable", below ? "below" : "neutral",
     below
-      ? `${coverageSentence} ${partial ? "The trend still points below maintenance, but let's get one more complete week before adjusting calories." : "The next complete week will make the calorie decision clearer."}`.trim()
+      ? `${coverageSentence} ${belowMaintenanceClause}`.trim()
       : `${coverageSentence} The available records do not support a stronger calorie conclusion yet.`,
     [balance, coverage].filter(Boolean),
     {
@@ -171,15 +188,18 @@ function summarizeEnergy(items) {
       headline: below ? "Calories still look low for maintenance." : "Calories need more context.",
     });
 }
-function summarizeWeight(items) {
+function summarizeWeight(items, phaseBoundary = null) {
   const current = items.find((item) => item.domain === "weight");
   const change = current?.explanationData?.absoluteChange;
   const stable = Number.isFinite(change) && Math.abs(change) < 1;
+  const phaseBoundaryClause = phaseBoundary
+    ? " Phase Review weighed this alongside DEXA and other evidence, rather than waiting for weight alone to prove maintenance, before the user authorized moving forward."
+    : "";
   return conclusion("weight", current ? "observed" : "unavailable", current?.direction ?? "neutral",
     current
       ? stable
-        ? "Weight stayed nearly flat this week. That is useful context, but one week of scale movement is not enough to determine whether calories are at maintenance."
-        : "Weight adds useful context, but one week of scale movement does not decide whether the plan should change."
+        ? `Weight stayed nearly flat this week. That is useful context, but one week of scale movement is not enough to determine whether calories are at maintenance.${phaseBoundaryClause}`
+        : `Weight adds useful context, but one week of scale movement does not decide whether the plan should change.${phaseBoundaryClause}`
       : "",
     [current].filter(Boolean),
     { headline: "Weight stayed nearly flat." });
@@ -190,7 +210,7 @@ function summarizePhotos(items) {
     current ? "Photos looked generally stable this week. They are useful for spotting a clear visual change, but they cannot confirm whether lean mass increased." : "", [current].filter(Boolean),
     { authority: "directional", headline: "Photos looked generally stable." });
 }
-function summarizeBodyComposition({ bodyComposition, goal }) {
+function summarizeBodyComposition({ bodyComposition, goal, phaseBoundary = null }) {
   const measuredAt = bodyComposition?.measuredAt ?? bodyComposition?.date ?? null;
   if (!measuredAt) return null;
   const date = new Intl.DateTimeFormat("en-US", {
@@ -199,10 +219,23 @@ function summarizeBodyComposition({ bodyComposition, goal }) {
     timeZone: "UTC",
   }).format(new Date(`${measuredAt}T12:00:00Z`));
   const goalType = goal?.type ?? goal?.goalType ?? goal?.semanticGoalType ?? "unknown";
+  const leanMassGoal = /lean_mass|muscle/i.test(goalType);
+  // When this week sits at a live phase boundary, the DEXA in view is the new phase's
+  // starting observation, not the goal's original baseline — the two must stay distinct.
+  if (phaseBoundary) {
+    const phaseLabel = phaseBoundary.phaseName ?? "the new phase";
+    return {
+      status: "baseline",
+      headline: `${phaseBoundary.phaseName ?? "Phase"} Starting Observation`,
+      explanation: leanMassGoal
+        ? `The ${date} DEXA is the ${phaseLabel} starting observation, not the goal's original baseline. The next scan will show whether lean mass continues increasing while body fat remains near the current level.`
+        : `The ${date} DEXA is the ${phaseLabel} starting observation, not the goal's original baseline. The next scan will show whether body composition continues moving in the intended direction.`,
+    };
+  }
   return {
     status: "baseline",
     headline: "Current Baseline",
-    explanation: /lean_mass|muscle/i.test(goalType)
+    explanation: leanMassGoal
       ? `The ${date} DEXA remains the starting point for this goal. The next scan will show whether lean mass is increasing while body fat remains near the current level.`
       : `The ${date} DEXA remains the measured starting point for this goal. The next scan will show whether body composition is moving in the intended direction.`,
   };
@@ -211,6 +244,23 @@ function conclusion(domain, status, directionValue, explanation, sources, extra 
   return { domain, status, direction: directionValue, strength: "moderate", explanation, evidenceBasis: sources.flatMap((item) => item?.supportingEvidenceIds ?? []), claimReferences: sources.map((item) => item?.id).filter(Boolean), limitations: sources.flatMap((item) => item?.confidence?.limitations ?? []), uncertainty: null, lifecycle: "relevant", authority: domain === "photos" ? "directional" : "corroborating", ...extra };
 }
 function headlineFor(training, calibration) { return training.breadth === "constructive" ? calibration ? "Training moved forward, but calories still look low." : "Training moved forward this week." : "The current direction is still forming."; }
+// Distinguishes the strategic recommendation and next-week actions from the evidence
+// conclusion above: maintenance was not conclusively proven, but the remaining uncertainty
+// was sufficiently bounded that PI recommended review and the user authorized moving on.
+function phaseBoundaryRecommendation(phaseBoundary) {
+  const reviewClause = phaseBoundary.strategicReviewCadence === "monthly"
+    ? ` with a monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? ", DEXA/body-composition aligned" : ""} strategic review`
+    : "";
+  return `Maintenance was not conclusively proven, but the remaining uncertainty was sufficiently bounded to move forward — additional information had some value, and delay had a goal cost too. PI recommended review, and the user authorized ${phaseBoundary.phaseName ?? "the next phase"}${reviewClause}, with weekly evidence monitoring continuing separately.`;
+}
+function phaseBoundaryActions(phaseBoundary) {
+  const actions = ["Continue progressing training.", "Keep logging food and activity every day.",
+    `Execute the authorized ${phaseBoundary.phaseName ?? "phase"} strategy.`, "Monitor weekly evidence."];
+  if (phaseBoundary.strategicReviewCadence === "monthly") {
+    actions.push(`Review strategy monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? " with DEXA/body-composition evidence" : ""} — any change remains user-authorized.`);
+  }
+  return actions;
+}
 function digest(value) { return createHash("sha256").update(stable(value)).digest("hex").slice(0, 24); }
 function stable(value) { if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(",")}}`; return JSON.stringify(value); }
 function byId(a, b) { return String(a?.id ?? "").localeCompare(String(b?.id ?? "")); }

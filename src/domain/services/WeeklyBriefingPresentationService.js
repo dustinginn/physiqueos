@@ -33,6 +33,7 @@ export function createWeeklyEnergyProgressModel(assessment) {
 export async function adaptWeeklyArtifactForPresentation({
   artifact,
   timeZone = "America/Los_Angeles",
+  phaseBoundary = null,
 } = {}) {
   const narrative = artifact?.briefing?.weeklyNarrative;
   if (!narrative) return artifact;
@@ -68,6 +69,7 @@ export async function adaptWeeklyArtifactForPresentation({
         timeZone,
         confidence: narrative.goalConfidence,
         bodyComposition: narrative.context?.latestCompletedDexa ?? null,
+        phaseBoundary,
       });
   const narrativePresentationSelection = selectWeeklyNarrativePresentation({
     assessment: narrativeAssessment,
