@@ -1,5 +1,7 @@
 import { createPhaseReviewMilestone, isPhaseReviewMilestone } from
   "../models/phaseReviewMilestone";
+import { resolveCanonicalPhaseReviewArtifactIdentity } from
+  "./CanonicalPhaseReviewArtifactIdentityService";
 
 export const CANONICAL_PHASE_REVIEW_MUTATION_BASELINE_VERSION =
   "canonical_phase_review_mutation_baseline_v1";
@@ -21,8 +23,7 @@ export function createCanonicalPhaseReviewMutationBaseline({ store, request } = 
     fail("trusted_context_missing", "Trusted Phase Review artifact context is incomplete.");
   }
   requiredSame(binding.artifactIdentity, artifact.id, "artifact_binding_mismatch");
-  requiredSame(authorization.goalId, artifact.goalId, "goal_binding_mismatch");
-  requiredSame(authorization.currentPhaseId, artifact.phaseId, "phase_binding_mismatch");
+  optionalSame(binding.eventIdentity, artifact.id, "artifact_binding_mismatch");
   requiredSame(authorization.designatedArtifactType, binding.artifactType,
     "artifact_type_mismatch");
   optionalSame(authorization.designatedArtifactIdentity, artifact.id,
@@ -30,8 +31,10 @@ export function createCanonicalPhaseReviewMutationBaseline({ store, request } = 
   optionalSame(authorization.designatedEvidenceIdentity, binding.evidenceIdentity,
     "evidence_binding_mismatch");
 
-  const goal = (baseline.goals ?? []).find((item) => item.id === authorization.goalId);
-  const phase = goal?.phases?.find((item) => item.id === authorization.currentPhaseId);
+  const identity = resolveCanonicalPhaseReviewArtifactIdentity({ store: baseline, artifact,
+    authorization });
+  const goal = (baseline.goals ?? []).find((item) => item.id === identity.goalId);
+  const phase = goal?.phases?.find((item) => item.id === identity.phaseId);
   if (!goal || !phase || !authorization.milestoneId || !authorization.unresolvedReviewId) {
     fail("trusted_context_missing", "Trusted Goal, phase, or milestone context is missing.");
   }
@@ -40,6 +43,18 @@ export function createCanonicalPhaseReviewMutationBaseline({ store, request } = 
     "milestone_binding_mismatch");
   optionalSame(presentation?.unresolvedReviewId, authorization.unresolvedReviewId,
     "unresolved_review_mismatch");
+  optionalSame(presentation?.actionRequest?.originatingArtifactId, artifact.id,
+    "artifact_binding_mismatch");
+  optionalSame(presentation?.actionRequest?.approvalId, authorization.approvalId,
+    "authorization_scope_mismatch");
+  const contextualMilestone = artifact.briefing?.dexaEventNarrative?.context?.activePhase
+    ?.reviewMilestone;
+  optionalSame(contextualMilestone?.milestoneId, authorization.milestoneId,
+    "milestone_binding_mismatch");
+  optionalSame(contextualMilestone?.unresolvedReviewId, authorization.unresolvedReviewId,
+    "unresolved_review_mismatch");
+  optionalSame(artifact.trigger?.scanId ?? artifact.trigger?.evidenceId,
+    binding.evidenceIdentity, "evidence_binding_mismatch");
 
   const raw = phase.reviewMilestone;
   if (isPhaseReviewMilestone(raw)) {

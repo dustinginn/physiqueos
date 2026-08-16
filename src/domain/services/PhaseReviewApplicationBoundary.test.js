@@ -22,9 +22,11 @@ afterEach(() => directories.splice(0).forEach((directory) =>
   fs.rmSync(directory, { recursive: true, force: true })));
 
 describe("server-only Phase Review application boundary", () => {
-  it("reproduces legacy milestone_invalid and hydrates the same trusted state to eligibility", () => {
+  it("reproduces deployed identity and milestone failures, then hydrates trusted state", () => {
     const value = store();
     const action = request(value);
+    expect(deployedTopLevelIdentityReason(value.dailyBriefings[0],
+      value.dailyBriefings[0].phaseReviewAuthorization)).toBe("goal_binding_mismatch");
     expect(eligibility(value, value.goals[0].phases[0].reviewMilestone)).toMatchObject({
       eligible: false, reason: "milestone_invalid",
     });
@@ -86,6 +88,28 @@ describe("server-only Phase Review application boundary", () => {
     ["contradictory consumed state", (value) => {
       value.goals[0].phases[0].reviewMilestone.consumed = true;
     }, "milestone_state_mismatch"],
+    ["top-level Goal contradiction", (value) => {
+      value.dailyBriefings[0].goalId = "other";
+    }, "goal_binding_mismatch"],
+    ["top-level phase contradiction", (value) => {
+      value.dailyBriefings[0].phaseId = "p2";
+    }, "phase_binding_mismatch"],
+    ["event identity contradiction", (value) => {
+      value.dailyBriefings[0].phaseReviewEligibilityBinding.eventIdentity = "other";
+    }, "artifact_binding_mismatch"],
+    ["trigger evidence contradiction", (value) => {
+      value.dailyBriefings[0].trigger.evidenceId = "other";
+    }, "evidence_binding_mismatch"],
+    ["persisted action artifact contradiction", (value) => {
+      value.dailyBriefings[0].briefing.phaseReview.actionRequest.originatingArtifactId = "other";
+    }, "artifact_binding_mismatch"],
+    ["persisted approval contradiction", (value) => {
+      value.dailyBriefings[0].briefing.phaseReview.actionRequest.approvalId = "other";
+    }, "authorization_scope_mismatch"],
+    ["contextual milestone contradiction", (value) => {
+      value.dailyBriefings[0].briefing.dexaEventNarrative.context.activePhase
+        .reviewMilestone.milestoneId = "other";
+    }, "milestone_binding_mismatch"],
     ["missing trusted binding", (value) => {
       delete value.dailyBriefings[0].phaseReviewEligibilityBinding;
     }, "trusted_context_missing"],
@@ -340,7 +364,19 @@ function store() {
       currentAssessmentId: "confidence-p1", currentScore: 50, scoreBand: "uncertain",
       schemaVersion: "goal_confidence_snapshot_v2", evidenceCutoff: "2026-08-15T18:00:00.000Z" }],
     goalConfidenceHistory: [], confidenceInitializationArtifacts: [],
-    dailyBriefings: [{ id: "artifact", goalId, phaseId: "p1", generatedAt: "2026-08-15T18:00:00.000Z",
+    dailyBriefings: [{ id: "artifact", generatedAt: "2026-08-15T18:00:00.000Z",
+      briefing: {
+        dexaEventNarrative: {
+          context: { activeGoal: { id: goalId }, activePhase: { id: "p1",
+            reviewMilestone: { goalId, phaseId: "p1", milestoneId: "milestone",
+              unresolvedReviewId: "review" } } },
+          goalConfidence: { assessmentContext: { goalId, phaseId: "p1" } },
+        },
+        phaseReview: { milestoneId: "milestone", unresolvedReviewId: "review",
+          currentPhase: { id: "p1" },
+          actionRequest: { goalId, currentPhaseId: "p1", originatingArtifactId: "artifact",
+            approvalId: "approval" } },
+      },
       trigger: { evidenceType: "dexa", evidenceId: "aug-15-dexa", occurredAt: "2026-08-15" },
       phaseReviewEligibilityBinding: { schemaVersion: "phase_review_eligibility_binding_v1",
         artifactType: "dexa_event", artifactIdentity: "artifact", eventIdentity: "artifact",
@@ -434,6 +470,13 @@ function eligibility(value, reviewMilestone) {
     currentDate: "2026-08-15", reviewState: phase.reviewState,
     decisionHistory: value.phaseReviewDecisions,
   });
+}
+function deployedTopLevelIdentityReason(artifact, authorization) {
+  if (authorization.goalId == null || artifact.goalId == null ||
+      authorization.goalId !== artifact.goalId) return "goal_binding_mismatch";
+  if (authorization.currentPhaseId == null || artifact.phaseId == null ||
+      authorization.currentPhaseId !== artifact.phaseId) return "phase_binding_mismatch";
+  return null;
 }
 function legacyMilestone() { return { type: "dexa_phase_review",
   plannedAt: "2026-08-15", originatingMilestoneAt: "2026-08-15" }; }
