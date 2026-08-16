@@ -10,12 +10,94 @@ import { createFounderStoreMutationLockService } from
 import { createPhaseStrategy } from "../models/phaseStrategy";
 import { createPhaseExpectedTrajectory } from "../models/phaseExpectedTrajectory";
 import { createPhaseReviewApplicationBoundary } from "./PhaseReviewApplicationBoundary";
+import { authorizePhaseReviewRequest } from "./PhaseReviewAuthorizationService";
+import { evaluatePhaseReviewEligibility } from "./PhaseReviewEligibilityService";
+import { createCanonicalPhaseReviewMutationBaseline } from
+  "./CanonicalPhaseReviewMutationBaselineService";
+import { deriveGoalAwarePhaseReviewInputs, evaluateGoalAwarePhaseReview } from
+  "./GoalAwarePhaseReviewRecommendationService";
 
 const directories = [];
 afterEach(() => directories.splice(0).forEach((directory) =>
   fs.rmSync(directory, { recursive: true, force: true })));
 
 describe("server-only Phase Review application boundary", () => {
+  it("reproduces legacy milestone_invalid and hydrates the same trusted state to eligibility", () => {
+    const value = store();
+    const action = request(value);
+    expect(eligibility(value, value.goals[0].phases[0].reviewMilestone)).toMatchObject({
+      eligible: false, reason: "milestone_invalid",
+    });
+    expect(() => authorizePhaseReviewRequest({ store: value, request: action,
+      actor: { id: value.user.id }, now: () => new Date("2026-08-15T19:00:00.000Z") }))
+      .toThrow(expect.objectContaining({ code: "PHASE_REVIEW_ARTIFACT_INELIGIBLE" }));
+
+    const result = createCanonicalPhaseReviewMutationBaseline({ store: value, request: action });
+    expect(result).toMatchObject({ hydrated: true, replay: false,
+      milestone: { schemaVersion: "phase_review_milestone_v1",
+        milestoneId: "milestone", goalId: "goal", phaseId: "p1",
+        unresolvedReviewId: "review", revision: 0 } });
+    expect(eligibility(result.store, result.milestone)).toMatchObject({
+      eligible: true, reason: "milestone_eligible", authorizationAllowed: true,
+    });
+    expect(value.goals[0].phases[0].reviewMilestone).toEqual(legacyMilestone());
+  });
+
+  it("preserves an already-canonical milestone semantically", () => {
+    const value = store();
+    value.goals[0].phases[0].reviewMilestone = canonicalMilestone("goal", "p1");
+    const before = structuredClone(value.goals[0].phases[0].reviewMilestone);
+    const result = createCanonicalPhaseReviewMutationBaseline({
+      store: value, request: request(value),
+    });
+    expect(result.hydrated).toBe(false);
+    expect(result.milestone).toEqual(before);
+    expect(result.store.goals[0].phases[0].reviewMilestone).toEqual(before);
+  });
+
+  it.each([
+    ["malformed milestone", (value) => { value.goals[0].phases[0].reviewMilestone = {}; },
+      "legacy_milestone_malformed"],
+    ["Goal mismatch", (value) => { value.goals[0].phases[0].reviewMilestone.goalId = "other"; },
+      "goal_binding_mismatch"],
+    ["phase mismatch", (value) => { value.goals[0].phases[0].reviewMilestone.phaseId = "p2"; },
+      "phase_binding_mismatch"],
+    ["artifact mismatch", (value) => {
+      value.goals[0].phases[0].reviewMilestone.designatedArtifactIdentity = "other";
+    }, "artifact_binding_mismatch"],
+    ["evidence mismatch", (value) => {
+      value.goals[0].phases[0].reviewMilestone.designatedEvidenceIdentity = "other";
+    }, "evidence_binding_mismatch"],
+    ["date mismatch", (value) => {
+      value.goals[0].phases[0].reviewMilestone.plannedAt = "2026-08-14";
+    }, "milestone_date_mismatch"],
+    ["unresolved review mismatch", (value) => {
+      value.goals[0].phases[0].reviewMilestone.unresolvedReviewId = "other";
+    }, "unresolved_review_mismatch"],
+    ["authorization scope mismatch", (value) => {
+      value.dailyBriefings[0].phaseReviewAuthorization.currentPhaseId = "p2";
+    }, "phase_binding_mismatch"],
+    ["invalid revision", (value) => {
+      value.goals[0].phases[0].reviewMilestone.revision = -1;
+    }, "milestone_revision_invalid"],
+    ["malformed required evidence", (value) => {
+      value.goals[0].phases[0].reviewMilestone.requiredEvidence = "dexa_event";
+    }, "legacy_milestone_malformed"],
+    ["contradictory consumed state", (value) => {
+      value.goals[0].phases[0].reviewMilestone.consumed = true;
+    }, "milestone_state_mismatch"],
+    ["missing trusted binding", (value) => {
+      delete value.dailyBriefings[0].phaseReviewEligibilityBinding;
+    }, "trusted_context_missing"],
+  ])("rejects contradictory or incomplete legacy state: %s", (_label, arrange, reason) => {
+    const value = store();
+    arrange(value);
+    expect(() => createCanonicalPhaseReviewMutationBaseline({
+      store: value, request: request(value),
+    })).toThrow(expect.objectContaining({
+      code: "PHASE_REVIEW_ARTIFACT_INELIGIBLE", reason,
+    }));
+  });
   it.each([
     ["wrong artifact", (fixture) => ({ ...fixture.request,
       originatingArtifactId: "wrong-artifact" })],
@@ -40,6 +122,8 @@ describe("server-only Phase Review application boundary", () => {
     ["wrong Goal", (fixture) => ({ ...fixture.request, goalId: "wrong" }),
       "PHASE_REVIEW_GOAL_OWNERSHIP_MISMATCH"],
     ["stale store revision", (fixture) => ({ ...fixture.request, expectedStoreRevision: 6 }),
+      "PHASE_REVIEW_ACTION_EXPECTED_REVISION_MISMATCH"],
+    ["stale phase revision", (fixture) => ({ ...fixture.request, expectedPhaseRevision: 1 }),
       "PHASE_REVIEW_ACTION_EXPECTED_REVISION_MISMATCH"],
     ["stale Goal-aware recommendation", (fixture) => ({ ...fixture.request,
       recommendationFingerprint: "sha256_stale" }), "PHASE_REVIEW_RECOMMENDATION_STALE"],
@@ -220,7 +304,7 @@ function createFixture({ arrange = () => {}, actorId = "user_founder_001",
       createCommitId: () => "commit", createTransactionId: () => "transaction" })),
     actorResolver: async () => ({ id: actorId }),
     now: () => new Date("2026-08-15T19:00:00.000Z") });
-  return { directory, file, liveStore, lock, boundary, request: request() };
+  return { directory, file, liveStore, lock, boundary, request: request(value) };
 }
 function store() {
   const goalId = "goal";
@@ -237,7 +321,7 @@ function store() {
           status: "active", startedAt: "2026-07-19", startDate: "2026-07-19",
           plannedReviewAt: "2026-08-15", timingMode: "completion_criteria",
           completionDecisionRequired: true, reviewState: "due", revision: 0, successCriteria: [],
-          reviewMilestone: milestone(goalId, "p1") },
+          reviewMilestone: legacyMilestone() },
         { id: "p2", goalId, name: "Lean Mass Build", purpose: "Build.", order: 1,
           status: "planned", startedAt: null, startDate: null,
           projectedNextPhaseStart: "2026-08-16", plannedReviewAt: "2026-10-15",
@@ -320,14 +404,40 @@ function trajectory(goalId) {
 }
 function lineage(sourceId) { return { field: "record", sourceType: "test_fixture", sourceId,
   path: sourceId, classification: "isolated_test_fixture" }; }
-function request() { return { goalId: "goal", currentPhaseId: "p1", decisionId: "decision",
+function request(value = store()) { return { goalId: "goal", currentPhaseId: "p1", decisionId: "decision",
   selectedOutcome: "begin_next_phase", selectedDuration: null, selectedReviewAt: null,
   expectedPhaseRevision: 0, expectedStoreRevision: 7, idempotencyKey: "decision",
   originatingArtifactId: "artifact", approvalId: "approval", approvalToken: "secret",
   milestoneId: "milestone", unresolvedReviewId: "review",
   caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
-  activityExpenditureTarget: { value: 800, unit: "kcal/day" } }; }
-function milestone(goalId, phaseId) { return { schemaVersion: "phase_review_milestone_v1",
+  activityExpenditureTarget: { value: 800, unit: "kcal/day" },
+  recommendationFingerprint: recommendation(value).fingerprint }; }
+function recommendation(value) {
+  const goal = value.goals[0];
+  const phase = goal.phases[0];
+  const artifact = value.dailyBriefings[0];
+  return evaluateGoalAwarePhaseReview(deriveGoalAwarePhaseReviewInputs({
+    goal, phase, nextPhase: goal.phases[1], artifact, canonicalScan: null,
+    extensionDays: 14, asOf: "2026-08-15",
+  }));
+}
+function eligibility(value, reviewMilestone) {
+  const goal = value.goals[0];
+  const phase = goal.phases[0];
+  const artifact = value.dailyBriefings[0];
+  return evaluatePhaseReviewEligibility({
+    activeGoal: goal, activePhase: phase, reviewMilestone,
+    currentArtifact: { ...artifact, evidenceTypes: ["dexa_event"],
+      evidenceIdentities: ["aug-15-dexa"] },
+    artifactType: "dexa_event", evidenceIdentity: "aug-15-dexa",
+    artifactTimestamp: "2026-08-15", publicationTimestamp: artifact.generatedAt,
+    currentDate: "2026-08-15", reviewState: phase.reviewState,
+    decisionHistory: value.phaseReviewDecisions,
+  });
+}
+function legacyMilestone() { return { type: "dexa_phase_review",
+  plannedAt: "2026-08-15", originatingMilestoneAt: "2026-08-15" }; }
+function canonicalMilestone(goalId, phaseId) { return { schemaVersion: "phase_review_milestone_v1",
   milestoneId: "milestone", goalId, phaseId, milestoneType: "planned_phase_review",
   reviewType: "phase_completion_review", requiredEvidence: [], eligibleArtifactTypes: ["dexa_event"],
   designatedArtifactIdentity: null, designatedEvidenceIdentity: null,

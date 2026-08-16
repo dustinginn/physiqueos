@@ -45,7 +45,8 @@ export function createPhaseReviewCommitCoordinator({
   return Object.freeze({
     version: PHASE_REVIEW_COMMIT_COORDINATOR_VERSION,
     participantNames: Object.freeze(orderedParticipants.map((item) => item.name)),
-    async commit(input, { authorization, expectedStoreRevision = null } = {}) {
+    async commit(input, { authorization, expectedStoreRevision = null,
+      canonicalBaseline = null } = {}) {
       let decision;
       try { decision = createPhaseReviewDecision(input); }
       catch (error) { return rejected("PHASE_REVIEW_DECISION_INVALID", error.message); }
@@ -63,7 +64,8 @@ export function createPhaseReviewCommitCoordinator({
       const preparedByName = new Map();
       let transaction = null;
       try {
-        const initial = await readPersistedStore();
+        const initial = canonicalBaseline == null
+          ? await readPersistedStore() : structuredClone(canonicalBaseline);
         const replay = findExisting(initial, decision);
         if (replay) return committedResult(replay, initial, true);
         const baselineRevision = getFounderStoreRevision(initial);

@@ -4,6 +4,8 @@ import { createCanonicalPhaseReviewParticipants } from "./PhaseReviewCommitParti
 import { validatePhaseReviewActionRequest, authorizePhaseReviewRequest } from
   "./PhaseReviewAuthorizationService";
 import { verifyPhaseReviewPostCommit } from "./PhaseReviewPostCommitVerificationService";
+import { createCanonicalPhaseReviewMutationBaseline } from
+  "./CanonicalPhaseReviewMutationBaselineService";
 import { createFounderStoreDryRunCapture, createFounderStoreDryRunUnitOfWork } from
   "../../data/repositories/FounderStoreDryRunUnitOfWork";
 
@@ -57,8 +59,11 @@ export function createPhaseReviewApplicationBoundary({
     let errorCode = null;
     try {
       const baselineBytes = await readPersistedBytes();
-      const baseline = await readPersistedStore();
-      startingRevision = Number(baseline.revision ?? 0);
+      const persistedBaseline = await readPersistedStore();
+      startingRevision = Number(persistedBaseline.revision ?? 0);
+      const { store: baseline } = createCanonicalPhaseReviewMutationBaseline({
+        store: persistedBaseline, request,
+      });
       const authorized = authorizePhaseReviewRequest({ store: baseline, request, actor, now });
       const capture = dryRun ? createFounderStoreDryRunCapture() : null;
       const coordinator = createPhaseReviewCommitCoordinator({
@@ -78,6 +83,7 @@ export function createPhaseReviewApplicationBoundary({
       const result = await coordinator.commit(authorized.decision, {
         authorization: authorized.authorization,
         expectedStoreRevision: request.expectedStoreRevision,
+        canonicalBaseline: baseline,
       });
       if (result.status !== "committed" || result.committed !== true) {
         errorCode = result.reasonCode ?? "PHASE_REVIEW_COMMIT_FAILED";
