@@ -34,6 +34,16 @@ describe("durable outbox worker", () => {
     const store = durableStore([message({ topic: "unknown" })]);
     const worker = createDurableOutboxWorker({ store, handlers: {}, workerId: "worker", buildId: "build", clock: () => at(0) });
     await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+    expect(store.state[0]).toMatchObject({ status: "dead", last_error_code: "OUTBOX_TOPIC_UNSUPPORTED" });
+  });
+
+  it("still fails closed for topics that formerly had speculative producers, since no handler is registered for them", async () => {
+    for (const topic of ["canonical.read-model.invalidate", "canonical.media.verified"]) {
+      const store = durableStore([message({ topic })]);
+      const worker = createDurableOutboxWorker({ store, handlers: { "foundation.synthetic": vi.fn() }, workerId: "worker", buildId: "build", clock: () => at(0) });
+      await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "dead" });
+      expect(store.state[0]).toMatchObject({ status: "dead", last_error_code: "OUTBOX_TOPIC_UNSUPPORTED" });
+    }
   });
 });
 

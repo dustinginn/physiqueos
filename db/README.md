@@ -68,6 +68,20 @@ an exact retry returns current status; payload drift fails closed. Worker lease
 expiry provides restart recovery, and terminal status remains pollable after a
 client disconnect.
 
+## Durable outbox contract
+
+`physiqueos.outbox_messages` holds executable asynchronous work, not a general
+event log. `DurableOutboxWorker` fails an unregistered topic closed and
+terminal (`OUTBOX_TOPIC_UNSUPPORTED`) by design; every enqueued topic is
+expected to have a real, deployed consumer. A producer must not enqueue a
+topic before its consumer exists — introduce both together in the same
+change. Read-model-invalidation events belong here only when there is actual
+invalidatable cache or projection state to invalidate; PhysiqueOS's current
+read paths compute fresh from canonical state on every request, so no such
+event exists today. Media post-verification events belong here only when a
+real downstream responsibility (indexing, notification, derived-asset
+generation, etc.) is implemented to consume them.
+
 This audit transport lives in the foundation logical database. Provider checks
 use a distinct, explicitly configured migration-target connection on the same
 accepted cluster. Dry-run uses SELECT/read-only provider operations and records

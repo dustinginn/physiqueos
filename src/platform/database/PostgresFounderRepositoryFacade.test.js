@@ -3,7 +3,7 @@ import { createPhase5SyntheticRuntime, PHASE5_SYNTHETIC_OWNER_ID } from "../migr
 import { createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
 
 describe("PostgreSQL Founder repository facade", () => {
-  it("hydrates reads from PostgreSQL and commits a repository mutation with metadata and outbox", async () => {
+  it("hydrates reads from PostgreSQL and commits a repository mutation with metadata, enqueueing no durable outbox work", async () => {
     const database = fakeDatabase();
     const repositories = createPostgresFounderRepositoryFacade({
       pool: database.pool,
@@ -21,8 +21,7 @@ describe("PostgreSQL Founder repository facade", () => {
     expect(updated.title).toBe("Provider canonical goal");
     expect((await repositories.goals.getGoalById(before.id)).title).toBe("Provider canonical goal");
     expect(database.metadata.revision).toBe(5002);
-    expect(database.outbox).toHaveLength(1);
-    expect(database.outbox[0]).toMatchObject({ commandId: "repository-command-1", collections: ["goals"] });
+    expect(database.outbox).toHaveLength(0);
     expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
   });
 

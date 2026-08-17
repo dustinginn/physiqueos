@@ -171,16 +171,6 @@ async function commitVerifiedUpload({
         intent.expectedSize, sha256, begun.objectKey, completed.providerVersion ?? null, completed.etag ?? null,
         JSON.stringify({ source: "provider-product-upload", uploadIntentId: intent.uploadId, artifactId })],
     );
-    await client.query(
-      `INSERT INTO physiqueos.outbox_messages
-        (id,user_id,topic,dedupe_key,payload_version,payload)
-       VALUES ($1,$2,'canonical.media.verified',$3,'1',$4::jsonb)
-       ON CONFLICT (topic,dedupe_key) DO NOTHING`,
-      [`outbox:${commandId}`, intent.ownerUserId, `media:${intent.uploadId}`, JSON.stringify({
-        commandId, objectId: intent.objectId, category, relationshipId: String(relationshipId),
-        canonicalStoreEpoch: compatibilityMode ? "provider-compatibility-noncanonical" : "postgres-canonical",
-      })],
-    );
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
