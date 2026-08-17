@@ -142,6 +142,159 @@ describe("embedded repository audit", () => {
     expect(report.repositories.every((entry) => entry.trackedRootGitlinkSha)).toBe(true);
     expect(report.violations.join("\n")).toContain("no intentional .gitmodules ownership");
   });
+
+  // The following cases mirror the real config/embedded-repository-policy.json entries for
+  // the three intentionally preserved deployment/incident-evidence worktrees, proving the
+  // exact shape of policy this repo actually ships (not just the generic schema) works as
+  // intended and stays narrowly scoped — no wildcard, no automatic future approval.
+
+  it("Case Q accepts a protected incident-anchor worktree only while it stays clean", () => {
+    const root = createRoot();
+    git(root, "worktree", "add", "-b", "fixture-anchor", path.join(root, ".tmp/windows-deploy-264a6306"), "HEAD");
+    writePolicy(root, [{
+      path: ".tmp/windows-deploy-264a6306",
+      repositoryType: "linked_worktree",
+      purpose: "Anchor for preserved failed-deployment incident evidence",
+      owner: "founder",
+      lifecycle: "protected_incident_evidence",
+      mayBeDirty: false,
+      generatedOnlyDirtyAllowed: false,
+      participatesInBackup: true,
+      recoveryRequirements: "Must be preserved alongside the incident evidence copy.",
+      endWorkSessionBehavior: "allow_clean",
+    }]);
+    const report = audit(root);
+    expect(report.passed).toBe(true);
+    expect(report.repositories[0]).toMatchObject({ path: ".tmp/windows-deploy-264a6306", allowed: true });
+  });
+
+  it("Case R accepts the incident evidence copy when its only dirty content is the explicitly approved failed-artifact logs", () => {
+    const root = createRoot();
+    const nested = path.join(root, ".tmp/incident-failed-artifact-264a6306");
+    git(root, "worktree", "add", "-b", "fixture-incident", nested, "HEAD");
+    write(root, ".tmp/incident-failed-artifact-264a6306/failed-artifact.err.log", "stderr\n");
+    write(root, ".tmp/incident-failed-artifact-264a6306/failed-artifact.out.log", "stdout\n");
+    writePolicy(root, [{
+      path: ".tmp/incident-failed-artifact-264a6306",
+      repositoryType: "linked_worktree",
+      purpose: "Preserved forensic copy of a failed Windows deployment build artifact",
+      owner: "founder",
+      lifecycle: "protected_incident_evidence",
+      mayBeDirty: true,
+      generatedOnlyDirtyAllowed: true,
+      generatedOnlyPatterns: ["failed-artifact.err.log", "failed-artifact.out.log"],
+      participatesInBackup: true,
+      recoveryRequirements: "Do not delete — the log files are the incident evidence itself.",
+      endWorkSessionBehavior: "allow_generated_only",
+    }]);
+    const report = audit(root);
+    expect(report.passed).toBe(true);
+    expect(report.repositories[0]).toMatchObject({
+      path: ".tmp/incident-failed-artifact-264a6306",
+      untrackedCount: 2,
+      allowed: true,
+    });
+  });
+
+  it("Case S blocks the incident evidence copy if it grows dirty content beyond the explicitly approved logs", () => {
+    const root = createRoot();
+    const nested = path.join(root, ".tmp/incident-failed-artifact-264a6306");
+    git(root, "worktree", "add", "-b", "fixture-incident-unsafe", nested, "HEAD");
+    write(root, ".tmp/incident-failed-artifact-264a6306/failed-artifact.err.log", "stderr\n");
+    write(root, ".tmp/incident-failed-artifact-264a6306/failed-artifact.out.log", "stdout\n");
+    write(root, ".tmp/incident-failed-artifact-264a6306/unexpected-extra-file.txt", "not approved\n");
+    writePolicy(root, [{
+      path: ".tmp/incident-failed-artifact-264a6306",
+      repositoryType: "linked_worktree",
+      purpose: "Preserved forensic copy of a failed Windows deployment build artifact",
+      owner: "founder",
+      lifecycle: "protected_incident_evidence",
+      mayBeDirty: true,
+      generatedOnlyDirtyAllowed: true,
+      generatedOnlyPatterns: ["failed-artifact.err.log", "failed-artifact.out.log"],
+      participatesInBackup: true,
+      recoveryRequirements: "Do not delete — the log files are the incident evidence itself.",
+      endWorkSessionBehavior: "allow_generated_only",
+    }]);
+    const report = audit(root);
+    expect(report.passed).toBe(false);
+    expect(report.repositories[0].allowed).toBe(false);
+    expect(report.violations.join("\n")).toContain("dirty state is not permitted by the generated-only policy");
+  });
+
+  it("Case T accepts the current-production candidate worktree only while it stays clean", () => {
+    const root = createRoot();
+    git(root, "worktree", "add", "-b", "fixture-current-production", path.join(root, ".tmp/windows-deploy-9c1aa80c"), "HEAD");
+    writePolicy(root, [{
+      path: ".tmp/windows-deploy-9c1aa80c",
+      repositoryType: "linked_worktree",
+      purpose: "Current-production deployment source candidate / short-lived recovery convenience",
+      owner: "founder",
+      lifecycle: "current_production_candidate",
+      mayBeDirty: false,
+      generatedOnlyDirtyAllowed: false,
+      participatesInBackup: true,
+      recoveryRequirements: "Corresponds to the currently deployed production source; may be retired after the migration/recovery checkpoint is accepted.",
+      endWorkSessionBehavior: "allow_clean",
+    }]);
+    const report = audit(root);
+    expect(report.passed).toBe(true);
+    expect(report.repositories[0]).toMatchObject({ path: ".tmp/windows-deploy-9c1aa80c", allowed: true });
+  });
+
+  it("Case U blocks a dirty current-production candidate even though the path is explicitly configured", () => {
+    const root = createRoot();
+    const nested = path.join(root, ".tmp/windows-deploy-9c1aa80c");
+    git(root, "worktree", "add", "-b", "fixture-current-production-dirty", nested, "HEAD");
+    write(root, ".tmp/windows-deploy-9c1aa80c/stray-build-output.log", "unexpected\n");
+    writePolicy(root, [{
+      path: ".tmp/windows-deploy-9c1aa80c",
+      repositoryType: "linked_worktree",
+      purpose: "Current-production deployment source candidate / short-lived recovery convenience",
+      owner: "founder",
+      lifecycle: "current_production_candidate",
+      mayBeDirty: false,
+      generatedOnlyDirtyAllowed: false,
+      participatesInBackup: true,
+      recoveryRequirements: "Corresponds to the currently deployed production source; may be retired after the migration/recovery checkpoint is accepted.",
+      endWorkSessionBehavior: "allow_clean",
+    }]);
+    const report = audit(root);
+    expect(report.passed).toBe(false);
+    expect(report.repositories[0].allowed).toBe(false);
+    expect(report.violations.join("\n")).toContain("dirty nested repository is blocked");
+  });
+
+  it("Case V still blocks an unexpected fourth, unconfigured windows-deploy-* worktree — no wildcard approval exists", () => {
+    const root = createRoot();
+    git(root, "worktree", "add", "-b", "fixture-anchor", path.join(root, ".tmp/windows-deploy-264a6306"), "HEAD");
+    git(root, "worktree", "add", "-b", "fixture-current-production", path.join(root, ".tmp/windows-deploy-9c1aa80c"), "HEAD");
+    git(root, "worktree", "add", "-b", "fixture-unexpected", path.join(root, ".tmp/windows-deploy-random999"), "HEAD");
+    writePolicy(root, [
+      {
+        path: ".tmp/windows-deploy-264a6306", repositoryType: "linked_worktree",
+        purpose: "fixture", owner: "test", lifecycle: "protected_incident_evidence",
+        mayBeDirty: false, generatedOnlyDirtyAllowed: false, participatesInBackup: true,
+        recoveryRequirements: "fixture", endWorkSessionBehavior: "allow_clean",
+      },
+      {
+        path: ".tmp/windows-deploy-9c1aa80c", repositoryType: "linked_worktree",
+        purpose: "fixture", owner: "test", lifecycle: "current_production_candidate",
+        mayBeDirty: false, generatedOnlyDirtyAllowed: false, participatesInBackup: true,
+        recoveryRequirements: "fixture", endWorkSessionBehavior: "allow_clean",
+      },
+    ]);
+    const report = audit(root);
+    expect(report.passed).toBe(false);
+    expect(report.repositoryCount).toBe(3);
+    const configured = report.repositories.filter((entry) => entry.path !== ".tmp/windows-deploy-random999");
+    const unexpected = report.repositories.find((entry) => entry.path === ".tmp/windows-deploy-random999");
+    expect(configured.every((entry) => entry.allowed)).toBe(true);
+    expect(unexpected).toMatchObject({ allowed: false, explicitlyAllowlisted: false });
+    expect(report.violations.join("\n")).toContain(
+      ".tmp/windows-deploy-random999: embedded repository is not explicitly configured; default policy is block",
+    );
+  });
 });
 
 function createRoot() {

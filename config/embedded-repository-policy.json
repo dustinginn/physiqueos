@@ -10,7 +10,45 @@
     "playwright-report",
     "test-results"
   ],
-  "repositories": [],
+  "repositories": [
+    {
+      "path": ".tmp/windows-deploy-264a6306",
+      "repositoryType": "linked_worktree",
+      "purpose": "Anchor for preserved failed-deployment incident evidence at .tmp/incident-failed-artifact-264a6306",
+      "owner": "founder",
+      "lifecycle": "protected_incident_evidence",
+      "mayBeDirty": false,
+      "generatedOnlyDirtyAllowed": false,
+      "participatesInBackup": true,
+      "recoveryRequirements": "Must be preserved alongside .tmp/incident-failed-artifact-264a6306 — that copy's .git file resolves through this worktree's metadata, so removing this worktree would break that copy's git linkage.",
+      "endWorkSessionBehavior": "allow_clean"
+    },
+    {
+      "path": ".tmp/incident-failed-artifact-264a6306",
+      "repositoryType": "linked_worktree",
+      "purpose": "Preserved forensic copy of a failed Windows deployment build artifact (commit 264a6306)",
+      "owner": "founder",
+      "lifecycle": "protected_incident_evidence",
+      "mayBeDirty": true,
+      "generatedOnlyDirtyAllowed": true,
+      "generatedOnlyPatterns": ["failed-artifact.err.log", "failed-artifact.out.log"],
+      "participatesInBackup": true,
+      "recoveryRequirements": "Do not delete — failed-artifact.err.log and failed-artifact.out.log are the incident evidence itself. Must be preserved alongside .tmp/windows-deploy-264a6306.",
+      "endWorkSessionBehavior": "allow_generated_only"
+    },
+    {
+      "path": ".tmp/windows-deploy-9c1aa80c",
+      "repositoryType": "linked_worktree",
+      "purpose": "Current-production deployment source candidate / short-lived recovery convenience",
+      "owner": "founder",
+      "lifecycle": "current_production_candidate",
+      "mayBeDirty": false,
+      "generatedOnlyDirtyAllowed": false,
+      "participatesInBackup": true,
+      "recoveryRequirements": "Corresponds to the currently deployed production source (9c1aa80c2bea7e48d5804fdde27c98b05eb60b53). May be retired via `git worktree remove` once the migration/recovery checkpoint is accepted; this entry does not authorize keeping any other or future deployment candidate automatically.",
+      "endWorkSessionBehavior": "allow_clean"
+    }
+  ],
   "externalArtifacts": [
     {
       "id": "physiqueos-release-preservation-20260807-233817",
