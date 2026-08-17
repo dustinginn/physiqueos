@@ -1,3 +1,0 @@
-module.exports=[873234,a=>{"use strict";var b=a.i(539790),c=a.i(707777);a.s(["default",0,function({alt:a,className:d="",diagnostic:e=null,src:f}){let[g,h]=(0,c.useState)(!1);return!f||g?(0,b.jsx)("div",{className:`grid place-items-center bg-[var(--surface-soft)] text-center text-xs font-bold leading-5 text-[var(--text-muted)] ${d}`,children:(0,b.jsxs)("span",{children:["Photo preview unavailable.",e&&(0,b.jsxs)("span",{className:"mt-1 block max-w-full break-words font-medium",children:[e.stage,": ",e.unresolvedSourceIds?.join(", ")||e.canonicalViewId," · ",e.repository]})]})}):(0,b.jsx)("img",{alt:a,className:d,onError:()=>h(!0),src:f})}])}];
-
-//# sourceMappingURL=_tmp_windows-deploy-4758bd37_src_components_progress_EvidenceImage_jsx_1d34clz._.js.map

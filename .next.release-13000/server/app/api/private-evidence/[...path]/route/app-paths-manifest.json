@@ -1,3 +1,0 @@
-{
-  "/api/private-evidence/[...path]/route": "app/api/private-evidence/[...path]/route.js"
-}

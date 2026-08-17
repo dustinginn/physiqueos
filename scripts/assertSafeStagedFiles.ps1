@@ -9,8 +9,9 @@ Set-StrictMode -Version Latest
 
 $maximumBlobBytes = 100MB
 $warningBlobBytes = 50MB
+# Keep this artifact-family word list aligned with RECOVERY_NAME in scripts/providerBuildSafety.mjs.
 $prohibitedGeneratedPath =
-  '^(?:\.next(?:/|$)|\.next\.(?:failed|rollback)-[^/]+(?:/|$)|node_modules(?:/|$))'
+  '^(?:\.next(?:/|$)|\.next\.(?:failed|rollback|release|fallback|recovery|staging|stage)-[^/]+(?:/|$)|node_modules(?:/|$))'
 
 function Invoke-CheckedGit {
   param(

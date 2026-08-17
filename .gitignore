@@ -18,6 +18,11 @@
 /.next-provider-check*/
 /.next.failed-*/
 /.next.rollback-*/
+/.next.release-*/
+/.next.fallback-*/
+/.next.recovery-*/
+/.next.staging-*/
+/.next.stage-*/
 /out/
 
 # production

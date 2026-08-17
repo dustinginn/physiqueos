@@ -63,6 +63,67 @@ describe("End Work Session staged-file preflight", () => {
     );
   });
 
+  it.each([
+    ["release", ".next.release-123/server/chunks/app.js"],
+    ["fallback", ".next.fallback-123/server/chunks/app.js"],
+    ["failed", ".next.failed-123/server/chunks/app.js"],
+    ["recovery", ".next.recovery-123/server/chunks/app.js"],
+  ])("rejects the generated %s artifact family, including nested files", (_label, relativePath) => {
+    const repository = createRepository();
+    writeFile(repository, relativePath, "generated build output");
+    git(repository, "add", "-A");
+
+    const result = runPreflight(repository);
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain("Prohibited generated path");
+    expect(result.output).toContain(relativePath);
+    expect(git(repository, "diff", "--cached", "--name-only")).toContain(relativePath);
+  });
+
+  it("rejects a plain tracked .next/ build directory", () => {
+    const repository = createRepository();
+    writeFile(repository, ".next/BUILD_ID", "build-id");
+    git(repository, "add", "-A");
+
+    const result = runPreflight(repository);
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain("Prohibited generated path");
+    expect(result.output).toContain(".next/BUILD_ID");
+  });
+
+  it("rejects a rename that lands inside the forbidden artifact family", () => {
+    const repository = createRepository();
+    writeFile(repository, "notes/build-log.txt", "ordinary build notes");
+    git(repository, "add", "-A");
+    git(repository, "commit", "-m", "seed ordinary file");
+    fs.mkdirSync(path.join(repository, ".next.release-999"), { recursive: true });
+    fs.renameSync(
+      path.join(repository, "notes", "build-log.txt"),
+      path.join(repository, ".next.release-999", "build-log.txt"),
+    );
+    git(repository, "add", "-A");
+
+    const result = runPreflight(repository);
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain("Prohibited generated path");
+    expect(result.output).toContain(".next.release-999/build-log.txt");
+  });
+
+  it("does not flag an ordinary file whose name merely contains 'tmp' or 'next'", () => {
+    const repository = createRepository();
+    writeFile(repository, "src/nextSteps.js", "export const nextSteps = [];\n");
+    writeFile(repository, "docs/tmpNotes.md", "# temporary planning notes\n");
+    git(repository, "add", "-A");
+
+    const result = runPreflight(repository);
+
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("Staged-file preflight passed.");
+  });
+
   it("rejects a staged blob larger than 100 MiB", () => {
     const repository = createRepository();
     const oversizedPath = path.join(repository, "assets", "oversized.bin");
