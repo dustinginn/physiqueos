@@ -1,8 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { createPayloadHash } from "../src/contracts/v1/canonicalJson.js";
-import { MIGRATION_MANIFEST_VERSION } from "../src/platform/migration/migrationManifest.js";
+import { register } from "node:module";
+
+register("./sourceModuleResolutionHook.mjs", import.meta.url);
+
+const { createPayloadHash } = await import("../src/contracts/v1/canonicalJson.js");
+const { MIGRATION_MANIFEST_VERSION } = await import("../src/platform/migration/migrationManifest.js");
 
 export function validateManifestFile(filePath) {
   const resolved = path.resolve(filePath);
