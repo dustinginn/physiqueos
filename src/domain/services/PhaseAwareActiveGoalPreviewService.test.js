@@ -44,11 +44,11 @@ describe("phase-aware active goal preview",()=>{
     const transition = result.turningPoints.find((item) => item.date === "2026-08-15");
     expect(transition).toBeDefined();
     expect(transition.body).toMatch(/Establish Maintenance was completed/);
-    expect(transition.body).toMatch(/did not conclusively prove maintenance/);
-    expect(transition.body).toMatch(/sufficiently bounded/);
-    expect(transition.body).toMatch(/authorized Lean Mass Build/);
+    expect(transition.body).toMatch(/enough to move forward with confidence/);
+    expect(transition.body).toMatch(/Lean Mass Build began/);
     expect(transition.body).toMatch(/2,500 kcal\/day intake and 800 kcal\/day activity/);
-    expect(transition.body).toMatch(/monthly.*DEXA\/body-composition aligned/);
+    expect(transition.body).toMatch(/monthly.*DEXA and body-composition evidence/);
+    expect(transition.body).not.toMatch(/did not conclusively prove|sufficiently bounded|authoriz/i);
     // No planned-review/destination entry may claim a date beyond currently known evidence.
     const knownDates = new Set(["2026-07-18", "2026-07-20", "2026-08-15", "2026-10-31"]);
     for (const point of result.turningPoints) expect(knownDates.has(point.date)).toBe(true);
@@ -63,7 +63,8 @@ describe("phase-aware active goal preview",()=>{
     expect(energy.summary).toMatch(/800 kcal\/day activity/);
     expect(energy.summary).toMatch(/weekly evidence monitoring/);
     expect(energy.summary).toMatch(/monthly.*DEXA aligned/);
-    expect(energy.summary).toMatch(/user-authorized/);
+    expect(energy.summary).toMatch(/adjusted as the evidence supports it/);
+    expect(energy.summary).not.toMatch(/user-authorized/);
     const nutrition = result.strategy.find((item) => item.label === "Nutrition");
     expect(nutrition.summary).toBeNull();
   });

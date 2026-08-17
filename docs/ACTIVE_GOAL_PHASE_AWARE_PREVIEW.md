@@ -10,7 +10,7 @@ Current persisted Goal confidence presentation is owned by `ActiveGoalConfidence
 
 ## Training Progress
 
-Training Progress is a derived, phase-aligned longitudinal review. Its first period runs from the committed phase start through the planned review milestone, inclusive; for Establish Maintenance that is July 19–August 15. The August 15 DEXA belongs to Phase 1 evidence until a later user-authorized transition becomes effective. The goal adapter reuses `TrainingPerformanceIntelligenceService` for canonical movement identity, volume-load change, PR detection, and plateau/regression classification. Checkpoints remain derived and are not persisted.
+Training Progress is a derived, phase-aligned longitudinal review. Its first period runs from the committed phase start through the planned review milestone, inclusive; for Establish Maintenance that is July 19–August 15. The August 15 DEXA belongs to Phase 1 evidence until a later phase transition becomes effective. The goal adapter reuses `TrainingPerformanceIntelligenceService` for canonical movement identity, volume-load change, PR detection, and plateau/regression classification. Checkpoints remain derived and are not persisted.
 
 The production shell is one centered, one-column `393px`-first layout with graceful `360px` behavior, horizontal-overflow protection, safe-area support, and bottom-navigation clearance.
 

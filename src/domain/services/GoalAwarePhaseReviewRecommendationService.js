@@ -117,14 +117,19 @@ function classifyDelayCost(extensionDays, remainingDays) {
   const share = positiveInteger(extensionDays, 14) / remainingDays;
   return share >= 0.15 ? "high" : share >= 0.07 ? "moderate" : "low";
 }
+// Coaching voice: explains what the evidence supports and why, without narrating internal
+// decision mechanics (uncertainty bounds, information value, delay cost) as such.
 function explain({ begin, evidenceConclusion, delayCost, valueOfInformation, deviation,
   stable, extensionDays }) {
   if (begin && evidenceConclusion === PHASE_READINESS_CONCLUSIONS.SUFFICIENTLY_RESOLVED) {
-    return `The phase objective is not conclusively proven, and the Guardrail remains ${deviation === "slight" ? "slightly outside its exact range" : "under review"}. The remaining uncertainty is bounded enough to act because the evidence is ${stable ? "stable" : "monitorable"}, another ${extensionDays ?? 14} days has meaningful Goal cost, and the next strategy can be adjusted with close monitoring.`;
+    return `Maintenance wasn't fully proven, and the Guardrail remains ${deviation === "slight" ? "slightly outside its exact range" : "under review"}. But the evidence is ${stable ? "stable" : "worth watching closely"}, waiting another ${extensionDays ?? 14} days would cost real progress toward the goal, and the next phase can start with close monitoring built in.`;
   }
-  if (begin) return "The phase objective is sufficiently supported to begin the next planned phase with continued Guardrail monitoring.";
-  if (valueOfInformation === "high") return "The remaining uncertainty is material enough that more evidence is worth the delay before changing strategy.";
-  return `Continue the current phase because the evidence is not yet sufficiently resolved; the cost of delay is ${delayCost}.`;
+  if (begin) return "The phase objective is well enough supported to begin the next planned phase, with Guardrail monitoring continuing.";
+  if (valueOfInformation === "high") return "There's still enough left to learn here that it's worth waiting a bit longer before changing the plan.";
+  const costPhrase = { high: ", and waiting longer would cost meaningful progress",
+    moderate: ", though waiting a bit longer isn't urgent",
+    low: ", though there's little cost to waiting a bit longer" }[delayCost] ?? "";
+  return `Staying in the current phase a little longer makes sense — the evidence isn't resolved enough yet${costPhrase}.`;
 }
 function positiveInteger(value, fallback) { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : fallback; }
 function nullableInteger(value) { const n = Number(value); return Number.isInteger(n) ? n : null; }

@@ -32,7 +32,7 @@ export function createPINarrativeAssessment({
   const overall = training.breadth === "constructive" && energy.direction === "below"
     ? calibration
       ? phaseBoundary
-        ? `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure; Phase Review weighed that alongside DEXA and other evidence and the user authorized moving into ${phaseBoundary.phaseName ?? "the next phase"}.`
+        ? `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure — that, alongside the body-composition picture, was enough to move into ${phaseBoundary.phaseName ?? "the next phase"} rather than wait longer.`
         : `${training.improvingCount} of ${training.reviewedCount} training areas improved. ${energy.pairedDayCount} of ${energy.eligibleDayCount} days still averaged about ${Math.abs(Math.round(energy.average))} calories below estimated expenditure, so keep training steady and complete another week of food and activity data before making a larger calorie adjustment.`
       : goalType.includes("fat")
         ? `${training.improvingCount} of the ${training.reviewedCount} training areas reviewed improved this week, while the available food and activity records kept intake below estimated expenditure in a way that supports the current fat-loss direction.`
@@ -169,7 +169,7 @@ function summarizeEnergy(items, phaseBoundary = null) {
     ? `Those days averaged ${Math.abs(Math.round(average))} calories below estimated expenditure, which still looks low for maintenance.`
     : "The available days do not show a clear difference between intake and estimated expenditure.";
   const belowMaintenanceClause = phaseBoundary
-    ? `The trend pointed below maintenance; that evidence, weighed during Phase Review, supported the authorized transition into a controlled ${phaseBoundary.phaseName ?? "next phase"} energy strategy.`
+    ? `Calories looked low, and that's still worth watching. The new intake target starts a controlled push into ${phaseBoundary.phaseName ?? "the next phase"} — weekly trends will show how the body responds.`
     : partial
       ? "The trend still points below maintenance, but let's get one more complete week before adjusting calories."
       : "The next complete week will make the calorie decision clearer.";
@@ -193,7 +193,7 @@ function summarizeWeight(items, phaseBoundary = null) {
   const change = current?.explanationData?.absoluteChange;
   const stable = Number.isFinite(change) && Math.abs(change) < 1;
   const phaseBoundaryClause = phaseBoundary
-    ? " Phase Review weighed this alongside DEXA and other evidence, rather than waiting for weight alone to prove maintenance, before the user authorized moving forward."
+    ? " Combined with the DEXA and training picture, that was enough context to move forward cautiously — the next few weeks will show how the new plan is working."
     : "";
   return conclusion("weight", current ? "observed" : "unavailable", current?.direction ?? "neutral",
     current
@@ -220,16 +220,16 @@ function summarizeBodyComposition({ bodyComposition, goal, phaseBoundary = null 
   }).format(new Date(`${measuredAt}T12:00:00Z`));
   const goalType = goal?.type ?? goal?.goalType ?? goal?.semanticGoalType ?? "unknown";
   const leanMassGoal = /lean_mass|muscle/i.test(goalType);
-  // When this week sits at a live phase boundary, the DEXA in view is the new phase's
-  // starting observation, not the goal's original baseline — the two must stay distinct.
+  // When this week sits at a live phase boundary, the DEXA in view is where the new phase
+  // begins, not the goal's own baseline — the two must stay distinct, explained naturally.
   if (phaseBoundary) {
     const phaseLabel = phaseBoundary.phaseName ?? "the new phase";
     return {
       status: "baseline",
-      headline: `${phaseBoundary.phaseName ?? "Phase"} Starting Observation`,
+      headline: `Where ${phaseLabel} Begins`,
       explanation: leanMassGoal
-        ? `The ${date} DEXA is the ${phaseLabel} starting observation, not the goal's original baseline. The next scan will show whether lean mass continues increasing while body fat remains near the current level.`
-        : `The ${date} DEXA is the ${phaseLabel} starting observation, not the goal's original baseline. The next scan will show whether body composition continues moving in the intended direction.`,
+        ? `This is where ${phaseLabel} begins, using the ${date} DEXA. The next scan should show whether lean mass keeps climbing while body fat stays controlled.`
+        : `This is where ${phaseLabel} begins, using the ${date} DEXA. The next scan should show whether body composition keeps moving in the right direction.`,
     };
   }
   return {
@@ -245,19 +245,23 @@ function conclusion(domain, status, directionValue, explanation, sources, extra 
 }
 function headlineFor(training, calibration) { return training.breadth === "constructive" ? calibration ? "Training moved forward, but calories still look low." : "Training moved forward this week." : "The current direction is still forming."; }
 // Distinguishes the strategic recommendation and next-week actions from the evidence
-// conclusion above: maintenance was not conclusively proven, but the remaining uncertainty
-// was sufficiently bounded that PI recommended review and the user authorized moving on.
+// conclusion above: training progressed, calories still looked low, and maintenance wasn't
+// fully proven — but enough was learned to move forward conservatively rather than wait
+// longer. This is coaching voice: no mention of PI, and no narration of how the decision was
+// authorized — just what changed, why it makes sense, and what to watch next.
 function phaseBoundaryRecommendation(phaseBoundary) {
+  const phaseLabel = phaseBoundary.phaseName ?? "the next phase";
   const reviewClause = phaseBoundary.strategicReviewCadence === "monthly"
-    ? ` with a monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? ", DEXA/body-composition aligned" : ""} strategic review`
+    ? ` The next monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? " DEXA/body-composition" : ""} review will help decide whether to push harder.`
     : "";
-  return `Maintenance was not conclusively proven, but the remaining uncertainty was sufficiently bounded to move forward — additional information had some value, and delay had a goal cost too. PI recommended review, and the user authorized ${phaseBoundary.phaseName ?? "the next phase"}${reviewClause}, with weekly evidence monitoring continuing separately.`;
+  return `Training kept moving forward, and while maintenance wasn't fully proven, there was enough to work with. ${phaseLabel} starts with a conservative push, keeping body composition front and center.${reviewClause} Watch the weekly trends to see how the body responds.`;
 }
 function phaseBoundaryActions(phaseBoundary) {
+  const phaseLabel = phaseBoundary.phaseName ?? "the new plan";
   const actions = ["Continue progressing training.", "Keep logging food and activity every day.",
-    `Execute the authorized ${phaseBoundary.phaseName ?? "phase"} strategy.`, "Monitor weekly evidence."];
+    `Follow the ${phaseLabel} calorie and activity targets.`, "Watch how the weekly trends respond."];
   if (phaseBoundary.strategicReviewCadence === "monthly") {
-    actions.push(`Review strategy monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? " with DEXA/body-composition evidence" : ""} — any change remains user-authorized.`);
+    actions.push(`Use the next monthly${phaseBoundary.strategicReviewAnchor === "dexa_body_composition" ? " DEXA/body-composition" : ""} review to decide whether to push the plan further.`);
   }
   return actions;
 }

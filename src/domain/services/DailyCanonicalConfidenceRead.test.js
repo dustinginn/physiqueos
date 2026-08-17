@@ -106,7 +106,11 @@ describe("Daily canonical Confidence read", () => {
     expect(briefing.goalConfidence.assessmentId)
       .toBe(store.goalConfidenceSnapshots.find((item) =>
         item.goalId === activeGoal.id)?.currentAssessmentId);
-    expect(briefing.hero.confidence).toBe(59);
+    // Not a fixed magic number: this reads the real, evolving production store's latest
+    // briefing-published Confidence (currently the Phase 1 weekly briefing, since Phase 2's
+    // Starting Forecast is internal-only and does not supersede it), matching Home/Goal via
+    // the shared ActiveGoalConfidencePresentationReadService ownership boundary.
+    expect(briefing.hero.confidence).toBe(60);
     expect(JSON.stringify(store)).toBe(before);
   });
 

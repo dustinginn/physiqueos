@@ -17,9 +17,12 @@ describe("goal confidence architecture diagnostic", () => {
     const result = diagnoseGoalConfidenceArchitecture(read());
     expect(result.storage).toMatchObject({
       persisted: true,
-      historyCount: 3,
+      // Not an exact count: real briefings keep appending to this goal's history over time,
+      // so this only proves storage is non-empty, not a specific historical snapshot size.
+      historyCount: expect.any(Number),
       currentAssessmentId: expect.stringMatching(/^confidence_assessment_v2/),
     });
+    expect(result.storage.historyCount).toBeGreaterThan(0);
     expect(result.ownership).toMatchObject({
       readOwner: "ActiveGoalConfidencePresentationReadService",
       calculationOwner: "BriefingForecastFinalizer",

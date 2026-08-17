@@ -16,7 +16,7 @@ export function resolveActiveGoalConfidencePresentation({
   if (!activeGoal?.id || !activePhase?.id) {
     return unavailable(activeGoal, activePhase, "active_goal_or_phase_unavailable");
   }
-  const canonical = createCanonicalConfidenceReadService({ store }).getCurrent({
+  const canonical = createCanonicalConfidenceReadService({ store }).getCurrentUserFacing({
     goalId: activeGoal.id,
     phaseId: activePhase.id,
   });
@@ -28,7 +28,7 @@ export function resolveActiveGoalConfidencePresentation({
   const operatingState = activeGoal?.openingApproach?.value ??
     activeGoal?.operatingState?.value ?? activeGoal?.operatingState ?? null;
   if (v1Compatibility && (assessment.operatingState !== operatingState ||
-      canonical.snapshot.operatingState !== operatingState)) {
+      canonical.snapshot?.operatingState !== operatingState)) {
     return unavailable(activeGoal, activePhase, "canonical_boundary_mismatch");
   }
   const presentationMovement = ({ increase: "increased", decrease: "decreased",
@@ -45,9 +45,13 @@ export function resolveActiveGoalConfidencePresentation({
     band: assessment.confidenceBand,
     label: title(assessment.confidenceBand),
     assessmentId: assessment.id,
-    snapshotId: canonical.snapshot.id,
+    snapshotId: canonical.snapshot?.id ?? null,
     goalId: assessment.goalId,
     phaseId: assessment.phaseId,
+    // True whenever the displayed Confidence was published in a different phase than the
+    // goal's current active phase (i.e., the active phase hasn't had its own briefing yet, so
+    // the goal's latest briefing-published value carries forward from a prior phase).
+    fromPriorPhase: assessment.phaseId !== activePhase.id,
     operatingState,
     movement: presentationMovement,
     movementDirection: presentationMovement,
@@ -82,7 +86,7 @@ function unavailable(goal, phase, reason) {
     canonicalSeries: false, compatibilityIncomplete: false,
     value: null, score: null, numericValue: null, percentageLabel: null,
     band: null, label: "Unavailable", assessmentId: null, snapshotId: null,
-    goalId: goal?.id ?? null, phaseId: phase?.id ?? null,
+    goalId: goal?.id ?? null, phaseId: phase?.id ?? null, fromPriorPhase: false,
     operatingState: goal?.openingApproach?.value ?? null,
     movement: null, movementDirection: null, movementMagnitude: null,
     delta: null, priorScore: null, primaryReason: null, explanation: null,

@@ -62,7 +62,7 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
     eyebrow: "Energy Strategy",
     title: strategy.mode ?? protocol.name,
     purpose: strategy.mode === "Phase Execution"
-      ? `Apply the user-authorized intake and activity targets for the current Goal phase while monitoring response and Guardrails.`
+      ? `Follow the current intake and activity targets for this phase while watching how the body responds and keeping the Guardrail in view.`
       : `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
     sections: [
       field("Current Energy Phase", energyPhase(strategy.mode)),
@@ -71,7 +71,7 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
       ...(strategy.mode === "Phase Execution" ? [
         field("Evidence Monitoring", monitoringCadence(strategy)),
         field("Strategic Review", strategicReviewCadence(strategy)),
-        field("Strategy Changes", "User authorized"),
+        field("Strategy Changes", "Adjusted as the evidence supports it"),
       ] : [field("Calibration Approach", calibrationApproach(strategy))]),
     ],
   };

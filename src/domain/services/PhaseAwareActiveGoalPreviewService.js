@@ -85,8 +85,8 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
       progress: active.progress.presentationLabel, review: phaseNarrative.review,
       evidence: phaseNarrative.evidence, readiness: phaseNarrative.readiness,
       color: active.presentationTone },
-    next: upcoming ? { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "Authoritative outcome evidence measures Goal progress.", lead: "Supporting evidence guides day-to-day execution.", guardrail } : null,
-    readiness: upcoming ? ["The current phase objective is sufficiently resolved.", "Goal and guardrail evidence support the next planned phase.", "The next strategy remains reviewable and user-authorized."] : [],
+    next: upcoming ? { title: upcoming.phaseName, goal: trajectory.overallGoal.targetDescription, outcome: "The next DEXA will show whether this phase is working.", lead: "Day-to-day evidence — weight, training, and energy — shows how things are trending in between.", guardrail } : null,
+    readiness: upcoming ? ["The current phase objective is sufficiently resolved.", "Goal and guardrail evidence support the next planned phase.", "The plan for the next phase will build on what's learned here."] : [],
     guardrail: { title: guardrail.replace(/[.]$/u, ""), scope: "Applies across every phase", body: "DEXA remains authoritative for body composition. Scale weight provides context between scans, but does not replace it.", observation: guardrailObservation },
     evidence: {
       goalBaseline: dexaAnchor(baseline),
@@ -116,12 +116,12 @@ function phaseCard(phase) {
     color: phase.presentationTone };
 }
 function currentPhaseNarrative({ upcoming, strategicReviewCadence, strategicReviewAnchor }) {
-  if (upcoming) return { review: "Evidence-led", evidence: "Current evidence shows whether this phase objective is sufficiently resolved.", readiness: "The next phase begins only after a recommendation and explicit user authorization." };
+  if (upcoming) return { review: "Evidence-led", evidence: "Current evidence shows whether this phase objective is sufficiently resolved.", readiness: "The next phase begins once the evidence supports moving forward." };
   const monthly = strategicReviewCadence === "monthly";
   const aligned = strategicReviewAnchor === "dexa_body_composition";
   return { review: monthly ? `Monthly${aligned ? " · DEXA aligned" : ""}` : "Evidence-led",
     evidence: "Weekly evidence monitors intake, activity, training, recovery, and body-composition response to the active targets.",
-    readiness: "Evidence accumulates toward goal review. Any strategy change remains user-authorized." };
+    readiness: "Evidence keeps accumulating toward the next review, where the plan can be adjusted if needed." };
 }
 function mass(value) { return Number.isFinite(value?.value) ? `${value.value.toFixed(1)} ${value.unit}` : "—"; }
 function metric(value, unit) { return Number.isFinite(value) ? `${value.toFixed(1)}${unit}` : "—"; }
@@ -161,13 +161,13 @@ function describePhaseTransition({ priorPhase, active, phaseStart, goalProgress,
     sentences.push(`The ${formatShortDate(phaseStart.measuredAt ?? phaseStart.date)} DEXA measured ${mass(phaseStart.leanMass)} of lean mass` +
       (Number.isFinite(goalProgress?.changeValue) ? `, ${signedAmount(goalProgress.changeValue)} from the goal baseline.` : "."));
   }
-  sentences.push("The evidence did not conclusively prove maintenance, but the remaining uncertainty was sufficiently bounded to proceed.");
-  sentences.push(`The user authorized ${active.phaseName}.`);
+  sentences.push("The evidence available at the time didn't fully prove out, but there was enough to move forward with confidence.");
+  sentences.push(`${active.phaseName} began.`);
   const targets = [];
   if (Number.isFinite(caloricIntakeTarget?.value)) targets.push(`${formatNumber(caloricIntakeTarget.value)} kcal/day intake`);
   if (Number.isFinite(activityExpenditureTarget?.value)) targets.push(`${formatNumber(activityExpenditureTarget.value)} kcal/day activity`);
-  if (targets.length) sentences.push(`A new energy strategy became active — ${targets.join(" and ")}.`);
-  if (strategicReviewCadence === "monthly") sentences.push(`Strategic review became monthly${strategicReviewAnchor === "dexa_body_composition" ? ", DEXA/body-composition aligned" : ""}, with weekly evidence monitoring continuing separately.`);
+  if (targets.length) sentences.push(`New targets took effect — ${targets.join(" and ")}.`);
+  if (strategicReviewCadence === "monthly") sentences.push(`From here, the plan is reviewed monthly${strategicReviewAnchor === "dexa_body_composition" ? " using DEXA and body-composition evidence" : ""}, while weekly evidence keeps getting watched in the meantime.`);
   return sentences.join(" ");
 }
 function summarizeStrategyDomain(label, { caloricIntakeTarget, activityExpenditureTarget, monitoringCadence, strategicReviewCadence, strategicReviewAnchor }) {
@@ -178,6 +178,6 @@ function summarizeStrategyDomain(label, { caloricIntakeTarget, activityExpenditu
   if (monitoringCadence === "weekly") parts.push("weekly evidence monitoring");
   if (strategicReviewCadence === "monthly") parts.push(`monthly${strategicReviewAnchor === "dexa_body_composition" ? " · DEXA aligned" : ""} review`);
   if (!parts.length) return null;
-  return `${parts.join(" · ")} · user-authorized changes`;
+  return `${parts.join(" · ")} · adjusted as the evidence supports it`;
 }
 function formatDate(value, options) { if (!value) return "Not scheduled"; return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)); }

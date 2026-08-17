@@ -231,3 +231,54 @@ Every interaction should leave the user feeling:
 * More motivated to take the next step.
 
 PhysiqueOS should reduce uncertainty, build trust, and make healthy decisions feel simpler.
+
+---
+
+# Internal Reasoning vs. User-Facing Coaching
+
+PhysiqueOS Intelligence (PI) reasons internally about evidence sufficiency, uncertainty
+bounds, the value of more information, the cost of delay, Phase Review, authorization,
+strategy lifecycle, monitoring and strategic-review cadence, Guardrails, and Forecast/
+Confidence lineage. That reasoning is real and should drive better decisions — but it is
+not what the user reads. **PhysiqueOS translates its intelligence; it does not narrate its
+architecture.**
+
+Concretely, user-facing coaching copy (Coach's Take, Current Phase, Guardrail context,
+Evidence Anchors and Turning Points, Current Strategy, weekly synthesis, Energy Balance,
+Weight Context, Body Composition, Forward Guidance, and Operating Plan copy) must never
+say things like "the remaining uncertainty was sufficiently bounded," "the value of more
+information," "the cost of delay," "user-authorized changes," "Phase Review weighed
+this," "monitoring cadence," "strategic review anchor," "PI recommended review," or "the
+user authorized moving forward." It must never mention "PI" by name. Coach's Take carries
+the highest voice standard of any surface — it should read like a knowledgeable coach
+talking to the user, not an audit report.
+
+Translating, not dumbing down, means every one of those internal concepts still reaches
+the user — just as an answer to a real question instead of a description of the reasoning
+process: Where am I? How is this going? What have we learned? What am I doing now? What
+should I focus on? What are we watching? When will we reconsider the plan? What might
+change next and why?
+
+A few standing distinctions worth keeping straight, because they shape what "translate,
+don't narrate" means in practice:
+
+* Founder production state is a validation case for this architecture, not the
+  specification. Every phase transition should read naturally for an arbitrary goal,
+  phase, and user — not just the one currently live.
+* Evidence interpretation, the resulting recommendation, and the user's decision are
+  distinct steps. Coaching copy can report all three without collapsing them into
+  governance narration of how the decision was reached.
+* Uncertainty does not require paralysis. Low confidence is honest information, not a
+  reason to hedge every sentence — see Transparency, above.
+* Goals are journeys and phases are chapters in them; Evidence Anchors and Turning Points
+  should read that way. A Goal baseline and a phase's own starting baseline are different
+  facts and should not be conflated in copy.
+* Monitoring cadence (how often evidence is reviewed week to week) and strategic-review
+  cadence (how often the plan itself is reconsidered) are different facts a user may
+  reasonably want to know, even though neither should be narrated using those internal
+  term-of-art names.
+* Historical evidence, briefings, and decisions are immutable. Coaching copy explains the
+  present without rewriting or reinterpreting what was already said at the time.
+
+See `docs/CONFIDENCE_V2_CURRENT_STATE.md` for the parallel rule that governs when
+user-facing Confidence itself is allowed to change.

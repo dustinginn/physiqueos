@@ -10,6 +10,23 @@ export const ConfidencePublisherType = Object.freeze({
   PHOTO_EVENT_BRIEFING: "photo_event_briefing",
 });
 
+// The briefing contract: a briefing reviews and interprets evidence and owns publication of
+// the Confidence the user sees. GOAL_INITIALIZATION is the one documented exception — it
+// seeds an internal Forecast context for a newly active phase (a Starting Forecast) and must
+// never silently supersede user-facing Confidence on its own; the user-facing value only
+// changes when an actual briefing publishes. This is a denylist rather than an allowlist of
+// briefing types on purpose: records that predate this registry (no publisherType at all)
+// stay trusted as user-facing, and any future briefing type is user-facing by default without
+// needing a matching code change here — only a type explicitly listed as internal-only is
+// excluded.
+export const INTERNAL_ONLY_CONFIDENCE_PUBLISHER_TYPES = Object.freeze(new Set([
+  ConfidencePublisherType.GOAL_INITIALIZATION,
+]));
+
+export function publishesUserFacingConfidence(publisherType) {
+  return !INTERNAL_ONLY_CONFIDENCE_PUBLISHER_TYPES.has(publisherType);
+}
+
 const DEFINITIONS = Object.freeze({
   [ConfidencePublisherType.GOAL_INITIALIZATION]: Object.freeze({
     kind: "goal_initialization", requiresArtifact: true,

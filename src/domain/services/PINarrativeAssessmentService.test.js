@@ -81,7 +81,8 @@ describe("PINarrativeAssessmentService", () => {
       const energy = result.domainConclusions.find((item) => item.domain === "energy");
       expect(energy.explanation).toMatch(/6 of 7 days/);
       expect(energy.explanation).not.toMatch(/let's get one more complete week/i);
-      expect(energy.explanation).toMatch(/Phase Review/);
+      expect(energy.explanation).toMatch(/controlled push into Lean Mass Build/);
+      expect(energy.explanation).not.toMatch(/Phase Review|authoriz/i);
       expectInternalDomainNamesNatural([energy.explanation]);
     });
 
@@ -91,30 +92,31 @@ describe("PINarrativeAssessmentService", () => {
       const weight = result.domainConclusions.find((item) => item.domain === "weight");
       const weightWithout = withoutBoundary.domainConclusions.find((item) => item.domain === "weight");
       expect(weight.explanation).toContain(weightWithout.explanation);
-      expect(weight.explanation).toMatch(/authorized moving forward/);
+      expect(weight.explanation).toMatch(/enough context to move forward cautiously/);
+      expect(weight.explanation).not.toMatch(/Phase Review|authoriz/i);
       expectInternalDomainNamesNatural([weight.explanation]);
     });
 
     it("no longer blindly requires another calibration week in Coach's Take", () => {
       const result = createPINarrativeAssessment({ ...input, phaseBoundary });
       expect(result.coachTake.recommendation).not.toMatch(/hold off on a larger calorie change until another complete week/i);
-      expect(result.coachTake.recommendation).toMatch(/not conclusively proven/i);
-      expect(result.coachTake.recommendation).toMatch(/sufficiently bounded/i);
-      expect(result.coachTake.recommendation).toMatch(/user authorized Lean Mass Build/);
-      expect(result.coachTake.recommendation).toMatch(/monthly.*DEXA\/body-composition aligned/);
+      expect(result.coachTake.recommendation).toMatch(/wasn't fully proven/i);
+      expect(result.coachTake.recommendation).toMatch(/conservative push/i);
+      expect(result.coachTake.recommendation).toMatch(/monthly DEXA\/body-composition review/);
+      expect(result.coachTake.recommendation).not.toMatch(/sufficiently bounded|user authorized|PI recommended|authoriz/i);
     });
 
     it("does not claim the weekly briefing itself authorized the transition", () => {
       const result = createPINarrativeAssessment({ ...input, phaseBoundary });
-      expect(result.coachTake.recommendation).toMatch(/PI recommended review, and the user authorized/);
+      expect(result.coachTake.recommendation).not.toMatch(/PI recommended review, and the user authorized/);
+      expect(result.coachTake.recommendation).not.toMatch(/\bPI\b|authoriz/i);
     });
 
     it("reflects active Phase 2 in Into Next Week without prescribing an automatic Strategy mutation", () => {
       const result = createPINarrativeAssessment({ ...input, phaseBoundary });
-      expect(result.coachTake.actions.some((item) => /Execute the authorized Lean Mass Build strategy/.test(item))).toBe(true);
-      expect(result.coachTake.actions.some((item) => /Monitor weekly evidence/.test(item))).toBe(true);
-      expect(result.coachTake.actions.join(" ")).not.toMatch(/increase.*calories|automatically|without.*authoriz/i);
-      expect(result.coachTake.actions.join(" ")).toMatch(/user-authorized/);
+      expect(result.coachTake.actions.some((item) => /Follow the Lean Mass Build calorie and activity targets/.test(item))).toBe(true);
+      expect(result.coachTake.actions.some((item) => /Watch how the weekly trends respond/.test(item))).toBe(true);
+      expect(result.coachTake.actions.join(" ")).not.toMatch(/increase.*calories|automatically|without.*authoriz|user-authorized|Execute the authorized/i);
     });
 
     it("leaves other weeks (no phaseBoundary) completely unaffected", () => {
@@ -134,8 +136,8 @@ describe("PINarrativeAssessmentService", () => {
       expect(withBoundary.overallConclusion.summary).not.toMatch(/complete another week/);
       expect(withBoundary.overallConclusion.summary).toMatch(/2 of 3 training areas improved/);
       expect(withBoundary.overallConclusion.summary).toMatch(/6 of 7 days/);
-      expect(withBoundary.overallConclusion.summary).toMatch(/Phase Review weighed that alongside DEXA/);
-      expect(withBoundary.overallConclusion.summary).toMatch(/authorized moving into Lean Mass Build/);
+      expect(withBoundary.overallConclusion.summary).toMatch(/enough to move into Lean Mass Build rather than wait longer/);
+      expect(withBoundary.overallConclusion.summary).not.toMatch(/Phase Review|authoriz/i);
       expectInternalDomainNamesNatural([withBoundary.overallConclusion.summary]);
     });
 
@@ -145,8 +147,9 @@ describe("PINarrativeAssessmentService", () => {
       expect(withoutBoundary.bodyCompositionConclusion.explanation).toMatch(/starting point for this goal/);
       const withBoundary = createPINarrativeAssessment({ ...input, goal: { id: "g", type: "build_lean_mass" }, bodyComposition, phaseBoundary });
       expect(withBoundary.bodyCompositionConclusion.explanation).not.toMatch(/starting point for this goal/);
-      expect(withBoundary.bodyCompositionConclusion.explanation).toMatch(/not the goal's original baseline/);
-      expect(withBoundary.bodyCompositionConclusion.explanation).toMatch(/Lean Mass Build starting observation/);
+      expect(withBoundary.bodyCompositionConclusion.explanation).toMatch(/This is where Lean Mass Build begins/);
+      expect(withBoundary.bodyCompositionConclusion.headline).toBe("Where Lean Mass Build Begins");
+      expect(withBoundary.bodyCompositionConclusion.explanation).not.toMatch(/starting observation|original baseline|current objective/i);
       expectInternalDomainNamesNatural([withBoundary.bodyCompositionConclusion.explanation]);
     });
   });

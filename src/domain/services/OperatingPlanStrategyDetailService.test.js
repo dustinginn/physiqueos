@@ -105,7 +105,7 @@ describe("Operating Plan strategy detail", () => {
       { label: "Current Energy Phase", value: "Phase execution" },
       { label: "Evidence Monitoring", value: "Weekly evidence review" },
       { label: "Strategic Review", value: "Monthly · DEXA and body composition aligned" },
-      { label: "Strategy Changes", value: "User authorized" },
+      { label: "Strategy Changes", value: "Adjusted as the evidence supports it" },
     ]));
     expect(JSON.stringify(result)).not.toMatch(/\bCut\b/);
   });

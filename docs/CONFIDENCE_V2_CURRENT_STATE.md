@@ -35,6 +35,30 @@ Daily, Energy, Training, Nutrition, Activity, Weight, Recovery, and raw evidence
 
 Home, Goals, and Daily consume the active Goal's persisted assessment through `ActiveGoalConfidencePresentationReadService`. Midweek, Weekly, Monthly, DEXA, qualifying Photo Event, and Briefing History consume canonical current or artifact-aligned historical presentation state. Consumers preserve assessment identity, percentage, band, prior percentage, delta, movement, canonical explanation, originating artifact, and source metadata. An absent matching assessment renders unavailable; it never produces a local or cross-Goal fallback.
 
+## The briefing publication invariant
+
+Every Confidence change the user sees must be explainable by a briefing. Briefings publish
+user-facing Confidence; Goal initialization is the one documented exception — it seeds an
+internal Forecast context for a newly active phase (a Starting Forecast) and must never
+silently supersede user-facing Confidence on its own. `ConfidencePublisherRegistry.publishesUserFacingConfidence(publisherType)` encodes this as a denylist (only `goal_initialization` is excluded) rather than an allowlist, so records that predate the registry — no `publisherType` at all — stay trusted as user-facing, and a future briefing type is user-facing by default without a matching code change.
+
+`CanonicalConfidenceReadService.getCurrentUserFacing({ goalId, phaseId })` is the shared
+read boundary this guarantees: it prefers the active phase's own canonical pointer when that
+pointer is itself user-facing, and otherwise falls back to `getLatestUserFacingConfidence`,
+the most recently published user-facing assessment across the whole Goal. In practice this
+means a newly active phase that has only had its Starting Forecast so far continues to show
+the prior phase's last briefing-published Confidence — Home does not jump to the internal
+Forecast value until an actual briefing publishes in the new phase. Nothing about this
+selection rewrites or deletes the internal Starting Forecast record; it stays exactly as
+persisted and remains directly readable through `getCurrent` by its own phase pointer.
+
+This must hold for an arbitrary Goal, phase, and user, not only the Founder's current
+transition — see `src/domain/confidence/ConfidencePublicationInvariant.test.js` and
+`src/domain/presentation/coachingLanguageBoundary.test.js` for the generic (non-Founder)
+regression coverage. See `docs/PERSONALITY.md`'s "Internal Reasoning vs. User-Facing
+Coaching" section for the parallel rule that governs how this Confidence value — and every
+other piece of PI reasoning — is described to the user in prose.
+
 ## Historical compatibility
 
 `ConfidenceV1CompatibilityAdapter` and `MonthlyPersistedArtifactCompatibilityService` remain supported compatibility boundaries. Persisted V1 history is immutable and remains renderable; migration or re-publication is not required merely to display it.

@@ -19,7 +19,10 @@ describe("Build Lean Mass phase-aware production", () => {
       title: "Build Lean Mass",
       status: "Active Goal",
       destination: "Build 10 lb of lean mass by October 31, 2026",
-      confidence: "62% confidence",
+      // Phase 2's Starting Forecast (goal_initialization) is internal-only and must not
+      // supersede Home's user-facing Confidence; the latest briefing-published value (the
+      // Phase 1 weekly briefing) carries forward until Phase 2 has its own briefing.
+      confidence: "60% confidence",
       confidenceBand: "Moderate",
       editHref: expect.stringMatching(/^\/goals\/.+\/edit$/),
     });
@@ -28,7 +31,9 @@ describe("Build Lean Mass phase-aware production", () => {
         expect.objectContaining({
           name: "Establish Maintenance",
           status: "Completed",
-          color: "neutral",
+          // Pre-existing staleness unrelated to this patch: completed phases render "gold",
+          // matching PhaseAwareActiveGoalPreviewService.test.js's own assertion.
+          color: "gold",
           progress: "Completed",
         }),
         expect.objectContaining({
@@ -43,7 +48,9 @@ describe("Build Lean Mass phase-aware production", () => {
     expect(result.guardrail).toMatchObject({
       scope: "Applies across every phase",
     });
-    expect(result.evidence.dexa).toMatchObject({
+    // Pre-existing staleness unrelated to this patch: the evidence shape split into
+    // goalBaseline/phaseStart before this session; `dexa` was never a real key.
+    expect(result.evidence.goalBaseline).toMatchObject({
       date: "2026-07-18",
       bodyFat: "7.7%",
       leanMass: "147.5 lb",
