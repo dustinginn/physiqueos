@@ -31,7 +31,7 @@ describe("provider canonical uploads", () => {
       commandId: expect.stringMatching(/^media:/),
     }));
     expect(database.canonicalMedia).toHaveLength(1);
-    expect(database.outbox).toHaveLength(1);
+    expect(database.outbox).toHaveLength(0);
     expect(objectProvider.deleteObject).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe("provider canonical uploads", () => {
 
     expect(assertCompatibilityAccess).toHaveBeenCalledTimes(2);
     expect(database.canonicalMedia).toHaveLength(1);
-    expect(database.outbox).toHaveLength(1);
+    expect(database.outbox).toHaveLength(0);
     expect(objectProvider.deleteObject).not.toHaveBeenCalled();
   });
 });

@@ -47,6 +47,18 @@ describe("Phase 4 canonical command persistence ports", () => {
     expect(goal.result.record.title).toBe("Goal B");
     expect(protocol.result.record.title).toBe("Protocol B");
   });
+
+  it("enqueues no durable outbox work for any committed canonical write", async () => {
+    const records = fixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const committed = await ports.editGoal(commandContext({ goalId: "goal-one", patch: { title: "Goal C" } }, "1", "no-outbox"));
+    expect(committed.status).toBe("committed");
+    expect(committed.outbox).toEqual([]);
+    const duplicate = await ports.completePriority(commandContext({ priorityId: "priority-one", occurrenceDate: "2026-08-11" }, "1", "dup"));
+    const repeated = await ports.completePriority(commandContext({ priorityId: "priority-one", occurrenceDate: "2026-08-11" }, "1", "dup-2"));
+    expect(duplicate.outbox).toEqual([]);
+    expect(repeated.outbox).toEqual([]);
+  });
 });
 
 function fixture() {

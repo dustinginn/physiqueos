@@ -103,19 +103,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     return {
       status: "committed",
       result: { status, record },
-      outbox: status === "committed" ? [{
-        id: `outbox:${context.metadata.commandId}`,
-        userId: context.ownerUserId,
-        topic: "canonical.read-model.invalidate",
-        dedupeKey: `command:${context.metadata.commandId}`,
-        payloadVersion: "1",
-        payload: {
-          commandId: context.metadata.commandId,
-          collection,
-          recordId: String(recordId),
-          ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}),
-        },
-      }] : [],
+      outbox: [],
     };
   }
   function commandProvenance(context) { return { source: "phase4-application-command", commandId: context.metadata.commandId, deviceId: context.principal.deviceId, ...(context.canonicalStoreEpoch ? { canonicalStoreEpoch: context.canonicalStoreEpoch } : {}) }; }

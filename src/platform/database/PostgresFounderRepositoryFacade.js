@@ -103,10 +103,6 @@ export async function executePostgresFounderRuntimeMutation({
     if (contextChanged) await replaceApplicationContext(client, { ownerUserId, runtime });
     if (changed.length || contextChanged) {
       await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
-      await enqueueInvalidation(client, {
-        ownerUserId, commandId, repositoryName: "application-runtime", methodName: operation,
-        changed: contextChanged ? [...changed, "applicationContext"] : changed,
-      });
     }
     await client.query("COMMIT");
     return structuredClone(result);
@@ -178,22 +174,6 @@ async function bumpRuntimeMetadata(client, { ownerUserId, commandId, now }) {
     error.code = "CANONICAL_RUNTIME_METADATA_UNAVAILABLE";
     throw error;
   }
-}
-
-async function enqueueInvalidation(client, { ownerUserId, commandId, repositoryName, methodName, changed }) {
-  await client.query(
-    `INSERT INTO physiqueos.outbox_messages
-      (id,user_id,topic,dedupe_key,payload_version,payload)
-     VALUES ($1,$2,'canonical.read-model.invalidate',$3,'1',$4::jsonb)
-     ON CONFLICT (topic,dedupe_key) DO NOTHING`,
-    [`outbox:${commandId}`, ownerUserId, `repository-command:${commandId}`, JSON.stringify({
-      commandId,
-      repository: repositoryName,
-      method: methodName,
-      collections: changed,
-      canonicalStoreEpoch: "postgres-canonical",
-    })],
-  );
 }
 
 function snapshotCollections(runtime) {
