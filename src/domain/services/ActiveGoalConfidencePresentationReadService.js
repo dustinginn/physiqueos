@@ -69,6 +69,7 @@ export function resolveActiveGoalConfidencePresentation({
       qualitativeLevel: title(assessment.confidenceBand),
       narrativeText: assessment.narrativeExplanation?.text ?? "",
       movement: assessment.movement,
+      movementRationaleCode: assessment.narrativeExplanation?.movementRationaleCode ?? null,
       uncertaintyReduction: assessment.narrativeExplanation?.uncertaintyReduction ?? null,
       remainingUncertaintyItems: assessment.remainingUncertainty?.items ?? [],
       nextConfidenceBuildingEvidence: assessment.nextConfidenceBuildingEvidence ?? null,

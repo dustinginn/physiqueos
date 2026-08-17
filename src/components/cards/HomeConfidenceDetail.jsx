@@ -31,15 +31,22 @@ export default function HomeConfidenceDetail({ confidence, detail }) {
       <ConfidenceRing label="Goal" size={82} value={confidence} />
     </button>
     <FloatingSheet description="The evidence currently supporting and limiting the overall trajectory." onOpenChange={changeOpen} open={open} title={`Why confidence is ${confidence}%`}>
-      <div className="space-y-4 px-1 py-2" data-testid="home-confidence-detail">
-        <p className="text-sm font-extrabold text-[var(--text-primary)]">Current confidence: {detail.qualitativeLevel}</p>
-        <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports confidence" />
-        <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits confidence" />
-        <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What will make confidence clearer" />
-        <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.uncertaintyStatement}</p>
-      </div>
+      <HomeConfidenceDetailBody detail={detail} />
     </FloatingSheet>
   </>;
+}
+
+// Extracted so the final rendered explanation strings can be tested directly — the Radix
+// Dialog above never mounts its Portal content while closed, so this is the only way to
+// assert on what the modal actually renders rather than only on the presentation-model output.
+export function HomeConfidenceDetailBody({ detail }) {
+  return <div className="space-y-4 px-1 py-2" data-testid="home-confidence-detail">
+    <p className="text-sm font-extrabold text-[var(--text-primary)]">Current confidence: {detail.qualitativeLevel}</p>
+    <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports confidence" />
+    <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits confidence" />
+    <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What will make confidence clearer" />
+    {detail.uncertaintyStatement && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.uncertaintyStatement}</p>}
+  </div>;
 }
 
 function DetailGroup({ icon: Icon, items = [], title }) {
