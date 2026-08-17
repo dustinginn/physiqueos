@@ -5,6 +5,8 @@ import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidenceP
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
+import { describeWeightAndEnergyInterpretation } from "../presentation/evidenceInterpretationPresentation";
+import { buildMilestoneStory } from "../presentation/milestoneStoryPresentation";
 
 export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {
   const user = await repositories.users.getCurrentUser();
@@ -67,15 +69,24 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
     : null;
   const priorPhase = trajectory.phases.find((item) => item.order === active.order - 1) ?? null;
   const transitionTurningPoint = active.order > 0 && active.startDate && priorPhase
-    ? { date: active.startDate, title: `${priorPhase.phaseName} completed · ${active.phaseName} began`,
-      body: describePhaseTransition({ priorPhase, active, phaseStart, goalProgress: trajectory.goalProgress,
-        caloricIntakeTarget, activityExpenditureTarget, strategicReviewCadence, strategicReviewAnchor }) }
+    ? buildMilestoneStory("phase_transition", {
+      date: active.startDate, priorPhaseName: priorPhase.phaseName, activePhaseName: active.phaseName,
+      measurementDate: phaseStart?.measuredAt ?? phaseStart?.date ?? null,
+      metricLabel: phaseStart ? "lean mass" : null,
+      metricValue: phaseStart ? mass(phaseStart.leanMass) : null,
+      changeFromBaseline: Number.isFinite(trajectory.goalProgress?.changeValue)
+        ? signedAmount(trajectory.goalProgress.changeValue) : null,
+    })
     : null;
-  const turningPoints = [{ date: baseline?.measuredAt ?? baseline?.date, title: "DEXA baseline established", body: "The accepted measurement became the authoritative starting point for this goal." }, { date: trajectory.overallGoal.journeyStartDate, title: "Goal journey activated", body: "The journey began with its first planned phase." },
+  const turningPoints = [
+    buildMilestoneStory("dexa_baseline", { date: baseline?.measuredAt ?? baseline?.date }),
+    buildMilestoneStory("goal_activated", { date: trajectory.overallGoal.journeyStartDate }),
     ...(transitionTurningPoint ? [transitionTurningPoint] : []),
-    ...(active.calculatedPlannedReviewDate ? [{ date: active.calculatedPlannedReviewDate,
-      title: "Planned phase review", body: upcoming ? `Evidence will determine readiness for ${upcoming.phaseName}.` : "Evidence will determine progress and the appropriate goal decision." }] : []),
-    { date: upcoming?.targetDate ?? trajectory.overallGoal.overallTargetDate, title: "Goal destination", body: `Future evidence will measure progress toward ${trajectory.overallGoal.targetDescription}.` }];
+    ...(active.calculatedPlannedReviewDate ? [buildMilestoneStory("planned_review",
+      { date: active.calculatedPlannedReviewDate, upcomingPhaseName: upcoming?.phaseName ?? null })] : []),
+    buildMilestoneStory("goal_destination", { date: upcoming?.targetDate ?? trajectory.overallGoal.overallTargetDate,
+      targetDescription: trajectory.overallGoal.targetDescription }),
+  ];
   if(trainingProgress?.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
   turningPoints.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.title.localeCompare(b.title));
   return {
@@ -95,7 +106,10 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
         ? { changeLabel: signedAmount(trajectory.goalProgress.changeValue), targetLabel: `${formatNumber(trajectory.goalProgress.targetAmount)} lb`,
           remainingLabel: `${formatNumber(Math.max(trajectory.goalProgress.targetAmount - trajectory.goalProgress.changeValue, 0))} lb remaining` }
         : null,
-      phaseBaseline: active.phaseBaseline, support: "Weight and energy evidence help interpret execution and recovery between DEXA measurements." },
+      phaseBaseline: active.phaseBaseline, support: describeWeightAndEnergyInterpretation({
+        weightEntries: store.weightEntries ?? [], phaseStartDate: active.startDate, currentDate,
+        caloricIntakeTarget, activityExpenditureTarget, goalDirection: goal.target?.direction ?? null,
+      }) },
     trainingProgress,
     turningPoints,
     strategy,
@@ -153,22 +167,6 @@ function describeGuardrailObservation(observed, range) {
   if (observed < range.min) return { relation: "below", label: `${value} observed — below the ${range.min}–${range.max}% guardrail range.` };
   if (observed > range.max) return { relation: "above", label: `${value} observed — above the ${range.min}–${range.max}% guardrail range.` };
   return { relation: "within", label: `${value} observed — within the ${range.min}–${range.max}% guardrail range.` };
-}
-function describePhaseTransition({ priorPhase, active, phaseStart, goalProgress, caloricIntakeTarget,
-  activityExpenditureTarget, strategicReviewCadence, strategicReviewAnchor }) {
-  const sentences = [`${priorPhase.phaseName} was completed.`];
-  if (phaseStart) {
-    sentences.push(`The ${formatShortDate(phaseStart.measuredAt ?? phaseStart.date)} DEXA measured ${mass(phaseStart.leanMass)} of lean mass` +
-      (Number.isFinite(goalProgress?.changeValue) ? `, ${signedAmount(goalProgress.changeValue)} from the goal baseline.` : "."));
-  }
-  sentences.push("The evidence available at the time didn't fully prove out, but there was enough to move forward with confidence.");
-  sentences.push(`${active.phaseName} began.`);
-  const targets = [];
-  if (Number.isFinite(caloricIntakeTarget?.value)) targets.push(`${formatNumber(caloricIntakeTarget.value)} kcal/day intake`);
-  if (Number.isFinite(activityExpenditureTarget?.value)) targets.push(`${formatNumber(activityExpenditureTarget.value)} kcal/day activity`);
-  if (targets.length) sentences.push(`New targets took effect — ${targets.join(" and ")}.`);
-  if (strategicReviewCadence === "monthly") sentences.push(`From here, the plan is reviewed monthly${strategicReviewAnchor === "dexa_body_composition" ? " using DEXA and body-composition evidence" : ""}, while weekly evidence keeps getting watched in the meantime.`);
-  return sentences.join(" ");
 }
 function summarizeStrategyDomain(label, { caloricIntakeTarget, activityExpenditureTarget, monitoringCadence, strategicReviewCadence, strategicReviewAnchor }) {
   if (label !== "Energy") return null;

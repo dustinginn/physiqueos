@@ -79,7 +79,7 @@ describe("Prospective Intelligence — coaching voice holds for an arbitrary fut
     const energy = result.strategy.find((item) => item.label === "Energy");
     expectNoGovernanceLanguageLeak([transition.body, energy.summary, ...result.readiness,
       result.currentPhase.readiness]);
-    expect(transition.body).toMatch(/Recomposition Phase began/);
+    expect(transition.body).toMatch(/focus now shifts to Recomposition Phase/);
     expect(energy.summary).toMatch(/adjusted as the evidence supports it/);
   });
 

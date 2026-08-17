@@ -80,6 +80,24 @@ describe("Home active chapter components", () => {
     expect(html).not.toMatch(/Journey began|Maintenance Calibration|Calibration in progress/);
   });
 
+  it("gives a completed phase a subtle gold-tinted background without making it look active", () => {
+    const html = renderToStaticMarkup(React.createElement(GoalRow, {
+      href: "/goals/build-lean-mass", icon: "dumbbell", primary: true, title: "Build Lean Mass",
+      presentation: { mode: "phase_trajectory_goal", trajectory: { overallGoal: { targetDescription: "Build 10 lb of lean mass", overallTargetDate: "2026-10-31", journeyStartDate: "2026-07-20" }, phases: [
+        { phaseId: "p1", phaseName: "Establish Maintenance", order: 0, status: "completed", presentationTone: "gold", progress: { progressType: "planned_time", clampedProgressPercentage: 100, presentationLabel: "Completed" } },
+        { phaseId: "p2", phaseName: "Lean Mass Build", order: 1, status: "active", presentationTone: "green", startDate: "2026-08-15", calculatedPlannedReviewDate: "2026-09-15", progress: { progressType: "outcome", clampedProgressPercentage: 8, presentationLabel: "0.8 of 10 lb gained" } },
+      ] } },
+    }));
+    // Completed phase: still tinted (not plain neutral), but at a lower intensity than active.
+    expect(html).toContain("color-mix(in srgb, #C9971A 3%, transparent)");
+    expect(html).toContain("color-mix(in srgb, #C9971A 14%, var(--divider))");
+    // Active phase keeps the stronger, unchanged tint.
+    expect(html).toContain("color-mix(in srgb, #3BC35B 4%, transparent)");
+    expect(html).toContain("color-mix(in srgb, #3BC35B 26%, var(--divider))");
+    expect(html).toContain("Completed");
+    expect(html).not.toContain("color-mix(in srgb, #C9971A 4%, transparent)");
+  });
+
   it("includes previous-chapter context in the briefing link accessible name", () => {
     const html = renderToStaticMarkup(React.createElement(LatestAnalysisCard, {
       sectionLabel: "Previous Chapter Briefing",

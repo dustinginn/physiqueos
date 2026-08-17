@@ -40,16 +40,9 @@ export function deriveHomeActiveChapterPresentation({
     ? overallGoalConfidence.value : trajectory.confidence.numericValue;
   const presentedConfidenceState = overallGoalConfidence?.label ??
     trajectory.confidence.qualitativeLevel;
-  const canonicalDetail = overallGoalConfidence?.canonicalSeries ? {
+  const canonicalDetail = overallGoalConfidence?.canonicalSeries && overallGoalConfidence.explanationDetail ? {
+    ...overallGoalConfidence.explanationDetail,
     qualitativeLevel: overallGoalConfidence.label,
-    supportingFactors: overallGoalConfidence.supportingContributors.map((item) =>
-      item.reason).filter(Boolean),
-    limitingFactors: overallGoalConfidence.limitingContributors.map((item) =>
-      item.reason).filter(Boolean),
-    clarifyingFactors: [],
-    uncertaintyStatement:
-      overallGoalConfidence.unresolvedUncertainty.join(" ") ||
-      overallGoalConfidence.primaryReason,
     movement: overallGoalConfidence.movement,
     delta: overallGoalConfidence.delta,
     evidenceCutoff: overallGoalConfidence.evidenceCutoff,

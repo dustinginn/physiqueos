@@ -91,7 +91,7 @@ describe("Operating Plan active Energy Strategy resolver", () => {
 
     expect(section.subtitle).toBe("Active");
     expect(section.items[0]).toMatchObject({
-      title: "Maintenance Calibration",
+      title: "Calorie Calibration",
       status: "Active",
       href: "/profile/operating-plan/strategy/energy/energy",
     });

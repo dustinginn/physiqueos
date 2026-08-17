@@ -282,3 +282,68 @@ don't narrate" means in practice:
 
 See `docs/CONFIDENCE_V2_CURRENT_STATE.md` for the parallel rule that governs when
 user-facing Confidence itself is allowed to change.
+
+---
+
+# Presentation Architecture
+
+The domain model supplies intelligence; presentation supplies meaning. A domain service
+decides *what is true* and *what is consequential enough to surface* — a canonical Strategy
+mode, a structured Confidence explanation, a milestone worth telling. A presentation module
+decides *how that reads* to the user. Neither layer should do the other's job: domain code
+should not hand-write coaching sentences inline, and presentation code should not
+recompute or reinterpret canonical facts.
+
+A few standing rules follow from that split:
+
+* **Canonical identity is not automatically presentation identity.** An internal record's
+  mode/version name (e.g. a Strategy protocol's `mode` field) exists for the system to
+  reason about, not for the user to read verbatim. A dedicated presentation function derives
+  what the plan is *doing* — from the active phase, its purpose, and its direction — and
+  that's what the user sees. The canonical record itself is never renamed; only its
+  presentation is derived, on every read, so it can never drift out of sync with the
+  underlying identity.
+* **Do not tell the user what evidence is for; tell them what it currently means.** A
+  static sentence describing an evidence category's purpose ("this helps interpret
+  execution between DEXA scans") is not an interpretation. A phase-aware read of the same
+  evidence — is weight trending in the intended direction, is it too early to judge, what
+  will the next DEXA settle — is. Insufficient post-transition evidence is a legitimate,
+  honestly-stated answer; a trend is never fabricated to fill the gap, and evidence from
+  before the current phase started is never treated as proof of how the body is responding
+  to it.
+* **Milestones are selective stories of consequential change, not serialized event logs.**
+  The domain decides whether an event (a phase transition, a meaningful DEXA, a Strategy
+  change, a Goal review) is consequential enough to become a Turning Point; presentation
+  decides how to tell it. Every milestone answers three things — what happened, why it
+  matters, what changed because of it — and nothing else. Strategy specifics (targets,
+  cadence) belong to Current Strategy, not the milestone story.
+* **Terminal phase is internal structure; the user sees the next meaningful checkpoint.**
+  "No further phase is currently planned" is a fact about the phase graph, not something to
+  narrate as such. The user-facing version explains what happens next: evidence and
+  progress from here decide the next step, which could be a new phase, an adjustment to the
+  current plan, or confirming the goal is complete. This generalizes to any goal whose
+  current phase happens to be its last planned one — the phase name is never hardcoded into
+  that copy.
+* **Structured reasoning objects require typed presentation models and must never rely on
+  implicit string coercion.** A Confidence assessment's remaining-uncertainty items,
+  next-decisive-evidence pointer, and narrative explanation are structured domain objects.
+  `String(object)`, `.join()` on an array of objects, or any other implicit coercion
+  collapses them into `[object Object]`. The one sanctioned path turns each structured
+  field into a real coaching-voice string (or array of strings) before it ever reaches a
+  render boundary — see `src/domain/presentation/confidenceExplanationPresentation.js`.
+* **User-facing capitalization is a centrally enforced presentation invariant, not a
+  per-surface convention.** Ordinary domain nouns (goal, strategy, phase, confidence,
+  evidence, guardrail, review, baseline, trajectory, protocol, …) read as ordinary English
+  words in prose; they are not capitalized merely because they name canonical objects.
+  Proper names (Build Lean Mass, Establish Maintenance, Phase Review) and acronyms (DEXA,
+  PhysiqueOS) keep their casing. Headings and short labels may use title casing — that's a
+  different, legitimate convention, not a violation. `src/domain/presentation/proseCapitalization.js`
+  is the one shared detector; it is applied not only to isolated generated strings but to
+  whole rendered surfaces (screen source, computed presentation output), because a leak can
+  originate from a static label baked directly into a component just as easily as from a
+  generated sentence.
+
+Founder production state is the validation case for all of the above, not the
+specification — every rule here should hold for an arbitrary goal, phase, and user, and the
+test suites for these presentation modules deliberately exercise names, dates, and values
+that are not Founder's.

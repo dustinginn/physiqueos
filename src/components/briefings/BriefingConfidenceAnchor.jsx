@@ -3,6 +3,7 @@ import {
   assertCanonicalConfidencePresentation,
   canonicalConfidenceExplanation,
 } from "../../domain/services/CanonicalConfidencePresentationInvariant";
+import { translateConfidenceProse } from "../../domain/presentation/confidenceExplanationPresentation";
 
 export default function BriefingConfidenceAnchor({
   animate = false,
@@ -56,7 +57,7 @@ export function movementLabel(confidence) {
 }
 
 export function confidenceHeadline(confidence) {
-  return canonicalConfidenceExplanation(confidence);
+  return translateConfidenceProse(canonicalConfidenceExplanation(confidence));
 }
 
 function bandLabel(value) {

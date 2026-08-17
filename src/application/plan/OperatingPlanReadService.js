@@ -4,6 +4,7 @@ import { createOperatingPlanEnergyStrategyService } from "../../domain/services/
 import { getOperatingPlanStrategyHref } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
+import { describeEnergyStrategyIdentity } from "../../domain/presentation/strategyIdentityPresentation.js";
 
 export function createOperatingPlanReadService({ repositories } = {}) {
   return Object.freeze({
@@ -43,7 +44,7 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
   const weighIn = resolveMorningWeighInSupport({ executionItems, protocols: active, reminders });
   const sections = [
     section("energy", "primary", "Energy Strategy", energyStrategy ? "Active" : "Not configured", [buildEnergyStrategyPlanItem(energyStrategy)]),
-    section("nutrition", "primary", "Nutrition", "Manual context", [{ id: "nutrition-calorie-range", title: nutritionContext?.calibrationStrategy ? "Maintenance Calibration" : "Calorie Range", detail: calorieRange(nutritionContext), href: getOperatingPlanStrategyHref("nutrition", nutritionContext?.activeProtocolId), status: "Active" }]),
+    section("nutrition", "primary", "Nutrition", "Manual context", [{ id: "nutrition-calorie-range", title: nutritionContext?.calibrationStrategy ? "Calorie Calibration" : "Calorie Range", detail: calorieRange(nutritionContext), href: getOperatingPlanStrategyHref("nutrition", nutritionContext?.activeProtocolId), status: "Active" }]),
     section("training", "effort", "Training", trainingProtocol ? "Active protocol" : "Protocol not defined", [buildTrainingPlanItem(trainingProtocol)]),
     section("recovery", "success", "Recovery", recovery.length ? `${recovery.length} current method` : "Strategy coming soon", recovery.length ? [protocolItem("recovery-strategy", "Recovery Strategy", recovery)] : [{ id: "recovery-coming-soon", title: "Recovery", detail: "A dedicated recovery strategy will complete this layer", href: null, status: "Coming Soon" }]),
     section("peptide", "effort", "Peptides", `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`, peptides.length ? [protocolItem("peptide-strategy", "Peptide Strategy", peptides)] : []),
@@ -56,7 +57,16 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
 
 function section(iconKey, tone, title, subtitle, items, extra = {}) { return Object.freeze({ iconKey, tone, title, subtitle, items: Object.freeze(items), ...extra }); }
 function protocolItem(id, title, protocols) { return { id, title, detail: protocols.map((item) => item.name).join(", "), href: `/profile/protocols/${protocols[0].id}?from=operating-plan`, status: "Active" }; }
-function energyItem(link) { if(!link)return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the Goal strategy", href: null, status: "Build Strategy" }; const phase=link.selectedPace==="phase_execution"; return { id: link.protocolId, title: phase ? "Phase Energy Strategy" : link.selectedPace === "maintenance_calibration" ? "Maintenance Calibration" : label(link.selectedPace), detail: phase ? `${formatTarget(link.caloricIntakeTarget)} intake · ${formatTarget(link.activityExpenditureTarget)} activity · ${label(link.evaluationCadence)} review` : "Activity and Nutrition linked for weekly calibration", href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" }; }
+function energyItem(link) {
+  if (!link) return { id: "energy-strategy-create", title: "Energy Strategy", detail: "Activity and Nutrition work together to define the Goal strategy", href: null, status: "Build Strategy" };
+  const phase = link.selectedPace === "phase_execution";
+  const identity = describeEnergyStrategyIdentity({
+    mode: phase ? "Phase Execution" : link.selectedPace === "maintenance_calibration" ? "Maintenance Calibration" : null,
+  });
+  return { id: link.protocolId, title: identity?.title ?? label(link.selectedPace),
+    detail: phase ? `${formatTarget(link.caloricIntakeTarget)} intake · ${formatTarget(link.activityExpenditureTarget)} activity · ${label(link.evaluationCadence)} review` : "Activity and Nutrition linked for weekly calibration",
+    href: getOperatingPlanStrategyHref("energy", link.protocolId), status: "Active" };
+}
 function trainingItem(version) { const strategy = version?.trainingStrategy; if (!strategy) return { id: "training-protocol-create", title: "Training", detail: "Define weekly frequency and progression strategy", href: "/profile/operating-plan/training/new", status: "Create Protocol" }; const sessions = Object.values(strategy.weeklyFrequencies ?? {}).reduce((sum, value) => sum + Number(value), 0); return { id: version.protocolId, title: "Maintenance Training Strategy", detail: `${sessions} weekly area sessions · ${label(strategy.progression?.pace)} progression`, href: getOperatingPlanStrategyHref("training", version.protocolId), status: "Active" }; }
 function calorieRange(context) { const range = context?.estimatedDailyCaloricIntake; if (context?.calibrationStrategy) return context.calibrationStrategy.proteinBasis === "body_weight" && Number(context.calibrationStrategy.proteinRatio) === 1 ? "1 g per lb of body weight · intake adjusted gradually" : "Intake adjusted gradually from weekly signals"; return range?.min && range?.max ? `${range.min}-${range.max} ${range.unit}` : "Range pending"; }
 function label(value) { return String(value ?? "").replace(/[_-]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }

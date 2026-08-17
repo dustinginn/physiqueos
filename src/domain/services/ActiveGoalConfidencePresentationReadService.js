@@ -3,6 +3,7 @@ import {
 } from "../confidence/CanonicalConfidenceReadService";
 import { assertCanonicalConfidencePresentation } from "./CanonicalConfidencePresentationInvariant";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
+import { buildConfidenceExplanationDetail } from "../presentation/confidenceExplanationPresentation";
 
 export const ACTIVE_GOAL_CONFIDENCE_PRESENTATION_VERSION =
   "active_goal_confidence_presentation_v2";
@@ -64,6 +65,14 @@ export function resolveActiveGoalConfidencePresentation({
     supportingContributors: [],
     limitingContributors: [],
     unresolvedUncertainty: assessment.remainingUncertainty?.items ?? [],
+    explanationDetail: buildConfidenceExplanationDetail({
+      qualitativeLevel: title(assessment.confidenceBand),
+      narrativeText: assessment.narrativeExplanation?.text ?? "",
+      movement: assessment.movement,
+      uncertaintyReduction: assessment.narrativeExplanation?.uncertaintyReduction ?? null,
+      remainingUncertaintyItems: assessment.remainingUncertainty?.items ?? [],
+      nextConfidenceBuildingEvidence: assessment.nextConfidenceBuildingEvidence ?? null,
+    }),
     evidenceCutoff: assessment.sourceCutoff,
     assessmentTimestamp: assessment.publicationTimestamp,
     publicationTimestamp: assessment.publicationTimestamp,
@@ -91,7 +100,7 @@ function unavailable(goal, phase, reason) {
     movement: null, movementDirection: null, movementMagnitude: null,
     delta: null, priorScore: null, primaryReason: null, explanation: null,
     supportingContributors: [], limitingContributors: [],
-    unresolvedUncertainty: [], evidenceCutoff: null,
+    unresolvedUncertainty: [], explanationDetail: null, evidenceCutoff: null,
     assessmentTimestamp: null, publicationTimestamp: null,
     originatingPublisher: null, originatingArtifactId: null,
     goalContractId: null, goalContractVersion: null,

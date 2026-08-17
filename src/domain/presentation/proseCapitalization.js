@@ -6,6 +6,7 @@ import { expect } from "vitest";
 export const INTERNAL_DOMAIN_NOUNS = Object.freeze([
   "Training", "Energy", "Weight", "Photos", "Goal", "Recovery", "Activity",
   "Strategy", "Phase", "Forecast", "Confidence", "Evidence", "Guardrail", "Nutrition",
+  "Review", "Baseline", "Trajectory", "Protocol",
 ]);
 
 // Proper user-facing titles/names that legitimately keep an internal-object noun capitalized
@@ -13,7 +14,7 @@ export const INTERNAL_DOMAIN_NOUNS = Object.freeze([
 // never flagged.
 export const KNOWN_PROSE_TITLE_EXCEPTIONS = Object.freeze([
   "Build Lean Mass", "Lean Mass Build", "Establish Maintenance", "Goal Review comes next",
-  "Phase Review",
+  "Phase Review", "DEXA", "PhysiqueOS",
 ]);
 
 // Returns every mid-sentence occurrence of a capitalized internal-object noun in `text` that

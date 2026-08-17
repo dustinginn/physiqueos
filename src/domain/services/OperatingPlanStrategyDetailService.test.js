@@ -14,13 +14,13 @@ describe("Operating Plan strategy detail", () => {
       protocol: { ...base, name: "Calibration", effectiveStrategy: { mode: "Maintenance Calibration", calorieStrategy: "increase_gradually", activityStrategy: "reduce_slightly", evaluationCadence: "Weekly", adjustmentSize: "small" } },
     });
     expect(result).toMatchObject({
-      title: "Maintenance Calibration",
+      title: "Calorie Calibration",
       goal: "Your Build Lean Mass goal",
       startedDate: "July 23, 2026",
       status: "Active",
     });
     expect(result.sections).toEqual([
-      { label: "Current Energy Phase", value: "Maintain" },
+      { label: "Plan Type", value: "Adjusting gradually from weekly signals" },
       { label: "Caloric Intake", value: "Increase Gradually" },
       { label: "Activity Target", value: "Reduce Slightly" },
       { label: "Calibration Approach", value: "Weekly \u00B7 Small adjustments" },
@@ -101,13 +101,30 @@ describe("Operating Plan strategy detail", () => {
       version: { id: "v2", effectiveAt: "2026-08-15" },
     });
     expect(result.startedDate).toBe("August 15, 2026");
+    // User-facing Strategy identity is derived from the active phase, not the raw internal
+    // protocol mode string — "Phase Execution" must never leak into the title or a field value.
+    expect(result.title).toBe("Lean Mass Build Energy Plan");
     expect(result.sections).toEqual(expect.arrayContaining([
-      { label: "Current Energy Phase", value: "Phase execution" },
+      { label: "Plan Type", value: "Following the active phase's targets" },
       { label: "Evidence Monitoring", value: "Weekly evidence review" },
       { label: "Strategic Review", value: "Monthly · DEXA and body composition aligned" },
       { label: "Strategy Changes", value: "Adjusted as the evidence supports it" },
     ]));
     expect(JSON.stringify(result)).not.toMatch(/\bCut\b/);
+    expect(JSON.stringify(result)).not.toMatch(/Phase [Ee]xecution/);
+  });
+
+  it("never renames the canonical Strategy mode — only the presentation layer translates it", () => {
+    const protocol = { ...base, currentVersionId: "v2", effectiveStrategy: {
+      mode: "Phase Execution", caloricIntakeTarget: { value: 2200, unit: "kcal/day" },
+      activityExpenditureTarget: { value: 600, unit: "kcal/day" }, monitoringCadence: "weekly" } };
+    composeOperatingPlanStrategyDetail({
+      goals: [{ ...goal, currentPhaseId: "p2", phases: [{ id: "p2", name: "Recomposition Phase", status: "active" }] }],
+      strategyType: "energy", protocol, version: { id: "v2", effectiveAt: "2027-03-04" },
+    });
+    // The canonical record itself is untouched by presentation — this is a read/derive step,
+    // never a rename of the underlying Strategy identity.
+    expect(protocol.effectiveStrategy.mode).toBe("Phase Execution");
   });
   it("uses stable IDs and returns no fabricated detail when unavailable", () => {
     expect(getOperatingPlanStrategyHref("energy", "protocol_energy")).toBe("/profile/operating-plan/strategy/energy/protocol_energy");

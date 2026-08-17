@@ -43,12 +43,13 @@ describe("phase-aware active goal preview",()=>{
       goal: terminalGoal, dexaScans: dexaWithPhaseStart, protocols: [energyProtocol], currentDate: new Date("2026-08-20T12:00:00Z") });
     const transition = result.turningPoints.find((item) => item.date === "2026-08-15");
     expect(transition).toBeDefined();
-    expect(transition.body).toMatch(/Establish Maintenance was completed/);
+    expect(transition.body).toMatch(/Establish Maintenance finished/);
+    expect(transition.body).toMatch(/148\.3 lb of lean mass, \+0\.8 lb from the goal baseline/);
     expect(transition.body).toMatch(/enough to move forward with confidence/);
-    expect(transition.body).toMatch(/Lean Mass Build began/);
-    expect(transition.body).toMatch(/2,500 kcal\/day intake and 800 kcal\/day activity/);
-    expect(transition.body).toMatch(/monthly.*DEXA and body-composition evidence/);
+    expect(transition.body).toMatch(/focus now shifts to Lean Mass Build/);
     expect(transition.body).not.toMatch(/did not conclusively prove|sufficiently bounded|authoriz/i);
+    // Strategy specifics (targets, review cadence) belong to Current Strategy, not the milestone story.
+    expect(transition.body).not.toMatch(/kcal\/day|monthly|DEXA and body-composition evidence/);
     // No planned-review/destination entry may claim a date beyond currently known evidence.
     const knownDates = new Set(["2026-07-18", "2026-07-20", "2026-08-15", "2026-10-31"]);
     for (const point of result.turningPoints) expect(knownDates.has(point.date)).toBe(true);
@@ -74,5 +75,17 @@ describe("phase-aware active goal preview",()=>{
     for (const fragment of ["6353e12e1ef8fbc3", "objective_lean_mass", "dexa_submission_20260815", "\"2026-08-15\"", "'2026-08-15'"]) {
       expect(source).not.toContain(fragment);
     }
+  });
+
+  it("reads with natural prose capitalization across every generated surface, including Evidence Anchors and every Turning Point", () => {
+    const result = composePhaseAwareActiveGoalPreview({ user: { timeZone: "America/Los_Angeles" },
+      goal: terminalGoal, dexaScans: dexaWithPhaseStart, protocols: [energyProtocol], currentDate: new Date("2026-08-20T12:00:00Z") });
+    expectInternalDomainNamesNatural([
+      result.currentPhase.evidence, result.currentPhase.readiness,
+      result.evidence.support,
+      ...result.turningPoints.map((item) => item.body),
+      ...result.strategy.map((item) => item.summary),
+      result.guardrail.body,
+    ]);
   });
 });

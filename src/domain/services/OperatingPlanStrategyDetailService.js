@@ -1,6 +1,7 @@
 import { formatGoalStartDate } from "../utils/goalStartDate";
 import { nutritionStrategy } from "./StrategyEditorService";
 import { resolveCoachingUpdatesReadModel } from "./CoachingUpdatesReadService";
+import { describeEnergyStrategyIdentity } from "../presentation/strategyIdentityPresentation";
 
 export function createOperatingPlanStrategyDetailService({ repositories }) {
   return {
@@ -57,24 +58,27 @@ export function composeOperatingPlanStrategyDetail({ goals = [], nutritionContex
       : null,
     editLabel: strategyType === "briefings" ? "Edit Coaching Updates" : "Edit Strategy",
   };
-  if (strategyType === "energy") return {
-    ...common,
-    eyebrow: "Energy Strategy",
-    title: strategy.mode ?? protocol.name,
-    purpose: strategy.mode === "Phase Execution"
-      ? `Follow the current intake and activity targets for this phase while watching how the body responds and keeping the Guardrail in view.`
-      : `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
-    sections: [
-      field("Current Energy Phase", energyPhase(strategy.mode)),
-      field("Caloric Intake", targetLabel(strategy.caloricIntakeTarget) ?? label(strategy.calorieStrategy)),
-      field("Activity Target", targetLabel(strategy.activityExpenditureTarget) ?? label(strategy.activityStrategy)),
-      ...(strategy.mode === "Phase Execution" ? [
-        field("Evidence Monitoring", monitoringCadence(strategy)),
-        field("Strategic Review", strategicReviewCadence(strategy)),
-        field("Strategy Changes", "Adjusted as the evidence supports it"),
-      ] : [field("Calibration Approach", calibrationApproach(strategy))]),
-    ],
-  };
+  if (strategyType === "energy") {
+    const energyIdentity = describeEnergyStrategyIdentity({ mode: strategy.mode, phaseName: currentPhase?.name });
+    return {
+      ...common,
+      eyebrow: "Energy Strategy",
+      title: energyIdentity?.title ?? strategy.mode ?? protocol.name,
+      purpose: strategy.mode === "Phase Execution"
+        ? `Follow the current intake and activity targets for this phase while watching how the body responds and keeping the Guardrail in view.`
+        : `Set caloric intake and activity together so energy availability can be calibrated for ${goalReference(goal)}.`,
+      sections: [
+        field("Plan Type", energyIdentity?.planType ?? energyPhase(strategy.mode)),
+        field("Caloric Intake", targetLabel(strategy.caloricIntakeTarget) ?? label(strategy.calorieStrategy)),
+        field("Activity Target", targetLabel(strategy.activityExpenditureTarget) ?? label(strategy.activityStrategy)),
+        ...(strategy.mode === "Phase Execution" ? [
+          field("Evidence Monitoring", monitoringCadence(strategy)),
+          field("Strategic Review", strategicReviewCadence(strategy)),
+          field("Strategy Changes", "Adjusted as the evidence supports it"),
+        ] : [field("Calibration Approach", calibrationApproach(strategy))]),
+      ],
+    };
+  }
   if (strategyType === "nutrition") return {
     ...common,
     eyebrow: "Nutrition Strategy",
