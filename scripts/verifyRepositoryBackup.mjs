@@ -16,6 +16,36 @@ function readJson(filePath, label) {
   }
 }
 
+// The embedded-repository audit already distinguishes approved from unapproved nested
+// repositories: config/embedded-repository-policy.json's explicit, path-exact allowlist,
+// evaluated by scripts/auditEmbeddedRepositories.mjs. This re-validates that same
+// per-repository record from the backup's own completeness report rather than categorically
+// rejecting any nonzero repository count — a backup with zero embedded repositories and one
+// with several explicitly policy-approved repositories (each recording proof of why it was
+// accepted) are both valid; an unapproved, dirty, or unconfigured one is not, regardless of
+// how many other repositories are present. This never approves a path on its own — it only
+// trusts what the audit already decided, so it cannot be used to special-case a path here.
+function assertEmbeddedRepositoriesAreExplicitlyApproved(nestedAudit) {
+  const repositories = nestedAudit?.repositories ?? [];
+  if (nestedAudit?.repositoryCount !== repositories.length) {
+    throw new Error("Backup completeness report repository count does not match its repository list");
+  }
+  for (const repository of repositories) {
+    if (!repository.allowed) {
+      throw new Error(`Backup completeness report contains an unapproved embedded repository: ${repository.path}`);
+    }
+    if (!repository.explicitlyAllowlisted || repository.policyClassification !== "explicitly_allowed") {
+      throw new Error(`Embedded repository is not explicitly policy-approved: ${repository.path}`);
+    }
+    if ((repository.violations ?? []).length > 0) {
+      throw new Error(`Embedded repository has unresolved policy violations: ${repository.path}`);
+    }
+    if (!repository.policyPurpose || !repository.policyLifecycle || !repository.endWorkSessionBehavior) {
+      throw new Error(`Embedded repository policy record is missing required approval detail: ${repository.path}`);
+    }
+  }
+}
+
 function resolveBackupFile(backupPath, relativePath, label) {
   if (!relativePath || path.isAbsolute(relativePath)) {
     throw new Error(`${label} must be a relative backup path`);
@@ -128,11 +158,12 @@ export function verifyRepositoryBackup({ backupPath, expectedHead, expectedBranc
   if (!completeness.passed || (completeness.violations ?? []).length > 0) {
     throw new Error("Backup completeness report did not pass");
   }
-  if (completeness.nestedAudit?.repositoryCount !== 0) {
-    throw new Error("Backup completeness report contains embedded repositories");
-  }
-  if (!manifest.completeness?.passed || manifest.completeness?.nestedRepositoryCount !== 0) {
+  assertEmbeddedRepositoriesAreExplicitlyApproved(completeness.nestedAudit);
+  if (!manifest.completeness?.passed) {
     throw new Error("Backup manifest does not record a passing completeness result");
+  }
+  if (manifest.completeness?.nestedRepositoryCount !== completeness.nestedAudit?.repositoryCount) {
+    throw new Error("Backup manifest nested repository count does not match the completeness report");
   }
   if (manifest.completeness?.reportFile !== "backup-completeness.json") {
     throw new Error("Backup manifest references an unexpected completeness report");
