@@ -1,0 +1,11 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/lab/evidence-reprocess/route.js")
+R.c("server/chunks/[root-of-the-server]__1_63g5a._.js")
+R.c("server/chunks/0qpb_next_0z7un6p._.js")
+R.c("server/chunks/0qpb_next_dist_esm_build_templates_app-route_1k130y7.js")
+R.c("server/chunks/0qpb_next_1_vfl-c._.js")
+R.c("server/chunks/[root-of-the-server]__151sjqr._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_1-9q6v8._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_domain_services_0-unrrw._.js")
+R.c("server/chunks/1q71__next-internal_server_app_api_lab_evidence-reprocess_route_actions_1ozw1jq.js")
+R.m(473225)
+module.exports=R.m(473225).exports

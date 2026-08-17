@@ -1,0 +1,12 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/media/read/route.js")
+R.c("server/chunks/[root-of-the-server]__15cxyac._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_0cdl9du._.js")
+R.c("server/chunks/0jwa_windows-deploy-4758bd37_src_domain_interpreters_PhotoInterpreterService_0pfu-rl.js")
+R.c("server/chunks/[root-of-the-server]__151sjqr._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_domain_0e2166m._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_0ipzin9._.js")
+R.c("server/chunks/0qpb_next_0lvnpr8._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_1-9q6v8._.js")
+R.c("server/chunks/1q71__next-internal_server_app_api_v1_media_read_route_actions_1w5fy5q.js")
+R.m(527000)
+module.exports=R.m(527000).exports

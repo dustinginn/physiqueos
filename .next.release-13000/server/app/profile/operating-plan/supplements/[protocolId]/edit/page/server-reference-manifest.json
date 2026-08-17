@@ -1,0 +1,17 @@
+{
+  "node": {
+    "7028474bf39f9f2010e5cf07bcfc1204d658bb2a9d": {
+      "workers": {
+        "app/profile/operating-plan/supplements/[protocolId]/edit/page": {
+          "moduleId": 989477,
+          "async": false,
+          "exportedName": "saveSupplementStrategy",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/supplements/[protocolId]/edit/actions.js"
+        }
+      },
+      "exportedName": "saveSupplementStrategy",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/supplements/[protocolId]/edit/actions.js"
+    }
+  },
+  "edge": {}
+}

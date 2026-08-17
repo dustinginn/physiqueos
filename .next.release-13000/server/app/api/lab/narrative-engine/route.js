@@ -1,0 +1,11 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/lab/narrative-engine/route.js")
+R.c("server/chunks/[root-of-the-server]__13e_o02._.js")
+R.c("server/chunks/0qpb_next_0lvnpr8._.js")
+R.c("server/chunks/0jwa_windows-deploy-4758bd37_src_domain_interpreters_PhotoInterpreterService_0pfu-rl.js")
+R.c("server/chunks/[root-of-the-server]__151sjqr._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_domain_0alhxy2._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_src_1-9q6v8._.js")
+R.c("server/chunks/_tmp_windows-deploy-4758bd37_0x-t65b._.js")
+R.c("server/chunks/1q71__next-internal_server_app_api_lab_narrative-engine_route_actions_0wafq60.js")
+R.m(818376)
+module.exports=R.m(818376).exports

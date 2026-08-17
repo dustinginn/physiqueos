@@ -1,0 +1,41 @@
+{
+  "node": {
+    "0017112475edf2ccdc5a7ee73d41cf9cb0f9f52ea1": {
+      "workers": {
+        "app/goals/transition/protocols/edit/[category]/page": {
+          "moduleId": 425588,
+          "async": false,
+          "exportedName": "markLiveProtocolTransitionReady",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+        }
+      },
+      "exportedName": "markLiveProtocolTransitionReady",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+    },
+    "4085e7670371cac5bcfcf37bcb38535c21e7195aab": {
+      "workers": {
+        "app/goals/transition/protocols/edit/[category]/page": {
+          "moduleId": 425588,
+          "async": false,
+          "exportedName": "saveLiveProtocolDisposition",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+        }
+      },
+      "exportedName": "saveLiveProtocolDisposition",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+    },
+    "4098f06320bed9e6d88a81f58455a8c2a9367acbc0": {
+      "workers": {
+        "app/goals/transition/protocols/edit/[category]/page": {
+          "moduleId": 425588,
+          "async": false,
+          "exportedName": "saveLiveTransitionProtocolDraft",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+        }
+      },
+      "exportedName": "saveLiveTransitionProtocolDraft",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/goals/transition/protocols/actions.js"
+    }
+  },
+  "edge": {}
+}

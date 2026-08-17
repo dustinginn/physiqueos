@@ -1,0 +1,17 @@
+{
+  "node": {
+    "4053f7cfa36d48a6cbd43c5d3cab926dbb48956982": {
+      "workers": {
+        "app/profile/operating-plan/activity/new/page": {
+          "moduleId": 219799,
+          "async": false,
+          "exportedName": "activateActivityProtocol",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/activity/new/actions.js"
+        }
+      },
+      "exportedName": "activateActivityProtocol",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/activity/new/actions.js"
+    }
+  },
+  "edge": {}
+}

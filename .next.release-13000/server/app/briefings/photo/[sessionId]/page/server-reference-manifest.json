@@ -1,0 +1,17 @@
+{
+  "node": {
+    "407138b90e3db0306fa697549e9e3b1bf89b23d00f": {
+      "workers": {
+        "app/briefings/photo/[sessionId]/page": {
+          "moduleId": 176436,
+          "async": false,
+          "exportedName": "completeVisibleAbsGoal",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/briefings/photo/[sessionId]/actions.js"
+        }
+      },
+      "exportedName": "completeVisibleAbsGoal",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/briefings/photo/[sessionId]/actions.js"
+    }
+  },
+  "edge": {}
+}

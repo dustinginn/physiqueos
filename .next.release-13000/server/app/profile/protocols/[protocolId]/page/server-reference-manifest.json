@@ -1,0 +1,29 @@
+{
+  "node": {
+    "403280e383b3fdd0d56c354d97b4f94994417192fb": {
+      "workers": {
+        "app/profile/protocols/[protocolId]/page": {
+          "moduleId": 340410,
+          "async": false,
+          "exportedName": "restoreSupplement",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/protocols/[protocolId]/supplementActions.js"
+        }
+      },
+      "exportedName": "restoreSupplement",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/protocols/[protocolId]/supplementActions.js"
+    },
+    "403c70d73985b6d38484d17a72a13858ae488731fb": {
+      "workers": {
+        "app/profile/protocols/[protocolId]/page": {
+          "moduleId": 340410,
+          "async": false,
+          "exportedName": "pauseSupplement",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/protocols/[protocolId]/supplementActions.js"
+        }
+      },
+      "exportedName": "pauseSupplement",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/protocols/[protocolId]/supplementActions.js"
+    }
+  },
+  "edge": {}
+}

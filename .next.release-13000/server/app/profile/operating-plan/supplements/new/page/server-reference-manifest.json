@@ -1,0 +1,17 @@
+{
+  "node": {
+    "600b0e673b5e65b335ef32bda64443d3918a212718": {
+      "workers": {
+        "app/profile/operating-plan/supplements/new/page": {
+          "moduleId": 763354,
+          "async": false,
+          "exportedName": "addSupplement",
+          "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/supplements/new/actions.js"
+        }
+      },
+      "exportedName": "addSupplement",
+      "filename": ".tmp/windows-deploy-4758bd37/src/app/profile/operating-plan/supplements/new/actions.js"
+    }
+  },
+  "edge": {}
+}
