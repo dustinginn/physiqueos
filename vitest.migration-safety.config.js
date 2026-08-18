@@ -8,6 +8,8 @@ export default defineConfig({
       "src/platform/cutover/CombinedRuntimeAuthorityState.test.js",
       "src/platform/cutover/ProviderCompatibilityAuthorityInitializer.test.js",
       "src/platform/cutover/CombinedCutoverAuthorityInitializer.test.js",
+      "src/platform/database/testing/transactionalPostgresFixture.test.js",
+      "src/platform/cutover/CombinedCutoverWriteBoundary.test.js",
       "src/platform/cutover/PostgresCombinedRuntimeAuthorityStore.test.js",
       "db/migrations/000005_combined_runtime_authority.test.js",
       "src/platform/cutover/CombinedAppPlatformCutoverOrchestrator.test.js",
