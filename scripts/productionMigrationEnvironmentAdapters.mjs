@@ -121,7 +121,7 @@ export async function createProductionMigrationEnvironment({ env = process.env }
     },
     async captureFinalSnapshot({ input }) {
       paths = operationPaths(input.migrationOperationId);
-      await fs.mkdir(paths.root, { recursive: false });
+      await prepareOperationWorkspace(paths);
       return canonicalExport.captureReadOnlyFounderSnapshot({
         sourceRuntimePath: runtimePath,
         sourceMediaRoot: mediaRoot,
@@ -283,12 +283,23 @@ async function compareRepresentativeReads({ legacy, postgres, principal, runtime
   return Object.freeze(checks);
 }
 
-function operationPaths(operationId) {
+export function operationPaths(operationId, { workspaceRoot = root } = {}) {
   if (!/^[A-Za-z0-9._:-]+$/.test(operationId)) throw new Error("Migration operation ID is unsafe for a workspace path.");
-  const operationRoot = path.resolve(root, ".tmp", "production-migration", operationId);
-  const parent = path.resolve(root, ".tmp", "production-migration");
+  const operationRoot = path.resolve(workspaceRoot, ".tmp", "production-migration", operationId);
+  const parent = path.resolve(workspaceRoot, ".tmp", "production-migration");
   if (!operationRoot.startsWith(`${parent}${path.sep}`)) throw new Error("Migration operation path escaped .tmp.");
-  return Object.freeze({ root: operationRoot, snapshot: path.join(operationRoot, "snapshot"), package: path.join(operationRoot, "package") });
+  return Object.freeze({ parent, root: operationRoot, snapshot: path.join(operationRoot, "snapshot"), package: path.join(operationRoot, "package") });
+}
+
+// The .tmp workspace parent is gitignored, so a freshly created isolated worktree never
+// contains it and a non-recursive mkdir of the operation directory fails ENOENT. Create
+// the stable parent recursively, then create the unique operation directory
+// non-recursively so an already-existing operation workspace still fails EEXIST and is
+// never silently reused.
+export async function prepareOperationWorkspace(paths) {
+  await fs.mkdir(paths.parent, { recursive: true });
+  await fs.mkdir(paths.root, { recursive: false });
+  return paths;
 }
 
 async function inspectRuntime(file) {

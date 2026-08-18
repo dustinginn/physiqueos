@@ -131,6 +131,7 @@ function runnerFixture(request) {
     fenceState: "inactive",
     canonicalStoreEpoch: "legacy-json",
     compositionMode: "legacy-json",
+    canonicalStoreTarget: "legacy-json",
     writesEnabled: true,
     readsEnabled: true,
     migrationOperationId: null,

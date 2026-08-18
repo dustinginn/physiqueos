@@ -130,6 +130,37 @@ describe("production migration CLI Windows entrypoint", () => {
   });
 });
 
+describe("production migration operation workspace", () => {
+  it("creates the gitignored workspace parent in a clean checkout that has no .tmp hierarchy", async () => {
+    const { operationPaths, prepareOperationWorkspace } = await import("./productionMigrationEnvironmentAdapters.mjs");
+    const workspaceRoot = temporaryDirectory("production-migration-workspace-");
+    expect(fs.existsSync(path.join(workspaceRoot, ".tmp"))).toBe(false);
+
+    const paths = operationPaths("gate8-production-migration-20260818-073122", { workspaceRoot });
+    await prepareOperationWorkspace(paths);
+
+    expect(fs.existsSync(paths.parent)).toBe(true);
+    expect(fs.existsSync(paths.root)).toBe(true);
+    expect(paths.parent).toBe(path.join(workspaceRoot, ".tmp", "production-migration"));
+  });
+
+  it("still refuses to reuse an existing operation directory", async () => {
+    const { operationPaths, prepareOperationWorkspace } = await import("./productionMigrationEnvironmentAdapters.mjs");
+    const workspaceRoot = temporaryDirectory("production-migration-workspace-");
+    const paths = operationPaths("gate8-retry-0001", { workspaceRoot });
+
+    await prepareOperationWorkspace(paths);
+    await expect(prepareOperationWorkspace(paths)).rejects.toMatchObject({ code: "EEXIST" });
+  });
+
+  it("keeps rejecting operation identifiers that would escape the workspace parent", async () => {
+    const { operationPaths } = await import("./productionMigrationEnvironmentAdapters.mjs");
+    const workspaceRoot = temporaryDirectory("production-migration-workspace-");
+    expect(() => operationPaths("..", { workspaceRoot })).toThrow(/escaped/);
+    expect(() => operationPaths("has space", { workspaceRoot })).toThrow(/unsafe/);
+  });
+});
+
 function temporaryDirectory(prefix) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   directories.push(directory);
@@ -150,6 +181,7 @@ const state = Object.freeze({
   fenceState: "inactive",
   canonicalStoreEpoch: "legacy-json",
   compositionMode: "legacy-json",
+  canonicalStoreTarget: "legacy-json",
   writesEnabled: true,
   readsEnabled: true,
   firstPostgresWriteAt: null,

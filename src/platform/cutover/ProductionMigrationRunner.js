@@ -2,6 +2,18 @@ import { createProductionMigrationOrchestrator } from "./ProductionMigrationOrch
 import { CanonicalCompositionMode, CanonicalStoreEpoch, MigrationFenceState } from "./migrationControlState.js";
 import { assertManagedPostgresBackupFreshness } from "../backup/DigitalOceanManagedPostgresBackupFreshness.js";
 
+// A fresh production migration may begin from exactly two control states: the pristine
+// INACTIVE state, and the state left behind by a completed pre-write ABORT_TO_LEGACY.
+// The control state machine already treats ABORTED as restartable, but the production
+// runner previously demanded INACTIVE, so its own safe abort path produced a state it
+// could never re-enter. This set is deliberately narrower than the state machine's
+// RESTARTABLE_STATES: COMPLETED (a finished cutover) and RECOVERY_REQUIRED (forward
+// repair owed) must never be restartable from the production runner.
+const RESTARTABLE_PRE_FENCE_STATES = new Set([
+  MigrationFenceState.INACTIVE,
+  MigrationFenceState.ABORTED,
+]);
+
 export function createProductionMigrationRunner({
   controlStore,
   adapters,
@@ -107,20 +119,38 @@ function validateInput(input = {}, { execution, allowAuthorization = false } = {
 }
 
 function assertExpectedControl(state, input) {
+  // Invariants that must hold for every restartable pre-fence state. canonicalStoreTarget
+  // is asserted alongside the epoch/composition so a target left pointing at PostgreSQL can
+  // never be mistaken for a legacy-safe restart point.
   const expected = {
     version: input.expectedControlVersion,
-    fenceState: MigrationFenceState.INACTIVE,
     canonicalStoreEpoch: CanonicalStoreEpoch.LEGACY_JSON,
     compositionMode: CanonicalCompositionMode.LEGACY_JSON,
+    canonicalStoreTarget: CanonicalCompositionMode.LEGACY_JSON,
     writesEnabled: true,
     readsEnabled: true,
-    migrationOperationId: null,
     firstPostgresWriteAt: null,
   };
   for (const [field, value] of Object.entries(expected)) {
     if (state?.[field] !== value) {
       throw runnerError("PRODUCTION_MIGRATION_EXPECTED_STATE_MISMATCH", `Migration control ${field} does not match the exact expected pre-fence state.`);
     }
+  }
+  if (!RESTARTABLE_PRE_FENCE_STATES.has(state.fenceState)) {
+    throw runnerError("PRODUCTION_MIGRATION_EXPECTED_STATE_MISMATCH", "Migration control fenceState does not match the exact expected pre-fence state.");
+  }
+  if (state.fenceState === MigrationFenceState.INACTIVE) {
+    // The pristine state has never carried an operation identity.
+    if (state.migrationOperationId !== null) {
+      throw runnerError("PRODUCTION_MIGRATION_EXPECTED_STATE_MISMATCH", "Migration control migrationOperationId does not match the exact expected pre-fence state.");
+    }
+    return;
+  }
+  // ABORT_TO_LEGACY deliberately retains the aborted operation/fence identity as audit
+  // evidence, so it is not cleared here. A retry must still carry a genuinely new
+  // operation so the audit trail can never conflate it with the aborted attempt.
+  if (state.migrationOperationId === input.migrationOperationId) {
+    throw runnerError("PRODUCTION_MIGRATION_OPERATION_REUSE_REJECTED", "A migration retry after an abort requires a new migration operation ID.");
   }
 }
 
