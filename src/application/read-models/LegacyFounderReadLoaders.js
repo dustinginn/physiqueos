@@ -19,7 +19,12 @@ export function createLegacyFounderReadLoaders({ repositories, readRuntimeStore,
   const training = createTrainingReadService({ repositories });
   const progress = createProgressReportingService({ repositories });
   const profile = createYouProfileService({ repositories });
-  const home = createHomeBriefingService({ repositories, readRuntimeStore });
+  // createHomeBriefingService already accepts `now` (defaulting to () => new Date(), same as
+  // every sibling service constructed above); it was simply never forwarded here. Wiring it
+  // through changes no live default (call sites that don't pass a custom `now` still get
+  // real-time behavior) and is required for migration read-parity verification to evaluate
+  // both sides of the comparison against one shared instant.
+  const home = createHomeBriefingService({ repositories, readRuntimeStore, now });
   return Object.freeze({
     [Phase3ReadModel.HOME]: ({ principal }) => home.getHomeBriefing(principal.userId),
     [Phase3ReadModel.LOG]: ({ principal, timeZone }) => log.getLog({ principal, timeZone }),

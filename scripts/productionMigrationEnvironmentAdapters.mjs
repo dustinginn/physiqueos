@@ -178,11 +178,35 @@ export async function createProductionMigrationEnvironment({ env = process.env }
       const runtime = ownerUserId === founderOperatingRhythm.userId
         ? { ...canonicalRuntime, operatingRhythm: founderOperatingRhythm }
         : canonicalRuntime;
+      // Both sides of this comparison must be evaluated against the exact same instant and
+      // the exact same resourceVersion formula, or genuinely identical canonical data can
+      // still disagree. Neither composition previously received a shared `now`: each defaulted
+      // independently to `() => new Date()`, and legacy's resourceVersion was hardcoded to "1"
+      // while the provider composition's was `data?.version ?? runtime.revision`. This mirrors
+      // the already-established pattern in scripts/validatePhase4ReadParity.mjs, which applies
+      // both a single frozen `now` and a matching readResourceVersion formula on its own legacy
+      // side for the same class of comparison. A dedicated composition is constructed here
+      // (rather than reusing the memoized `providerComposition`, which verifyMigrationScripts
+      // already built during preflight with a real, unshared clock) so this frozen-clock
+      // instance is scoped strictly to the parity check and never leaks into later steps that
+      // are expected to observe real time.
+      const frozenInstant = new Date();
+      const now = () => frozenInstant;
+      const readResourceVersion = ({ data }) => String(data?.version ?? runtime.revision ?? "1");
       const repositories = createSeedRepositories(runtime);
-      const legacy = createPhase3ReadModelService({ loaders: createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime }) });
-      providerComposition ??= await createPhase5ProviderApplicationComposition({ pool, ownerUserId, objectProvider, mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER") });
+      const legacy = createPhase3ReadModelService({
+        loaders: createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime, now }),
+        now,
+        readResourceVersion,
+      });
+      const parityProviderComposition = await createPhase5ProviderApplicationComposition({
+        pool, ownerUserId, objectProvider,
+        mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
+        now,
+      });
+      providerComposition ??= parityProviderComposition;
       const principal = migrationPrincipal(ownerUserId);
-      const checks = await compareRepresentativeReads({ legacy, postgres: providerComposition.readModels, principal, runtime });
+      const checks = await compareRepresentativeReads({ legacy, postgres: parityProviderComposition.readModels, principal, runtime });
       return { status: "passed", checks };
     },
     async verifyCommandReadiness() {
@@ -294,6 +318,75 @@ export function readModelsSemanticallyEqual(left, right) {
   return createPayloadHash(semanticReadModelProjection(left)) === createPayloadHash(semanticReadModelProjection(right));
 }
 
+// Bounded, non-dumping semantic-difference diagnostics for a parity failure. The automatic
+// pre-write rollback erases the imported provider data before any later inspection is
+// possible, so this must be captured at failure time - but it must stay strictly to
+// field paths and compact type/shape metadata, never raw values, never full payloads, and
+// never anything sensitive (credentials, URLs, media content, private row bodies).
+const MAX_DIAGNOSTIC_PATHS = 20;
+const MAX_DIAGNOSTIC_DEPTH = 12;
+
+function diagnosticTypeOf(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+// Path/type-only by design (no primitive values are ever emitted): there is no established
+// migration-logging policy confirming any field class is safe to log verbatim, so this
+// defaults to the strictest option rather than guessing.
+export function computeBoundedSemanticDifference(left, right, { maxPaths = MAX_DIAGNOSTIC_PATHS, maxDepth = MAX_DIAGNOSTIC_DEPTH } = {}) {
+  const differingPaths = [];
+  let truncated = false;
+  function record(entry) {
+    if (differingPaths.length >= maxPaths) { truncated = true; return false; }
+    differingPaths.push(Object.freeze(entry));
+    return true;
+  }
+  function visit(a, b, path, depth) {
+    if (truncated) return;
+    if (depth > maxDepth) { record({ path, kind: "max-depth-exceeded" }); truncated = true; return; }
+    if (a === undefined && b !== undefined) { record({ path, kind: "missing-left", rightType: diagnosticTypeOf(b) }); return; }
+    if (b === undefined && a !== undefined) { record({ path, kind: "missing-right", leftType: diagnosticTypeOf(a) }); return; }
+    const leftType = diagnosticTypeOf(a);
+    const rightType = diagnosticTypeOf(b);
+    if (leftType !== rightType) { record({ path, kind: "type-mismatch", leftType, rightType }); return; }
+    if (leftType === "array") {
+      if (a.length !== b.length) { record({ path, kind: "array-length-mismatch", leftLength: a.length, rightLength: b.length }); return; }
+      for (let index = 0; index < a.length; index += 1) {
+        let elementsEqual;
+        try { elementsEqual = createPayloadHash(a[index]) === createPayloadHash(b[index]); }
+        catch { elementsEqual = false; }
+        if (!elementsEqual) { visit(a[index], b[index], `${path}[${index}]`, depth + 1); return; }
+      }
+      return;
+    }
+    if (leftType === "object") {
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+      for (const key of keys) {
+        visit(a[key], b[key], path ? `${path}.${key}` : key, depth + 1);
+        if (truncated) return;
+      }
+      return;
+    }
+    if (!Object.is(a, b)) record({ path, kind: "value-mismatch", leftType, rightType });
+  }
+  visit(left, right, "$", 0);
+  return Object.freeze({ differingPaths: Object.freeze(differingPaths), truncated });
+}
+
+function safeComputeParityDiagnostic(method, left, right) {
+  try {
+    const { differingPaths, truncated } = computeBoundedSemanticDifference(
+      semanticReadModelProjection(left), semanticReadModelProjection(right),
+    );
+    return Object.freeze({ method, leftType: diagnosticTypeOf(left), rightType: diagnosticTypeOf(right), differingPaths, truncated });
+  } catch {
+    // Diagnostic generation must never be able to suppress the underlying parity failure.
+    return Object.freeze({ method, unavailable: true });
+  }
+}
+
 export async function compareRepresentativeReads({ legacy, postgres, principal, runtime }) {
   const pendingReview = runtime.evidenceReviews.find((item) => item.status === "pending") ?? runtime.evidenceReviews[0];
   const priority = runtime.executionItems[0];
@@ -305,7 +398,11 @@ export async function compareRepresentativeReads({ legacy, postgres, principal, 
     ["confidence", {}], ["briefings", {}], ["training", {}], ["profile", {}],
   ]) {
     const [left, right] = await Promise.all([legacy[method](principal, input), postgres[method](principal, input)]);
-    if (!readModelsSemanticallyEqual(left, right)) throw new Error(`Application read parity failed for ${method}.`);
+    if (!readModelsSemanticallyEqual(left, right)) {
+      const error = new Error(`Application read parity failed for ${method}.`);
+      error.parityDiagnostic = safeComputeParityDiagnostic(method, left, right);
+      throw error;
+    }
     checks[method] = "pass";
   }
   return Object.freeze(checks);
