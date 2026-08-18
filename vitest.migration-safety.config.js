@@ -32,6 +32,7 @@ export default defineConfig({
       "scripts/AppPlatformProductSpec.test.js",
       "scripts/ProductionMigrationRemediationWiring.test.js",
       "scripts/ProductionMigrationEntrypoint.test.js",
+      "scripts/productionMigrationEnvironmentAdapters.test.js",
       "scripts/RemoteProductionMigrationDryRunClient.test.js",
       "src/platform/migration/ProductionSpacesMediaMigration.test.js",
       "src/platform/migration/migrationManifest.test.js",

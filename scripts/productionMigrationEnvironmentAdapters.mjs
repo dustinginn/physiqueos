@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { register } from "node:module";
+import { createPayloadHash } from "../src/contracts/v1/canonicalJson.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
@@ -266,7 +267,34 @@ function readOperatorInput(args, env, control) {
   return value;
 }
 
-async function compareRepresentativeReads({ legacy, postgres, principal, runtime }) {
+// createApplicationReadModel (src/application/read-models/readModel.js) stamps generatedAt
+// and freshThrough from the read-invocation wall clock, and derives etag by hashing the
+// envelope that already contains those timestamps. None of the three carry independent
+// canonical content, so two reads of identical underlying data legitimately produce
+// different values for all three - excluding them here cannot mask a real migration
+// difference. Everything else (contractVersion, model, resourceVersion, data,
+// intentionalDifferences, and any future envelope field) remains compared.
+const VOLATILE_READ_MODEL_ENVELOPE_FIELDS = new Set(["generatedAt", "freshThrough", "etag"]);
+
+export function semanticReadModelProjection(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  const projected = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (VOLATILE_READ_MODEL_ENVELOPE_FIELDS.has(key)) continue;
+    projected[key] = entry;
+  }
+  return projected;
+}
+
+// Canonical-key-ordering hash from src/contracts/v1/canonicalJson.js, reused rather than
+// duplicated: it sorts object keys (so insertion order alone cannot cause a false
+// mismatch) while leaving array order, null-vs-missing, and value types untouched, since
+// those remain semantically significant.
+export function readModelsSemanticallyEqual(left, right) {
+  return createPayloadHash(semanticReadModelProjection(left)) === createPayloadHash(semanticReadModelProjection(right));
+}
+
+export async function compareRepresentativeReads({ legacy, postgres, principal, runtime }) {
   const pendingReview = runtime.evidenceReviews.find((item) => item.status === "pending") ?? runtime.evidenceReviews[0];
   const priority = runtime.executionItems[0];
   const checks = {};
@@ -277,7 +305,7 @@ async function compareRepresentativeReads({ legacy, postgres, principal, runtime
     ["confidence", {}], ["briefings", {}], ["training", {}], ["profile", {}],
   ]) {
     const [left, right] = await Promise.all([legacy[method](principal, input), postgres[method](principal, input)]);
-    if (digestJson(left) !== digestJson(right)) throw new Error(`Application read parity failed for ${method}.`);
+    if (!readModelsSemanticallyEqual(left, right)) throw new Error(`Application read parity failed for ${method}.`);
     checks[method] = "pass";
   }
   return Object.freeze(checks);
@@ -318,7 +346,6 @@ function migrationPrincipal(userId) {
 }
 
 function pass(value = {}) { return Object.freeze({ ready: true, mutated: false, ...value }); }
-function digestJson(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function sha256(value) { const candidate = value.toLowerCase(); if (!/^[a-f0-9]{64}$/.test(candidate)) throw new Error("Recovery SHA-256 is invalid."); return candidate; }
 function required(value, field) { const candidate = String(value ?? "").trim(); if (!candidate) throw new Error(`${field} is required.`); return candidate; }
 
