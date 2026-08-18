@@ -36,6 +36,7 @@ services:
       - { key: PHYSIQUEOS_SPACES_SECRET_ACCESS_KEY, scope: RUN_TIME, type: SECRET, value: ${SPACES_SECRET_ACCESS_KEY} }
       - { key: PHYSIQUEOS_CREDENTIAL_PEPPER, scope: RUN_TIME, type: SECRET, value: ${CREDENTIAL_PEPPER} }
       - { key: PHYSIQUEOS_OPERATIONS_TOKEN, scope: RUN_TIME, type: SECRET, value: ${OPERATIONS_TOKEN} }
+      - { key: PHYSIQUEOS_ACCESS_GATE_SECRET, scope: RUN_TIME, type: SECRET, value: ${ACCESS_GATE_SECRET} }
       - { key: PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED, scope: RUN_TIME, value: "0" }
       - { key: PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY, scope: RUN_TIME, value: digitalocean-app-platform }
       - { key: PHYSIQUEOS_BUILD_ID, scope: RUN_AND_BUILD_TIME, value: ${BUILD_ID} }
