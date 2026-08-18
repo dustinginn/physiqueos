@@ -12,6 +12,7 @@ export default defineConfig({
       "src/platform/accessGate/loginRateLimiter.test.js",
       "src/middleware.test.js",
       "src/platform/health/ProviderProductReadiness.test.js",
+      "src/app/founder-gate/actions.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,
