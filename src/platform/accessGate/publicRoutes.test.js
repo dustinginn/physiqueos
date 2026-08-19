@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPublicPath, FOUNDER_GATE_LOGIN_PATH } from "./publicRoutes.js";
+import { isPublicPath, FOUNDER_GATE_LOGIN_PATH, COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX } from "./publicRoutes.js";
 
 describe("publicRoutes.isPublicPath", () => {
   it("allows exactly the two health endpoints", () => {
@@ -54,5 +54,21 @@ describe("publicRoutes.isPublicPath", () => {
   it("does not treat a path merely prefixed by the login path as public", () => {
     expect(isPublicPath("/founder-gate-evil")).toBe(false);
     expect(isPublicPath(`${FOUNDER_GATE_LOGIN_PATH}/../goals`)).toBe(false);
+  });
+
+  it("allows the machine-authenticated combined-cutover transfer channel (exempt from the Founder session cookie, not from authentication)", () => {
+    expect(isPublicPath(`${COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX}declare`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX}chunk`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX}complete`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX}status`)).toBe(true);
+  });
+
+  it("does NOT allow the bare transfer route without its trailing segment", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/transfer")).toBe(false);
+  });
+
+  it("does NOT allow a sibling combined-cutover path to ride the transfer prefix", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/transfer-evil/declare")).toBe(false);
+    expect(isPublicPath("/api/v1/operations/combined-cutover/authority")).toBe(false);
   });
 });
