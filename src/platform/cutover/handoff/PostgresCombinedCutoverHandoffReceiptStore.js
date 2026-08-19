@@ -112,6 +112,52 @@ export function createPostgresCombinedCutoverHandoffReceiptStore({ pool } = {}) 
           : { sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET routing_status='failed', updated_at=now() WHERE receipt_id=$1 RETURNING *`, values: [current.receipt_id] }),
       });
     },
+
+    // Phase 6A pre-boundary Windows-routing-recovery evidence (migration 000009). These never
+    // participate in the forward-handoff `authority_status`/`routing_status` CHECK constraints from
+    // 000008 - a recovery attempt records its own honest outcome on the same operation-bound row
+    // without altering what the row says about the original (failed/aborted) forward handoff.
+    async recordWindowsRoutingRestored({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.windows_routing_restore_status === "restored"
+          ? null
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      windows_routing_restore_status='restored', windows_routing_restore_at=now(), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
+
+    async recordWindowsRoutingRestoreFailed({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.windows_routing_restore_status === "restored"
+          ? null // Never downgrade an already-restored outcome.
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      windows_routing_restore_status='failed', windows_routing_restore_at=now(), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
+
+    async recordWindowsRoutingRestoreAmbiguous({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.windows_routing_restore_status === "restored"
+          ? null // Never downgrade an already-restored outcome.
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      windows_routing_restore_status='ambiguous', windows_routing_restore_at=now(), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
   });
 }
 
@@ -179,6 +225,8 @@ function row(value) {
     routingStatus: value.routing_status,
     routingActivatedAt: toIso(value.routing_activated_at),
     routingVerifiedAt: toIso(value.routing_verified_at),
+    windowsRoutingRestoreStatus: value.windows_routing_restore_status ?? null,
+    windowsRoutingRestoreAt: toIso(value.windows_routing_restore_at),
     createdAt: toIso(value.created_at),
     updatedAt: toIso(value.updated_at),
   });

@@ -20,6 +20,7 @@ export function createFakeHandoffReceiptPool() {
         expected_route_snapshot: expectedRouteSnapshot ? JSON.parse(expectedRouteSnapshot) : null,
         authority_status: "pending", authority_committed_at: null, resulting_authority: null,
         routing_status: "pending", routing_activated_at: null, routing_verified_at: null,
+        windows_routing_restore_status: null, windows_routing_restore_at: null,
         created_at: now, updated_at: now,
       };
       rows.set(operationIdValue, record);
@@ -50,6 +51,21 @@ export function createFakeHandoffReceiptPool() {
     if (normalized.includes("routing_status='failed'")) {
       const row = findByReceiptId(rows, values[0]);
       row.routing_status = "failed"; row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("windows_routing_restore_status='restored'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.windows_routing_restore_status = "restored"; row.windows_routing_restore_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("windows_routing_restore_status='failed'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.windows_routing_restore_status = "failed"; row.windows_routing_restore_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("windows_routing_restore_status='ambiguous'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.windows_routing_restore_status = "ambiguous"; row.windows_routing_restore_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
       return { rows: [row], rowCount: 1 };
     }
 

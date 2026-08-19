@@ -23,6 +23,16 @@ import { initializeCombinedCutoverAuthority } from "./CombinedCutoverAuthorityIn
 import { createTransactionalPostgresFixture } from "../database/testing/transactionalPostgresFixture.js";
 import { createPhase4CanonicalRecordStore } from "../database/Phase4CanonicalRecordStore.js";
 import { RuntimeAuthority } from "./CombinedRuntimeAuthorityState.js";
+import { inspectCombinedCutoverRecovery } from "./combinedCutoverRecoveryDecision.js";
+
+// Re-exported for backward compatibility: this rehearsal file originally defined the recovery
+// decision helper locally. It now lives in `combinedCutoverRecoveryDecision.js` so the Phase 6A
+// production recovery services (`recovery/ProductionWindowsAuthorityRestorationService.js`,
+// `recovery/ProductionProviderForwardRecoveryService.js`) can depend on the exact same logic this
+// rehearsal already proved, without a production module importing a file labeled SYNTHETIC /
+// NON-PRODUCTION. Every existing import of `inspectCombinedCutoverRecovery` from this module
+// continues to work unchanged.
+export { inspectCombinedCutoverRecovery };
 
 export const REHEARSAL_ENVIRONMENT = "synthetic-combined-cutover";
 export const REHEARSAL_OWNER_ID = "synthetic-founder";
@@ -332,40 +342,6 @@ export function createSyntheticCombinedCutoverRehearsal({
       });
     },
   };
-}
-
-// Source-owned recovery inspector. Provider-side durable evidence is authoritative: if the
-// provider recorded a canonical write boundary, no local state - including a stale or missing
-// migration-control firstPostgresWriteAt - may readmit a Windows rollback or a pre-boundary retry.
-export function inspectCombinedCutoverRecovery(authorityState) {
-  if (!authorityState) {
-    return Object.freeze({
-      classification: "AUTHORITY_UNAVAILABLE", rollbackLegal: false, forwardRecoveryRequired: false, restartAdmissible: false,
-      reason: "Combined runtime authority state is unavailable; nothing may be admitted.",
-    });
-  }
-  if (authorityState.firstProviderCanonicalWriteAt != null) {
-    return Object.freeze({
-      classification: "FORWARD_REPAIR_REQUIRED", rollbackLegal: false, forwardRecoveryRequired: true, restartAdmissible: false,
-      reason: "Provider recorded a durable canonical write boundary; only forward recovery applies.",
-    });
-  }
-  if (authorityState.authority === RuntimeAuthority.RECOVERY_REQUIRED) {
-    return Object.freeze({
-      classification: "FORWARD_REPAIR_REQUIRED", rollbackLegal: false, forwardRecoveryRequired: true, restartAdmissible: false,
-      reason: "Runtime authority is explicitly recovery-required.",
-    });
-  }
-  if (authorityState.authority === RuntimeAuthority.WINDOWS_LEGACY) {
-    return Object.freeze({
-      classification: "WINDOWS_AUTHORITATIVE", rollbackLegal: true, forwardRecoveryRequired: false, restartAdmissible: true,
-      reason: "Windows retains legacy authority with no provider write boundary.",
-    });
-  }
-  return Object.freeze({
-    classification: "PRE_BOUNDARY_CUTOVER_IN_PROGRESS", rollbackLegal: true, forwardRecoveryRequired: false, restartAdmissible: false,
-    reason: "A combined cutover is in progress before the provider write boundary; rollback remains legal but a fresh restart is not admissible until it is resolved.",
-  });
 }
 
 export function createDeterministicClock({ start = new Date("2026-08-18T00:00:00.000Z") } = {}) {
