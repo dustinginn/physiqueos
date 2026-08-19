@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isPublicPath, FOUNDER_GATE_LOGIN_PATH, COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX } from "./publicRoutes.js";
+import {
+  isPublicPath,
+  FOUNDER_GATE_LOGIN_PATH,
+  COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX,
+  COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX,
+} from "./publicRoutes.js";
 
 describe("publicRoutes.isPublicPath", () => {
   it("allows exactly the two health endpoints", () => {
@@ -70,5 +75,20 @@ describe("publicRoutes.isPublicPath", () => {
   it("does NOT allow a sibling combined-cutover path to ride the transfer prefix", () => {
     expect(isPublicPath("/api/v1/operations/combined-cutover/transfer-evil/declare")).toBe(false);
     expect(isPublicPath("/api/v1/operations/combined-cutover/authority")).toBe(false);
+  });
+
+  it("allows the machine-authenticated combined-cutover preparation channel (exempt from the Founder session cookie, not from authentication)", () => {
+    expect(isPublicPath(`${COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX}import`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX}parity`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX}acknowledge`)).toBe(true);
+    expect(isPublicPath(`${COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX}status`)).toBe(true);
+  });
+
+  it("does NOT allow the bare preparation route without its trailing segment", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/prepare")).toBe(false);
+  });
+
+  it("does NOT allow a sibling combined-cutover path to ride the preparation prefix", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/prepare-evil/import")).toBe(false);
   });
 });

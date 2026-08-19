@@ -204,6 +204,35 @@ export function createPostgresCombinedCutoverTransferReceiptStore({ pool, stagin
       if (!result.rows[0]) throw transferError(TransferErrorCode.RECEIPT_UNAVAILABLE, "Combined cutover transfer receipt is unavailable.");
       return freeze({ receipt: row(result.rows[0]) });
     },
+
+    /**
+     * Consumer-side read of an already-`verified` artifact's assembled bytes, for callers (such as
+     * canonical import) that need the transferred content itself rather than just its receipt. This
+     * never trusts the stored `verified` status alone: it re-assembles every chunk from staging and
+     * re-recomputes the whole-artifact digest before returning bytes, so a staging substrate that
+     * was corrupted or tampered with after verification is still caught rather than silently
+     * imported. Refuses any receipt that is not exactly `verified`.
+     */
+    async readVerifiedBytes({ operationId, packageId }) {
+      const operation = requireTransferOperationId(operationId);
+      const packageIdentity = requireTransferPackageId(packageId);
+      const receipt = await readReceiptRow(pool, { operationId: operation, packageId: packageIdentity });
+      if (receipt.status !== TransferStatus.VERIFIED) {
+        throw transferError(TransferErrorCode.INCOMPLETE, "Only a verified transfer artifact can be read for import.");
+      }
+      const chunkRows = await pool.query(
+        `SELECT chunk_index,staging_key FROM physiqueos.combined_cutover_transfer_chunks
+          WHERE receipt_id=$1 ORDER BY chunk_index ASC`,
+        [receipt.receipt_id],
+      );
+      const parts = [];
+      for (const chunkRow of chunkRows.rows) parts.push(await staging.read({ key: chunkRow.staging_key }));
+      const bytes = Buffer.concat(parts);
+      if (sha256Of(bytes) !== receipt.overall_digest) {
+        throw transferError(TransferErrorCode.ASSEMBLED_DIGEST_MISMATCH, "Re-assembled artifact bytes no longer match the verified digest.");
+      }
+      return freeze({ bytes, receipt: row(receipt) });
+    },
   });
 }
 

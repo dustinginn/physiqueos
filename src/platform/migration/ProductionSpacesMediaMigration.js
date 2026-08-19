@@ -4,24 +4,43 @@ import path from "node:path";
 import { createPhase4MediaObjectId } from "./phase4LocalMediaMigration.js";
 import { readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
 
+/**
+ * `readSourceBytes(entry)`, when supplied, replaces the default "read from an immutable local
+ * snapshot directory" source with any other already-integrity-checked byte source - for example
+ * the combined-cutover transfer channel's verified Spaces staging (see
+ * `src/platform/cutover/preparation/ProductionCanonicalImportService.js`), which has no local
+ * `snapshotMediaRoot` at all. The upload/readback-verify/DB-update sequence below is identical
+ * either way, so this is the single source of truth for that sequence; it is never duplicated.
+ * `snapshotMediaRoot` remains required (and is enforced with its own integrity check, exactly as
+ * before) when `readSourceBytes` is not supplied.
+ */
 export async function migrateCanonicalPackageMediaToSpaces({
   packageRoot,
   snapshotMediaRoot,
   pool,
   objectProvider,
   fetchImpl = globalThis.fetch,
+  readSourceBytes = null,
 } = {}) {
   if (!pool?.query || !objectProvider?.beginMultipartUpload || typeof fetchImpl !== "function") {
     throw new Error("Production media migration requires PostgreSQL, Spaces, and fetch adapters.");
   }
+  if (typeof readSourceBytes !== "function" && !snapshotMediaRoot) {
+    throw new Error("Production media migration requires either snapshotMediaRoot or readSourceBytes.");
+  }
   const packageData = await readAndValidateCanonicalPackage(packageRoot);
-  const mediaRoot = path.resolve(snapshotMediaRoot);
+  const mediaRoot = snapshotMediaRoot ? path.resolve(snapshotMediaRoot) : null;
+  const readEntryBytes = typeof readSourceBytes === "function" ? readSourceBytes : async (entry) => {
+    const absolutePath = path.resolve(mediaRoot, ...entry.relativePath.split("/"));
+    if (!isWithin(mediaRoot, absolutePath)) throw new Error("Migration media path escaped the immutable snapshot.");
+    return fs.readFile(absolutePath);
+  };
   const uploaded = [];
   try {
     for (const entry of packageData.manifest.files) {
-      const absolutePath = path.resolve(mediaRoot, ...entry.relativePath.split("/"));
-      if (!isWithin(mediaRoot, absolutePath)) throw new Error("Migration media path escaped the immutable snapshot.");
-      const bytes = await fs.readFile(absolutePath);
+      // Re-checked here regardless of source, so an injected `readSourceBytes` can never skip
+      // this integrity gate merely by being a different code path.
+      const bytes = await readEntryBytes(entry);
       if (bytes.length !== entry.size || createHash("sha256").update(bytes).digest("hex") !== entry.sha256) {
         throw new Error(`Migration source media integrity failed: ${entry.relativePath}.`);
       }

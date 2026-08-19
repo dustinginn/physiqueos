@@ -14,9 +14,10 @@
 // between two durable, already-computed receipts - it never re-parses or re-interprets Founder
 // runtime or media content, so it stays inside transfer plumbing rather than becoming a real import.
 
-import { TransferErrorCode, deriveTransferPackageId, requireTransferOperationId, transferError } from "./combinedCutoverTransferContract.js";
+import { requireTransferOperationId } from "./combinedCutoverTransferContract.js";
 import { authenticateCombinedCutoverTransfer } from "./combinedCutoverTransferAuth.js";
 import { handleTransferRequest } from "./combinedCutoverTransferService.js";
+import { verifyManifestArtifactsAgainstReceipts } from "./combinedCutoverManifestArtifactVerification.js";
 
 export function createCombinedCutoverManifestTransferService({ manifestReceiptStore, artifactReceiptStore, authConfig, now = () => new Date() } = {}) {
   if (!manifestReceiptStore?.declare || !manifestReceiptStore?.read || !manifestReceiptStore?.verify) {
@@ -42,23 +43,7 @@ export function createCombinedCutoverManifestTransferService({ manifestReceiptSt
           return { status: 200, body: publicManifestReceipt(receipt, "idempotent-replay") };
         }
         const files = receipt.manifest?.files ?? [];
-        if (files.length === 0) throw transferError(TransferErrorCode.INCOMPLETE, "The declared manifest has no artifacts.");
-        for (const file of files) {
-          const packageId = deriveTransferPackageId(file.path);
-          let artifact;
-          try {
-            artifact = (await artifactReceiptStore.status(operation, packageId)).receipt;
-          } catch (error) {
-            if (error?.code === TransferErrorCode.RECEIPT_UNAVAILABLE) {
-              throw transferError(TransferErrorCode.INCOMPLETE, `Artifact ${file.path} has not been transferred yet.`);
-            }
-            throw error;
-          }
-          if (artifact.status !== "verified") throw transferError(TransferErrorCode.INCOMPLETE, `Artifact ${file.path} is not yet verified.`);
-          if (artifact.overallDigest !== String(file.sha256).toLowerCase() || artifact.expectedBytes !== Number(file.byteLength)) {
-            throw transferError(TransferErrorCode.PACKAGE_IDENTITY_MISMATCH, `Verified artifact ${file.path} does not match the declared manifest entry.`);
-          }
-        }
+        await verifyManifestArtifactsAgainstReceipts({ operationId: operation, files, artifactReceiptStore });
         const verified = await manifestReceiptStore.verify({
           migrationOperationId: operation,
           authorizationFingerprint: receipt.authorizationFingerprint,
