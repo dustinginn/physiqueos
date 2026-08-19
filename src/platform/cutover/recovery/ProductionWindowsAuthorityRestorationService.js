@@ -20,31 +20,41 @@
 // rollback is still legal via the shared `inspectCombinedCutoverRecovery` decision helper (the same
 // logic already proven by the Phase 2B synthetic rehearsal) against a FRESH durable read - never the
 // caller-supplied `state`. If `firstProviderCanonicalWriteAt` is non-null, or authority is already
-// `recovery-required`, this refuses outright; it never attempts a stale rollback.
+// `recovery-required`, this refuses outright; it never attempts a stale rollback. A SEPARATE guard
+// (`assertWindowsFenceRollbackLegal`, Phase 6C) independently checks the Windows-LOCAL migration
+// control's own `firstPostgresWriteAt` - a different boundary belonging to a different durable system
+// - before touching anything, for the identical reason.
 //
-// ROUTING AND AUTHORITY ARE NOT ATOMIC, AND THIS MODULE NEVER PRETENDS OTHERWISE. If provider routing
-// was ever activated or verified for this operation (durable evidence, from the Phase 5 handoff
-// receipt), this module calls `routingControl.restoreWindowsRoute` and honestly records the outcome
-// via the Phase 6A recovery-evidence columns on that same receipt (migration 000009) - it never
-// silently declares Windows restored while routing evidence says otherwise. Windows AUTHORITY still
-// reverts even if routing restoration fails or is ambiguous: `PostgresCombinedRuntimeAuthorityStore`
-// independently refuses provider canonical writes once authority is no longer `provider-authoritative`
+// THREE SEPARATE, NON-ATOMIC SURFACES ARE RECONCILED HERE, AND THIS MODULE NEVER PRETENDS OTHERWISE.
+// If provider routing was ever activated or verified for this operation (durable evidence, from the
+// Phase 5 handoff receipt), this module calls `routingControl.restoreWindowsRoute` and honestly
+// records the outcome via the Phase 6A recovery-evidence columns on that same receipt (migration
+// 000009) - distinguishing a definite failure from a genuinely AMBIGUOUS one (the routing control
+// itself reporting `ROUTING_CONTROL_UNAVAILABLE`, meaning the actual route state cannot be determined
+// at all, as opposed to an attempt that was made and explicitly failed). The Windows-LOCAL migration
+// control fence (Phase 6C, `combinedCutoverWindowsFenceRelease.js`) is released through the exact same
+// `ABORT_TO_LEGACY` transition `ProductionWindowsWriteFenceAdapter.js` already proved releases it -
+// no second Windows fence model exists. Windows AUTHORITY still reverts even if routing or fence
+// release fails or is ambiguous: `PostgresCombinedRuntimeAuthorityStore` independently refuses
+// provider canonical writes once authority is no longer `provider-authoritative`
 // (`assertProviderWriteAllowed`), so no dual canonical-write risk exists either way - only the public
-// route's destination may remain honestly unresolved, which the returned/persisted evidence surfaces
-// rather than hides.
+// route's destination or Windows' local write-acceptance may remain honestly unresolved, which the
+// returned/persisted evidence and `classification` field surface rather than hide.
 import { RuntimeAuthority, RuntimeAuthorityAction } from "../CombinedRuntimeAuthorityState.js";
 import { requireTransferOperationId, TransferErrorCode } from "../transfer/combinedCutoverTransferContract.js";
-import { assertCombinedCutoverRoutingControl } from "../routing/combinedCutoverRoutingControl.js";
+import { assertCombinedCutoverRoutingControl, RoutingErrorCode } from "../routing/combinedCutoverRoutingControl.js";
 import { inspectCombinedCutoverRecovery } from "../combinedCutoverRecoveryDecision.js";
+import { assertWindowsFenceRollbackLegal, releaseCombinedCutoverWindowsFence } from "./combinedCutoverWindowsFenceRelease.js";
 import { RecoveryErrorCode, recoveryError } from "./combinedCutoverRecoveryContract.js";
 
 const ACTIVE_CUTOVER_AUTHORITIES = Object.freeze([
   RuntimeAuthority.CUTOVER_IN_PROGRESS, RuntimeAuthority.PROVIDER_PREPARED, RuntimeAuthority.PROVIDER,
 ]);
 
-export function createProductionWindowsAuthorityRestorationService({ authorityStore, handoffReceiptStore, routingControl } = {}) {
+export function createProductionWindowsAuthorityRestorationService({ authorityStore, handoffReceiptStore, routingControl, controlStore } = {}) {
   if (!authorityStore?.read || !authorityStore?.transition) throw new Error("Windows authority restoration requires the runtime-authority store.");
   if (!handoffReceiptStore?.read) throw new Error("Windows authority restoration requires the durable handoff evidence store.");
+  if (!controlStore?.read || !controlStore?.transition) throw new Error("Windows authority restoration requires the durable Windows migration-control store.");
   assertCombinedCutoverRoutingControl(routingControl);
 
   return Object.freeze({
@@ -65,8 +75,15 @@ export function createProductionWindowsAuthorityRestorationService({ authoritySt
         // Windows is already legacy-authoritative and bound to a DIFFERENT prior operation's leftover
         // identity fields - nothing to restore for the requested operation; treat as a stale/no-op
         // recovery attempt rather than mutating unrelated state.
-        return freeze({ ready: true, authority: RuntimeAuthority.WINDOWS_LEGACY, operationId, firstProviderCanonicalWriteAt: null, routing: { action: "not-required" } });
+        return freeze({
+          ready: true, classification: "RESTORED", authority: RuntimeAuthority.WINDOWS_LEGACY, operationId,
+          firstProviderCanonicalWriteAt: null, routing: { action: "not-required" }, fence: { action: "not-required" },
+        });
       }
+
+      // Fail closed BEFORE any other recovery work if the Windows-local system independently shows an
+      // irreversible write already happened - checked here, upfront, not only at release time.
+      assertWindowsFenceRollbackLegal((await controlStore.read()).state);
 
       const routingOutcome = await reconcileRouting({ handoffReceiptStore, routingControl, operationId });
 
@@ -87,20 +104,38 @@ export function createProductionWindowsAuthorityRestorationService({ authoritySt
         }
       }
 
-      // "ready" is honest about BOTH halves of recovery: authority reverting to Windows is the safe
-      // direction regardless of routing outcome (no dual canonical-write risk either way, since
-      // `assertProviderWriteAllowed` independently refuses provider writes once authority is no
-      // longer `provider-authoritative`) - but this must never report success while routing evidence
-      // says the public route may still point at the provider.
+      const fenceOutcome = await releaseCombinedCutoverWindowsFence({ controlStore, operationId, error });
+
+      const authorityRestored = finalAuthority === RuntimeAuthority.WINDOWS_LEGACY;
+      const routingOk = ["not-required", "restored"].includes(routingOutcome.action);
+      const routingAmbiguous = routingOutcome.action === "restore-ambiguous";
+      const fenceOk = ["not-required", "released"].includes(fenceOutcome.action);
+      const classification = classifyRestoration({ authorityRestored, routingOk, routingAmbiguous, fenceOk });
+
       return freeze({
-        ready: finalAuthority === RuntimeAuthority.WINDOWS_LEGACY && routingOutcome.action !== "restore-failed",
+        ready: classification === "RESTORED",
+        classification,
         authority: finalAuthority,
         operationId,
         firstProviderCanonicalWriteAt: null,
         routing: routingOutcome,
+        fence: fenceOutcome,
       });
     },
   });
+}
+
+// "ready" (RESTORED) is honest about ALL THREE halves of recovery: authority reverting to Windows is
+// the safe direction regardless of routing/fence outcome (no dual canonical-write risk either way),
+// but this must never report full success while routing or fence evidence disagrees. AMBIGUOUS is
+// reserved for the one case where authority and the fence both genuinely recovered but routing's true
+// state is simply unknown (the routing control itself is unconfigured/unreachable) rather than known
+// to have failed; any other partial outcome - including a real routing/fence failure - is PARTIAL.
+function classifyRestoration({ authorityRestored, routingOk, routingAmbiguous, fenceOk }) {
+  if (!authorityRestored) return "FAILED";
+  if (routingOk && fenceOk) return "RESTORED";
+  if (routingAmbiguous && fenceOk) return "AMBIGUOUS";
+  return "PARTIAL";
 }
 
 async function reconcileRouting({ handoffReceiptStore, routingControl, operationId }) {
@@ -120,6 +155,13 @@ async function reconcileRouting({ handoffReceiptStore, routingControl, operation
     await handoffReceiptStore.recordWindowsRoutingRestored({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest });
     return { action: "restored" };
   } catch (routingError) {
+    // The routing control itself being unconfigured/unreachable means the actual route state is
+    // genuinely unknown - distinct from an attempt that was made and explicitly failed - so this is
+    // recorded and reported as "ambiguous," never silently folded into "failed".
+    if (routingError?.code === RoutingErrorCode.UNAVAILABLE) {
+      await handoffReceiptStore.recordWindowsRoutingRestoreAmbiguous({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest }).catch(() => undefined);
+      return { action: "restore-ambiguous", error: safeMessage(routingError) };
+    }
     await handoffReceiptStore.recordWindowsRoutingRestoreFailed({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest }).catch(() => undefined);
     return { action: "restore-failed", error: safeMessage(routingError) };
   }

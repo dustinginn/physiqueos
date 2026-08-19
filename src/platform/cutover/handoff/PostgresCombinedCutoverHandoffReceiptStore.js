@@ -158,6 +158,69 @@ export function createPostgresCombinedCutoverHandoffReceiptStore({ pool } = {}) 
             }),
       });
     },
+
+    // Phase 6C worker-handoff evidence (migration 000010, phase N/O: "release writes only through
+    // the provider platform, start the authority-gated worker"). Reuses this same operation-bound
+    // row rather than starting a second evidence lifecycle - see that migration's header comment.
+    async recordWorkerActivated({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (["activated", "verified"].includes(current.worker_activation_status)
+          ? null
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      worker_activation_status='activated', worker_activated_at=now(), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
+
+    async recordWorkerVerified({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.worker_activation_status === "verified"
+          ? null
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      worker_activation_status='verified', worker_verified_at=COALESCE(worker_verified_at, now()), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
+
+    async recordWorkerActivationFailed({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.worker_activation_status === "verified"
+          ? null // Never downgrade already-verified worker activation.
+          : { sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET worker_activation_status='failed', updated_at=now() WHERE receipt_id=$1 RETURNING *`, values: [current.receipt_id] }),
+      });
+    },
+
+    async recordWindowsWorkerRetired({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.windows_worker_retirement_status === "retired"
+          ? null
+          : {
+              sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET
+                      windows_worker_retirement_status='retired', windows_worker_retired_at=now(), updated_at=now()
+                    WHERE receipt_id=$1 RETURNING *`,
+              values: [current.receipt_id],
+            }),
+      });
+    },
+
+    async recordWindowsWorkerRetirementFailed({ migrationOperationId, expectedPackageDigest }) {
+      return transition({
+        pool, migrationOperationId, expectedPackageDigest,
+        apply: (current) => (current.windows_worker_retirement_status === "retired"
+          ? null // Never downgrade an already-retired outcome.
+          : { sql: `UPDATE physiqueos.combined_cutover_handoff_receipts SET windows_worker_retirement_status='failed', updated_at=now() WHERE receipt_id=$1 RETURNING *`, values: [current.receipt_id] }),
+      });
+    },
   });
 }
 
@@ -227,6 +290,11 @@ function row(value) {
     routingVerifiedAt: toIso(value.routing_verified_at),
     windowsRoutingRestoreStatus: value.windows_routing_restore_status ?? null,
     windowsRoutingRestoreAt: toIso(value.windows_routing_restore_at),
+    workerActivationStatus: value.worker_activation_status ?? null,
+    workerActivatedAt: toIso(value.worker_activated_at),
+    workerVerifiedAt: toIso(value.worker_verified_at),
+    windowsWorkerRetirementStatus: value.windows_worker_retirement_status ?? null,
+    windowsWorkerRetiredAt: toIso(value.windows_worker_retired_at),
     createdAt: toIso(value.created_at),
     updatedAt: toIso(value.updated_at),
   });

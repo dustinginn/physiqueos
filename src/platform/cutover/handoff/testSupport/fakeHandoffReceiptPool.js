@@ -21,6 +21,8 @@ export function createFakeHandoffReceiptPool() {
         authority_status: "pending", authority_committed_at: null, resulting_authority: null,
         routing_status: "pending", routing_activated_at: null, routing_verified_at: null,
         windows_routing_restore_status: null, windows_routing_restore_at: null,
+        worker_activation_status: "pending", worker_activated_at: null, worker_verified_at: null,
+        windows_worker_retirement_status: "pending", windows_worker_retired_at: null,
         created_at: now, updated_at: now,
       };
       rows.set(operationIdValue, record);
@@ -66,6 +68,31 @@ export function createFakeHandoffReceiptPool() {
     if (normalized.includes("windows_routing_restore_status='ambiguous'")) {
       const row = findByReceiptId(rows, values[0]);
       row.windows_routing_restore_status = "ambiguous"; row.windows_routing_restore_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("worker_activation_status='activated'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.worker_activation_status = "activated"; row.worker_activated_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("worker_activation_status='verified'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.worker_activation_status = "verified"; row.worker_verified_at = row.worker_verified_at ?? new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("worker_activation_status='failed'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.worker_activation_status = "failed"; row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("windows_worker_retirement_status='retired'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.windows_worker_retirement_status = "retired"; row.windows_worker_retired_at = new Date().toISOString(); row.updated_at = new Date().toISOString();
+      return { rows: [row], rowCount: 1 };
+    }
+    if (normalized.includes("windows_worker_retirement_status='failed'")) {
+      const row = findByReceiptId(rows, values[0]);
+      row.windows_worker_retirement_status = "failed"; row.updated_at = new Date().toISOString();
       return { rows: [row], rowCount: 1 };
     }
 

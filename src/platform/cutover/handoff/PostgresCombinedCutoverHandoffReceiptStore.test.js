@@ -101,6 +101,65 @@ describe("PostgreSQL combined cutover handoff receipts — status transitions", 
   });
 });
 
+describe("PostgreSQL combined cutover handoff receipts — worker evidence (Phase 6C)", () => {
+  it("records worker activated then verified, and Windows worker retired", async () => {
+    const s = store();
+    await s.declare(declaration());
+    const activated = await s.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(activated.receipt.workerActivationStatus).toBe("activated");
+    expect(activated.receipt.workerActivatedAt).not.toBeNull();
+
+    const verified = await s.recordWorkerVerified({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(verified.receipt.workerActivationStatus).toBe("verified");
+    expect(verified.receipt.workerVerifiedAt).not.toBeNull();
+
+    const retired = await s.recordWindowsWorkerRetired({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(retired.receipt.windowsWorkerRetirementStatus).toBe("retired");
+    expect(retired.receipt.windowsWorkerRetiredAt).not.toBeNull();
+  });
+
+  it("is idempotent on repeated worker-activated and windows-worker-retired calls", async () => {
+    const s = store();
+    await s.declare(declaration());
+    await s.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    const replay = await s.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(replay.outcome).toBe("idempotent-replay");
+  });
+
+  it("never downgrades an already-verified worker activation via a later failure record", async () => {
+    const s = store();
+    await s.declare(declaration());
+    await s.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    await s.recordWorkerVerified({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    const stillVerified = await s.recordWorkerActivationFailed({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(stillVerified.receipt.workerActivationStatus).toBe("verified");
+  });
+
+  it("never downgrades an already-retired Windows worker status via a later failure record", async () => {
+    const s = store();
+    await s.declare(declaration());
+    await s.recordWindowsWorkerRetired({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    const stillRetired = await s.recordWindowsWorkerRetirementFailed({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(stillRetired.receipt.windowsWorkerRetirementStatus).toBe("retired");
+  });
+
+  it("records worker activation failure and Windows worker retirement failure distinctly", async () => {
+    const s = store();
+    await s.declare(declaration());
+    const workerFailed = await s.recordWorkerActivationFailed({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(workerFailed.receipt.workerActivationStatus).toBe("failed");
+    const retirementFailed = await s.recordWindowsWorkerRetirementFailed({ migrationOperationId: operationId, expectedPackageDigest: digest("c") });
+    expect(retirementFailed.receipt.windowsWorkerRetirementStatus).toBe("failed");
+  });
+
+  it("fails closed when the expected package digest does not match the durable row", async () => {
+    const s = store();
+    await s.declare(declaration());
+    await expect(s.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: digest("9") }))
+      .rejects.toMatchObject({ code: "TRANSFER_PACKAGE_DIGEST_CONFLICT" });
+  });
+});
+
 describe("PostgreSQL combined cutover handoff receipts — read and isolation", () => {
   it("reconstructs full durable evidence via read()", async () => {
     const s = store();

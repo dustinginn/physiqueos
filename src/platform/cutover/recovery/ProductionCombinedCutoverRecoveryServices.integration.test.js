@@ -7,8 +7,12 @@
 // preflights and Windows fence/snapshot/export/transfer/import/parity/acknowledge remain minimal
 // stubs (out of scope for this task). No authority transition is duplicated in a test helper - every
 // transition is driven through the real orchestrator/store/services.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCombinedAppPlatformCutoverOrchestrator } from "../CombinedAppPlatformCutoverOrchestrator.js";
+import { createDurableMigrationControlStore } from "../DurableMigrationControlStore.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "../PostgresCombinedRuntimeAuthorityStore.js";
 import { initializeCombinedCutoverAuthority } from "../CombinedCutoverAuthorityInitializer.js";
 import { createTransactionalPostgresFixture } from "../../database/testing/transactionalPostgresFixture.js";
@@ -40,14 +44,25 @@ const target = Object.freeze({ databaseClusterId: "cluster", databaseName: "phys
 const providerSource = Object.freeze({ commit: "p".repeat(40), buildId: "provider-build" });
 const windowsSource = Object.freeze({ commit: "w".repeat(40), buildId: "windows-build" });
 
+// Isolated (never live) Windows-local migration-control store, one per harness instance - a fresh
+// OS temp file, never the real `private/founder/migration-control.json`. Synchronous so `harness()`
+// itself can stay synchronous like every other call site in this file already expects.
+function isolatedControlStore() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "physiqueos-cutover-recovery-integration-fence-"));
+  const controlStore = createDurableMigrationControlStore({ filePath: path.join(root, "migration-control.json") });
+  controlStore.initialize({ environment: ENVIRONMENT, operator: "test-operator", commandId: "init:1", correlationId: "init" });
+  return controlStore;
+}
+
 function harness({ routing = createDeterministicCombinedCutoverRoutingControl() } = {}) {
   const fixture = createTransactionalPostgresFixture();
   const authorityStore = createPostgresCombinedRuntimeAuthorityStore({ pool: fixture.pool, environment: ENVIRONMENT });
   const preparationStore = createPostgresCombinedCutoverPreparationStore({ pool: createFakePreparationPool() });
   const handoffReceiptStore = createPostgresCombinedCutoverHandoffReceiptStore({ pool: createFakeHandoffReceiptPool() });
+  const controlStore = isolatedControlStore();
   const handoffService = createProductionAuthorityHandoffService({ authorityStore, preparationStore, handoffReceiptStore, routingControl: routing });
   const verificationService = createProductionPostHandoffVerificationService({ authorityStore, handoffReceiptStore });
-  const restorationService = createProductionWindowsAuthorityRestorationService({ authorityStore, handoffReceiptStore, routingControl: routing });
+  const restorationService = createProductionWindowsAuthorityRestorationService({ authorityStore, handoffReceiptStore, routingControl: routing, controlStore });
   const forwardRecoveryService = createProductionProviderForwardRecoveryService({ authorityStore });
 
   const preflightOk = async () => ({ ready: true, mutated: false });
@@ -80,7 +95,7 @@ function harness({ routing = createDeterministicCombinedCutoverRoutingControl() 
   };
 
   const orchestrator = createCombinedAppPlatformCutoverOrchestrator({ authorityStore, adapters });
-  return { fixture, authorityStore, preparationStore, handoffReceiptStore, routing, orchestrator, verificationService, restorationService, forwardRecoveryService };
+  return { fixture, authorityStore, preparationStore, handoffReceiptStore, controlStore, routing, orchestrator, verificationService, restorationService, forwardRecoveryService };
 }
 
 function executeInput(overrides = {}) {
