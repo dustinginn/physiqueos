@@ -13,8 +13,10 @@ ENV PHYSIQUEOS_BUILD_ID=$PHYSIQUEOS_BUILD_ID \
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+RUN test -f src/middleware.js || { echo "FATAL: provider product build context is missing the access-gate middleware source (src/middleware.js). Refusing to build - the deployed image would silently omit the Founder access gate." >&2; exit 1; }
 RUN npm run build -- --webpack
 RUN test -f .next/standalone/.next/server/webpack-runtime.js
+RUN node scripts/verifyProviderMiddlewareArtifact.mjs .next/standalone/.next
 RUN rm -rf .next/standalone/src/data/founderSeed .next/standalone/src/data/seed \
     .next/standalone/src/fixtures .next/standalone/src/features/dashboard \
     .next/standalone/src/lib/mockData.js .next/standalone/src/models/UserProfile.js \
