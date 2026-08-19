@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { founderOwnerIdentifierContentPattern, isFounderOwnerIdentifier } from "./founderOwnerIdentity.js";
 
@@ -44,5 +45,18 @@ describe("founderOwnerIdentifierContentPattern", () => {
     const a = founderOwnerIdentifierContentPattern();
     const b = founderOwnerIdentifierContentPattern();
     expect(a).not.toBe(b);
+  });
+});
+
+describe("self-scan regression", () => {
+  it("this module's own source contains no literal string matching the Founder-owner content pattern", async () => {
+    // The provider artifact privacy scanner (scripts/scanProviderArtifact.mjs) imports this exact
+    // pattern and scans this module's own source as part of the collected worker artifact - a
+    // literal documentation example here (e.g. a bare "user_founder_001") would make the classifier
+    // flag itself and block artifact collection. See scripts/collectProviderWorkerArtifact.mjs and
+    // PROVIDER_ARTIFACT_PRIVACY_REJECTED.
+    const source = await fs.readFile(new URL("./founderOwnerIdentity.js", import.meta.url), "utf8");
+    const pattern = founderOwnerIdentifierContentPattern();
+    expect(pattern.test(source)).toBe(false);
   });
 });
