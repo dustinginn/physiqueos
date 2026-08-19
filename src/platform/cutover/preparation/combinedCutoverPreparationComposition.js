@@ -14,6 +14,8 @@ import { createSpacesCombinedCutoverTransferStaging } from "../transfer/combined
 import { createPostgresCombinedCutoverTransferReceiptStore } from "../transfer/PostgresCombinedCutoverTransferReceiptStore.js";
 import { createPostgresCombinedTransferReceiptStore } from "../PostgresCombinedTransferReceiptStore.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "../PostgresCombinedRuntimeAuthorityStore.js";
+import { isCompatibilityShapedEnvironment } from "../compatibilityEnvironmentShape.js";
+import { assertCompatibilityOwnerIdentity } from "../combinedCutoverCompatibilityOwnerGuard.js";
 import { createPostgresCombinedCutoverPreparationStore } from "./PostgresCombinedCutoverPreparationStore.js";
 import { createProductionCanonicalImportService } from "./ProductionCanonicalImportService.js";
 import { createProductionProviderParityService } from "./ProductionProviderParityService.js";
@@ -31,6 +33,18 @@ function required(env, key) {
 
 function resolve(env) {
   if (resolved) return resolved;
+  const runtimeAuthorityEnvironment = required(env, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT");
+  const ownerUserId = required(env, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
+  if (isCompatibilityShapedEnvironment(runtimeAuthorityEnvironment)) {
+    // Checked FIRST, before any database/Spaces client or persistence-capable service is built:
+    // this composition drives canonical import and parity comparison, both persistence mutations,
+    // so an isolated compatibility/rehearsal deployment must never operate under a Founder-owner
+    // identity. Outside a compatibility-shaped environment (the eventual production combined-cutover
+    // deployment), the real Founder owner remains legitimate and this check does not apply.
+    assertCompatibilityOwnerIdentity(ownerUserId, {
+      expectedOwnerUserId: env.PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID ?? null,
+    });
+  }
   const databaseConfig = readDatabaseConfig(env);
   const spacesConfig = readSpacesConfig(env);
   if (!databaseConfig.enabled || !spacesConfig.enabled) {
@@ -47,10 +61,9 @@ function resolve(env) {
   const manifestReceiptStore = createPostgresCombinedTransferReceiptStore({ pool });
   const preparationStore = createPostgresCombinedCutoverPreparationStore({ pool });
   const authorityStore = createPostgresCombinedRuntimeAuthorityStore({
-    pool, environment: required(env, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+    pool, environment: runtimeAuthorityEnvironment,
   });
   const targetDatabase = new URL(databaseConfig.connectionString).pathname.slice(1);
-  const ownerUserId = required(env, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
   const mediaAccessSecret = required(env, "PHYSIQUEOS_CREDENTIAL_PEPPER");
   const providerDeploymentId = required(env, "PHYSIQUEOS_PROVIDER_DEPLOYMENT_ID");
 

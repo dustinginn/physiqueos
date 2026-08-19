@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isCompatibilityShapedEnvironment } from "./compatibilityEnvironmentShape.js";
 
 export const COMBINED_RUNTIME_AUTHORITY_SCHEMA_VERSION = "combined-runtime-authority-v1";
 
@@ -344,7 +345,7 @@ function requiredTarget(value) {
 
 function requiredCompatibilityEnvironment(value) {
   required(value, "environment");
-  if (!/^compatibility(?:[-/]|$)/i.test(String(value))) {
+  if (!isCompatibilityShapedEnvironment(value)) {
     throw authorityError("RUNTIME_AUTHORITY_COMPATIBILITY_REJECTED", "Compatibility authority requires an explicit compatibility environment.");
   }
 }

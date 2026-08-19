@@ -6,15 +6,31 @@ import { createValidationPostgresPool } from "./validationPostgresPool.mjs";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 const { importCanonicalPackage, validateCanonicalImport } = await import("../src/platform/migration/phase4CanonicalImport.js");
+const { readAndValidateCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
 const { canonicalJson, createPayloadHash } = await import("../src/contracts/v1/canonicalJson.js");
+const { assertCanonicalImportOwnerAllowed, isCompatibilityRehearsalTargetDatabase } = await import("../src/platform/migration/canonicalImportOwnerGuard.js");
 
 const databaseUrl = String(process.env.PHYSIQUEOS_PHASE4_DATABASE_URL ?? "").trim();
 const packageRoot = process.argv[2];
+const expectedOwnerFlagIndex = process.argv.indexOf("--expected-owner");
+const expectedOwnerUserId = expectedOwnerFlagIndex === -1 ? null : (String(process.argv[expectedOwnerFlagIndex + 1] ?? "").trim() || null);
 if (!databaseUrl || !packageRoot) throw new Error("PHYSIQUEOS_PHASE4_DATABASE_URL and a package directory are required.");
 const parsed = new URL(databaseUrl);
-if (!/^(?:physiqueos_phase4_(?:test|rehearsal|restore)|physiqueos_phase5_(?:test|restore)_provider)(?:_|$)/.test(decodeURIComponent(parsed.pathname.slice(1)))) {
+const targetDatabaseName = decodeURIComponent(parsed.pathname.slice(1));
+if (!isCompatibilityRehearsalTargetDatabase(targetDatabaseName)) {
   throw new Error("Refusing canonical import outside a guarded Phase 4 rehearsal or Phase 5 provider-test database.");
 }
+
+// Owner identity is read from the package's OWN manifest - never from a filename or caller claim -
+// before any database mutation is attempted, so this guard cannot be bypassed by renaming or
+// relocating a package directory.
+const { manifest: preflightManifest } = await readAndValidateCanonicalPackage(packageRoot);
+assertCanonicalImportOwnerAllowed({
+  packageOwnerUserId: preflightManifest.criticalValues?.userId,
+  targetDatabaseName,
+  expectedOwnerUserId,
+});
+
 const pool = createValidationPostgresPool({ connectionString: databaseUrl, maximumPoolSize: 2, applicationName: "physiqueos-canonical-import" });
 try {
   const importStarted = performance.now();

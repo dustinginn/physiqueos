@@ -13,6 +13,7 @@ import { createCanonicalWriteFence } from "../../platform/cutover/canonicalWrite
 import { CanonicalCompositionMode, CanonicalStoreEpoch } from "../../platform/cutover/migrationControlState.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "../../platform/cutover/PostgresCombinedRuntimeAuthorityStore.js";
 import { assertCompatibilityRuntimeAuthorityState } from "../../platform/cutover/CombinedRuntimeAuthorityState.js";
+import { assertCompatibilityOwnerIdentity } from "../../platform/cutover/combinedCutoverCompatibilityOwnerGuard.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -91,6 +92,12 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
       })
     : null;
   if (compatibilityMode) {
+    // Checked FIRST, before any database identity check or persistence-capable composition is
+    // built: a compatibility/rehearsal environment must never operate under a Founder-owner
+    // identity, regardless of what else is configured.
+    assertCompatibilityOwnerIdentity(providerRuntime.ownerUserId, {
+      expectedOwnerUserId: env.PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID ?? null,
+    });
     const expectedDatabaseName = required(env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME");
     const database = await providerRuntime.pool.query("SELECT current_database() AS database");
     if (database.rows[0]?.database !== expectedDatabaseName) {
