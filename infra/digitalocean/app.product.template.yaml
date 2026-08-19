@@ -41,6 +41,19 @@ services:
       - { key: PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY, scope: RUN_TIME, value: digitalocean-app-platform }
       - { key: PHYSIQUEOS_BUILD_ID, scope: RUN_AND_BUILD_TIME, value: ${BUILD_ID} }
       - { key: PHYSIQUEOS_GIT_SHA, scope: RUN_AND_BUILD_TIME, value: ${GIT_SHA} }
+      - { key: PHYSIQUEOS_PROVIDER_DEPLOYMENT_ID, scope: RUN_TIME, value: ${PROVIDER_DEPLOYMENT_ID} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_TRANSFER_ENABLED, scope: RUN_TIME, value: ${COMBINED_CUTOVER_TRANSFER_ENABLED} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_TRANSFER_OPERATION_ID, scope: RUN_TIME, value: ${COMBINED_CUTOVER_TRANSFER_OPERATION_ID} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_TRANSFER_CREDENTIAL_HASH, scope: RUN_TIME, type: SECRET, value: ${COMBINED_CUTOVER_TRANSFER_CREDENTIAL_HASH} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_TRANSFER_CREDENTIAL_EXPIRES_AT, scope: RUN_TIME, value: ${COMBINED_CUTOVER_TRANSFER_CREDENTIAL_EXPIRES_AT} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_PREPARE_ENABLED, scope: RUN_TIME, value: ${COMBINED_CUTOVER_PREPARE_ENABLED} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_PREPARE_OPERATION_ID, scope: RUN_TIME, value: ${COMBINED_CUTOVER_PREPARE_OPERATION_ID} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_PREPARE_CREDENTIAL_HASH, scope: RUN_TIME, type: SECRET, value: ${COMBINED_CUTOVER_PREPARE_CREDENTIAL_HASH} }
+      - { key: PHYSIQUEOS_COMBINED_CUTOVER_PREPARE_CREDENTIAL_EXPIRES_AT, scope: RUN_TIME, value: ${COMBINED_CUTOVER_PREPARE_CREDENTIAL_EXPIRES_AT} }
+      # Authority/routing handoff (Phase 5) is deliberately NOT wired here: its own composition
+      # (combinedCutoverHandoffComposition.js) already refuses to activate whenever this deployment's
+      # own compatibility-mode flag above is set to "1" - leaving
+      # PHYSIQUEOS_COMBINED_CUTOVER_HANDOFF_ENABLED unset is the narrower, equally-safe choice.
 workers:
   - name: worker
     dockerfile_path: Dockerfile.provider-worker
