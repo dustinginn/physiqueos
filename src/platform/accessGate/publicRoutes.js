@@ -20,6 +20,13 @@ export const COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX = "/api/v1/operations/c
 // reaches this prefix on its own - only an authenticated cutover coordinator can.
 export const COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX = "/api/v1/operations/combined-cutover/prepare/";
 
+// Same reasoning, for the Phase 5 authority/routing handoff channel - but note this prefix carries
+// only a single READ-ONLY status route (`combinedCutoverHandoffService.js`). There is no endpoint
+// that triggers the handoff itself: the orchestrator's `commitAuthority` closure cannot cross an
+// HTTP boundary, so the real transition only ever runs in-process with the orchestrator. Gated by
+// its own separate, narrower machine credential (`combinedCutoverHandoffAuth.js`).
+export const COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX = "/api/v1/operations/combined-cutover/handoff/";
+
 const PUBLIC_EXACT_PATHS = new Set([
   "/api/v1/health/live",
   "/api/v1/health/ready",
@@ -32,7 +39,7 @@ const PUBLIC_EXACT_PATHS = new Set([
  * page itself (GET and its own POST-back share this path), static
  * framework assets under /_next/static/ (JS/CSS/font chunks - never
  * product data, required to render the login page at all), and the
- * separately-machine-authenticated combined-cutover transfer/preparation channels.
+ * separately-machine-authenticated combined-cutover transfer/preparation/handoff channels.
  * Everything else - every product page, every other /api route, every
  * media/private-evidence route, every Server Action - is protected by
  * default.
@@ -42,5 +49,6 @@ export function isPublicPath(pathname) {
   if (pathname.startsWith("/_next/static/")) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX)) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX)) return true;
+  if (pathname.startsWith(COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX)) return true;
   return false;
 }

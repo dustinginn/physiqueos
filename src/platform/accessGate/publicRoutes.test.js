@@ -4,6 +4,7 @@ import {
   FOUNDER_GATE_LOGIN_PATH,
   COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX,
   COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX,
+  COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX,
 } from "./publicRoutes.js";
 
 describe("publicRoutes.isPublicPath", () => {
@@ -90,5 +91,17 @@ describe("publicRoutes.isPublicPath", () => {
 
   it("does NOT allow a sibling combined-cutover path to ride the preparation prefix", () => {
     expect(isPublicPath("/api/v1/operations/combined-cutover/prepare-evil/import")).toBe(false);
+  });
+
+  it("allows the machine-authenticated combined-cutover handoff status channel (exempt from the Founder session cookie, not from authentication)", () => {
+    expect(isPublicPath(`${COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX}status`)).toBe(true);
+  });
+
+  it("does NOT allow the bare handoff route without its trailing segment", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/handoff")).toBe(false);
+  });
+
+  it("does NOT allow a sibling combined-cutover path to ride the handoff prefix", () => {
+    expect(isPublicPath("/api/v1/operations/combined-cutover/handoff-evil/status")).toBe(false);
   });
 });
