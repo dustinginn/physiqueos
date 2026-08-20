@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createPrivateObjectKey, createSpacesPrivateObjectProvider } from "./SpacesPrivateObjectProvider";
 import { readSpacesConfig } from "./spacesConfig";
@@ -43,5 +44,50 @@ describe("DigitalOcean Spaces private provider", () => {
       .mockResolvedValueOnce({ Body: { async *[Symbol.asyncIterator]() { yield Buffer.from("abc"); } } });
     const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send, destroy: vi.fn() }, sign: vi.fn() });
     await expect(provider.inspectObject({ objectKey: "private/user/object/original" })).resolves.toMatchObject({ sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" });
+  });
+
+  it("bounds and aborts only the health request", async () => {
+    const send = vi.fn((_command, { abortSignal } = {}) => new Promise((_resolve, reject) => {
+      abortSignal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true });
+    }));
+    const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send, destroy: vi.fn() }, sign: vi.fn() });
+
+    await expect(provider.healthCheck({ timeoutMs: 100 })).rejects.toMatchObject({ code: "OBJECT_STORAGE_HEALTH_TIMEOUT" });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][1].abortSignal.aborted).toBe(true);
+  });
+
+  it("honors a caller abort and does not apply health deadlines to normal object operations", async () => {
+    const controller = new AbortController();
+    const send = vi.fn((_command, options = {}) => {
+      if (!options.abortSignal) return Promise.resolve({ UploadId: "normal-upload" });
+      return new Promise((_resolve, reject) => {
+        options.abortSignal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true });
+      });
+    });
+    const provider = createSpacesPrivateObjectProvider(CONFIG, { client: { send, destroy: vi.fn() }, sign: vi.fn() });
+
+    const health = provider.healthCheck({ signal: controller.signal, timeoutMs: 1000 });
+    controller.abort();
+    await expect(health).rejects.toMatchObject({ code: "OBJECT_STORAGE_HEALTH_ABORTED" });
+    await expect(provider.beginMultipartUpload({ ownerUserId: "user", objectId: OBJECT_ID, contentType: "image/jpeg" })).resolves.toMatchObject({ providerUploadId: "normal-upload" });
+    expect(send.mock.calls[1][1]).toBeUndefined();
+  });
+
+  it("isolates the single-attempt health client from normal object-operation retry behavior", async () => {
+    const operationClient = { send: vi.fn().mockResolvedValue({ UploadId: "normal-upload" }), destroy: vi.fn() };
+    const healthClient = { send: vi.fn().mockResolvedValue({}), destroy: vi.fn() };
+    const provider = createSpacesPrivateObjectProvider(CONFIG, { client: operationClient, healthClient, sign: vi.fn() });
+
+    await expect(provider.healthCheck()).resolves.toEqual({ reachable: true });
+    await expect(provider.beginMultipartUpload({ ownerUserId: "user", objectId: OBJECT_ID, contentType: "image/jpeg" })).resolves.toMatchObject({ providerUploadId: "normal-upload" });
+    expect(healthClient.send).toHaveBeenCalledTimes(1);
+    expect(operationClient.send).toHaveBeenCalledTimes(1);
+    provider.close();
+    expect(healthClient.destroy).toHaveBeenCalledTimes(1);
+    expect(operationClient.destroy).toHaveBeenCalledTimes(1);
+
+    const source = fs.readFileSync(new URL("./SpacesPrivateObjectProvider.js", import.meta.url), "utf8");
+    expect(source).toContain("maxAttempts: 1");
   });
 });

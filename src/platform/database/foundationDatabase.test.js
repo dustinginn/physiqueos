@@ -11,13 +11,18 @@ const migration = require("../../../db/migrations/000001_shared_platform_foundat
 describe("PostgreSQL foundation", () => {
   it("is disabled and connection-free by default", () => {
     const config = readDatabaseConfig({});
-    expect(config).toMatchObject({ enabled: false, connectionString: null, maximumPoolSize: 5 });
+    expect(config).toMatchObject({ enabled: false, connectionString: null, databaseName: null, maximumPoolSize: 5, connectionTimeoutMs: 5000 });
     expect(() => createPostgresPool(config)).toThrow("PostgreSQL is inactive");
   });
 
   it("requires explicit enablement and a database URL", () => {
     expect(() => readDatabaseConfig({ PHYSIQUEOS_DATABASE_ENABLED: "1" })).toThrow("PHYSIQUEOS_DATABASE_URL");
-    expect(readDatabaseConfig({ PHYSIQUEOS_DATABASE_ENABLED: "1", PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db" })).toMatchObject({ enabled: true, connectionString: "postgresql://synthetic.invalid/db" });
+    expect(readDatabaseConfig({ PHYSIQUEOS_DATABASE_ENABLED: "1", PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db" })).toMatchObject({
+      enabled: true,
+      connectionString: "postgresql://synthetic.invalid/db",
+      databaseName: "db",
+      connectionTimeoutMs: 5000,
+    });
   });
 
   it("configures an explicit provider CA with certificate verification", async () => {
@@ -31,12 +36,30 @@ describe("PostgreSQL foundation", () => {
     expect(pool.options.ssl).toEqual({ ca: certificate, rejectUnauthorized: true });
     expect(pool.options.connectionString).not.toContain("sslmode");
     expect(pool.options.connectionString).toContain("application_name=synthetic");
+    expect(pool.options.connectionTimeoutMillis).toBe(5000);
     await pool.end();
     expect(() => readDatabaseConfig({
       PHYSIQUEOS_DATABASE_ENABLED: "1",
       PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db",
       PHYSIQUEOS_DATABASE_CA_CERT: "not-a-certificate",
     })).toThrow("CA certificate");
+  });
+
+  it("bounds connection acquisition explicitly and validates overrides", async () => {
+    const config = readDatabaseConfig({
+      PHYSIQUEOS_DATABASE_ENABLED: "1",
+      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/compatibility_db",
+      PHYSIQUEOS_DATABASE_CONNECTION_TIMEOUT_MS: "2500",
+    });
+    const pool = createPostgresPool(config);
+    expect(config.connectionTimeoutMs).toBe(2500);
+    expect(pool.options.connectionTimeoutMillis).toBe(2500);
+    await pool.end();
+    expect(() => readDatabaseConfig({
+      PHYSIQUEOS_DATABASE_ENABLED: "1",
+      PHYSIQUEOS_DATABASE_URL: "postgresql://synthetic.invalid/db",
+      PHYSIQUEOS_DATABASE_CONNECTION_TIMEOUT_MS: "0",
+    })).toThrow("connection timeout");
   });
 
   it("commits or rolls back transaction work", async () => {

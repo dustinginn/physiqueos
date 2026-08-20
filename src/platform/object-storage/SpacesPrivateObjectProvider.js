@@ -16,15 +16,18 @@ import { requirePrivateMediaObjectId } from "../../contracts/v1/mediaIdentifiers
 
 const MAX_READ_SECONDS = 300;
 const MAX_UPLOAD_PART_SECONDS = 900;
+const DEFAULT_HEALTH_TIMEOUT_MS = 3_000;
 
-export function createSpacesPrivateObjectProvider(config, { client, sign = getSignedUrl } = {}) {
+export function createSpacesPrivateObjectProvider(config, { client, healthClient, sign = getSignedUrl } = {}) {
   if (!config?.enabled) throw new Error("Private object storage is inactive.");
-  const s3 = client ?? new S3Client({
+  const clientConfig = {
     region: config.region,
     endpoint: config.endpoint,
     forcePathStyle: false,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-  });
+  };
+  const s3 = client ?? new S3Client(clientConfig);
+  const healthS3 = healthClient ?? (client ? client : new S3Client({ ...clientConfig, maxAttempts: 1 }));
 
   return Object.freeze({
     async beginMultipartUpload({ ownerUserId, objectId, contentType, expectedSha256 }) {
@@ -72,9 +75,25 @@ export function createSpacesPrivateObjectProvider(config, { client, sign = getSi
       const url = await sign(s3, new GetObjectCommand({ Bucket: config.bucket, Key: objectKey, VersionId: providerVersion ?? undefined }), { expiresIn });
       return Object.freeze({ url, expiresInSeconds: expiresIn });
     },
-    async healthCheck() {
-      await s3.send(new HeadBucketCommand({ Bucket: config.bucket }));
-      return Object.freeze({ reachable: true });
+    async healthCheck({ signal = null, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS } = {}) {
+      const timeout = boundedHealthTimeout(timeoutMs);
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
+      const abortSignal = signal ? AbortSignal.any([signal, timeoutController.signal]) : timeoutController.signal;
+      try {
+        await healthS3.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal });
+        return Object.freeze({ reachable: true });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw providerHealthError("OBJECT_STORAGE_HEALTH_TIMEOUT", "Private object storage health did not complete within its deadline.", error);
+        }
+        if (signal?.aborted) {
+          throw providerHealthError("OBJECT_STORAGE_HEALTH_ABORTED", "Private object storage health was cancelled.", error);
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
     async listInventory({ continuationToken = null, maximum = 1000 } = {}) {
       const result = await s3.send(new ListObjectsV2Command({ Bucket: config.bucket, ContinuationToken: continuationToken ?? undefined, MaxKeys: Math.min(1000, maximum) }));
@@ -83,7 +102,10 @@ export function createSpacesPrivateObjectProvider(config, { client, sign = getSi
         continuationToken: result.IsTruncated ? result.NextContinuationToken ?? null : null,
       });
     },
-    close() { s3.destroy?.(); },
+    close() {
+      s3.destroy?.();
+      if (healthS3 !== s3) healthS3.destroy?.();
+    },
   });
 }
 
@@ -122,4 +144,12 @@ function clampSeconds(value, maximum) {
   const seconds = Number(value);
   if (!Number.isInteger(seconds) || seconds < 1) throw new Error("Signed access lifetime is invalid.");
   return Math.min(seconds, maximum);
+}
+function boundedHealthTimeout(value) {
+  const timeout = Number(value);
+  if (!Number.isInteger(timeout) || timeout < 100 || timeout > 10_000) throw new Error("Object storage health timeout is invalid.");
+  return timeout;
+}
+function providerHealthError(code, message, cause) {
+  return Object.assign(new Error(message, { cause }), { code });
 }

@@ -12,6 +12,7 @@ export function createPostgresPool(config) {
     ssl: config.caCertificate ? { ca: config.caCertificate, rejectUnauthorized: true } : undefined,
     application_name: config.applicationName,
     max: config.maximumPoolSize,
+    connectionTimeoutMillis: config.connectionTimeoutMs ?? 5_000,
     statement_timeout: config.statementTimeoutMs,
     allowExitOnIdle: true,
   });

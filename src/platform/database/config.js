@@ -7,11 +7,19 @@ export function readDatabaseConfig(env = process.env) {
   return Object.freeze({
     enabled,
     connectionString: enabled ? connectionString : null,
+    databaseName: enabled ? databaseNameFromConnectionString(connectionString) : null,
     caCertificate: normalizeCertificate(env.PHYSIQUEOS_DATABASE_CA_CERT),
     applicationName: String(env.PHYSIQUEOS_DATABASE_APPLICATION_NAME ?? "physiqueos-foundation"),
     maximumPoolSize: normalizePoolSize(env.PHYSIQUEOS_DATABASE_POOL_MAX),
     statementTimeoutMs: normalizeTimeout(env.PHYSIQUEOS_DATABASE_STATEMENT_TIMEOUT_MS),
+    connectionTimeoutMs: normalizeConnectionTimeout(env.PHYSIQUEOS_DATABASE_CONNECTION_TIMEOUT_MS),
   });
+}
+
+function databaseNameFromConnectionString(value) {
+  const name = decodeURIComponent(new URL(value).pathname.replace(/^\//, ""));
+  if (!name) throw new Error("PHYSIQUEOS_DATABASE_URL must identify a database.");
+  return name;
 }
 
 function normalizeCertificate(value) {
@@ -34,5 +42,12 @@ function normalizeTimeout(value) {
   if (value == null || value === "") return 15_000;
   const result = Number(value);
   if (!Number.isInteger(result) || result < 1_000 || result > 120_000) throw new Error("Database statement timeout is invalid.");
+  return result;
+}
+
+function normalizeConnectionTimeout(value) {
+  if (value == null || value === "") return 5_000;
+  const result = Number(value);
+  if (!Number.isInteger(result) || result < 1_000 || result > 30_000) throw new Error("Database connection timeout is invalid.");
   return result;
 }

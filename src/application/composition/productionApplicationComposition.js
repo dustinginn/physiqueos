@@ -7,6 +7,7 @@ import { createProductionApplicationCompositionRuntime } from "../../platform/cu
 import { createPhase5ProviderApplicationComposition } from "../../platform/database/phase5ProviderComposition.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
+import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
 import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
 import { createCanonicalWriteFence } from "../../platform/cutover/canonicalWriteFence.js";
@@ -38,6 +39,36 @@ export async function getProductionApplicationComposition(env = process.env) {
     return createPostgresComposition({ controlStore: null, env, providerFullRuntime: true });
   }
   return getProductionApplicationCompositionRuntime(env).resolve();
+}
+
+export function getProductionProviderReadinessComposition(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  const compatibilityMode = env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
+  if (compatibilityMode) {
+    assertCompatibilityOwnerIdentity(runtime.ownerUserId, {
+      expectedOwnerUserId: env.PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID ?? null,
+    });
+  }
+  required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER");
+  const authorityStore = createPostgresCombinedRuntimeAuthorityStore({
+    pool: runtime.pool,
+    environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+  });
+  const expectedDatabaseName = compatibilityMode
+    ? required(env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME")
+    : runtime.databaseName;
+  return Object.freeze({
+    kind: "production-provider-readiness",
+    compatibilityMode,
+    ownerUserId: runtime.ownerUserId,
+    expectedDatabaseName,
+    databaseProbe: createPostgresProviderReadinessProbe({ pool: runtime.pool, ownerUserId: runtime.ownerUserId }),
+    objectProvider: runtime.objectProvider,
+    authorityStore,
+  });
 }
 
 export async function closeProductionApplicationComposition() {
@@ -73,21 +104,11 @@ function createLegacyComposition({ controlStore }) {
 }
 
 async function createPostgresComposition({ controlStore, env, providerFullRuntime = false }) {
-  if (!providerRuntime) {
-    const databaseConfig = readDatabaseConfig(env);
-    const spacesConfig = readSpacesConfig(env);
-    if (!databaseConfig.enabled || !spacesConfig.enabled) {
-      throw new Error("PostgreSQL/Spaces production composition is unavailable without explicit provider configuration.");
-    }
-    const ownerUserId = required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
-    const pool = createPostgresPool(databaseConfig);
-    const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
-    providerRuntime = Object.freeze({ pool, objectProvider, ownerUserId });
-  }
+  const runtime = getOrCreateProviderRuntime(env);
   const compatibilityMode = providerFullRuntime && env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
   const authorityStore = providerFullRuntime
     ? createPostgresCombinedRuntimeAuthorityStore({
-        pool: providerRuntime.pool,
+        pool: runtime.pool,
         environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
       })
     : null;
@@ -95,11 +116,11 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     // Checked FIRST, before any database identity check or persistence-capable composition is
     // built: a compatibility/rehearsal environment must never operate under a Founder-owner
     // identity, regardless of what else is configured.
-    assertCompatibilityOwnerIdentity(providerRuntime.ownerUserId, {
+    assertCompatibilityOwnerIdentity(runtime.ownerUserId, {
       expectedOwnerUserId: env.PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID ?? null,
     });
     const expectedDatabaseName = required(env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME");
-    const database = await providerRuntime.pool.query("SELECT current_database() AS database");
+    const database = await runtime.pool.query("SELECT current_database() AS database");
     if (database.rows[0]?.database !== expectedDatabaseName) {
       throw Object.assign(new Error("Provider compatibility database identity does not match."), { code: "PROVIDER_COMPATIBILITY_TARGET_REJECTED" });
     }
@@ -115,9 +136,9 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     expectedCanonicalStoreEpoch: CanonicalStoreEpoch.POSTGRES_CANONICAL,
   }) : null;
   const composition = await createPhase5ProviderApplicationComposition({
-    pool: providerRuntime.pool,
-    ownerUserId: providerRuntime.ownerUserId,
-    objectProvider: providerRuntime.objectProvider,
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    objectProvider: runtime.objectProvider,
     mediaAccessSecret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
     writeFence,
     authorityStore,
@@ -131,12 +152,31 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     canonicalStoreEpoch: compatibilityMode ? CanonicalStoreEpoch.LEGACY_JSON : CanonicalStoreEpoch.POSTGRES_CANONICAL,
     compositionMode: CanonicalCompositionMode.POSTGRES,
     repositoryPersistence: "transactional-postgres-repository-and-command-ports",
-    objectProvider: providerRuntime.objectProvider,
+    objectProvider: runtime.objectProvider,
     authorityStore,
     compatibilityMode,
     productionWritesAllowed: compatibilityMode ? false : undefined,
     combinedExecutionAllowed: compatibilityMode ? false : undefined,
   });
+}
+
+function getOrCreateProviderRuntime(env) {
+  if (providerRuntime) return providerRuntime;
+  const databaseConfig = readDatabaseConfig(env);
+  const spacesConfig = readSpacesConfig(env);
+  if (!databaseConfig.enabled || !spacesConfig.enabled) {
+    throw new Error("PostgreSQL/Spaces production composition is unavailable without explicit provider configuration.");
+  }
+  const ownerUserId = required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
+  const pool = createPostgresPool(databaseConfig);
+  const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
+  providerRuntime = Object.freeze({
+    pool,
+    objectProvider,
+    ownerUserId,
+    databaseName: databaseConfig.databaseName,
+  });
+  return providerRuntime;
 }
 
 function providerBuildAccessError() {

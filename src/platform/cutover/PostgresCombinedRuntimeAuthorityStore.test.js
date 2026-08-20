@@ -28,6 +28,19 @@ describe("PostgreSQL combined runtime-authority store initialization", () => {
     await expect(store.initialize(state)).rejects.toMatchObject({ code: "RUNTIME_AUTHORITY_INITIALIZATION_CONFLICT" });
     expect(database.queries).toContain("ROLLBACK");
   });
+
+  it("supports a bounded read-only authority query for readiness", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ state }], rowCount: 1 });
+    const store = createPostgresCombinedRuntimeAuthorityStore({ pool: { query, connect: vi.fn() }, environment });
+
+    await expect(store.read({ queryTimeoutMs: 1200 })).resolves.toEqual({ state });
+
+    expect(query).toHaveBeenCalledWith(expect.objectContaining({
+      values: [environment],
+      query_timeout: 1200,
+    }));
+    expect(query.mock.calls[0][0].text).toMatch(/^SELECT state FROM/);
+  });
 });
 
 function fakeDatabase(existing) {

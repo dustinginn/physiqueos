@@ -45,8 +45,11 @@ export function createPostgresCombinedRuntimeAuthorityStore({ pool, environment 
       }
     },
 
-    async read({ client = null, forUpdate = false } = {}) {
-      const state = await readRow(client ?? pool, environment, { forUpdate: Boolean(client && forUpdate) });
+    async read({ client = null, forUpdate = false, queryTimeoutMs = null } = {}) {
+      const state = await readRow(client ?? pool, environment, {
+        forUpdate: Boolean(client && forUpdate),
+        queryTimeoutMs,
+      });
       if (!state) throw storeError("RUNTIME_AUTHORITY_UNAVAILABLE", "Provider runtime-authority state is unavailable.");
       return Object.freeze({ state });
     },
@@ -148,12 +151,18 @@ async function requireCurrent(queryTarget, environment) {
   return state;
 }
 
-async function readRow(queryTarget, environment, { forUpdate = false } = {}) {
-  const result = await queryTarget.query(
-    `SELECT state FROM physiqueos.combined_runtime_authority WHERE environment=$1${forUpdate ? " FOR UPDATE" : ""}`,
-    [environment],
-  );
+async function readRow(queryTarget, environment, { forUpdate = false, queryTimeoutMs = null } = {}) {
+  const text = `SELECT state FROM physiqueos.combined_runtime_authority WHERE environment=$1${forUpdate ? " FOR UPDATE" : ""}`;
+  const result = queryTimeoutMs == null
+    ? await queryTarget.query(text, [environment])
+    : await queryTarget.query({ text, values: [environment], query_timeout: boundedReadTimeout(queryTimeoutMs) });
   return result.rows[0]?.state ? validateCombinedRuntimeAuthorityState(result.rows[0].state) : null;
+}
+
+function boundedReadTimeout(value) {
+  const timeout = Number(value);
+  if (!Number.isInteger(timeout) || timeout < 100 || timeout > 10_000) throw new Error("Runtime-authority read timeout is invalid.");
+  return timeout;
 }
 
 async function insertState(client, state) {

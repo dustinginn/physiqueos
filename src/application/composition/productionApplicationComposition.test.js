@@ -104,4 +104,30 @@ describe("getProductionApplicationComposition — compatibility owner guard wiri
     await expect(getProductionApplicationComposition(env)).rejects.not.toMatchObject({ code: "PROVIDER_COMPATIBILITY_OWNER_FORBIDDEN" });
     expect(poolQuery).not.toHaveBeenCalled();
   });
+
+  it("constructs a lightweight readiness composition without querying or hydrating canonical runtime", async () => {
+    const { getProductionProviderReadinessComposition } = await import("./productionApplicationComposition.js");
+    const result = getProductionProviderReadinessComposition(compatibilityEnv({
+      PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID: "phase5-synthetic-user",
+    }));
+
+    expect(result).toMatchObject({
+      kind: "production-provider-readiness",
+      compatibilityMode: true,
+      ownerUserId: "phase5-synthetic-user",
+      expectedDatabaseName: "physiqueos_phase5_test_provider_test",
+    });
+    expect(Object.keys(result.databaseProbe)).toEqual(["healthCheck"]);
+    expect(Object.keys(result.authorityStore)).toContain("read");
+    expect(poolQuery).not.toHaveBeenCalled();
+    expect(poolConnect).not.toHaveBeenCalled();
+  });
+
+  it("applies the compatibility owner guard before constructing the readiness probe", async () => {
+    const { getProductionProviderReadinessComposition } = await import("./productionApplicationComposition.js");
+    expect(() => getProductionProviderReadinessComposition(compatibilityEnv({
+      PHYSIQUEOS_CANONICAL_OWNER_USER_ID: "user_founder_001",
+    }))).toThrow(expect.objectContaining({ code: "PROVIDER_COMPATIBILITY_OWNER_FORBIDDEN" }));
+    expect(poolQuery).not.toHaveBeenCalled();
+  });
 });
