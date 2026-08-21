@@ -129,6 +129,10 @@ RW 167772160 SPARSE "phase7b-isolated-s001.vmdk"
   $bootstrapText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bIsolatedGuestBootstrap.ps1") -Raw
   Assert-True ($bootstrapText.Contains('$identity.classification')) "wrong host fails closed"
   Assert-True (-not ($bootstrapText -match '(?i)(token|password|secret)\s*=\s*["''][^"'']{8,}["'']')) "no embedded credential literals"
+  $hostPreflightText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bVmwareHostPreflight.ps1") -Raw
+  Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm")')) "preflight exposes explicit pre-install host baseline mode"
+  Assert-True ($hostPreflightText.Contains('PHASE7B_VMX_REQUIRED_FOR_FULL_PREFLIGHT')) "full VM preflight still requires exact VMX"
+  Assert-True ($hostPreflightText.Contains('VMWARE_HOST_BASELINE_PREFLIGHT_PASS')) "host baseline has distinct pass classification"
 
   $kitOutputDirectory = Join-Path $testRoot "kit"
   $builderOutput = @(& (Join-Path $PSScriptRoot "phase7bBuildVmwareGuestBootstrapKit.ps1") -OutputDirectory $kitOutputDirectory -ToolingCommit "TEST_TOOLING_COMMIT") -join [Environment]::NewLine
