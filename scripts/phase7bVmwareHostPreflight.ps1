@@ -16,8 +16,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($ReportPath)) {
   $ReportPath = Join-Path $repositoryRoot ".tmp\phase7b-vmware-host-preflight-$nonce.json"
 }
+$stage = "initialize"
 
 try {
+  $stage = "read-host-operating-system"
   $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
   $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
   $availableMemoryGiB = [Math]::Round(([double]$os.FreePhysicalMemory * 1KB / 1GB), 2)
@@ -27,8 +29,22 @@ try {
   $branch = @(& git -C $repositoryRoot branch --show-current 2>$null)
   $repositoryBranchExact = $LASTEXITCODE -eq 0 -and ($branch -join "").Trim() -eq $contract.applicationBranch
   $windows11Host = [string]$os.Caption -match 'Windows 11' -and [string]$os.OSArchitecture -eq '64-bit'
-  $virtualMachinePlatform = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction SilentlyContinue
-  $hostVirtualizationContract = [bool]($computer.HypervisorPresent -and $virtualMachinePlatform -and [string]$virtualMachinePlatform.State -eq "Enabled")
+  $windowsIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $windowsPrincipal = New-Object Security.Principal.WindowsPrincipal($windowsIdentity)
+  $preflightElevated = $windowsPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  $virtualMachinePlatform = $null
+  $virtualMachinePlatformReadable = $false
+  if ($preflightElevated) {
+    $stage = "read-virtual-machine-platform"
+    try {
+      $virtualMachinePlatform = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction Stop
+      $virtualMachinePlatformReadable = $true
+    } catch {
+      $virtualMachinePlatform = $null
+    }
+  }
+  $hostVirtualizationContract = [bool]($computer.HypervisorPresent -and $virtualMachinePlatformReadable -and [string]$virtualMachinePlatform.State -eq "Enabled")
+  $stage = "read-vmware-installation"
   $vmrunCandidates = @(
     "C:\Program Files (x86)\VMware\VMware Workstation\vmrun.exe",
     "C:\Program Files\VMware\VMware Workstation\vmrun.exe"
@@ -37,11 +53,14 @@ try {
   $vmwareInstalled = $vmrunPath.Count -eq 1
   $vmwareDisplayVersion = $null
   $vmwareProduct = @(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
-    Where-Object { [string]$_.DisplayName -match '^VMware Workstation' } | Select-Object -First 1)
-  if ($vmwareProduct.Count -eq 1) { $vmwareDisplayVersion = [string]$vmwareProduct[0].DisplayVersion }
+    Where-Object { $_.PSObject.Properties["DisplayName"] -and [string]$_.PSObject.Properties["DisplayName"].Value -match '^VMware Workstation' } | Select-Object -First 1)
+  if ($vmwareProduct.Count -eq 1 -and $vmwareProduct[0].PSObject.Properties["DisplayVersion"]) {
+    $vmwareDisplayVersion = [string]$vmwareProduct[0].PSObject.Properties["DisplayVersion"].Value
+  }
   $vmwareVersionAccepted = $vmwareInstalled -and $vmwareDisplayVersion -match '^(?:26\.|26H1)'
   $vmRunning = $false
 
+  $stage = "read-founder-runtime"
   $runtimeStatus = $null
   $runtimeStatusScript = Join-Path $PSScriptRoot "statusPhysiqueOS.ps1"
   if (Test-Path -LiteralPath $runtimeStatusScript -PathType Leaf) {
@@ -52,6 +71,7 @@ try {
     founderRepositoryPathExact = $repositoryPathExact
     founderRepositoryBranchExact = $repositoryBranchExact
     windows11Host64Bit = $windows11Host
+    hostPreflightElevated = $preflightElevated
     virtualMachinePlatformAndHypervisorPresent = $hostVirtualizationContract
     availableMemoryAtLeast7GiB = $availableMemoryGiB -ge 7
     systemDriveFreeAtLeast120GiB = $freeDiskGiB -ge 120
@@ -61,6 +81,7 @@ try {
   $diskContract = $null
   $resolvedVmxPath = $null
   if ($Mode -eq "FullVm") {
+    $stage = "validate-full-vm"
     if ([string]::IsNullOrWhiteSpace($VmxPath)) { throw "PHASE7B_VMX_REQUIRED_FOR_FULL_PREFLIGHT" }
     $resolvedVmxPath = (Resolve-Path -LiteralPath $VmxPath -ErrorAction Stop).Path
     if ($vmwareInstalled) {
@@ -75,6 +96,7 @@ try {
     $checks.vmwareWorkstation26H1Available = $vmwareVersionAccepted
     $checks.targetVmPoweredOff = -not $vmRunning
   }
+  $stage = "write-safe-report"
   $pass = @($checks.Values | Where-Object { -not $_ }).Count -eq 0
   $report = [ordered]@{
     schemaVersion = 1
@@ -85,6 +107,7 @@ try {
     pass = $pass
     acceptedApplicationCommit = $contract.applicationCommit
     vmDisplayName = $contract.vmDisplayName
+    reportPath = $ReportPath
     vmxPath = $resolvedVmxPath
     checks = $checks
     safeEvidence = [ordered]@{
@@ -100,7 +123,7 @@ try {
       windowsCaption = [string]$os.Caption
       windowsArchitecture = [string]$os.OSArchitecture
       hypervisorPresent = [bool]$computer.HypervisorPresent
-      virtualMachinePlatformState = if ($virtualMachinePlatform) { [string]$virtualMachinePlatform.State } else { "Unavailable" }
+      virtualMachinePlatformState = if ($virtualMachinePlatform) { [string]$virtualMachinePlatform.State } elseif (-not $preflightElevated) { "UNREADABLE_REQUIRES_ELEVATION" } else { "UNAVAILABLE" }
       repositoryPathExact = $repositoryPathExact
       repositoryBranch = ($branch -join "").Trim()
     }
@@ -113,7 +136,7 @@ try {
   $safeCode = if ([string]$_.Exception.Message -match '^PHASE7B_[A-Z0-9_:.-]+$') { [string]$_.Exception.Message } else { "HOST_PREFLIGHT_EXCEPTION" }
   [ordered]@{
     schemaVersion = 1; nonce = $nonce; observedAt = $timestamp; pass = $false
-    classification = "VMWARE_HOST_PREFLIGHT_ERROR"; safeErrorCode = $safeCode
+    classification = "VMWARE_HOST_PREFLIGHT_ERROR"; safeErrorCode = $safeCode; safeStage = $stage; safeLineNumber = [int]$_.InvocationInfo.ScriptLineNumber
   } | ConvertTo-Json -Compress
   exit 1
 }

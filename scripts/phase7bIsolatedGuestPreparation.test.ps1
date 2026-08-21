@@ -133,6 +133,8 @@ RW 167772160 SPARSE "phase7b-isolated-s001.vmdk"
   Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm")')) "preflight exposes explicit pre-install host baseline mode"
   Assert-True ($hostPreflightText.Contains('PHASE7B_VMX_REQUIRED_FOR_FULL_PREFLIGHT')) "full VM preflight still requires exact VMX"
   Assert-True ($hostPreflightText.Contains('VMWARE_HOST_BASELINE_PREFLIGHT_PASS')) "host baseline has distinct pass classification"
+  Assert-True ($hostPreflightText.Contains('hostPreflightElevated')) "host preflight records elevation as a distinct check"
+  Assert-True ($hostPreflightText.Contains('UNREADABLE_REQUIRES_ELEVATION')) "VMP evidence fails closed when elevation is unavailable"
 
   $kitOutputDirectory = Join-Path $testRoot "kit"
   $builderOutput = @(& (Join-Path $PSScriptRoot "phase7bBuildVmwareGuestBootstrapKit.ps1") -OutputDirectory $kitOutputDirectory -ToolingCommit "TEST_TOOLING_COMMIT") -join [Environment]::NewLine
