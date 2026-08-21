@@ -30,9 +30,9 @@
 // AUTHORITY IS NEVER TOUCHED HERE. This service only ever calls `authorityStore.read()` - it has no
 // `transition` capability at all, so it cannot set `firstProviderCanonicalWriteAt`, cannot revert
 // authority, and cannot introduce a second worker-authority source: `combined_runtime_authority
-// .workerAuthority` (already `"provider"` since phase L) remains the sole authority signal
-// `AuthorityGatedWorker.js` itself independently re-checks on every `runOnce()` call, regardless of
-// what this service's own durable evidence says.
+// .workerAuthority` remains the sole worker-authority source. `AuthorityGatedWorker.js` independently
+// re-checks it and the durable `firstProviderCanonicalWriteAt` release boundary on every `runOnce()`
+// call, regardless of what this service's own durable evidence says.
 import { RuntimeAuthority } from "../CombinedRuntimeAuthorityState.js";
 import { requireTransferOperationId, TransferErrorCode } from "../transfer/combinedCutoverTransferContract.js";
 import { assertCombinedCutoverWorkerControl } from "./combinedCutoverWorkerControl.js";

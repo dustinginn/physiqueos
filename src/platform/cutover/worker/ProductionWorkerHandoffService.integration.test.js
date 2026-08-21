@@ -21,6 +21,7 @@ import { createDeterministicCombinedCutoverRoutingControl } from "../routing/tes
 import { createProductionWorkerHandoffService } from "./ProductionWorkerHandoffService.js";
 import { createDeterministicCombinedCutoverWorkerControl } from "./testSupport/deterministicWorkerControl.js";
 import { WorkerState } from "./combinedCutoverWorkerControl.js";
+import { createAuthorityGatedWorker } from "../../jobs/AuthorityGatedWorker.js";
 
 const ENVIRONMENT = "combined-cutover-worker-integration-test";
 const OPERATION_ID = "combined-op-worker-0001";
@@ -112,6 +113,38 @@ async function crossFirstWriteBoundary(fixture, authorityStore, commandId) {
 }
 
 describe("integration — the full documented L -> M -> N/O sequence", () => {
+  it("keeps the real always-running provider worker idle before L and through the L-to-M window", async () => {
+    const { fixture, authorityStore, orchestrator } = harness();
+    await initialize(fixture);
+    let pollCount = 0;
+    const worker = createAuthorityGatedWorker({
+      worker: {
+        async runOnce() { pollCount += 1; return { outcome: "idle" }; },
+        markStopping() {},
+        isStopping() { return false; },
+      },
+      authorityStore,
+    });
+
+    expect((await worker.runOnce()).outcome).toBe("idle");
+    expect(pollCount).toBe(0); // before L: Windows remains authoritative
+
+    const result = await orchestrator.execute(executeInput());
+    expect(result.state).toMatchObject({
+      authority: RuntimeAuthority.PROVIDER,
+      workerAuthority: "provider",
+      publicRuntimeAuthority: "provider",
+      canonicalStoreEpoch: "postgres-canonical",
+      firstProviderCanonicalWriteAt: null,
+    });
+    expect((await worker.runOnce()).outcome).toBe("idle");
+    expect(pollCount).toBe(0); // L is complete, but M is not
+
+    await crossFirstWriteBoundary(fixture, authorityStore, "integration:real-worker-gate");
+    await worker.runOnce();
+    expect(pollCount).toBe(1); // the real M transaction is the event that opens the gate
+  });
+
   it("worker handoff succeeds only after real authority transfer (L) and a real first-write boundary (M)", async () => {
     const { fixture, authorityStore, orchestrator, workerHandoffService, workerControl } = harness();
     await initialize(fixture);

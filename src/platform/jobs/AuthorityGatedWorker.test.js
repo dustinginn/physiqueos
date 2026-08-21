@@ -18,14 +18,66 @@ describe("authority-gated worker", () => {
     expect(heartbeat).toHaveBeenCalledWith(expect.objectContaining({ status: "paused_authority" }));
   });
 
-  it("polls only under complete provider authority", async () => {
+  it("remains paused after phase L while the first provider write boundary is null", async () => {
+    const runOnce = vi.fn();
+    const heartbeat = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: providerState({ firstProviderCanonicalWriteAt: null, firstProviderCommandId: null }) }) },
+      heartbeat,
+    });
+    expect(await gated.runOnce()).toMatchObject({ outcome: "idle", authority: "provider-authoritative" });
+    expect(runOnce).not.toHaveBeenCalled();
+    expect(heartbeat).toHaveBeenCalledWith(expect.objectContaining({
+      status: "paused_authority",
+      details: expect.objectContaining({ firstProviderWriteBoundaryRecorded: false }),
+    }));
+  });
+
+  it("polls only under complete provider authority after the first provider write boundary", async () => {
     const runOnce = vi.fn(async () => ({ outcome: "idle" }));
     const gated = createAuthorityGatedWorker({
       worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
-      authorityStore: { read: async () => ({ state: { authority: "provider-authoritative", workerAuthority: "provider", publicRuntimeAuthority: "provider", canonicalStoreEpoch: "postgres-canonical" } }) },
+      authorityStore: { read: async () => ({ state: providerState() }) },
     });
     await gated.runOnce();
     expect(runOnce).toHaveBeenCalledOnce();
+  });
+
+  it("remains paused in recovery-required even after the boundary was crossed", async () => {
+    const runOnce = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: providerState({ authority: "recovery-required", workerAuthority: "paused" }) }) },
+    });
+    expect(await gated.runOnce()).toMatchObject({ outcome: "idle", authority: "recovery-required" });
+    expect(runOnce).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing timestamp", { firstProviderCanonicalWriteAt: undefined }],
+    ["empty timestamp", { firstProviderCanonicalWriteAt: "" }],
+    ["whitespace timestamp", { firstProviderCanonicalWriteAt: "  " }],
+    ["malformed timestamp", { firstProviderCanonicalWriteAt: "not-a-timestamp" }],
+    ["missing command identity", { firstProviderCommandId: null }],
+  ])("fails closed for %s first-provider-write boundary evidence", async (_label, boundaryOverride) => {
+    const runOnce = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: providerState(boundaryOverride) }) },
+    });
+    expect(await gated.runOnce()).toMatchObject({ outcome: "idle" });
+    expect(runOnce).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for an unknown authority even when the other provider fields and boundary look valid", async () => {
+    const runOnce = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: providerState({ authority: "unknown-authority" }) }) },
+    });
+    expect(await gated.runOnce()).toMatchObject({ outcome: "idle", authority: "unknown-authority" });
+    expect(runOnce).not.toHaveBeenCalled();
   });
 
   it("polls isolated work only under the exact compatibility tuple", async () => {
@@ -61,3 +113,16 @@ describe("authority-gated worker", () => {
     expect(runOnce).not.toHaveBeenCalled();
   });
 });
+
+function providerState(overrides = {}) {
+  return {
+    authority: "provider-authoritative",
+    workerAuthority: "provider",
+    publicRuntimeAuthority: "provider",
+    canonicalStoreEpoch: "postgres-canonical",
+    firstProviderCanonicalWriteAt: "2026-08-21T00:00:00.000Z",
+    firstProviderCommandId: "command:first-provider-write",
+    version: 5,
+    ...overrides,
+  };
+}
