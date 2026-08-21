@@ -182,6 +182,15 @@ export function createProductionCombinedCutoverWorkerControl({
     return freeze({ ready: true, outcome: "quiesced", workerState: WorkerState.WINDOWS_CADENCE_QUIESCED, snapshot, evidence: safeEvidence(reconciliation) });
   }
 
+  async function captureWindowsCadenceSnapshot({ operationId } = {}) {
+    required(operationId, "operationId");
+    const [monitor, productionServer, ngrok] = await Promise.all([inspectMonitor(), inspectProductionServer(), inspectNgrok()]);
+    if (monitor.enabled !== true) {
+      throw workerControlError(WorkerErrorCode.SNAPSHOT_MISMATCH, "Runtime Monitor pre-change snapshot requires the exact enabled state.", safeWindowsEvidence(monitor));
+    }
+    return freeze({ ready: true, snapshot: createSnapshot(monitor, productionServer, ngrok) });
+  }
+
   async function retireWindowsWorkers({ operationId, operationIdentity } = {}) {
     const identity = requireIdentity(operationIdentity, operationId, "retire-windows-workers");
     // Prove both independent Windows resources before stopping either one. This avoids an otherwise
@@ -253,6 +262,7 @@ export function createProductionCombinedCutoverWorkerControl({
   return freeze({
     kind: "production-combined-cutover-worker-control",
     inspectWorkerState,
+    captureWindowsCadenceSnapshot,
     quiesceWindowsCadence,
     activateProviderWorkers,
     verifyProviderWorkers,

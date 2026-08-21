@@ -28,6 +28,15 @@ describe("ProductionWindowsCadenceControlService — B ordering", () => {
     });
   });
 
+  it("captures the exact restoration snapshot read-only after the fence and before quiescence", async () => {
+    const workerControl = createDeterministicCombinedCutoverWorkerControl({ runtimeMonitorRunning: true, cadenceActive: true });
+    const service = createProductionWindowsCadenceControlService({ controlStore: store(controlState()), workerControl });
+    const captured = await service.captureAfterWriteFence({ input, fenceEvidence: { ready: true, fenceId: FENCE_ID } });
+    expect(captured).toMatchObject({ ready: true, snapshot: { runtimeMonitor: { enabled: true }, cadencePresent: true } });
+    expect(workerControl.inspectCalls().map((call) => call.op)).toEqual(["capture"]);
+    expect(workerControl.currentWindowsState()).toMatchObject({ monitorEnabled: true, cadencePresent: true, serverRetired: false, ngrokRetired: false });
+  });
+
   it("rejects stale fence identity", async () => {
     const workerControl = createDeterministicCombinedCutoverWorkerControl();
     const service = createProductionWindowsCadenceControlService({ controlStore: store(controlState()), workerControl });

@@ -8,14 +8,12 @@ export function createProductionWindowsCadenceControlService({ controlStore, wor
   assertCombinedCutoverWorkerControl(workerControl);
 
   return Object.freeze({
+    async captureAfterWriteFence({ input, fenceEvidence } = {}) {
+      const operationId = await requireFence({ input, fenceEvidence });
+      return workerControl.captureWindowsCadenceSnapshot({ operationId });
+    },
     async quiesceAfterWriteFence({ input, fenceEvidence, snapshot = null } = {}) {
-      const operationId = requireTransferOperationId(input?.migrationOperationId);
-      const current = (await controlStore.read()).state;
-      if (current.fenceState !== MigrationFenceState.ACTIVE || current.migrationOperationId !== operationId ||
-          current.writesEnabled !== false || current.firstPostgresWriteAt != null ||
-          !fenceEvidence || fenceEvidence.ready !== true || fenceEvidence.fenceId !== current.fenceId) {
-        throw workerControlError(WorkerErrorCode.FENCE_REQUIRED, "Runtime Monitor cannot be changed until the exact durable Windows write fence is active.");
-      }
+      const operationId = await requireFence({ input, fenceEvidence });
       return workerControl.quiesceWindowsCadence({
         operationId,
         snapshot,
@@ -26,6 +24,17 @@ export function createProductionWindowsCadenceControlService({ controlStore, wor
       });
     },
   });
+
+  async function requireFence({ input, fenceEvidence }) {
+      const operationId = requireTransferOperationId(input?.migrationOperationId);
+      const current = (await controlStore.read()).state;
+      if (current.fenceState !== MigrationFenceState.ACTIVE || current.migrationOperationId !== operationId ||
+          current.writesEnabled !== false || current.firstPostgresWriteAt != null ||
+          !fenceEvidence || fenceEvidence.ready !== true || fenceEvidence.fenceId !== current.fenceId) {
+        throw workerControlError(WorkerErrorCode.FENCE_REQUIRED, "Runtime Monitor cannot be changed until the exact durable Windows write fence is active.");
+      }
+      return operationId;
+  }
 }
 
 function required(value, field) {

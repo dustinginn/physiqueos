@@ -45,6 +45,10 @@ export function createDeterministicCombinedCutoverWorkerControl({
       calls.push({ op: "inspect", operationId });
       return Object.freeze({ workerState, operationId: operationId ?? null, snapshot: snapshot(), windows: { monitorEnabled, monitorRunning, cadencePresent, serverRetired, ngrokRetired: tunnelRetired } });
     },
+    async captureWindowsCadenceSnapshot({ operationId } = {}) {
+      calls.push({ op: "capture", operationId });
+      return Object.freeze({ ready: true, snapshot: snapshot() });
+    },
     async quiesceWindowsCadence({ operationId, operationIdentity } = {}) {
       calls.push({ op: "quiesce", operationId, operationIdentity });
       if (failQuiesceWith) throw failQuiesceWith;

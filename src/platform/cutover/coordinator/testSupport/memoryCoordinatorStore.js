@@ -1,0 +1,23 @@
+import { CoordinatorErrorCode, CoordinatorStep, CoordinatorStepStatus, coordinatorError, freeze, requireRunId } from "../combinedCutoverCoordinatorContract.js";
+import { validateCoordinatorBSnapshot } from "../combinedCutoverBSnapshot.js";
+
+export function createMemoryCoordinatorStore({ now = () => new Date("2026-08-21T06:00:00.000Z") } = {}) {
+  const runs = new Map();
+  return freeze({ createRun, readRun, beginStep, recordStepOutcome, saveBSnapshot, snapshot: () => structuredClone([...runs.values()]) });
+  async function createRun(identity) {
+    const id = requireRunId(identity?.runId);
+    if (runs.has(id)) {
+      const current = runs.get(id);
+      for (const key of ["coordinatorOperationId","migrationOperationId","environment","authorizationFingerprint","inputDigest"]) if (current[key] !== identity[key]) throw coordinatorError(CoordinatorErrorCode.RUN_CONFLICT, "Coordinator run identity conflicts with durable state.");
+      return freeze({ run: current, outcome: "idempotent-replay" });
+    }
+    const timestamp = now().toISOString();
+    const run = freeze({ schemaVersion: 1, ...identity, version: 0, currentStep: "A", stepStatus: CoordinatorStepStatus.NOT_STARTED, completedSteps: [], evidenceRefs: {}, approvalFingerprints: {}, bSnapshot: null, bSnapshotDigest: null, mBoundaryCrossed: false, failureCode: null, createdAt: timestamp, updatedAt: timestamp });
+    runs.set(id, run); return freeze({ run, outcome: "created" });
+  }
+  async function readRun(runId) { const run = runs.get(requireRunId(runId)); if (!run) throw coordinatorError(CoordinatorErrorCode.RUN_NOT_FOUND, "Coordinator run does not exist."); return freeze({ run }); }
+  async function beginStep({ runId, expectedVersion, step, approvalFingerprint = null }) { return update(runId, expectedVersion, (run) => { if (run.currentStep !== step || ![CoordinatorStepStatus.NOT_STARTED,CoordinatorStepStatus.FAILED_CONCLUSIVE,CoordinatorStepStatus.BLOCKED_PRECONDITION].includes(run.stepStatus)) throw coordinatorError(CoordinatorErrorCode.STALE_STATE, "Step cannot begin."); return { stepStatus: CoordinatorStepStatus.IN_PROGRESS_OR_UNRESOLVED, approvalFingerprints: approvalFingerprint ? { ...run.approvalFingerprints, [step]: approvalFingerprint } : run.approvalFingerprints, failureCode: null }; }); }
+  async function recordStepOutcome({ runId, expectedVersion, step, status, evidenceRef = null, failureCode = null, completed = false, mBoundaryCrossed = false, approvalFingerprint = null }) { return update(runId, expectedVersion, (run) => { if (run.currentStep !== step) throw coordinatorError(CoordinatorErrorCode.STALE_STATE, "Step changed."); const completedSteps = completed && !run.completedSteps.includes(step) ? [...run.completedSteps, step] : run.completedSteps; const next = completed ? (["A","B","C_D","E","F_G","H_I_J","K","L","M","N_O","P"].find((value) => !completedSteps.includes(value)) ?? CoordinatorStep.COMPLETE) : step; return { currentStep: next, stepStatus: completed ? (next === CoordinatorStep.COMPLETE ? CoordinatorStepStatus.COMPLETED : CoordinatorStepStatus.NOT_STARTED) : status, completedSteps, evidenceRefs: evidenceRef ? { ...run.evidenceRefs, [step]: structuredClone(evidenceRef) } : run.evidenceRefs, approvalFingerprints: approvalFingerprint ? { ...run.approvalFingerprints, recovery: approvalFingerprint } : run.approvalFingerprints, failureCode, mBoundaryCrossed: run.mBoundaryCrossed || mBoundaryCrossed }; }); }
+  async function saveBSnapshot({ runId, expectedVersion, snapshot }) { const envelope = validateCoordinatorBSnapshot(snapshot, { runId }); return update(runId, expectedVersion, (run) => { if (run.currentStep !== "B" || run.stepStatus !== CoordinatorStepStatus.IN_PROGRESS_OR_UNRESOLVED) throw coordinatorError(CoordinatorErrorCode.STALE_STATE, "B snapshot cannot be saved now."); if (run.bSnapshot) { if (run.bSnapshotDigest !== envelope.digest) throw coordinatorError(CoordinatorErrorCode.SNAPSHOT_CONFLICT, "Conflicting B snapshot."); return null; } return { bSnapshot: envelope, bSnapshotDigest: envelope.digest }; }); }
+  function update(runId, expectedVersion, apply) { const current = runs.get(requireRunId(runId)); if (!current) throw coordinatorError(CoordinatorErrorCode.RUN_NOT_FOUND, "Coordinator run does not exist."); if (current.version !== Number(expectedVersion)) throw coordinatorError(CoordinatorErrorCode.STALE_STATE, "Coordinator CAS version is stale."); const patch = apply(current); if (!patch) return freeze({ run: current, outcome: "idempotent-replay" }); const next = freeze({ ...current, ...patch, version: current.version + 1, updatedAt: now().toISOString() }); runs.set(runId, next); return freeze({ run: next, outcome: "updated" }); }
+}

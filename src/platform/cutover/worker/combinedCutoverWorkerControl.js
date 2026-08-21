@@ -77,6 +77,7 @@ export function createUnavailableWorkerControl({ reason = "No production worker-
   return Object.freeze({
     kind: "unavailable-worker-control",
     inspectWorkerState: unavailable,
+    captureWindowsCadenceSnapshot: unavailable,
     quiesceWindowsCadence: unavailable,
     activateProviderWorkers: unavailable,
     verifyProviderWorkers: unavailable,
@@ -90,7 +91,7 @@ export function createUnavailableWorkerControl({ reason = "No production worker-
  * implementation is supplied (unavailable, deterministic test double, or a future real one).
  */
 export function assertCombinedCutoverWorkerControl(workerControl) {
-  const required = ["inspectWorkerState", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"];
+  const required = ["inspectWorkerState", "captureWindowsCadenceSnapshot", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"];
   const missing = required.filter((name) => typeof workerControl?.[name] !== "function");
   if (missing.length) throw new Error(`Combined cutover worker control is missing: ${missing.join(", ")}.`);
   return workerControl;
