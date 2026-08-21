@@ -3,7 +3,7 @@ import { createProductionAuthorityHandoffService } from "./ProductionAuthorityHa
 import { createPostgresCombinedCutoverHandoffReceiptStore } from "./PostgresCombinedCutoverHandoffReceiptStore.js";
 import { createFakeHandoffReceiptPool } from "./testSupport/fakeHandoffReceiptPool.js";
 import { createDeterministicCombinedCutoverRoutingControl } from "../routing/testSupport/deterministicRoutingControl.js";
-import { createUnavailableRoutingControl, RouteState } from "../routing/combinedCutoverRoutingControl.js";
+import { createUnavailableRoutingControl, RouteState, RoutingErrorCode, routingControlError } from "../routing/combinedCutoverRoutingControl.js";
 import {
   RuntimeAuthority,
   RuntimeAuthorityAction,
@@ -140,6 +140,10 @@ describe("ProductionAuthorityHandoffService — successful handoff (authority be
     const calls = routing.inspectCalls().map((call) => call.op);
     expect(calls.indexOf("activate")).toBeGreaterThan(-1);
     expect(calls.indexOf("verify")).toBeGreaterThan(calls.indexOf("activate"));
+    expect(routing.inspectCalls().find((call) => call.op === "activate")?.operationIdentity).toEqual({
+      operationId,
+      commandId: `${commandPrefix}:activate-provider-route`,
+    });
 
     const { receipt } = await handoffReceiptStore.read(operationId);
     expect(receipt).toMatchObject({ authorityStatus: "committed", resultingAuthority: RuntimeAuthority.PROVIDER, routingStatus: "verified" });
@@ -184,6 +188,60 @@ describe("ProductionAuthorityHandoffService — idempotency", () => {
 });
 
 describe("ProductionAuthorityHandoffService — routing failure classification", () => {
+  it("records activation as reached-but-unverified when the one provider mutation outcome is ambiguous", async () => {
+    const routing = createDeterministicCombinedCutoverRoutingControl({
+      failActivateWith: routingControlError(RoutingErrorCode.AMBIGUOUS, "provider update timed out and readback remained ambiguous", { mutationAttempted: true }),
+    });
+    const { service, authorityStore, input, handoffReceiptStore } = harness({ routing });
+    const state = (await authorityStore.read()).state;
+    await expect(service.transferAuthorityAndRoute({ input, state, acknowledgement: acknowledgement(), commitAuthority: commitAuthorityFor(authorityStore) }))
+      .rejects.toMatchObject({ code: "HANDOFF_ROUTING_ACTIVATION_AMBIGUOUS" });
+
+    expect((await authorityStore.read()).state.authority).toBe(RuntimeAuthority.PROVIDER);
+    const { receipt } = await handoffReceiptStore.read(operationId);
+    expect(receipt.authorityStatus).toBe("committed");
+    expect(receipt.routingStatus).toBe("activated");
+  });
+
+  it("resumes an activation-ambiguous receipt with verification only and never a second mutation", async () => {
+    const ambiguousRouting = createDeterministicCombinedCutoverRoutingControl({
+      failActivateWith: routingControlError(RoutingErrorCode.AMBIGUOUS, "provider update unresolved", { mutationAttempted: true }),
+    });
+    const { service, authorityStore, input, handoffReceiptStore } = harness({ routing: ambiguousRouting });
+    const state = (await authorityStore.read()).state;
+    await expect(service.transferAuthorityAndRoute({ input, state, acknowledgement: acknowledgement(), commitAuthority: commitAuthorityFor(authorityStore) })).rejects.toThrow();
+
+    const reconciliationRouting = createDeterministicCombinedCutoverRoutingControl({ initialRouteState: RouteState.PROVIDER_ACTIVE });
+    const resumedService = createProductionAuthorityHandoffService({
+      authorityStore,
+      preparationStore: fakePreparationStore(),
+      handoffReceiptStore,
+      routingControl: reconciliationRouting,
+    });
+    const resumed = await resumedService.transferAuthorityAndRoute({
+      input,
+      state: providerPreparedState(),
+      acknowledgement: acknowledgement(),
+      commitAuthority: commitAuthorityFor(authorityStore),
+    });
+    expect(resumed.outcome).toBe("handed-off");
+    expect(reconciliationRouting.inspectCalls().map((call) => call.op)).toEqual(["inspect", "verify"]);
+  });
+
+  it("records a pre-mutation ambiguous inspection as failed, not as a dispatched activation", async () => {
+    const routing = createDeterministicCombinedCutoverRoutingControl({
+      failActivateWith: routingControlError(RoutingErrorCode.AMBIGUOUS, "provider inspection unavailable before mutation"),
+    });
+    const { service, authorityStore, input, handoffReceiptStore } = harness({ routing });
+    const state = (await authorityStore.read()).state;
+    await expect(service.transferAuthorityAndRoute({ input, state, acknowledgement: acknowledgement(), commitAuthority: commitAuthorityFor(authorityStore) }))
+      .rejects.toMatchObject({ code: "HANDOFF_ROUTING_FAILED" });
+
+    const { receipt } = await handoffReceiptStore.read(operationId);
+    expect(receipt.routingStatus).toBe("failed");
+  });
+
+
   it("routing activation failure leaves authority committed but routing evidence 'failed', not 'verified'", async () => {
     const routing = createDeterministicCombinedCutoverRoutingControl({ failActivateWith: new Error("activation boom") });
     const { service, authorityStore, input, handoffReceiptStore } = harness({ routing });

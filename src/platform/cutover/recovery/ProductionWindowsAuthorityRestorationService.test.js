@@ -3,7 +3,7 @@ import { createProductionWindowsAuthorityRestorationService } from "./Production
 import { createPostgresCombinedCutoverHandoffReceiptStore } from "../handoff/PostgresCombinedCutoverHandoffReceiptStore.js";
 import { createFakeHandoffReceiptPool } from "../handoff/testSupport/fakeHandoffReceiptPool.js";
 import { createDeterministicCombinedCutoverRoutingControl } from "../routing/testSupport/deterministicRoutingControl.js";
-import { createUnavailableRoutingControl, RouteState } from "../routing/combinedCutoverRoutingControl.js";
+import { createUnavailableRoutingControl, RouteState, RoutingErrorCode, routingControlError } from "../routing/combinedCutoverRoutingControl.js";
 import { RuntimeAuthority } from "../CombinedRuntimeAuthorityState.js";
 import { MigrationFenceState, MigrationControlAction } from "../migrationControlState.js";
 import { withIsolatedMigrationControlStore, activateIsolatedFence } from "./testSupport/isolatedMigrationControlStore.js";
@@ -72,6 +72,10 @@ describe("ProductionWindowsAuthorityRestorationService — legal pre-boundary re
       const result = await service.restoreWindowsAuthority({ input: input() });
       expect(result).toMatchObject({ ready: true, classification: "RESTORED", authority: RuntimeAuthority.WINDOWS_LEGACY, routing: { action: "restored" } });
       expect(routingControl.inspectCalls().map((call) => call.op)).toContain("restore");
+      expect(routingControl.inspectCalls().find((call) => call.op === "restore")?.operationIdentity).toEqual({
+        operationId: OPERATION_ID,
+        commandId: `combined-cutover-restore-route:${OPERATION_ID}`,
+      });
       expect(routingControl.currentRouteState()).toBe(RouteState.WINDOWS_ACTIVE);
 
       const { receipt } = await handoffReceiptStore.read(OPERATION_ID);
@@ -251,6 +255,24 @@ describe("ProductionWindowsAuthorityRestorationService — honest routing-failur
 
       const { receipt } = await handoffReceiptStore.read(OPERATION_ID);
       expect(receipt.windowsRoutingRestoreStatus).toBe("ambiguous"); // never conflated with a definite failure
+    });
+  });
+
+  it("records a production adapter's unresolved mutation outcome as ambiguous rather than failed", async () => {
+    await withIsolatedMigrationControlStore(async (controlStore) => {
+      activateIsolatedFence(controlStore, OPERATION_ID);
+      const authorityStore = memoryAuthorityStore(providerAuthoritativeState());
+      const handoffReceiptStore = await activatedReceiptStore({ verified: true });
+      const routingControl = createDeterministicCombinedCutoverRoutingControl({
+        initialRouteState: RouteState.PROVIDER_ACTIVE,
+        failRestoreWith: routingControlError(RoutingErrorCode.AMBIGUOUS, "provider readback unresolved"),
+      });
+      const service = createProductionWindowsAuthorityRestorationService({ authorityStore, handoffReceiptStore, routingControl, controlStore });
+
+      const result = await service.restoreWindowsAuthority({ input: input() });
+      expect(result).toMatchObject({ ready: false, classification: "AMBIGUOUS", routing: { action: "restore-ambiguous" } });
+      const { receipt } = await handoffReceiptStore.read(OPERATION_ID);
+      expect(receipt.windowsRoutingRestoreStatus).toBe("ambiguous");
     });
   });
 });

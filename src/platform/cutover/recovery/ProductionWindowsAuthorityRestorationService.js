@@ -151,14 +151,20 @@ async function reconcileRouting({ handoffReceiptStore, routingControl, operation
   }
 
   try {
-    await routingControl.restoreWindowsRoute({ routingTarget: receipt.routingTarget });
+    await routingControl.restoreWindowsRoute({
+      routingTarget: receipt.routingTarget,
+      operationIdentity: {
+        operationId,
+        commandId: `combined-cutover-restore-route:${operationId}`,
+      },
+    });
     await handoffReceiptStore.recordWindowsRoutingRestored({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest });
     return { action: "restored" };
   } catch (routingError) {
     // The routing control itself being unconfigured/unreachable means the actual route state is
     // genuinely unknown - distinct from an attempt that was made and explicitly failed - so this is
     // recorded and reported as "ambiguous," never silently folded into "failed".
-    if (routingError?.code === RoutingErrorCode.UNAVAILABLE) {
+    if ([RoutingErrorCode.UNAVAILABLE, RoutingErrorCode.AMBIGUOUS].includes(routingError?.code)) {
       await handoffReceiptStore.recordWindowsRoutingRestoreAmbiguous({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest }).catch(() => undefined);
       return { action: "restore-ambiguous", error: safeMessage(routingError) };
     }

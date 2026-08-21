@@ -71,6 +71,7 @@ export default defineConfig({
       "src/app/api/v1/operations/combined-cutover/prepare/CombinedCutoverPreparationRoutes.test.js",
       "db/migrations/000008_combined_cutover_handoff_receipts.test.js",
       "src/platform/cutover/routing/combinedCutoverRoutingControl.test.js",
+      "src/platform/cutover/routing/ProductionDigitalOceanRoutingControl.test.js",
       "src/platform/cutover/handoff/PostgresCombinedCutoverHandoffReceiptStore.test.js",
       "src/platform/cutover/handoff/ProductionAuthorityHandoffService.test.js",
       "src/platform/cutover/handoff/ProductionAuthorityHandoffService.integration.test.js",

@@ -49,7 +49,7 @@
 
 import { RuntimeAuthority } from "../CombinedRuntimeAuthorityState.js";
 import { requireTransferDigest, requireTransferOperationId, transferError, TransferErrorCode } from "../transfer/combinedCutoverTransferContract.js";
-import { assertCombinedCutoverRoutingControl } from "../routing/combinedCutoverRoutingControl.js";
+import { assertCombinedCutoverRoutingControl, RoutingErrorCode } from "../routing/combinedCutoverRoutingControl.js";
 import { HandoffErrorCode, handoffError } from "./combinedCutoverHandoffContract.js";
 
 export function createProductionAuthorityHandoffService({
@@ -130,9 +130,23 @@ export function createProductionAuthorityHandoffService({
       // state machine, and this durable evidence records exactly how far routing got.
       if (declared.receipt.routingStatus === "pending" || declared.receipt.routingStatus === "failed") {
         try {
-          await routingControl.activateProviderRoute({ routingTarget, providerDeploymentId });
+          await routingControl.activateProviderRoute({
+            routingTarget,
+            providerDeploymentId,
+            operationIdentity: {
+              operationId,
+              commandId: `${input.commandPrefix}:activate-provider-route`,
+            },
+          });
           await handoffReceiptStore.recordRoutingActivated({ migrationOperationId: operationId, expectedPackageDigest: packageDigest });
         } catch (error) {
+          if (error?.code === RoutingErrorCode.AMBIGUOUS && error?.mutationAttempted === true) {
+            // Conservatively mark the activation phase reached but UNVERIFIED: the provider may
+            // have applied the one permitted mutation. Resume therefore skips a second mutation
+            // and performs only exact verification; pre-M recovery knows it must reconcile.
+            await handoffReceiptStore.recordRoutingActivated({ migrationOperationId: operationId, expectedPackageDigest: packageDigest });
+            throw handoffError(HandoffErrorCode.ROUTING_ACTIVATION_AMBIGUOUS, `Routing activation outcome is ambiguous after authority committed: ${safeMessage(error)}.`, { cause: error });
+          }
           await handoffReceiptStore.recordRoutingFailed({ migrationOperationId: operationId, expectedPackageDigest: packageDigest }).catch(() => undefined);
           throw handoffError(HandoffErrorCode.ROUTING_FAILED, `Routing activation failed after authority committed: ${safeMessage(error)}.`, { cause: error });
         }

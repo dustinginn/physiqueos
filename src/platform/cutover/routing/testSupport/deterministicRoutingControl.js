@@ -15,19 +15,23 @@ export function createDeterministicCombinedCutoverRoutingControl({
 } = {}) {
   let routeState = initialRouteState;
   const calls = [];
+  const recordId = "deterministic-routing-record";
 
   return Object.freeze({
     kind: "deterministic-routing-control",
     async inspectCurrentRoute({ routingTarget } = {}) {
       calls.push({ op: "inspect", routingTarget });
-      return Object.freeze({ routeState, routingTarget: routingTarget ?? null });
+      return Object.freeze({ routeState, routingTarget: routingTarget ?? null, recordId });
     },
-    async activateProviderRoute({ routingTarget, providerDeploymentId } = {}) {
-      calls.push({ op: "activate", routingTarget, providerDeploymentId });
+    async activateProviderRoute({ routingTarget, providerDeploymentId, operationIdentity } = {}) {
+      calls.push({ op: "activate", routingTarget, providerDeploymentId, operationIdentity });
       if (failActivateWith) throw failActivateWith;
-      if (routeState === RouteState.PROVIDER_ACTIVE) return Object.freeze({ routeState, outcome: "idempotent-replay" });
+      if (routeState === RouteState.PROVIDER_ACTIVE) return Object.freeze({ routeState, outcome: "idempotent-replay", recordId });
+      if (routeState !== RouteState.WINDOWS_ACTIVE) {
+        throw routingControlError(RoutingErrorCode.ACTIVATION_FAILED, `Provider activation refused routing state ${routeState}.`);
+      }
       routeState = RouteState.PROVIDER_ACTIVE;
-      return Object.freeze({ routeState, outcome: "activated" });
+      return Object.freeze({ routeState, outcome: "activated", recordId });
     },
     async verifyProviderRoute({ routingTarget } = {}) {
       calls.push({ op: "verify", routingTarget });
@@ -35,13 +39,17 @@ export function createDeterministicCombinedCutoverRoutingControl({
       if (routeState !== RouteState.PROVIDER_ACTIVE) {
         throw routingControlError(RoutingErrorCode.VERIFICATION_FAILED, "Provider route is not active.");
       }
-      return Object.freeze({ ready: true, routeState });
+      return Object.freeze({ ready: true, routeState, recordId });
     },
-    async restoreWindowsRoute({ routingTarget } = {}) {
-      calls.push({ op: "restore", routingTarget });
+    async restoreWindowsRoute({ routingTarget, operationIdentity } = {}) {
+      calls.push({ op: "restore", routingTarget, operationIdentity });
       if (failRestoreWith) throw failRestoreWith;
+      if (routeState === RouteState.WINDOWS_ACTIVE) return Object.freeze({ routeState, outcome: "idempotent-replay", recordId });
+      if (routeState !== RouteState.PROVIDER_ACTIVE) {
+        throw routingControlError(RoutingErrorCode.RESTORE_FAILED, `Windows restoration refused routing state ${routeState}.`);
+      }
       routeState = RouteState.WINDOWS_ACTIVE;
-      return Object.freeze({ routeState, outcome: "restored" });
+      return Object.freeze({ routeState, outcome: "restored", recordId });
     },
     inspectCalls: () => calls.map((entry) => ({ ...entry })),
     currentRouteState: () => routeState,

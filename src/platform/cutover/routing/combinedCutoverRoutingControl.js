@@ -19,11 +19,10 @@
 // unknown, the authority row alone remains authoritative and durable handoff-receipt evidence
 // records exactly how far routing got, so recovery tooling can reconcile without guessing.
 //
-// FAIL CLOSED BY DEFAULT. `createUnavailableRoutingControl` is the production default until a real
-// DigitalOcean-backed implementation exists: every operation throws `ROUTING_CONTROL_UNAVAILABLE`.
-// This is intentional, not a placeholder bug - real routing cannot be truthfully exercised without a
-// provider-backed compatibility deployment, and silently no-op'ing or synthetically succeeding here
-// would let a real handoff believe routing activated when it did not. See
+// FAIL CLOSED BY DEFAULT. `createUnavailableRoutingControl` remains the production default until the
+// separately configured DigitalOcean implementation is explicitly wired: every operation throws
+// `ROUTING_CONTROL_UNAVAILABLE`. This is intentional - silently no-op'ing or synthetically
+// succeeding would let a real handoff believe routing activated when it did not. See
 // `createDeterministicCombinedCutoverRoutingControl` for the in-memory double used by rehearsal and
 // integration tests, and the synthetic Phase 2B adapter
 // (`syntheticCombinedCutoverRehearsal.js`) for the fully synthetic rehearsal path, which this module
@@ -33,6 +32,13 @@ export const RouteState = Object.freeze({
   WINDOWS_ACTIVE: "windows-active",
   PROVIDER_PREPARED_NOT_ACTIVE: "provider-prepared-not-active",
   PROVIDER_ACTIVE: "provider-active",
+  UNPREPARED: "unprepared",
+  AMBIGUOUS: "ambiguous",
+  UNEXPECTED_TARGET: "unexpected-target",
+  MULTIPLE_MATCHING_RECORDS: "multiple-matching-records",
+  UNEXPECTED_RECORD_TYPE: "unexpected-record-type",
+  TTL_MISMATCH: "ttl-mismatch",
+  RECORD_IDENTITY_MISMATCH: "record-identity-mismatch",
 });
 
 export const RoutingErrorCode = Object.freeze({
@@ -41,6 +47,11 @@ export const RoutingErrorCode = Object.freeze({
   ACTIVATION_FAILED: "ROUTING_ACTIVATION_FAILED",
   VERIFICATION_FAILED: "ROUTING_VERIFICATION_FAILED",
   RESTORE_FAILED: "ROUTING_RESTORE_FAILED",
+  AMBIGUOUS: "ROUTING_OUTCOME_AMBIGUOUS",
+  UNEXPECTED_STATE: "ROUTING_UNEXPECTED_STATE",
+  MULTIPLE_RECORDS: "ROUTING_MULTIPLE_MATCHING_RECORDS",
+  RECORD_TYPE_UNEXPECTED: "ROUTING_RECORD_TYPE_UNEXPECTED",
+  IDENTITY_MISMATCH: "ROUTING_IDENTITY_MISMATCH",
 });
 
 export function routingControlError(code, message, extra = {}) {
