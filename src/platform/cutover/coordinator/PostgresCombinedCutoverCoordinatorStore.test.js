@@ -33,6 +33,13 @@ describe("PostgresCombinedCutoverCoordinatorStore", () => {
     await expect(store.createRun({ ...identity, environment: "other" })).rejects.toMatchObject({ code: "COORDINATOR_RUN_CONFLICT" });
   });
 
+  it.each([" compatibility", "compatibility ", "bad/environment", "x".repeat(129)])("rejects an invalid environment before persistence: %s", async (environment) => {
+    const fake = fakePool();
+    const store = createPostgresCombinedCutoverCoordinatorStore({ pool: fake.pool });
+    await expect(store.createRun({ ...identity, environment })).rejects.toMatchObject({ code: "COORDINATOR_IDENTITY_MISMATCH" });
+    expect(fake.current()).toBeNull();
+  });
+
   it("CAS-reserves recovery before any external recovery mutation", async () => {
     const store = createPostgresCombinedCutoverCoordinatorStore({ pool: fakePool().pool });
     await store.createRun(identity);
@@ -60,6 +67,6 @@ function fakePool() {
     return { rows: [] };
   };
   const client = { query, release() {} };
-  return { pool: { query, connect: async () => client } };
+  return { pool: { query, connect: async () => client }, current: () => row };
 }
 function workerSnapshot() { return { schemaVersion: 1, runtimeMonitor: { taskName: "PhysiqueOS Runtime Monitor", enabled: true, taskState: "ready", definitionSha256: "a".repeat(64) }, runtimeDesiredState: "running", ngrokDesiredState: "running", cadencePresent: false, productionServer: { taskName: "PhysiqueOS Production Server", taskState: "running", definitionSha256: "b".repeat(64), listenerPid: 4100, nodeOwnershipProven: true, runtimeMetadataMatches: true }, ngrok: { taskName: "PhysiqueOS Ngrok Tunnel", taskState: "running", definitionSha256: "c".repeat(64), processId: 4200, processOwnershipProven: true } }; }

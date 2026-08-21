@@ -23,7 +23,7 @@ export function createDigitalOceanApiClient({
   now = () => Date.now(),
   wait = delay,
 } = {}) {
-  const token = required(accessToken, "A DigitalOcean access token");
+  const token = normalizeAccessToken(accessToken);
   if (typeof fetchImpl !== "function") throw new Error("A fetch implementation is required.");
   const baseUrl = parseApiBaseUrl(apiBaseUrl);
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) throw new Error("requestTimeoutMs must be a positive integer.");
@@ -58,6 +58,7 @@ export function createDigitalOceanApiClient({
             ...(body === undefined ? {} : { "content-type": "application/json" }),
           },
           body: serializedBody,
+          redirect: "error",
           signal: deadline.signal,
         })));
       } catch (cause) {
@@ -75,6 +76,7 @@ export function createDigitalOceanApiClient({
           : "The provider read failed at the transport boundary.", evidence({
           method, resourceKind, safePath, classification, elapsedMs: elapsed(now, startedAt), timedOut,
           retryCount: attempt - 1, operationIdentity: applicationIdentity,
+          authorizationHeaderConstructed: true, authorizationScheme: "Bearer",
         }));
       }
 
@@ -88,6 +90,9 @@ export function createDigitalOceanApiClient({
         retryCount: attempt - 1,
         operationIdentity: applicationIdentity,
         providerRequestId: safeHeader(response.headers, "x-request-id"),
+        contentType: safeHeader(response.headers, "content-type"),
+        authorizationHeaderConstructed: true,
+        authorizationScheme: "Bearer",
         rateLimit: readRateLimit(response.headers),
       });
 
@@ -353,6 +358,19 @@ function required(value, field) {
   const candidate = String(value ?? "").trim();
   if (!candidate) throw new Error(`${field} is required.`);
   return candidate;
+}
+
+function normalizeAccessToken(value) {
+  if (typeof value !== "string") throw new Error("A DigitalOcean access token must be a string.");
+  const token = value.trim();
+  if (!token) throw new Error("A DigitalOcean access token is required.");
+  // RFC 6750 bearer credentials use the b64token character set. DigitalOcean PAT/OAuth access
+  // tokens fit this shape. Reject quotes, duplicate `Bearer`, controls, invisible Unicode, and
+  // caller-owned array/object coercion before any request reaches the transport boundary.
+  if (!/^[A-Za-z0-9\-._~+/]+={0,2}$/.test(token)) {
+    throw new Error("A DigitalOcean access token contains unsupported characters.");
+  }
+  return token;
 }
 
 function segment(value, field) {

@@ -22,15 +22,39 @@ describe("DigitalOceanApiClient reads", () => {
       value: { id: "app-1" },
       evidence: {
         method: "GET", resourceKind: "app", safePath: "/v2/apps/{app_id}", status: 200,
-        providerRequestId: "provider-request-1", rateLimit: { limit: 5000, remaining: 4999, reset: 123 },
+        providerRequestId: "provider-request-1", contentType: "application/json",
+        authorizationHeaderConstructed: true, authorizationScheme: "Bearer",
+        rateLimit: { limit: 5000, remaining: 4999, reset: 123 },
       },
     });
     const [url, init] = fetchImpl.mock.calls[0];
     expect(String(url)).toBe("https://api.digitalocean.com/v2/apps/app-1");
     expect(String(url)).not.toContain(PAT);
     expect(init.headers.authorization).toBe(`Bearer ${PAT}`);
+    expect(init.redirect).toBe("error");
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(JSON.stringify(result)).not.toContain(PAT);
+  });
+
+  it("normalizes surrounding clipboard whitespace but rejects transformed credential shapes before dispatch", async () => {
+    const fetchImpl = vi.fn(async () => json({ app: { id: "app-1" } }));
+    const api = createDigitalOceanApiClient({ accessToken: `\uFEFF \r\n${PAT}\r\n `, fetchImpl });
+    await expect(api.getApp("app-1")).resolves.toMatchObject({ classification: ProviderResultClassification.REQUEST_ACCEPTED });
+    expect(fetchImpl.mock.calls[0][1].headers.authorization).toBe(`Bearer ${PAT}`);
+    expect(fetchImpl.mock.calls[0][1].headers.authorization.match(/Bearer/g)).toHaveLength(1);
+
+    const malformed = [
+      [PAT],
+      { token: PAT },
+      `Bearer ${PAT}`,
+      `"${PAT}"`,
+      `${PAT}\r\nother`,
+      `${PAT}\u200B`,
+    ];
+    for (const accessToken of malformed) {
+      expect(() => createDigitalOceanApiClient({ accessToken, fetchImpl })).toThrow(/must be a string|unsupported characters/);
+    }
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it.each([403, 404, 429, 500, 503])("classifies HTTP %i as a conclusive read failure without retry", async (status) => {
@@ -38,6 +62,23 @@ describe("DigitalOceanApiClient reads", () => {
     const error = await capture(client(fetchImpl).getApp("app-1"));
     expect(error).toMatchObject({ classification: ProviderResultClassification.READ_FAILED, evidence: { status, retryCount: 0 } });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(error)).not.toContain(PAT);
+  });
+
+  it("retains safe first-response authentication telemetry without reading or exposing the body", async () => {
+    const fetchImpl = vi.fn(async () => json({ message: `Bearer ${PAT}` }, 401, {
+      "content-type": "application/json; charset=utf-8",
+      "x-request-id": "provider-auth-request",
+    }));
+    const error = await capture(client(fetchImpl).getApp("app-1"));
+    expect(error).toMatchObject({
+      classification: ProviderResultClassification.READ_FAILED,
+      evidence: {
+        method: "GET", safePath: "/v2/apps/{app_id}", status: 401,
+        contentType: "application/json; charset=utf-8", providerRequestId: "provider-auth-request",
+        authorizationHeaderConstructed: true, authorizationScheme: "Bearer", retryCount: 0,
+      },
+    });
     expect(JSON.stringify(error)).not.toContain(PAT);
   });
 

@@ -8,6 +8,10 @@ describe("000011 combined cutover coordinator", () => {
     expect(migration.UP_SQL).toContain("combined_cutover_coordinator_runs");
     expect(migration.UP_SQL).toContain("migration_operation_id text NOT NULL UNIQUE");
     expect(migration.UP_SQL).toContain("coordinator_operation_id text NOT NULL UNIQUE");
+    expect(migration.UP_SQL).toContain("coordinator_operation_id ~ '^[A-Za-z0-9][A-Za-z0-9:_-]{7,127}$'");
+    expect(migration.UP_SQL).toContain("migration_operation_id ~ '^[A-Za-z0-9][A-Za-z0-9:_-]{7,127}$'");
+    expect(migration.UP_SQL).toContain("environment ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'");
+    expect(migration.UP_SQL).toContain("failure_code IS NULL OR failure_code ~ '^[A-Z0-9][A-Z0-9_:-]{0,127}$'");
     expect(migration.UP_SQL).toContain("version bigint NOT NULL DEFAULT 0");
     expect(migration.UP_SQL).toContain("b_snapshot_digest");
     expect(migration.UP_SQL).toContain("m_boundary_crossed");
