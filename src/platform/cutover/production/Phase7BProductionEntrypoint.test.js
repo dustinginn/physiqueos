@@ -75,18 +75,18 @@ function setup({ durablePhase, stepStatus, version }) {
 function request() {
   return {
     identity: { runId: "phase7b-isolated-run-1", coordinatorOperationId: "phase7b-coordinator-operation-1", migrationOperationId: "phase7b-migration-operation-1", environment: "phase7b-isolated-exercise-1" },
-    exercise: { mode: "isolated-synthetic", datasetId: "phase7b-synthetic-358" },
+    exercise: { mode: "isolated-synthetic", datasetId: "phase7b-synthetic-358", identityContractDigest: "f".repeat(64) },
     input: {
       migrationOperationId: "phase7b-migration-operation-1", commandPrefix: "phase7b-isolated", authorizationFingerprint: "a".repeat(64), expectedRuntimeSha256: "b".repeat(64), expectedRuntimeRevision: 358,
       expectedSourceCommit: "c".repeat(40), expectedBuildId: "windows-build-1", expectedMonthlyCostUsd: 25,
       canonicalOwnerUserId: "phase5-synthetic-user", providerDeploymentId: "bed088ae-064e-4420-845c-0d972ed81153", providerBuildId: "phase7b-build-1", providerWorkerId: "phase7b-worker-1",
       windowsHostId: "phase7b-isolated-windows-restore-1",
       providerSource: { commit: "d".repeat(40), buildId: "phase7b-build-1" }, routingTarget: "provider.ondigitalocean.app", firstProviderCommandId: "phase7b:first-provider-command",
-      target: { databaseClusterId: "isolated-cluster", databaseName: "physiqueos_phase5_restore_provider_phase7b", spacesBucket: "physiqueos-staging", spacesPrefix: "phase7b-isolated/exercise-1/" },
+      target: { databaseClusterId: "isolated-cluster", databaseName: "physiqueos_phase5_restore_provider_phase7b", spacesBucket: "physiqueos-phase7b-isolated-exercise-1", spacesPrefix: "private/phase5-synthetic-user/" },
     },
   };
 }
-function trusted() { return { environment: "phase7b-isolated-exercise-1", ownerUserId: "phase5-synthetic-user", datasetId: "phase7b-synthetic-358", databaseClusterId: "isolated-cluster", databaseName: "physiqueos_phase5_restore_provider_phase7b", spacesBucket: "physiqueos-staging", spacesPrefix: "phase7b-isolated/exercise-1/", providerWorkerId: "phase7b-worker-1", windowsHostId: "phase7b-isolated-windows-restore-1" }; }
+function trusted() { return { environment: "phase7b-isolated-exercise-1", runId: "phase7b-isolated-run-1", coordinatorOperationId: "phase7b-coordinator-operation-1", migrationOperationId: "phase7b-migration-operation-1", commandPrefix: "phase7b-isolated", firstProviderCommandId: "phase7b:first-provider-command", identityContractDigest: "f".repeat(64), ownerUserId: "phase5-synthetic-user", datasetId: "phase7b-synthetic-358", databaseClusterId: "isolated-cluster", databaseName: "physiqueos_phase5_restore_provider_phase7b", spacesBucket: "physiqueos-phase7b-isolated-exercise-1", spacesPrefix: "private/phase5-synthetic-user/", providerWorkerId: "phase7b-worker-1", windowsHostId: "phase7b-isolated-windows-restore-1" }; }
 function validEnv() { return {
   PHYSIQUEOS_PHASE7B_ENVIRONMENT: "phase7b-isolated-exercise-1", PHYSIQUEOS_PHASE7B_APP_ID: PHASE7B_PRODUCTION_APP_ID,
   PHYSIQUEOS_PHASE7B_WEB_COMPONENT: "web", PHYSIQUEOS_PHASE7B_WORKER_COMPONENT: "worker",

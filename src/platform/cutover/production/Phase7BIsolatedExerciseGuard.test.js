@@ -8,6 +8,12 @@ describe("Phase7BIsolatedExerciseGuard", () => {
 
   it.each([
     ["environment", (value) => { value.identity.environment = "production"; }],
+    ["run ID", (value) => { value.identity.runId = "phase7b-stale-run"; }],
+    ["coordinator operation", (value) => { value.identity.coordinatorOperationId = "phase7b-stale-coordinator"; }],
+    ["migration operation", (value) => { value.input.migrationOperationId = "phase7a-stale-operation"; }],
+    ["command prefix", (value) => { value.input.commandPrefix = "phase7a-stale"; }],
+    ["M command", (value) => { value.input.firstProviderCommandId = "phase7a-stale:first-provider-command"; }],
+    ["contract digest", (value) => { value.exercise.identityContractDigest = "0".repeat(64); }],
     ["owner", (value) => { value.input.canonicalOwnerUserId = "user_founder_001"; }],
     ["database", (value) => { value.input.target.databaseName = "physiqueos_staging"; }],
     ["Spaces prefix", (value) => { value.input.target.spacesPrefix = "founder/"; }],
@@ -34,12 +40,18 @@ describe("Phase7BIsolatedExerciseGuard", () => {
 function fixture() {
   const trusted = {
     environment: "phase7b-isolated-exercise-1",
+    runId: "phase7b-isolated-run-1",
+    coordinatorOperationId: "phase7b-coordinator-operation-1",
+    migrationOperationId: "phase7b-migration-operation-1",
+    commandPrefix: "phase7b-isolated",
+    firstProviderCommandId: "phase7b:first-provider-command",
+    identityContractDigest: "f".repeat(64),
     ownerUserId: "phase5-synthetic-user",
     datasetId: "phase7b-synthetic-358",
     databaseClusterId: "isolated-cluster",
     databaseName: "physiqueos_phase5_restore_provider_phase7b",
-    spacesBucket: "physiqueos-staging",
-    spacesPrefix: "phase7b-isolated/exercise-1/",
+    spacesBucket: "physiqueos-phase7b-isolated-exercise-1",
+    spacesPrefix: "private/phase5-synthetic-user/",
     providerWorkerId: "phase7b-worker-1",
     windowsHostId: "phase7b-isolated-windows-restore-1",
   };
@@ -52,9 +64,12 @@ function fixture() {
   return {
     trusted,
     configuration,
-    identity: { environment: trusted.environment },
-    exercise: { mode: "isolated-synthetic", datasetId: trusted.datasetId },
+    identity: { environment: trusted.environment, runId: trusted.runId, coordinatorOperationId: trusted.coordinatorOperationId, migrationOperationId: trusted.migrationOperationId },
+    exercise: { mode: "isolated-synthetic", datasetId: trusted.datasetId, identityContractDigest: trusted.identityContractDigest },
     input: {
+      migrationOperationId: trusted.migrationOperationId,
+      commandPrefix: trusted.commandPrefix,
+      firstProviderCommandId: trusted.firstProviderCommandId,
       canonicalOwnerUserId: trusted.ownerUserId,
       providerDeploymentId: configuration.provider.deploymentId,
       providerBuildId: configuration.provider.buildId,
