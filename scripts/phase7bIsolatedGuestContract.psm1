@@ -31,7 +31,7 @@ function Get-Phase7BIsolatedGuestContract {
     vmMemoryMiB = 4096
     vmDiskGiB = 80
     vmNetwork = "nat"
-    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v2.iso"
+    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v3.iso"
     bootstrapIsoVolumeLabel = "P7B_BOOTSTRAP"
     repositoryRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
     isolatedRoot = "C:\Phase7B\isolated\379bb303"
@@ -286,21 +286,56 @@ function Test-Phase7BVmwareGuestIdentity {
     [Parameter(Mandatory = $true)][string]$Manufacturer,
     [Parameter(Mandatory = $true)][string]$Model,
     [Parameter(Mandatory = $true)][bool]$ToolsServicePresent,
+    [Parameter(Mandatory = $true)][bool]$ToolsServiceRunning,
     [Parameter(Mandatory = $true)][bool]$ToolsExecutablePresent,
     [Parameter(Mandatory = $true)][bool]$SharedFolderEnumerationAvailable,
-    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$SharedFolderNames
+    [Parameter(Mandatory = $true)][int]$SharedFolderEnumerationExitCode,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$SharedFolderNames,
+    [Parameter(Mandatory = $true)][bool]$HgfsDriverPresent,
+    [Parameter(Mandatory = $true)][bool]$HgfsDriverRunning,
+    [Parameter(Mandatory = $true)][ValidateRange(0, 2147483647)][int]$MappedHgfsDiskCount,
+    [Parameter(Mandatory = $true)][ValidateRange(0, 2147483647)][int]$MappedHgfsConnectionCount
   )
 
-  $isVmware = $Manufacturer.Trim() -eq "VMware, Inc." -and $Model.Trim() -eq "VMware Virtual Platform"
-  $pass = $isVmware -and $ToolsServicePresent -and $ToolsExecutablePresent -and $SharedFolderEnumerationAvailable -and @($SharedFolderNames).Count -eq 0
+  $trimmedManufacturer = $Manufacturer.Trim()
+  $trimmedModel = $Model.Trim()
+  $manufacturerExact = $trimmedManufacturer -eq "VMware, Inc."
+  # VMware desktop virtual hardware is exposed either through the legacy generic
+  # SMBIOS product name or a versioned VMware<major>,<minor> product name. Keep
+  # this syntax bounded; manufacturer alone is not accepted as guest identity.
+  $modelSupported = $trimmedModel -match '^(?:VMware Virtual Platform|VMware[0-9]+,[0-9]+)$'
+  $isVmware = $manufacturerExact -and $modelSupported
+  $sharedFolderCount = @($SharedFolderNames).Count
+  # Current Windows VMwareHgfsClient returns exit 1 for an empty share set. It is
+  # accepted only as the empty sentinel and only with the independent driver and
+  # mapped-endpoint checks below. Every other nonzero exit remains fail-closed.
+  $enumerationExitAccepted = $SharedFolderEnumerationExitCode -eq 0 -or
+    ($SharedFolderEnumerationExitCode -eq 1 -and $sharedFolderCount -eq 0)
+  $toolsPass = $ToolsServicePresent -and $ToolsServiceRunning -and $ToolsExecutablePresent
+  $isolationPass = $SharedFolderEnumerationAvailable -and
+    $enumerationExitAccepted -and
+    $sharedFolderCount -eq 0 -and
+    $HgfsDriverPresent -and
+    $HgfsDriverRunning -and
+    $MappedHgfsDiskCount -eq 0 -and
+    $MappedHgfsConnectionCount -eq 0
+  $pass = $isVmware -and $toolsPass -and $isolationPass
   [pscustomobject][ordered]@{
     pass = $pass
     classification = if ($pass) { "ISOLATED_VMWARE_GUEST_IDENTITY_PASS" } else { "PHASE7B_WRONG_OR_UNISOLATED_WINDOWS_HOST" }
-    manufacturer = $Manufacturer
-    model = $Model
-    vmwareToolsPresent = [bool]($ToolsServicePresent -and $ToolsExecutablePresent)
+    manufacturer = $trimmedManufacturer
+    model = $trimmedModel
+    manufacturerExact = $manufacturerExact
+    modelSupported = $modelSupported
+    vmwareToolsPresent = [bool]$toolsPass
     sharedFolderEnumerationAvailable = $SharedFolderEnumerationAvailable
-    sharedFolderCount = @($SharedFolderNames).Count
+    sharedFolderEnumerationExitCode = $SharedFolderEnumerationExitCode
+    sharedFolderEnumerationStatus = if ($SharedFolderEnumerationExitCode -eq 0) { "SUCCESS" } elseif ($SharedFolderEnumerationExitCode -eq 1 -and $sharedFolderCount -eq 0) { "EMPTY_EXIT_1_CORROBORATED" } else { "REJECTED" }
+    sharedFolderCount = $sharedFolderCount
+    hgfsDriverPresent = $HgfsDriverPresent
+    hgfsDriverRunning = $HgfsDriverRunning
+    mappedHgfsDiskCount = $MappedHgfsDiskCount
+    mappedHgfsConnectionCount = $MappedHgfsConnectionCount
   }
 }
 

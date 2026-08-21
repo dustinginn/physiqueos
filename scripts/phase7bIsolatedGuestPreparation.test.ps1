@@ -21,6 +21,7 @@ try {
   Assert-True ($contract.applicationCommit -eq "379bb30391cfb7ed912e4757c77604e859b8a599") "accepted application commit"
   Assert-True ($contract.manifestDigest -eq "134bb6b4fd81e067c5c77fc1b5574373b62d4f6d033f14ed7c6afa4db40f557d") "manifest digest"
   Assert-True ($contract.repositoryRoot -eq "C:\Users\dusti\Documents\GitHub\physiqueos") "exact guest repository path"
+  Assert-True ($contract.bootstrapIsoFileName -eq "phase7b-vmware-guest-bootstrap-kit-v3.iso") "detector correction uses a new bootstrap ISO identity"
 
   $validVmxPath = Join-Path $testRoot "valid.vmx"
   @'
@@ -98,14 +99,91 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   $invalidDisk = Test-Phase7BVmdkContract -Vmx $invalidDiskVmx -VmxPath $validVmxPath -Contract $contract
   Assert-True (-not $invalidDisk.pass) "second virtual disk rejected"
 
-  $guestIdentity = Test-Phase7BVmwareGuestIdentity -Manufacturer "VMware, Inc." -Model "VMware Virtual Platform" -ToolsServicePresent $true -ToolsExecutablePresent $true -SharedFolderEnumerationAvailable $true -SharedFolderNames @()
-  Assert-True $guestIdentity.pass "exact VMware guest accepted"
-  $physicalIdentity = Test-Phase7BVmwareGuestIdentity -Manufacturer "ASUSTeK COMPUTER INC." -Model "Founder PC" -ToolsServicePresent $false -ToolsExecutablePresent $false -SharedFolderEnumerationAvailable $false -SharedFolderNames @()
-  Assert-True (-not $physicalIdentity.pass) "Founder physical host rejected"
-  $sharedIdentity = Test-Phase7BVmwareGuestIdentity -Manufacturer "VMware, Inc." -Model "VMware Virtual Platform" -ToolsServicePresent $true -ToolsExecutablePresent $true -SharedFolderEnumerationAvailable $true -SharedFolderNames @("dangerous-share")
-  Assert-True (-not $sharedIdentity.pass) "VMware guest shared folder rejected"
-  $unprovenSharedIdentity = Test-Phase7BVmwareGuestIdentity -Manufacturer "VMware, Inc." -Model "VMware Virtual Platform" -ToolsServicePresent $true -ToolsExecutablePresent $true -SharedFolderEnumerationAvailable $false -SharedFolderNames @()
-  Assert-True (-not $unprovenSharedIdentity.pass) "unavailable shared-folder enumeration rejected"
+  $validGuestIdentityArgs = @{
+    Manufacturer = "VMware, Inc."
+    Model = "VMware20,1"
+    ToolsServicePresent = $true
+    ToolsServiceRunning = $true
+    ToolsExecutablePresent = $true
+    SharedFolderEnumerationAvailable = $true
+    SharedFolderEnumerationExitCode = 1
+    SharedFolderNames = @()
+    HgfsDriverPresent = $true
+    HgfsDriverRunning = $true
+    MappedHgfsDiskCount = 0
+    MappedHgfsConnectionCount = 0
+  }
+  $currentGuestIdentity = Test-Phase7BVmwareGuestIdentity @validGuestIdentityArgs
+  Assert-True $currentGuestIdentity.pass "current VMware20,1 Workstation guest with corroborated empty HGFS accepted"
+  Assert-True ($currentGuestIdentity.sharedFolderEnumerationStatus -eq "EMPTY_EXIT_1_CORROBORATED") "current Windows HGFS empty exit is explicitly classified"
+
+  $legacyGuestIdentityArgs = @{} + $validGuestIdentityArgs
+  $legacyGuestIdentityArgs.Model = "VMware Virtual Platform"
+  $legacyGuestIdentityArgs.SharedFolderEnumerationExitCode = 0
+  $legacyGuestIdentity = Test-Phase7BVmwareGuestIdentity @legacyGuestIdentityArgs
+  Assert-True $legacyGuestIdentity.pass "legacy VMware Virtual Platform guest accepted"
+
+  $physicalIdentityArgs = @{} + $validGuestIdentityArgs
+  $physicalIdentityArgs.Manufacturer = "ASUSTeK COMPUTER INC."
+  $physicalIdentityArgs.Model = "Founder PC"
+  $physicalIdentity = Test-Phase7BVmwareGuestIdentity @physicalIdentityArgs
+  Assert-True (-not $physicalIdentity.pass) "physical host rejected even with VMware software signals"
+
+  $otherHypervisorIdentityArgs = @{} + $validGuestIdentityArgs
+  $otherHypervisorIdentityArgs.Manufacturer = "Microsoft Corporation"
+  $otherHypervisorIdentityArgs.Model = "Virtual Machine"
+  $otherHypervisorIdentity = Test-Phase7BVmwareGuestIdentity @otherHypervisorIdentityArgs
+  Assert-True (-not $otherHypervisorIdentity.pass) "non-VMware hypervisor rejected"
+
+  $ambiguousVmwareIdentityArgs = @{} + $validGuestIdentityArgs
+  $ambiguousVmwareIdentityArgs.Model = "VMware Cloud Platform"
+  $ambiguousVmwareIdentity = Test-Phase7BVmwareGuestIdentity @ambiguousVmwareIdentityArgs
+  Assert-True (-not $ambiguousVmwareIdentity.pass) "unsupported VMware model syntax rejected"
+
+  $missingToolsIdentityArgs = @{} + $validGuestIdentityArgs
+  $missingToolsIdentityArgs.ToolsServicePresent = $false
+  $missingToolsIdentityArgs.ToolsServiceRunning = $false
+  $missingToolsIdentityArgs.ToolsExecutablePresent = $false
+  $missingToolsIdentity = Test-Phase7BVmwareGuestIdentity @missingToolsIdentityArgs
+  Assert-True (-not $missingToolsIdentity.pass) "VMware manufacturer with missing Tools rejected"
+
+  $stoppedToolsIdentityArgs = @{} + $validGuestIdentityArgs
+  $stoppedToolsIdentityArgs.ToolsServiceRunning = $false
+  $stoppedToolsIdentity = Test-Phase7BVmwareGuestIdentity @stoppedToolsIdentityArgs
+  Assert-True (-not $stoppedToolsIdentity.pass) "stopped VMware Tools service rejected"
+
+  $sharedIdentityArgs = @{} + $validGuestIdentityArgs
+  $sharedIdentityArgs.SharedFolderEnumerationExitCode = 0
+  $sharedIdentityArgs.SharedFolderNames = @("dangerous-share")
+  $sharedIdentity = Test-Phase7BVmwareGuestIdentity @sharedIdentityArgs
+  Assert-True (-not $sharedIdentity.pass) "VMware guest with shared folder rejected"
+
+  $missingClientIdentityArgs = @{} + $validGuestIdentityArgs
+  $missingClientIdentityArgs.SharedFolderEnumerationAvailable = $false
+  $missingClientIdentityArgs.SharedFolderEnumerationExitCode = -1
+  $missingClientIdentity = Test-Phase7BVmwareGuestIdentity @missingClientIdentityArgs
+  Assert-True (-not $missingClientIdentity.pass) "missing Windows HGFS client rejected"
+
+  $failedEnumerationIdentityArgs = @{} + $validGuestIdentityArgs
+  $failedEnumerationIdentityArgs.SharedFolderEnumerationExitCode = 2
+  $failedEnumerationIdentity = Test-Phase7BVmwareGuestIdentity @failedEnumerationIdentityArgs
+  Assert-True (-not $failedEnumerationIdentity.pass) "unsupported HGFS enumeration failure rejected"
+
+  $missingDriverIdentityArgs = @{} + $validGuestIdentityArgs
+  $missingDriverIdentityArgs.HgfsDriverPresent = $false
+  $missingDriverIdentityArgs.HgfsDriverRunning = $false
+  $missingDriverIdentity = Test-Phase7BVmwareGuestIdentity @missingDriverIdentityArgs
+  Assert-True (-not $missingDriverIdentity.pass) "missing or stopped HGFS driver rejected"
+
+  $mappedDiskIdentityArgs = @{} + $validGuestIdentityArgs
+  $mappedDiskIdentityArgs.MappedHgfsDiskCount = 1
+  $mappedDiskIdentity = Test-Phase7BVmwareGuestIdentity @mappedDiskIdentityArgs
+  Assert-True (-not $mappedDiskIdentity.pass) "mapped HGFS disk rejected"
+
+  $mappedConnectionIdentityArgs = @{} + $validGuestIdentityArgs
+  $mappedConnectionIdentityArgs.MappedHgfsConnectionCount = 1
+  $mappedConnectionIdentity = Test-Phase7BVmwareGuestIdentity @mappedConnectionIdentityArgs
+  Assert-True (-not $mappedConnectionIdentity.pass) "mapped HGFS network connection rejected"
 
   $paths = Test-Phase7BGuestPathContract -RepositoryRoot $contract.repositoryRoot -IsolatedRoot $contract.isolatedRoot -Contract $contract
   Assert-True $paths.pass "exact guest paths accepted"
@@ -161,6 +239,9 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   Assert-True ($restoreProcess.ExitCode -ne 0) "WP2 unauthorized mutation command exits nonzero"
   $bootstrapText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bIsolatedGuestBootstrap.ps1") -Raw
   Assert-True ($bootstrapText.Contains('$identity.classification')) "wrong host fails closed"
+  Assert-True ($bootstrapText.Contains('C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe')) "bootstrap uses the Windows VMware HGFS client path"
+  Assert-True (-not $bootstrapText.Contains('C:\Program Files\VMware\VMware Tools\vmware-hgfsclient.exe')) "bootstrap excludes the Linux-style HGFS client path"
+  Assert-True ($bootstrapText.Contains('Win32_SystemDriver') -and $bootstrapText.Contains('Win32_LogicalDisk') -and $bootstrapText.Contains('Win32_NetworkConnection')) "bootstrap collects corroborating driver and mapped-HGFS evidence"
   Assert-True (-not ($bootstrapText -match '(?i)(token|password|secret)\s*=\s*["''][^"'']{8,}["'']')) "no embedded credential literals"
   $hostPreflightText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bVmwareHostPreflight.ps1") -Raw
   Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm", "BootstrapReady")')) "preflight exposes host, VM, and bootstrap-bound modes"

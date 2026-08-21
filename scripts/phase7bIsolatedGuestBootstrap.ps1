@@ -33,18 +33,33 @@ function Get-Phase7BGuestIdentity {
     "C:\Program Files\VMware\VMware Tools\vmtoolsd.exe"
   )
   $toolsExecutable = @($toolsCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
-  $hgfsClient = "C:\Program Files\VMware\VMware Tools\vmware-hgfsclient.exe"
+  $hgfsClient = "C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe"
   $sharedFolderNames = @()
+  $sharedFolderEnumerationExitCode = -1
   if (Test-Path -LiteralPath $hgfsClient -PathType Leaf) {
     $sharedFolderNames = @(& $hgfsClient 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($null -ne $LASTEXITCODE) { $sharedFolderEnumerationExitCode = [int]$LASTEXITCODE }
   }
+  $vmhgfsDriver = Get-CimInstance Win32_SystemDriver -Filter "Name='vmhgfs'" -ErrorAction Stop
+  $mappedHgfsDisks = @(Get-CimInstance Win32_LogicalDisk -ErrorAction Stop | Where-Object {
+    [string]$_.ProviderName -match '(?i)(vmware-host|\\\.host|hgfs)'
+  })
+  $mappedHgfsConnections = @(Get-CimInstance Win32_NetworkConnection -ErrorAction Stop | Where-Object {
+    [string]$_.RemoteName -match '(?i)(vmware-host|\\\.host|hgfs)'
+  })
   Test-Phase7BVmwareGuestIdentity `
     -Manufacturer ([string]$computer.Manufacturer) `
     -Model ([string]$computer.Model) `
     -ToolsServicePresent ([bool]$toolsService) `
+    -ToolsServiceRunning ([bool]($toolsService -and [string]$toolsService.Status -eq "Running")) `
     -ToolsExecutablePresent ($toolsExecutable.Count -eq 1) `
     -SharedFolderEnumerationAvailable (Test-Path -LiteralPath $hgfsClient -PathType Leaf) `
-    -SharedFolderNames $sharedFolderNames
+    -SharedFolderEnumerationExitCode $sharedFolderEnumerationExitCode `
+    -SharedFolderNames $sharedFolderNames `
+    -HgfsDriverPresent ([bool]$vmhgfsDriver) `
+    -HgfsDriverRunning ([bool]($vmhgfsDriver -and [string]$vmhgfsDriver.State -eq "Running")) `
+    -MappedHgfsDiskCount $mappedHgfsDisks.Count `
+    -MappedHgfsConnectionCount $mappedHgfsConnections.Count
 }
 
 function Get-Phase7BKitValidation {
