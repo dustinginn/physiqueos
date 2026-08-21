@@ -62,6 +62,30 @@ describe("ProductionFinalSnapshotService — captureFinalSnapshot", () => {
     });
   });
 
+  it("reconstructs the exact package identity after a crash without rewriting the workspace", async () => {
+    await withTempDir(async (root) => {
+      const { service: svc } = await service(root);
+      const captured = await svc.captureFinalSnapshot({ input: { migrationOperationId: "combined-op-snap-0001" }, fence: fenceResult() });
+      const inspected = await svc.inspectFinalSnapshot({ input: { migrationOperationId: "combined-op-snap-0001" }, fence: fenceResult() });
+      expect(inspected).toMatchObject({
+        operationId: captured.operationId,
+        runtimeSha256: captured.runtimeSha256,
+        runtimeRevision: captured.runtimeRevision,
+        mediaInventorySha256: captured.mediaInventorySha256,
+        migrationControlSha256: captured.migrationControlSha256,
+        packageDigest: captured.packageDigest,
+      });
+      expect(inspected).not.toHaveProperty("capturedAt");
+    });
+  });
+
+  it("reports no resumable snapshot when the operation workspace is absent", async () => {
+    await withTempDir(async (root) => {
+      const { service: svc } = await service(root);
+      await expect(svc.inspectFinalSnapshot({ input: { migrationOperationId: "combined-op-snap-0001" }, fence: fenceResult() })).resolves.toBeNull();
+    });
+  });
+
   it("binds the package digest to the exact combined-cutover operation - a different operation ID produces a different digest", async () => {
     await withTempDir(async (root) => {
       const { service: svc } = await service(root);

@@ -132,6 +132,22 @@ export function createProductionCombinedCutoverWorkerControl({
     });
   }
 
+  async function inspectWindowsCadence({ operationId } = {}) {
+    required(operationId, "operationId");
+    const [monitor, productionServer, ngrok] = await Promise.all([
+      inspectMonitor(), inspectProductionServer(), inspectNgrok(),
+    ]);
+    const quiesced = monitor.enabled === false && monitor.taskState !== "running" &&
+      Number(monitor.monitorProcessCount) === 0 && monitor.cadencePresent === false;
+    return freeze({
+      ready: quiesced,
+      workerState: quiesced ? WorkerState.WINDOWS_CADENCE_QUIESCED : WorkerState.WINDOWS_ACTIVE,
+      runtimeMonitor: monitor,
+      productionServer,
+      ngrok,
+    });
+  }
+
   async function activateProviderWorkers({ operationId, providerDeploymentId, operationIdentity } = {}) {
     requireIdentity(operationIdentity, operationId, "activate-provider-workers");
     const provider = await inspectProvider(providerDeploymentId);
@@ -262,6 +278,7 @@ export function createProductionCombinedCutoverWorkerControl({
   return freeze({
     kind: "production-combined-cutover-worker-control",
     inspectWorkerState,
+    inspectWindowsCadence,
     captureWindowsCadenceSnapshot,
     quiesceWindowsCadence,
     activateProviderWorkers,

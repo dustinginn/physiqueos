@@ -8,6 +8,22 @@ export function createProductionWindowsCadenceControlService({ controlStore, wor
   assertCombinedCutoverWorkerControl(workerControl);
 
   return Object.freeze({
+    async inspect({ input } = {}) {
+      const operationId = requireTransferOperationId(input?.migrationOperationId);
+      const current = (await controlStore.read()).state;
+      if (current.migrationOperationId !== operationId || current.fenceState !== MigrationFenceState.ACTIVE || current.writesEnabled !== false) {
+        return Object.freeze({ classification: "NOT_APPLIED", evidence: { operationId, status: "windows-fence-not-active" } });
+      }
+      try {
+        const observed = await workerControl.inspectWindowsCadence({ operationId });
+        return Object.freeze({
+          classification: observed.ready === true ? "COMPLETED" : "NOT_APPLIED",
+          evidence: { operationId, status: observed.ready === true ? "windows-cadence-quiesced" : "windows-cadence-active" },
+        });
+      } catch {
+        return Object.freeze({ classification: "AMBIGUOUS", evidence: { operationId, status: "windows-cadence-inspection-unavailable" } });
+      }
+    },
     async captureAfterWriteFence({ input, fenceEvidence } = {}) {
       const operationId = await requireFence({ input, fenceEvidence });
       return workerControl.captureWindowsCadenceSnapshot({ operationId });

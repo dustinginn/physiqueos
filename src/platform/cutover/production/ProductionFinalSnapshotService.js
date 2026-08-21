@@ -29,6 +29,7 @@
 // per-operation directory is created non-recursively, so an already-existing operation workspace
 // (from a prior attempt) fails EEXIST rather than being silently reused or overwritten.
 import { captureReadOnlyFounderSnapshot, exportCanonicalPackage, PHASE4_PACKAGE_VERSION } from "../../migration/phase4CanonicalExport.js";
+import { readAndValidateCanonicalPackage } from "../../migration/phase4CanonicalExport.js";
 import { deriveTrustedMigrationSourceIdentity, createFilesystemBuildIdentityProvider } from "../../migration/MigrationSourceIdentity.js";
 import { createPayloadHash } from "../../../contracts/v1/canonicalJson.js";
 import { combinedCutoverOperationPaths, prepareCombinedCutoverOperationWorkspace } from "./combinedCutoverOperationWorkspace.js";
@@ -46,6 +47,24 @@ export function createProductionFinalSnapshotService({
   if (!String(workspaceRoot ?? "").trim()) throw new Error("captureFinalSnapshot requires a workspace root.");
 
   return Object.freeze({
+    async inspectFinalSnapshot({ input, fence } = {}) {
+      const operationId = requireNonEmpty(input?.migrationOperationId, "migrationOperationId");
+      if (!fence?.controlState) {
+        throw new Error("inspectFinalSnapshot requires the exact durable Windows write-fence state.");
+      }
+      const paths = combinedCutoverOperationPaths(operationId, { workspaceRoot });
+      let packageData;
+      try {
+        packageData = await readAndValidateCanonicalPackage(paths.package);
+      } catch (error) {
+        if (error?.code === "ENOENT") return null;
+        throw error;
+      }
+      if (String(packageData.manifest.source?.migration?.operationId ?? "") !== operationId) {
+        throw snapshotError("COMBINED_CUTOVER_SNAPSHOT_OPERATION_MISMATCH", "Existing final package belongs to another migration operation.");
+      }
+      return snapshotIdentity({ operationId, paths, packageData, fence });
+    },
     async captureFinalSnapshot({ input, fence } = {}) {
       const operationId = requireNonEmpty(input?.migrationOperationId, "migrationOperationId");
       if (!fence?.controlState) {
@@ -75,20 +94,25 @@ export function createProductionFinalSnapshotService({
         normalizeRuntime,
       });
 
-      const migrationControlSha256 = createPayloadHash(fence.controlState);
-      const mediaInventorySha256 = createPayloadHash(exported.manifest.files);
-
-      return Object.freeze({
-        runtimeSha256: sourceIdentity.runtime.sha256,
-        runtimeRevision: Number(sourceIdentity.runtime.revision),
-        mediaInventorySha256,
-        migrationControlSha256,
-        packageDigest: exported.manifest.semanticDigest,
-        operationId,
-        capturedAt: new Date().toISOString(),
-        packageRoot: paths.package,
-      });
+      return snapshotIdentity({ operationId, paths, packageData: exported, fence, capturedAt: new Date().toISOString() });
     },
+  });
+}
+
+function snapshotIdentity({ operationId, paths, packageData, fence, capturedAt = null }) {
+  const runtime = packageData.manifest.source?.runtime;
+  if (!runtime?.sha256 || !Number.isSafeInteger(Number(runtime.revision))) {
+    throw snapshotError("COMBINED_CUTOVER_SNAPSHOT_IDENTITY_INVALID", "Final package does not contain a valid runtime identity.");
+  }
+  return Object.freeze({
+    runtimeSha256: runtime.sha256,
+    runtimeRevision: Number(runtime.revision),
+    mediaInventorySha256: createPayloadHash(packageData.manifest.files),
+    migrationControlSha256: createPayloadHash(fence.controlState),
+    packageDigest: packageData.manifest.semanticDigest,
+    operationId,
+    ...(capturedAt == null ? {} : { capturedAt }),
+    packageRoot: paths.package,
   });
 }
 
@@ -96,4 +120,8 @@ function requireNonEmpty(value, field) {
   const candidate = String(value ?? "").trim();
   if (!candidate) throw new Error(`captureFinalSnapshot requires ${field}.`);
   return candidate;
+}
+
+function snapshotError(code, message) {
+  return Object.assign(new Error(message), { code });
 }

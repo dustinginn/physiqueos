@@ -8,6 +8,12 @@ const FENCE_ID = "fence-cadence";
 const input = { migrationOperationId: OPERATION_ID, commandPrefix: OPERATION_ID };
 
 describe("ProductionWindowsCadenceControlService — B ordering", () => {
+  it("reads back durable quiescence without provider heartbeat or mutation", async () => {
+    const workerControl = createDeterministicCombinedCutoverWorkerControl({ runtimeMonitorEnabled: false, runtimeMonitorRunning: false, cadenceActive: false });
+    const service = createProductionWindowsCadenceControlService({ controlStore: store(controlState()), workerControl });
+    await expect(service.inspect({ input })).resolves.toMatchObject({ classification: "COMPLETED", evidence: { status: "windows-cadence-quiesced" } });
+    expect(workerControl.inspectCalls().map((call) => call.op)).toEqual(["inspect-cadence"]);
+  });
   it("refuses Runtime Monitor mutation without exact active write-fence evidence", async () => {
     const workerControl = createDeterministicCombinedCutoverWorkerControl({ runtimeMonitorRunning: true, cadenceActive: true });
     const service = createProductionWindowsCadenceControlService({ controlStore: store(controlState({ fenceState: MigrationFenceState.INACTIVE, writesEnabled: true })), workerControl });

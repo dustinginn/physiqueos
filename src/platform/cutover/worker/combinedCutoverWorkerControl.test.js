@@ -16,7 +16,7 @@ describe("assertCombinedCutoverWorkerControl", () => {
 describe("createUnavailableWorkerControl", () => {
   it("every operation throws WORKER_CONTROL_UNAVAILABLE, never a silent success", async () => {
     const control = createUnavailableWorkerControl();
-    for (const op of ["inspectWorkerState", "captureWindowsCadenceSnapshot", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"]) {
+    for (const op of ["inspectWorkerState", "inspectWindowsCadence", "captureWindowsCadenceSnapshot", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"]) {
       await expect(control[op]({})).rejects.toMatchObject({ code: WorkerErrorCode.UNAVAILABLE });
     }
   });

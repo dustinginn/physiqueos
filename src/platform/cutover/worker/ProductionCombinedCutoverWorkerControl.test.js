@@ -55,6 +55,13 @@ describe("production provider worker identity and M-gate-compatible posture", ()
 });
 
 describe("Runtime Monitor B control and ambiguity", () => {
+  it("provides a narrow readback that distinguishes active from quiesced cadence", async () => {
+    const windows = createDeterministicWindowsWorkerTransport({ monitor: { taskState: "running", monitorProcessCount: 1, cadenceProcessCount: 1, cadencePresent: true } });
+    const fixture = harness({ windows });
+    await expect(fixture.control.inspectWindowsCadence({ operationId: OPERATION_ID })).resolves.toMatchObject({ ready: false, workerState: WorkerState.WINDOWS_ACTIVE });
+    await fixture.control.quiesceWindowsCadence({ operationId: OPERATION_ID, operationIdentity: identity("quiesce-runtime-monitor") });
+    await expect(fixture.control.inspectWindowsCadence({ operationId: OPERATION_ID })).resolves.toMatchObject({ ready: true, workerState: WorkerState.WINDOWS_CADENCE_QUIESCED });
+  });
   it("captures a safe exact pre-mutation snapshot without changing Windows", async () => {
     const fixture = harness();
     const result = await fixture.control.captureWindowsCadenceSnapshot({ operationId: OPERATION_ID });
