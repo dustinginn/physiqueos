@@ -91,7 +91,7 @@ function Test-Phase7BVmxContract {
   Require-Value "isolation.tools.copy.disable" "TRUE"
   Require-Value "isolation.tools.paste.disable" "TRUE"
   Require-Value "isolation.tools.dnd.disable" "TRUE"
-  Require-Value "isolation.tools.hgfs.disable" "TRUE"
+  Require-Value "isolation.tools.hgfsserverset.disable" "TRUE"
   Require-Value "sharedfolder.maxnum" "0"
   Require-Value "usb.restrictions.defaultallow" "FALSE"
 
@@ -120,21 +120,45 @@ function Test-Phase7BVmdkContract {
     [Parameter()][psobject]$Contract = (Get-Phase7BIsolatedGuestContract)
   )
   $failures = New-Object System.Collections.Generic.List[string]
-  if (-not $Vmx.ContainsKey("scsi0:0.present") -or [string]$Vmx["scsi0:0.present"] -ne "TRUE") { $failures.Add("scsi0:0.present=TRUE") }
-  $otherDisks = @($Vmx.Keys | Where-Object { $_ -match '^(?:scsi|sata|nvme|ide)\d+:\d+\.filename$' -and $_ -ne "scsi0:0.filename" })
-  if ($otherDisks.Count -gt 0) { $failures.Add("single-disk-only") }
+  $storageFileKeys = @($Vmx.Keys | Where-Object { $_ -match '^(?:scsi|sata|nvme|ide)\d+:\d+\.filename$' })
+  $diskSlots = New-Object System.Collections.Generic.List[string]
+  $opticalAttachmentCount = 0
+  foreach ($fileKey in $storageFileKeys) {
+    $slot = $fileKey.Substring(0, $fileKey.Length - ".filename".Length)
+    $fileName = [string]$Vmx[$fileKey]
+    $deviceTypeKey = "$slot.devicetype"
+    $deviceType = if ($Vmx.ContainsKey($deviceTypeKey)) { [string]$Vmx[$deviceTypeKey] } else { "" }
+    $isVirtualDisk = $fileName -match '(?i)\.vmdk$'
+    $isOpticalMedia = $deviceType -match '(?i)^cdrom-' -or $fileName -match '(?i)\.iso$'
+    if ($isVirtualDisk) {
+      $diskSlots.Add($slot)
+    } elseif ($isOpticalMedia) {
+      $opticalAttachmentCount++
+    } else {
+      $failures.Add("unsupported-storage-attachment:$slot")
+    }
+  }
+  if ($diskSlots.Count -eq 0) { $failures.Add("single-vmdk-disk=present") }
+  if ($diskSlots.Count -gt 1) { $failures.Add("single-disk-only") }
   $descriptorPath = $null
   $capacitySectors = $null
   $createType = $null
-  if (-not $Vmx.ContainsKey("scsi0:0.filename")) {
-    $failures.Add("scsi0:0.filename=present")
-  } else {
-    $descriptorPath = Join-Path (Split-Path -Parent $VmxPath) ([string]$Vmx["scsi0:0.filename"])
+  $diskSlot = if ($diskSlots.Count -eq 1) { $diskSlots[0] } else { $null }
+  if ($diskSlot) {
+    $presentKey = "$diskSlot.present"
+    if (-not $Vmx.ContainsKey($presentKey) -or [string]$Vmx[$presentKey] -ne "TRUE") { $failures.Add("$presentKey=TRUE") }
+    $descriptorPath = Join-Path (Split-Path -Parent $VmxPath) ([string]$Vmx["$diskSlot.filename"])
     if (-not (Test-Path -LiteralPath $descriptorPath -PathType Leaf)) {
       $failures.Add("vmdk-descriptor=present")
     } else {
       $descriptor = Get-Content -LiteralPath $descriptorPath -Raw -ErrorAction Stop
-      if ($descriptor -match '(?m)^RW\s+(\d+)\s+(?:SPARSE|FLAT)\s+') { $capacitySectors = [Int64]$matches[1] } else { $failures.Add("vmdk-capacity=readable") }
+      $extentMatches = [regex]::Matches($descriptor, '(?m)^RW\s+(\d+)\s+(?:SPARSE|FLAT)\s+')
+      if ($extentMatches.Count -gt 0) {
+        $capacitySectors = [Int64]0
+        foreach ($extentMatch in $extentMatches) { $capacitySectors += [Int64]$extentMatch.Groups[1].Value }
+      } else {
+        $failures.Add("vmdk-capacity=readable")
+      }
       if ($descriptor -match '(?m)^createType="([^"]+)"') { $createType = $matches[1] } else { $failures.Add("vmdk-createType=readable") }
       if ($createType -and $createType -notin @("monolithicSparse", "twoGbMaxExtentSparse")) { $failures.Add("vmdk=dynamically-allocated-sparse") }
       $expectedSectors = [Int64]$Contract.vmDiskGiB * 1024 * 1024 * 1024 / 512
@@ -144,9 +168,11 @@ function Test-Phase7BVmdkContract {
   [pscustomobject][ordered]@{
     pass = $failures.Count -eq 0
     classification = if ($failures.Count -eq 0) { "VMWARE_DISK_CONTRACT_PASS" } else { "VMWARE_DISK_CONTRACT_FAIL" }
+    diskSlot = $diskSlot
     descriptorPath = $descriptorPath
     capacityGiB = if ($capacitySectors) { [Math]::Round(($capacitySectors * 512 / 1GB), 2) } else { $null }
     createType = $createType
+    opticalAttachmentCount = $opticalAttachmentCount
     failures = @($failures)
   }
 }

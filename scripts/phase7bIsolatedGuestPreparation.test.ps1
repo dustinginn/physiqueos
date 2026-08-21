@@ -36,7 +36,7 @@ ethernet1.present = "FALSE"
 isolation.tools.copy.disable = "TRUE"
 isolation.tools.paste.disable = "TRUE"
 isolation.tools.dnd.disable = "TRUE"
-isolation.tools.hgfs.disable = "TRUE"
+isolation.tools.hgfsServerSet.disable = "TRUE"
 sharedFolder.maxNum = "0"
 usb.restrictions.defaultAllow = "FALSE"
 scsi0:0.present = "TRUE"
@@ -55,6 +55,38 @@ RW 167772160 SPARSE "phase7b-isolated-s001.vmdk"
   Assert-True $validResult.pass "valid VMX accepted"
   $validDisk = Test-Phase7BVmdkContract -Vmx $validVmx -VmxPath $validVmxPath -Contract $contract
   Assert-True $validDisk.pass "80 GiB sparse VMDK accepted"
+
+  $opticalVmx = @{} + $validVmx
+  $opticalVmx["sata0:1.present"] = "TRUE"
+  $opticalVmx["sata0:1.devicetype"] = "cdrom-image"
+  $opticalVmx["sata0:1.filename"] = "windows-installer.iso"
+  $opticalDisk = Test-Phase7BVmdkContract -Vmx $opticalVmx -VmxPath $validVmxPath -Contract $contract
+  Assert-True $opticalDisk.pass "single VMDK plus optical ISO accepted"
+  Assert-True ($opticalDisk.opticalAttachmentCount -eq 1) "optical ISO reported separately from disks"
+
+  $nvmeVmx = @{} + $validVmx
+  [void]$nvmeVmx.Remove("scsi0:0.present")
+  [void]$nvmeVmx.Remove("scsi0:0.filename")
+  $nvmeVmx["nvme0:0.present"] = "TRUE"
+  $nvmeVmx["nvme0:0.filename"] = "phase7b-isolated.vmdk"
+  $nvmeDisk = Test-Phase7BVmdkContract -Vmx $nvmeVmx -VmxPath $validVmxPath -Contract $contract
+  Assert-True $nvmeDisk.pass "VMware 26H1 NVMe single-disk layout accepted"
+  Assert-True ($nvmeDisk.diskSlot -eq "nvme0:0") "NVMe disk slot safely projected"
+
+  @'
+# Disk DescriptorFile
+version=1
+CID=fffffffd
+parentCID=ffffffff
+createType="twoGbMaxExtentSparse"
+RW 83886080 SPARSE "phase7b-split-s001.vmdk"
+RW 83886080 SPARSE "phase7b-split-s002.vmdk"
+'@ | Set-Content -LiteralPath (Join-Path $testRoot "phase7b-split.vmdk") -Encoding ASCII
+  $splitVmx = @{} + $nvmeVmx
+  $splitVmx["nvme0:0.filename"] = "phase7b-split.vmdk"
+  $splitDisk = Test-Phase7BVmdkContract -Vmx $splitVmx -VmxPath $validVmxPath -Contract $contract
+  Assert-True $splitDisk.pass "split sparse VMDK capacity aggregates all extents"
+  Assert-True ($splitDisk.capacityGiB -eq 80) "split sparse VMDK reports aggregate 80 GiB"
 
   $invalidVmx = @{} + $validVmx
   $invalidVmx["ethernet0.connectiontype"] = "bridged"
@@ -112,6 +144,7 @@ RW 167772160 SPARSE "phase7b-isolated-s001.vmdk"
     "phase7bIsolatedGuestBootstrap.ps1",
     "phase7bIsolatedGuestRestoreInterface.ps1",
     "phase7bBuildVmwareGuestBootstrapKit.ps1",
+    "phase7bBuildVmwareGuestBootstrapIso.ps1",
     "phase7bIsolatedGuestPreparation.test.ps1"
   ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
   foreach ($path in $scriptPaths) {
@@ -148,6 +181,15 @@ RW 167772160 SPARSE "phase7b-isolated-s001.vmdk"
   Assert-True ($kitManifest.applicationCommit -eq $contract.applicationCommit) "kit keeps accepted application commit"
   $kitText = @((Get-ChildItem -LiteralPath $kitOutputDirectory -File | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })) -join [Environment]::NewLine
   Assert-True (-not ($kitText -match '(?i)dop_v1_|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY')) "kit contains no credential/private-key material"
+
+  $isoPath = Join-Path $testRoot "phase7b-bootstrap.iso"
+  $isoOutput = @(& (Join-Path $PSScriptRoot "phase7bBuildVmwareGuestBootstrapIso.ps1") -KitDirectory $kitOutputDirectory -OutputPath $isoPath) -join [Environment]::NewLine
+  $isoResult = $isoOutput | ConvertFrom-Json
+  Assert-True ($isoResult.classification -eq "PHASE7B_VMWARE_GUEST_BOOTSTRAP_ISO_BUILT") "bootstrap ISO builder classification"
+  Assert-True (Test-Path -LiteralPath $isoResult.outputPath -PathType Leaf) "bootstrap ISO exists"
+  Assert-True ($isoResult.outputBytes -gt 32774) "bootstrap ISO has an ISO9660 volume descriptor"
+  Assert-True (-not $isoResult.productionCredentialsIncluded) "bootstrap ISO excludes production credentials"
+  Assert-True (-not $isoResult.workPackage2Authorized) "bootstrap ISO does not authorize work package 2"
 
   [ordered]@{
     classification = "PHASE7B_ISOLATED_GUEST_PREPARATION_TESTS_PASS"
