@@ -123,10 +123,20 @@ describe("PostgreSQL combined cutover transfer receipts — completion and verif
     }
   }
 
-  it("verifies a fully received package whose assembled digest matches", async () => {
-    const { store } = harness();
+  it("verifies a fully received package when pg returns bigint byte counters as strings", async () => {
+    const { store, pool } = harness();
     const pkg = makePackage();
     await declareAndUploadAll(store, pkg);
+    const persisted = await pool.query(
+      `SELECT * FROM physiqueos.combined_cutover_transfer_receipts WHERE migration_operation_id=$1 AND package_id=$2`,
+      [operationId, packageId],
+    );
+    expect(persisted.rows[0]).toMatchObject({
+      expected_bytes: String(pkg.expectedBytes),
+      received_bytes: String(pkg.expectedBytes),
+      expected_chunk_count: pkg.expectedChunkCount,
+      received_chunk_count: pkg.expectedChunkCount,
+    });
     const result = await store.completeAndVerify({ operationId, packageId });
     expect(result.outcome).toBe("verified");
     expect(result.receipt.status).toBe("verified");

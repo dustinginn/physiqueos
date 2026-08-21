@@ -24,7 +24,9 @@ export function createFakeCutoverTransferPool() {
       const now = new Date().toISOString();
       const row = {
         receipt_id: receiptId, schema_version: schemaVersion, migration_operation_id: operationIdValue, package_id: packageIdValue,
-        overall_digest: overallDigest, expected_bytes: expectedBytes, received_bytes: 0,
+        // node-postgres returns PostgreSQL bigint/int8 columns as strings by default. Keep the
+        // fake faithful to production so completion tests catch mixed string/number comparisons.
+        overall_digest: overallDigest, expected_bytes: String(expectedBytes), received_bytes: "0",
         expected_chunk_count: expectedChunkCount, received_chunk_count: 0, chunk_size_bytes: chunkSizeBytes,
         status: "declared", staging_prefix: stagingPrefix, created_at: now, updated_at: now, completed_at: null, verified_at: null,
       };
@@ -55,7 +57,7 @@ export function createFakeCutoverTransferPool() {
     if (normalized.startsWith("UPDATE physiqueos.combined_cutover_transfer_receipts SET received_bytes=received_bytes+$2")) {
       const [receiptId, byteLength] = values;
       const row = receiptsById.get(receiptId);
-      row.received_bytes += byteLength;
+      row.received_bytes = String(Number(row.received_bytes) + byteLength);
       row.received_chunk_count += 1;
       row.status = "receiving";
       row.updated_at = new Date().toISOString();

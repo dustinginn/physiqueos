@@ -142,7 +142,7 @@ export function createPostgresCombinedCutoverTransferReceiptStore({ pool, stagin
           await client.query("COMMIT");
           return freeze({ outcome: "idempotent-replay", receipt: row(receipt) });
         }
-        if (receipt.received_chunk_count !== receipt.expected_chunk_count || receipt.received_bytes !== Number(receipt.expected_bytes)) {
+        if (receipt.received_chunk_count !== receipt.expected_chunk_count || Number(receipt.received_bytes) !== Number(receipt.expected_bytes)) {
           await client.query("ROLLBACK");
           throw transferError(TransferErrorCode.INCOMPLETE, "Every declared chunk must be received before verification.");
         }
