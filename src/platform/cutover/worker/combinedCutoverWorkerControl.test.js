@@ -16,7 +16,7 @@ describe("assertCombinedCutoverWorkerControl", () => {
 describe("createUnavailableWorkerControl", () => {
   it("every operation throws WORKER_CONTROL_UNAVAILABLE, never a silent success", async () => {
     const control = createUnavailableWorkerControl();
-    for (const op of ["inspectWorkerState", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"]) {
+    for (const op of ["inspectWorkerState", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"]) {
       await expect(control[op]({})).rejects.toMatchObject({ code: WorkerErrorCode.UNAVAILABLE });
     }
   });
@@ -35,7 +35,11 @@ describe("createDeterministicCombinedCutoverWorkerControl", () => {
     expect(control.currentWorkerState()).toBe(WorkerState.PROVIDER_ACTIVE);
     await expect(control.verifyProviderWorkers({ operationId: "op-1" })).resolves.toMatchObject({ ready: true });
     await expect(control.retireWindowsWorkers({ operationId: "op-1" })).resolves.toMatchObject({ retired: true });
-    await control.restoreWindowsWorkers({ operationId: "op-1" });
+    await control.restoreWindowsWorkers({ operationId: "op-1", snapshot: {
+      schemaVersion: 1,
+      runtimeMonitor: { taskName: "PhysiqueOS Runtime Monitor", enabled: true, taskState: "ready", definitionSha256: "a".repeat(64) },
+      runtimeDesiredState: "running", ngrokDesiredState: "running", cadencePresent: false,
+    } });
     expect(control.currentWorkerState()).toBe(WorkerState.WINDOWS_ACTIVE);
   });
 

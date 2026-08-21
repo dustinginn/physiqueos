@@ -53,11 +53,28 @@ describe("ProductionWorkerHandoffService — authority isolation", () => {
   });
 });
 
-describe("pre-boundary Windows authority restoration never touches worker control", () => {
-  it("ProductionWindowsAuthorityRestorationService.js imports no worker-control module - pre-boundary recovery never needs to restore worker posture, since workers can only ever activate AFTER the boundary", () => {
+describe("pre-boundary Windows authority restoration keeps cadence restoration in the guarded wrapper", () => {
+  it("ProductionWindowsAuthorityRestorationService.js remains worker-neutral", () => {
     const raw = readModule("../recovery/ProductionWindowsAuthorityRestorationService.js");
     expect(raw).not.toMatch(/combinedCutoverWorkerControl\.js/);
     expect(raw).not.toContain("workerControl");
+  });
+
+  it("the checkpoint-5 wrapper composes exact snapshot restoration but cannot transition authority itself", () => {
+    const raw = readModule("./ProductionWindowsWorkerRestorationService.js");
+    const source = codeOnly(raw);
+    expect(source).toContain("restoreWindowsWorkers");
+    expect(source).not.toContain("authorityStore.transition(");
+    expect(source).not.toContain("claimCanonicalWriteBoundary(");
+  });
+});
+
+describe("production worker mechanism owns no authority or routing policy", () => {
+  it("ProductionCombinedCutoverWorkerControl imports neither authority nor routing state", () => {
+    const raw = readModule("./ProductionCombinedCutoverWorkerControl.js");
+    const imports = raw.split("\n").filter((line) => /^\s*import\b/.test(line)).join("\n");
+    expect(imports).not.toMatch(/CombinedRuntimeAuthorityState|combinedCutoverRoutingControl/);
+    expect(raw).not.toContain("authorityStore");
   });
 });
 

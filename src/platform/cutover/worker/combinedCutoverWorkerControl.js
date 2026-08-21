@@ -3,7 +3,7 @@
 // provider platform, start the authority-gated worker, and perform immediate web/read/write/media/
 // user-facing acceptance. Windows remains stopped or read-only and cannot accept writes.").
 //
-// WHY FOUR OPERATIONS, MIRRORING `combinedCutoverRoutingControl.js`. Worker PREPARATION (deploying and
+// WHY THESE OPERATIONS. Worker PREPARATION (deploying and
 // configuring the provider worker container/component) is a deployment concern - out of scope here,
 // exactly like route preparation was excluded from the routing-control contract - so there is no
 // "prepare" operation. What remains is inspecting current posture, activating the provider worker,
@@ -28,6 +28,23 @@ export const WorkerState = Object.freeze({
   WINDOWS_ACTIVE: "windows-active",
   PROVIDER_INERT: "provider-inert",
   PROVIDER_ACTIVE: "provider-active",
+  WINDOWS_CADENCE_QUIESCED: "windows-cadence-quiesced",
+  WINDOWS_RETIRED: "windows-retired",
+  AMBIGUOUS: "ambiguous",
+  IDENTITY_MISMATCH: "identity-mismatch",
+});
+
+export const WorkerMutationClassification = Object.freeze({
+  ACCEPTED: "WORKER_MUTATION_ACCEPTED",
+  REJECTED: "WORKER_MUTATION_REJECTED",
+  AMBIGUOUS: "WORKER_MUTATION_AMBIGUOUS",
+  UNRESOLVED: "WORKER_MUTATION_UNRESOLVED",
+});
+
+export const WorkerReadbackClassification = Object.freeze({
+  PROVEN_APPLIED: "PROVEN_APPLIED",
+  PROVEN_NOT_APPLIED: "PROVEN_NOT_APPLIED",
+  STILL_AMBIGUOUS: "STILL_AMBIGUOUS",
 });
 
 export const WorkerErrorCode = Object.freeze({
@@ -37,6 +54,11 @@ export const WorkerErrorCode = Object.freeze({
   VERIFICATION_FAILED: "WORKER_VERIFICATION_FAILED",
   RETIRE_FAILED: "WORKER_RETIRE_FAILED",
   RESTORE_FAILED: "WORKER_RESTORE_FAILED",
+  AMBIGUOUS: "WORKER_OUTCOME_AMBIGUOUS",
+  IDENTITY_MISMATCH: "WORKER_IDENTITY_MISMATCH",
+  FENCE_REQUIRED: "WORKER_WINDOWS_FENCE_REQUIRED",
+  SNAPSHOT_MISMATCH: "WORKER_WINDOWS_SNAPSHOT_MISMATCH",
+  CADENCE_STILL_ACTIVE: "WORKER_WINDOWS_CADENCE_STILL_ACTIVE",
 });
 
 export function workerControlError(code, message, extra = {}) {
@@ -55,6 +77,7 @@ export function createUnavailableWorkerControl({ reason = "No production worker-
   return Object.freeze({
     kind: "unavailable-worker-control",
     inspectWorkerState: unavailable,
+    quiesceWindowsCadence: unavailable,
     activateProviderWorkers: unavailable,
     verifyProviderWorkers: unavailable,
     retireWindowsWorkers: unavailable,
@@ -67,7 +90,7 @@ export function createUnavailableWorkerControl({ reason = "No production worker-
  * implementation is supplied (unavailable, deterministic test double, or a future real one).
  */
 export function assertCombinedCutoverWorkerControl(workerControl) {
-  const required = ["inspectWorkerState", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"];
+  const required = ["inspectWorkerState", "quiesceWindowsCadence", "activateProviderWorkers", "verifyProviderWorkers", "retireWindowsWorkers", "restoreWindowsWorkers"];
   const missing = required.filter((name) => typeof workerControl?.[name] !== "function");
   if (missing.length) throw new Error(`Combined cutover worker control is missing: ${missing.join(", ")}.`);
   return workerControl;

@@ -54,7 +54,7 @@ export function createProductionWorkerHandoffService({ authorityStore, handoffRe
       if (String(durable.migrationOperationId ?? "") !== operationId) {
         throw workerHandoffError(WorkerHandoffErrorCode.OPERATION_FORBIDDEN, "Worker handoff does not match the active cutover operation.");
       }
-      if (durable.firstProviderCanonicalWriteAt == null) {
+      if (!hasRecordedFirstProviderWriteBoundary(durable)) {
         throw workerHandoffError(WorkerHandoffErrorCode.BOUNDARY_NOT_YET_CROSSED, "Worker handoff (phase N/O) requires the first-write boundary (phase M) to already be crossed.");
       }
 
@@ -73,7 +73,14 @@ export function createProductionWorkerHandoffService({ authorityStore, handoffRe
 
       if (!["activated", "verified"].includes(receipt.workerActivationStatus)) {
         try {
-          await workerControl.activateProviderWorkers({ operationId, providerDeploymentId: expectedDeploymentId });
+          await workerControl.activateProviderWorkers({
+            operationId,
+            providerDeploymentId: expectedDeploymentId,
+            operationIdentity: {
+              operationId,
+              commandId: `${requireNonEmpty(input?.commandPrefix, "commandPrefix")}:activate-provider-workers`,
+            },
+          });
           await handoffReceiptStore.recordWorkerActivated({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest });
         } catch (error) {
           await handoffReceiptStore.recordWorkerActivationFailed({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest }).catch(() => undefined);
@@ -85,7 +92,7 @@ export function createProductionWorkerHandoffService({ authorityStore, handoffRe
       // - never downgraded to "failed"; a human or later automation resolves it deliberately, exactly
       // like the Phase 5 routing-verification-ambiguous handling this mirrors.
       try {
-        const verified = await workerControl.verifyProviderWorkers({ operationId });
+        const verified = await workerControl.verifyProviderWorkers({ operationId, providerDeploymentId: expectedDeploymentId });
         if (verified?.ready !== true) throw new Error("Provider worker verification did not report readiness.");
         await handoffReceiptStore.recordWorkerVerified({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest });
       } catch (error) {
@@ -96,7 +103,13 @@ export function createProductionWorkerHandoffService({ authorityStore, handoffRe
       // point, not earlier.
       if (receipt.windowsWorkerRetirementStatus !== "retired") {
         try {
-          await workerControl.retireWindowsWorkers({ operationId });
+          await workerControl.retireWindowsWorkers({
+            operationId,
+            operationIdentity: {
+              operationId,
+              commandId: `${requireNonEmpty(input?.commandPrefix, "commandPrefix")}:retire-windows-workers`,
+            },
+          });
           await handoffReceiptStore.recordWindowsWorkerRetired({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest });
         } catch (error) {
           await handoffReceiptStore.recordWindowsWorkerRetirementFailed({ migrationOperationId: operationId, expectedPackageDigest: receipt.packageDigest }).catch(() => undefined);
@@ -130,6 +143,15 @@ function safeMessage(error) {
   const message = String(error?.message ?? "unknown failure");
   if (/postgres(?:ql)?:\/\/|secret|password|authorization|bearer\s|token/i.test(message)) return "see protected server logs";
   return message.slice(0, 300);
+}
+
+function hasRecordedFirstProviderWriteBoundary(state) {
+  const recordedAt = state?.firstProviderCanonicalWriteAt;
+  const commandId = state?.firstProviderCommandId;
+  if (typeof recordedAt !== "string" || recordedAt.length === 0 || recordedAt.trim() !== recordedAt) return false;
+  if (typeof commandId !== "string" || !commandId.trim()) return false;
+  const timestamp = Date.parse(recordedAt);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === recordedAt;
 }
 
 function freeze(value) { return Object.freeze(value); }

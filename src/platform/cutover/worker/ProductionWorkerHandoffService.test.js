@@ -11,7 +11,7 @@ import {
 } from "../recovery/testSupport/recoveryFixtures.js";
 
 function input(overrides = {}) {
-  return { migrationOperationId: OPERATION_ID, ...overrides };
+  return { migrationOperationId: OPERATION_ID, commandPrefix: OPERATION_ID, ...overrides };
 }
 
 async function declaredReceiptStore({ workerActivationStatus = null, windowsWorkerRetirementStatus = null } = {}) {
@@ -70,6 +70,23 @@ describe("ProductionWorkerHandoffService — authority preconditions", () => {
     const service = createProductionWorkerHandoffService({ authorityStore, handoffReceiptStore: await receiptStorePromise, workerControl });
     const result = await service.activateProviderWorkersAndRetireWindows({ input: input() });
     expect(result).toMatchObject({ ready: true, outcome: "activated", worker: { status: "verified" }, windowsRetirement: { status: "retired" } });
+    expect(workerControl.inspectCalls().find((call) => call.op === "activate")?.operationIdentity).toEqual({
+      operationId: OPERATION_ID, commandId: `${OPERATION_ID}:activate-provider-workers`,
+    });
+    expect(workerControl.inspectCalls().find((call) => call.op === "retire")?.operationIdentity).toEqual({
+      operationId: OPERATION_ID, commandId: `${OPERATION_ID}:retire-windows-workers`,
+    });
+  });
+
+  it.each([
+    ["missing paired command", { firstProviderCommandId: null }],
+    ["malformed timestamp", { firstProviderCanonicalWriteAt: "not-a-timestamp" }],
+  ])("rejects malformed M evidence: %s", async (_label, override) => {
+    const authorityStore = memoryAuthorityStore({ ...firstWriteBoundaryState(), ...override });
+    const workerControl = createDeterministicCombinedCutoverWorkerControl();
+    const service = createProductionWorkerHandoffService({ authorityStore, handoffReceiptStore: await declaredReceiptStore(), workerControl });
+    await expect(service.activateProviderWorkersAndRetireWindows({ input: input() })).rejects.toMatchObject({ code: "WORKER_HANDOFF_BOUNDARY_NOT_YET_CROSSED" });
+    expect(workerControl.inspectCalls()).toHaveLength(0);
   });
 });
 
