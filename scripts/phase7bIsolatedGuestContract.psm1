@@ -31,6 +31,8 @@ function Get-Phase7BIsolatedGuestContract {
     vmMemoryMiB = 4096
     vmDiskGiB = 80
     vmNetwork = "nat"
+    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v2.iso"
+    bootstrapIsoVolumeLabel = "P7B_BOOTSTRAP"
     repositoryRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
     isolatedRoot = "C:\Phase7B\isolated\379bb303"
     ngrokRoot = "C:\Users\dusti\AppData\Local\ngrok"
@@ -173,6 +175,107 @@ function Test-Phase7BVmdkContract {
     capacityGiB = if ($capacitySectors) { [Math]::Round(($capacitySectors * 512 / 1GB), 2) } else { $null }
     createType = $createType
     opticalAttachmentCount = $opticalAttachmentCount
+    failures = @($failures)
+  }
+}
+
+function Get-Phase7BIsoVolumeIdentity {
+  [CmdletBinding()]
+  param([Parameter(Mandatory = $true)][string]$LiteralPath)
+
+  if (-not (Test-Path -LiteralPath $LiteralPath -PathType Leaf)) { throw "PHASE7B_ISO_NOT_FOUND" }
+  $stream = [IO.File]::OpenRead((Resolve-Path -LiteralPath $LiteralPath).Path)
+  $primaryVolumeLabel = $null
+  $jolietVolumeLabel = $null
+  $descriptorCount = 0
+  try {
+    $sector = New-Object byte[] 2048
+    for ($sectorNumber = 16; $sectorNumber -lt 64; $sectorNumber++) {
+      [void]$stream.Seek(([int64]$sectorNumber * 2048), [IO.SeekOrigin]::Begin)
+      if ($stream.Read($sector, 0, $sector.Length) -ne $sector.Length) { break }
+      if ([Text.Encoding]::ASCII.GetString($sector, 1, 5) -ne "CD001") { continue }
+      $descriptorCount++
+      $descriptorType = [int]$sector[0]
+      if ($descriptorType -eq 1) {
+        $primaryVolumeLabel = [Text.Encoding]::ASCII.GetString($sector, 40, 32).Trim([char]0, [char]32)
+      } elseif ($descriptorType -eq 2 -and [Text.Encoding]::ASCII.GetString($sector, 88, 3) -match '^%/[CE]$') {
+        $jolietVolumeLabel = [Text.Encoding]::BigEndianUnicode.GetString($sector, 40, 32).Trim([char]0, [char]32)
+      } elseif ($descriptorType -eq 255) {
+        break
+      }
+    }
+  } finally {
+    $stream.Dispose()
+  }
+  [pscustomobject][ordered]@{
+    primaryVolumeLabel = $primaryVolumeLabel
+    jolietVolumeLabel = $jolietVolumeLabel
+    descriptorCount = $descriptorCount
+  }
+}
+
+function Test-Phase7BBootstrapOpticalContract {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)][hashtable]$Vmx,
+    [Parameter(Mandatory = $true)][string]$VmxPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedIsoPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedIsoSha256,
+    [Parameter()][psobject]$Contract = (Get-Phase7BIsolatedGuestContract)
+  )
+
+  $failures = New-Object System.Collections.Generic.List[string]
+  $expectedHash = $ExpectedIsoSha256.ToLowerInvariant()
+  if ($expectedHash -notmatch '^[0-9a-f]{64}$') { $failures.Add("expected-iso-sha256=valid") }
+  $expectedPath = [IO.Path]::GetFullPath($ExpectedIsoPath)
+  $storageFileKeys = @($Vmx.Keys | Where-Object { $_ -match '^(?:scsi|sata|nvme|ide)\d+:\d+\.filename$' })
+  $opticalSlots = New-Object System.Collections.Generic.List[string]
+  foreach ($fileKey in $storageFileKeys) {
+    $slot = $fileKey.Substring(0, $fileKey.Length - ".filename".Length)
+    $fileName = [string]$Vmx[$fileKey]
+    $deviceTypeKey = "$slot.devicetype"
+    $deviceType = if ($Vmx.ContainsKey($deviceTypeKey)) { [string]$Vmx[$deviceTypeKey] } else { "" }
+    if ($deviceType -match '(?i)^cdrom-' -or $fileName -match '(?i)\.iso$') { $opticalSlots.Add($slot) }
+  }
+  if ($opticalSlots.Count -ne 1) { $failures.Add("single-bootstrap-optical-attachment") }
+
+  $slotName = if ($opticalSlots.Count -eq 1) { $opticalSlots[0] } else { $null }
+  $configuredPath = $null
+  $configuredHash = $null
+  $identity = $null
+  $startConnected = $null
+  if ($slotName) {
+    $presentKey = "$slotName.present"
+    $deviceTypeKey = "$slotName.devicetype"
+    $startConnectedKey = "$slotName.startconnected"
+    if (-not $Vmx.ContainsKey($presentKey) -or [string]$Vmx[$presentKey] -ne "TRUE") { $failures.Add("$presentKey=TRUE") }
+    if (-not $Vmx.ContainsKey($deviceTypeKey) -or [string]$Vmx[$deviceTypeKey] -ne "cdrom-image") { $failures.Add("$deviceTypeKey=cdrom-image") }
+    if ($Vmx.ContainsKey($startConnectedKey)) { $startConnected = [string]$Vmx[$startConnectedKey] }
+    $configuredValue = [string]$Vmx["$slotName.filename"]
+    $configuredPath = if ([IO.Path]::IsPathRooted($configuredValue)) { [IO.Path]::GetFullPath($configuredValue) } else { [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $VmxPath) $configuredValue)) }
+    if (-not $configuredPath.Equals($expectedPath, [StringComparison]::OrdinalIgnoreCase)) { $failures.Add("bootstrap-iso-path=expected") }
+    if (-not (Test-Path -LiteralPath $configuredPath -PathType Leaf)) {
+      $failures.Add("bootstrap-iso=present")
+    } else {
+      $configuredHash = Get-Phase7BSha256 -LiteralPath $configuredPath
+      if ($configuredHash -ne $expectedHash) { $failures.Add("bootstrap-iso-sha256=expected") }
+      $identity = Get-Phase7BIsoVolumeIdentity -LiteralPath $configuredPath
+      if ([string]$identity.primaryVolumeLabel -ne [string]$Contract.bootstrapIsoVolumeLabel) { $failures.Add("bootstrap-iso-primary-label=$($Contract.bootstrapIsoVolumeLabel)") }
+      if ([string]$identity.jolietVolumeLabel -ne [string]$Contract.bootstrapIsoVolumeLabel) { $failures.Add("bootstrap-iso-joliet-label=$($Contract.bootstrapIsoVolumeLabel)") }
+    }
+  }
+
+  [pscustomobject][ordered]@{
+    pass = $failures.Count -eq 0
+    classification = if ($failures.Count -eq 0) { "VMWARE_BOOTSTRAP_OPTICAL_CONTRACT_PASS" } else { "VMWARE_BOOTSTRAP_OPTICAL_CONTRACT_FAIL" }
+    slot = $slotName
+    configuredPath = $configuredPath
+    configuredSha256 = $configuredHash
+    expectedPath = $expectedPath
+    expectedSha256 = $expectedHash
+    primaryVolumeLabel = if ($identity) { $identity.primaryVolumeLabel } else { $null }
+    jolietVolumeLabel = if ($identity) { $identity.jolietVolumeLabel } else { $null }
+    startConnected = $startConnected
     failures = @($failures)
   }
 }
@@ -329,6 +432,8 @@ Export-ModuleMember -Function @(
   "Read-Phase7BVmx",
   "Test-Phase7BVmxContract",
   "Test-Phase7BVmdkContract",
+  "Get-Phase7BIsoVolumeIdentity",
+  "Test-Phase7BBootstrapOpticalContract",
   "Test-Phase7BVmwareGuestIdentity",
   "Test-Phase7BGuestPathContract",
   "Find-Phase7BForbiddenCredentialSignals",

@@ -11,13 +11,14 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tmpRoot = (Resolve-Path (Join-Path $repositoryRoot ".tmp")).Path
 $contract = Get-Phase7BIsolatedGuestContract
 if ([string]::IsNullOrWhiteSpace($KitDirectory)) { $KitDirectory = Join-Path $tmpRoot "phase7b-vmware-guest-bootstrap-kit" }
-if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $tmpRoot "phase7b-vmware-guest-bootstrap-kit.iso" }
+if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $tmpRoot $contract.bootstrapIsoFileName }
 
 $resolvedKit = (Resolve-Path -LiteralPath $KitDirectory -ErrorAction Stop).Path
 $fullOutputPath = [IO.Path]::GetFullPath($OutputPath)
 if (-not $resolvedKit.StartsWith($tmpRoot + "\", [StringComparison]::OrdinalIgnoreCase)) { throw "PHASE7B_ISO_KIT_MUST_BE_UNDER_TMP" }
 if (-not $fullOutputPath.StartsWith($tmpRoot + "\", [StringComparison]::OrdinalIgnoreCase)) { throw "PHASE7B_ISO_OUTPUT_MUST_BE_UNDER_TMP" }
 if ([IO.Path]::GetExtension($fullOutputPath) -ine ".iso") { throw "PHASE7B_ISO_OUTPUT_EXTENSION_REQUIRED" }
+if ([string]$contract.bootstrapIsoVolumeLabel -notmatch '^[A-Z0-9_]{1,16}$') { throw "PHASE7B_ISO_JOLIET_SAFE_VOLUME_LABEL_REQUIRED" }
 
 $manifestPath = Join-Path $resolvedKit "phase7b-vmware-guest-bootstrap-kit-manifest.json"
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop | ConvertFrom-Json
@@ -68,7 +69,7 @@ Work package 2 remains unauthorized.
   # IMAPI_MEDIA_TYPE_DISK (12) builds a filesystem image without requiring writable optical media.
   $fileSystemImage.ChooseImageDefaultsForMediaType(12)
   $fileSystemImage.FileSystemsToCreate = 3
-  $fileSystemImage.VolumeName = "PHASE7B_BOOTSTRAP"
+  $fileSystemImage.VolumeName = $contract.bootstrapIsoVolumeLabel
   $fileSystemImage.Root.AddTree($stagingRoot, $false)
   $resultImage = $fileSystemImage.CreateResultImage()
   $imageStream = $resultImage.ImageStream
@@ -120,13 +121,20 @@ public static class Phase7BIsoStreamWriter {
   } finally {
     $stream.Dispose()
   }
+  $volumeIdentity = Get-Phase7BIsoVolumeIdentity -LiteralPath $fullOutputPath
+  if ([string]$volumeIdentity.primaryVolumeLabel -ne [string]$contract.bootstrapIsoVolumeLabel -or
+      [string]$volumeIdentity.jolietVolumeLabel -ne [string]$contract.bootstrapIsoVolumeLabel) {
+    throw "PHASE7B_ISO_WINDOWS_VOLUME_LABEL_MISMATCH"
+  }
 
   [ordered]@{
     classification = "PHASE7B_VMWARE_GUEST_BOOTSTRAP_ISO_BUILT"
     outputPath = (Resolve-Path -LiteralPath $fullOutputPath).Path
     outputSha256 = Get-Phase7BSha256 -LiteralPath $fullOutputPath
     outputBytes = (Get-Item -LiteralPath $fullOutputPath).Length
-    volumeName = "PHASE7B_BOOTSTRAP"
+    volumeName = $contract.bootstrapIsoVolumeLabel
+    primaryVolumeLabel = $volumeIdentity.primaryVolumeLabel
+    jolietVolumeLabel = $volumeIdentity.jolietVolumeLabel
     applicationCommit = $contract.applicationCommit
     toolingCommit = [string]$manifest.toolingCommit
     kitManifestSha256 = Get-Phase7BSha256 -LiteralPath $manifestPath

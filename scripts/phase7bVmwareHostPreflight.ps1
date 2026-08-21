@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
-  [Parameter()][ValidateSet("HostBaseline", "FullVm")][string]$Mode = "FullVm",
+  [Parameter()][ValidateSet("HostBaseline", "FullVm", "BootstrapReady")][string]$Mode = "FullVm",
   [Parameter()][string]$VmxPath,
+  [Parameter()][string]$ExpectedBootstrapIsoPath,
+  [Parameter()][string]$ExpectedBootstrapIsoSha256,
   [Parameter()][string]$ReportPath
 )
 
@@ -79,8 +81,9 @@ try {
   }
   $vmxContract = $null
   $diskContract = $null
+  $opticalContract = $null
   $resolvedVmxPath = $null
-  if ($Mode -eq "FullVm") {
+  if ($Mode -in @("FullVm", "BootstrapReady")) {
     $stage = "validate-full-vm"
     if ([string]::IsNullOrWhiteSpace($VmxPath)) { throw "PHASE7B_VMX_REQUIRED_FOR_FULL_PREFLIGHT" }
     $resolvedVmxPath = (Resolve-Path -LiteralPath $VmxPath -ErrorAction Stop).Path
@@ -95,6 +98,13 @@ try {
     $checks.vmdkContract = [bool]$diskContract.pass
     $checks.vmwareWorkstation26H1Available = $vmwareVersionAccepted
     $checks.targetVmPoweredOff = -not $vmRunning
+    if ($Mode -eq "BootstrapReady") {
+      $stage = "validate-bootstrap-optical-binding"
+      if ([string]::IsNullOrWhiteSpace($ExpectedBootstrapIsoPath)) { throw "PHASE7B_EXPECTED_BOOTSTRAP_ISO_PATH_REQUIRED" }
+      if ([string]::IsNullOrWhiteSpace($ExpectedBootstrapIsoSha256)) { throw "PHASE7B_EXPECTED_BOOTSTRAP_ISO_SHA256_REQUIRED" }
+      $opticalContract = Test-Phase7BBootstrapOpticalContract -Vmx $vmx -VmxPath $resolvedVmxPath -ExpectedIsoPath $ExpectedBootstrapIsoPath -ExpectedIsoSha256 $ExpectedBootstrapIsoSha256 -Contract $contract
+      $checks.bootstrapOpticalContract = [bool]$opticalContract.pass
+    }
   }
   $stage = "write-safe-report"
   $pass = @($checks.Values | Where-Object { -not $_ }).Count -eq 0
@@ -103,7 +113,7 @@ try {
     nonce = $nonce
     observedAt = $timestamp
     mode = $Mode
-    classification = if ($pass) { if ($Mode -eq "HostBaseline") { "VMWARE_HOST_BASELINE_PREFLIGHT_PASS" } else { "VMWARE_HOST_PREFLIGHT_PASS" } } else { if ($Mode -eq "HostBaseline") { "VMWARE_HOST_BASELINE_PREFLIGHT_FAIL" } else { "VMWARE_HOST_PREFLIGHT_FAIL" } }
+    classification = if ($pass) { if ($Mode -eq "HostBaseline") { "VMWARE_HOST_BASELINE_PREFLIGHT_PASS" } elseif ($Mode -eq "BootstrapReady") { "VMWARE_BOOTSTRAP_READY_PREFLIGHT_PASS" } else { "VMWARE_HOST_PREFLIGHT_PASS" } } else { if ($Mode -eq "HostBaseline") { "VMWARE_HOST_BASELINE_PREFLIGHT_FAIL" } elseif ($Mode -eq "BootstrapReady") { "VMWARE_BOOTSTRAP_READY_PREFLIGHT_FAIL" } else { "VMWARE_HOST_PREFLIGHT_FAIL" } }
     pass = $pass
     acceptedApplicationCommit = $contract.applicationCommit
     vmDisplayName = $contract.vmDisplayName
@@ -120,6 +130,13 @@ try {
       vmdkFailures = if ($diskContract) { @($diskContract.failures) } else { @() }
       vmdkCapacityGiB = if ($diskContract) { $diskContract.capacityGiB } else { $null }
       vmdkCreateType = if ($diskContract) { $diskContract.createType } else { $null }
+      bootstrapOpticalClassification = if ($opticalContract) { $opticalContract.classification } else { $null }
+      bootstrapOpticalSlot = if ($opticalContract) { $opticalContract.slot } else { $null }
+      bootstrapIsoPath = if ($opticalContract) { $opticalContract.configuredPath } else { $null }
+      bootstrapIsoSha256 = if ($opticalContract) { $opticalContract.configuredSha256 } else { $null }
+      bootstrapIsoPrimaryVolumeLabel = if ($opticalContract) { $opticalContract.primaryVolumeLabel } else { $null }
+      bootstrapIsoJolietVolumeLabel = if ($opticalContract) { $opticalContract.jolietVolumeLabel } else { $null }
+      bootstrapOpticalFailures = if ($opticalContract) { @($opticalContract.failures) } else { @() }
       windowsCaption = [string]$os.Caption
       windowsArchitecture = [string]$os.OSArchitecture
       hypervisorPresent = [bool]$computer.HypervisorPresent

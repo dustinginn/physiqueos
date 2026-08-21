@@ -163,9 +163,11 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   Assert-True ($bootstrapText.Contains('$identity.classification')) "wrong host fails closed"
   Assert-True (-not ($bootstrapText -match '(?i)(token|password|secret)\s*=\s*["''][^"'']{8,}["'']')) "no embedded credential literals"
   $hostPreflightText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bVmwareHostPreflight.ps1") -Raw
-  Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm")')) "preflight exposes explicit pre-install host baseline mode"
+  Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm", "BootstrapReady")')) "preflight exposes host, VM, and bootstrap-bound modes"
   Assert-True ($hostPreflightText.Contains('PHASE7B_VMX_REQUIRED_FOR_FULL_PREFLIGHT')) "full VM preflight still requires exact VMX"
   Assert-True ($hostPreflightText.Contains('VMWARE_HOST_BASELINE_PREFLIGHT_PASS')) "host baseline has distinct pass classification"
+  Assert-True ($hostPreflightText.Contains('VMWARE_BOOTSTRAP_READY_PREFLIGHT_PASS')) "bootstrap-ready preflight has distinct pass classification"
+  Assert-True ($hostPreflightText.Contains('Test-Phase7BBootstrapOpticalContract')) "bootstrap-ready preflight binds optical identity"
   Assert-True ($hostPreflightText.Contains('hostPreflightElevated')) "host preflight records elevation as a distinct check"
   Assert-True ($hostPreflightText.Contains('UNREADABLE_REQUIRES_ELEVATION')) "VMP evidence fails closed when elevation is unavailable"
 
@@ -190,6 +192,32 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   Assert-True ($isoResult.outputBytes -gt 32774) "bootstrap ISO has an ISO9660 volume descriptor"
   Assert-True (-not $isoResult.productionCredentialsIncluded) "bootstrap ISO excludes production credentials"
   Assert-True (-not $isoResult.workPackage2Authorized) "bootstrap ISO does not authorize work package 2"
+  Assert-True ($isoResult.volumeName -eq $contract.bootstrapIsoVolumeLabel) "bootstrap ISO uses the Joliet-safe contract label"
+  Assert-True ($isoResult.primaryVolumeLabel -eq $contract.bootstrapIsoVolumeLabel) "primary ISO label is exact"
+  Assert-True ($isoResult.jolietVolumeLabel -eq $contract.bootstrapIsoVolumeLabel) "Windows-visible Joliet label is exact"
+
+  $boundOpticalVmx = @{} + $validVmx
+  $boundOpticalVmx["sata0:1.present"] = "TRUE"
+  $boundOpticalVmx["sata0:1.devicetype"] = "cdrom-image"
+  $boundOpticalVmx["sata0:1.filename"] = $isoPath
+  $isoHash = Get-Phase7BSha256 -LiteralPath $isoPath
+  $opticalContract = Test-Phase7BBootstrapOpticalContract -Vmx $boundOpticalVmx -VmxPath $validVmxPath -ExpectedIsoPath $isoPath -ExpectedIsoSha256 $isoHash -Contract $contract
+  Assert-True $opticalContract.pass "exact optical path/hash/primary/Joliet binding accepted"
+  $wrongHashContract = Test-Phase7BBootstrapOpticalContract -Vmx $boundOpticalVmx -VmxPath $validVmxPath -ExpectedIsoPath $isoPath -ExpectedIsoSha256 ("0" * 64) -Contract $contract
+  Assert-True (-not $wrongHashContract.pass) "wrong optical hash rejected"
+
+  $wrongLabelIso = Join-Path $testRoot "phase7b-bootstrap-wrong-label.iso"
+  Copy-Item -LiteralPath $isoPath -Destination $wrongLabelIso
+  $wrongLabelStream = [IO.File]::Open($wrongLabelIso, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  try {
+    [void]$wrongLabelStream.Seek((17 * 2048) + 40, [IO.SeekOrigin]::Begin)
+    $wrongLabelBytes = [Text.Encoding]::BigEndianUnicode.GetBytes("WRONG_LABEL".PadRight(16))
+    $wrongLabelStream.Write($wrongLabelBytes, 0, $wrongLabelBytes.Length)
+  } finally { $wrongLabelStream.Dispose() }
+  $wrongLabelVmx = @{} + $boundOpticalVmx
+  $wrongLabelVmx["sata0:1.filename"] = $wrongLabelIso
+  $wrongLabelContract = Test-Phase7BBootstrapOpticalContract -Vmx $wrongLabelVmx -VmxPath $validVmxPath -ExpectedIsoPath $wrongLabelIso -ExpectedIsoSha256 (Get-Phase7BSha256 -LiteralPath $wrongLabelIso) -Contract $contract
+  Assert-True (-not $wrongLabelContract.pass) "Windows-visible Joliet label mismatch rejected"
 
   [ordered]@{
     classification = "PHASE7B_ISOLATED_GUEST_PREPARATION_TESTS_PASS"
