@@ -33,6 +33,8 @@ export default defineConfig({
       "src/platform/cutover/ProductionMigrationRunner.test.js",
       "src/platform/cutover/ProviderMigrationDryRun.test.js",
       "src/platform/backup/DigitalOceanManagedPostgresBackupFreshness.test.js",
+      "src/platform/provider/digitalocean/DigitalOceanApiClient.test.js",
+      "src/platform/provider/digitalocean/DigitalOceanMutationReconciler.test.js",
       "src/platform/cutover/EpochBoundOutboxHandler.test.js",
       "src/platform/cutover/MigrationOperationalStatus.test.js",
       "src/platform/cutover/CanonicalLegacyWriteFenceIntegration.test.js",
