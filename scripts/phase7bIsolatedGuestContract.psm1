@@ -31,7 +31,7 @@ function Get-Phase7BIsolatedGuestContract {
     vmMemoryMiB = 4096
     vmDiskGiB = 80
     vmNetwork = "nat"
-    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v3.iso"
+    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v4.iso"
     bootstrapIsoVolumeLabel = "P7B_BOOTSTRAP"
     repositoryRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
     isolatedRoot = "C:\Phase7B\isolated\379bb303"
@@ -354,6 +354,121 @@ function Test-Phase7BGuestPathContract {
   }
 }
 
+function Set-Phase7BDeterministicToolEnvironment {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)][string]$NodePath,
+    [Parameter(Mandatory = $true)][string]$NpmPath,
+    [Parameter(Mandatory = $true)][string]$GitPath,
+    [Parameter()][string]$WindowsDirectory = $env:SystemRoot
+  )
+
+  $resolvedNode = [IO.Path]::GetFullPath($NodePath)
+  $resolvedNpm = [IO.Path]::GetFullPath($NpmPath)
+  $resolvedGit = [IO.Path]::GetFullPath($GitPath)
+  $resolvedWindows = [IO.Path]::GetFullPath($WindowsDirectory).TrimEnd('\')
+  if ([IO.Path]::GetFileName($resolvedNode) -ine "node.exe") { throw "PHASE7B_NODE_EXECUTABLE_IDENTITY_INVALID" }
+  if ([IO.Path]::GetFileName($resolvedNpm) -ine "npm.cmd") { throw "PHASE7B_NPM_EXECUTABLE_IDENTITY_INVALID" }
+  if ([IO.Path]::GetFileName($resolvedGit) -ine "git.exe") { throw "PHASE7B_GIT_EXECUTABLE_IDENTITY_INVALID" }
+  foreach ($path in @($resolvedNode, $resolvedNpm, $resolvedGit)) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "PHASE7B_DETERMINISTIC_TOOL_MISSING:$([IO.Path]::GetFileName($path))" }
+  }
+
+  $nodeDirectory = Split-Path -Parent $resolvedNode
+  $npmDirectory = Split-Path -Parent $resolvedNpm
+  if ($nodeDirectory.TrimEnd('\') -ine $npmDirectory.TrimEnd('\')) { throw "PHASE7B_NODE_NPM_DIRECTORY_MISMATCH" }
+  $boundedDirectories = @(
+    $nodeDirectory,
+    (Split-Path -Parent $resolvedGit),
+    (Join-Path $resolvedWindows "System32"),
+    $resolvedWindows,
+    (Join-Path $resolvedWindows "System32\Wbem"),
+    (Join-Path $resolvedWindows "System32\WindowsPowerShell\v1.0")
+  )
+  $uniqueDirectories = New-Object System.Collections.Generic.List[string]
+  foreach ($directory in $boundedDirectories) {
+    $fullDirectory = [IO.Path]::GetFullPath($directory).TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $fullDirectory -PathType Container)) { throw "PHASE7B_DETERMINISTIC_PATH_DIRECTORY_MISSING" }
+    if (@($uniqueDirectories | Where-Object { $_ -ieq $fullDirectory }).Count -eq 0) { $uniqueDirectories.Add($fullDirectory) }
+  }
+  $env:Path = [string]::Join(";", $uniqueDirectories.ToArray())
+
+  $nodeCommands = @(Get-Command node.exe -All -CommandType Application -ErrorAction SilentlyContinue)
+  $npmCommands = @(Get-Command npm.cmd -All -CommandType Application -ErrorAction SilentlyContinue)
+  $gitCommands = @(Get-Command git.exe -All -CommandType Application -ErrorAction SilentlyContinue)
+  if ($nodeCommands.Count -ne 1 -or $nodeCommands[0].Source -ine $resolvedNode) { throw "PHASE7B_NODE_RESOLUTION_AMBIGUOUS_OR_WRONG" }
+  if ($npmCommands.Count -ne 1 -or $npmCommands[0].Source -ine $resolvedNpm) { throw "PHASE7B_NPM_RESOLUTION_AMBIGUOUS_OR_WRONG" }
+  if ($gitCommands.Count -ne 1 -or $gitCommands[0].Source -ine $resolvedGit) { throw "PHASE7B_GIT_RESOLUTION_AMBIGUOUS_OR_WRONG" }
+
+  $nodeVersion = ((@(& $nodeCommands[0].Source --version 2>$null) -join [Environment]::NewLine)).Trim()
+  $nodeVersionExitCode = $LASTEXITCODE
+  if ($nodeVersionExitCode -ne 0 -or $nodeVersion -notmatch '^v24\.') { throw "PHASE7B_NODE_24_LTS_REQUIRED" }
+  $npmVersion = ((@(& $npmCommands[0].Source --version 2>$null) -join [Environment]::NewLine)).Trim()
+  $npmVersionExitCode = $LASTEXITCODE
+  if ($npmVersionExitCode -ne 0 -or $npmVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "PHASE7B_NPM_IDENTITY_INVALID" }
+  $gitVersion = ((@(& $gitCommands[0].Source --version 2>$null) -join [Environment]::NewLine)).Trim()
+  $gitVersionExitCode = $LASTEXITCODE
+  if ($gitVersionExitCode -ne 0 -or $gitVersion -notmatch '^git version [0-9]+\.[0-9]+\.[0-9]+') { throw "PHASE7B_GIT_IDENTITY_INVALID" }
+
+  $cmdPath = Join-Path $resolvedWindows "System32\cmd.exe"
+  if (-not (Test-Path -LiteralPath $cmdPath -PathType Leaf)) { throw "PHASE7B_CMD_EXECUTABLE_MISSING" }
+  $childNodeVersion = ((@(& $cmdPath /d /s /c "node --version" 2>$null) -join [Environment]::NewLine)).Trim()
+  $childNodeVersionExitCode = $LASTEXITCODE
+  if ($childNodeVersionExitCode -ne 0 -or $childNodeVersion -ne $nodeVersion) { throw "PHASE7B_CHILD_NODE_RESOLUTION_FAIL" }
+
+  [pscustomobject][ordered]@{
+    pass = $true
+    classification = "PHASE7B_DETERMINISTIC_TOOL_ENVIRONMENT_PASS"
+    nodePath = $resolvedNode
+    npmPath = $resolvedNpm
+    gitPath = $resolvedGit
+    nodeVersion = $nodeVersion
+    npmVersion = $npmVersion
+    gitVersion = $gitVersion
+    boundedPathSha256 = Get-Phase7BSha256 -Text $env:Path
+    boundedDirectoryCount = $uniqueDirectories.Count
+    childNodeResolutionPass = $true
+  }
+}
+
+function Get-Phase7BGuestBootstrapRecoveryDecision {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)][bool]$MutationStarted,
+    [Parameter(Mandatory = $true)][bool]$AcceptedPass,
+    [Parameter(Mandatory = $true)][bool]$S1SnapshotExists,
+    [Parameter()][bool]$PartialNpmStatePresent = $false,
+    [Parameter()][bool]$PartialRepositoryPresent = $false
+  )
+
+  if ($AcceptedPass) {
+    return [pscustomobject][ordered]@{
+      classification = "PHASE7B_GUEST_BOOTSTRAP_RECOVERY_NOT_REQUIRED"
+      restoreS0Required = $false
+      currentDiskResumeAllowed = $false
+      newFounderAuthorizationRequired = $false
+      partialStateObserved = [bool]($PartialNpmStatePresent -or $PartialRepositoryPresent)
+    }
+  }
+  if ($S1SnapshotExists) { throw "PHASE7B_FAILED_BOOTSTRAP_WITH_S1_INCONSISTENT" }
+  if ($MutationStarted -or $PartialNpmStatePresent -or $PartialRepositoryPresent) {
+    return [pscustomobject][ordered]@{
+      classification = "PHASE7B_GUEST_BOOTSTRAP_RESTORE_S0_REQUIRED"
+      restoreS0Required = $true
+      currentDiskResumeAllowed = $false
+      newFounderAuthorizationRequired = $true
+      partialStateObserved = [bool]($PartialNpmStatePresent -or $PartialRepositoryPresent)
+    }
+  }
+  [pscustomobject][ordered]@{
+    classification = "PHASE7B_GUEST_BOOTSTRAP_FRESH_ATTEMPT_AUTHORIZATION_REQUIRED"
+    restoreS0Required = $false
+    currentDiskResumeAllowed = $false
+    newFounderAuthorizationRequired = $true
+    partialStateObserved = $false
+  }
+}
+
 function Find-Phase7BForbiddenCredentialSignals {
   [CmdletBinding()]
   param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
@@ -471,6 +586,8 @@ Export-ModuleMember -Function @(
   "Test-Phase7BBootstrapOpticalContract",
   "Test-Phase7BVmwareGuestIdentity",
   "Test-Phase7BGuestPathContract",
+  "Set-Phase7BDeterministicToolEnvironment",
+  "Get-Phase7BGuestBootstrapRecoveryDecision",
   "Find-Phase7BForbiddenCredentialSignals",
   "Get-Phase7BSafeTaskProjection",
   "Test-Phase7BInertTaskSet"

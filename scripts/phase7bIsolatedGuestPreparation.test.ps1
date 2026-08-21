@@ -21,7 +21,7 @@ try {
   Assert-True ($contract.applicationCommit -eq "379bb30391cfb7ed912e4757c77604e859b8a599") "accepted application commit"
   Assert-True ($contract.manifestDigest -eq "134bb6b4fd81e067c5c77fc1b5574373b62d4f6d033f14ed7c6afa4db40f557d") "manifest digest"
   Assert-True ($contract.repositoryRoot -eq "C:\Users\dusti\Documents\GitHub\physiqueos") "exact guest repository path"
-  Assert-True ($contract.bootstrapIsoFileName -eq "phase7b-vmware-guest-bootstrap-kit-v3.iso") "detector correction uses a new bootstrap ISO identity"
+  Assert-True ($contract.bootstrapIsoFileName -eq "phase7b-vmware-guest-bootstrap-kit-v4.iso") "Node environment correction uses a new bootstrap ISO identity"
 
   $validVmxPath = Join-Path $testRoot "valid.vmx"
   @'
@@ -190,6 +190,79 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   $wrongPaths = Test-Phase7BGuestPathContract -RepositoryRoot "C:\Users\founder\repo" -IsolatedRoot $contract.isolatedRoot -Contract $contract
   Assert-True (-not $wrongPaths.pass) "portable but non-contract path rejected"
 
+  $hostNodePath = "C:\Program Files\nodejs\node.exe"
+  $hostNpmPath = "C:\Program Files\nodejs\npm.cmd"
+  $hostGitPath = "C:\Program Files\Git\cmd\git.exe"
+  foreach ($toolPath in @($hostNodePath, $hostNpmPath, $hostGitPath)) {
+    Assert-True (Test-Path -LiteralPath $toolPath -PathType Leaf) "focused deterministic tool fixture prerequisite exists: $(Split-Path -Leaf $toolPath)"
+  }
+  $originalProcessPath = $env:Path
+  try {
+    $env:Path = "$env:SystemRoot\System32"
+    Assert-True (@(Get-Command node.exe -All -CommandType Application -ErrorAction SilentlyContinue).Count -eq 0) "fresh-process stale PATH initially cannot resolve Node"
+
+    $toolEnvironment = Set-Phase7BDeterministicToolEnvironment -NodePath $hostNodePath -NpmPath $hostNpmPath -GitPath $hostGitPath
+    Assert-True $toolEnvironment.pass "deterministic tool environment accepted"
+    Assert-True ($toolEnvironment.classification -eq "PHASE7B_DETERMINISTIC_TOOL_ENVIRONMENT_PASS") "deterministic tool environment classification"
+    Assert-True ($toolEnvironment.nodeVersion -match '^v24\.') "bounded environment resolves Node 24"
+    Assert-True ($toolEnvironment.npmVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') "bounded environment resolves npm"
+    Assert-True ($toolEnvironment.gitVersion -match '^git version ') "bounded environment resolves Git"
+    Assert-True $toolEnvironment.childNodeResolutionPass "child cmd resolves exact Node without shell restart"
+    Assert-True (@(Get-Command node.exe -All -CommandType Application).Count -eq 1) "bounded PATH has one Node resolution"
+    Assert-True (@(Get-Command npm.cmd -All -CommandType Application).Count -eq 1) "bounded PATH has one npm resolution"
+    Assert-True (@(Get-Command git.exe -All -CommandType Application).Count -eq 1) "bounded PATH has one Git resolution"
+
+    $lifecycleRoot = Join-Path $testRoot "npm-lifecycle"
+    New-Item -ItemType Directory -Path $lifecycleRoot -Force | Out-Null
+    '{"private":true,"scripts":{"install":"node install.js"}}' | Set-Content -LiteralPath (Join-Path $lifecycleRoot "package.json") -Encoding ASCII
+    'process.stdout.write("PHASE7B_ESBUILD_STYLE_NODE_LIFECYCLE_PASS")' | Set-Content -LiteralPath (Join-Path $lifecycleRoot "install.js") -Encoding ASCII
+    Push-Location $lifecycleRoot
+    try {
+      $lifecycleOutput = @(& $hostNpmPath run install --silent 2>&1) -join [Environment]::NewLine
+      $lifecycleExitCode = $LASTEXITCODE
+    } finally { Pop-Location }
+    Assert-True ($lifecycleExitCode -eq 0 -and $lifecycleOutput.Contains("PHASE7B_ESBUILD_STYLE_NODE_LIFECYCLE_PASS")) "npm lifecycle child resolves node install.js"
+
+    $idempotentEnvironment = Set-Phase7BDeterministicToolEnvironment -NodePath $hostNodePath -NpmPath $hostNpmPath -GitPath $hostGitPath
+    Assert-True ($idempotentEnvironment.boundedPathSha256 -eq $toolEnvironment.boundedPathSha256) "already-installed accepted tools remain idempotent"
+
+    $missingToolRejected = $false
+    try { [void](Set-Phase7BDeterministicToolEnvironment -NodePath (Join-Path $testRoot "missing\node.exe") -NpmPath $hostNpmPath -GitPath $hostGitPath) } catch { $missingToolRejected = $_.Exception.Message -match '^PHASE7B_' }
+    Assert-True $missingToolRejected "missing Node directory fails closed"
+
+    $wrongToolRoot = Join-Path $testRoot "wrong-node"
+    New-Item -ItemType Directory -Path $wrongToolRoot -Force | Out-Null
+    Copy-Item -LiteralPath "$env:SystemRoot\System32\where.exe" -Destination (Join-Path $wrongToolRoot "node.exe")
+    Copy-Item -LiteralPath $hostNpmPath -Destination (Join-Path $wrongToolRoot "npm.cmd")
+    $wrongNodeRejected = $false
+    try { [void](Set-Phase7BDeterministicToolEnvironment -NodePath (Join-Path $wrongToolRoot "node.exe") -NpmPath (Join-Path $wrongToolRoot "npm.cmd") -GitPath $hostGitPath) } catch { $wrongNodeRejected = $_.Exception.Message -eq "PHASE7B_NODE_24_LTS_REQUIRED" }
+    Assert-True $wrongNodeRejected "wrong Node executable identity fails closed"
+
+    $ambiguousWindows = Join-Path $testRoot "ambiguous-windows"
+    New-Item -ItemType Directory -Path @(
+      (Join-Path $ambiguousWindows "System32"),
+      (Join-Path $ambiguousWindows "System32\Wbem"),
+      (Join-Path $ambiguousWindows "System32\WindowsPowerShell\v1.0")
+    ) -Force | Out-Null
+    Copy-Item -LiteralPath $hostNodePath -Destination (Join-Path $ambiguousWindows "System32\node.exe")
+    $ambiguousNodeRejected = $false
+    try { [void](Set-Phase7BDeterministicToolEnvironment -NodePath $hostNodePath -NpmPath $hostNpmPath -GitPath $hostGitPath -WindowsDirectory $ambiguousWindows) } catch { $ambiguousNodeRejected = $_.Exception.Message -eq "PHASE7B_NODE_RESOLUTION_AMBIGUOUS_OR_WRONG" }
+    Assert-True $ambiguousNodeRejected "multiple Node resolutions fail closed"
+
+    $partialNpmRecovery = Get-Phase7BGuestBootstrapRecoveryDecision -MutationStarted $true -AcceptedPass $false -S1SnapshotExists $false -PartialNpmStatePresent $true
+    Assert-True ($partialNpmRecovery.classification -eq "PHASE7B_GUEST_BOOTSTRAP_RESTORE_S0_REQUIRED" -and $partialNpmRecovery.restoreS0Required -and -not $partialNpmRecovery.currentDiskResumeAllowed) "partial npm cache requires S0 restoration instead of resume"
+    $partialRepositoryRecovery = Get-Phase7BGuestBootstrapRecoveryDecision -MutationStarted $true -AcceptedPass $false -S1SnapshotExists $false -PartialRepositoryPresent $true
+    Assert-True ($partialRepositoryRecovery.classification -eq "PHASE7B_GUEST_BOOTSTRAP_RESTORE_S0_REQUIRED" -and $partialRepositoryRecovery.restoreS0Required -and -not $partialRepositoryRecovery.currentDiskResumeAllowed) "partial repository checkout requires S0 restoration instead of resume"
+    Assert-True $partialRepositoryRecovery.newFounderAuthorizationRequired "recovery and another attempt require Founder authorization"
+    $preMutationRecovery = Get-Phase7BGuestBootstrapRecoveryDecision -MutationStarted $false -AcceptedPass $false -S1SnapshotExists $false
+    Assert-True ($preMutationRecovery.classification -eq "PHASE7B_GUEST_BOOTSTRAP_FRESH_ATTEMPT_AUTHORIZATION_REQUIRED" -and -not $preMutationRecovery.currentDiskResumeAllowed) "pre-mutation failure still prohibits automatic retry"
+    $inconsistentS1Rejected = $false
+    try { [void](Get-Phase7BGuestBootstrapRecoveryDecision -MutationStarted $true -AcceptedPass $false -S1SnapshotExists $true) } catch { $inconsistentS1Rejected = $_.Exception.Message -eq "PHASE7B_FAILED_BOOTSTRAP_WITH_S1_INCONSISTENT" }
+    Assert-True $inconsistentS1Rejected "failed bootstrap with S1 fails closed"
+  } finally {
+    $env:Path = $originalProcessPath
+  }
+
   $credentialRoot = Join-Path $testRoot "credential-scan"
   New-Item -ItemType Directory -Path (Join-Path $credentialRoot "private\founder") -Force | Out-Null
   "fixture-only" | Set-Content -LiteralPath (Join-Path $credentialRoot ".env.production") -Encoding ASCII
@@ -242,6 +315,8 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   Assert-True ($bootstrapText.Contains('C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe')) "bootstrap uses the Windows VMware HGFS client path"
   Assert-True (-not $bootstrapText.Contains('C:\Program Files\VMware\VMware Tools\vmware-hgfsclient.exe')) "bootstrap excludes the Linux-style HGFS client path"
   Assert-True ($bootstrapText.Contains('Win32_SystemDriver') -and $bootstrapText.Contains('Win32_LogicalDisk') -and $bootstrapText.Contains('Win32_NetworkConnection')) "bootstrap collects corroborating driver and mapped-HGFS evidence"
+  Assert-True ($bootstrapText.IndexOf('Set-Phase7BDeterministicToolEnvironment') -lt $bootstrapText.IndexOf('Initialize-Phase7BRepository -Prerequisites')) "bootstrap establishes deterministic PATH before npm ci"
+  Assert-True ($bootstrapText.Contains('toolEnvironment = if ($toolEnvironmentState)')) "bootstrap report includes deterministic tool evidence"
   Assert-True (-not ($bootstrapText -match '(?i)(token|password|secret)\s*=\s*["''][^"'']{8,}["'']')) "no embedded credential literals"
   $hostPreflightText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bVmwareHostPreflight.ps1") -Raw
   Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm", "BootstrapReady")')) "preflight exposes host, VM, and bootstrap-bound modes"

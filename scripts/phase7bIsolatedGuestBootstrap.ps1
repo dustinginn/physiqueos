@@ -18,6 +18,7 @@ $observedAt = [DateTime]::UtcNow.ToString("o")
 $reportDirectory = Join-Path $contract.isolatedRoot "reports"
 $reportPath = Join-Path $reportDirectory "guest-bootstrap-$nonce.json"
 $mutationStarted = $false
+$toolEnvironmentState = $null
 
 function Invoke-Phase7BNative {
   param([Parameter(Mandatory = $true)][string]$FilePath, [Parameter()][string[]]$Arguments = @())
@@ -223,6 +224,10 @@ try {
     ) -Force | Out-Null
     Install-Phase7BPrerequisites
     $prerequisites = Assert-Phase7BPrerequisites
+    $toolEnvironmentState = Set-Phase7BDeterministicToolEnvironment `
+      -NodePath $prerequisites.nodePath `
+      -NpmPath $prerequisites.npmPath `
+      -GitPath $prerequisites.gitPath
     Initialize-Phase7BRepository -Prerequisites $prerequisites
     $credentialSignals = @(Find-Phase7BForbiddenCredentialSignals -RepositoryRoot $contract.repositoryRoot)
     $sensitiveVariableNames = @("DATABASE_URL", "DIRECT_URL", "DIGITALOCEAN_ACCESS_TOKEN", "DIGITALOCEAN_TOKEN", "NGROK_AUTHTOKEN", "SPACES_ACCESS_KEY_ID", "SPACES_SECRET_ACCESS_KEY")
@@ -259,7 +264,7 @@ try {
     ($_.Name -in @("powershell.exe", "pwsh.exe") -and $commandLine -match '(?i)monitorPhysiqueOS\.ps1')
   } | ForEach-Object { [pscustomobject]@{ name = $_.Name; pid = [int]$_.ProcessId } })
   $markerPresent = Test-Path -LiteralPath (Join-Path $contract.isolatedRoot "guest-identity-marker.json") -PathType Leaf
-  $applyPass = $identity.pass -and $kit.pass -and $repoPresent -and $head -eq $contract.applicationCommit -and $treeClean -and $taskSet.pass -and $credentialSignalsFinal.Count -eq 0 -and $port3000.Count -eq 0 -and $cadenceProcesses.Count -eq 0 -and $markerPresent
+  $applyPass = $identity.pass -and $kit.pass -and $toolEnvironmentState -and $toolEnvironmentState.pass -and $repoPresent -and $head -eq $contract.applicationCommit -and $treeClean -and $taskSet.pass -and $credentialSignalsFinal.Count -eq 0 -and $port3000.Count -eq 0 -and $cadenceProcesses.Count -eq 0 -and $markerPresent
   $inspectPass = $identity.pass -and $kit.pass
   $pass = if ($Mode -eq "Apply") { $applyPass } else { $inspectPass }
   if (-not (Test-Path -LiteralPath $reportDirectory -PathType Container)) {
@@ -282,6 +287,7 @@ try {
     windowsRuntimeId = $contract.windowsRuntimeId
     guestIdentity = $identity
     kitIntegrityPass = $kit.pass
+    toolEnvironment = if ($toolEnvironmentState) { [ordered]@{ pass = [bool]$toolEnvironmentState.pass; classification = [string]$toolEnvironmentState.classification; nodeVersion = [string]$toolEnvironmentState.nodeVersion; npmVersion = [string]$toolEnvironmentState.npmVersion; gitVersion = [string]$toolEnvironmentState.gitVersion; boundedPathSha256 = [string]$toolEnvironmentState.boundedPathSha256; boundedDirectoryCount = [int]$toolEnvironmentState.boundedDirectoryCount; childNodeResolutionPass = [bool]$toolEnvironmentState.childNodeResolutionPass } } else { $null }
     repository = [ordered]@{ present = $repoPresent; head = $head; clean = $treeClean }
     tasks = [ordered]@{ pass = $taskSet.pass; projections = $taskProjections }
     runtime = [ordered]@{ classification = if ($port3000.Count -eq 0) { "NOT_RUNNING_EXPECTED" } else { "UNEXPECTED_PORT_3000_LISTENER" }; listenerCount = $port3000.Count; physiqueOsProcessCount = $cadenceProcesses.Count }
