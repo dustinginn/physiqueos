@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   CoordinatorErrorCode, CoordinatorInspectionClassification, CoordinatorStep, CoordinatorStepStatus,
-  EXPANDED_AP_STEPS, coordinatorError, freeze, nextCoordinatorStep, requireRunId,
+  EXPANDED_AP_STEPS, coordinatorError, freeze, nextCoordinatorStep, requireRunId, validateCoordinatorRunState,
 } from "./combinedCutoverCoordinatorContract.js";
 import { coordinatorStateDigest, validateCoordinatorAuthorization } from "./combinedCutoverCoordinatorAuthorization.js";
 import { createCoordinatorBSnapshot, validateCoordinatorBSnapshot } from "./combinedCutoverBSnapshot.js";
@@ -78,14 +78,21 @@ export function createExternalCombinedCutoverCoordinator({ store, authorityStore
   async function recover({ runId, input, authorization, error = null } = {}) {
     let run = await readBoundRun(runId, input);
     const authority = (await authorityStore.read()).state;
+    assertOperationAuthority(run, authority);
     const m = inspectM(authority, input);
     if (m.classification === CoordinatorInspectionClassification.AMBIGUOUS) {
       throw coordinatorError(CoordinatorErrorCode.FIRST_WRITE_AMBIGUOUS, "Recovery direction is blocked until the first-provider-write transaction is conclusively reconciled.");
     }
     const recoveryStep = m.classification === CoordinatorInspectionClassification.COMPLETED || authority.authority === "recovery-required" ? "PROVIDER_FORWARD_RECOVERY" : "RECOVER_TO_WINDOWS";
     const recoveryService = recoveryStep === "PROVIDER_FORWARD_RECOVERY" ? services.providerRecoveryService : services.windowsRecoveryService;
-    if (run.failureCode === "COORDINATOR_RECOVERY_AMBIGUOUS") {
+    if (["COORDINATOR_RECOVERY_IN_PROGRESS", "COORDINATOR_RECOVERY_AMBIGUOUS"].includes(run.failureCode)) {
       const reconciled = normalizeInspection(await safeInspect(recoveryService, { input, run, authority }));
+      if (reconciled.classification === CoordinatorInspectionClassification.NOT_APPLIED) {
+        if (authorization == null) return freeze({ classification: CoordinatorStepStatus.IN_PROGRESS_OR_UNRESOLVED, run, reconciliationOnly: true, mutationDispatched: false });
+        const resetApproval = validateCoordinatorAuthorization(authorization, { run, step: recoveryStep, priorStateDigest: coordinatorStateDigest(run, authority), now: now() });
+        run = (await store.recordStepOutcome({ runId: run.runId, expectedVersion: run.version, step: run.currentStep, status: CoordinatorStepStatus.FAILED_CONCLUSIVE, evidenceRef: evidence(reconciled.evidence), failureCode: "COORDINATOR_RECOVERY_PROVEN_NOT_APPLIED", approvalFingerprint: resetApproval.fingerprint })).run;
+        return freeze({ classification: CoordinatorStepStatus.FAILED_CONCLUSIVE, run, reconciliationOnly: true, mutationDispatched: false });
+      }
       if (reconciled.classification !== CoordinatorInspectionClassification.COMPLETED) {
         return freeze({ classification: CoordinatorStepStatus.FAILED_AMBIGUOUS, run, reconciliationOnly: true });
       }
@@ -95,6 +102,8 @@ export function createExternalCombinedCutoverCoordinator({ store, authorityStore
     }
     const approval = validateCoordinatorAuthorization(authorization, { run, step: recoveryStep, priorStateDigest: coordinatorStateDigest(run, authority), now: now() });
     if (!approval) throw coordinatorError(CoordinatorErrorCode.AUTHORIZATION_REQUIRED, "Recovery authorization is required.");
+    if (recoveryStep === "RECOVER_TO_WINDOWS" && !run.bSnapshot) throw coordinatorError(CoordinatorErrorCode.SNAPSHOT_CONFLICT, "Pre-M recovery requires the exact durable B snapshot.");
+    run = (await store.beginRecovery({ runId: run.runId, expectedVersion: run.version, approvalFingerprint: approval.fingerprint, recoveryStep })).run;
     if (recoveryStep === "PROVIDER_FORWARD_RECOVERY") {
       const result = await executeRecovery(recoveryService, "enterProviderRecovery", { input, run, authority, error });
       if (result.ambiguous) return recordAmbiguousRecovery(run, result.evidence, approval);
@@ -102,7 +111,6 @@ export function createExternalCombinedCutoverCoordinator({ store, authorityStore
       run = (await store.recordStepOutcome({ runId: run.runId, expectedVersion: run.version, step: run.currentStep, status: CoordinatorStepStatus.PROVIDER_FORWARD_RECOVERY, evidenceRef: evidence(result), failureCode: null, approvalFingerprint: approval.fingerprint })).run;
       return freeze({ classification: CoordinatorStepStatus.PROVIDER_FORWARD_RECOVERY, run });
     }
-    if (!run.bSnapshot) throw coordinatorError(CoordinatorErrorCode.SNAPSHOT_CONFLICT, "Pre-M recovery requires the exact durable B snapshot.");
     const envelope = validateCoordinatorBSnapshot(run.bSnapshot, { runId: run.runId, migrationOperationId: run.migrationOperationId });
     const result = await executeRecovery(recoveryService, "restorePreBoundaryWindows", { input, run, snapshot: envelope.snapshot, error });
     if (result.ambiguous) return recordAmbiguousRecovery(run, result.evidence, approval);
@@ -115,7 +123,8 @@ export function createExternalCombinedCutoverCoordinator({ store, authorityStore
     const before = normalizeInspection(await safeInspect(service, args));
     if (before.classification === CoordinatorInspectionClassification.COMPLETED) return { ...before.evidence, ready: true, classification: method === "restorePreBoundaryWindows" ? "RESTORED" : "RECOVERED" };
     if (before.classification !== CoordinatorInspectionClassification.NOT_APPLIED) return { ambiguous: true, evidence: before.evidence };
-    try { return await service[method](args); } catch {
+    try { return await service[method](args); } catch (error) {
+      if (error?.simulatedCrash === true) throw error;
       const after = normalizeInspection(await safeInspect(service, args));
       if (after.classification === CoordinatorInspectionClassification.COMPLETED) return { ...after.evidence, ready: true, classification: method === "restorePreBoundaryWindows" ? "RESTORED" : "RECOVERED" };
       return { ambiguous: true, evidence: after.evidence };
@@ -237,7 +246,7 @@ export function createExternalCombinedCutoverCoordinator({ store, authorityStore
   }
 
   async function readBoundRun(runId, input) {
-    const run = (await store.readRun(requireRunId(runId))).run;
+    const run = validateCoordinatorRunState((await store.readRun(requireRunId(runId))).run);
     if (run.inputDigest !== coordinatorInputDigest(input) || run.migrationOperationId !== String(input?.migrationOperationId ?? "") || run.authorizationFingerprint !== String(input?.authorizationFingerprint ?? "").toLowerCase()) throw coordinatorError(CoordinatorErrorCode.IDENTITY_MISMATCH, "Coordinator input does not match the durable run identity.");
     return run;
   }
@@ -273,7 +282,7 @@ function expandCompleted(groups) { return freeze(groups.flatMap((step) => EXPAND
 function safeStrings(values) { return freeze((Array.isArray(values) ? values : []).map((value) => String(value).slice(0, 120)).slice(0, 20)); }
 function safeRole(value) { return String(value ?? "unknown").slice(0, 80); }
 function assertDependencies({ store, authorityStore, services }) {
-  for (const method of ["createRun","readRun","beginStep","recordStepOutcome","saveBSnapshot"]) if (typeof store?.[method] !== "function") throw new Error(`Coordinator store requires ${method}.`);
+  for (const method of ["createRun","readRun","beginStep","beginRecovery","recordStepOutcome","saveBSnapshot"]) if (typeof store?.[method] !== "function") throw new Error(`Coordinator store requires ${method}.`);
   if (typeof authorityStore?.read !== "function") throw new Error("Coordinator requires the durable runtime-authority store.");
   for (const name of ["preflightService","finalPackageService","transferService","importService","providerValidationService","preparationService","authorityHandoffService","workerHandoffService","stabilizationService"]) for (const method of ["inspect","execute"]) if (typeof services?.[name]?.[method] !== "function") throw new Error(`Coordinator requires ${name}.${method}.`);
   for (const [name, methods] of Object.entries({ windowsFenceService: ["inspect","activate"], windowsCadenceService: ["inspect","captureAfterWriteFence","quiesceAfterWriteFence"], firstProviderCommandService: ["executeFirstProviderCommand"], windowsRecoveryService: ["inspect","restorePreBoundaryWindows"], providerRecoveryService: ["inspect","enterProviderRecovery"], statusService: ["inspect"] })) for (const method of methods) if (typeof services?.[name]?.[method] !== "function") throw new Error(`Coordinator requires ${name}.${method}.`);

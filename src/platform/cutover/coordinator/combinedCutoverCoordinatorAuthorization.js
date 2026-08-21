@@ -4,7 +4,10 @@ import {
 } from "./combinedCutoverCoordinatorContract.js";
 
 export function validateCoordinatorAuthorization(decision, { run, step, priorStateDigest, now = new Date() } = {}) {
-  if (!FOUNDER_AUTHORIZATION_STEPS.includes(step)) return null;
+  if (!FOUNDER_AUTHORIZATION_STEPS.includes(step)) {
+    if (decision != null) throw coordinatorError(CoordinatorErrorCode.AUTHORIZATION_STALE, "Founder authorization was supplied for a phase that does not accept it.", { runId: run?.runId, step });
+    return null;
+  }
   if (!decision || decision.authorized !== true) throw authorizationRequired(step);
   const runId = requireRunId(decision.runId, "authorization.runId");
   const decisionStep = String(decision.step ?? "");

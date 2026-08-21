@@ -5,7 +5,7 @@ import { validateCoordinatorBSnapshot } from "./combinedCutoverBSnapshot.js";
 
 export function createPostgresCombinedCutoverCoordinatorStore({ pool } = {}) {
   if (!pool?.connect || !pool?.query) throw new Error("Coordinator state requires PostgreSQL.");
-  return freeze({ createRun, readRun, beginStep, recordStepOutcome, saveBSnapshot });
+  return freeze({ createRun, readRun, beginStep, beginRecovery, recordStepOutcome, saveBSnapshot });
 
   async function createRun(identity) {
     const value = normalizeIdentity(identity);
@@ -35,6 +35,17 @@ export function createPostgresCombinedCutoverCoordinatorStore({ pool } = {}) {
       const approvals = { ...current.approvalFingerprints };
       if (approvalFingerprint) approvals[step] = approvalFingerprint;
       return { currentStep: step, stepStatus: CoordinatorStepStatus.IN_PROGRESS_OR_UNRESOLVED, approvalFingerprints: approvals, failureCode: null };
+    } });
+  }
+
+  async function beginRecovery({ runId, expectedVersion, approvalFingerprint, recoveryStep }) {
+    return update({ runId, expectedVersion, apply(current) {
+      if ([CoordinatorStepStatus.ABORTED_TO_WINDOWS, CoordinatorStepStatus.PROVIDER_FORWARD_RECOVERY].includes(current.stepStatus) ||
+          current.failureCode === "COORDINATOR_RECOVERY_IN_PROGRESS" || current.failureCode === "COORDINATOR_RECOVERY_AMBIGUOUS") {
+        throw coordinatorError(CoordinatorErrorCode.STALE_STATE, "Coordinator recovery is already terminal or unresolved.");
+      }
+      const approvals = { ...current.approvalFingerprints, recovery: approvalFingerprint };
+      return { stepStatus: CoordinatorStepStatus.IN_PROGRESS_OR_UNRESOLVED, approvalFingerprints: approvals, failureCode: "COORDINATOR_RECOVERY_IN_PROGRESS", evidenceRefs: { ...current.evidenceRefs, recovery: { status: "reserved", recoveryStep } } };
     } });
   }
 

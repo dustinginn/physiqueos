@@ -62,6 +62,16 @@ describe("external resumable A-P coordinator", () => {
     expect(f.deterministic.counts()["B:fence"]).toBeUndefined();
   });
 
+  it("rejects future-issued, cross-phase, consumed, and replayed approvals before mutation", async () => {
+    const f = await fixture(); await advanceCurrent(f);
+    const approval = await approvalFor(f, "B");
+    await expect(f.coordinator.advance({ runId: RUN_ID, input: f.input, authorization: { ...approval, authorizedAt: "2026-08-21T06:00:01.000Z" } })).rejects.toMatchObject({ code: "COORDINATOR_AUTHORIZATION_STALE" });
+    await expect(f.coordinator.advance({ runId: RUN_ID, input: f.input, authorization: { ...approval, step: "M" } })).rejects.toMatchObject({ code: "COORDINATOR_AUTHORIZATION_STALE" });
+    await f.coordinator.advance({ runId: RUN_ID, input: f.input, authorization: approval });
+    await expect(f.coordinator.advance({ runId: RUN_ID, input: f.input, authorization: approval })).rejects.toMatchObject({ code: "COORDINATOR_AUTHORIZATION_STALE" });
+    expect(f.deterministic.counts()["B:fence"]).toBe(1);
+  });
+
   it("rejects a coordinator receipt or input from another run/operation", async () => {
     const f = await fixture();
     await expect(f.coordinator.inspect({ runId: RUN_ID, input: { ...f.input, migrationOperationId: "other-operation-1" } })).rejects.toMatchObject({ code: "COORDINATOR_IDENTITY_MISMATCH" });
@@ -82,6 +92,30 @@ describe("external resumable A-P coordinator", () => {
     expect((await advanceCurrent(f)).classification).toBe(CoordinatorStepStatus.FAILED_AMBIGUOUS);
     expect((await f.store.readRun(RUN_ID)).run.currentStep).toBe("M");
     expect(f.deterministic.counts().N_O).toBeUndefined();
+  });
+
+  it.each([
+    ["timestamp without command", { firstProviderCanonicalWriteAt: "2026-08-21T06:05:00.000Z", firstProviderCommandId: null }],
+    ["command without timestamp", { firstProviderCanonicalWriteAt: null, firstProviderCommandId: "phase7b-coordinator:first-provider-command" }],
+    ["mismatched command", { firstProviderCanonicalWriteAt: "2026-08-21T06:05:00.000Z", firstProviderCommandId: "another-command" }],
+  ])("treats partial M evidence as ambiguous and dispatches no command: %s", async (_label, patch) => {
+    const f = await fixture(); await advanceUntilCurrent(f, "M"); f.authority.patch(patch);
+    expect((await advanceCurrent(f)).classification).toBe(CoordinatorStepStatus.FAILED_AMBIGUOUS);
+    expect(f.deterministic.counts().M).toBeUndefined();
+    expect(f.deterministic.counts().N_O).toBeUndefined();
+  });
+
+  it("treats a conclusively absent/rejected M command as retryable only on a later invocation", async () => {
+    const f = await fixture({ modes: { M: "rejected" } }); await advanceUntilCurrent(f, "M");
+    expect((await advanceCurrent(f)).classification).toBe(CoordinatorStepStatus.FAILED_CONCLUSIVE);
+    expect(f.deterministic.counts().M).toBe(1);
+    expect(f.deterministic.counts().N_O).toBeUndefined();
+  });
+
+  it("blocks M when provider authority drifted before the command", async () => {
+    const f = await fixture(); await advanceUntilCurrent(f, "M"); f.authority.patch({ authority: "windows-legacy-authoritative" });
+    expect((await advanceCurrent(f)).classification).toBe(CoordinatorStepStatus.BLOCKED_PRECONDITION);
+    expect(f.deterministic.counts().M).toBeUndefined();
   });
 
   it("does not retire Windows when provider deployment/worker evidence is wrong", async () => {
@@ -247,6 +281,65 @@ describe("recovery direction", () => {
     expect((await f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, "PROVIDER_FORWARD_RECOVERY") })).classification).toBe(CoordinatorStepStatus.FAILED_AMBIGUOUS);
     expect((await f.coordinator.recover({ runId: RUN_ID, input: f.input })).reconciliationOnly).toBe(true);
     expect(f.deterministic.state().recoveryCalls).toBe(1);
+  });
+
+  it("CAS-reserves pre-M recovery so concurrent callers perform one Windows mutation", async () => {
+    const f = await fixture(); await advanceThrough(f, "B");
+    const authorization = await approvalFor(f, "RECOVER_TO_WINDOWS");
+    const results = await Promise.allSettled([
+      f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization }),
+      f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")[0].reason).toMatchObject({ code: "COORDINATOR_STALE_STATE" });
+    expect(f.deterministic.state().recoveryCalls).toBe(1);
+  });
+
+  it("CAS-reserves post-M recovery so concurrent callers perform one forward mutation", async () => {
+    const f = await fixture(); await advanceThrough(f, "M");
+    const authorization = await approvalFor(f, "PROVIDER_FORWARD_RECOVERY");
+    const results = await Promise.allSettled([
+      f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization }),
+      f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")[0].reason).toMatchObject({ code: "COORDINATOR_STALE_STATE" });
+    expect(f.deterministic.state().recoveryCalls).toBe(1);
+  });
+
+  it.each([["pre-M", "windowsRecovery", "B", "RECOVER_TO_WINDOWS"], ["post-M", "providerRecovery", "M", "PROVIDER_FORWARD_RECOVERY"]])
+  ("reconciles a crash after applied %s recovery without repeating mutation", async (_label, mode, through, recoveryStep) => {
+    const f = await fixture({ modes: { [mode]: "crash-after-apply" } }); await advanceThrough(f, through);
+    await expect(f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, recoveryStep) })).rejects.toMatchObject({ simulatedCrash: true });
+    const restarted = createExternalCombinedCutoverCoordinator({ store: f.store, authorityStore: f.authority, services: f.deterministic.services, now: () => new Date(NOW) });
+    await expect(restarted.recover({ runId: RUN_ID, input: f.input })).resolves.toMatchObject({ reconciliationOnly: true });
+    expect(f.deterministic.state().recoveryCalls).toBe(1);
+  });
+
+  it("keeps a crash-before-recovery-mutation reserved and inspection-only", async () => {
+    const f = await fixture({ modes: { windowsRecovery: "crash-before-apply" } }); await advanceThrough(f, "B");
+    await expect(f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, "RECOVER_TO_WINDOWS") })).rejects.toMatchObject({ simulatedCrash: true });
+    expect(await f.coordinator.recover({ runId: RUN_ID, input: f.input })).toMatchObject({ classification: "IN_PROGRESS_OR_UNRESOLVED", reconciliationOnly: true, mutationDispatched: false });
+    expect(f.deterministic.state().recoveryCalls).toBe(1);
+  });
+
+  it("requires one fresh approval to clear proven-not-applied recovery and another to retry", async () => {
+    const f = await fixture({ modes: { windowsRecovery: "crash-before-apply" } }); await advanceThrough(f, "B");
+    const original = await approvalFor(f, "RECOVER_TO_WINDOWS");
+    await expect(f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: original })).rejects.toMatchObject({ simulatedCrash: true });
+    await expect(f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: original })).rejects.toMatchObject({ code: "COORDINATOR_AUTHORIZATION_STALE" });
+    expect(await f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, "RECOVER_TO_WINDOWS") })).toMatchObject({ classification: "FAILED_CONCLUSIVE", reconciliationOnly: true, mutationDispatched: false });
+    expect(f.deterministic.state().recoveryCalls).toBe(1);
+    f.deterministic.setMode("windowsRecovery", "accepted");
+    expect(await f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, "RECOVER_TO_WINDOWS") })).toMatchObject({ classification: "ABORTED_TO_WINDOWS" });
+    expect(f.deterministic.state().recoveryCalls).toBe(2);
+  });
+
+  it("refuses pre-M recovery before B produced a durable restoration snapshot", async () => {
+    const f = await fixture();
+    await expect(f.coordinator.recover({ runId: RUN_ID, input: f.input, authorization: await approvalFor(f, "RECOVER_TO_WINDOWS") })).rejects.toMatchObject({ code: "COORDINATOR_B_SNAPSHOT_CONFLICT" });
+    expect((await f.store.readRun(RUN_ID)).run).toMatchObject({ version: 0, stepStatus: "NOT_STARTED" });
+    expect(f.deterministic.state().recoveryCalls).toBe(0);
   });
 });
 

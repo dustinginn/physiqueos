@@ -32,6 +32,14 @@ describe("PostgresCombinedCutoverCoordinatorStore", () => {
     await store.createRun(identity);
     await expect(store.createRun({ ...identity, environment: "other" })).rejects.toMatchObject({ code: "COORDINATOR_RUN_CONFLICT" });
   });
+
+  it("CAS-reserves recovery before any external recovery mutation", async () => {
+    const store = createPostgresCombinedCutoverCoordinatorStore({ pool: fakePool().pool });
+    await store.createRun(identity);
+    const reserved = await store.beginRecovery({ runId: identity.runId, expectedVersion: 0, approvalFingerprint: "c".repeat(64), recoveryStep: "RECOVER_TO_WINDOWS" });
+    expect(reserved.run).toMatchObject({ version: 1, stepStatus: "IN_PROGRESS_OR_UNRESOLVED", failureCode: "COORDINATOR_RECOVERY_IN_PROGRESS", approvalFingerprints: { recovery: "c".repeat(64) } });
+    await expect(store.beginRecovery({ runId: identity.runId, expectedVersion: 0, approvalFingerprint: "d".repeat(64), recoveryStep: "RECOVER_TO_WINDOWS" })).rejects.toMatchObject({ code: "COORDINATOR_STALE_STATE" });
+  });
 });
 
 function fakePool() {

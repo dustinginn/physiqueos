@@ -7,9 +7,16 @@ describe("000011 combined cutover coordinator", () => {
   it("creates one CAS-versioned run row with bounded coordinator and B-snapshot evidence", () => {
     expect(migration.UP_SQL).toContain("combined_cutover_coordinator_runs");
     expect(migration.UP_SQL).toContain("migration_operation_id text NOT NULL UNIQUE");
+    expect(migration.UP_SQL).toContain("coordinator_operation_id text NOT NULL UNIQUE");
     expect(migration.UP_SQL).toContain("version bigint NOT NULL DEFAULT 0");
     expect(migration.UP_SQL).toContain("b_snapshot_digest");
     expect(migration.UP_SQL).toContain("m_boundary_crossed");
+    expect(migration.UP_SQL).toContain("pg_column_size(b_snapshot) <= 16384");
+    expect(migration.UP_SQL).toContain("pg_column_size(evidence_refs) <= 65536");
+    expect(migration.UP_SQL).toContain("current_step = CASE jsonb_array_length(completed_steps)");
+    expect(migration.UP_SQL).toContain("m_boundary_crossed = (completed_steps ? 'M')");
+    expect(migration.UP_SQL).toContain("NOT (completed_steps ? 'B') OR b_snapshot IS NOT NULL");
+    expect(migration.UP_SQL).toContain("b_snapshot IS NULL OR current_step = 'B' OR completed_steps ? 'B'");
   });
   it("does not store payloads, credentials, commands, raw provider responses, or task XML", () => {
     expect(migration.UP_SQL).not.toMatch(/payload|credential|access_token|command_line|task_xml|provider_body/i);

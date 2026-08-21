@@ -72,6 +72,32 @@ export function nextCoordinatorStep(completedSteps) {
   return COORDINATOR_STEP_ORDER.find((step) => !complete.has(step)) ?? CoordinatorStep.COMPLETE;
 }
 
+/** Rejects corrupted or hand-crafted durable state before it can select a mutating phase. */
+export function validateCoordinatorRunState(value) {
+  if (!value || value.schemaVersion !== 1 || !Object.values(CoordinatorStep).includes(value.currentStep) ||
+      !Object.values(CoordinatorStepStatus).includes(value.stepStatus) || !Array.isArray(value.completedSteps)) {
+    throw coordinatorError(CoordinatorErrorCode.IDENTITY_MISMATCH, "Coordinator durable state has an invalid shape.");
+  }
+  const completed = value.completedSteps;
+  const expectedPrefix = COORDINATOR_STEP_ORDER.slice(0, completed.length);
+  if (completed.length > COORDINATOR_STEP_ORDER.length || new Set(completed).size !== completed.length ||
+      completed.some((step, index) => step !== expectedPrefix[index]) ||
+      value.currentStep !== nextCoordinatorStep(completed)) {
+    throw coordinatorError(CoordinatorErrorCode.IDENTITY_MISMATCH, "Coordinator durable state does not contain an exact A-P prefix.");
+  }
+  const completedM = completed.includes(CoordinatorStep.M);
+  if (value.mBoundaryCrossed !== completedM || (completed.includes(CoordinatorStep.B) && (!value.bSnapshot || !value.bSnapshotDigest)) ||
+      ((value.bSnapshot == null) !== (value.bSnapshotDigest == null))) {
+    throw coordinatorError(CoordinatorErrorCode.IDENTITY_MISMATCH, "Coordinator boundary or B-snapshot state is inconsistent.");
+  }
+  const terminalRecovery = [CoordinatorStepStatus.ABORTED_TO_WINDOWS, CoordinatorStepStatus.PROVIDER_FORWARD_RECOVERY].includes(value.stepStatus);
+  if (value.currentStep === CoordinatorStep.COMPLETE && value.stepStatus !== CoordinatorStepStatus.COMPLETED && !terminalRecovery &&
+      value.failureCode !== "COORDINATOR_RECOVERY_IN_PROGRESS" && value.failureCode !== "COORDINATOR_RECOVERY_AMBIGUOUS") {
+    throw coordinatorError(CoordinatorErrorCode.IDENTITY_MISMATCH, "Completed coordinator state has an invalid terminal status.");
+  }
+  return value;
+}
+
 export function freeze(value) {
   if (!value || typeof value !== "object") return value;
   if (Array.isArray(value)) return Object.freeze(value.map(freeze));

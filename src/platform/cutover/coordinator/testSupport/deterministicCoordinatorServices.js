@@ -53,16 +53,18 @@ export function createDeterministicCoordinatorServices({ authorityStore, modes =
     inspect: async () => inspection(windowsRecovered, windowsRecoveryAmbiguous, { status: windowsRecovered ? "windows-restored" : "not-restored" }),
     async restorePreBoundaryWindows({ snapshot: supplied }) {
       recoveryCalls += 1;
+      if (modes.windowsRecovery === "crash-before-apply") throw crash();
       if (modes.windowsRecovery === "ambiguous") { windowsRecoveryAmbiguous = true; throw new Error("ambiguous restoration"); }
       if (supplied?.runtimeMonitor?.definitionSha256 !== snapshot.runtimeMonitor.definitionSha256) return { ready: false, classification: "SNAPSHOT_MISMATCH" };
       authorityStore.patch({ authority: "windows-legacy-authoritative", migrationOperationId: null, firstProviderCanonicalWriteAt: null, firstProviderCommandId: null });
       windowsRecovered = true;
+      if (modes.windowsRecovery === "crash-after-apply") throw crash();
       return { ready: true, classification: "RESTORED", status: "windows-restored" };
     },
   };
   services.providerRecoveryService = {
     inspect: async () => inspection(providerRecovered, providerRecoveryAmbiguous, { status: providerRecovered ? "provider-forward" : "not-recovered" }),
-    async enterProviderRecovery() { recoveryCalls += 1; if (modes.providerRecovery === "ambiguous") { providerRecoveryAmbiguous = true; throw new Error("ambiguous recovery"); } authorityStore.patch({ authority: "recovery-required" }); providerRecovered = true; return { ready: true, status: "provider-forward" }; },
+    async enterProviderRecovery() { recoveryCalls += 1; if (modes.providerRecovery === "crash-before-apply") throw crash(); if (modes.providerRecovery === "ambiguous") { providerRecoveryAmbiguous = true; throw new Error("ambiguous recovery"); } authorityStore.patch({ authority: "recovery-required" }); providerRecovered = true; if (modes.providerRecovery === "crash-after-apply") throw crash(); return { ready: true, status: "provider-forward" }; },
   };
   services.statusService = {
     async inspect() {
@@ -76,7 +78,7 @@ export function createDeterministicCoordinatorServices({ authorityStore, modes =
     counts: () => Object.fromEntries(counts),
     completed: () => [...completed],
     setMode(step, mode) { modes[step] = mode; },
-    markCompleted(step) { completed.add(step); applyAuthority(step); },
+    markCompleted(step, operationId = "migration-operation-1") { completed.add(step); applyAuthority(step, operationId); },
     markAmbiguous(step) { ambiguous.add(step); },
     state: () => ({ fence, cadenceQuiesced, recoveryCalls }),
     snapshot,
@@ -91,7 +93,7 @@ export function createDeterministicCoordinatorServices({ authorityStore, modes =
         if (step === "P") return { ...result, phase: "P", categories: Object.fromEntries(P_CATEGORIES.map((name) => [name, modes.PPartial !== name])) };
         return result;
       },
-      execute: async () => mutate(step, () => { completed.add(step); applyAuthority(step); }),
+      execute: async ({ input }) => mutate(step, () => { completed.add(step); applyAuthority(step, input?.migrationOperationId); }),
     };
   }
   async function mutate(step, apply) {
@@ -105,10 +107,10 @@ export function createDeterministicCoordinatorServices({ authorityStore, modes =
     if (mode === "response-lost-applied") throw new Error("response lost");
     return { ready: true };
   }
-  function applyAuthority(step) {
-    if (step === "C_D") authorityStore.patch({ authority: "combined-cutover-in-progress", migrationOperationId: "migration-operation-1" });
-    if (step === "K") authorityStore.patch({ authority: "provider-prepared", migrationOperationId: "migration-operation-1" });
-    if (step === "L") authorityStore.patch({ authority: "provider-authoritative", migrationOperationId: "migration-operation-1" });
+  function applyAuthority(step, operationId = "migration-operation-1") {
+    if (step === "C_D") authorityStore.patch({ authority: "combined-cutover-in-progress", migrationOperationId: operationId });
+    if (step === "K") authorityStore.patch({ authority: "provider-prepared", migrationOperationId: operationId });
+    if (step === "L") authorityStore.patch({ authority: "provider-authoritative", migrationOperationId: operationId });
   }
   function count(step) { counts.set(step, (counts.get(step) ?? 0) + 1); }
 }
