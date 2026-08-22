@@ -31,7 +31,7 @@ function Get-Phase7BIsolatedGuestContract {
     vmMemoryMiB = 4096
     vmDiskGiB = 80
     vmNetwork = "nat"
-    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v4.iso"
+    bootstrapIsoFileName = "phase7b-vmware-guest-bootstrap-kit-v5.iso"
     bootstrapIsoVolumeLabel = "P7B_BOOTSTRAP"
     repositoryRoot = "C:\Users\dusti\Documents\GitHub\physiqueos"
     isolatedRoot = "C:\Phase7B\isolated\379bb303"

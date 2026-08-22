@@ -21,7 +21,7 @@ try {
   Assert-True ($contract.applicationCommit -eq "379bb30391cfb7ed912e4757c77604e859b8a599") "accepted application commit"
   Assert-True ($contract.manifestDigest -eq "134bb6b4fd81e067c5c77fc1b5574373b62d4f6d033f14ed7c6afa4db40f557d") "manifest digest"
   Assert-True ($contract.repositoryRoot -eq "C:\Users\dusti\Documents\GitHub\physiqueos") "exact guest repository path"
-  Assert-True ($contract.bootstrapIsoFileName -eq "phase7b-vmware-guest-bootstrap-kit-v4.iso") "Node environment correction uses a new bootstrap ISO identity"
+  Assert-True ($contract.bootstrapIsoFileName -eq "phase7b-vmware-guest-bootstrap-kit-v5.iso") "post-marker report correction uses a new bootstrap ISO identity"
 
   $validVmxPath = Join-Path $testRoot "valid.vmx"
   @'
@@ -317,6 +317,38 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   Assert-True ($bootstrapText.Contains('Win32_SystemDriver') -and $bootstrapText.Contains('Win32_LogicalDisk') -and $bootstrapText.Contains('Win32_NetworkConnection')) "bootstrap collects corroborating driver and mapped-HGFS evidence"
   Assert-True ($bootstrapText.IndexOf('Set-Phase7BDeterministicToolEnvironment') -lt $bootstrapText.IndexOf('Initialize-Phase7BRepository -Prerequisites')) "bootstrap establishes deterministic PATH before npm ci"
   Assert-True ($bootstrapText.Contains('toolEnvironment = if ($toolEnvironmentState)')) "bootstrap report includes deterministic tool evidence"
+  Assert-True ($bootstrapText.Contains('$credentialSignalsFinal = @(')) "post-marker credential projection preserves zero-result array cardinality"
+  Assert-True (-not $bootstrapText.Contains('$credentialSignalsFinal = if ($repoPresent)')) "post-marker credential projection excludes conditional output unwrapping"
+
+  $zeroFinalCredentialSignals = @(
+    if ($true) { @() }
+  )
+  Assert-True ($zeroFinalCredentialSignals.Count -eq 0) "PowerShell 5.1 zero final credential signals remain an empty array"
+  $oneFinalCredentialSignals = @(
+    if ($true) { [pscustomobject]@{ relativePath = ".env.fixture" } }
+  )
+  Assert-True ($oneFinalCredentialSignals.Count -eq 1) "PowerShell 5.1 one final credential signal remains a one-element array"
+
+  $postMarkerNonce = [Guid]::NewGuid().ToString("N")
+  $postMarkerReportPath = Join-Path $testRoot "guest-bootstrap-$postMarkerNonce.json"
+  $postMarkerReport = [ordered]@{
+    schemaVersion = 1
+    nonce = $postMarkerNonce
+    pass = $zeroFinalCredentialSignals.Count -eq 0
+    classification = "PHASE7B_VMWARE_GUEST_BOOTSTRAP_PASS_INERT"
+    credentials = [ordered]@{
+      pass = $zeroFinalCredentialSignals.Count -eq 0
+      signalCount = $zeroFinalCredentialSignals.Count
+      signalPaths = @($zeroFinalCredentialSignals | ForEach-Object { $_.relativePath })
+    }
+  }
+  $postMarkerReport | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $postMarkerReportPath -Encoding UTF8
+  $postMarkerPersisted = Get-Content -LiteralPath $postMarkerReportPath -Raw | ConvertFrom-Json
+  Assert-True (Test-Path -LiteralPath $postMarkerReportPath -PathType Leaf) "post-marker nonce-bound report persists"
+  Assert-True ([string]$postMarkerPersisted.nonce -eq $postMarkerNonce) "post-marker report nonce/path construction is exact"
+  Assert-True ([bool]$postMarkerPersisted.pass -and [bool]$postMarkerPersisted.credentials.pass) "post-marker report accepts zero credential signals"
+  Assert-True ([int]$postMarkerPersisted.credentials.signalCount -eq 0) "post-marker report serializes zero credential signal count"
+  Assert-True (@($postMarkerPersisted.credentials.signalPaths).Count -eq 0) "post-marker report serializes empty credential signal paths"
   Assert-True (-not ($bootstrapText -match '(?i)(token|password|secret)\s*=\s*["''][^"'']{8,}["'']')) "no embedded credential literals"
   $hostPreflightText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "phase7bVmwareHostPreflight.ps1") -Raw
   Assert-True ($hostPreflightText.Contains('ValidateSet("HostBaseline", "FullVm", "BootstrapReady")')) "preflight exposes host, VM, and bootstrap-bound modes"

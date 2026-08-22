@@ -255,7 +255,9 @@ try {
   }
   $taskProjections = @(Get-Phase7BTaskProjections)
   $taskSet = Test-Phase7BInertTaskSet -TaskProjections $taskProjections -Contract $contract
-  $credentialSignalsFinal = if ($repoPresent) { @(Find-Phase7BForbiddenCredentialSignals -RepositoryRoot $contract.repositoryRoot) } else { @() }
+  $credentialSignalsFinal = @(
+    if ($repoPresent) { Find-Phase7BForbiddenCredentialSignals -RepositoryRoot $contract.repositoryRoot }
+  )
   $port3000 = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
   $cadenceProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
     $commandLine = [string]$_.CommandLine
