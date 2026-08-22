@@ -97,6 +97,7 @@ Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $wrong
 $tracked = @(
   (Join-Path $PSScriptRoot 'phase7bSecondComputerReplicaContract.psm1'),
   (Join-Path $PSScriptRoot 'phase7bAttestSecondComputerReplica.ps1'),
+  (Join-Path $PSScriptRoot 'phase7bConfigureAndAttestSecondComputerReplica.ps1'),
   (Join-Path $PSScriptRoot 'phase7bSecondComputerReplica.test.ps1')
 )
 foreach ($path in $tracked) {
@@ -109,9 +110,23 @@ $text = @($tracked | ForEach-Object { Get-Content -LiteralPath $_ -Raw }) -join 
 $operationalText = @(
   Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bSecondComputerReplicaContract.psm1') -Raw
   Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bAttestSecondComputerReplica.ps1') -Raw
+  Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bConfigureAndAttestSecondComputerReplica.ps1') -Raw
 ) -join [Environment]::NewLine
 Assert-True (-not ($text -match '(?i)(?:password|secret)\s*=\s*["''][^"'']{8,}["'']')) 'no credential literal'
 Assert-True (-not ($operationalText -match '(?i)Export-Clixml|ConvertFrom-SecureString|SaveCredentials\s*=\s*\$true')) 'no durable credential mechanism'
+
+$configurationText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bConfigureAndAttestSecondComputerReplica.ps1') -Raw
+Assert-True ($configurationText -match "Read-Host\s+-Prompt\s+[^\r\n]+\s+-AsSecureString") 'password collected only as interactive SecureString'
+Assert-True ($configurationText -match "phase7b-wp2b-replica-config-6cce4f4197ae4651a33ec123825326f9") 'exact one-shot authorization identity bound'
+Assert-True ($configurationText -match "ExpectedReplicaIpv4\s+-ne\s+'192\.168\.1\.68'" -and $configurationText -match "PrimaryHostIpv4\s+-ne\s+'192\.168\.1\.69'") 'exact same-LAN endpoints bound'
+Assert-True ($configurationText -match "ExpectedDiskNumber\s+-ne\s+0" -and $configurationText -match "ExpectedDiskBusType\s+-ne\s+'SATA'" -and $configurationText -match "ExpectedFileSystem\s+-ne\s+'NTFS'") 'exact selected D disk contract bound'
+Assert-True ($configurationText -match "Get-LocalUser.+ACCOUNT_ALREADY_EXISTS" -and $configurationText -match "ROOT_ALREADY_EXISTS" -and $configurationText -match "SHARE_ALREADY_EXISTS" -and $configurationText -match "FIREWALL_ALREADY_EXISTS") 'fresh target collision gates present'
+Assert-True ($configurationText -match "New-LocalUser" -and $configurationText -match "New-SmbShare" -and $configurationText -match "New-NetFirewallRule") 'only authorized configuration primitives present'
+Assert-True ($configurationText -match "S-1-5-18" -and $configurationText -match "S-1-5-32-544" -and $configurationText -match "FileSystemRights\]::Modify") 'exact SYSTEM Administrators replica-account ACL contract present'
+Assert-True ($configurationText -match '-EncryptData\s+\$true' -and $configurationText -match '-CachingMode\s+None' -and $configurationText -match '-FolderEnumerationMode\s+AccessBased') 'exact encrypted no-cache access-based share contract present'
+Assert-True ($configurationText -match '-Profile\s+Private' -and $configurationText -match '-Protocol\s+TCP' -and $configurationText -match '-LocalPort\s+445' -and $configurationText -match '-RemoteAddress\s+\$PrimaryHostIpv4') 'exact restricted firewall contract present'
+Assert-True (-not ($configurationText -match '(?i)New-SmbMapping|New-PSDrive|Copy-Item|Start-BitsTransfer|Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient')) 'no probe mapping copy capture or network execution path'
+Assert-True ($configurationText -match 'automaticRetryAllowed\s*=\s*\$false' -and $configurationText -match 'newFounderAuthorizationRequired\s*=\s*\$mutationStarted') 'partial mutation fails closed without retry'
 
 [ordered]@{
   classification = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_CONTRACT_TESTS_PASS'
