@@ -7,6 +7,8 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedPacketSha256,
   [Parameter(Mandatory = $true)][string]$DescriptorPath,
   [Parameter(Mandatory = $true)][string]$ExpectedDescriptorSha256,
+  [Parameter(Mandatory = $true)][string]$AgeExePath,
+  [Parameter(Mandatory = $true)][string]$ExpectedAgeExeSha256,
   [Parameter(Mandatory = $true)][string]$OutputPath
 )
 
@@ -24,11 +26,16 @@ $resultImage = $null
 $imageStream = $null
 
 try {
-  if ($ExpectedPacketSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedDescriptorSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "PHASE7B_WP2_MEDIA_HASH_ARGUMENT_INVALID" }
+  if ($ExpectedPacketSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedDescriptorSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "PHASE7B_WP2_MEDIA_HASH_ARGUMENT_INVALID" }
   $packet = Test-Phase7BEncryptedPacket -LiteralPath $PacketPath -ExpectedSha256 $ExpectedPacketSha256
   if (-not $packet.pass) { throw $packet.classification }
   if (-not (Test-Path -LiteralPath $DescriptorPath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $DescriptorPath) -ne $ExpectedDescriptorSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_DESCRIPTOR_HASH_MISMATCH" }
+  if (-not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or
+      (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
+  $ageVersion = @(& $AgeExePath --version 2>&1) -join ' '
+  if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
   $descriptor = Get-Content -LiteralPath $DescriptorPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
   if ([int]$descriptor.schemaVersion -ne 1 -or [string]$descriptor.classification -ne "PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS" -or
       [string]$descriptor.attemptId -ne $AttemptId -or [string]$descriptor.applicationCommit -ne $contract.applicationCommit -or
@@ -55,8 +62,11 @@ try {
   if (Test-Path -LiteralPath $stagingRoot) { throw "PHASE7B_WP2_MEDIA_STAGING_EXISTS" }
   New-Item -ItemType Directory -Path $stagingRoot -ErrorAction Stop | Out-Null
   Copy-Item -LiteralPath $PacketPath -Destination (Join-Path $stagingRoot (Split-Path -Leaf $PacketPath))
+  Copy-Item -LiteralPath $AgeExePath -Destination (Join-Path $stagingRoot $contract.ageMediaFileName)
   $mediaDescriptor = [ordered]@{}
   foreach ($property in $descriptor.PSObject.Properties) { $mediaDescriptor[$property.Name] = $property.Value }
+  $mediaDescriptor.ageFileName = $contract.ageMediaFileName
+  $mediaDescriptor.ageExeSha256 = $ExpectedAgeExeSha256.ToLowerInvariant()
   $mediaDescriptor.guestAuthorization = $guestAuthorization
   $mediaDescriptorPath = Join-Path $stagingRoot "phase7b-wp2-packet-descriptor.json"
   $mediaDescriptorBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $mediaDescriptor))
@@ -69,7 +79,7 @@ try {
   }
   $mediaDescriptorSha256 = Get-Phase7BSha256 -LiteralPath $mediaDescriptorPath
   $mediaFiles = @(Get-ChildItem -LiteralPath $stagingRoot -File)
-  $mediaFileSet = Test-Phase7BWorkPackage2MediaFileSet -FileNames @($mediaFiles.Name) -PacketFileName (Split-Path -Leaf $PacketPath)
+  $mediaFileSet = Test-Phase7BWorkPackage2MediaFileSet -FileNames @($mediaFiles.Name) -PacketFileName (Split-Path -Leaf $PacketPath) -AgeFileName $contract.ageMediaFileName
   if (-not $mediaFileSet.pass) { throw "PHASE7B_WP2_MEDIA_FILE_SET_INVALID" }
 
   $fileSystemImage = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
@@ -125,11 +135,13 @@ public static class Phase7BWP2IsoStreamWriter {
     outputBytes = (Get-Item -LiteralPath $fullOutput).Length
     primaryVolumeLabel = $identity.primaryVolumeLabel
     jolietVolumeLabel = $identity.jolietVolumeLabel
-    fileCount = 2
+    fileCount = 3
     packetFileName = Split-Path -Leaf $PacketPath
     packetSha256 = $ExpectedPacketSha256.ToLowerInvariant()
     sourceDescriptorSha256 = $ExpectedDescriptorSha256.ToLowerInvariant()
     mediaDescriptorSha256 = $mediaDescriptorSha256
+    ageFileName = $contract.ageMediaFileName
+    ageExeSha256 = $ExpectedAgeExeSha256.ToLowerInvariant()
     embeddedAuthorizedStages = @('WP2C_MEDIA', 'WP2C_STAGE', 'WP2C_RESTORE', 'WP2C_VERIFY')
     credentialsIncluded = $false
     plaintextIncluded = $false

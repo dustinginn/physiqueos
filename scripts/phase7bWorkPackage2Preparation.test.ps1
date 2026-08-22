@@ -177,15 +177,15 @@ exit /b %ERRORLEVEL%
   Copy-Item -LiteralPath $encrypted -Destination $replica
   Assert-True (Test-Phase7BPacketReplica -LocalPacketPath $encrypted -ReplicaPacketPath $replica -ExpectedSha256 $packetSha).pass "exact independent replica accepted"
   Assert-Throws { Test-Phase7BPacketReplica -LocalPacketPath $encrypted -ReplicaPacketPath (Join-Path $testRoot 'missing.age') -ExpectedSha256 $packetSha } 'PHASE7B_WP2_PACKET_NOT_FOUND' "missing replica rejected"
-  Assert-True (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted), 'phase7b-wp2-packet-descriptor.json') -PacketFileName (Split-Path -Leaf $encrypted)).pass "exact two-file media set accepted"
+  Assert-True (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted), 'phase7b-wp2-packet-descriptor.json', 'age.exe') -PacketFileName (Split-Path -Leaf $encrypted)).pass "exact packet/descriptor/age media set accepted"
   Assert-True (-not (Test-Phase7BWorkPackage2MediaFileSet -FileNames @() -PacketFileName (Split-Path -Leaf $encrypted)).pass) "zero-file media rejected"
   Assert-True (-not (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted)) -PacketFileName (Split-Path -Leaf $encrypted)).pass) "missing descriptor media rejected"
-  Assert-True (-not (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted), 'phase7b-wp2-packet-descriptor.json', 'unexpected.txt') -PacketFileName (Split-Path -Leaf $encrypted)).pass) "unexpected media file rejected"
+  Assert-True (-not (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted), 'phase7b-wp2-packet-descriptor.json', 'age.exe', 'unexpected.txt') -PacketFileName (Split-Path -Leaf $encrypted)).pass) "unexpected media file rejected"
   Assert-True (-not (Test-Phase7BWorkPackage2MediaFileSet -FileNames @((Split-Path -Leaf $encrypted), (Split-Path -Leaf $encrypted)) -PacketFileName (Split-Path -Leaf $encrypted)).pass) "duplicate media file rejected"
   Assert-True (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @() -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Empty).pass "empty incoming staging state accepted before mutation"
   Assert-True (-not (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @((Split-Path -Leaf $encrypted)) -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Complete).pass) "one-file partial staging rejected"
-  Assert-True (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @((Split-Path -Leaf $encrypted), "$attemptId-descriptor.json") -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Complete).pass "exact staged packet and bound descriptor accepted"
-  Assert-True (-not (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @((Split-Path -Leaf $encrypted), "$attemptId-descriptor.json", 'unexpected.bin') -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Complete).pass) "unexpected staged file rejected"
+  Assert-True (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @((Split-Path -Leaf $encrypted), "$attemptId-descriptor.json", "$attemptId-age.exe") -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Complete).pass "exact staged packet, descriptor, and age binary accepted"
+  Assert-True (-not (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames @((Split-Path -Leaf $encrypted), "$attemptId-descriptor.json", "$attemptId-age.exe", 'unexpected.bin') -PacketFileName (Split-Path -Leaf $encrypted) -AttemptId $attemptId -ExpectedState Complete).pass) "unexpected staged file rejected"
 
   $validEvidence = Test-Phase7BWorkPackage2RestoreEvidence -ManifestPass $true -FileDigestsPass $true -GuestIdentityPass $true -TaskSetPass $true -StoppedControlsPass $true -CredentialScanPass $true -RuntimeListenerCount 0 -PhysiqueOsProcessCount 0 -MappedHgfsDiskCount 0 -MappedHgfsConnectionCount 0 -EnabledTaskCount 0
   Assert-True $validEvidence.pass "complete inert restore evidence accepted"
@@ -204,10 +204,11 @@ exit /b %ERRORLEVEL%
   $mediaAuthPath = Join-Path $testRoot 'media-authorization.json'
   $mediaAuthHash = New-Authorization -Path $mediaAuthPath -Stage 'WP2C_MEDIA' -AttemptId $attemptId -InventorySha $two.inventorySha256 -PacketSha $packetSha
   $isoPath = Join-Path $testRoot 'phase7b-wp2-fixture.iso'
-  $isoOutput = @(& (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2RestoreIso.ps1') -AttemptId $attemptId -AuthorizationPath $mediaAuthPath -ExpectedAuthorizationSha256 $mediaAuthHash -PacketPath $encrypted -ExpectedPacketSha256 $packetSha -DescriptorPath $descriptorPath -ExpectedDescriptorSha256 $descriptorHash -OutputPath $isoPath) -join [Environment]::NewLine
+  $isoOutput = @(& (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2RestoreIso.ps1') -AttemptId $attemptId -AuthorizationPath $mediaAuthPath -ExpectedAuthorizationSha256 $mediaAuthHash -PacketPath $encrypted -ExpectedPacketSha256 $packetSha -DescriptorPath $descriptorPath -ExpectedDescriptorSha256 $descriptorHash -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeHash -OutputPath $isoPath) -join [Environment]::NewLine
   $isoResult = $isoOutput | ConvertFrom-Json
   Assert-True ($isoResult.pass -and $isoResult.classification -eq 'PHASE7B_WP2_RESTORE_MEDIA_BUILT') "synthetic two-file restore media built"
-  Assert-True ($isoResult.fileCount -eq 2 -and $isoResult.primaryVolumeLabel -eq 'P7B_WP2' -and $isoResult.jolietVolumeLabel -eq 'P7B_WP2') "restore media exact file count and labels"
+  Assert-True ($isoResult.fileCount -eq 3 -and $isoResult.primaryVolumeLabel -eq 'P7B_WP2' -and $isoResult.jolietVolumeLabel -eq 'P7B_WP2') "restore media exact file count and labels"
+  Assert-True ($isoResult.ageFileName -eq 'age.exe' -and $isoResult.ageExeSha256 -eq $fakeAgeHash) "restore media binds exact offline age executable"
   Assert-True (@($isoResult.embeddedAuthorizedStages).Count -eq 4 -and $isoResult.mediaDescriptorSha256 -match '^[0-9a-f]{64}$') "media descriptor embeds exact offline guest stage authorizations"
   Assert-True (-not $isoResult.credentialsIncluded -and -not $isoResult.plaintextIncluded) "restore media excludes credentials and plaintext"
 

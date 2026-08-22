@@ -73,7 +73,8 @@ function Read-BoundDescriptor {
       [string]$descriptor.attemptId -ne $AttemptId -or [string]$descriptor.applicationCommit -ne $contract.applicationCommit -or
       [string]$descriptor.environmentId -ne $contract.environmentId -or [string]$descriptor.vmDisplayName -ne $contract.vmDisplayName -or
       [string]$descriptor.packetFileName -ne (Split-Path -Leaf $PacketPath) -or [string]$descriptor.packetSha256 -ne $ExpectedSha256.ToLowerInvariant() -or -not [bool]$descriptor.localEncryptedCopyPass -or
-      -not [bool]$descriptor.independentEncryptedReplicaPass) { throw "PHASE7B_WP2_DESCRIPTOR_BINDING_MISMATCH" }
+      -not [bool]$descriptor.independentEncryptedReplicaPass -or [string]$descriptor.ageFileName -ne $contract.ageMediaFileName -or
+      [string]$descriptor.ageExeSha256 -notmatch '^[0-9a-f]{64}$') { throw "PHASE7B_WP2_DESCRIPTOR_BINDING_MISMATCH" }
   $descriptor
 }
 
@@ -164,12 +165,15 @@ try {
     $resolvedDescriptor = (Resolve-Path -LiteralPath $DescriptorPath -ErrorAction Stop).Path
     if (-not $resolvedPacket.StartsWith($opticalRoot, [StringComparison]::OrdinalIgnoreCase) -or -not $resolvedDescriptor.StartsWith($opticalRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "PHASE7B_WP2_MEDIA_SOURCE_MISMATCH" }
     $opticalFiles = @(Get-ChildItem -LiteralPath $opticalRoot -File -ErrorAction Stop)
-    $mediaFileSet = Test-Phase7BWorkPackage2MediaFileSet -FileNames @($opticalFiles.Name) -PacketFileName (Split-Path -Leaf $resolvedPacket)
+    $mediaFileSet = Test-Phase7BWorkPackage2MediaFileSet -FileNames @($opticalFiles.Name) -PacketFileName (Split-Path -Leaf $resolvedPacket) -AgeFileName $contract.ageMediaFileName
     if (-not $mediaFileSet.pass) { throw $mediaFileSet.classification }
     $packet = Test-Phase7BEncryptedPacket -LiteralPath $resolvedPacket -ExpectedSha256 $ExpectedSha256
     if (-not $packet.pass) { throw $packet.classification }
+    $resolvedAge = Join-Path $opticalRoot $contract.ageMediaFileName
+    if (-not (Test-Path -LiteralPath $resolvedAge -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $resolvedAge) -ne [string]$descriptor.ageExeSha256) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
     $destinationPacket = Join-Path $incoming (Split-Path -Leaf $resolvedPacket)
     $destinationDescriptor = Join-Path $incoming "$AttemptId-descriptor.json"
+    $destinationAge = Join-Path $incoming "$AttemptId-age.exe"
     $incomingPrefix = [IO.Path]::GetFullPath($incoming).TrimEnd('\') + '\'
     $incomingBefore = @(Get-ChildItem -LiteralPath $incoming -File -Recurse -Force -ErrorAction Stop | ForEach-Object { $_.FullName.Substring($incomingPrefix.Length).Replace('\', '/') })
     if (-not (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames $incomingBefore -PacketFileName (Split-Path -Leaf $resolvedPacket) -AttemptId $AttemptId -ExpectedState Empty).pass) { throw "PHASE7B_WP2_STAGING_DESTINATION_NOT_EMPTY" }
@@ -177,10 +181,12 @@ try {
     $mutationStarted = $true
     [IO.File]::Copy($resolvedPacket, $destinationPacket, $false)
     [IO.File]::Copy($resolvedDescriptor, $destinationDescriptor, $false)
+    [IO.File]::Copy($resolvedAge, $destinationAge, $false)
     $staged = Test-Phase7BEncryptedPacket -LiteralPath $destinationPacket -ExpectedSha256 $ExpectedSha256
     $incomingAfter = @(Get-ChildItem -LiteralPath $incoming -File -Recurse -Force -ErrorAction Stop | ForEach-Object { $_.FullName.Substring($incomingPrefix.Length).Replace('\', '/') })
     $stagingSet = Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames $incomingAfter -PacketFileName (Split-Path -Leaf $resolvedPacket) -AttemptId $AttemptId -ExpectedState Complete
-    if (-not $staged.pass -or -not $stagingSet.pass -or (Get-Phase7BSha256 -LiteralPath $destinationDescriptor) -ne $ExpectedDescriptorSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_STAGED_READBACK_FAIL" }
+    if (-not $staged.pass -or -not $stagingSet.pass -or (Get-Phase7BSha256 -LiteralPath $destinationDescriptor) -ne $ExpectedDescriptorSha256.ToLowerInvariant() -or
+        (Get-Phase7BSha256 -LiteralPath $destinationAge) -ne [string]$descriptor.ageExeSha256) { throw "PHASE7B_WP2_STAGED_READBACK_FAIL" }
     Write-SafeResult ([ordered]@{ schemaVersion = 2; nonce = $nonce; observedAt = $timestamp; operation = $Operation; classification = "PHASE7B_WP2_ENCRYPTED_PACKET_STAGED_PASS"; pass = $true; attemptId = $AttemptId; packetFileName = Split-Path -Leaf $destinationPacket; packetSha256 = $ExpectedSha256.ToLowerInvariant(); descriptorSha256 = $ExpectedDescriptorSha256.ToLowerInvariant(); mutationPerformed = $true; automaticRetryAllowed = $false })
     exit 0
   }
@@ -196,7 +202,12 @@ try {
     if (-not (Test-Phase7BWorkPackage2StagingFileSet -RelativeFileNames $incomingFiles -PacketFileName (Split-Path -Leaf $resolvedPacket) -AttemptId $AttemptId -ExpectedState Complete).pass) { throw "PHASE7B_WP2_STAGING_FILE_SET_INCOMPLETE" }
     $packet = Test-Phase7BEncryptedPacket -LiteralPath $resolvedPacket -ExpectedSha256 $ExpectedSha256
     if (-not $packet.pass) { throw $packet.classification }
-    if ([string]::IsNullOrWhiteSpace($AgeExePath) -or $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$' -or -not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
+    $expectedStagedAge = Join-Path $incoming "$AttemptId-age.exe"
+    if ([string]::IsNullOrWhiteSpace($AgeExePath) -or -not [IO.Path]::GetFullPath($AgeExePath).Equals([IO.Path]::GetFullPath($expectedStagedAge), [StringComparison]::OrdinalIgnoreCase) -or
+        $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedAgeExeSha256.ToLowerInvariant() -ne [string]$descriptor.ageExeSha256 -or
+        -not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
+    $ageVersion = @(& $AgeExePath --version 2>&1) -join ' '
+    if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
     if ($Host.Name -ne "ConsoleHost" -or -not [Environment]::UserInteractive) { throw "PHASE7B_WP2_INTERACTIVE_SECRET_CONSOLE_REQUIRED" }
     $finalRestore = Join-Path $restore $contract.restoredPacketDirectoryName
     $incompleteRestore = Join-Path $restore ".incomplete-$AttemptId"

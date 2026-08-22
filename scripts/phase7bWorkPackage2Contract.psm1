@@ -20,6 +20,7 @@ function Get-Phase7BWorkPackage2Contract {
     restoredPacketDirectoryName = "packet"
     opticalVolumeLabel = "P7B_WP2"
     packetExtension = ".zip.age"
+    ageMediaFileName = "age.exe"
     authorizationClassification = "PHASE7B_WP2_STAGE_AUTHORIZATION"
     authorizationStages = @("WP2B_INVENTORY", "WP2B_CAPTURE", "WP2C_MEDIA", "WP2C_STAGE", "WP2C_RESTORE", "WP2C_VERIFY")
     automaticRetryAllowed = $false
@@ -368,11 +369,12 @@ function Test-Phase7BWorkPackage2MediaFileSet {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$FileNames,
-    [Parameter(Mandatory = $true)][string]$PacketFileName
+    [Parameter(Mandatory = $true)][string]$PacketFileName,
+    [Parameter()][string]$AgeFileName = 'age.exe'
   )
   $actual = @($FileNames | ForEach-Object { [string]$_ } | Sort-Object)
-  $expected = @($PacketFileName, 'phase7b-wp2-packet-descriptor.json') | Sort-Object
-  $pass = $actual.Count -eq 2 -and ($actual -join '|') -ceq ($expected -join '|')
+  $expected = @($PacketFileName, 'phase7b-wp2-packet-descriptor.json', $AgeFileName) | Sort-Object
+  $pass = $actual.Count -eq 3 -and ($actual -join '|') -ceq ($expected -join '|')
   [pscustomobject][ordered]@{
     pass = $pass
     classification = if ($pass) { 'PHASE7B_WP2_MEDIA_FILE_SET_PASS' } else { 'PHASE7B_WP2_MEDIA_FILE_SET_FAIL' }
@@ -390,7 +392,7 @@ function Test-Phase7BWorkPackage2StagingFileSet {
   )
 
   $actual = @($RelativeFileNames | ForEach-Object { ([string]$_).Replace('\', '/') } | Sort-Object -CaseSensitive)
-  $expected = @(if ($ExpectedState -eq 'Complete') { @($PacketFileName, "$AttemptId-descriptor.json") | Sort-Object -CaseSensitive })
+  $expected = @(if ($ExpectedState -eq 'Complete') { @($PacketFileName, "$AttemptId-descriptor.json", "$AttemptId-age.exe") | Sort-Object -CaseSensitive })
   $pass = $actual.Count -eq $expected.Count -and ($actual -join '|') -ceq ($expected -join '|')
   [pscustomobject][ordered]@{
     pass = $pass
