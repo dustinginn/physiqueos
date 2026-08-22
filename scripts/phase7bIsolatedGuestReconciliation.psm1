@@ -8,6 +8,68 @@ function Assert-Phase7BReconciliationInvariant {
   if (-not $Condition) { throw "PHASE7B_RECONCILIATION_INVARIANT:$Code" }
 }
 
+function Get-Phase7BRequiredTaskPropertyValue {
+  param(
+    [Parameter(Mandatory = $true)][object]$InputObject,
+    [Parameter(Mandatory = $true)][string]$PropertyName,
+    [Parameter(Mandatory = $true)][string]$Code
+  )
+  $property = $InputObject.PSObject.Properties[$PropertyName]
+  if ($null -eq $property) { throw "PHASE7B_RECONCILIATION_TASK_SHAPE:$Code" }
+  return $property.Value
+}
+
+function Get-Phase7BReconciliationTaskProjection {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)][string]$TaskName,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Task
+  )
+
+  $taskObjects = @($Task | Where-Object { $null -ne $_ })
+  if ($taskObjects.Count -ne 1) { throw "PHASE7B_RECONCILIATION_TASK_QUERY_CARDINALITY" }
+  $taskObject = $taskObjects[0]
+  $actions = @(Get-Phase7BRequiredTaskPropertyValue -InputObject $taskObject -PropertyName "Actions" -Code "ACTIONS" | Where-Object { $null -ne $_ })
+  if ($actions.Count -ne 1) { throw "PHASE7B_RECONCILIATION_TASK_ACTION_CARDINALITY" }
+  $action = $actions[0]
+  $principal = Get-Phase7BRequiredTaskPropertyValue -InputObject $taskObject -PropertyName "Principal" -Code "PRINCIPAL"
+  $settings = Get-Phase7BRequiredTaskPropertyValue -InputObject $taskObject -PropertyName "Settings" -Code "SETTINGS"
+  if ($null -eq $principal -or $null -eq $settings) { throw "PHASE7B_RECONCILIATION_TASK_SHAPE:PRINCIPAL_OR_SETTINGS_NULL" }
+
+  # Windows PowerShell 5.1 wraps an explicitly evaluated $null in @($null) as a
+  # one-element array. A persisted task with no triggers therefore must filter
+  # null before any strict-mode CimClass access.
+  $rawTriggers = Get-Phase7BRequiredTaskPropertyValue -InputObject $taskObject -PropertyName "Triggers" -Code "TRIGGERS"
+  $triggers = @($rawTriggers | Where-Object { $null -ne $_ })
+  $triggerTypes = @()
+  $repetitionIntervals = @()
+  foreach ($trigger in $triggers) {
+    $cimClass = Get-Phase7BRequiredTaskPropertyValue -InputObject $trigger -PropertyName "CimClass" -Code "TRIGGER_CIM_CLASS"
+    if ($null -eq $cimClass) { throw "PHASE7B_RECONCILIATION_TASK_SHAPE:TRIGGER_CIM_CLASS_NULL" }
+    $triggerTypes += [string](Get-Phase7BRequiredTaskPropertyValue -InputObject $cimClass -PropertyName "CimClassName" -Code "TRIGGER_CIM_CLASS_NAME")
+    $repetitionProperty = $trigger.PSObject.Properties["Repetition"]
+    if ($null -ne $repetitionProperty -and $null -ne $repetitionProperty.Value) {
+      $intervalProperty = $repetitionProperty.Value.PSObject.Properties["Interval"]
+      if ($null -ne $intervalProperty -and -not [string]::IsNullOrWhiteSpace([string]$intervalProperty.Value)) {
+        $repetitionIntervals += [string]$intervalProperty.Value
+      }
+    }
+  }
+
+  Get-Phase7BSafeTaskProjection `
+    -TaskName $TaskName `
+    -Execute ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $action -PropertyName "Execute" -Code "ACTION_EXECUTE")) `
+    -Arguments ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $action -PropertyName "Arguments" -Code "ACTION_ARGUMENTS")) `
+    -WorkingDirectory ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $action -PropertyName "WorkingDirectory" -Code "ACTION_WORKING_DIRECTORY")) `
+    -LogonType ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $principal -PropertyName "LogonType" -Code "PRINCIPAL_LOGON_TYPE")) `
+    -RunLevel ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $principal -PropertyName "RunLevel" -Code "PRINCIPAL_RUN_LEVEL")) `
+    -MultipleInstances ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $settings -PropertyName "MultipleInstances" -Code "SETTINGS_MULTIPLE_INSTANCES")) `
+    -ExecutionTimeLimit ([string](Get-Phase7BRequiredTaskPropertyValue -InputObject $settings -PropertyName "ExecutionTimeLimit" -Code "SETTINGS_EXECUTION_TIME_LIMIT")) `
+    -Enabled ([bool](Get-Phase7BRequiredTaskPropertyValue -InputObject $settings -PropertyName "Enabled" -Code "SETTINGS_ENABLED")) `
+    -TriggerTypes @($triggerTypes) `
+    -RepetitionIntervals @($repetitionIntervals)
+}
+
 function Test-Phase7BReportOnlyReconciliationState {
   [CmdletBinding()]
   param(
@@ -185,6 +247,7 @@ function Write-Phase7BReportOnlyReconciliation {
 }
 
 Export-ModuleMember -Function @(
+  "Get-Phase7BReconciliationTaskProjection",
   "Test-Phase7BReportOnlyReconciliationState",
   "Write-Phase7BReportOnlyReconciliation"
 )

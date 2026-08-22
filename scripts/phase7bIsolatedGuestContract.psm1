@@ -537,6 +537,7 @@ function Test-Phase7BInertTaskSet {
   $names = @($TaskProjections | ForEach-Object { $_.taskName })
   $required = @($Contract.productionTaskName, $Contract.monitorTaskName, $Contract.ngrokTaskName)
   $missing = @($required | Where-Object { $names -notcontains $_ })
+  $unexpected = @($names | Where-Object { $required -notcontains $_ })
   $enabled = @($TaskProjections | Where-Object { $_.enabled })
   $wrongPrincipal = @($TaskProjections | Where-Object { $_.logonType -ne "S4U" -or $_.runLevel -ne "Limited" -or $_.multipleInstances -ne "IgnoreNew" })
   $wrongDefinition = New-Object System.Collections.Generic.List[object]
@@ -565,11 +566,12 @@ function Test-Phase7BInertTaskSet {
         $ngrok[0].argumentsSha256 -ne (Get-Phase7BSha256 -Text "http 3000") -or
         $ngrok[0].executionTimeLimit -ne "PT0S") { $wrongDefinition.Add($ngrok[0]) }
   }
-  $pass = $missing.Count -eq 0 -and $enabled.Count -eq 0 -and $wrongPrincipal.Count -eq 0 -and $wrongDefinition.Count -eq 0
+  $pass = $TaskProjections.Count -eq $required.Count -and $missing.Count -eq 0 -and $unexpected.Count -eq 0 -and $enabled.Count -eq 0 -and $wrongPrincipal.Count -eq 0 -and $wrongDefinition.Count -eq 0
   [pscustomobject][ordered]@{
     pass = $pass
     classification = if ($pass) { "INERT_TASK_SET_PASS" } else { "INERT_TASK_SET_FAIL" }
     missingTaskNames = $missing
+    unexpectedTaskNames = $unexpected
     enabledTaskNames = @($enabled | ForEach-Object { $_.taskName })
     principalMismatchTaskNames = @($wrongPrincipal | ForEach-Object { $_.taskName })
     definitionMismatchTaskNames = @($wrongDefinition | ForEach-Object { $_.taskName })

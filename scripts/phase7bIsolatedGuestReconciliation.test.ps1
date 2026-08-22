@@ -43,6 +43,52 @@ function Copy-State([psobject]$State) {
   return ($State | ConvertTo-Json -Depth 12 | ConvertFrom-Json)
 }
 
+function New-TaskFixture([string]$TaskName, [bool]$Enabled = $false) {
+  $logonTrigger = [pscustomobject]@{
+    CimClass = [pscustomobject]@{ CimClassName = "MSFT_TaskLogonTrigger" }
+    Repetition = $null
+  }
+  $timeTrigger = [pscustomobject]@{
+    CimClass = [pscustomobject]@{ CimClassName = "MSFT_TaskTimeTrigger" }
+    Repetition = [pscustomobject]@{ Interval = "PT1M" }
+  }
+  $execute = $null
+  $arguments = $null
+  $workingDirectory = $null
+  $executionTimeLimit = "PT0S"
+  $triggers = $null
+  if ($TaskName -eq $contract.productionTaskName) {
+    $execute = "C:\Program Files\nodejs\node.exe"
+    $arguments = "`"$($contract.repositoryRoot)\node_modules\next\dist\bin\next`" start --hostname 0.0.0.0 --port 3000"
+    $workingDirectory = $contract.repositoryRoot
+    $triggers = @($logonTrigger)
+  } elseif ($TaskName -eq $contract.monitorTaskName) {
+    $execute = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$($contract.repositoryRoot)\scripts\monitorPhysiqueOS.ps1`""
+    $workingDirectory = $contract.repositoryRoot
+    $executionTimeLimit = "PT30S"
+    $triggers = @($logonTrigger, $timeTrigger)
+  } elseif ($TaskName -eq $contract.ngrokTaskName) {
+    $execute = "$($contract.ngrokRoot)\ngrok.exe"
+    $arguments = "http 3000"
+    $workingDirectory = $contract.ngrokRoot
+    # Reproduce the persisted zero-trigger Windows task shape exactly: the
+    # Triggers property exists but its value is null.
+    $triggers = $null
+  } else {
+    $execute = "C:\Windows\System32\cmd.exe"
+    $arguments = "/c exit 0"
+    $workingDirectory = "C:\Windows\System32"
+    $triggers = @($logonTrigger)
+  }
+  [pscustomobject]@{
+    Actions = @([pscustomobject]@{ Execute = $execute; Arguments = $arguments; WorkingDirectory = $workingDirectory })
+    Principal = [pscustomobject]@{ LogonType = "S4U"; RunLevel = "Limited" }
+    Settings = [pscustomobject]@{ MultipleInstances = "IgnoreNew"; ExecutionTimeLimit = $executionTimeLimit; Enabled = $Enabled }
+    Triggers = $triggers
+  }
+}
+
 try {
   New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
   $bootstrapCommit = "be86ec20394fff9760134b583d6f3c949ea95673"
@@ -50,6 +96,28 @@ try {
   $validState = New-ValidReconciliationState
   $validation = Test-Phase7BReportOnlyReconciliationState -State $validState -Contract $contract -BootstrapToolingCommit $bootstrapCommit -ReconciliationToolingCommit $reconciliationCommit
   Assert-True $validation.pass "exact attempt-4 inert fixture validates"
+
+  $zeroTaskRejected = $false
+  try { [void](Get-Phase7BReconciliationTaskProjection -TaskName $contract.ngrokTaskName -Task @()) } catch { $zeroTaskRejected = $_.Exception.Message -eq "PHASE7B_RECONCILIATION_TASK_QUERY_CARDINALITY" }
+  Assert-True $zeroTaskRejected "zero scheduled-task results fail closed"
+  $manyTaskRejected = $false
+  $ngrokTaskFixture = New-TaskFixture -TaskName $contract.ngrokTaskName
+  try { [void](Get-Phase7BReconciliationTaskProjection -TaskName $contract.ngrokTaskName -Task @($ngrokTaskFixture, $ngrokTaskFixture)) } catch { $manyTaskRejected = $_.Exception.Message -eq "PHASE7B_RECONCILIATION_TASK_QUERY_CARDINALITY" }
+  Assert-True $manyTaskRejected "multiple same-name scheduled-task results fail closed"
+
+  $productionProjection = Get-Phase7BReconciliationTaskProjection -TaskName $contract.productionTaskName -Task @(New-TaskFixture -TaskName $contract.productionTaskName)
+  $monitorProjection = Get-Phase7BReconciliationTaskProjection -TaskName $contract.monitorTaskName -Task @(New-TaskFixture -TaskName $contract.monitorTaskName)
+  $ngrokProjection = Get-Phase7BReconciliationTaskProjection -TaskName $contract.ngrokTaskName -Task @($ngrokTaskFixture)
+  Assert-True (@($productionProjection.triggerTypes).Count -eq 1) "one-trigger task projection remains scalar-safe"
+  Assert-True (@($monitorProjection.triggerTypes).Count -eq 2 -and @($monitorProjection.repetitionIntervals).Count -eq 1) "multi-trigger task projection remains array-safe"
+  Assert-True (@($ngrokProjection.triggerTypes).Count -eq 0 -and @($ngrokProjection.repetitionIntervals).Count -eq 0) "null zero-trigger task projection does not dereference CimClass"
+  $exactTaskSet = @($productionProjection, $monitorProjection, $ngrokProjection)
+  Assert-True ([bool](Test-Phase7BInertTaskSet -TaskProjections $exactTaskSet -Contract $contract).pass) "three exact disabled persisted tasks pass"
+  Assert-True (-not [bool](Test-Phase7BInertTaskSet -TaskProjections @($productionProjection, $monitorProjection) -Contract $contract).pass) "missing task fails closed"
+  $unexpectedProjection = Get-Phase7BReconciliationTaskProjection -TaskName "Unexpected PhysiqueOS Task" -Task @(New-TaskFixture -TaskName "Unexpected PhysiqueOS Task")
+  Assert-True (-not [bool](Test-Phase7BInertTaskSet -TaskProjections @($exactTaskSet + $unexpectedProjection) -Contract $contract).pass) "extra task fails closed"
+  $enabledProjection = Get-Phase7BReconciliationTaskProjection -TaskName $contract.ngrokTaskName -Task @(New-TaskFixture -TaskName $contract.ngrokTaskName -Enabled $true)
+  Assert-True (-not [bool](Test-Phase7BInertTaskSet -TaskProjections @($productionProjection, $monitorProjection, $enabledProjection) -Contract $contract).pass) "enabled task fails closed"
 
   $sentinelDirectory = Join-Path $testRoot "sentinels"
   New-Item -ItemType Directory -Path $sentinelDirectory -Force | Out-Null

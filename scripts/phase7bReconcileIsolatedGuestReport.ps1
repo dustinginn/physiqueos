@@ -161,11 +161,9 @@ try {
   $stage = "task-state"
   $taskProjections = @()
   foreach ($taskName in @($contract.productionTaskName, $contract.monitorTaskName, $contract.ngrokTaskName)) {
-    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    if (-not $task) { continue }
-    $action = @($task.Actions)[0]
-    $triggers = @($task.Triggers)
-    $taskProjections += Get-Phase7BSafeTaskProjection -TaskName $taskName -Execute ([string]$action.Execute) -Arguments ([string]$action.Arguments) -WorkingDirectory ([string]$action.WorkingDirectory) -LogonType ([string]$task.Principal.LogonType) -RunLevel ([string]$task.Principal.RunLevel) -MultipleInstances ([string]$task.Settings.MultipleInstances) -ExecutionTimeLimit ([string]$task.Settings.ExecutionTimeLimit) -Enabled ([bool]$task.Settings.Enabled) -TriggerTypes @($triggers | ForEach-Object { [string]$_.CimClass.CimClassName }) -RepetitionIntervals @($triggers | ForEach-Object { if ($_.Repetition) { [string]$_.Repetition.Interval } } | Where-Object { $_ })
+    $taskMatches = @(Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Where-Object { $null -ne $_ })
+    if ($taskMatches.Count -eq 0) { continue }
+    $taskProjections += Get-Phase7BReconciliationTaskProjection -TaskName $taskName -Task @($taskMatches)
   }
   $taskProjections = @($taskProjections)
   $taskSet = Test-Phase7BInertTaskSet -TaskProjections $taskProjections -Contract $contract
