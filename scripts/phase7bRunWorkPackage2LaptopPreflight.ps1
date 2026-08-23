@@ -31,9 +31,7 @@ function Assert-Phase7BStage0Snapshot {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][string]$ObservedAttemptId,
     [Parameter(Mandatory = $true)][string]$ObservedToolingCommit,
-    [Parameter(Mandatory = $true)][string]$EnvironmentMachineName,
-    [Parameter(Mandatory = $true)][string]$EnvironmentComputerName,
-    [Parameter(Mandatory = $true)][string]$CimComputerName,
+    [Parameter(Mandatory = $true)][string]$CanonicalComputerName,
     [Parameter(Mandatory = $true)][string]$HostIdentitySha256,
     [Parameter(Mandatory = $true)][string]$DiskIdentitySha256,
     [Parameter(Mandatory = $true)][string]$FileSystem,
@@ -50,9 +48,7 @@ function Assert-Phase7BStage0Snapshot {
   if ($ObservedToolingCommit -cnotmatch '^[0-9a-f]{40}$') {
     throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL'
   }
-  if ($EnvironmentMachineName -cne 'LAPTOP-4G5U0U2R' -or
-      $EnvironmentComputerName -cne 'LAPTOP-4G5U0U2R' -or
-      $CimComputerName -cne 'LAPTOP-4G5U0U2R') {
+  if ($CanonicalComputerName -cne 'LAPTOP-4G5U0U2R') {
     throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
   }
   if ($HostIdentitySha256 -cne 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c') {
@@ -91,14 +87,8 @@ try {
   if ($ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL' }
 
   $stage = 'validate-host-identity'
-  $environmentMachineName = [string][Environment]::MachineName
-  $environmentComputerName = [string]$env:COMPUTERNAME
-  $computerSystems = @(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop)
-  if ($computerSystems.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_COMPUTER_SYSTEM_CARDINALITY_FAIL' }
-  $cimComputerName = [string]$computerSystems[0].Name
-  if ($environmentMachineName -cne $acceptedComputerName -or
-      $environmentComputerName -cne $acceptedComputerName -or
-      $cimComputerName -cne $acceptedComputerName) {
+  $canonicalComputerName = [string][Environment]::MachineName
+  if ($canonicalComputerName -cne $acceptedComputerName) {
     throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
   }
   $products = @(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop)
@@ -161,8 +151,7 @@ try {
   $replicaPrefixLength = [int]$lanCandidates[0].PrefixLength
 
   [void](Assert-Phase7BStage0Snapshot -ObservedAttemptId $AttemptId -ObservedToolingCommit $ExpectedToolingCommit `
-    -EnvironmentMachineName $environmentMachineName -EnvironmentComputerName $environmentComputerName `
-    -CimComputerName $cimComputerName -HostIdentitySha256 $hostIdentitySha256 `
+    -CanonicalComputerName $canonicalComputerName -HostIdentitySha256 $hostIdentitySha256 `
     -DiskIdentitySha256 $diskIdentitySha256 -FileSystem $fileSystem -DiskNumber $diskNumber -BusType $busType `
     -FreeBytes $freeBytes -PrivateLanCandidateCount $lanCandidates.Count -ReplicaIpv4 $replicaIpv4 `
     -ReplicaPrefixLength $replicaPrefixLength)
