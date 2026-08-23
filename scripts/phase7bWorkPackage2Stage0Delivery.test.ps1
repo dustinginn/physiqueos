@@ -62,6 +62,23 @@ try {
   }
   Assert-True ($source.Contains('[bool]$result.mutationPerformed') -and $source.Contains('[bool]$result.receiverOpened') -and
       $source.Contains('[bool]$result.automaticRetryAllowed')) 'wrapper requires read-only no-receiver no-retry projection'
+  $wrapperAst = [Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
+  foreach ($functionName in @('Get-Phase7BStage0SafeValueShape','Get-Phase7BStage0SafeIdentityResult')) {
+    $functionAst = @($wrapperAst.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName },$true))
+    Assert-True ($functionAst.Count -eq 1) "one safe telemetry helper present:$functionName"
+    Invoke-Expression $functionAst[0].Extent.Text
+  }
+  $passResult = [pscustomobject]@{pass=$true;classification='PHASE7B_WP2_COMPUTER_IDENTITY_PASS';canonicalComputerName='LAPTOP-4G5U0U2R'}
+  $passEvidence = Get-Phase7BStage0SafeIdentityResult -ObservedValue 'LAPTOP-4G5U0U2R' -IdentityResult $passResult
+  Assert-True ($passEvidence.observed.cardinality -eq 1 -and $passEvidence.observed.runtimeType -eq 'System.String' -and
+      $passEvidence.observed.stringLength -eq 15 -and $passEvidence.resultCardinality -eq 1 -and
+      $passEvidence.resultType -eq 'System.Management.Automation.PSCustomObject' -and $passEvidence.passRuntimeType -eq 'System.Boolean' -and
+      $passEvidence.pass -and -not $passEvidence.observed.rawValueProjected -and -not $passEvidence.observed.utf16CodePointsProjected) 'safe telemetry captures accepted scalar representation without raw hostname'
+  $failResult = [pscustomobject]@{pass=$false;classification='PHASE7B_WP2_COMPUTER_IDENTITY_FAIL';canonicalComputerName=$null}
+  $failEvidence = Get-Phase7BStage0SafeIdentityResult -ObservedValue @('LAPTOP-4G5U0U2R','OTHER') -IdentityResult $failResult
+  Assert-True ($failEvidence.observed.cardinality -eq 2 -and -not $failEvidence.observed.scalarString -and -not $failEvidence.pass -and
+      $failEvidence.canonicalizationClassification -eq 'PHASE7B_WP2_COMPUTER_IDENTITY_FAIL') 'safe telemetry reproduces multi-value identity failure without raw value projection'
+  Assert-True ($source.Contains('sourcePreflightFailedAfterWrapperIdentityPass') -and $source.Contains('PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_CORRELATION')) 'source failure correlates wrapper-safe representation evidence'
   Assert-True (-not ($source -match '(?i)-Operation\s+OpenEphemeralReceiver|New-SmbShare|New-NetFirewallRule|CaptureEncryptReplicate|SetWorkPackage2CaptureQuiescence|Start-Process|Stop-Process')) 'wrapper cannot invoke receiver capture quiescence or host termination'
 
   $wrongAttempt = Invoke-Child -Arguments @('-AttemptId','phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','-ExpectedToolingCommit',('a'*40)) -TemporaryRoot $testRoot

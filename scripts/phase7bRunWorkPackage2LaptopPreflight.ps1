@@ -9,6 +9,37 @@ $authorizedAttemptId = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
 if ($AttemptId -cne $authorizedAttemptId -or $ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$') {
   throw 'PHASE7B_WP2B_ATTEMPT_OR_TOOLING_IDENTITY_MISMATCH'
 }
+function Get-Phase7BStage0SafeValueShape {
+  [CmdletBinding()] param([Parameter(Mandatory = $true)][AllowNull()]$Value)
+  $values = @($Value)
+  $item = if ($values.Count -eq 1) { $values[0] } else { $null }
+  [pscustomobject][ordered]@{
+    cardinality = $values.Count
+    valuePresent = $null -ne $item
+    runtimeType = if ($null -ne $item) { $item.GetType().FullName } else { $null }
+    scalarString = $null -ne $item -and $item -is [string]
+    stringLength = if ($null -ne $item -and $item -is [string]) { ([string]$item).Length } else { $null }
+    rawValueProjected = $false
+    utf16CodePointsProjected = $false
+  }
+}
+function Get-Phase7BStage0SafeIdentityResult {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()]$ObservedValue,
+    [Parameter(Mandatory = $true)][AllowNull()]$IdentityResult
+  )
+  $results = @($IdentityResult)
+  $result = if ($results.Count -eq 1) { $results[0] } else { $null }
+  [pscustomobject][ordered]@{
+    observed = Get-Phase7BStage0SafeValueShape -Value $ObservedValue
+    resultCardinality = $results.Count
+    resultType = if ($null -ne $result) { $result.GetType().FullName } else { $null }
+    passRuntimeType = if ($null -ne $result -and $null -ne $result.pass) { $result.pass.GetType().FullName } else { $null }
+    pass = $results.Count -eq 1 -and $null -ne $result -and [bool]$result.pass
+    canonicalizationClassification = if ($null -ne $result) { [string]$result.classification } else { 'PHASE7B_WP2_COMPUTER_IDENTITY_RESULT_SHAPE_FAIL' }
+    canonicalResultPresent = $null -ne $result -and $null -ne $result.canonicalComputerName
+  }
+}
 $toolRoot = Join-Path $env:TEMP "phase7b-wp2b-$($ExpectedToolingCommit.Substring(0, 8))"
 $expected = [ordered]@{
   'phase7bPreflightBoundedReplicaDestination.ps1' = '9f2079409ba18b9321e6d09575ab92b1598d07dd1c07790de5a9cce53eb2e7a4'
@@ -32,6 +63,51 @@ foreach ($name in $expected.Keys) {
 }
 if (@(Get-ChildItem -LiteralPath $toolRoot -File -Force).Count -ne $expected.Count) {
   throw 'PHASE7B_WP2B_LAPTOP_TOOL_CARDINALITY_FAIL'
+}
+$boundedModule = Join-Path $toolRoot 'phase7bBoundedReplicaTransport.psm1'
+Import-Module $boundedModule -Force -ErrorAction Stop
+$contractValues = @(phase7bBoundedReplicaTransport\Get-Phase7BBoundedReplicaTransportContract)
+$contract = if ($contractValues.Count -eq 1) { $contractValues[0] } else { $null }
+$expectedNameValues = if ($null -ne $contract) { @($contract.acceptedComputerName) } else { @() }
+$expectedName = if ($expectedNameValues.Count -eq 1) { $expectedNameValues[0] } else { $expectedNameValues }
+$environmentMachineName = [Environment]::MachineName
+$environmentComputerName = $env:COMPUTERNAME
+$computerSystems = @(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop)
+$cimName = if ($computerSystems.Count -eq 1) { $computerSystems[0].Name } else { @($computerSystems | ForEach-Object { $_.Name }) }
+$machineResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentMachineName -ExpectedComputerName $expectedName)
+$environmentResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentComputerName -ExpectedComputerName $expectedName)
+$cimResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $cimName -ExpectedComputerName $expectedName)
+$hostNameEvidence = [pscustomobject][ordered]@{
+  classification = 'PHASE7B_WP2B_STAGE0_SAFE_HOSTNAME_REPRESENTATION'
+  expected = Get-Phase7BStage0SafeValueShape -Value $expectedNameValues
+  contractCardinality = $contractValues.Count
+  contractType = if ($null -ne $contract) { $contract.GetType().FullName } else { $null }
+  environmentMachineName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $environmentMachineName -IdentityResult $machineResults
+  environmentComputerName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $environmentComputerName -IdentityResult $environmentResults
+  win32ComputerSystemObjectCount = $computerSystems.Count
+  win32ComputerSystemName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $cimName -IdentityResult $cimResults
+  allIdentityChecksPass = $contractValues.Count -eq 1 -and $expectedNameValues.Count -eq 1 -and
+    $machineResults.Count -eq 1 -and [bool]$machineResults[0].pass -and
+    $environmentResults.Count -eq 1 -and [bool]$environmentResults[0].pass -and
+    $computerSystems.Count -eq 1 -and $cimResults.Count -eq 1 -and [bool]$cimResults[0].pass
+  rawNamesProjected = $false
+  rawHardwareIdentifiersProjected = $false
+  mutationPerformed = $false
+  reportPersisted = $false
+}
+if (-not [bool]$hostNameEvidence.allIdentityChecksPass) {
+  [ordered]@{
+    classification = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_FAIL'
+    pass = $false
+    safeStage = 'validate-host-identity-representation'
+    safeErrorCode = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
+    hostnameEvidence = $hostNameEvidence
+    mutationPerformed = $false
+    reportPersisted = $false
+    receiverOpened = $false
+    automaticRetryAllowed = $false
+  } | ConvertTo-Json -Depth 8
+  throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_FAIL'
 }
 $powershell51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not (Test-Path -LiteralPath $powershell51 -PathType Leaf)) { throw 'PHASE7B_WP2B_LAPTOP_POWERSHELL51_MISSING' }
@@ -57,6 +133,18 @@ if ($exitCode -ne 0 -or -not [bool]$result.pass -or
     [bool]$result.rawHardwareIdentifiersProjected -or [bool]$result.mutationPerformed -or [bool]$result.reportPersisted -or
     [bool]$result.receiverOpened -or [bool]$result.automaticRetryAllowed) {
   Write-Host $text
+  if ([string]$result.safeErrorCode -ceq 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL') {
+    [ordered]@{
+      classification = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_CORRELATION'
+      pass = $false
+      sourcePreflightFailedAfterWrapperIdentityPass = [bool]$hostNameEvidence.allIdentityChecksPass
+      hostnameEvidence = $hostNameEvidence
+      mutationPerformed = $false
+      reportPersisted = $false
+      receiverOpened = $false
+      automaticRetryAllowed = $false
+    } | ConvertTo-Json -Depth 8 | Write-Host
+  }
   throw 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_ACCEPTANCE_FAIL'
 }
 Write-Output $text
