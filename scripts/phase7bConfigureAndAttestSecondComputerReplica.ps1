@@ -31,7 +31,7 @@ Set-StrictMode -Version Latest
 $stage = 'validate-arguments'
 $mutationStarted = $false
 $completedMutations = New-Object System.Collections.Generic.List[string]
-$authorizationLiteral = 'phase7b-wp2b-replica-config-6cce4f4197ae4651a33ec123825326f9'
+$authorizationLiteral = 'phase7b-wp2b-replica-config-r2-6cce4f4197ae4651a33ec123825326f9'
 $configurationPass = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_CONFIGURATION_PASS'
 $attestationPass = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_ATTESTATION_PASS'
 
