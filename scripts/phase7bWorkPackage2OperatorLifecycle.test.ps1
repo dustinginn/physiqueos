@@ -49,6 +49,20 @@ try {
   foreach($property in @('missingCollectionCount','unknownCollectionCount','missingMediaReferenceCount','credentialSignalCount')){$bad=New-StableEvidence;$bad.$property=1;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects nonzero $property"}
   $bad=New-StableEvidence;$bad.requiredCollectionCount=38;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) 'preflight rejects collection cardinality mismatch'
 
+  $exactAttempt='phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
+  Assert-True ((Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $exactAttempt -ObservedAttemptId $exactAttempt) -ceq $exactAttempt) 'exact Founder-authorized attempt identity accepted'
+  foreach($observed in @('phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','phase7b-wp2-f1fa937cdd9a4937b9471defb3dc46b5','wrong','PHASE7B-WP2-FC48221852204C188C414A18F6C42BBD')){
+    Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $exactAttempt -ObservedAttemptId $observed } 'ATTEMPT_IDENTITY_MISMATCH' "substituted or malformed attempt rejected:$observed"
+  }
+  Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $null -ObservedAttemptId $exactAttempt } 'ATTEMPT_IDENTITY_MISMATCH' 'null expected attempt rejected'
+  Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $exactAttempt -ObservedAttemptId $null } 'ATTEMPT_IDENTITY_MISMATCH' 'null observed attempt rejected'
+  Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId 'PHASE7B-WP2-FC48221852204C188C414A18F6C42BBD' -ObservedAttemptId 'PHASE7B-WP2-FC48221852204C188C414A18F6C42BBD' } 'ATTEMPT_IDENTITY_MISMATCH' 'uppercase expected and observed attempt rejected'
+  $refreshOutputRoot=Join-Path $testRoot 'stable-refresh-output';New-Item -ItemType Directory $refreshOutputRoot|Out-Null
+  $refreshOutput=Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -OutputDirectory $refreshOutputRoot
+  Assert-True ((Split-Path -Leaf $refreshOutput.selectionPath) -ceq "$exactAttempt-selection.json" -and (Split-Path -Leaf $refreshOutput.inventoryAuthorizationPath) -ceq "$exactAttempt-inventory-authorization.json" -and (Split-Path -Leaf $refreshOutput.capturePlanPath) -ceq "$exactAttempt-capture-plan.json") 'stable refresh output names bind exact attempt identity'
+  [IO.File]::WriteAllText($refreshOutput.selectionPath,'collision',[Text.UTF8Encoding]::new($false))
+  Assert-Throws { Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -OutputDirectory $refreshOutputRoot } 'STABLE_REFRESH_OUTPUT_COLLISION' 'stable refresh rejects existing exact-attempt output'
+
   $parent=Join-Path $testRoot 'replica-parent';New-Item -ItemType Directory $parent|Out-Null;$pathContract=Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot $parent
   New-Item -ItemType Directory $pathContract.attemptRoot|Out-Null
   $localPacket=Join-Path $testRoot "$attempt.zip.age";[IO.File]::WriteAllBytes($localPacket,[Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`noperator-lifecycle"));$packetSha=Get-Phase7BSha256 -LiteralPath $localPacket;$packetBytes=(Get-Item $localPacket).Length
@@ -79,5 +93,11 @@ try {
   Assert-True (-not ($sourceText -match '(?i)Start-Process.+(?:cmd|powershell).+exit')) 'no parent-host termination path'
   Assert-True ($sourceText.Contains('automaticRetryAllowed = $false') -and $sourceText.Contains('wp2cAuthorized = $false')) 'no retry and no WP2-C authority'
   Assert-True ($sourceText.Contains('PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED') -and $sourceText.Contains('PHASE7B_WP2B_POST_QUIESCENCE_STABLE_INVENTORY_PASS')) 'stale plan has one bounded post-quiescence refresh path'
+  $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')
+  Assert-True ($refreshSource.Contains('[Parameter(Mandatory = $true)][string]$ExpectedAttemptId')) 'stable refresh requires explicit expected attempt identity'
+  Assert-True (-not $refreshSource.Contains('[guid]::NewGuid()')) 'stable refresh never generates or substitutes attempt identity'
+  Assert-True ($refreshSource.Contains('$selectionRead.attemptId') -and $refreshSource.Contains('$inventoryAuthorizationRead.attemptId') -and $refreshSource.Contains('$planRead.attemptId') -and $refreshSource.Contains('$plannerResult.attemptId')) 'selection inventory authorization plan and planner output require one exact attempt identity'
+  Assert-True ($refreshSource.Contains('Assert-Phase7BWorkPackage2StableRefreshOutputSet') -and $refreshSource.Contains('attemptIdentityExact=$true')) 'stable refresh uses exact output-set contract and reports exact attempt binding'
+  Assert-True ($refreshSource.Contains('sourceMutationPerformed=$false') -and $refreshSource.Contains('automaticRetryAllowed=$false') -and $refreshSource.Contains('wp2cAuthorized=$false')) 'stable refresh remains read-only no-retry and WP2-C unauthorized'
   [ordered]@{classification='PHASE7B_WP2B_OPERATOR_LIFECYCLE_TESTS_PASS';pass=$true;assertions=$script:assertions}|ConvertTo-Json -Compress
 } finally {if(Test-Path $testRoot){Remove-Item -LiteralPath $testRoot -Recurse -Force}}

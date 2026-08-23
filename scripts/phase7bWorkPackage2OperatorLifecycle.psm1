@@ -165,6 +165,36 @@ function Use-Phase7BWorkPackage2CaptureAuthorization {
   [pscustomobject][ordered]@{ classification = $value.classification; pass = $true; markerFileName = Split-Path -Leaf $marker; markerSha256 = Get-Phase7BSha256 -LiteralPath $marker }
 }
 
+function Assert-Phase7BWorkPackage2AttemptIdentity {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$ExpectedAttemptId,
+    [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$ObservedAttemptId
+  )
+  if ($ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
+      $ObservedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
+      $ObservedAttemptId -cne $ExpectedAttemptId) {
+    throw 'PHASE7B_WP2B_ATTEMPT_IDENTITY_MISMATCH'
+  }
+  $ExpectedAttemptId
+}
+
+function Assert-Phase7BWorkPackage2StableRefreshOutputSet {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$ExpectedAttemptId,
+    [Parameter(Mandatory = $true)][string]$OutputDirectory
+  )
+  $attemptId = Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $ExpectedAttemptId -ObservedAttemptId $ExpectedAttemptId
+  $paths = [ordered]@{
+    selectionPath = Join-Path $OutputDirectory "$attemptId-selection.json"
+    inventoryAuthorizationPath = Join-Path $OutputDirectory "$attemptId-inventory-authorization.json"
+    capturePlanPath = Join-Path $OutputDirectory "$attemptId-capture-plan.json"
+  }
+  if (@(@($paths.Values) | Where-Object { Test-Path -LiteralPath $_ }).Count -gt 0) {
+    throw 'PHASE7B_WP2B_STABLE_REFRESH_OUTPUT_COLLISION'
+  }
+  [pscustomobject]$paths
+}
+
 function Test-Phase7BWorkPackage2StablePreflightEvidence {
   [CmdletBinding()] param([Parameter(Mandatory = $true)]$Evidence)
   $pass = [bool]$Evidence.repositoryIdentityPass -and [bool]$Evidence.originParityPass -and [bool]$Evidence.trackedTreeClean -and
@@ -182,5 +212,7 @@ Export-ModuleMember -Function @(
   'New-Phase7BWorkPackage2CaptureAuthorizationDocument',
   'Assert-Phase7BWorkPackage2CaptureAuthorization',
   'Use-Phase7BWorkPackage2CaptureAuthorization',
+  'Assert-Phase7BWorkPackage2AttemptIdentity',
+  'Assert-Phase7BWorkPackage2StableRefreshOutputSet',
   'Test-Phase7BWorkPackage2StablePreflightEvidence'
 )
