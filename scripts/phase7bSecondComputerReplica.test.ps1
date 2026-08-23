@@ -13,6 +13,18 @@ function Assert-Throws([scriptblock]$Action, [string]$Pattern, [string]$Message)
   try { & $Action } catch { $threw = $_.Exception.Message -match $Pattern }
   Assert-True $threw $Message
 }
+function Import-SourceFunction([string]$Path, [string]$Name) {
+  $tokens = $null
+  $errors = $null
+  $ast = [Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+  if (@($errors).Count -ne 0) { throw "SOURCE_PARSE_FAIL:$Name" }
+  $matches = @($ast.FindAll({
+      param($node)
+      $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $Name
+    }, $true))
+  if ($matches.Count -ne 1) { throw "SOURCE_FUNCTION_CARDINALITY_FAIL:$Name" }
+  Set-Item -Path "Function:\global:$Name" -Value $matches[0].Body.GetScriptBlock()
+}
 
 $attemptId = 'phase7b-wp2-6cce4f4197ae4651a33ec123825326f9'
 $hostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
@@ -116,6 +128,12 @@ Assert-True (-not ($text -match '(?i)(?:password|secret)\s*=\s*["''][^"'']{8,}["
 Assert-True (-not ($operationalText -match '(?i)Export-Clixml|ConvertFrom-SecureString|SaveCredentials\s*=\s*\$true')) 'no durable credential mechanism'
 
 $configurationText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bConfigureAndAttestSecondComputerReplica.ps1') -Raw
+$configurationPath = Join-Path $PSScriptRoot 'phase7bConfigureAndAttestSecondComputerReplica.ps1'
+Import-SourceFunction -Path $configurationPath -Name 'Test-InteractiveReplicaPassword'
+Import-SourceFunction -Path $configurationPath -Name 'Test-ExactConfigurationObservation'
+Import-SourceFunction -Path $configurationPath -Name 'Get-PrincipalSidText'
+Import-SourceFunction -Path $configurationPath -Name 'Set-ExactReplicaAcl'
+Import-SourceFunction -Path $configurationPath -Name 'Test-ExactReplicaAcl'
 Assert-True ($configurationText -match "Read-Host\s+-Prompt\s+[^\r\n]+\s+-AsSecureString") 'password collected only as interactive SecureString'
 Assert-True ($configurationText -match "phase7b-wp2b-replica-config-6cce4f4197ae4651a33ec123825326f9") 'exact one-shot authorization identity bound'
 Assert-True ($configurationText -match "ExpectedReplicaIpv4\s+-ne\s+'192\.168\.1\.68'" -and $configurationText -match "PrimaryHostIpv4\s+-ne\s+'192\.168\.1\.69'") 'exact same-LAN endpoints bound'
@@ -127,6 +145,88 @@ Assert-True ($configurationText -match '-EncryptData\s+\$true' -and $configurati
 Assert-True ($configurationText -match '-Profile\s+Private' -and $configurationText -match '-Protocol\s+TCP' -and $configurationText -match '-LocalPort\s+445' -and $configurationText -match '-RemoteAddress\s+\$PrimaryHostIpv4') 'exact restricted firewall contract present'
 Assert-True (-not ($configurationText -match '(?i)New-SmbMapping|New-PSDrive|Copy-Item|Start-BitsTransfer|Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient')) 'no probe mapping copy capture or network execution path'
 Assert-True ($configurationText -match 'automaticRetryAllowed\s*=\s*\$false' -and $configurationText -match 'newFounderAuthorizationRequired\s*=\s*\$mutationStarted') 'partial mutation fails closed without retry'
+Assert-True (-not ($configurationText -match '(?m)^\s*exit\s+1\s*$')) 'configuration failure never exits the parent PowerShell host'
+Assert-True ($configurationText -match '\$global:LASTEXITCODE\s*=\s*1' -and $configurationText -match 'invocationStatus\s*=\s*1') 'safe nonzero failure status projected without host exit'
+Assert-True ($configurationText -match '\$password\.Dispose\(\)' -and -not ($configurationText -match '(?i)SecureStringToBSTR|PtrToString|NetworkCredential')) 'SecureString disposed without plaintext conversion'
+
+$emptySecure = New-Object Security.SecureString
+$shortSecure = ConvertTo-SecureString -String ('x' * 13) -AsPlainText -Force
+$acceptedSecure = ConvertTo-SecureString -String ('x' * 14) -AsPlainText -Force
+Assert-True (-not (Test-InteractiveReplicaPassword -Password $null)) 'cancelled or null password rejected'
+Assert-True (-not (Test-InteractiveReplicaPassword -Password $emptySecure)) 'empty password rejected'
+Assert-True (-not (Test-InteractiveReplicaPassword -Password $shortSecure)) 'short password rejected before mutation'
+Assert-True (Test-InteractiveReplicaPassword -Password $acceptedSecure) 'accepted interactive SecureString path'
+$emptySecure.Dispose()
+$shortSecure.Dispose()
+$acceptedSecure.Dispose()
+
+$successfulObservation = [pscustomobject][ordered]@{
+  hostIdentityMatch = $true
+  diskIdentityMatch = $true
+  networkBindingMatch = $true
+  accountEnabled = $true
+  accountIsAdministrator = $false
+  aclExact = $true
+  replicaRootEmpty = $true
+  sharePathExact = $true
+  shareEncryptData = $true
+  shareCachingMode = 'None'
+  shareFolderEnumerationMode = 'AccessBased'
+  shareAccessExact = $true
+  firewallExact = $true
+}
+Assert-True (Test-ExactConfigurationObservation -Observation $successfulObservation) 'synthetic exact configuration and attestation path accepted'
+$failedObservation = $successfulObservation.PSObject.Copy()
+$failedObservation.firewallExact = $false
+Assert-True (-not (Test-ExactConfigurationObservation -Observation $failedObservation)) 'synthetic incomplete configuration rejected'
+
+$aclFixture = Join-Path ([IO.Path]::GetTempPath()) ("phase7b-replica-acl-fixture-" + [guid]::NewGuid().ToString('N'))
+if (Test-Path -LiteralPath $aclFixture) { throw 'ACL_FIXTURE_PREEXISTS' }
+[void](New-Item -ItemType Directory -Path $aclFixture)
+try {
+  $fixtureSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  Set-ExactReplicaAcl -LiteralPath $aclFixture -ReplicaSid $fixtureSid
+  Assert-True (Test-ExactReplicaAcl -LiteralPath $aclFixture -ReplicaSid ([string]$fixtureSid)) 'exact ACL integration fixture accepted'
+  $fixtureAcl = Get-Acl -LiteralPath $aclFixture
+  Assert-True ($fixtureAcl.AreAccessRulesProtected -and @($fixtureAcl.Access | Where-Object { [string]$_.AccessControlType -eq 'Allow' }).Count -eq 3) 'ACL integration fixture has exact protected three-principal shape'
+} finally {
+  if (Test-Path -LiteralPath $aclFixture) { Remove-Item -LiteralPath $aclFixture -Force }
+}
+
+$preMutationArgs = @{
+  Operation = 'ConfigureAndAttest'
+  AttemptId = $attemptId
+  ExpectedComputerName = 'LAPTOP-4G5U0U2R'
+  ExpectedHostIdentitySha256 = $hostSha
+  ExpectedDiskIdentitySha256 = $diskSha
+  ExpectedDiskNumber = 0
+  ExpectedDiskBusType = 'SATA'
+  ExpectedFileSystem = 'NTFS'
+  MinimumFreeBytes = [int64]1GB
+  ExpectedReplicaIpv4 = '192.168.1.68'
+  ExpectedReplicaPrefixLength = 24
+  PrimaryHostIpv4 = '192.168.1.69'
+  PrimaryHostPrefixLength = 24
+  ShareRoot = 'D:\Phase7B\replicas\379bb303\wp2b'
+  LocalReplicaRoot = $localRoot
+  ShareName = $shareName
+  UncReplicaRoot = $uncRoot
+  ReplicaAccountName = 'PhysiqueOSReplica'
+  FirewallRuleName = 'PhysiqueOS-Phase7B-WP2B-SMB-In'
+  FounderAuthorizationId = 'intentionally-invalid-fixture-authorization'
+  AcknowledgeExactlyOneConfiguration = $true
+  AcknowledgeNoAutomaticRetry = $true
+  AcknowledgeNoProbeOrCapture = $true
+}
+$dynamicTool = [scriptblock]::Create($configurationText)
+$preMutationOutput = @(& $dynamicTool @preMutationArgs) -join [Environment]::NewLine
+$parentAliveAfterFailure = $true
+$preMutationFailure = $preMutationOutput | ConvertFrom-Json
+Assert-True $parentAliveAfterFailure 'dynamic ScriptBlock failure returns to parent host'
+Assert-True (-not $preMutationFailure.pass -and [int]$preMutationFailure.invocationStatus -eq 1) 'dynamic pre-mutation failure returns safe nonzero status'
+Assert-True (-not $preMutationFailure.mutationStarted -and @($preMutationFailure.completedMutations).Count -eq 0) 'pre-mutation failure reports zero persistent mutation'
+Assert-True ($global:LASTEXITCODE -eq 1) 'dynamic failure leaves inspectable nonzero LASTEXITCODE'
+$global:LASTEXITCODE = 0
 
 [ordered]@{
   classification = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_CONTRACT_TESTS_PASS'

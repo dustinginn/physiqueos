@@ -73,6 +73,30 @@ function Test-SameIpv4Subnet {
   ([BitConverter]::ToUInt32($firstBytes, 0) -band $mask) -eq ([BitConverter]::ToUInt32($secondBytes, 0) -band $mask)
 }
 
+function Test-InteractiveReplicaPassword {
+  param([Parameter()][AllowNull()][Security.SecureString]$Password)
+  $null -ne $Password -and $Password.Length -ge 14
+}
+
+function Test-ExactConfigurationObservation {
+  param([Parameter(Mandatory = $true)]$Observation)
+  [bool](
+    [bool]$Observation.hostIdentityMatch -and
+    [bool]$Observation.diskIdentityMatch -and
+    [bool]$Observation.networkBindingMatch -and
+    [bool]$Observation.accountEnabled -and
+    -not [bool]$Observation.accountIsAdministrator -and
+    [bool]$Observation.aclExact -and
+    [bool]$Observation.replicaRootEmpty -and
+    [bool]$Observation.sharePathExact -and
+    [bool]$Observation.shareEncryptData -and
+    [string]$Observation.shareCachingMode -eq 'None' -and
+    [string]$Observation.shareFolderEnumerationMode -eq 'AccessBased' -and
+    [bool]$Observation.shareAccessExact -and
+    [bool]$Observation.firewallExact
+  )
+}
+
 function Set-ExactReplicaAcl {
   param(
     [Parameter(Mandatory = $true)][string]$LiteralPath,
@@ -199,7 +223,7 @@ try {
 
   $stage = 'collect-interactive-password'
   $password = Read-Host -Prompt 'Enter a new password for LAPTOP-4G5U0U2R\PhysiqueOSReplica' -AsSecureString
-  if ($null -eq $password -or $password.Length -lt 14) { throw 'PHASE7B_WP2_REPLICA_PASSWORD_POLICY_FAIL' }
+  if (-not (Test-InteractiveReplicaPassword -Password $password)) { throw 'PHASE7B_WP2_REPLICA_PASSWORD_POLICY_FAIL' }
 
   $stage = 'create-dedicated-account'
   $mutationStarted = $true
@@ -250,17 +274,30 @@ try {
     [string]$portFilters[0].Protocol -eq 'TCP' -and [string]$portFilters[0].LocalPort -eq '445' -and
     @($addressFilters[0].RemoteAddress).Count -eq 1 -and [string]$addressFilters[0].RemoteAddress -eq $PrimaryHostIpv4
 
-  $allPass = $hostSha -eq $ExpectedHostIdentitySha256 -and $diskSha -eq $ExpectedDiskIdentitySha256 -and
-    $boundAddresses.Count -eq 1 -and $account.Enabled -and -not $accountIsAdministrator -and $aclPathsPass -and
-    $rootEmpty -and [IO.Path]::GetFullPath([string]$share.Path).TrimEnd('\') -eq $shareRootFull -and
-    [bool]$share.EncryptData -and [string]$share.CachingMode -eq 'None' -and
-    [string]$share.FolderEnumerationMode -eq 'AccessBased' -and $shareAccessPass -and $firewallPass
+  $configurationObservation = [pscustomobject][ordered]@{
+    hostIdentityMatch = $hostSha -eq $ExpectedHostIdentitySha256
+    diskIdentityMatch = $diskSha -eq $ExpectedDiskIdentitySha256
+    networkBindingMatch = $boundAddresses.Count -eq 1
+    accountEnabled = [bool]$account.Enabled
+    accountIsAdministrator = $accountIsAdministrator
+    aclExact = $aclPathsPass
+    replicaRootEmpty = $rootEmpty
+    sharePathExact = [IO.Path]::GetFullPath([string]$share.Path).TrimEnd('\') -eq $shareRootFull
+    shareEncryptData = [bool]$share.EncryptData
+    shareCachingMode = [string]$share.CachingMode
+    shareFolderEnumerationMode = [string]$share.FolderEnumerationMode
+    shareAccessExact = $shareAccessPass
+    firewallExact = $firewallPass
+  }
+  $allPass = Test-ExactConfigurationObservation -Observation $configurationObservation
   if (-not $allPass) { throw 'PHASE7B_WP2_REPLICA_POST_CONFIGURATION_ATTESTATION_FAIL' }
 
+  $global:LASTEXITCODE = 0
   [ordered]@{
     schemaVersion = 2
     classification = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_CONFIGURATION_AND_ATTESTATION_PASS'
     pass = $true
+    invocationStatus = 0
     operation = $Operation
     attemptId = $AttemptId
     configurationClassification = $configurationPass
@@ -313,6 +350,7 @@ try {
     schemaVersion = 2
     classification = 'PHASE7B_WP2_SECOND_COMPUTER_REPLICA_CONFIGURATION_AND_ATTESTATION_FAIL'
     pass = $false
+    invocationStatus = 1
     operation = $Operation
     attemptId = $AttemptId
     safeStage = $stage
@@ -326,7 +364,11 @@ try {
     passwordProjected = $false
     reportPersisted = $false
   } | ConvertTo-Json -Depth 5
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 } finally {
-  if (Get-Variable -Name password -ErrorAction SilentlyContinue) { $password = $null }
+  if (Get-Variable -Name password -ErrorAction SilentlyContinue) {
+    if ($null -ne $password) { $password.Dispose() }
+    $password = $null
+  }
 }
