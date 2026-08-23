@@ -16,6 +16,7 @@ function Get-Phase7BBoundedReplicaTransportContract {
     acceptedDiskNumber = 0
     acceptedBusType = 'SATA'
     minimumFreeBytes = [int64]1GB
+    replicaPathModel = 'EXACT_ATTEMPT_ROOT'
     persistentAccountPermitted = $false
     persistentSharePermitted = $false
     persistentFirewallRulePermitted = $false
@@ -24,6 +25,60 @@ function Get-Phase7BBoundedReplicaTransportContract {
     rawProductionFilesPermitted = $false
     automaticRetryAllowed = $false
   }
+}
+
+function Get-Phase7BBoundedReplicaAttemptRoot {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$AttemptId,
+    [Parameter(Mandatory = $true)][string]$ReplicaParentRoot
+  )
+  if ($AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$') { throw 'PHASE7B_WP2_ATTEMPT_ID_INVALID' }
+  $parent = $ReplicaParentRoot.TrimEnd('\')
+  if ([string]::IsNullOrWhiteSpace($parent)) { throw 'PHASE7B_WP2_REPLICA_PARENT_INVALID' }
+  $attemptRoot = "$parent\$AttemptId"
+  [pscustomobject][ordered]@{
+    classification = 'PHASE7B_WP2_REPLICA_PATH_CONTRACT_PASS'
+    pass = $true
+    pathModel = 'EXACT_ATTEMPT_ROOT'
+    attemptId = $AttemptId
+    attemptRoot = $attemptRoot
+    packetPath = "$attemptRoot\$AttemptId.zip.age"
+  }
+}
+
+function Get-Phase7BReplicaDirectoryIdentity {
+  [CmdletBinding()] param([Parameter(Mandatory = $true)][string]$LiteralPath)
+  $driveMatch = [regex]::Match($LiteralPath, '^(?<name>[A-Za-z][A-Za-z0-9_-]*):\\?(?<relative>.*)$')
+  if ($driveMatch.Success) {
+    $drive = Get-PSDrive -Name $driveMatch.Groups['name'].Value -PSProvider FileSystem -ErrorAction Stop
+    $relative = $driveMatch.Groups['relative'].Value.TrimStart('\')
+    $providerRoot = if ([string]::IsNullOrWhiteSpace($relative)) { [string]$drive.Root } else { Join-Path ([string]$drive.Root) $relative }
+    $full = if ([string]::IsNullOrWhiteSpace($relative)) { "$($drive.Name):\" } else { "$($drive.Name):\$relative" }
+  } else {
+    $full = [IO.Path]::GetFullPath($LiteralPath).TrimEnd('\')
+    $providerRoot = $full
+  }
+  [pscustomobject][ordered]@{
+    classification = 'PHASE7B_WP2_REPLICA_DIRECTORY_IDENTITY_PASS'
+    pass = $true
+    localPath = $full
+    providerRoot = $providerRoot.TrimEnd('\')
+    providerRootSha256 = Get-Phase7BSha256 -Text $providerRoot.TrimEnd('\').ToLowerInvariant()
+  }
+}
+
+function Write-Phase7BSafeEvidenceFile {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$LiteralPath,
+    [Parameter(Mandatory = $true)]$Evidence
+  )
+  if ([IO.Path]::GetExtension($LiteralPath) -ine '.json' -or (Test-Path -LiteralPath $LiteralPath)) { throw 'PHASE7B_WP2_SAFE_EVIDENCE_OUTPUT_REJECTED' }
+  $parent = Split-Path -Parent ([IO.Path]::GetFullPath($LiteralPath))
+  if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'PHASE7B_WP2_SAFE_EVIDENCE_PARENT_MISSING' }
+  $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $Evidence))
+  $stream = New-Object IO.FileStream($LiteralPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+  [pscustomobject][ordered]@{ classification = 'PHASE7B_WP2_SAFE_EVIDENCE_PERSISTED'; pass = $true; fileName = Split-Path -Leaf $LiteralPath; sha256 = Get-Phase7BSha256 -LiteralPath $LiteralPath; bytes = [int64]$bytes.Length }
 }
 
 function Test-Phase7BBoundedEncryptedReplicaSource {
@@ -111,7 +166,10 @@ function Test-Phase7BBoundedReplicaReceipt {
     [bool]$Receipt.pass -and [string]$Receipt.attemptId -eq $ExpectedAttemptId -and
     [string]$Receipt.packetSha256 -eq $ExpectedPacketSha256 -and [int64]$Receipt.packetBytes -eq $ExpectedPacketBytes -and
     [bool]$Receipt.destinationBytesReread -and [bool]$Receipt.sessionTornDown -and
-    [bool]$Receipt.encryptedPacketOnly -and -not [bool]$Receipt.reportPersisted -and -not [bool]$Receipt.automaticRetryAllowed
+    [bool]$Receipt.encryptedPacketOnly -and [bool]$Receipt.reportPersisted -and
+    [string]$Receipt.evidenceNonce -match '^[0-9a-f]{32}$' -and
+    [string]$Receipt.evidenceFileName -ceq "$ExpectedAttemptId-replica-receipt-$([string]$Receipt.evidenceNonce).json" -and
+    [string]$Receipt.observedAt -match '^\d{4}-\d{2}-\d{2}T' -and -not [bool]$Receipt.automaticRetryAllowed
   [pscustomobject][ordered]@{
     pass = [bool]$pass
     classification = if ($pass) { 'PHASE7B_WP2_BOUNDED_REPLICA_RECEIPT_ACCEPTED' } else { 'PHASE7B_WP2_BOUNDED_REPLICA_RECEIPT_REJECTED' }
@@ -126,12 +184,18 @@ function Test-Phase7BPrimaryReplicaSessionTeardownEvidence {
     [string]$Evidence.attemptId -eq $ExpectedAttemptId -and [string]$Evidence.serverName -eq $ExpectedServerName -and [string]$Evidence.shareName -eq $ExpectedShareName -and
     [int]$Evidence.matchingPsDriveCount -eq 0 -and [int]$Evidence.matchingSmbMappingCount -eq 0 -and [int]$Evidence.savedCredentialTargetCount -eq 0 -and
     -not [bool]$Evidence.mappingPersistent -and -not [bool]$Evidence.credentialsPersisted -and [bool]$Evidence.sessionTornDown -and
-    -not [bool]$Evidence.mutationPerformed -and -not [bool]$Evidence.reportPersisted -and -not [bool]$Evidence.automaticRetryAllowed
+    -not [bool]$Evidence.mutationPerformed -and [bool]$Evidence.reportPersisted -and
+    [string]$Evidence.evidenceNonce -match '^[0-9a-f]{32}$' -and
+    [string]$Evidence.evidenceFileName -ceq "$ExpectedAttemptId-primary-teardown-$([string]$Evidence.evidenceNonce).json" -and
+    [string]$Evidence.observedAt -match '^\d{4}-\d{2}-\d{2}T' -and -not [bool]$Evidence.automaticRetryAllowed
   [pscustomobject][ordered]@{ pass = [bool]$pass; classification = if ($pass) { 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_ACCEPTED' } else { 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_REJECTED' } }
 }
 
 Export-ModuleMember -Function @(
   'Get-Phase7BBoundedReplicaTransportContract',
+  'Get-Phase7BBoundedReplicaAttemptRoot',
+  'Get-Phase7BReplicaDirectoryIdentity',
+  'Write-Phase7BSafeEvidenceFile',
   'Test-Phase7BBoundedEncryptedReplicaSource',
   'Test-Phase7BBoundedReplicaDestinationEvidence',
   'Copy-Phase7BBoundedEncryptedReplica',

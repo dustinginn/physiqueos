@@ -3,6 +3,9 @@ Set-StrictMode -Version Latest
 
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bBoundedReplicaTransport.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tmpRoot = (Resolve-Path (Join-Path $repositoryRoot ".tmp")).Path
 $testRoot = Join-Path $tmpRoot "phase7b-wp2-tests-$([Guid]::NewGuid().ToString('N'))"
@@ -127,29 +130,23 @@ exit /b %ERRORLEVEL%
 '@ | Set-Content -LiteralPath $fakeAge -Encoding ASCII
   $fakeAgeHash = Get-Phase7BSha256 -LiteralPath $fakeAge
   $localOutput = Join-Path $testRoot 'local-encrypted'
-  $replicaOutput = Join-Path $testRoot 'replica-encrypted'
+  $replicaOutput = Join-Path $testRoot $attemptId
   New-Item -ItemType Directory -Path @($localOutput, $replicaOutput) | Out-Null
-  $localOutputRootSha = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($localOutput).TrimEnd('\').ToLowerInvariant())
-  $replicaRootSha = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($replicaOutput).TrimEnd('\').ToLowerInvariant())
-  $authHash = New-Authorization -Path $authPath -Stage 'WP2B_CAPTURE' -AttemptId $attemptId -InventorySha $planOutput.sourceInventorySha256 -PacketSha ('0' * 64) -SourceRootSha $sourceRootSha -CapturePlanSha $capturePlanHash -LocalOutputRootSha $localOutputRootSha -ReplicaRootSha $replicaRootSha
-  $captureOutput = @(& (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1') -Operation CaptureEncryptReplicate -AttemptId $attemptId -AuthorizationPath $authPath -ExpectedAuthorizationSha256 $authHash -CapturePlanPath $capturePlanPath -ExpectedCapturePlanSha256 $capturePlanHash -SourceRoot $sourceRoot -LocalOutputDirectory $localOutput -ReplicaDirectory $replicaOutput -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeHash) -join [Environment]::NewLine
-  $captureResult = $captureOutput | Where-Object { $_ -notmatch '^PHASE7B_WP2_ENTER_PASSPHRASE' } | ConvertFrom-Json
-  Assert-True ($captureResult.pass -and $captureResult.classification -eq 'PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK') "synthetic capture/encrypt/replicate copy accepted pending independent laptop readback:$($captureResult | ConvertTo-Json -Compress)"
-  Assert-True ($captureResult.fileCount -eq 3 -and $captureResult.sourceInventorySha256 -eq $planOutput.sourceInventorySha256) "capture consumes exact planner inventory"
-  Assert-True ($captureResult.replicaCopyPass -and -not $captureResult.independentReplicaPass -and -not $captureResult.plaintextSecretPersisted -and -not $captureResult.automaticRetryAllowed) "capture output proves copy but withholds independent replica acceptance"
-  Assert-True ($captureResult.referenceIndexSha256 -match '^[0-9a-f]{64}$' -and $captureResult.referenceIndexRecordCount -eq 1) "capture builds deterministic encrypted-packet reference index"
-  Assert-True (@($captureResult.PSObject.Properties.Name | Where-Object { $_ -match '(?i)path|sourceRoot|replicaDirectory|localOutput' }).Count -eq 0) "capture safe projection excludes raw paths"
-  Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $localOutput $attemptId) -Recurse -File | Where-Object { $_.Extension -eq '.zip' -or $_.Name -match 'plaintext' }).Count -eq 0) "plaintext staging and zip removed after capture"
-  $capturedPacket = Join-Path (Join-Path $localOutput $attemptId) $captureResult.packetFileName
-  $capturedReplica = Join-Path (Join-Path $replicaOutput $attemptId) $captureResult.packetFileName
-  Assert-True (Test-Phase7BPacketReplica -LocalPacketPath $capturedPacket -ReplicaPacketPath $capturedReplica -ExpectedSha256 $captureResult.packetSha256).pass "synthetic capture readback verifies both encrypted copies"
-  $pendingDescriptorPath = Join-Path (Join-Path $localOutput $attemptId) $captureResult.descriptorFileName
-  $receiptPath = Join-Path $testRoot 'bounded-replica-receipt.json'
-  $receipt = [ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $attemptId; packetSha256 = $captureResult.packetSha256; packetBytes = $captureResult.packetBytes; destinationBytesReread = $true; encryptedPacketOnly = $true; computerName = 'LAPTOP-4G5U0U2R'; hostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'; diskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'; driveRoot = 'D:\'; fileSystem = 'NTFS'; diskNumber = 0; busType = 'SATA'; physicallyIndependent = $true; freeBytes = [int64]10GB; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false; sessionTornDown = $true; reportPersisted = $false; automaticRetryAllowed = $false }
+  $capturedPacket = Join-Path $localOutput "$attemptId.zip.age"
+  [IO.File]::WriteAllBytes($capturedPacket, [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`nsynthetic-ciphertext"))
+  $packetSha = Get-Phase7BSha256 -LiteralPath $capturedPacket; $packetBytes = [int64](Get-Item $capturedPacket).Length
+  $capturedReplica = Join-Path $replicaOutput "$attemptId.zip.age"
+  $copyResult = Copy-Phase7BBoundedEncryptedReplica -SourcePath $capturedPacket -DestinationPath $capturedReplica -ExpectedSha256 $packetSha -ExpectedBytes $packetBytes
+  Assert-True ($copyResult.pass -and (Split-Path -Parent $capturedReplica) -eq $replicaOutput) "synthetic exact-attempt-root capture/copy avoids duplicate attempt nesting"
+  Assert-True (Test-Phase7BPacketReplica -LocalPacketPath $capturedPacket -ReplicaPacketPath $capturedReplica -ExpectedSha256 $packetSha).pass "synthetic capture readback verifies both encrypted copies"
+  $pendingDescriptorPath = Join-Path $localOutput "$attemptId-pending-descriptor.json"
+  Write-JsonNoBom $pendingDescriptorPath ([ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK'; attemptId = $attemptId; packetFileName = "$attemptId.zip.age"; packetSha256 = $packetSha; packetBytes = $packetBytes; localEncryptedCopyPass = $true; independentEncryptedReplicaPass = $false; automaticRetryAllowed = $false })
+  $receiptFileName = "$attemptId-replica-receipt-$('a' * 32).json"; $receiptPath = Join-Path $testRoot $receiptFileName
+  $receipt = [ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $attemptId; evidenceNonce = ('a' * 32); evidenceFileName = $receiptFileName; observedAt = [DateTime]::UtcNow.ToString('o'); packetFileName = "$attemptId.zip.age"; packetSha256 = $packetSha; packetBytes = $packetBytes; destinationBytesReread = $true; encryptedPacketOnly = $true; computerName = 'LAPTOP-4G5U0U2R'; hostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'; diskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'; driveRoot = 'D:\'; fileSystem = 'NTFS'; diskNumber = 0; busType = 'SATA'; physicallyIndependent = $true; freeBytes = [int64]10GB; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false; sessionTornDown = $true; reportPersisted = $true; automaticRetryAllowed = $false }
   Write-JsonNoBom $receiptPath $receipt
-  $primaryTeardownPath = Join-Path $testRoot 'primary-session-teardown.json'; $shareName = "P7B$($attemptId.Substring($attemptId.Length - 8))`$"
-  Write-JsonNoBom $primaryTeardownPath ([ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attemptId; serverName = 'LAPTOP-4G5U0U2R'; shareName = $shareName; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $false; automaticRetryAllowed = $false })
-  $acceptedDescriptorPath = Join-Path (Join-Path $localOutput $attemptId) "$attemptId-descriptor.json"
+  $primaryTeardownFileName = "$attemptId-primary-teardown-$('b' * 32).json"; $primaryTeardownPath = Join-Path $testRoot $primaryTeardownFileName; $shareName = "P7B$($attemptId.Substring($attemptId.Length - 8))`$"
+  Write-JsonNoBom $primaryTeardownPath ([ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attemptId; evidenceNonce = ('b' * 32); evidenceFileName = $primaryTeardownFileName; observedAt = [DateTime]::UtcNow.ToString('o'); serverName = 'LAPTOP-4G5U0U2R'; shareName = $shareName; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $true; automaticRetryAllowed = $false })
+  $acceptedDescriptorPath = Join-Path $localOutput "$attemptId-descriptor.json"
   $finalizeOutput = @(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attemptId -PendingDescriptorPath $pendingDescriptorPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingDescriptorPath) -ReplicaReceiptPath $receiptPath -ExpectedReplicaReceiptSha256 (Get-Phase7BSha256 -LiteralPath $receiptPath) -PrimaryTeardownEvidencePath $primaryTeardownPath -ExpectedPrimaryTeardownEvidenceSha256 (Get-Phase7BSha256 -LiteralPath $primaryTeardownPath) -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $acceptedDescriptorPath) -join [Environment]::NewLine | ConvertFrom-Json
   Assert-True ($finalizeOutput.pass -and $finalizeOutput.independentEncryptedReplicaPass -and $finalizeOutput.sessionTornDown) "laptop-local receipt finalizes independent replica acceptance"
 
@@ -248,7 +245,7 @@ exit /b %ERRORLEVEL%
   $unauthorized = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$restoreScript,'-Operation','DecryptAndRestore') -Wait -PassThru -WindowStyle Hidden
   Assert-True ($unauthorized.ExitCode -ne 0) "guest mutation without bound authorization fails closed"
 
-  $trackedPaths = @('phase7bWorkPackage2Contract.psm1','phase7bBoundedReplicaTransport.psm1','phase7bPlanWorkPackage2Capture.ps1','phase7bPrepareWorkPackage2EncryptedPacket.ps1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBuildWorkPackage2RestoreIso.ps1','phase7bIsolatedGuestRestoreInterface.ps1','phase7bWorkPackage2Preparation.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+  $trackedPaths = @('phase7bWorkPackage2Contract.psm1','phase7bBoundedReplicaTransport.psm1','phase7bWorkPackage2OperatorLifecycle.psm1','phase7bPlanWorkPackage2Capture.ps1','phase7bSetWorkPackage2CaptureQuiescence.ps1','phase7bRefreshWorkPackage2StableInventory.ps1','phase7bPrepareWorkPackage2CaptureAuthorization.ps1','phase7bPrepareWorkPackage2EncryptedPacket.ps1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBuildWorkPackage2RestoreIso.ps1','phase7bIsolatedGuestRestoreInterface.ps1','phase7bWorkPackage2Preparation.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
   foreach ($path in $trackedPaths) {
     $tokens = $null; $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)

@@ -15,9 +15,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2OperatorLifecycle.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bBoundedReplicaTransport.psm1") -Force
-Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 $contract = Get-Phase7BWorkPackage2Contract
 
 if ($Operation -eq "Inspect") {
@@ -63,9 +64,10 @@ try {
   $source = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path.TrimEnd('\')
   $sourceRootSha256 = Get-Phase7BSha256 -Text $source.ToLowerInvariant()
   $localBase = [IO.Path]::GetFullPath($LocalOutputDirectory).TrimEnd('\')
-  $replicaBase = [IO.Path]::GetFullPath($ReplicaDirectory).TrimEnd('\')
+  $replicaIdentity = Get-Phase7BReplicaDirectoryIdentity -LiteralPath $ReplicaDirectory
+  $replicaBase = $replicaIdentity.localPath
   $localOutputRootSha256 = Get-Phase7BSha256 -Text $localBase.ToLowerInvariant()
-  $replicaRootSha256 = Get-Phase7BSha256 -Text $replicaBase.ToLowerInvariant()
+  $replicaRootSha256 = $replicaIdentity.providerRootSha256
   foreach ($destination in @($localBase, $replicaBase)) {
     if ($destination.Equals($source, [StringComparison]::OrdinalIgnoreCase) -or
         $destination.StartsWith($source + '\', [StringComparison]::OrdinalIgnoreCase)) { throw "PHASE7B_WP2_OUTPUT_INSIDE_SOURCE_REJECTED" }
@@ -85,17 +87,37 @@ try {
   $inventory = New-Phase7BWorkPackage2Inventory -SourceRoot $source -Entries @($plan.files)
   if ([string]$plan.sourceInventorySha256 -ne $inventory.inventorySha256 -or [int]$plan.fileCount -ne $inventory.fileCount -or
       [int64]$plan.totalBytes -ne $inventory.totalBytes) { throw "PHASE7B_WP2_CAPTURE_PLAN_INVENTORY_MISMATCH" }
-  [void](Assert-Phase7BWorkPackage2Authorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 `
-    -ExpectedStage "WP2B_CAPTURE" -ExpectedAttemptId $AttemptId -ExpectedSourceInventorySha256 $inventory.inventorySha256 `
+  if ($ExpectedAuthorizationSha256 -notmatch '^[0-9a-fA-F]{64}$' -or (Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -ne $ExpectedAuthorizationSha256.ToLowerInvariant()) { throw 'PHASE7B_WP2_AUTHORIZATION_HASH_MISMATCH' }
+  $authorizationPreview = Get-Content -LiteralPath $AuthorizationPath -Raw | ConvertFrom-Json -ErrorAction Stop
+  $toolingCommit = (& git -C (Resolve-Path (Join-Path $PSScriptRoot '..')).Path rev-parse HEAD).Trim().ToLowerInvariant()
+  $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 `
+    -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $toolingCommit -ExpectedInventorySha256 $inventory.inventorySha256 `
     -ExpectedSourceRootSha256 $sourceRootSha256 -ExpectedCapturePlanSha256 $ExpectedCapturePlanSha256 `
-    -ExpectedLocalOutputRootSha256 $localOutputRootSha256 -ExpectedReplicaRootSha256 $replicaRootSha256)
+    -ExpectedLocalOutputRootSha256 $localOutputRootSha256 -ExpectedReplicaRootSha256 $replicaRootSha256 `
+    -ExpectedAgeExeSha256 $ExpectedAgeExeSha256.ToLowerInvariant() -ExpectedQuiescenceEvidenceSha256 ([string]$authorizationPreview.quiescenceEvidenceSha256)
+  $agePathSha256 = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($AgeExePath).ToLowerInvariant())
+  if ([string]$authorization.ageExePathSha256 -ne $agePathSha256) { throw 'PHASE7B_WP2_AGE_PATH_IDENTITY_MISMATCH' }
+  if ([string]$authorization.replicaUncRoot -ne [string]$replicaIdentity.providerRoot) { throw 'PHASE7B_WP2_REPLICA_MAPPING_IDENTITY_FAIL' }
+  $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+  $branch = (& git -C $repositoryRoot branch --show-current).Trim()
+  $delta = (& git -C $repositoryRoot rev-list --left-right --count 'HEAD...origin/combined-app-platform-cutover').Trim()
+  $dirty = @(& git -C $repositoryRoot status --short --untracked-files=no)
+  if ($branch -ne 'combined-app-platform-cutover' -or $delta -ne "0`t0" -or $dirty.Count -ne 0) { throw 'PHASE7B_WP2B_CAPTURE_REPOSITORY_IDENTITY_FAIL' }
+  $quiescencePath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$authorization.quiescenceEvidenceFileName)
+  if (-not (Test-Path -LiteralPath $quiescencePath -PathType Leaf) -or
+      (Get-Phase7BSha256 -LiteralPath $quiescencePath) -ne [string]$authorization.quiescenceEvidenceSha256) { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_EVIDENCE_FAIL' }
+  $quiescence = Get-Content -LiteralPath $quiescencePath -Raw | ConvertFrom-Json -ErrorAction Stop
+  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit $toolingCommit).pass) { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_EVIDENCE_FAIL' }
+  $monitorTask = Get-ScheduledTask -TaskName 'PhysiqueOS Runtime Monitor' -ErrorAction Stop
+  if ([string]$monitorTask.State -ne 'Disabled') { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_NOT_ESTABLISHED' }
 
   $localAttemptRoot = Join-Path $localBase $AttemptId
-  $replicaAttemptRoot = Join-Path $replicaBase $AttemptId
-  if ((Test-Path -LiteralPath $localAttemptRoot) -or (Test-Path -LiteralPath $replicaAttemptRoot)) { throw "PHASE7B_WP2_ATTEMPT_OUTPUT_EXISTS" }
-  New-Item -ItemType Directory -Path $localAttemptRoot -ErrorAction Stop | Out-Null
-  New-Item -ItemType Directory -Path $replicaAttemptRoot -ErrorAction Stop | Out-Null
+  $replicaAttemptRoot = $replicaBase
+  if ((Test-Path -LiteralPath $localAttemptRoot) -or -not (Test-Path -LiteralPath $replicaAttemptRoot -PathType Container) -or
+      @(Get-ChildItem -LiteralPath $replicaAttemptRoot -Force -ErrorAction Stop).Count -ne 0) { throw "PHASE7B_WP2_ATTEMPT_OUTPUT_EXISTS_OR_REPLICA_NOT_EMPTY" }
+  [void](Use-Phase7BWorkPackage2CaptureAuthorization -AuthorizationPath $AuthorizationPath -Authorization $authorization)
   $mutationStarted = $true
+  New-Item -ItemType Directory -Path $localAttemptRoot -ErrorAction Stop | Out-Null
   $plaintextRoot = Join-Path $localAttemptRoot ".plaintext-incomplete"
   New-Item -ItemType Directory -Path $plaintextRoot -ErrorAction Stop | Out-Null
 

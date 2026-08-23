@@ -53,22 +53,36 @@ try {
   Assert-Throws { Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath (Join-Path $root 'missing.age') -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PACKET_NOT_FOUND' 'readback failure rejects'
 
   $attempt = 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  New-PSDrive -Name P7BF -PSProvider FileSystem -Root $root | Out-Null
+  try {
+    $mappedIdentity = Get-Phase7BReplicaDirectoryIdentity -LiteralPath 'P7BF:\'
+    Assert-True ($mappedIdentity.localPath -eq 'P7BF:\' -and $mappedIdentity.providerRoot -eq $root -and $mappedIdentity.providerRootSha256 -eq (Get-Phase7BSha256 -Text $root.ToLowerInvariant())) 'nonpersistent PSDrive resolves to exact provider attempt root'
+  } finally { Remove-PSDrive -Name P7BF -Force }
+  $pathsContract = Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot 'D:\Phase7B\wp2-replica'
+  Assert-True ($pathsContract.pathModel -eq 'EXACT_ATTEMPT_ROOT' -and $pathsContract.attemptRoot -eq "D:\Phase7B\wp2-replica\$attempt" -and
+    $pathsContract.packetPath -eq "D:\Phase7B\wp2-replica\$attempt\$attempt.zip.age") 'canonical attempt root appends attempt exactly once'
+  Assert-True ($pathsContract.packetPath -notmatch ([regex]::Escape("$attempt\$attempt\"))) 'duplicate nested attempt directory rejected by canonical path model'
   $receipt = New-Evidence
-  foreach ($property in ([ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $attempt; packetSha256 = $sha; packetBytes = $bytes; destinationBytesReread = $true; sessionTornDown = $true; encryptedPacketOnly = $true; reportPersisted = $false; automaticRetryAllowed = $false }).GetEnumerator()) { Add-Member -InputObject $receipt -NotePropertyName $property.Key -NotePropertyValue $property.Value }
+  foreach ($property in ([ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $attempt; evidenceNonce = ('a' * 32); evidenceFileName = "$attempt-replica-receipt-$('a' * 32).json"; observedAt = [DateTime]::UtcNow.ToString('o'); packetSha256 = $sha; packetBytes = $bytes; destinationBytesReread = $true; sessionTornDown = $true; encryptedPacketOnly = $true; reportPersisted = $true; automaticRetryAllowed = $false }).GetEnumerator()) { Add-Member -InputObject $receipt -NotePropertyName $property.Key -NotePropertyValue $property.Value }
   Assert-True (Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass 'independent receipt and teardown accepted'
   foreach ($property in @('destinationBytesReread','sessionTornDown','encryptedPacketOnly')) { $bad = $receipt.PSObject.Copy(); $bad.$property = $false; Assert-True (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $bad -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass) "receipt rejects $property false" }
   $wrongReceipt = $receipt.PSObject.Copy(); $wrongReceipt.packetSha256 = 'f' * 64
   Assert-True (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $wrongReceipt -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass) 'independent readback hash mismatch rejected'
-  $primary = [pscustomobject]@{ classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attempt; serverName = 'LAPTOP-4G5U0U2R'; shareName = 'P7Baaaaaaaa$'; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $false; automaticRetryAllowed = $false }
+  $wrongReceiptName = $receipt.PSObject.Copy(); $wrongReceiptName.evidenceFileName = 'wrong.json'
+  Assert-True (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $wrongReceiptName -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass) 'receipt path identity mismatch rejected'
+  $primary = [pscustomobject]@{ classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attempt; evidenceNonce = ('b' * 32); evidenceFileName = "$attempt-primary-teardown-$('b' * 32).json"; observedAt = [DateTime]::UtcNow.ToString('o'); serverName = 'LAPTOP-4G5U0U2R'; shareName = 'P7Baaaaaaaa$'; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $true; automaticRetryAllowed = $false }
   Assert-True (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primary -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass 'primary mapping and credential teardown accepted'
   foreach ($property in @('matchingPsDriveCount','matchingSmbMappingCount','savedCredentialTargetCount')) { $bad = $primary.PSObject.Copy(); $bad.$property = 1; Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $bad -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) "primary teardown rejects $property residue" }
+  $wrongTeardownName = $primary.PSObject.Copy(); $wrongTeardownName.evidenceFileName = 'wrong.json'
+  Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $wrongTeardownName -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) 'primary teardown path identity mismatch rejected'
 
-  $paths = @('phase7bBoundedReplicaTransport.psm1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+  $paths = @('phase7bBoundedReplicaTransport.psm1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
   foreach ($path in $paths) { $tokens = $null; $errors = $null; [void][Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors); Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST:$(Split-Path -Leaf $path)" }
   $operational = @($paths | Where-Object { $_ -notmatch '\.test\.ps1$' } | ForEach-Object { Get-Content -Raw $_ }) -join "`n"
   Assert-True (-not ($operational -match '(?i)cmdkey(?:\.exe)?["'']?\s+(?:/add|/delete)|savecredentials|New-LocalUser|ConvertFrom-SecureString|Export-Clixml')) 'no persistent credential or dedicated account path'
   Assert-True (-not ($operational -match '(?i)Copy-Item.+runtime-store|Copy-Item.+canonical')) 'no raw production copy path'
   Assert-True ($operational.Contains('automaticRetryAllowed = $false')) 'automatic retry disabled'
   Assert-True ($operational.Contains('Remove-SmbShare') -and $operational.Contains('Remove-NetFirewallRule')) 'ephemeral session teardown source-owned'
+  Assert-True ($operational.Contains('RequiredCapacityBytes') -and -not (Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bOpenBoundedReplicaReceiver.ps1')).Contains('ExpectedPacketBytes')) 'receiver capacity does not claim pre-encryption ciphertext size'
   [ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_TRANSPORT_TESTS_PASS'; pass = $true; assertions = $script:assertions } | ConvertTo-Json -Compress
 } finally { if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force } }
