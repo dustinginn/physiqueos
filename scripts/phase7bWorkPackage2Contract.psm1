@@ -365,6 +365,36 @@ function Test-Phase7BPacketReplica {
   }
 }
 
+function Test-Phase7BWorkPackage2ReferenceIndexFile {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)][string]$LiteralPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedFileSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedSemanticSha256,
+    [Parameter(Mandatory = $true)][int64]$ExpectedBytes
+  )
+  if ($ExpectedFileSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedSemanticSha256 -notmatch '^[0-9a-f]{64}$' -or
+      -not (Test-Path -LiteralPath $LiteralPath -PathType Leaf)) { throw 'PHASE7B_WP2_REFERENCE_INDEX_IDENTITY_INVALID' }
+  $text = Get-Content -LiteralPath $LiteralPath -Raw -ErrorAction Stop
+  $index = $text | ConvertFrom-Json -ErrorAction Stop
+  $unsigned = [ordered]@{}
+  foreach ($property in @($index.PSObject.Properties | Where-Object { $_.Name -ne 'referenceIndexSha256' })) { $unsigned[$property.Name] = $property.Value }
+  $collections = @($index.collections); $recordTotal = [int](($collections | Measure-Object count -Sum).Sum)
+  $pass = (Get-Phase7BSha256 -LiteralPath $LiteralPath) -eq $ExpectedFileSha256 -and
+    (Get-Item -LiteralPath $LiteralPath).Length -eq $ExpectedBytes -and
+    [int]$index.schemaVersion -eq 1 -and [string]$index.referenceIndexVersion -eq 'phase7b-wp2-reference-index-v1' -and
+    [string]$index.classification -eq 'PHASE7B_WP2_REFERENCE_INDEX' -and
+    (Get-Phase7BSha256 -Text (ConvertTo-Phase7BCanonicalJson -InputObject $unsigned)) -eq $ExpectedSemanticSha256 -and
+    [string]$index.referenceIndexSha256 -eq $ExpectedSemanticSha256 -and
+    [int]$index.collectionCount -eq 39 -and $collections.Count -eq 39 -and @($collections.name | Sort-Object -Unique).Count -eq 39 -and
+    [int]$index.recordCount -eq $recordTotal -and [int]$index.mediaCount -eq @($index.media).Count -and
+    [int]$index.relationshipCount -eq @($index.relationships).Count -and
+    [string]$index.founderCutoffPolicy.founderMeaningfulDataThrough -eq '2026-08-16' -and
+    [string]$index.founderCutoffPolicy.founderDowntimeBegan -eq '2026-08-17' -and
+    -not [bool]$index.founderCutoffPolicy.destructiveFilteringPerformed -and -not [bool]$index.founderCutoffPolicy.provenanceInferred
+  [pscustomobject][ordered]@{ pass = [bool]$pass; classification = if ($pass) { 'PHASE7B_WP2_REFERENCE_INDEX_FILE_PASS' } else { 'PHASE7B_WP2_REFERENCE_INDEX_FILE_FAIL' }; referenceIndexSha256 = if ($pass) { $ExpectedSemanticSha256 } else { $null }; collectionCount = if ($pass) { 39 } else { 0 }; recordCount = if ($pass) { $recordTotal } else { 0 } }
+}
+
 function Test-Phase7BWorkPackage2MediaFileSet {
   [CmdletBinding()]
   param(
@@ -464,6 +494,7 @@ Export-ModuleMember -Function @(
   "Expand-Phase7BSafePacketZip",
   "Test-Phase7BEncryptedPacket",
   "Test-Phase7BPacketReplica",
+  "Test-Phase7BWorkPackage2ReferenceIndexFile",
   "Test-Phase7BWorkPackage2MediaFileSet",
   "Test-Phase7BWorkPackage2StagingFileSet",
   "Test-Phase7BWorkPackage2RestoreEvidence",

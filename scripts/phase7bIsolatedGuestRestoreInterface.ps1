@@ -105,7 +105,7 @@ function Test-RestoredPacket([string]$Root) {
   $manifestPath = Join-Path $Root "packet-manifest.json"
   if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "PHASE7B_WP2_RESTORED_MANIFEST_MISSING" }
   $manifest = Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-  if ([int]$manifest.schemaVersion -ne 1 -or [string]$manifest.classification -ne "PHASE7B_WP2_DECRYPTED_PACKET_MANIFEST" -or
+  if ([int]$manifest.schemaVersion -ne 2 -or [string]$manifest.classification -ne "PHASE7B_WP2_DECRYPTED_PACKET_MANIFEST" -or
       [string]$manifest.attemptId -ne $AttemptId -or [string]$manifest.applicationCommit -ne $contract.applicationCommit -or
       [string]$manifest.environmentId -ne $contract.environmentId -or [string]$manifest.vmDisplayName -ne $contract.vmDisplayName -or
       [string]$manifest.manifestDigest -ne $contract.manifestDigest) { throw "PHASE7B_WP2_RESTORED_MANIFEST_BINDING_MISMATCH" }
@@ -124,10 +124,14 @@ function Test-RestoredPacket([string]$Root) {
     if (-not (Test-Phase7BWorkPackage2CredentialSignal -LiteralPath $path).pass) { throw "PHASE7B_WP2_RESTORED_CREDENTIAL_SIGNAL" }
     $totalBytes += [int64]$file.bytes
   }
+  $reference = $manifest.referenceIndex
+  $referencePath = Join-Path $Root 'reference-index.json'
+  $referencePass = Test-Phase7BWorkPackage2ReferenceIndexFile -LiteralPath $referencePath -ExpectedFileSha256 ([string]$reference.fileSha256) -ExpectedSemanticSha256 ([string]$reference.semanticSha256) -ExpectedBytes ([int64]$reference.bytes)
+  if (-not $referencePass.pass -or [string]$reference.fileName -ne 'reference-index.json' -or [string]$reference.version -ne 'phase7b-wp2-reference-index-v1') { throw 'PHASE7B_WP2_RESTORED_REFERENCE_INDEX_FAIL' }
   $prefix = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
   $actualFiles = @(Get-ChildItem -LiteralPath $Root -File -Recurse | ForEach-Object { $_.FullName.Substring($prefix.Length).Replace('\', '/') })
-  if ($actualFiles.Count -ne $files.Count + 1 -or @($actualFiles | Where-Object { $_ -ne 'packet-manifest.json' -and -not $seen.ContainsKey($_.ToLowerInvariant()) }).Count -gt 0) { throw "PHASE7B_WP2_RESTORED_UNEXPECTED_FILE_SET" }
-  [pscustomobject][ordered]@{ pass = $true; fileCount = $files.Count; totalBytes = $totalBytes; sourceInventorySha256 = [string]$manifest.sourceInventorySha256 }
+  if ($actualFiles.Count -ne $files.Count + 2 -or @($actualFiles | Where-Object { $_ -notin @('packet-manifest.json','reference-index.json') -and -not $seen.ContainsKey($_.ToLowerInvariant()) }).Count -gt 0) { throw "PHASE7B_WP2_RESTORED_UNEXPECTED_FILE_SET" }
+  [pscustomobject][ordered]@{ pass = $true; fileCount = $files.Count; totalBytes = $totalBytes; sourceInventorySha256 = [string]$manifest.sourceInventorySha256; referenceIndexSha256 = $referencePass.referenceIndexSha256; referenceRecordCount = $referencePass.recordCount }
 }
 
 try {

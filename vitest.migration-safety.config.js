@@ -53,6 +53,7 @@ export default defineConfig({
       "src/platform/migration/ProductionSpacesMediaMigration.test.js",
       "src/platform/migration/migrationManifest.test.js",
       "src/platform/migration/phase4CanonicalExport.test.js",
+      "src/platform/migration/phase7bWorkPackage2ReferenceIndex.test.js",
       "src/platform/database/phase4PostgresComposition.test.js",
       "src/platform/database/PostgresFounderRepositoryFacade.test.js",
       "src/screens/HomeProviderCompositionWiring.test.js",

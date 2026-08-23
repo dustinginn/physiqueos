@@ -15,6 +15,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot "phase7bBoundedReplicaTransport.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
 $contract = Get-Phase7BWorkPackage2Contract
@@ -32,6 +33,8 @@ if ($Operation -eq "Inspect") {
     commandLineSecretPermitted = $false
     clipboardSecretPermitted = $false
     automaticRetryAllowed = $false
+    independentLaptopReadbackRequired = $true
+    persistentReplicaInfrastructureRequired = $false
     mutationPerformed = $false
   } | ConvertTo-Json -Depth 5
   exit 0
@@ -109,8 +112,44 @@ try {
         (Get-Phase7BSha256 -LiteralPath $destinationPath) -ne [string]$file.sha256) { throw "PHASE7B_WP2_SOURCE_CHANGED_OR_COPY_MISMATCH" }
   }
   $publicFiles = @($inventory.files | ForEach-Object { [ordered]@{ logicalPath = $_.logicalPath; bytes = $_.bytes; sha256 = $_.sha256 } })
-  $packetManifest = [ordered]@{
+  $stage = "build-encrypted-packet-reference-index"
+  $nodeCandidates = @(Get-Command node.exe -CommandType Application -All -ErrorAction Stop | ForEach-Object { $_.Source } | Sort-Object -Unique)
+  if ($nodeCandidates.Count -ne 1) { throw "PHASE7B_WP2_REFERENCE_NODE_IDENTITY_AMBIGUOUS" }
+  $referenceBuilderPath = Join-Path $PSScriptRoot "phase7bBuildWorkPackage2ReferenceIndex.mjs"
+  if (-not (Test-Path -LiteralPath $referenceBuilderPath -PathType Leaf)) { throw "PHASE7B_WP2_REFERENCE_BUILDER_MISSING" }
+  $referenceInputPath = Join-Path $plaintextRoot ".reference-input.json"
+  $referencePath = Join-Path $plaintextRoot "reference-index.json"
+  $referenceInput = [ordered]@{
     schemaVersion = 1
+    applicationCommit = $contract.applicationCommit
+    observedAt = [DateTime]::UtcNow.ToString('o')
+    missingReferencedMedia = @()
+    files = $publicFiles
+  }
+  $referenceInputBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $referenceInput))
+  $referenceInputStream = New-Object IO.FileStream($referenceInputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  try { $referenceInputStream.Write($referenceInputBytes, 0, $referenceInputBytes.Length); $referenceInputStream.Flush($true) } finally { $referenceInputStream.Dispose() }
+  $priorErrorPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $referenceOutput = @(& $nodeCandidates[0] --no-warnings $referenceBuilderPath $referenceInputPath $plaintextRoot $referencePath 2>&1) -join [Environment]::NewLine; $referenceExit = $LASTEXITCODE } finally { $ErrorActionPreference = $priorErrorPreference }
+  if ($referenceExit -ne 0) {
+    $referenceFailure = $null
+    try { $referenceFailure = $referenceOutput | ConvertFrom-Json -ErrorAction Stop } catch { }
+    if ($null -ne $referenceFailure -and [string]$referenceFailure.safeErrorCode -match '^PHASE7B_') {
+      if ([string]$referenceFailure.safeErrorCode -eq 'PHASE7B_WP2_REFERENCE_INDEX_BUILD_FAIL' -and [string]$referenceFailure.safeStage -match '^[a-z-]+$') { throw "PHASE7B_WP2_REFERENCE_$(([string]$referenceFailure.safeStage).Replace('-', '_').ToUpperInvariant())_FAIL" }
+      throw [string]$referenceFailure.safeErrorCode
+    }
+    if ($referenceOutput -match '"safeErrorCode"\s*:\s*"(?<code>PHASE7B_[A-Z0-9_:.-]+)"') { throw [string]$Matches.code }
+    throw "PHASE7B_WP2_REFERENCE_INDEX_BUILD_FAIL"
+  }
+  $referenceResult = $referenceOutput | ConvertFrom-Json -ErrorAction Stop
+  if (-not [bool]$referenceResult.pass -or [string]$referenceResult.referenceIndexSha256 -notmatch '^[0-9a-f]{64}$' -or
+      -not (Test-Path -LiteralPath $referencePath -PathType Leaf)) { throw "PHASE7B_WP2_REFERENCE_INDEX_ACCEPTANCE_FAIL" }
+  Remove-Item -LiteralPath $referenceInputPath -Force
+  $referenceFileSha256 = Get-Phase7BSha256 -LiteralPath $referencePath
+  $referenceFileBytes = [int64](Get-Item -LiteralPath $referencePath).Length
+  $packetManifest = [ordered]@{
+    schemaVersion = 2
     classification = "PHASE7B_WP2_DECRYPTED_PACKET_MANIFEST"
     attemptId = $AttemptId
     applicationCommit = $contract.applicationCommit
@@ -127,6 +166,17 @@ try {
     fileCount = $inventory.fileCount
     totalBytes = $inventory.totalBytes
     files = $publicFiles
+    referenceIndex = [ordered]@{
+      fileName = 'reference-index.json'
+      version = 'phase7b-wp2-reference-index-v1'
+      semanticSha256 = [string]$referenceResult.referenceIndexSha256
+      fileSha256 = $referenceFileSha256
+      bytes = $referenceFileBytes
+      collectionCount = [int]$referenceResult.collectionCount
+      recordCount = [int]$referenceResult.recordCount
+      mediaCount = [int]$referenceResult.mediaCount
+      relationshipCount = [int]$referenceResult.relationshipCount
+    }
   }
   $manifestJson = ConvertTo-Phase7BCanonicalJson -InputObject $packetManifest
   $manifestPath = Join-Path $plaintextRoot "packet-manifest.json.source"
@@ -139,7 +189,7 @@ try {
     $manifestStream.Dispose()
   }
   $plainZipPath = Join-Path $localAttemptRoot "$AttemptId.zip"
-  $zipFiles = @($inventory.files | ForEach-Object { [pscustomobject]@{ logicalPath = $_.logicalPath } })
+  $zipFiles = @($inventory.files | ForEach-Object { [pscustomobject]@{ logicalPath = $_.logicalPath } }) + @([pscustomobject]@{ logicalPath = 'reference-index.json' })
   [void](New-Phase7BDeterministicPacketZip -SourceRoot $plaintextRoot -Files $zipFiles -ManifestPath $manifestPath -OutputPath $plainZipPath)
 
   $stage = "interactive-age-encryption"
@@ -153,13 +203,12 @@ try {
 
   $stage = "replicate-and-verify"
   $replicaPacketPath = Join-Path $replicaAttemptRoot (Split-Path -Leaf $localPacketPath)
-  [IO.File]::Copy($localPacketPath, $replicaPacketPath, $false)
-  $replica = Test-Phase7BPacketReplica -LocalPacketPath $localPacketPath -ReplicaPacketPath $replicaPacketPath -ExpectedSha256 $packetSha
+  $replica = Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacketPath -DestinationPath $replicaPacketPath -ExpectedSha256 $packetSha -ExpectedBytes $packet.packetBytes
   if (-not $replica.pass) { throw $replica.classification }
 
   $descriptor = [ordered]@{
     schemaVersion = 1
-    classification = "PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS"
+    classification = "PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK"
     attemptId = $AttemptId
     applicationCommit = $contract.applicationCommit
     environmentId = $contract.environmentId
@@ -175,12 +224,19 @@ try {
     packetFileName = Split-Path -Leaf $localPacketPath
     packetSha256 = $packetSha
     packetBytes = $packet.packetBytes
+    ageFileName = $contract.ageMediaFileName
+    ageExeSha256 = $ExpectedAgeExeSha256.ToLowerInvariant()
+    referenceIndexVersion = 'phase7b-wp2-reference-index-v1'
+    referenceIndexSha256 = [string]$referenceResult.referenceIndexSha256
+    referenceIndexFileSha256 = $referenceFileSha256
     localEncryptedCopyPass = $true
-    independentEncryptedReplicaPass = $true
+    independentEncryptedReplicaPass = $false
+    independentLaptopReadbackRequired = $true
+    ephemeralTransportTeardownRequired = $true
     plaintextSecretPersisted = $false
     automaticRetryAllowed = $false
   }
-  $descriptorPath = Join-Path $localAttemptRoot "$AttemptId-descriptor.json"
+  $descriptorPath = Join-Path $localAttemptRoot "$AttemptId-pending-descriptor.json"
   $descriptorBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $descriptor))
   $descriptorStream = New-Object IO.FileStream($descriptorPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
   try {
@@ -197,11 +253,14 @@ try {
     packetFileName = $descriptor.packetFileName
     packetSha256 = $packetSha
     packetBytes = $packet.packetBytes
+    referenceIndexSha256 = [string]$referenceResult.referenceIndexSha256
+    referenceIndexRecordCount = [int]$referenceResult.recordCount
     descriptorFileName = Split-Path -Leaf $descriptorPath
     descriptorSha256 = Get-Phase7BSha256 -LiteralPath $descriptorPath
     sourceInventorySha256 = $inventory.inventorySha256
     fileCount = $inventory.fileCount
-    replicaPass = $true
+    replicaCopyPass = $true
+    independentReplicaPass = $false
     plaintextSecretPersisted = $false
     automaticRetryAllowed = $false
   } | ConvertTo-Json -Depth 5

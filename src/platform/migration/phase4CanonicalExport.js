@@ -13,6 +13,11 @@ import {
   assertTrustedMigrationSourceIdentity,
   validateSerializableMigrationSourceIdentity,
 } from "./MigrationSourceIdentity.js";
+import {
+  buildCanonicalMediaReferenceIndex,
+  canonicalMimeTypeFor,
+  collectCanonicalRelationships,
+} from "./canonicalReferenceProjection.js";
 
 export const PHASE4_PACKAGE_VERSION = "phase4-canonical-package-v2";
 
@@ -85,7 +90,7 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
       retiredMilestones: runtime.milestones ?? [],
     },
     files: fileInventory,
-    relationships: collectRelationships(collections, userId),
+    relationships: collectCanonicalRelationships(collections, userId),
     criticalValues: {
       userId,
       activeGoalIds: (collections.goals ?? []).filter((goal) => goal?.status === "active").map((goal) => String(goal.id)).sort(),
@@ -149,7 +154,7 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
 
 async function inventoryMedia({ mediaRoot, collections, ownerUserId }) {
   const root = path.resolve(mediaRoot);
-  const references = buildMediaReferenceIndex(collections);
+  const references = buildCanonicalMediaReferenceIndex(collections);
   const files = await listFiles(root);
   const entries = [];
   for (const absolutePath of files) {
@@ -161,7 +166,7 @@ async function inventoryMedia({ mediaRoot, collections, ownerUserId }) {
       relativePath,
       size: hashed.size,
       sha256: hashed.sha256,
-      mimeType: mimeTypeFor(relativePath),
+      mimeType: canonicalMimeTypeFor(relativePath),
       ownerUserId,
       relationshipIds,
     });
@@ -169,68 +174,6 @@ async function inventoryMedia({ mediaRoot, collections, ownerUserId }) {
   return entries.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
 }
 
-function buildMediaReferenceIndex(collections) {
-  const index = new Map();
-  for (const [collection, source] of Object.entries(collections)) {
-    const records = source == null ? [] : Array.isArray(source) ? source : [source];
-    records.forEach((record, position) => {
-      const recordId = `${collection}:${resolveRecordId(record, position)}`;
-      walkStrings(record, (value) => {
-        const normalized = value.replaceAll("\\", "/").toLowerCase();
-        const base = path.posix.basename(normalized);
-        if (!/\.[a-z0-9]{2,6}(?:$|\?)/i.test(base)) return;
-        for (const key of [normalized, base]) {
-          const values = index.get(key) ?? [];
-          values.push(recordId);
-          index.set(key, values);
-        }
-      });
-    });
-  }
-  return index;
-}
-
-function collectRelationships(collections, ownerUserId) {
-  const knownIds = new Map();
-  for (const [collection, source] of Object.entries(collections)) {
-    const records = source == null ? [] : Array.isArray(source) ? source : [source];
-    for (let position = 0; position < records.length; position += 1) {
-      const id = resolveRecordId(records[position], position);
-      knownIds.set(id, { collection, id });
-    }
-  }
-  const relationships = [];
-  for (const [collection, source] of Object.entries(collections)) {
-    const records = source == null ? [] : Array.isArray(source) ? source : [source];
-    records.forEach((record, position) => {
-      const fromId = resolveRecordId(record, position);
-      relationships.push({ from: `${collection}:${fromId}`, to: `user:${ownerUserId}`, type: "owned_by" });
-      walkStrings(record, (value, key) => {
-        if (!/(?:^|_)(?:id|ids)$|Id$|Ids$/.test(key)) return;
-        const target = knownIds.get(value);
-        if (target && !(target.collection === collection && target.id === fromId)) {
-          relationships.push({ from: `${collection}:${fromId}`, to: `${target.collection}:${target.id}`, type: `references:${key}` });
-        }
-      });
-    });
-  }
-  return uniqueSortedRelationships(relationships);
-}
-
-function walkStrings(value, visitor, key = "") {
-  if (typeof value === "string") return visitor(value, key);
-  if (Array.isArray(value)) return value.forEach((entry) => walkStrings(entry, visitor, key));
-  if (value && typeof value === "object") {
-    for (const [childKey, child] of Object.entries(value)) walkStrings(child, visitor, childKey);
-  }
-}
-
-function uniqueSortedRelationships(values) {
-  const keyed = new Map(values.map((value) => [`${value.from}|${value.to}|${value.type}`, value]));
-  return [...keyed.values()].sort((left, right) =>
-    `${left.from}|${left.to}|${left.type}`.localeCompare(`${right.from}|${right.to}|${right.type}`)
-  );
-}
 
 async function copyMediaTreeVerified({ sourceRoot, destinationRoot, mediaInclude }) {
   const files = (await listFiles(sourceRoot)).filter((file) => mediaInclude(path.relative(sourceRoot, file).split(path.sep).join("/")));
@@ -285,13 +228,4 @@ function assertSeparated(source, destination) {
 
 function deterministicMigrationId(hash) {
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-7${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-}
-
-function resolveRecordId(record, position) {
-  return String(record?.id ?? record?.package_id ?? record?.review_id ?? `@index:${position}`);
-}
-
-function mimeTypeFor(file) {
-  const extension = path.extname(file).toLowerCase();
-  return ({ ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".pdf": "application/pdf", ".json": "application/json", ".txt": "text/plain", ".csv": "text/csv", ".m4a": "audio/mp4", ".mp4": "video/mp4" })[extension] ?? "application/octet-stream";
 }
