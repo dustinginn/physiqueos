@@ -4,23 +4,31 @@ $scriptPath = Join-Path $PSScriptRoot 'phase7bRunWorkPackage2LaptopPreflight.ps1
 $attempt = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "phase7b-stage0-delivery-$([guid]::NewGuid().ToString('N'))"
 $assertions = 0
-function Assert-True([bool]$Condition,[string]$Message) {
+
+function Assert-True([bool]$Condition, [string]$Message) {
   $script:assertions++
   if (-not $Condition) { throw "ASSERTION_FAILED:$Message" }
 }
-function Invoke-Child([string[]]$Arguments,[string]$TemporaryRoot,[string]$ChildScriptPath = $scriptPath) {
-  $savedTemp = $env:TEMP
+
+function Assert-ThrowsCode([scriptblock]$Action, [string]$ExpectedCode, [string]$Message) {
+  $script:assertions++
+  $observed = $null
+  try { [void](& $Action) } catch { $observed = $_.Exception.Message }
+  if ($observed -cne $ExpectedCode) { throw "ASSERTION_FAILED:$Message:expected=$ExpectedCode:observed=$observed" }
+}
+
+function Invoke-Child([string[]]$Arguments, [string]$ChildScriptPath = $scriptPath) {
   $savedErrorActionPreference = $ErrorActionPreference
   try {
-    $env:TEMP = $TemporaryRoot
     $ErrorActionPreference = 'Continue'
-    $lines = @(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $ChildScriptPath @Arguments 2>&1)
+    $lines = @(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive `
+      -ExecutionPolicy Bypass -File $ChildScriptPath @Arguments 2>&1)
     [pscustomobject]@{ exitCode = $LASTEXITCODE; text = $lines -join [Environment]::NewLine }
   } finally {
-    $env:TEMP = $savedTemp
     $ErrorActionPreference = $savedErrorActionPreference
   }
 }
+
 function Invoke-SyntheticBootstrapFlow(
   [string]$AuthorizedCommit,
   [string]$RequestedCommit,
@@ -28,8 +36,12 @@ function Invoke-SyntheticBootstrapFlow(
   [string]$RequestedArtifactSha256,
   [string]$DeliveryRoot
 ) {
-  if ($RequestedCommit -cne $AuthorizedCommit -or $RequestedCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_COMMIT_FAIL' }
-  if ($RequestedArtifactSha256 -cne $ExpectedArtifactSha256 -or $RequestedArtifactSha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_EXPECTED_HASH_FAIL' }
+  if ($RequestedCommit -cne $AuthorizedCommit -or $RequestedCommit -cnotmatch '^[0-9a-f]{40}$') {
+    throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_COMMIT_FAIL'
+  }
+  if ($RequestedArtifactSha256 -cne $ExpectedArtifactSha256 -or $RequestedArtifactSha256 -cnotmatch '^[0-9a-f]{64}$') {
+    throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_EXPECTED_HASH_FAIL'
+  }
   if (Test-Path -LiteralPath $DeliveryRoot) { throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_DELIVERY_ROOT_PREEXISTS' }
   New-Item -ItemType Directory -Path $DeliveryRoot -ErrorAction Stop | Out-Null
   $downloaded = Join-Path $DeliveryRoot 'phase7bRunWorkPackage2LaptopPreflight.ps1'
@@ -37,77 +49,126 @@ function Invoke-SyntheticBootstrapFlow(
   if ((Get-FileHash -Algorithm SHA256 -LiteralPath $downloaded).Hash.ToLowerInvariant() -cne $ExpectedArtifactSha256) {
     throw 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_DOWNLOADED_HASH_FAIL'
   }
-  $toolRoot = Join-Path $testRoot "phase7b-wp2b-$($RequestedCommit.Substring(0,8))"
-  if (-not (Test-Path -LiteralPath $toolRoot)) { New-Item -ItemType Directory -Path $toolRoot -ErrorAction Stop | Out-Null }
-  Invoke-Child -Arguments @('-AttemptId',$attempt,'-ExpectedToolingCommit',$RequestedCommit) -TemporaryRoot $testRoot -ChildScriptPath $downloaded
+  [pscustomobject]@{
+    artifactPath = $downloaded
+    attemptId = $attempt
+    toolingCommit = $RequestedCommit
+    executionPerformed = $false
+  }
 }
+
 try {
   New-Item -ItemType Directory -Path $testRoot -ErrorAction Stop | Out-Null
   $tokens = $null
   $errors = $null
-  [void][Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
+  $ast = [Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$errors)
   Assert-True ($errors.Count -eq 0) 'tracked Stage 0 wrapper parses in Windows PowerShell 5.1'
   $source = Get-Content -LiteralPath $scriptPath -Raw
   $hash1 = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLowerInvariant()
   $hash2 = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLowerInvariant()
   Assert-True ($hash1 -ceq $hash2 -and $hash1 -match '^[0-9a-f]{64}$') 'tracked Stage 0 artifact hash is deterministic'
-  Assert-True ($source.Contains('[Parameter(Mandatory = $true)][ValidatePattern(''^[0-9a-f]{40}$'')][string]$ExpectedToolingCommit')) 'wrapper requires explicit tooling commit'
-  Assert-True ($source.Contains($attempt) -and $source.Contains('$AttemptId -cne $authorizedAttemptId')) 'wrapper binds exact authorized attempt'
-  Assert-True ($source.Contains('raw.githubusercontent.com/dustinginn/physiqueos/$ExpectedToolingCommit/scripts/$name')) 'wrapper retrieves source tools from exact commit'
-  Assert-True ($source.Contains('-NoLogo -NoProfile -NonInteractive') -and $source.Contains('phase7bPreflightBoundedReplicaDestination.ps1')) 'wrapper uses isolated Windows PowerShell 5.1 preflight child'
+
+  foreach ($functionName in @('Get-Phase7BStage0Sha256', 'Assert-Phase7BStage0Snapshot')) {
+    $functions = @($ast.FindAll({
+      param($node)
+      $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName
+    }, $true))
+    Assert-True ($functions.Count -eq 1) "one simplified helper present:$functionName"
+    Invoke-Expression $functions[0].Extent.Text
+  }
+
+  Assert-True ($source.Contains($attempt)) 'wrapper binds exact authorized attempt'
   foreach ($binding in @(
-      'LAPTOP-4G5U0U2R','ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c',
-      '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896','NTFS','SATA','192.168.1.69')) {
-    Assert-True ($source.Contains($binding)) "Stage 0 accepted identity unchanged:$binding"
+      'LAPTOP-4G5U0U2R',
+      'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c',
+      '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896',
+      "'NTFS'", "'SATA'", "'192.168.1.69'", '[int64]1GB')) {
+    Assert-True ($source.Contains($binding)) "Stage 0 exact invariant retained:$binding"
   }
-  Assert-True ($source.Contains('[bool]$result.mutationPerformed') -and $source.Contains('[bool]$result.receiverOpened') -and
-      $source.Contains('[bool]$result.automaticRetryAllowed')) 'wrapper requires read-only no-receiver no-retry projection'
-  $wrapperAst = [Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
-  foreach ($functionName in @('Get-Phase7BStage0SafeValueShape','Get-Phase7BStage0SafeIdentityResult')) {
-    $functionAst = @($wrapperAst.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName },$true))
-    Assert-True ($functionAst.Count -eq 1) "one safe telemetry helper present:$functionName"
-    Invoke-Expression $functionAst[0].Extent.Text
+  Assert-True (-not $source.Contains('Get-Phase7BStage0SafeIdentityResult') -and
+    -not $source.Contains('Get-Phase7BStage0SafeValueShape') -and
+    -not $source.Contains('hostnameEvidence')) 'nested hostname evidence layer removed'
+  Assert-True (-not ($source -match '\$result\.(pass|classification|canonicalComputerName)')) 'optional result-property dereferences removed'
+  Assert-True (-not ($source -match '(?i)Invoke-WebRequest|Import-Module|phase7bPreflightBoundedReplicaDestination')) 'standalone wrapper has no downloaded dependency chain'
+  Assert-True (-not ($source -match '(?i)-Operation\s+OpenEphemeralReceiver|New-SmbShare|New-NetFirewallRule|CaptureEncryptReplicate|SetWorkPackage2CaptureQuiescence|Start-Process|Stop-Process')) 'wrapper cannot mutate receiver capture quiescence or processes'
+  Assert-True ($source.Contains("classification = 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_PASS'") -and
+    $source.Contains("classification = 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_FAIL'")) 'flat PASS and FAIL classifications are source-owned'
+  Assert-True ($source.Contains('mutationPerformed = $false') -and $source.Contains('reportPersisted = $false') -and
+    $source.Contains('receiverOpened = $false') -and $source.Contains('automaticRetryAllowed = $false') -and
+    $source.Contains('wp2cAuthorized = $false')) 'flat result preserves no-mutation authorization boundary'
+
+  $valid = @{
+    ObservedAttemptId = $attempt
+    ObservedToolingCommit = 'a' * 40
+    EnvironmentMachineName = 'LAPTOP-4G5U0U2R'
+    EnvironmentComputerName = 'LAPTOP-4G5U0U2R'
+    CimComputerName = 'LAPTOP-4G5U0U2R'
+    HostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+    DiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+    FileSystem = 'NTFS'
+    DiskNumber = 0
+    BusType = 'SATA'
+    FreeBytes = [int64]2GB
+    PrivateLanCandidateCount = 1
+    ReplicaIpv4 = '192.168.1.68'
+    ReplicaPrefixLength = 24
   }
-  $passResult = [pscustomobject]@{pass=$true;classification='PHASE7B_WP2_COMPUTER_IDENTITY_PASS';canonicalComputerName='LAPTOP-4G5U0U2R'}
-  $passEvidence = Get-Phase7BStage0SafeIdentityResult -ObservedValue 'LAPTOP-4G5U0U2R' -IdentityResult $passResult
-  Assert-True ($passEvidence.observed.cardinality -eq 1 -and $passEvidence.observed.runtimeType -eq 'System.String' -and
-      $passEvidence.observed.stringLength -eq 15 -and $passEvidence.resultCardinality -eq 1 -and
-      $passEvidence.resultType -eq 'System.Management.Automation.PSCustomObject' -and $passEvidence.passRuntimeType -eq 'System.Boolean' -and
-      $passEvidence.pass -and -not $passEvidence.observed.rawValueProjected -and -not $passEvidence.observed.utf16CodePointsProjected) 'safe telemetry captures accepted scalar representation without raw hostname'
-  $failResult = [pscustomobject]@{pass=$false;classification='PHASE7B_WP2_COMPUTER_IDENTITY_FAIL';canonicalComputerName=$null}
-  $failEvidence = Get-Phase7BStage0SafeIdentityResult -ObservedValue @('LAPTOP-4G5U0U2R','OTHER') -IdentityResult $failResult
-  Assert-True ($failEvidence.observed.cardinality -eq 2 -and -not $failEvidence.observed.scalarString -and -not $failEvidence.pass -and
-      $failEvidence.canonicalizationClassification -eq 'PHASE7B_WP2_COMPUTER_IDENTITY_FAIL') 'safe telemetry reproduces multi-value identity failure without raw value projection'
-  Assert-True ($source.Contains('sourcePreflightFailedAfterWrapperIdentityPass') -and $source.Contains('PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_CORRELATION')) 'source failure correlates wrapper-safe representation evidence'
-  Assert-True (-not ($source -match '(?i)-Operation\s+OpenEphemeralReceiver|New-SmbShare|New-NetFirewallRule|CaptureEncryptReplicate|SetWorkPackage2CaptureQuiescence|Start-Process|Stop-Process')) 'wrapper cannot invoke receiver capture quiescence or host termination'
+  Assert-True ([bool](Assert-Phase7BStage0Snapshot @valid)) 'exact simplified snapshot passes'
 
-  $wrongAttempt = Invoke-Child -Arguments @('-AttemptId','phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','-ExpectedToolingCommit',('a'*40)) -TemporaryRoot $testRoot
-  Assert-True ($wrongAttempt.exitCode -ne 0 -and $wrongAttempt.text.Contains('PHASE7B_WP2B_ATTEMPT_OR_TOOLING_IDENTITY_MISMATCH')) 'substituted attempt fails before delivery'
-  $malformedCommit = Invoke-Child -Arguments @('-AttemptId',$attempt,'-ExpectedToolingCommit','wrong') -TemporaryRoot $testRoot
-  Assert-True ($malformedCommit.exitCode -ne 0) 'malformed commit fails parameter binding'
-  $collisionCommit = 'b' * 40
-  $collisionRoot = Join-Path $testRoot "phase7b-wp2b-$($collisionCommit.Substring(0,8))"
-  New-Item -ItemType Directory -Path $collisionRoot -ErrorAction Stop | Out-Null
-  $collision = Invoke-Child -Arguments @('-AttemptId',$attempt,'-ExpectedToolingCommit',$collisionCommit) -TemporaryRoot $testRoot
-  Assert-True ($collision.exitCode -ne 0 -and $collision.text.Contains('PHASE7B_WP2B_LAPTOP_TOOL_ROOT_PREEXISTS_STOP')) 'exact attempt reaches and fails closed on preexisting new TEMP root'
-  Assert-True (@(Get-ChildItem -LiteralPath $collisionRoot -Force).Count -eq 0) 'collision test performs no download or live execution'
+  $wrongAttempt = $valid.Clone(); $wrongAttempt.ObservedAttemptId = 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongAttempt } 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL' 'wrong attempt fails closed'
+  $wrongCommit = $valid.Clone(); $wrongCommit.ObservedToolingCommit = 'wrong'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongCommit } 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL' 'malformed tooling commit fails closed'
+  foreach ($nameField in @('EnvironmentMachineName', 'EnvironmentComputerName', 'CimComputerName')) {
+    $wrongName = $valid.Clone(); $wrongName[$nameField] = 'OTHER-HOST'
+    Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongName } 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL' "wrong hostname source fails:$nameField"
+  }
+  $wrongHost = $valid.Clone(); $wrongHost.HostIdentitySha256 = 'b' * 64
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'wrong host identity fails closed'
+  $wrongDisk = $valid.Clone(); $wrongDisk.DiskIdentitySha256 = 'c' * 64
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'wrong disk identity fails closed'
+  foreach ($storageCase in @(
+      @{ field = 'FileSystem'; value = 'ReFS' },
+      @{ field = 'DiskNumber'; value = 1 },
+      @{ field = 'BusType'; value = 'USB' })) {
+    $wrongStorage = $valid.Clone(); $wrongStorage[$storageCase.field] = $storageCase.value
+    Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongStorage } 'PHASE7B_WP2B_LAPTOP_STORAGE_CONTRACT_FAIL' "wrong storage invariant fails:$($storageCase.field)"
+  }
+  $lowCapacity = $valid.Clone(); $lowCapacity.FreeBytes = [int64](1GB - 1)
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @lowCapacity } 'PHASE7B_WP2B_LAPTOP_CAPACITY_FAIL' 'insufficient capacity fails closed'
+  $manyLan = $valid.Clone(); $manyLan.PrivateLanCandidateCount = 2
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @manyLan } 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_CARDINALITY_FAIL' 'many matching LAN addresses fail closed'
+  $wrongPrefix = $valid.Clone(); $wrongPrefix.ReplicaPrefixLength = 16
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongPrefix } 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_CARDINALITY_FAIL' 'wrong LAN prefix fails closed'
+  $wrongSubnet = $valid.Clone(); $wrongSubnet.ReplicaIpv4 = '192.168.2.68'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongSubnet } 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_SUBNET_FAIL' 'wrong LAN subnet fails closed'
+  $invalidIpv4 = $valid.Clone(); $invalidIpv4.ReplicaIpv4 = 'not-an-ip'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @invalidIpv4 } 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_IPV4_FAIL' 'invalid LAN address fails closed'
 
-  $bootstrapCommit = 'c' * 40
-  $bootstrap = Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `
+  $wrongAttemptChild = Invoke-Child -Arguments @('-AttemptId', 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '-ExpectedToolingCommit', ('a' * 40))
+  Assert-True ($wrongAttemptChild.exitCode -ne 0 -and $wrongAttemptChild.text.Contains('PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL')) 'wrong attempt stops before live host inspection'
+  $malformedCommitChild = Invoke-Child -Arguments @('-AttemptId', $attempt, '-ExpectedToolingCommit', 'wrong')
+  Assert-True ($malformedCommitChild.exitCode -ne 0) 'malformed commit fails parameter binding before live inspection'
+
+  $bootstrapCommit = 'd' * 40
+  $download = Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `
     -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 $hash1 -DeliveryRoot (Join-Path $testRoot 'delivery-pass')
-  Assert-True ($bootstrap.exitCode -ne 0 -and $bootstrap.text.Contains('PHASE7B_WP2B_LAPTOP_TOOL_ROOT_PREEXISTS_STOP')) 'PowerShell 5.1 bootstrap fixture downloads hashes and executes exact wrapper without live preflight'
-  $wrongHashStopped = $false
-  try {
-    [void](Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `
-      -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 ('d' * 64) -DeliveryRoot (Join-Path $testRoot 'delivery-wrong-hash'))
-  } catch { $wrongHashStopped = $_.Exception.Message -eq 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_EXPECTED_HASH_FAIL' }
-  Assert-True $wrongHashStopped 'bootstrap rejects wrong authorized wrapper hash before download or execution'
-  $wrongCommitStopped = $false
-  try {
-    [void](Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit ('e' * 40) `
-      -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 $hash1 -DeliveryRoot (Join-Path $testRoot 'delivery-wrong-commit'))
-  } catch { $wrongCommitStopped = $_.Exception.Message -eq 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_COMMIT_FAIL' }
-  Assert-True $wrongCommitStopped 'bootstrap rejects wrong commit before download or execution'
+  Assert-True ((Get-FileHash -Algorithm SHA256 -LiteralPath $download.artifactPath).Hash.ToLowerInvariant() -ceq $hash1 -and
+    -not $download.executionPerformed) 'synthetic bootstrap retrieves exact bytes without live execution'
+  Assert-ThrowsCode {
+    Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit ('e' * 40) `
+      -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 $hash1 -DeliveryRoot (Join-Path $testRoot 'delivery-wrong-commit')
+  } 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_COMMIT_FAIL' 'bootstrap rejects wrong commit'
+  Assert-ThrowsCode {
+    Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `
+      -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 ('f' * 64) -DeliveryRoot (Join-Path $testRoot 'delivery-wrong-hash')
+  } 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_EXPECTED_HASH_FAIL' 'bootstrap rejects wrong hash'
+  $collisionRoot = Join-Path $testRoot 'delivery-collision'
+  New-Item -ItemType Directory -Path $collisionRoot -ErrorAction Stop | Out-Null
+  Assert-ThrowsCode {
+    Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `
+      -ExpectedArtifactSha256 $hash1 -RequestedArtifactSha256 $hash1 -DeliveryRoot $collisionRoot
+  } 'PHASE7B_WP2B_STAGE0_BOOTSTRAP_DELIVERY_ROOT_PREEXISTS' 'bootstrap rejects preexisting delivery root'
 
   [ordered]@{
     classification = 'PHASE7B_WP2B_STAGE0_DELIVERY_TESTS_PASS'

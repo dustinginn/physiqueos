@@ -5,146 +5,211 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$authorizedAttemptId = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
-if ($AttemptId -cne $authorizedAttemptId -or $ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$') {
-  throw 'PHASE7B_WP2B_ATTEMPT_OR_TOOLING_IDENTITY_MISMATCH'
-}
-function Get-Phase7BStage0SafeValueShape {
-  [CmdletBinding()] param([Parameter(Mandatory = $true)][AllowNull()]$Value)
-  $values = @($Value)
-  $item = if ($values.Count -eq 1) { $values[0] } else { $null }
-  [pscustomobject][ordered]@{
-    cardinality = $values.Count
-    valuePresent = $null -ne $item
-    runtimeType = if ($null -ne $item) { $item.GetType().FullName } else { $null }
-    scalarString = $null -ne $item -and $item -is [string]
-    stringLength = if ($null -ne $item -and $item -is [string]) { ([string]$item).Length } else { $null }
-    rawValueProjected = $false
-    utf16CodePointsProjected = $false
+
+$acceptedAttemptId = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
+$acceptedComputerName = 'LAPTOP-4G5U0U2R'
+$acceptedHostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+$acceptedDiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+$acceptedFileSystem = 'NTFS'
+$acceptedDiskNumber = 0
+$acceptedBusType = 'SATA'
+$requiredFreeBytes = [int64]1GB
+$primaryIpv4 = '192.168.1.69'
+$requiredPrefixLength = 24
+
+function Get-Phase7BStage0Sha256 {
+  [CmdletBinding()] param([Parameter(Mandatory = $true)][string]$Text)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
   }
 }
-function Get-Phase7BStage0SafeIdentityResult {
+
+function Assert-Phase7BStage0Snapshot {
   [CmdletBinding()] param(
-    [Parameter(Mandatory = $true)][AllowNull()]$ObservedValue,
-    [Parameter(Mandatory = $true)][AllowNull()]$IdentityResult
+    [Parameter(Mandatory = $true)][string]$ObservedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ObservedToolingCommit,
+    [Parameter(Mandatory = $true)][string]$EnvironmentMachineName,
+    [Parameter(Mandatory = $true)][string]$EnvironmentComputerName,
+    [Parameter(Mandatory = $true)][string]$CimComputerName,
+    [Parameter(Mandatory = $true)][string]$HostIdentitySha256,
+    [Parameter(Mandatory = $true)][string]$DiskIdentitySha256,
+    [Parameter(Mandatory = $true)][string]$FileSystem,
+    [Parameter(Mandatory = $true)][int]$DiskNumber,
+    [Parameter(Mandatory = $true)][string]$BusType,
+    [Parameter(Mandatory = $true)][int64]$FreeBytes,
+    [Parameter(Mandatory = $true)][int]$PrivateLanCandidateCount,
+    [Parameter(Mandatory = $true)][string]$ReplicaIpv4,
+    [Parameter(Mandatory = $true)][int]$ReplicaPrefixLength
   )
-  $results = @($IdentityResult)
-  $result = if ($results.Count -eq 1) { $results[0] } else { $null }
-  [pscustomobject][ordered]@{
-    observed = Get-Phase7BStage0SafeValueShape -Value $ObservedValue
-    resultCardinality = $results.Count
-    resultType = if ($null -ne $result) { $result.GetType().FullName } else { $null }
-    passRuntimeType = if ($null -ne $result -and $null -ne $result.pass) { $result.pass.GetType().FullName } else { $null }
-    pass = $results.Count -eq 1 -and $null -ne $result -and [bool]$result.pass
-    canonicalizationClassification = if ($null -ne $result) { [string]$result.classification } else { 'PHASE7B_WP2_COMPUTER_IDENTITY_RESULT_SHAPE_FAIL' }
-    canonicalResultPresent = $null -ne $result -and $null -ne $result.canonicalComputerName
+  if ($ObservedAttemptId -cne 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd') {
+    throw 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL'
   }
-}
-$toolRoot = Join-Path $env:TEMP "phase7b-wp2b-$($ExpectedToolingCommit.Substring(0, 8))"
-$expected = [ordered]@{
-  'phase7bPreflightBoundedReplicaDestination.ps1' = '9f2079409ba18b9321e6d09575ab92b1598d07dd1c07790de5a9cce53eb2e7a4'
-  'phase7bOpenBoundedReplicaReceiver.ps1' = 'ee25fc64fcaed1116e4b2a1d265854ee39cb0ec3c69d765a1b213cd3dbb8c4d8'
-  'phase7bVerifyAndCloseBoundedReplicaReceiver.ps1' = '7cd70d1853600ef2aaaa00f6586d20bf588dcd662935cd1491ccbdbf1395ac8a'
-  'phase7bBoundedReplicaTransport.psm1' = '99b12c2ca2935ca0fa05e38cd16334a58899b677004ff96cdd493b631cbbc32f'
-  'phase7bWorkPackage2Contract.psm1' = '1349b85ed6349556338937de3de04c16d87399357117aa7d728470911cbd0e45'
-  'phase7bIsolatedGuestContract.psm1' = '56c91d1fc3dc2248c0144f436ef1cd10627f4546323ad566a76ddda1e3fe1e1d'
-  'phase7bSecondComputerReplicaContract.psm1' = 'e1f4e0c059ea3dcd961a0c26619d27ab7e712f759d0dd0dfdad13f8fa2c8010c'
-}
-if (Test-Path -LiteralPath $toolRoot) { throw 'PHASE7B_WP2B_LAPTOP_TOOL_ROOT_PREEXISTS_STOP' }
-New-Item -ItemType Directory -Path $toolRoot -ErrorAction Stop | Out-Null
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-foreach ($name in $expected.Keys) {
-  $uri = "https://raw.githubusercontent.com/dustinginn/physiqueos/$ExpectedToolingCommit/scripts/$name"
-  $path = Join-Path $toolRoot $name
-  Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $path -ErrorAction Stop
-  if ((Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -cne $expected[$name]) {
-    throw "PHASE7B_WP2B_LAPTOP_TOOL_HASH_FAIL:$name"
+  if ($ObservedToolingCommit -cnotmatch '^[0-9a-f]{40}$') {
+    throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL'
   }
+  if ($EnvironmentMachineName -cne 'LAPTOP-4G5U0U2R' -or
+      $EnvironmentComputerName -cne 'LAPTOP-4G5U0U2R' -or
+      $CimComputerName -cne 'LAPTOP-4G5U0U2R') {
+    throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
+  }
+  if ($HostIdentitySha256 -cne 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c') {
+    throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL'
+  }
+  if ($DiskIdentitySha256 -cne '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896') {
+    throw 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL'
+  }
+  if ($FileSystem -cne 'NTFS' -or $DiskNumber -ne 0 -or $BusType -cne 'SATA') {
+    throw 'PHASE7B_WP2B_LAPTOP_STORAGE_CONTRACT_FAIL'
+  }
+  if ($FreeBytes -lt [int64]1GB) {
+    throw 'PHASE7B_WP2B_LAPTOP_CAPACITY_FAIL'
+  }
+  if ($PrivateLanCandidateCount -ne 1 -or $ReplicaPrefixLength -ne 24) {
+    throw 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_CARDINALITY_FAIL'
+  }
+  $replicaAddress = [ipaddress]::None
+  if (-not [ipaddress]::TryParse($ReplicaIpv4, [ref]$replicaAddress) -or
+      $replicaAddress.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) {
+    throw 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_IPV4_FAIL'
+  }
+  $primaryBytes = ([ipaddress]'192.168.1.69').GetAddressBytes()
+  $replicaBytes = $replicaAddress.GetAddressBytes()
+  if ($primaryBytes[0] -ne $replicaBytes[0] -or
+      $primaryBytes[1] -ne $replicaBytes[1] -or
+      $primaryBytes[2] -ne $replicaBytes[2]) {
+    throw 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_SUBNET_FAIL'
+  }
+  $true
 }
-if (@(Get-ChildItem -LiteralPath $toolRoot -File -Force).Count -ne $expected.Count) {
-  throw 'PHASE7B_WP2B_LAPTOP_TOOL_CARDINALITY_FAIL'
-}
-$boundedModule = Join-Path $toolRoot 'phase7bBoundedReplicaTransport.psm1'
-Import-Module $boundedModule -Force -ErrorAction Stop
-$contractValues = @(phase7bBoundedReplicaTransport\Get-Phase7BBoundedReplicaTransportContract)
-$contract = if ($contractValues.Count -eq 1) { $contractValues[0] } else { $null }
-$expectedNameValues = if ($null -ne $contract) { @($contract.acceptedComputerName) } else { @() }
-$expectedName = if ($expectedNameValues.Count -eq 1) { $expectedNameValues[0] } else { $expectedNameValues }
-$environmentMachineName = [Environment]::MachineName
-$environmentComputerName = $env:COMPUTERNAME
-$computerSystems = @(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop)
-$cimName = if ($computerSystems.Count -eq 1) { $computerSystems[0].Name } else { @($computerSystems | ForEach-Object { $_.Name }) }
-$machineResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentMachineName -ExpectedComputerName $expectedName)
-$environmentResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentComputerName -ExpectedComputerName $expectedName)
-$cimResults = @(phase7bBoundedReplicaTransport\Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $cimName -ExpectedComputerName $expectedName)
-$hostNameEvidence = [pscustomobject][ordered]@{
-  classification = 'PHASE7B_WP2B_STAGE0_SAFE_HOSTNAME_REPRESENTATION'
-  expected = Get-Phase7BStage0SafeValueShape -Value $expectedNameValues
-  contractCardinality = $contractValues.Count
-  contractType = if ($null -ne $contract) { $contract.GetType().FullName } else { $null }
-  environmentMachineName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $environmentMachineName -IdentityResult $machineResults
-  environmentComputerName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $environmentComputerName -IdentityResult $environmentResults
-  win32ComputerSystemObjectCount = $computerSystems.Count
-  win32ComputerSystemName = Get-Phase7BStage0SafeIdentityResult -ObservedValue $cimName -IdentityResult $cimResults
-  allIdentityChecksPass = $contractValues.Count -eq 1 -and $expectedNameValues.Count -eq 1 -and
-    $machineResults.Count -eq 1 -and [bool]$machineResults[0].pass -and
-    $environmentResults.Count -eq 1 -and [bool]$environmentResults[0].pass -and
-    $computerSystems.Count -eq 1 -and $cimResults.Count -eq 1 -and [bool]$cimResults[0].pass
-  rawNamesProjected = $false
-  rawHardwareIdentifiersProjected = $false
-  mutationPerformed = $false
-  reportPersisted = $false
-}
-if (-not [bool]$hostNameEvidence.allIdentityChecksPass) {
+
+$stage = 'validate-operation-identity'
+try {
+  if ($AttemptId -cne $acceptedAttemptId) { throw 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL' }
+  if ($ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL' }
+
+  $stage = 'validate-host-identity'
+  $environmentMachineName = [string][Environment]::MachineName
+  $environmentComputerName = [string]$env:COMPUTERNAME
+  $computerSystems = @(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop)
+  if ($computerSystems.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_COMPUTER_SYSTEM_CARDINALITY_FAIL' }
+  $cimComputerName = [string]$computerSystems[0].Name
+  if ($environmentMachineName -cne $acceptedComputerName -or
+      $environmentComputerName -cne $acceptedComputerName -or
+      $cimComputerName -cne $acceptedComputerName) {
+    throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
+  }
+  $products = @(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop)
+  if ($products.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_PRODUCT_CARDINALITY_FAIL' }
+  $machineGuid = [string](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid
+  if ([string]::IsNullOrWhiteSpace($machineGuid)) { throw 'PHASE7B_WP2B_LAPTOP_MACHINE_GUID_FAIL' }
+  $hostIdentitySha256 = Get-Phase7BStage0Sha256 -Text ($acceptedComputerName.ToLowerInvariant() + '|' +
+    ([string]$products[0].UUID).ToLowerInvariant() + '|' + $machineGuid.ToLowerInvariant())
+  if ($hostIdentitySha256 -cne $acceptedHostIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' }
+
+  $stage = 'validate-storage-identity'
+  $volumes = @(Get-Volume -DriveLetter D -ErrorAction Stop)
+  $partitions = @(Get-Partition -DriveLetter D -ErrorAction Stop)
+  if ($volumes.Count -ne 1 -or $partitions.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_STORAGE_CARDINALITY_FAIL' }
+  $disks = @($partitions | Get-Disk -ErrorAction Stop)
+  if ($disks.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_DISK_CARDINALITY_FAIL' }
+  $volume = $volumes[0]
+  $disk = $disks[0]
+  $fileSystem = [string]$volume.FileSystemType
+  $diskNumber = [int]$disk.Number
+  $busType = [string]$disk.BusType
+  $freeBytes = [int64]$volume.SizeRemaining
+  $diskIdentitySha256 = Get-Phase7BStage0Sha256 -Text ($acceptedComputerName.ToLowerInvariant() + '|' +
+    [string]$diskNumber + '|' + ([string]$disk.UniqueId).ToLowerInvariant() + '|' +
+    ([string]$disk.SerialNumber).ToLowerInvariant() + '|' + ([string]$disk.FriendlyName).ToLowerInvariant() + '|' +
+    [string]$disk.Size + '|' + $busType.ToLowerInvariant())
+  if ($diskIdentitySha256 -cne $acceptedDiskIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' }
+  if ($fileSystem -cne $acceptedFileSystem -or $diskNumber -ne $acceptedDiskNumber -or $busType -cne $acceptedBusType) {
+    throw 'PHASE7B_WP2B_LAPTOP_STORAGE_CONTRACT_FAIL'
+  }
+  if ($freeBytes -lt $requiredFreeBytes) { throw 'PHASE7B_WP2B_LAPTOP_CAPACITY_FAIL' }
+
+  $stage = 'validate-private-lan-binding'
+  $privateInterfaceIndices = @(Get-NetConnectionProfile -ErrorAction Stop |
+    Where-Object { [string]$_.NetworkCategory -ceq 'Private' } |
+    Select-Object -ExpandProperty InterfaceIndex -Unique)
+  $lanCandidates = @(
+    foreach ($interfaceIndex in $privateInterfaceIndices) {
+      foreach ($address in @(Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -AddressState Preferred -ErrorAction SilentlyContinue)) {
+        $candidateIpv4 = [string]$address.IPAddress
+        $candidatePrefixLength = [int]$address.PrefixLength
+        $candidateAddress = [ipaddress]::None
+        if ($candidatePrefixLength -eq $requiredPrefixLength -and
+            $candidateIpv4 -notlike '169.254.*' -and
+            [ipaddress]::TryParse($candidateIpv4, [ref]$candidateAddress) -and
+            $candidateAddress.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork) {
+          $primaryBytes = ([ipaddress]$primaryIpv4).GetAddressBytes()
+          $candidateBytes = $candidateAddress.GetAddressBytes()
+          if ($primaryBytes[0] -eq $candidateBytes[0] -and
+              $primaryBytes[1] -eq $candidateBytes[1] -and
+              $primaryBytes[2] -eq $candidateBytes[2]) {
+            $address
+          }
+        }
+      }
+    }
+  )
+  if ($lanCandidates.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_CARDINALITY_FAIL' }
+  $replicaIpv4 = [string]$lanCandidates[0].IPAddress
+  $replicaPrefixLength = [int]$lanCandidates[0].PrefixLength
+
+  [void](Assert-Phase7BStage0Snapshot -ObservedAttemptId $AttemptId -ObservedToolingCommit $ExpectedToolingCommit `
+    -EnvironmentMachineName $environmentMachineName -EnvironmentComputerName $environmentComputerName `
+    -CimComputerName $cimComputerName -HostIdentitySha256 $hostIdentitySha256 `
+    -DiskIdentitySha256 $diskIdentitySha256 -FileSystem $fileSystem -DiskNumber $diskNumber -BusType $busType `
+    -FreeBytes $freeBytes -PrivateLanCandidateCount $lanCandidates.Count -ReplicaIpv4 $replicaIpv4 `
+    -ReplicaPrefixLength $replicaPrefixLength)
+
   [ordered]@{
-    classification = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_FAIL'
-    pass = $false
-    safeStage = 'validate-host-identity-representation'
-    safeErrorCode = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
-    hostnameEvidence = $hostNameEvidence
+    classification = 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_PASS'
+    pass = $true
+    attemptId = $AttemptId
+    toolingCommit = $ExpectedToolingCommit
+    computerName = $acceptedComputerName
+    hostIdentitySha256 = $hostIdentitySha256
+    diskIdentitySha256 = $diskIdentitySha256
+    driveRoot = 'D:\'
+    fileSystem = $fileSystem
+    diskNumber = $diskNumber
+    busType = $busType
+    freeBytes = $freeBytes
+    requiredFreeBytes = $requiredFreeBytes
+    networkCategory = 'Private'
+    replicaIpv4 = $replicaIpv4
+    replicaPrefixLength = $replicaPrefixLength
+    primaryIpv4 = $primaryIpv4
+    primaryPrefixLength = $requiredPrefixLength
     mutationPerformed = $false
     reportPersisted = $false
     receiverOpened = $false
     automaticRetryAllowed = $false
-  } | ConvertTo-Json -Depth 8
-  throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_FAIL'
-}
-$powershell51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not (Test-Path -LiteralPath $powershell51 -PathType Leaf)) { throw 'PHASE7B_WP2B_LAPTOP_POWERSHELL51_MISSING' }
-$preflight = Join-Path $toolRoot 'phase7bPreflightBoundedReplicaDestination.ps1'
-$output = @(& $powershell51 -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $preflight `
-  -AttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit -PrimaryHostIpv4 '192.168.1.69' -PrimaryPrefixLength 24 `
-  -RequiredCapacityBytes ([int64]1GB) 2>&1)
-$exitCode = $LASTEXITCODE
-$text = $output -join [Environment]::NewLine
-try { $result = $text | ConvertFrom-Json -ErrorAction Stop } catch {
-  Write-Host $text
-  throw 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_JSON_FAIL'
-}
-if ($exitCode -ne 0 -or -not [bool]$result.pass -or
-    [string]$result.classification -cne 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_PASS' -or
-    [string]$result.attemptId -cne $AttemptId -or [string]$result.toolingCommit -cne $ExpectedToolingCommit -or
-    [string]$result.computerName -cne 'LAPTOP-4G5U0U2R' -or
-    [string]$result.hostIdentitySha256 -cne 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c' -or
-    [string]$result.diskIdentitySha256 -cne '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896' -or
-    [string]$result.fileSystem -cne 'NTFS' -or [int]$result.diskNumber -ne 0 -or [string]$result.busType -cne 'SATA' -or
-    [string]$result.primaryIpv4 -cne '192.168.1.69' -or [int]$result.primaryPrefixLength -ne 24 -or
-    [int]$result.replicaPrefixLength -ne 24 -or -not [bool]$result.allComputerNameSourcesCanonicalAndExact -or
-    [bool]$result.rawHardwareIdentifiersProjected -or [bool]$result.mutationPerformed -or [bool]$result.reportPersisted -or
-    [bool]$result.receiverOpened -or [bool]$result.automaticRetryAllowed) {
-  Write-Host $text
-  if ([string]$result.safeErrorCode -ceq 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL') {
-    [ordered]@{
-      classification = 'PHASE7B_WP2B_LAPTOP_HOST_NAME_REPRESENTATION_CORRELATION'
-      pass = $false
-      sourcePreflightFailedAfterWrapperIdentityPass = [bool]$hostNameEvidence.allIdentityChecksPass
-      hostnameEvidence = $hostNameEvidence
-      mutationPerformed = $false
-      reportPersisted = $false
-      receiverOpened = $false
-      automaticRetryAllowed = $false
-    } | ConvertTo-Json -Depth 8 | Write-Host
+    wp2cAuthorized = $false
+  } | ConvertTo-Json -Compress
+} catch {
+  $safeErrorCode = if ($_.Exception.Message -match '^PHASE7B_') {
+    $_.Exception.Message
+  } else {
+    'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_EXCEPTION'
   }
-  throw 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_ACCEPTANCE_FAIL'
+  [ordered]@{
+    classification = 'PHASE7B_WP2B_LAPTOP_READONLY_PREFLIGHT_FAIL'
+    pass = $false
+    attemptId = $AttemptId
+    toolingCommit = $ExpectedToolingCommit
+    safeStage = $stage
+    safeErrorCode = $safeErrorCode
+    mutationPerformed = $false
+    reportPersisted = $false
+    receiverOpened = $false
+    automaticRetryAllowed = $false
+    wp2cAuthorized = $false
+  } | ConvertTo-Json -Compress
+  exit 1
 }
-Write-Output $text
