@@ -22,7 +22,11 @@ try {
       $RequiredCapacityBytes -le 0 -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_EPHEMERAL_REPLICA_OPEN_EXACTLY_ONCE') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_ARGUMENT_OR_AUTHORIZATION_FAIL' }
   $primary = [ipaddress]::None
   if (-not [ipaddress]::TryParse($PrimaryHostIpv4, [ref]$primary) -or $primary.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_PRIMARY_IPV4_INVALID' }
-  if ([Environment]::MachineName -ne $contract.acceptedComputerName) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_HOST_IDENTITY_FAIL' }
+  $machineIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName ([Environment]::MachineName) -ExpectedComputerName $contract.acceptedComputerName
+  $environmentIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $env:COMPUTERNAME -ExpectedComputerName $contract.acceptedComputerName
+  $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+  $cimIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $computerSystem.Name -ExpectedComputerName $contract.acceptedComputerName
+  if (-not $machineIdentity.pass -or -not $environmentIdentity.pass -or -not $cimIdentity.pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_HOST_IDENTITY_FAIL' }
   $stage = 'validate-laptop-storage'
   $product = Get-CimInstance Win32_ComputerSystemProduct
   $machineGuid = [string](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid).MachineGuid
@@ -32,7 +36,7 @@ try {
   if ($partitions.Count -ne 1 -or $disks.Count -ne 1) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DISK_CARDINALITY_FAIL' }
   $disk = $disks[0]
   $diskSha = Get-Phase7BSha256 -Text ($contract.acceptedComputerName.ToLowerInvariant() + '|' + [string]$disk.Number + '|' + ([string]$disk.UniqueId).ToLowerInvariant() + '|' + ([string]$disk.SerialNumber).ToLowerInvariant() + '|' + ([string]$disk.FriendlyName).ToLowerInvariant() + '|' + [string]$disk.Size + '|' + ([string]$disk.BusType).ToLowerInvariant())
-  $evidence = [pscustomobject]@{ computerName = $env:COMPUTERNAME; hostIdentitySha256 = $hostSha; diskIdentitySha256 = $diskSha; driveRoot = 'D:\'; fileSystem = [string]$volume.FileSystemType; diskNumber = [int]$disk.Number; busType = [string]$disk.BusType; physicallyIndependent = $true; freeBytes = [int64]$volume.SizeRemaining; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false }
+  $evidence = [pscustomobject]@{ computerName = $machineIdentity.canonicalComputerName; hostIdentitySha256 = $hostSha; diskIdentitySha256 = $diskSha; driveRoot = 'D:\'; fileSystem = [string]$volume.FileSystemType; diskNumber = [int]$disk.Number; busType = [string]$disk.BusType; physicallyIndependent = $true; freeBytes = [int64]$volume.SizeRemaining; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false }
   if (-not (Test-Phase7BBoundedReplicaDestinationEvidence -Evidence $evidence -RequiredBytes $RequiredCapacityBytes).pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_FAIL' }
   $stage = 'create-ephemeral-receiver'
   $root = "D:\Phase7B\wp2-replica\$AttemptId"; $shareName = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"; $ruleName = "Phase7B-$($AttemptId.Substring($AttemptId.Length - 8))-ephemeral-smb"

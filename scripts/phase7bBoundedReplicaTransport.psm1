@@ -27,6 +27,51 @@ function Get-Phase7BBoundedReplicaTransportContract {
   }
 }
 
+function ConvertTo-Phase7BCanonicalComputerName {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()]$Value
+  )
+  $values = @($Value)
+  if ($values.Count -ne 1 -or $null -eq $values[0] -or $values[0] -isnot [string]) {
+    throw 'PHASE7B_WP2_COMPUTER_NAME_SHAPE_INVALID'
+  }
+  $name = [string]$values[0]
+  if ([string]::IsNullOrWhiteSpace($name) -or $name -cne $name.Trim() -or
+      $name -match '[\x00-\x1f\x7f]' -or $name -notmatch '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,13}[A-Za-z0-9])?$') {
+    throw 'PHASE7B_WP2_COMPUTER_NAME_FORMAT_INVALID'
+  }
+  $name.ToUpperInvariant()
+}
+
+function Test-Phase7BBoundedReplicaComputerIdentity {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()]$ObservedComputerName,
+    [Parameter(Mandatory = $true)][AllowNull()]$ExpectedComputerName
+  )
+  try {
+    $observed = ConvertTo-Phase7BCanonicalComputerName -Value $ObservedComputerName
+    $expected = ConvertTo-Phase7BCanonicalComputerName -Value $ExpectedComputerName
+    $pass = [StringComparer]::Ordinal.Equals($observed, $expected)
+    [pscustomobject][ordered]@{
+      pass = [bool]$pass
+      classification = if ($pass) { 'PHASE7B_WP2_COMPUTER_IDENTITY_PASS' } else { 'PHASE7B_WP2_COMPUTER_IDENTITY_FAIL' }
+      canonicalComputerName = if ($pass) { $expected } else { $null }
+      inputCardinalityValid = $true
+      scalarStringValid = $true
+      canonicalFormatValid = $true
+    }
+  } catch {
+    [pscustomobject][ordered]@{
+      pass = $false
+      classification = 'PHASE7B_WP2_COMPUTER_IDENTITY_FAIL'
+      canonicalComputerName = $null
+      inputCardinalityValid = $_.Exception.Message -ne 'PHASE7B_WP2_COMPUTER_NAME_SHAPE_INVALID'
+      scalarStringValid = $false
+      canonicalFormatValid = $false
+    }
+  }
+}
+
 function Get-Phase7BBoundedReplicaAttemptRoot {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][string]$AttemptId,
@@ -102,7 +147,8 @@ function Test-Phase7BBoundedEncryptedReplicaSource {
 function Test-Phase7BBoundedReplicaDestinationEvidence {
   [CmdletBinding()] param([Parameter(Mandatory = $true)]$Evidence, [Parameter(Mandatory = $true)][int64]$RequiredBytes)
   $contract = Get-Phase7BBoundedReplicaTransportContract
-  $pass = [string]$Evidence.computerName -eq $contract.acceptedComputerName -and
+  $computerIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $Evidence.computerName -ExpectedComputerName $contract.acceptedComputerName
+  $pass = $computerIdentity.pass -and
     [string]$Evidence.hostIdentitySha256 -eq $contract.acceptedHostIdentitySha256 -and
     [string]$Evidence.diskIdentitySha256 -eq $contract.acceptedDiskIdentitySha256 -and
     [string]$Evidence.driveRoot -eq $contract.acceptedDriveRoot -and
@@ -193,6 +239,8 @@ function Test-Phase7BPrimaryReplicaSessionTeardownEvidence {
 
 Export-ModuleMember -Function @(
   'Get-Phase7BBoundedReplicaTransportContract',
+  'ConvertTo-Phase7BCanonicalComputerName',
+  'Test-Phase7BBoundedReplicaComputerIdentity',
   'Get-Phase7BBoundedReplicaAttemptRoot',
   'Get-Phase7BReplicaDirectoryIdentity',
   'Write-Phase7BSafeEvidenceFile',

@@ -12,6 +12,23 @@ function New-Evidence {
 }
 try {
   New-Item -ItemType Directory -Path $root | Out-Null
+  $acceptedName = 'LAPTOP-4G5U0U2R'
+  Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value $acceptedName) -ceq $acceptedName) 'accepted scalar computer name canonicalized'
+  Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value 'laptop-4g5u0u2r') -ceq $acceptedName) 'computer name uses ordinal case-insensitive canonical identity'
+  Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value (, $acceptedName)) -ceq $acceptedName) 'one-element string collection canonicalized'
+  Assert-True (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $acceptedName -ExpectedComputerName $acceptedName).pass 'current accepted laptop name passes canonical identity'
+  Assert-True (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName 'laptop-4g5u0u2r' -ExpectedComputerName $acceptedName).pass 'case-only Windows hostname representation accepted'
+  foreach ($invalidName in @(
+      $null, '', ' ',
+      ' LAPTOP-4G5U0U2R', 'LAPTOP-4G5U0U2R ', "LAPTOP-4G5U0U2R`0", "LAPTOP-4G5U0U2R`n", 'WRONG_HOST'
+    )) {
+    Assert-True (-not (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $invalidName -ExpectedComputerName $acceptedName).pass) 'invalid, malformed, or wrong computer name rejected'
+  }
+  Assert-True (-not (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName @($acceptedName, $acceptedName) -ExpectedComputerName $acceptedName).pass) 'multi-value computer name identity fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value $null } 'SHAPE_INVALID' 'null computer name fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value @('A', 'B') } 'SHAPE_INVALID' 'multi-value computer name fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value ' LAPTOP-4G5U0U2R' } 'FORMAT_INVALID' 'leading whitespace fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value "LAPTOP-4G5U0U2R`0" } 'FORMAT_INVALID' 'embedded null fails closed'
   $packet = Join-Path $root 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip.age'
   [IO.File]::WriteAllBytes($packet, [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`nsynthetic-ciphertext"))
   $sha = Get-Phase7BSha256 -LiteralPath $packet; $bytes = [int64](Get-Item $packet).Length
@@ -76,11 +93,16 @@ try {
   $wrongTeardownName = $primary.PSObject.Copy(); $wrongTeardownName.evidenceFileName = 'wrong.json'
   Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $wrongTeardownName -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) 'primary teardown path identity mismatch rejected'
 
-  $paths = @('phase7bBoundedReplicaTransport.psm1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
+  $paths = @('phase7bBoundedReplicaTransport.psm1','phase7bPreflightBoundedReplicaDestination.ps1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
   foreach ($path in $paths) { $tokens = $null; $errors = $null; [void][Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors); Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST:$(Split-Path -Leaf $path)" }
   $operational = @($paths | Where-Object { $_ -notmatch '\.test\.ps1$' } | ForEach-Object { Get-Content -Raw $_ }) -join "`n"
   Assert-True (-not ($operational -match '(?i)cmdkey(?:\.exe)?["'']?\s+(?:/add|/delete)|savecredentials|New-LocalUser|ConvertFrom-SecureString|Export-Clixml')) 'no persistent credential or dedicated account path'
   Assert-True (-not ($operational -match '(?i)Copy-Item.+runtime-store|Copy-Item.+canonical')) 'no raw production copy path'
+  $preflightSource = Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bPreflightBoundedReplicaDestination.ps1')
+  Assert-True (-not ($preflightSource -match '(?i)New-Item|Remove-Item|Set-Item|Set-Content|Add-Content|Out-File|Export-Clixml|New-SmbShare|New-NetFirewallRule|Invoke-WebRequest|Invoke-RestMethod')) 'laptop preflight remains read-only'
+  Assert-True ($preflightSource.Contains('contractObjectCount') -and $preflightSource.Contains('acceptedComputerNameValueType') -and $preflightSource.Contains('allComputerNameSourcesCanonicalAndExact')) 'laptop preflight projects safe representation evidence'
+  Assert-True (-not ($operational.Contains('[Environment]::MachineName -ne $contract.acceptedComputerName'))) 'fragile direct hostname comparison removed from source-owned lifecycle'
+  Assert-True (@($operational -split 'Test-Phase7BBoundedReplicaComputerIdentity').Count -ge 8) 'preflight, receiver open, verification, and destination evidence share canonical identity contract'
   Assert-True ($operational.Contains('automaticRetryAllowed = $false')) 'automatic retry disabled'
   Assert-True ($operational.Contains('Remove-SmbShare') -and $operational.Contains('Remove-NetFirewallRule')) 'ephemeral session teardown source-owned'
   Assert-True ($operational.Contains('RequiredCapacityBytes') -and -not (Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bOpenBoundedReplicaReceiver.ps1')).Contains('ExpectedPacketBytes')) 'receiver capacity does not claim pre-encryption ciphertext size'
