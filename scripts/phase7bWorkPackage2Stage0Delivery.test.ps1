@@ -88,9 +88,10 @@ try {
   Assert-True (-not $source.Contains('Get-Phase7BStage0SafeIdentityResult') -and
     -not $source.Contains('Get-Phase7BStage0SafeValueShape') -and
     -not $source.Contains('hostnameEvidence')) 'nested hostname evidence layer removed'
-  Assert-True ($source.Contains('[Environment]::MachineName') -and
+  Assert-True (-not $source.Contains('[Environment]::MachineName') -and
     -not $source.Contains('$env:COMPUTERNAME') -and
-    -not $source.Contains('Get-CimInstance Win32_ComputerSystem -')) 'one canonical .NET machine-name source only'
+    -not $source.Contains('Get-CimInstance Win32_ComputerSystem -') -and
+    -not $source.Contains('PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL')) 'standalone runtime hostname gate removed'
   Assert-True (-not ($source -match '\$result\.(pass|classification|canonicalComputerName)')) 'optional result-property dereferences removed'
   Assert-True (-not ($source -match '(?i)Invoke-WebRequest|Import-Module|phase7bPreflightBoundedReplicaDestination')) 'standalone wrapper has no downloaded dependency chain'
   Assert-True (-not ($source -match '(?i)-Operation\s+OpenEphemeralReceiver|New-SmbShare|New-NetFirewallRule|CaptureEncryptReplicate|SetWorkPackage2CaptureQuiescence|Start-Process|Stop-Process')) 'wrapper cannot mutate receiver capture quiescence or processes'
@@ -103,7 +104,6 @@ try {
   $valid = @{
     ObservedAttemptId = $attempt
     ObservedToolingCommit = 'a' * 40
-    CanonicalComputerName = 'LAPTOP-4G5U0U2R'
     HostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
     DiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
     FileSystem = 'NTFS'
@@ -114,18 +114,16 @@ try {
     ReplicaIpv4 = '192.168.1.68'
     ReplicaPrefixLength = 24
   }
-  Assert-True ([bool](Assert-Phase7BStage0Snapshot @valid)) 'exact simplified snapshot passes'
+  Assert-True ([bool](Assert-Phase7BStage0Snapshot @valid)) 'exact accepted host and disk identities pass without runtime hostname equality'
 
   $wrongAttempt = $valid.Clone(); $wrongAttempt.ObservedAttemptId = 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongAttempt } 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL' 'wrong attempt fails closed'
   $wrongCommit = $valid.Clone(); $wrongCommit.ObservedToolingCommit = 'wrong'
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongCommit } 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL' 'malformed tooling commit fails closed'
-  $wrongName = $valid.Clone(); $wrongName.CanonicalComputerName = 'OTHER-HOST'
-  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongName } 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL' 'wrong canonical hostname fails closed'
   $wrongHost = $valid.Clone(); $wrongHost.HostIdentitySha256 = 'b' * 64
-  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'wrong host identity fails closed'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'wrong host with correct disk fails closed'
   $wrongDisk = $valid.Clone(); $wrongDisk.DiskIdentitySha256 = 'c' * 64
-  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'wrong disk identity fails closed'
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'correct host with wrong disk fails closed'
   foreach ($storageCase in @(
       @{ field = 'FileSystem'; value = 'ReFS' },
       @{ field = 'DiskNumber'; value = 1 },
