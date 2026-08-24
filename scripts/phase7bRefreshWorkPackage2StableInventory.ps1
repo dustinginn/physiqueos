@@ -7,6 +7,9 @@ param(
   [Parameter(Mandatory = $true)][string]$OutputDirectory,
   [Parameter(Mandatory = $true)][string]$QuiescenceEvidencePath,
   [Parameter(Mandatory = $true)][string]$ExpectedQuiescenceEvidenceSha256,
+  [Parameter()][string]$ExpectedQuiescenceEvidenceToolingCommit,
+  [Parameter()][ValidateSet('FRESH_ESTABLISH','EXACT_EXISTING_QUIESCENCE_RESUME')][string]$QuiescenceMode = 'FRESH_ESTABLISH',
+  [Parameter()][string]$QuiescenceResumeAuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement
 )
 $ErrorActionPreference = 'Stop'
@@ -43,15 +46,22 @@ function Get-Selection([string]$Root) {
   [pscustomobject]@{definitions=$definitions;entries=@($entries)}
 }
 try {
+  if($QuiescenceMode -ceq 'FRESH_ESTABLISH'){
+    if([string]::IsNullOrWhiteSpace($ExpectedQuiescenceEvidenceToolingCommit)){$ExpectedQuiescenceEvidenceToolingCommit=$ExpectedToolingCommit}
+    if($ExpectedQuiescenceEvidenceToolingCommit -cne $ExpectedToolingCommit -or -not [string]::IsNullOrEmpty($QuiescenceResumeAuthorizationAcknowledgement)){throw 'PHASE7B_WP2B_STABLE_REFRESH_FRESH_QUIESCENCE_BINDING_FAIL'}
+  }elseif([string]::IsNullOrWhiteSpace($ExpectedQuiescenceEvidenceToolingCommit) -or
+    $QuiescenceResumeAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_QUIESCENCE_READ_ONLY'){
+    throw 'PHASE7B_WP2B_STABLE_REFRESH_RESUME_AUTHORIZATION_FAIL'
+  }
   if($ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $RefreshNonce -cnotmatch '^[0-9a-f]{32}$' -or $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or $ExpectedQuiescenceEvidenceSha256 -notmatch '^[0-9a-f]{64}$' -or
-     $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_REFRESH_STABLE_INVENTORY_EXACTLY_ONCE'){throw 'PHASE7B_WP2B_STABLE_REFRESH_ARGUMENT_FAIL'}
+     $ExpectedQuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_REFRESH_STABLE_INVENTORY_EXACTLY_ONCE'){throw 'PHASE7B_WP2B_STABLE_REFRESH_ARGUMENT_FAIL'}
   $attempt=Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $ExpectedAttemptId -ObservedAttemptId $ExpectedAttemptId
   $repositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path.TrimEnd('\');$source=(Resolve-Path $SourceRoot).Path.TrimEnd('\')
   $head=(& git -C $repositoryRoot rev-parse HEAD).Trim().ToLowerInvariant();$branch=(& git -C $repositoryRoot branch --show-current).Trim();$delta=(& git -C $repositoryRoot rev-list --left-right --count 'HEAD...origin/combined-app-platform-cutover').Trim();$dirty=@(& git -C $repositoryRoot status --short --untracked-files=no)
   if($head -ne $ExpectedToolingCommit -or $branch -ne 'combined-app-platform-cutover' -or $delta -ne "0`t0" -or $dirty.Count -ne 0){throw 'PHASE7B_WP2B_STABLE_REFRESH_REPOSITORY_FAIL'}
   if(-not(Test-Path $QuiescenceEvidencePath -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $QuiescenceEvidencePath) -ne $ExpectedQuiescenceEvidenceSha256){throw 'PHASE7B_WP2B_STABLE_REFRESH_QUIESCENCE_HASH_FAIL'}
   $quiescence=Get-Content $QuiescenceEvidencePath -Raw|ConvertFrom-Json
-  if(-not(Test-Phase7BWorkPackage2QuiescenceEvidence $quiescence $head).pass){throw 'PHASE7B_WP2B_STABLE_REFRESH_QUIESCENCE_FAIL'}
+  if(-not(Test-Phase7BWorkPackage2QuiescenceEvidence $quiescence $ExpectedQuiescenceEvidenceToolingCommit).pass){throw 'PHASE7B_WP2B_STABLE_REFRESH_QUIESCENCE_FAIL'}
   if(-not(Test-Path $OutputDirectory -PathType Container)){throw 'PHASE7B_WP2B_STABLE_REFRESH_OUTPUT_ROOT_MISSING'}
   $stage='audit-stable-source-before'
   $auditScript=Join-Path $PSScriptRoot 'phase7bAuditWorkPackage2CaptureSource.mjs';$beforeText=@(& node --no-warnings $auditScript $source)-join [Environment]::NewLine

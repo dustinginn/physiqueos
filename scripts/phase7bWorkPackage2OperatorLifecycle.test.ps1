@@ -9,7 +9,7 @@ $script:assertions = 0
 function Assert-True([bool]$Condition,[string]$Message){if(-not $Condition){throw "ASSERTION_FAILED:$Message"};$script:assertions++}
 function Assert-Throws([scriptblock]$Action,[string]$Pattern,[string]$Message){$ok=$false;try{&$Action}catch{$ok=$_.Exception.Message -match $Pattern};Assert-True $ok $Message}
 function Write-Canonical([string]$Path,$Value){[IO.File]::WriteAllText($Path,($Value|ConvertTo-Json -Depth 12),(New-Object Text.UTF8Encoding($false)))}
-function New-Quiescence([string]$Commit){[pscustomobject][ordered]@{classification='PHASE7B_WP2B_NARROW_QUIESCENCE_PASS';pass=$true;toolingCommit=$Commit;monitorTaskDefinitionExact=$true;monitorTaskDisabled=$true;monitorTaskNotRunning=$true;productionServerLeftRunning=$true;productionListenerPresent=$true;autonomousCanonicalWriterPaused=$true;fullCutoverFenceStarted=$false;nonce=('1'*32);observedAt=[DateTime]::UtcNow.ToString('o');automaticRetryAllowed=$false}}
+function New-Quiescence([string]$Commit){[pscustomobject][ordered]@{classification='PHASE7B_WP2B_NARROW_QUIESCENCE_PASS';pass=$true;toolingCommit=$Commit;monitorTaskDefinitionExact=$true;monitorTaskDisabled=$true;monitorTaskNotRunning=$true;productionServerLeftRunning=$true;productionListenerPresent=$true;autonomousCanonicalWriterPaused=$true;fullCutoverFenceStarted=$false;nonce=('1'*32);observedAt=[DateTime]::UtcNow.ToString('o');mutationPerformed=$true;reportPersisted=$true;automaticRetryAllowed=$false}}
 function New-StableEvidence {[pscustomobject]@{repositoryIdentityPass=$true;originParityPass=$true;trackedTreeClean=$true;planBindingPass=$true;inventoryBindingPass=$true;runtimeBindingPass=$true;requiredCollectionCount=39;missingCollectionCount=0;unknownCollectionCount=0;missingMediaReferenceCount=0;credentialSignalCount=0;ageIdentityPass=$true;primaryDestinationPass=$true;laptopReachable=$true;quiescencePass=$true;sourceStableAcrossPreflight=$true}}
 try {
   New-Item -ItemType Directory -Path $testRoot | Out-Null
@@ -44,6 +44,46 @@ try {
   foreach($property in @('monitorTaskDefinitionExact','monitorTaskDisabled','monitorTaskNotRunning','productionServerLeftRunning','productionListenerPresent','autonomousCanonicalWriterPaused')){$bad=$q.PSObject.Copy();$bad.$property=$false;Assert-True (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $bad -ExpectedToolingCommit $tooling).pass) "quiescence rejects $property false"}
   $bad=$q.PSObject.Copy();$bad.fullCutoverFenceStarted=$true;Assert-True (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $bad -ExpectedToolingCommit $tooling).pass) 'quiescence rejects full cutover fence'
   Assert-True (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $q -ExpectedToolingCommit ('0'*40)).pass) 'quiescence rejects wrong tooling commit'
+  $resumeName="phase7b-wp2b-quiescence-$('1'*32).json"
+  function New-ResumeParameters {
+    @{
+      Evidence=(New-Quiescence $tooling);ExpectedAttemptId=$attempt;ObservedAttemptId=$attempt;ExpectedEvidenceToolingCommit=$tooling
+      ExpectedEvidenceFileName=$resumeName;ExpectedEvidenceSha256=$quiescenceSha
+      ObservedEvidenceFileName=$resumeName;ObservedEvidenceSha256=$quiescenceSha;EvidenceCandidateCount=1
+      RepositoryIdentityPass=$true;ApplicationBindingPass=$true;SourceRootBindingPass=$true;RuntimeBindingPass=$true
+      SourceIntegrityPass=$true;MonitorTaskDefinitionExact=$true;MonitorState='Disabled';ProductionServerState='Running'
+      ListenerCount=1;RefreshArtifactCount=0;CaptureAuthorizationCount=0
+    }
+  }
+  $resumeParameters=New-ResumeParameters
+  $resume=Test-Phase7BWorkPackage2ExactQuiescenceResume @resumeParameters
+  Assert-True ($resume.pass -and $resume.classification -ceq 'PHASE7B_WP2B_EXACT_EXISTING_QUIESCENCE_RESUME_PASS' -and
+    -not $resume.quiescenceMutationPerformed -and $resume.quiescenceEvidenceReused -and -not $resume.quiescenceEvidenceCreated -and
+    -not $resume.automaticRetryAllowed -and -not $resume.wp2cAuthorized) 'exact accepted evidence and disabled monitor enter zero-mutation resume'
+  foreach($case in @(
+    @{p='ExpectedEvidenceSha256';v=('0'*64);code='EVIDENCE_SHA256_FAIL'},
+    @{p='ObservedEvidenceFileName';v="phase7b-wp2b-quiescence-$('2'*32).json";code='EVIDENCE_FILENAME_FAIL'},
+    @{p='ExpectedAttemptId';v='phase7b-wp2-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';code='ATTEMPT_IDENTITY_FAIL'},
+    @{p='ExpectedEvidenceToolingCommit';v=('0'*40);code='EVIDENCE_CONTRACT_FAIL'},
+    @{p='EvidenceCandidateCount';v=0;code='EVIDENCE_CARDINALITY_FAIL'},
+    @{p='EvidenceCandidateCount';v=2;code='EVIDENCE_CARDINALITY_FAIL'},
+    @{p='MonitorState';v='Running';code='MONITOR_STATE_FAIL'},
+    @{p='ProductionServerState';v='Ready';code='PRODUCTION_SERVER_STATE_FAIL'},
+    @{p='ListenerCount';v=0;code='LISTENER_COUNT_FAIL'},
+    @{p='RefreshArtifactCount';v=1;code='REFRESH_ARTIFACT_COLLISION'},
+    @{p='CaptureAuthorizationCount';v=1;code='CAPTURE_AUTHORIZATION_COLLISION'},
+    @{p='RepositoryIdentityPass';v=$false;code='REPOSITORY_IDENTITY_FAIL'},
+    @{p='ApplicationBindingPass';v=$false;code='APPLICATION_BINDING_FAIL'},
+    @{p='SourceRootBindingPass';v=$false;code='SOURCE_ROOT_BINDING_FAIL'},
+    @{p='RuntimeBindingPass';v=$false;code='RUNTIME_BINDING_FAIL'},
+    @{p='SourceIntegrityPass';v=$false;code='SOURCE_INTEGRITY_FAIL'}
+  )) {
+    $parameters=New-ResumeParameters;$parameters[$case.p]=$case.v
+    $rejected=Test-Phase7BWorkPackage2ExactQuiescenceResume @parameters
+    Assert-True (-not $rejected.pass -and $rejected.classification -ceq 'PHASE7B_WP2B_EXACT_EXISTING_QUIESCENCE_NONRESUMABLE' -and
+      [string]$rejected.safeReasonCode -match $case.code -and -not $rejected.quiescenceMutationPerformed -and
+      -not $rejected.quiescenceEvidenceCreated -and -not $rejected.automaticRetryAllowed) "resume rejects:$($case.p)"
+  }
   $preflight=New-StableEvidence;Assert-True (Test-Phase7BWorkPackage2StablePreflightEvidence $preflight).pass 'complete stable preflight accepted'
   foreach($property in @('repositoryIdentityPass','originParityPass','trackedTreeClean','planBindingPass','inventoryBindingPass','runtimeBindingPass','ageIdentityPass','primaryDestinationPass','laptopReachable','quiescencePass','sourceStableAcrossPreflight')){$bad=New-StableEvidence;$bad.$property=$false;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects $property false"}
   foreach($property in @('missingCollectionCount','unknownCollectionCount','missingMediaReferenceCount','credentialSignalCount')){$bad=New-StableEvidence;$bad.$property=1;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects nonzero $property"}
@@ -114,22 +154,44 @@ try {
   $wrongFinal=Join-Path $testRoot 'wrong-final.json';$wrongReceipt=$receiptPath+'.wrong';Copy-Item $receiptPath $wrongReceipt;[IO.File]::AppendAllText($wrongReceipt,' ')
   $failure=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attempt -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $wrongReceipt -ExpectedReplicaReceiptSha256 $receiptPersisted.sha256 -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 $teardownPersisted.sha256 -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $wrongFinal)-join [Environment]::NewLine|ConvertFrom-Json
   Assert-True (-not $failure.pass -and -not (Test-Path $wrongFinal)) 'descriptor rejects wrong receipt hash before mutation'
-  $paths=@('phase7bWorkPackage2OperatorLifecycle.psm1','phase7bSetWorkPackage2CaptureQuiescence.ps1','phase7bRefreshWorkPackage2StableInventory.ps1','phase7bPrepareWorkPackage2CaptureAuthorization.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bWorkPackage2OperatorLifecycle.test.ps1')|ForEach-Object{Join-Path $PSScriptRoot $_}
+  $paths=@('phase7bWorkPackage2OperatorLifecycle.psm1','phase7bSetWorkPackage2CaptureQuiescence.ps1','phase7bResumeWorkPackage2CaptureQuiescence.ps1','phase7bRefreshWorkPackage2StableInventory.ps1','phase7bPrepareWorkPackage2CaptureAuthorization.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bWorkPackage2OperatorLifecycle.test.ps1')|ForEach-Object{Join-Path $PSScriptRoot $_}
   foreach($path in $paths){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors);Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST:$(Split-Path -Leaf $path)"}
   $sourceText=@($paths|Where-Object{$_ -notmatch '\.test\.ps1$'}|ForEach-Object{Get-Content -Raw $_})-join "`n"
   Assert-True (-not ($sourceText -match '(?i)ConvertFrom-SecureString|Export-Clixml|cmdkey(?:\.exe)?\s+/(?:add|delete)|New-LocalUser')) 'no persistent secret or account mechanism'
   Assert-True (-not ($sourceText -match '(?i)Start-Process.+(?:cmd|powershell).+exit')) 'no parent-host termination path'
   Assert-True ($sourceText.Contains('automaticRetryAllowed = $false') -and $sourceText.Contains('wp2cAuthorized = $false')) 'no retry and no WP2-C authority'
   Assert-True ($sourceText.Contains('PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED') -and $sourceText.Contains('PHASE7B_WP2B_POST_QUIESCENCE_STABLE_INVENTORY_PASS')) 'stale plan has one bounded post-quiescence refresh path'
+  $establishSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bSetWorkPackage2CaptureQuiescence.ps1')
+  Assert-True ($establishSource.Contains("[ValidateSet('Inspect', 'Establish')]") -and $establishSource.Contains('PHASE7B_WP2B_QUIESCENCE_PRIOR_STATE_REJECTED') -and
+    $establishSource.Contains('Stop-ScheduledTask') -and $establishSource.Contains('Disable-ScheduledTask')) 'fresh Establish contract remains unchanged and rejects already-disabled monitor'
+  $resumeSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bResumeWorkPackage2CaptureQuiescence.ps1')
+  Assert-True ($resumeSource.Contains('WP2B_CAPTURE_RESUME_EXACT_EXISTING_QUIESCENCE_READ_ONLY') -and
+    $resumeSource.Contains('Test-Phase7BWorkPackage2ExactQuiescenceResume')) 'resume requires explicit source-owned acknowledgement and exact decision contract'
+  Assert-True (-not ($resumeSource -match '(?i)\b(?:Stop|Disable|Enable|Start|Register|Unregister|Set)-ScheduledTask\b|Write-Phase7BSafeEvidenceFile|\b(?:New-Item|Set-Content|Add-Content|Out-File)\b')) 'resume source contains no task or evidence mutation command'
+  Assert-True (-not $resumeSource.Contains('phase7bSetWorkPackage2CaptureQuiescence.ps1')) 'nonresumable path never falls back to fresh Establish'
   $prepareSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2CaptureAuthorization.ps1')
   Assert-True ($prepareSource.Contains('PHASE7B_WP2B_CAPTURE_SOURCE_INTEGRITY_FAIL') -and
     $prepareSource.IndexOf('PHASE7B_WP2B_CAPTURE_SOURCE_INTEGRITY_FAIL') -lt $prepareSource.IndexOf('PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED')) `
     'missing collections media or credential signals remain nonrefreshable before stale-binding decision'
+  Assert-True ($prepareSource.Contains('$ExpectedQuiescenceEvidenceToolingCommit') -and
+    $prepareSource.Contains('Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit $ExpectedQuiescenceEvidenceToolingCommit')) `
+    'capture preflight can validate an exact reused evidence commit without weakening current repository identity'
+  Assert-True ($prepareSource.Contains("[ValidateSet('FRESH_ESTABLISH','EXACT_EXISTING_QUIESCENCE_RESUME')]") -and
+    $prepareSource.Contains('PHASE7B_WP2B_CAPTURE_PREFLIGHT_FRESH_QUIESCENCE_BINDING_FAIL') -and
+    $prepareSource.Contains('PHASE7B_WP2B_CAPTURE_PREFLIGHT_RESUME_AUTHORIZATION_FAIL')) `
+    'capture preflight requires explicit resume mode before accepting a noncurrent evidence commit'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')
   Assert-True ($refreshSource.Contains('[Parameter(Mandatory = $true)][string]$ExpectedAttemptId')) 'stable refresh requires explicit expected attempt identity'
   Assert-True (-not $refreshSource.Contains('[guid]::NewGuid()')) 'stable refresh never generates or substitutes attempt identity'
   Assert-True ($refreshSource.Contains('$selectionRead.attemptId') -and $refreshSource.Contains('$inventoryAuthorizationRead.attemptId') -and $refreshSource.Contains('$planRead.attemptId') -and $refreshSource.Contains('$plannerResult.attemptId')) 'selection inventory authorization plan and planner output require one exact attempt identity'
   Assert-True ($refreshSource.Contains('Assert-Phase7BWorkPackage2StableRefreshOutputSet') -and $refreshSource.Contains('attemptIdentityExact=$true')) 'stable refresh uses exact output-set contract and reports exact attempt binding'
   Assert-True ($refreshSource.Contains('sourceMutationPerformed=$false') -and $refreshSource.Contains('automaticRetryAllowed=$false') -and $refreshSource.Contains('wp2cAuthorized=$false')) 'stable refresh remains read-only no-retry and WP2-C unauthorized'
+  Assert-True ($refreshSource.Contains('$ExpectedQuiescenceEvidenceToolingCommit') -and
+    $refreshSource.Contains('Test-Phase7BWorkPackage2QuiescenceEvidence $quiescence $ExpectedQuiescenceEvidenceToolingCommit')) `
+    'stable refresh preserves the exact reused quiescence evidence commit binding'
+  Assert-True ($refreshSource.Contains("[ValidateSet('FRESH_ESTABLISH','EXACT_EXISTING_QUIESCENCE_RESUME')]") -and
+    $refreshSource.Contains('PHASE7B_WP2B_STABLE_REFRESH_FRESH_QUIESCENCE_BINDING_FAIL') -and
+    $refreshSource.Contains('PHASE7B_WP2B_STABLE_REFRESH_RESUME_AUTHORIZATION_FAIL')) `
+    'stable refresh requires explicit resume mode before accepting a noncurrent evidence commit'
   [ordered]@{classification='PHASE7B_WP2B_OPERATOR_LIFECYCLE_TESTS_PASS';pass=$true;assertions=$script:assertions}|ConvertTo-Json -Compress
 } finally {if(Test-Path $testRoot){Remove-Item -LiteralPath $testRoot -Recurse -Force}}

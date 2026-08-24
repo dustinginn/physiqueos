@@ -41,6 +41,70 @@ function Test-Phase7BWorkPackage2QuiescenceEvidence {
   [pscustomobject][ordered]@{ pass = [bool]$pass; classification = if ($pass) { 'PHASE7B_WP2B_QUIESCENCE_EVIDENCE_ACCEPTED' } else { 'PHASE7B_WP2B_QUIESCENCE_EVIDENCE_REJECTED' } }
 }
 
+function Test-Phase7BWorkPackage2ExactQuiescenceResume {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)]$Evidence,
+    [Parameter(Mandatory = $true)][string]$ExpectedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ObservedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceToolingCommit,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedEvidenceFileName,
+    [Parameter(Mandatory = $true)][string]$ObservedEvidenceSha256,
+    [Parameter(Mandatory = $true)][int]$EvidenceCandidateCount,
+    [Parameter(Mandatory = $true)][bool]$RepositoryIdentityPass,
+    [Parameter(Mandatory = $true)][bool]$ApplicationBindingPass,
+    [Parameter(Mandatory = $true)][bool]$SourceRootBindingPass,
+    [Parameter(Mandatory = $true)][bool]$RuntimeBindingPass,
+    [Parameter(Mandatory = $true)][bool]$SourceIntegrityPass,
+    [Parameter(Mandatory = $true)][bool]$MonitorTaskDefinitionExact,
+    [Parameter(Mandatory = $true)][string]$MonitorState,
+    [Parameter(Mandatory = $true)][string]$ProductionServerState,
+    [Parameter(Mandatory = $true)][int]$ListenerCount,
+    [Parameter(Mandatory = $true)][int]$RefreshArtifactCount,
+    [Parameter(Mandatory = $true)][int]$CaptureAuthorizationCount
+  )
+  $safeReasonCode = $null
+  if ($ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ObservedAttemptId -cne $ExpectedAttemptId) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_ATTEMPT_IDENTITY_FAIL' }
+  elseif ($ExpectedEvidenceToolingCommit -cnotmatch '^[0-9a-f]{40}$') { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_TOOLING_BINDING_FAIL' }
+  elseif ($ExpectedEvidenceFileName -cnotmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
+      $ExpectedEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$') { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_EXPECTATION_FAIL' }
+  elseif ($EvidenceCandidateCount -ne 1) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_CARDINALITY_FAIL' }
+  elseif ($ObservedEvidenceFileName -cne $ExpectedEvidenceFileName) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_FILENAME_FAIL' }
+  elseif ($ObservedEvidenceSha256 -cne $ExpectedEvidenceSha256) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_SHA256_FAIL' }
+  elseif ([string]$Evidence.nonce -cnotmatch '^[0-9a-f]{32}$' -or
+      $ExpectedEvidenceFileName -cne "phase7b-wp2b-quiescence-$([string]$Evidence.nonce).json") { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_NONCE_FAIL' }
+  elseif (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $Evidence -ExpectedToolingCommit $ExpectedEvidenceToolingCommit).pass -or
+      -not [bool]$Evidence.mutationPerformed -or -not [bool]$Evidence.reportPersisted) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_EVIDENCE_CONTRACT_FAIL' }
+  elseif (-not $RepositoryIdentityPass) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_REPOSITORY_IDENTITY_FAIL' }
+  elseif (-not $ApplicationBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_APPLICATION_BINDING_FAIL' }
+  elseif (-not $SourceRootBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_SOURCE_ROOT_BINDING_FAIL' }
+  elseif (-not $RuntimeBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_RUNTIME_BINDING_FAIL' }
+  elseif (-not $SourceIntegrityPass) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_SOURCE_INTEGRITY_FAIL' }
+  elseif (-not $MonitorTaskDefinitionExact) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_MONITOR_DEFINITION_FAIL' }
+  elseif ($MonitorState -cne 'Disabled') { $safeReasonCode = 'PHASE7B_WP2B_RESUME_MONITOR_STATE_FAIL' }
+  elseif ($ProductionServerState -cne 'Running') { $safeReasonCode = 'PHASE7B_WP2B_RESUME_PRODUCTION_SERVER_STATE_FAIL' }
+  elseif ($ListenerCount -ne 1) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_LISTENER_COUNT_FAIL' }
+  elseif ($RefreshArtifactCount -ne 0) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_REFRESH_ARTIFACT_COLLISION' }
+  elseif ($CaptureAuthorizationCount -ne 0) { $safeReasonCode = 'PHASE7B_WP2B_RESUME_CAPTURE_AUTHORIZATION_COLLISION' }
+  $pass = $null -eq $safeReasonCode
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2B_EXACT_EXISTING_QUIESCENCE_RESUME_PASS' } else { 'PHASE7B_WP2B_EXACT_EXISTING_QUIESCENCE_NONRESUMABLE' }
+    pass = [bool]$pass
+    safeReasonCode = $safeReasonCode
+    attemptId = $ExpectedAttemptId
+    attemptIdentityExact = [bool]$pass
+    attemptBindingSource = 'EXACT_FOUNDER_AUTHORIZED_EVIDENCE_TUPLE'
+    evidenceFileName = $ObservedEvidenceFileName
+    evidenceSha256 = $ObservedEvidenceSha256
+    quiescenceMutationPerformed = $false
+    quiescenceEvidenceReused = [bool]$pass
+    quiescenceEvidenceCreated = $false
+    automaticRetryAllowed = $false
+    wp2cAuthorized = $false
+  }
+}
+
 function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][string]$AuthorizationId,
@@ -316,6 +380,7 @@ function Test-Phase7BWorkPackage2StablePreflightEvidence {
 Export-ModuleMember -Function @(
   'Get-Phase7BWorkPackage2OperatorContract',
   'Test-Phase7BWorkPackage2QuiescenceEvidence',
+  'Test-Phase7BWorkPackage2ExactQuiescenceResume',
   'New-Phase7BWorkPackage2CaptureAuthorizationDocument',
   'Assert-Phase7BWorkPackage2CaptureAuthorization',
   'Use-Phase7BWorkPackage2CaptureAuthorization',

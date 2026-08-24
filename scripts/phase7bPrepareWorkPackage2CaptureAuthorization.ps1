@@ -17,6 +17,9 @@ param(
   [Parameter(Mandatory = $true)][string]$LaptopIpv4,
   [Parameter(Mandatory = $true)][string]$QuiescenceEvidencePath,
   [Parameter(Mandatory = $true)][string]$ExpectedQuiescenceEvidenceSha256,
+  [Parameter()][string]$ExpectedQuiescenceEvidenceToolingCommit,
+  [Parameter()][ValidateSet('FRESH_ESTABLISH','EXACT_EXISTING_QUIESCENCE_RESUME')][string]$QuiescenceMode = 'FRESH_ESTABLISH',
+  [Parameter()][string]$QuiescenceResumeAuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement
 )
@@ -28,11 +31,21 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Forc
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 $stage = 'validate-input'
 try {
+  if ($QuiescenceMode -ceq 'FRESH_ESTABLISH') {
+    if ([string]::IsNullOrWhiteSpace($ExpectedQuiescenceEvidenceToolingCommit)) { $ExpectedQuiescenceEvidenceToolingCommit = $ExpectedToolingCommit }
+    if ($ExpectedQuiescenceEvidenceToolingCommit -cne $ExpectedToolingCommit -or -not [string]::IsNullOrEmpty($QuiescenceResumeAuthorizationAcknowledgement)) {
+      throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_FRESH_QUIESCENCE_BINDING_FAIL'
+    }
+  } elseif ([string]::IsNullOrWhiteSpace($ExpectedQuiescenceEvidenceToolingCommit) -or
+      $QuiescenceResumeAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_QUIESCENCE_READ_ONLY') {
+    throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_RESUME_AUTHORIZATION_FAIL'
+  }
   $hashArguments = @($ExpectedToolingCommit, $ExpectedCapturePlanSha256, $ExpectedSelectionSha256, $ExpectedInventorySha256, $ExpectedAgeExeSha256, $ExpectedQuiescenceEvidenceSha256)
   if ($AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_PREPARE_ONE_USE_AUTHORIZATION_EXACTLY_ONCE' -or
       $AuthorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or $AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
       @($hashArguments | Where-Object { $_ -notmatch '^[0-9a-f]{40}$' -and $_ -notmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
-      $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or (Test-Path -LiteralPath $OutputPath)) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_ARGUMENT_FAIL' }
+      $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or $ExpectedQuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
+      (Test-Path -LiteralPath $OutputPath)) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_ARGUMENT_FAIL' }
   $authorizationParent = Split-Path -Parent ([IO.Path]::GetFullPath($OutputPath))
   if (-not (Test-Path -LiteralPath $authorizationParent -PathType Container) -or
       -not $authorizationParent.Equals((Split-Path -Parent ([IO.Path]::GetFullPath($QuiescenceEvidencePath))), [StringComparison]::OrdinalIgnoreCase)) {
@@ -51,7 +64,7 @@ try {
     if (-not (Test-Path -LiteralPath $binding[0] -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $binding[0]) -ne $binding[1]) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_FILE_BINDING_FAIL' }
   }
   $quiescence = Get-Content -LiteralPath $QuiescenceEvidencePath -Raw | ConvertFrom-Json -ErrorAction Stop
-  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit $head).pass) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_QUIESCENCE_FAIL' }
+  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit $ExpectedQuiescenceEvidenceToolingCommit).pass) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_QUIESCENCE_FAIL' }
   $plan = Get-Content -LiteralPath $CapturePlanPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $selection = Get-Content -LiteralPath $SelectionPath -Raw | ConvertFrom-Json -ErrorAction Stop
   if ([string]$plan.attemptId -ne $AttemptId -or [string]$plan.selectionSha256 -ne $ExpectedSelectionSha256 -or
