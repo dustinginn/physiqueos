@@ -24,7 +24,7 @@ try {
   }
   $authorization = Get-Content -LiteralPath $AuthorizationPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $authorizedStages = @($authorization.authorizedStages)
-  if ([int]$authorization.schemaVersion -ne 1 -or [string]$authorization.classification -cne 'PHASE7B_WP2_AUTHORIZATION' -or
+  if ([int]$authorization.schemaVersion -ne 1 -or [string]$authorization.classification -cne 'PHASE7B_WP2_STAGE_AUTHORIZATION' -or
       $authorizedStages.Count -ne 1 -or [string]$authorizedStages[0].stage -cne 'WP2B_CAPTURE' -or [int]$authorizedStages[0].mutationBudget -ne 1 -or
       [string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.capturePlanSha256 -cne $ExpectedCapturePlanSha256 -or
       [string]$authorization.localOutputRootSha256 -cne $localRootSha -or [string]$authorization.toolingCommit -cne $ExpectedToolingCommit -or -not [bool]$authorization.oneUseOnly -or

@@ -28,6 +28,8 @@ $finalize = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bFinalizeBo
 Assert-True (-not $prepare.Contains('Test-Connection') -and $prepare.Contains('laptopReachabilityDeferredToReceiver')) 'pre-Stage2 LAN proof is binding-only and does not require an unopened receiver'
 Assert-True ($prepare.Contains('capturePlanFileName') -and $prepare.Contains('requiredCapacityBytes') -and $prepare.Contains('laptopIpv4')) 'Stage1 emits every Stage2 and Stage3 nonsecret handoff'
 Assert-True ($capture.Contains('$authorization.capturePlanFileName') -and $capture.Contains('$authorization.quiescenceEvidenceToolingCommit')) 'Stage3 consumes exact authorization-bound filenames and evidence commit'
+$captureResume = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bResumeCompletedWorkPackage2Capture.ps1') -Raw
+Assert-True ($captureResume.Contains("classification -cne 'PHASE7B_WP2_STAGE_AUTHORIZATION'") -and $captureResume.Contains('exactCompletedCaptureReused')) 'completed-capture resume validates the exact source-owned authorization schema/classification'
 Assert-True ($capture.LastIndexOf('Use-Phase7BWorkPackage2CaptureAuthorization') -gt $capture.IndexOf('$descriptorCreated = $true')) 'capture authorization consumption is the final successful mutation'
 Assert-True ($capture.Contains('exactSameAuthorizationReusableAfterCleanup') -and $capture.Contains('$replicaPacketCreated')) 'pre-consumption failure cleanup is explicit'
 Assert-True ($verify.Contains('teardownResumed') -and $verify.Contains('TEARDOWN_CARDINALITY_FAIL')) 'Stage4 exact partial-teardown resume is bounded'
