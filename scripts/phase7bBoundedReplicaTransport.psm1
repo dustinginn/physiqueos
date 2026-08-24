@@ -2,15 +2,53 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 
+function Test-Phase7BSha256IdentityShape {
+  [CmdletBinding()] param([Parameter(Mandatory = $true)][AllowNull()]$Value)
+  $values = @($Value)
+  $values.Count -eq 1 -and $null -ne $values[0] -and $values[0] -is [string] -and
+    [string]$values[0] -cmatch '^[0-9a-f]{64}$'
+}
+
+function Get-Phase7BBoundedReplicaHostIdentitySha256 {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$ComputerName,
+    [Parameter(Mandatory = $true)][string]$Uuid,
+    [Parameter(Mandatory = $true)][string]$MachineGuid
+  )
+  $uuidValue = [guid]::Empty
+  $machineGuidValue = [guid]::Empty
+  if (-not [guid]::TryParse($Uuid, [ref]$uuidValue) -or $uuidValue -eq [guid]::Empty -or
+      -not [guid]::TryParse($MachineGuid, [ref]$machineGuidValue) -or $machineGuidValue -eq [guid]::Empty) {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_HOST_COMPONENT_FORMAT_FAIL'
+  }
+  Get-Phase7BSha256 -Text ($ComputerName.ToLowerInvariant() + '|' + $Uuid.ToLowerInvariant() + '|' +
+    $MachineGuid.ToLowerInvariant())
+}
+
+function Get-Phase7BBoundedReplicaDiskIdentitySha256 {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$ComputerName,
+    [Parameter(Mandatory = $true)][int]$DiskNumber,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$UniqueId,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$SerialNumber,
+    [Parameter(Mandatory = $true)][string]$FriendlyName,
+    [Parameter(Mandatory = $true)][int64]$DiskSizeBytes,
+    [Parameter(Mandatory = $true)][string]$BusType
+  )
+  Get-Phase7BSha256 -Text ($ComputerName.ToLowerInvariant() + '|' + [string]$DiskNumber + '|' +
+    $UniqueId.ToLowerInvariant() + '|' + $SerialNumber.ToLowerInvariant() + '|' +
+    $FriendlyName.ToLowerInvariant() + '|' + [string]$DiskSizeBytes + '|' + $BusType.ToLowerInvariant())
+}
+
 function Get-Phase7BBoundedReplicaTransportContract {
   [CmdletBinding()] param()
-  [pscustomobject][ordered]@{
+  $contract = [pscustomobject][ordered]@{
     schemaVersion = 1
     classification = 'PHASE7B_WP2_BOUNDED_REPLICA_TRANSPORT_CONTRACT'
     transportClassification = 'EPHEMERAL_SMB_EXISTING_ACCOUNT_ONE_ENCRYPTED_PACKET'
     acceptedComputerName = 'LAPTOP-4G5U0U2R'
-    acceptedHostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
-    acceptedDiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+    acceptedHostIdentitySha256 = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+    acceptedDiskIdentitySha256 = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
     acceptedDriveRoot = 'D:\'
     acceptedFileSystem = 'NTFS'
     acceptedDiskNumber = 0
@@ -25,6 +63,11 @@ function Get-Phase7BBoundedReplicaTransportContract {
     rawProductionFilesPermitted = $false
     automaticRetryAllowed = $false
   }
+  if (-not (Test-Phase7BSha256IdentityShape -Value $contract.acceptedHostIdentitySha256) -or
+      -not (Test-Phase7BSha256IdentityShape -Value $contract.acceptedDiskIdentitySha256)) {
+    throw 'PHASE7B_WP2_ACTIVE_REPLICA_IDENTITY_CONTRACT_INVALID'
+  }
+  $contract
 }
 
 function ConvertTo-Phase7BCanonicalComputerName {
@@ -149,8 +192,10 @@ function Test-Phase7BBoundedReplicaDestinationEvidence {
   $contract = Get-Phase7BBoundedReplicaTransportContract
   $computerIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $Evidence.computerName -ExpectedComputerName $contract.acceptedComputerName
   $pass = $computerIdentity.pass -and
-    [string]$Evidence.hostIdentitySha256 -eq $contract.acceptedHostIdentitySha256 -and
-    [string]$Evidence.diskIdentitySha256 -eq $contract.acceptedDiskIdentitySha256 -and
+    (Test-Phase7BSha256IdentityShape -Value $Evidence.hostIdentitySha256) -and
+    (Test-Phase7BSha256IdentityShape -Value $Evidence.diskIdentitySha256) -and
+    [string]$Evidence.hostIdentitySha256 -ceq $contract.acceptedHostIdentitySha256 -and
+    [string]$Evidence.diskIdentitySha256 -ceq $contract.acceptedDiskIdentitySha256 -and
     [string]$Evidence.driveRoot -eq $contract.acceptedDriveRoot -and
     [string]$Evidence.fileSystem -eq $contract.acceptedFileSystem -and
     [int]$Evidence.diskNumber -eq $contract.acceptedDiskNumber -and
@@ -239,6 +284,9 @@ function Test-Phase7BPrimaryReplicaSessionTeardownEvidence {
 
 Export-ModuleMember -Function @(
   'Get-Phase7BBoundedReplicaTransportContract',
+  'Test-Phase7BSha256IdentityShape',
+  'Get-Phase7BBoundedReplicaHostIdentitySha256',
+  'Get-Phase7BBoundedReplicaDiskIdentitySha256',
   'ConvertTo-Phase7BCanonicalComputerName',
   'Test-Phase7BBoundedReplicaComputerIdentity',
   'Get-Phase7BBoundedReplicaAttemptRoot',

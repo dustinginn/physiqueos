@@ -24,27 +24,24 @@ try {
   $acceptedName = ConvertTo-Phase7BCanonicalComputerName -Value $acceptedNameValues
 
   $stage = 'validate-host-identity'
-  $environmentName = [Environment]::MachineName
-  $environmentVariableName = $env:COMPUTERNAME
-  $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
-  $machineIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentName -ExpectedComputerName $acceptedName
-  $environmentIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $environmentVariableName -ExpectedComputerName $acceptedName
-  $cimIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $computerSystem.Name -ExpectedComputerName $acceptedName
-  if (-not $machineIdentity.pass -or -not $environmentIdentity.pass -or -not $cimIdentity.pass) {
-    throw 'PHASE7B_WP2B_LAPTOP_HOST_NAME_FAIL'
-  }
-  $product = Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop
+  $products = @(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop)
+  if ($products.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_PRODUCT_CARDINALITY_FAIL' }
+  $product = $products[0]
   $machineGuid = [string](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid
-  $hostSha = Get-Phase7BSha256 -Text ($acceptedName.ToLowerInvariant() + '|' + ([string]$product.UUID).ToLowerInvariant() + '|' + $machineGuid.ToLowerInvariant())
-  if ($hostSha -ne $contract.acceptedHostIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' }
+  $hostSha = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName $acceptedName `
+    -Uuid ([string]$product.UUID) -MachineGuid $machineGuid
+  if ($hostSha -cne $contract.acceptedHostIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' }
 
   $stage = 'validate-storage-identity'
-  $volume = Get-Volume -DriveLetter D -ErrorAction Stop
+  $volumes = @(Get-Volume -DriveLetter D -ErrorAction Stop)
   $partitions = @(Get-Partition -DriveLetter D -ErrorAction Stop)
   $disks = @($partitions | Get-Disk -ErrorAction Stop)
-  if ($partitions.Count -ne 1 -or $disks.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_DISK_CARDINALITY_FAIL' }
+  if ($volumes.Count -ne 1 -or $partitions.Count -ne 1 -or $disks.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_DISK_CARDINALITY_FAIL' }
+  $volume = $volumes[0]
   $disk = $disks[0]
-  $diskSha = Get-Phase7BSha256 -Text ($acceptedName.ToLowerInvariant() + '|' + [string]$disk.Number + '|' + ([string]$disk.UniqueId).ToLowerInvariant() + '|' + ([string]$disk.SerialNumber).ToLowerInvariant() + '|' + ([string]$disk.FriendlyName).ToLowerInvariant() + '|' + [string]$disk.Size + '|' + ([string]$disk.BusType).ToLowerInvariant())
+  $diskSha = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName $acceptedName `
+    -DiskNumber ([int]$disk.Number) -UniqueId ([string]$disk.UniqueId) -SerialNumber ([string]$disk.SerialNumber) `
+    -FriendlyName ([string]$disk.FriendlyName) -DiskSizeBytes ([int64]$disk.Size) -BusType ([string]$disk.BusType)
   $destinationEvidence = [pscustomobject]@{
     computerName = $acceptedName
     hostIdentitySha256 = $hostSha
@@ -92,10 +89,8 @@ try {
     contractObjectType = $contract.GetType().FullName
     acceptedComputerNameValueCount = $acceptedNameValues.Count
     acceptedComputerNameValueType = $acceptedNameValues[0].GetType().FullName
-    environmentMachineNameType = $environmentName.GetType().FullName
-    environmentComputerNameType = $environmentVariableName.GetType().FullName
-    win32ComputerSystemNameType = $computerSystem.Name.GetType().FullName
-    allComputerNameSourcesCanonicalAndExact = $true
+    hardwareBoundIdentityAuthoritative = $true
+    standaloneRuntimeHostnameGateRequired = $false
     hostIdentitySha256 = $hostSha
     diskIdentitySha256 = $diskSha
     fileSystem = [string]$volume.FileSystemType

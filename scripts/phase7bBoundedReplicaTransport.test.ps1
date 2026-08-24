@@ -12,6 +12,32 @@ function New-Evidence {
 }
 try {
   New-Item -ItemType Directory -Path $root | Out-Null
+  $authoritativeHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+  $authoritativeDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
+  $historicalHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+  $historicalDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+  $invalidTranscribedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+  $contract = Get-Phase7BBoundedReplicaTransportContract
+  Assert-True ($contract.acceptedHostIdentitySha256 -ceq $authoritativeHostSha -and
+    $contract.acceptedDiskIdentitySha256 -ceq $authoritativeDiskSha) 'shared contract binds authoritative current identities'
+  foreach ($validIdentity in @($contract.acceptedHostIdentitySha256, $contract.acceptedDiskIdentitySha256)) {
+    Assert-True (Test-Phase7BSha256IdentityShape -Value $validIdentity) 'active shared identity is exact lowercase 64-hex'
+  }
+  foreach ($invalidIdentity in @($null, '', ('a' * 63), ('a' * 65), ('A' * 64), (('a' * 63) + 'g'))) {
+    Assert-True (-not (Test-Phase7BSha256IdentityShape -Value $invalidIdentity)) 'malformed shared identity rejected'
+  }
+  $fixtureHost = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+    -Uuid '01234567-89AB-CDEF-0123-456789ABCDEF' -MachineGuid 'FEDCBA98-7654-3210-FEDC-BA9876543210'
+  Assert-True ($fixtureHost -ceq 'ff570bf96b4cc2331dc8b27086b8b51928b2e79af3bef7decea29b5335ae224f') `
+    'shared real host hash-producing path matches fixed V2 fixture digest'
+  $fixtureDisk = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+    -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
+    -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
+  Assert-True ($fixtureDisk -ceq 'a30f346e3f58de06dad4034b8eba9de3818a1464210539897740707c91eb6e28') `
+    'shared real disk hash-producing path matches fixed V2 fixture digest'
+  Assert-Throws { Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+    -Uuid 'not-a-guid' -MachineGuid 'FEDCBA98-7654-3210-FEDC-BA9876543210' } 'HOST_COMPONENT_FORMAT_FAIL' `
+    'malformed UUID fails shared host computation'
   $acceptedName = 'LAPTOP-4G5U0U2R'
   Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value $acceptedName) -ceq $acceptedName) 'accepted scalar computer name canonicalized'
   Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value 'laptop-4g5u0u2r') -ceq $acceptedName) 'computer name uses ordinal case-insensitive canonical identity'
@@ -47,6 +73,14 @@ try {
 
   $evidence = New-Evidence
   Assert-True (Test-Phase7BBoundedReplicaDestinationEvidence -Evidence $evidence -RequiredBytes $bytes).pass 'accepted host and physical disk evidence'
+  foreach ($case in @(
+      @{ property = 'hostIdentitySha256'; value = $historicalHostSha },
+      @{ property = 'diskIdentitySha256'; value = $historicalDiskSha },
+      @{ property = 'hostIdentitySha256'; value = $invalidTranscribedHostSha })) {
+    $retired = New-Evidence; $retired.($case.property) = $case.value
+    Assert-True (-not (Test-Phase7BBoundedReplicaDestinationEvidence -Evidence $retired -RequiredBytes $bytes).pass) `
+      "retired or malformed identity fails active destination gate:$($case.property)"
+  }
   foreach ($case in @(
       @{ property = 'computerName'; value = 'WRONG' }, @{ property = 'hostIdentitySha256'; value = '0' * 64 },
       @{ property = 'diskIdentitySha256'; value = '0' * 64 }, @{ property = 'physicallyIndependent'; value = $false },
@@ -100,11 +134,42 @@ try {
   Assert-True (-not ($operational -match '(?i)Copy-Item.+runtime-store|Copy-Item.+canonical')) 'no raw production copy path'
   $preflightSource = Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bPreflightBoundedReplicaDestination.ps1')
   Assert-True (-not ($preflightSource -match '(?i)New-Item|Remove-Item|Set-Item|Set-Content|Add-Content|Out-File|Export-Clixml|New-SmbShare|New-NetFirewallRule|Invoke-WebRequest|Invoke-RestMethod')) 'laptop preflight remains read-only'
-  Assert-True ($preflightSource.Contains('contractObjectCount') -and $preflightSource.Contains('acceptedComputerNameValueType') -and $preflightSource.Contains('allComputerNameSourcesCanonicalAndExact')) 'laptop preflight projects safe representation evidence'
-  Assert-True (-not ($operational.Contains('[Environment]::MachineName -ne $contract.acceptedComputerName'))) 'fragile direct hostname comparison removed from source-owned lifecycle'
-  Assert-True (@($operational -split 'Test-Phase7BBoundedReplicaComputerIdentity').Count -ge 8) 'preflight, receiver open, verification, and destination evidence share canonical identity contract'
+  Assert-True ($preflightSource.Contains('contractObjectCount') -and $preflightSource.Contains('acceptedComputerNameValueType') -and
+    $preflightSource.Contains('hardwareBoundIdentityAuthoritative') -and $preflightSource.Contains('standaloneRuntimeHostnameGateRequired = $false')) `
+    'laptop preflight projects accepted hardware-bound identity model'
+  Assert-True (-not ($operational.Contains('[Environment]::MachineName -ne $contract.acceptedComputerName')) -and
+    -not $operational.Contains('allComputerNameSourcesCanonicalAndExact')) 'retired runtime hostname representation gate absent'
+  Assert-True ($operational.Contains('Get-Phase7BBoundedReplicaHostIdentitySha256') -and
+    $operational.Contains('Get-Phase7BBoundedReplicaDiskIdentitySha256')) 'Stage 2 and Stage 4 share exact V2 hash-producing helpers'
   Assert-True ($operational.Contains('automaticRetryAllowed = $false')) 'automatic retry disabled'
   Assert-True ($operational.Contains('Remove-SmbShare') -and $operational.Contains('Remove-NetFirewallRule')) 'ephemeral session teardown source-owned'
   Assert-True ($operational.Contains('RequiredCapacityBytes') -and -not (Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bOpenBoundedReplicaReceiver.ps1')).Contains('ExpectedPacketBytes')) 'receiver capacity does not claim pre-encryption ciphertext size'
+
+  $receiverPath = Join-Path $PSScriptRoot 'phase7bOpenBoundedReplicaReceiver.ps1'
+  $receiverTokens = $null; $receiverErrors = $null
+  $receiverAst = [Management.Automation.Language.Parser]::ParseFile($receiverPath, [ref]$receiverTokens, [ref]$receiverErrors)
+  $cleanupFunctions = @($receiverAst.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -eq 'Remove-Phase7BInvocationCreatedEmptyAttemptRoot' }, $true))
+  Assert-True ($cleanupFunctions.Count -eq 1) 'one bounded invocation-created empty-root cleanup helper present'
+  Invoke-Expression $cleanupFunctions[0].Extent.Text
+  $cleanupParent = Join-Path $root 'cleanup-parent'; New-Item -ItemType Directory -Path $cleanupParent | Out-Null
+  $cleanupAttempt = 'phase7b-wp2-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  $emptyCreated = Join-Path $cleanupParent $cleanupAttempt; New-Item -ItemType Directory -Path $emptyCreated | Out-Null
+  $removed = Remove-Phase7BInvocationCreatedEmptyAttemptRoot -LiteralPath $emptyCreated -ReplicaParentRoot $cleanupParent `
+    -AttemptId $cleanupAttempt -CreatedByInvocation $true
+  Assert-True ($removed.attempted -and $removed.removed -and -not (Test-Path -LiteralPath $emptyCreated)) `
+    'current invocation empty attempt root removed exactly'
+  $preexisting = Join-Path $cleanupParent $cleanupAttempt; New-Item -ItemType Directory -Path $preexisting | Out-Null
+  $retained = Remove-Phase7BInvocationCreatedEmptyAttemptRoot -LiteralPath $preexisting -ReplicaParentRoot $cleanupParent `
+    -AttemptId $cleanupAttempt -CreatedByInvocation $false
+  Assert-True (-not $retained.attempted -and -not $retained.removed -and (Test-Path -LiteralPath $preexisting)) `
+    'preexisting empty root is never removed'
+  Remove-Item -LiteralPath $preexisting
+  $nonempty = Join-Path $cleanupParent $cleanupAttempt; New-Item -ItemType Directory -Path $nonempty | Out-Null
+  [IO.File]::WriteAllText((Join-Path $nonempty 'accepted-or-ambiguous-evidence.bin'), 'fixture')
+  $blocked = Remove-Phase7BInvocationCreatedEmptyAttemptRoot -LiteralPath $nonempty -ReplicaParentRoot $cleanupParent `
+    -AttemptId $cleanupAttempt -CreatedByInvocation $true
+  Assert-True ($blocked.attempted -and -not $blocked.removed -and $blocked.blockedByContent -and
+    (Test-Path -LiteralPath $nonempty)) 'nonempty ambiguous or evidence-bearing root is never removed'
   [ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_TRANSPORT_TESTS_PASS'; pass = $true; assertions = $script:assertions } | ConvertTo-Json -Compress
 } finally { if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force } }

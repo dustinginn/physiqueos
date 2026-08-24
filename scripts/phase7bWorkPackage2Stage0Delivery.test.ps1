@@ -2,10 +2,11 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $scriptPath = Join-Path $PSScriptRoot 'phase7bRunWorkPackage2LaptopPreflight.ps1'
 $attempt = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
-$acceptedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+$acceptedHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
 $acceptedDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
 $historicalHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
 $historicalDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+$invalidTranscribedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "phase7b-stage0-delivery-$([guid]::NewGuid().ToString('N'))"
 $assertions = 0
 
@@ -72,7 +73,7 @@ try {
   $hash2 = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLowerInvariant()
   Assert-True ($hash1 -ceq $hash2 -and $hash1 -match '^[0-9a-f]{64}$') 'tracked Stage 0 artifact hash is deterministic'
 
-  foreach ($functionName in @('Get-Phase7BStage0Sha256', 'Get-Phase7BStage0HostIdentitySha256',
+  foreach ($functionName in @('Get-Phase7BStage0Sha256', 'Assert-Phase7BStage0Sha256Identity', 'Get-Phase7BStage0HostIdentitySha256',
       'Get-Phase7BStage0DiskIdentitySha256', 'Assert-Phase7BStage0Snapshot')) {
     $functions = @($ast.FindAll({
       param($node)
@@ -92,6 +93,8 @@ try {
   }
   Assert-True (-not $source.Contains($historicalHostSha) -and -not $source.Contains($historicalDiskSha)) `
     'historical identity digests are retired from active Stage 0 gates'
+  Assert-True (-not ($source -cmatch ('(?<![0-9a-f])' + [regex]::Escape($invalidTranscribedHostSha) + '(?![0-9a-f])'))) `
+    'invalid 63-character transcription is retired from active Stage 0 gates'
   Assert-True (-not $source.Contains('Get-Phase7BStage0SafeIdentityResult') -and
     -not $source.Contains('Get-Phase7BStage0SafeValueShape') -and
     -not $source.Contains('hostnameEvidence')) 'nested hostname evidence layer removed'
@@ -133,13 +136,24 @@ try {
   $v2Host = Get-V2ReferenceHostIdentitySha256 'LAPTOP-4G5U0U2R' $syntheticUuid $syntheticMachineGuid
   $stage0Host = Get-Phase7BStage0HostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
     -Uuid $syntheticUuid -MachineGuid $syntheticMachineGuid
-  Assert-True ($v2Host -ceq $stage0Host) 'Stage 0 host computation is byte-identical to V2 attestation semantics'
+  Assert-True ($v2Host -ceq $stage0Host -and $stage0Host -ceq 'ff570bf96b4cc2331dc8b27086b8b51928b2e79af3bef7decea29b5335ae224f') `
+    'Stage 0 real host hash-producing path matches fixed V2 fixture digest'
   $v2Disk = Get-V2ReferenceDiskIdentitySha256 'LAPTOP-4G5U0U2R' 0 'UNIQUE-ID' 'SERIAL-01' `
     'Friendly Disk' ([int64]1000204886016) 'SATA'
   $stage0Disk = Get-Phase7BStage0DiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
     -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
     -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
-  Assert-True ($v2Disk -ceq $stage0Disk) 'Stage 0 disk computation is byte-identical to V2 attestation semantics'
+  Assert-True ($v2Disk -ceq $stage0Disk -and $stage0Disk -ceq 'a30f346e3f58de06dad4034b8eba9de3818a1464210539897740707c91eb6e28') `
+    'Stage 0 real disk hash-producing path matches fixed V2 fixture digest'
+
+  foreach ($validIdentity in @($acceptedHostSha, $acceptedDiskSha, $stage0Host, $stage0Disk)) {
+    Assert-True ((Assert-Phase7BStage0Sha256Identity -Value $validIdentity -ErrorCode 'SHAPE_FAIL') -ceq $validIdentity) `
+      'exact lowercase 64-hex identity accepted'
+  }
+  foreach ($invalidIdentity in @($null, '', ('a' * 63), ('a' * 65), ('A' * 64), (('a' * 63) + 'g'))) {
+    Assert-ThrowsCode { Assert-Phase7BStage0Sha256Identity -Value $invalidIdentity -ErrorCode 'SHAPE_FAIL' } `
+      'SHAPE_FAIL' 'malformed active identity fails closed'
+  }
 
   $valid = @{
     ObservedAttemptId = $attempt
@@ -168,6 +182,9 @@ try {
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'historical host identity is audit-only and fails active gate'
   $historicalDisk = $valid.Clone(); $historicalDisk.DiskIdentitySha256 = $historicalDiskSha
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'historical disk identity is audit-only and fails active gate'
+  $invalidTranscription = $valid.Clone(); $invalidTranscription.HostIdentitySha256 = $invalidTranscribedHostSha
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @invalidTranscription } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_SHAPE_FAIL' `
+    'invalid 63-character host transcription fails shape gate'
   foreach ($storageCase in @(
       @{ field = 'FileSystem'; value = 'ReFS' },
       @{ field = 'DiskNumber'; value = 1 },

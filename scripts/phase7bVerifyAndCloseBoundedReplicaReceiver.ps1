@@ -27,23 +27,24 @@ try {
   if (-not (Test-Phase7BBoundedReplicaFileSet -FileNames @($files.Name) -ExpectedPacketFileName "$AttemptId.zip.age").pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FILE_CARDINALITY_FAIL' }
   $packet = Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $packetPath -ExpectedSha256 $ExpectedPacketSha256 -ExpectedBytes $ExpectedPacketBytes
   if (-not $packet.pass) { throw $packet.classification }
-  $machineIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName ([Environment]::MachineName) -ExpectedComputerName $contract.acceptedComputerName
-  $environmentIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $env:COMPUTERNAME -ExpectedComputerName $contract.acceptedComputerName
-  $computerSystem = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
-  $cimIdentity = Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $computerSystem.Name -ExpectedComputerName $contract.acceptedComputerName
-  if (-not $machineIdentity.pass -or -not $environmentIdentity.pass -or -not $cimIdentity.pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_HOST_IDENTITY_FAIL' }
-  $product = Get-CimInstance Win32_ComputerSystemProduct
+  $products = @(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop)
+  if ($products.Count -ne 1) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_PRODUCT_CARDINALITY_FAIL' }
+  $product = $products[0]
   $machineGuid = [string](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid).MachineGuid
-  $hostSha = Get-Phase7BSha256 -Text ($contract.acceptedComputerName.ToLowerInvariant() + '|' + ([string]$product.UUID).ToLowerInvariant() + '|' + $machineGuid.ToLowerInvariant())
-  $volume = Get-Volume -DriveLetter D -ErrorAction Stop; $partitions = @(Get-Partition -DriveLetter D -ErrorAction Stop); $disks = @($partitions | Get-Disk -ErrorAction Stop)
-  if ($partitions.Count -ne 1 -or $disks.Count -ne 1) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DISK_CARDINALITY_FAIL' }
+  $hostSha = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName $contract.acceptedComputerName `
+    -Uuid ([string]$product.UUID) -MachineGuid $machineGuid
+  $volumes = @(Get-Volume -DriveLetter D -ErrorAction Stop); $partitions = @(Get-Partition -DriveLetter D -ErrorAction Stop); $disks = @($partitions | Get-Disk -ErrorAction Stop)
+  if ($volumes.Count -ne 1 -or $partitions.Count -ne 1 -or $disks.Count -ne 1) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DISK_CARDINALITY_FAIL' }
+  $volume = $volumes[0]
   $disk = $disks[0]
-  $diskSha = Get-Phase7BSha256 -Text ($contract.acceptedComputerName.ToLowerInvariant() + '|' + [string]$disk.Number + '|' + ([string]$disk.UniqueId).ToLowerInvariant() + '|' + ([string]$disk.SerialNumber).ToLowerInvariant() + '|' + ([string]$disk.FriendlyName).ToLowerInvariant() + '|' + [string]$disk.Size + '|' + ([string]$disk.BusType).ToLowerInvariant())
+  $diskSha = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName $contract.acceptedComputerName `
+    -DiskNumber ([int]$disk.Number) -UniqueId ([string]$disk.UniqueId) -SerialNumber ([string]$disk.SerialNumber) `
+    -FriendlyName ([string]$disk.FriendlyName) -DiskSizeBytes ([int64]$disk.Size) -BusType ([string]$disk.BusType)
   $stage = 'mandatory-session-teardown'; $teardownAttempted = $true
   Remove-SmbShare -Name $shareName -Force -Confirm:$false -ErrorAction Stop
   Remove-NetFirewallRule -Name $ruleName -ErrorAction Stop
   if (@(Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue).Count -ne 0 -or @(Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue).Count -ne 0) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_TEARDOWN_FAIL' }
-  $receipt = [pscustomobject][ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; observedAt = [DateTime]::UtcNow.ToString('o'); evidenceFileName = Split-Path -Leaf $EvidenceOutputPath; packetFileName = "$AttemptId.zip.age"; packetSha256 = $packet.packetSha256; packetBytes = $packet.packetBytes; destinationBytesReread = $true; encryptedPacketOnly = $true; computerName = $machineIdentity.canonicalComputerName; hostIdentitySha256 = $hostSha; diskIdentitySha256 = $diskSha; driveRoot = 'D:\'; fileSystem = [string]$volume.FileSystemType; diskNumber = [int]$disk.Number; busType = [string]$disk.BusType; physicallyIndependent = $true; freeBytes = [int64]$volume.SizeRemaining; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false; sessionTornDown = $true; reportPersisted = $true; automaticRetryAllowed = $false }
+  $receipt = [pscustomobject][ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; observedAt = [DateTime]::UtcNow.ToString('o'); evidenceFileName = Split-Path -Leaf $EvidenceOutputPath; packetFileName = "$AttemptId.zip.age"; packetSha256 = $packet.packetSha256; packetBytes = $packet.packetBytes; destinationBytesReread = $true; encryptedPacketOnly = $true; computerName = $contract.acceptedComputerName; hostIdentitySha256 = $hostSha; diskIdentitySha256 = $diskSha; driveRoot = 'D:\'; fileSystem = [string]$volume.FileSystemType; diskNumber = [int]$disk.Number; busType = [string]$disk.BusType; physicallyIndependent = $true; freeBytes = [int64]$volume.SizeRemaining; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false; sessionTornDown = $true; reportPersisted = $true; automaticRetryAllowed = $false }
   if (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 $ExpectedPacketSha256 -ExpectedPacketBytes $ExpectedPacketBytes).pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_RECEIPT_SELF_CHECK_FAIL' }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $EvidenceOutputPath -Evidence $receipt
   $transportBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $receipt))

@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 
 $acceptedAttemptId = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
 $acceptedComputerName = 'LAPTOP-4G5U0U2R'
-$acceptedHostIdentitySha256 = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+$acceptedHostIdentitySha256 = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
 $acceptedDiskIdentitySha256 = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
 $acceptedFileSystem = 'NTFS'
 $acceptedDiskNumber = 0
@@ -26,6 +26,19 @@ function Get-Phase7BStage0Sha256 {
   } finally {
     $sha.Dispose()
   }
+}
+
+function Assert-Phase7BStage0Sha256Identity {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowNull()]$Value,
+    [Parameter(Mandatory = $true)][string]$ErrorCode
+  )
+  $values = @($Value)
+  if ($values.Count -ne 1 -or $null -eq $values[0] -or $values[0] -isnot [string] -or
+      [string]$values[0] -cnotmatch '^[0-9a-f]{64}$') {
+    throw $ErrorCode
+  }
+  [string]$values[0]
 }
 
 function Get-Phase7BStage0HostIdentitySha256 {
@@ -80,7 +93,11 @@ function Assert-Phase7BStage0Snapshot {
   if ($ObservedToolingCommit -cnotmatch '^[0-9a-f]{40}$') {
     throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL'
   }
-  if ($HostIdentitySha256 -cne 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1') {
+  [void](Assert-Phase7BStage0Sha256Identity -Value $HostIdentitySha256 `
+    -ErrorCode 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_SHAPE_FAIL')
+  [void](Assert-Phase7BStage0Sha256Identity -Value $DiskIdentitySha256 `
+    -ErrorCode 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_SHAPE_FAIL')
+  if ($HostIdentitySha256 -cne 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1') {
     throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL'
   }
   if ($DiskIdentitySha256 -cne '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948') {
@@ -114,6 +131,12 @@ $stage = 'validate-delivery-identity'
 try {
   $actualArtifactSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $PSCommandPath -ErrorAction Stop).Hash.ToLowerInvariant()
   if ($actualArtifactSha256 -cne $ExpectedArtifactSha256) { throw 'PHASE7B_WP2B_STAGE0_ARTIFACT_IDENTITY_FAIL' }
+
+  $stage = 'validate-active-identity-contract'
+  [void](Assert-Phase7BStage0Sha256Identity -Value $acceptedHostIdentitySha256 `
+    -ErrorCode 'PHASE7B_WP2B_ACTIVE_HOST_IDENTITY_CONTRACT_INVALID')
+  [void](Assert-Phase7BStage0Sha256Identity -Value $acceptedDiskIdentitySha256 `
+    -ErrorCode 'PHASE7B_WP2B_ACTIVE_DISK_IDENTITY_CONTRACT_INVALID')
 
   $stage = 'validate-operation-identity'
   if ($AttemptId -cne $acceptedAttemptId) { throw 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL' }

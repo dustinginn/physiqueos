@@ -27,6 +27,7 @@ function Import-SourceFunction([string]$Path, [string]$Name) {
 }
 
 $attemptId = 'phase7b-wp2-6cce4f4197ae4651a33ec123825326f9'
+# Historical pre-update attestation fixture retained for regression/audit only.
 $hostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
 $diskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
 $localRoot = 'D:\Phase7B\replicas\379bb303\wp2b\encrypted-replica'
