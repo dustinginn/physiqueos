@@ -2,6 +2,10 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $scriptPath = Join-Path $PSScriptRoot 'phase7bRunWorkPackage2LaptopPreflight.ps1'
 $attempt = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
+$acceptedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+$acceptedDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
+$historicalHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+$historicalDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "phase7b-stage0-delivery-$([guid]::NewGuid().ToString('N'))"
 $assertions = 0
 
@@ -80,11 +84,13 @@ try {
   Assert-True ($source.Contains($attempt)) 'wrapper binds exact authorized attempt'
   foreach ($binding in @(
       'LAPTOP-4G5U0U2R',
-      'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c',
-      '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896',
+      $acceptedHostSha,
+      $acceptedDiskSha,
       "'NTFS'", "'SATA'", "'192.168.1.69'", '[int64]1GB')) {
     Assert-True ($source.Contains($binding)) "Stage 0 exact invariant retained:$binding"
   }
+  Assert-True (-not $source.Contains($historicalHostSha) -and -not $source.Contains($historicalDiskSha)) `
+    'historical identity digests are retired from active Stage 0 gates'
   Assert-True (-not $source.Contains('Get-Phase7BStage0SafeIdentityResult') -and
     -not $source.Contains('Get-Phase7BStage0SafeValueShape') -and
     -not $source.Contains('hostnameEvidence')) 'nested hostname evidence layer removed'
@@ -104,8 +110,8 @@ try {
   $valid = @{
     ObservedAttemptId = $attempt
     ObservedToolingCommit = 'a' * 40
-    HostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
-    DiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+    HostIdentitySha256 = $acceptedHostSha
+    DiskIdentitySha256 = $acceptedDiskSha
     FileSystem = 'NTFS'
     DiskNumber = 0
     BusType = 'SATA'
@@ -124,6 +130,10 @@ try {
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'wrong host with correct disk fails closed'
   $wrongDisk = $valid.Clone(); $wrongDisk.DiskIdentitySha256 = 'c' * 64
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'correct host with wrong disk fails closed'
+  $historicalHost = $valid.Clone(); $historicalHost.HostIdentitySha256 = $historicalHostSha
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'historical host identity is audit-only and fails active gate'
+  $historicalDisk = $valid.Clone(); $historicalDisk.DiskIdentitySha256 = $historicalDiskSha
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'historical disk identity is audit-only and fails active gate'
   foreach ($storageCase in @(
       @{ field = 'FileSystem'; value = 'ReFS' },
       @{ field = 'DiskNumber'; value = 1 },
