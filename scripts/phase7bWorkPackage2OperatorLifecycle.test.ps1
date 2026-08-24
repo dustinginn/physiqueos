@@ -21,6 +21,9 @@ try {
   Assert-True ($document.selectionSha256 -eq $selection -and $document.runtimeRevision -eq 142 -and $document.replicaPathModel -eq 'EXACT_ATTEMPT_ROOT') 'authorization binds selection runtime and replica path model'
   Assert-True ($document.capturePlanFileName -eq "$attempt-refresh-$('2'*32)-capture-plan.json" -and $document.selectionFileName -eq "$attempt-refresh-$('2'*32)-selection.json" -and $document.quiescenceEvidenceToolingCommit -eq $tooling) 'authorization binds exact handoff filenames and original quiescence tooling commit'
   Assert-True ($document.founderMeaningfulDataThrough -eq '2026-08-16' -and $document.founderDowntimeBegan -eq '2026-08-17') 'authorization binds Founder cutoff policy'
+  Assert-True ($document.maximumAuthorizationLifetimeHours -eq 24) 'authorization document binds a bounded 24-hour maximum lifecycle'
+  $tooLongParameters=@{AuthorizationId=$authorizationId;AttemptId=$attempt;ToolingCommit=$tooling;CapturePlanSha256=$plan;CapturePlanFileName="$attempt-refresh-$('2'*32)-capture-plan.json";InventorySha256=$inventory;SelectionSha256=$selection;SelectionFileName="$attempt-refresh-$('2'*32)-selection.json";SourceRootSha256=$source;RuntimeRevision=142;RuntimeSha256=$runtime;AgeExePathSha256=$agePath;AgeExeSha256=$age;LocalOutputRootSha256=$local;ReplicaRootSha256=$replica;ReplicaUncRoot=$unc;QuiescenceEvidenceSha256=$quiescenceSha;QuiescenceEvidenceFileName="phase7b-wp2b-quiescence-$('1'*32).json";QuiescenceEvidenceToolingCommit=$tooling;ConsumptionMarkerFileName="$authorizationId.used.json";IssuedAt=$issued;ExpiresAt=$issued.AddHours(25)}
+  Assert-Throws { New-Phase7BWorkPackage2CaptureAuthorizationDocument @tooLongParameters } 'AUTHORIZATION_ARGUMENT_FAIL' 'authorization lifetime over 24 hours rejected'
   foreach($change in @(
     @{name='authorizationId';value='wrong'},@{name='attemptId';value='wrong'},@{name='tooling';value='0'},@{name='runtimeRevision';value=0},@{name='unc';value='\\WRONG\share'}
   )){

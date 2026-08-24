@@ -123,7 +123,7 @@ try {
     -QuiescenceEvidenceSha256 $ExpectedQuiescenceEvidenceSha256 -QuiescenceEvidenceFileName (Split-Path -Leaf $QuiescenceEvidencePath) `
     -QuiescenceEvidenceToolingCommit $ExpectedQuiescenceEvidenceToolingCommit `
     -ConsumptionMarkerFileName "$AuthorizationId.used.json" `
-    -IssuedAt $issued -ExpiresAt $issued.AddHours(2)
+    -IssuedAt $issued -ExpiresAt $issued.AddHours(24)
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $document
   [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanFileName = Split-Path -Leaf $CapturePlanPath; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCapacityBytes = [Math]::Max([int64]1GB, ([int64]$plan.totalBytes * 2L) + [int64]64MB); laptopIpv4 = $LaptopIpv4; laptopIdentityDeferredToReceiver = $true; laptopReachabilityDeferredToReceiver = $true; primaryNetworkBindingPass = $true; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
 } catch {

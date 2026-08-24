@@ -227,7 +227,8 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
       $QuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
       @(@($CapturePlanFileName, $SelectionFileName) | Where-Object { $_ -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or $_ -notmatch [regex]::Escape($AttemptId) }).Count -gt 0 -or
       $QuiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
-      $ConsumptionMarkerFileName -cne "$AuthorizationId.used.json" -or $ExpiresAt.ToUniversalTime() -le $IssuedAt.ToUniversalTime()) {
+      $ConsumptionMarkerFileName -cne "$AuthorizationId.used.json" -or $ExpiresAt.ToUniversalTime() -le $IssuedAt.ToUniversalTime() -or
+      $ExpiresAt.ToUniversalTime() -gt $IssuedAt.ToUniversalTime().AddHours(24)) {
     throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_ARGUMENT_FAIL'
   }
   [ordered]@{
@@ -273,6 +274,7 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     wp2cAuthorized = $false
     issuedAt = $IssuedAt.ToUniversalTime().ToString('o')
     expiresAt = $ExpiresAt.ToUniversalTime().ToString('o')
+    maximumAuthorizationLifetimeHours = 24
   }
 }
 
