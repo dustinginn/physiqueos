@@ -84,6 +84,60 @@ try {
       [string]$rejected.safeReasonCode -match $case.code -and -not $rejected.quiescenceMutationPerformed -and
       -not $rejected.quiescenceEvidenceCreated -and -not $rejected.automaticRetryAllowed) "resume rejects:$($case.p)"
   }
+  foreach($ageCase in @(
+    @{lines=@('v1.3.1');exit=0;pass=$true;version='1.3.1';format='OFFICIAL_V_PREFIX'},
+    @{lines=@('age v1.3.1');exit=0;pass=$true;version='1.3.1';format='LEGACY_AGE_V_PREFIX'},
+    @{lines=@('age 1.4.0');exit=0;pass=$true;version='1.4.0';format='LEGACY_AGE_PREFIX'},
+    @{lines=@('1.10.2');exit=0;pass=$true;version='1.10.2';format='PLAIN_SEMVER'},
+    @{lines=@('v1.2.0');exit=0;pass=$false;version='1.2.0';format='OFFICIAL_V_PREFIX'},
+    @{lines=@('v2.0.0');exit=0;pass=$false;version='2.0.0';format='OFFICIAL_V_PREFIX'},
+    @{lines=@('age version unknown');exit=0;pass=$false;version='';format='UNRECOGNIZED'},
+    @{lines=@('v1.3.1');exit=1;pass=$false;version='1.3.1';format='OFFICIAL_V_PREFIX'}
+  )) {
+    $ageDecision=Test-Phase7BAgeVersionOutput -OutputLines $ageCase.lines -ExitCode $ageCase.exit
+    Assert-True ([bool]$ageDecision.pass -eq [bool]$ageCase.pass -and [string]$ageDecision.normalizedVersion -ceq $ageCase.version -and [string]$ageDecision.outputFormat -ceq $ageCase.format) "age version parser:$($ageCase.lines -join ' ') exit:$($ageCase.exit)"
+  }
+
+  $postRefreshNonce='a'*32
+  $postSelectionName="$attempt-refresh-$postRefreshNonce-selection.json"
+  $postInventoryAuthorizationName="$attempt-refresh-$postRefreshNonce-inventory-authorization.json"
+  $postCapturePlanName="$attempt-refresh-$postRefreshNonce-capture-plan.json"
+  function New-PostRefreshParameters {
+    @{
+      Evidence=(New-Quiescence $tooling);ExpectedAttemptId=$attempt;ObservedAttemptId=$attempt
+      ExpectedEvidenceToolingCommit=$tooling;ExpectedEvidenceFileName=$resumeName;ExpectedEvidenceSha256=$quiescenceSha
+      ObservedEvidenceFileName=$resumeName;ObservedEvidenceSha256=$quiescenceSha;EvidenceCandidateCount=1
+      ExpectedRefreshNonce=$postRefreshNonce;ObservedRefreshNonce=$postRefreshNonce;RefreshArtifactCount=3
+      ExpectedSelectionFileName=$postSelectionName;ExpectedSelectionSha256=('6'*64);ObservedSelectionFileName=$postSelectionName;ObservedSelectionSha256=('6'*64)
+      ExpectedInventoryAuthorizationFileName=$postInventoryAuthorizationName;ExpectedInventoryAuthorizationSha256=('7'*64);ObservedInventoryAuthorizationFileName=$postInventoryAuthorizationName;ObservedInventoryAuthorizationSha256=('7'*64)
+      ExpectedCapturePlanFileName=$postCapturePlanName;ExpectedCapturePlanSha256=('8'*64);ObservedCapturePlanFileName=$postCapturePlanName;ObservedCapturePlanSha256=('8'*64)
+      ExpectedSourceInventorySha256=('9'*64);ObservedSourceInventorySha256=('9'*64)
+      ExpectedRuntimeRevision=142;ObservedRuntimeRevision=142;ExpectedRuntimeSha256=$runtime;ObservedRuntimeSha256=$runtime
+      ExpectedFileCount=404;ObservedFileCount=404;ExpectedTotalBytes=[int64]320252496;ObservedTotalBytes=[int64]320252496
+      RepositoryIdentityPass=$true;ApplicationBindingPass=$true;SourceRootBindingPass=$true;RuntimeBindingPass=$true;SourceIntegrityPass=$true;RefreshInternalBindingPass=$true
+      MonitorTaskDefinitionExact=$true;MonitorState='Disabled';ProductionServerState='Running';ListenerCount=1;CaptureAuthorizationCount=0
+    }
+  }
+  $postRefreshParameters=New-PostRefreshParameters
+  $postRefresh=Test-Phase7BWorkPackage2PostRefreshCheckpoint @postRefreshParameters
+  Assert-True ($postRefresh.pass -and $postRefresh.classification -ceq 'PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_RESUME_PASS' -and
+    $postRefresh.refreshCheckpointReused -and -not $postRefresh.additionalRefreshAllowed -and -not $postRefresh.quiescenceMutationPerformed -and
+    -not $postRefresh.refreshMutationPerformed -and -not $postRefresh.sourceMutationPerformed) 'exact successful refresh checkpoint is reusable without another refresh or quiescence mutation'
+  foreach($case in @(
+    @{p='ObservedRefreshNonce';v=('b'*32);code='NONCE_FAIL'},
+    @{p='ObservedSelectionSha256';v=('0'*64);code='SELECTION_BINDING_FAIL'},
+    @{p='ObservedInventoryAuthorizationSha256';v=('0'*64);code='INVENTORY_AUTHORIZATION_BINDING_FAIL'},
+    @{p='ObservedCapturePlanSha256';v=('0'*64);code='CAPTURE_PLAN_BINDING_FAIL'},
+    @{p='ObservedSourceInventorySha256';v=('0'*64);code='SOURCE_INVENTORY_BINDING_FAIL'},
+    @{p='RefreshArtifactCount';v=6;code='ARTIFACT_CARDINALITY_FAIL'},
+    @{p='RefreshInternalBindingPass';v=$false;code='INTERNAL_BINDING_FAIL'},
+    @{p='CaptureAuthorizationCount';v=1;code='CAPTURE_AUTHORIZATION_COLLISION'}
+  )) {
+    $parameters=New-PostRefreshParameters;$parameters[$case.p]=$case.v
+    $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
+    Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match $case.code -and -not $rejected.additionalRefreshAllowed -and
+      -not $rejected.quiescenceMutationPerformed -and -not $rejected.refreshMutationPerformed) "post-refresh checkpoint rejects:$($case.p)"
+  }
   $preflight=New-StableEvidence;Assert-True (Test-Phase7BWorkPackage2StablePreflightEvidence $preflight).pass 'complete stable preflight accepted'
   foreach($property in @('repositoryIdentityPass','originParityPass','trackedTreeClean','planBindingPass','inventoryBindingPass','runtimeBindingPass','ageIdentityPass','primaryDestinationPass','laptopReachable','quiescencePass','sourceStableAcrossPreflight')){$bad=New-StableEvidence;$bad.$property=$false;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects $property false"}
   foreach($property in @('missingCollectionCount','unknownCollectionCount','missingMediaReferenceCount','credentialSignalCount')){$bad=New-StableEvidence;$bad.$property=1;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects nonzero $property"}
@@ -225,6 +279,34 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
     $prepareSource.Contains('PHASE7B_WP2B_CAPTURE_PREFLIGHT_FRESH_QUIESCENCE_BINDING_FAIL') -and
     $prepareSource.Contains('PHASE7B_WP2B_CAPTURE_PREFLIGHT_RESUME_AUTHORIZATION_FAIL')) `
     'capture preflight requires explicit resume mode before accepting a noncurrent evidence commit'
+  Assert-True ($prepareSource.Contains('Test-Phase7BAgeVersionOutput') -and
+    $prepareSource.IndexOf('PHASE7B_WP2B_CAPTURE_PREFLIGHT_FILE_BINDING_FAIL') -lt $prepareSource.IndexOf('Test-Phase7BAgeVersionOutput')) `
+    'capture preflight validates exact age executable hash before parsing its source-owned version output'
+  $postRefreshPath=Join-Path $PSScriptRoot 'phase7bResumeWorkPackage2PostRefreshCheckpoint.ps1'
+  $postRefreshSource=Get-Content -LiteralPath $postRefreshPath -Raw
+  $postRefreshTokens=$null;$postRefreshErrors=$null
+  $postRefreshAst=[Management.Automation.Language.Parser]::ParseFile($postRefreshPath,[ref]$postRefreshTokens,[ref]$postRefreshErrors)
+  Assert-True (@($postRefreshErrors).Count -eq 0) 'post-refresh checkpoint PowerShell 5.1 AST'
+  $postRefreshCommands=@($postRefreshAst.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Where-Object{$_ -match '^(?:Get|New|Test)-Phase7B'}|Sort-Object -Unique)
+  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
+  Assert-True (@(Compare-Object $expectedPostRefreshCommands $postRefreshCommands).Count -eq 0) 'post-refresh checkpoint custom command inventory is complete and reviewed'
+  $postRefreshProbe=@"
+`$ErrorActionPreference='Stop'
+Set-StrictMode -Version Latest
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2OperatorLifecycle.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Contract.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.psm1' -Force
+`$names=@('$($expectedPostRefreshCommands -join "','")','Test-Phase7BAgeVersionOutput')
+`$resolved=@(`$names|ForEach-Object{[bool](Get-Command `$_ -CommandType Function -ErrorAction Stop)})
+[ordered]@{classification='PHASE7B_WP2B_POST_REFRESH_HELPERS_PS51_PASS';pass=(@(`$resolved|Where-Object{-not `$_}).Count-eq0);resolvedCommandCount=`$resolved.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
+"@
+  $postRefreshEncoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($postRefreshProbe))
+  $postRefreshOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $postRefreshEncoded 2>&1)
+  $postRefreshExit=$LASTEXITCODE
+  $postRefreshResult=($postRefreshOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
+  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 5 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
+  Assert-True (-not ($postRefreshSource -match '(?i)\b(?:Stop|Disable|Enable|Start|Register|Unregister|Set)-ScheduledTask\b|Write-Phase7BSafeEvidenceFile|phase7bRefreshWorkPackage2StableInventory|phase7bSetWorkPackage2CaptureQuiescence')) `
+    'post-refresh checkpoint has no quiescence refresh evidence or task mutation path'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')
   Assert-True ($refreshSource.Contains('[Parameter(Mandatory = $true)][string]$ExpectedAttemptId')) 'stable refresh requires explicit expected attempt identity'
   Assert-True (-not $refreshSource.Contains('[guid]::NewGuid()')) 'stable refresh never generates or substitutes attempt identity'

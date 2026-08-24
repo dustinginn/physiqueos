@@ -105,6 +105,104 @@ function Test-Phase7BWorkPackage2ExactQuiescenceResume {
   }
 }
 
+function Test-Phase7BAgeVersionOutput {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$OutputLines,
+    [Parameter(Mandatory = $true)][int]$ExitCode
+  )
+  $text = (@($OutputLines | ForEach-Object { [string]$_ }) -join ' ').Trim()
+  $match = [regex]::Match($text, '^(?i:(?:age\s+)?v?)(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)$')
+  $major = if ($match.Success) { [int]$match.Groups['major'].Value } else { -1 }
+  $minor = if ($match.Success) { [int]$match.Groups['minor'].Value } else { -1 }
+  $patch = if ($match.Success) { [int]$match.Groups['patch'].Value } else { -1 }
+  $pass = $ExitCode -eq 0 -and $match.Success -and $major -eq 1 -and $minor -ge 3
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2_AGE_VERSION_SUPPORTED' } else { 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
+    pass = [bool]$pass
+    normalizedVersion = if ($match.Success) { "$major.$minor.$patch" } else { '' }
+    outputFormat = if ($text -cmatch '^v[0-9]') { 'OFFICIAL_V_PREFIX' } elseif ($text -cmatch '^age v[0-9]') { 'LEGACY_AGE_V_PREFIX' } elseif ($text -cmatch '^age [0-9]') { 'LEGACY_AGE_PREFIX' } elseif ($text -cmatch '^[0-9]') { 'PLAIN_SEMVER' } else { 'UNRECOGNIZED' }
+  }
+}
+
+function Test-Phase7BWorkPackage2PostRefreshCheckpoint {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)]$Evidence,
+    [Parameter(Mandatory = $true)][string]$ExpectedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ObservedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceToolingCommit,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedEvidenceSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedEvidenceFileName,
+    [Parameter(Mandatory = $true)][string]$ObservedEvidenceSha256,
+    [Parameter(Mandatory = $true)][int]$EvidenceCandidateCount,
+    [Parameter(Mandatory = $true)][string]$ExpectedRefreshNonce,
+    [Parameter(Mandatory = $true)][string]$ObservedRefreshNonce,
+    [Parameter(Mandatory = $true)][int]$RefreshArtifactCount,
+    [Parameter(Mandatory = $true)][string]$ExpectedSelectionFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedSelectionSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedSelectionFileName,
+    [Parameter(Mandatory = $true)][string]$ObservedSelectionSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedInventoryAuthorizationFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedInventoryAuthorizationSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedInventoryAuthorizationFileName,
+    [Parameter(Mandatory = $true)][string]$ObservedInventoryAuthorizationSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedCapturePlanFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedCapturePlanSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedCapturePlanFileName,
+    [Parameter(Mandatory = $true)][string]$ObservedCapturePlanSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedSourceInventorySha256,
+    [Parameter(Mandatory = $true)][string]$ObservedSourceInventorySha256,
+    [Parameter(Mandatory = $true)][int64]$ExpectedRuntimeRevision,
+    [Parameter(Mandatory = $true)][int64]$ObservedRuntimeRevision,
+    [Parameter(Mandatory = $true)][string]$ExpectedRuntimeSha256,
+    [Parameter(Mandatory = $true)][string]$ObservedRuntimeSha256,
+    [Parameter(Mandatory = $true)][int]$ExpectedFileCount,
+    [Parameter(Mandatory = $true)][int]$ObservedFileCount,
+    [Parameter(Mandatory = $true)][int64]$ExpectedTotalBytes,
+    [Parameter(Mandatory = $true)][int64]$ObservedTotalBytes,
+    [Parameter(Mandatory = $true)][bool]$RepositoryIdentityPass,
+    [Parameter(Mandatory = $true)][bool]$ApplicationBindingPass,
+    [Parameter(Mandatory = $true)][bool]$SourceRootBindingPass,
+    [Parameter(Mandatory = $true)][bool]$RuntimeBindingPass,
+    [Parameter(Mandatory = $true)][bool]$SourceIntegrityPass,
+    [Parameter(Mandatory = $true)][bool]$RefreshInternalBindingPass,
+    [Parameter(Mandatory = $true)][bool]$MonitorTaskDefinitionExact,
+    [Parameter(Mandatory = $true)][string]$MonitorState,
+    [Parameter(Mandatory = $true)][string]$ProductionServerState,
+    [Parameter(Mandatory = $true)][int]$ListenerCount,
+    [Parameter(Mandatory = $true)][int]$CaptureAuthorizationCount
+  )
+  $safeReasonCode = $null
+  $expectedStem = "$ExpectedAttemptId-refresh-$ExpectedRefreshNonce"
+  if ($ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ObservedAttemptId -cne $ExpectedAttemptId) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_ATTEMPT_IDENTITY_FAIL' }
+  elseif ($ExpectedRefreshNonce -cnotmatch '^[0-9a-f]{32}$' -or $ObservedRefreshNonce -cne $ExpectedRefreshNonce) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_NONCE_FAIL' }
+  elseif ($ExpectedEvidenceToolingCommit -cnotmatch '^[0-9a-f]{40}$' -or $ExpectedEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_EVIDENCE_EXPECTATION_FAIL' }
+  elseif ($EvidenceCandidateCount -ne 1 -or $ObservedEvidenceFileName -cne $ExpectedEvidenceFileName -or $ObservedEvidenceSha256 -cne $ExpectedEvidenceSha256) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_EVIDENCE_BINDING_FAIL' }
+  elseif (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $Evidence -ExpectedToolingCommit $ExpectedEvidenceToolingCommit).pass -or -not [bool]$Evidence.mutationPerformed -or -not [bool]$Evidence.reportPersisted) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_QUIESCENCE_EVIDENCE_FAIL' }
+  elseif ($RefreshArtifactCount -ne 3) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_ARTIFACT_CARDINALITY_FAIL' }
+  elseif ($ExpectedSelectionFileName -cne "$expectedStem-selection.json" -or $ObservedSelectionFileName -cne $ExpectedSelectionFileName -or $ObservedSelectionSha256 -cne $ExpectedSelectionSha256 -or $ExpectedSelectionSha256 -cnotmatch '^[0-9a-f]{64}$') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SELECTION_BINDING_FAIL' }
+  elseif ($ExpectedInventoryAuthorizationFileName -cne "$expectedStem-inventory-authorization.json" -or $ObservedInventoryAuthorizationFileName -cne $ExpectedInventoryAuthorizationFileName -or $ObservedInventoryAuthorizationSha256 -cne $ExpectedInventoryAuthorizationSha256 -or $ExpectedInventoryAuthorizationSha256 -cnotmatch '^[0-9a-f]{64}$') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_INVENTORY_AUTHORIZATION_BINDING_FAIL' }
+  elseif ($ExpectedCapturePlanFileName -cne "$expectedStem-capture-plan.json" -or $ObservedCapturePlanFileName -cne $ExpectedCapturePlanFileName -or $ObservedCapturePlanSha256 -cne $ExpectedCapturePlanSha256 -or $ExpectedCapturePlanSha256 -cnotmatch '^[0-9a-f]{64}$') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_CAPTURE_PLAN_BINDING_FAIL' }
+  elseif ($ExpectedSourceInventorySha256 -cnotmatch '^[0-9a-f]{64}$' -or $ObservedSourceInventorySha256 -cne $ExpectedSourceInventorySha256) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SOURCE_INVENTORY_BINDING_FAIL' }
+  elseif ($ObservedRuntimeRevision -ne $ExpectedRuntimeRevision -or $ObservedRuntimeSha256 -cne $ExpectedRuntimeSha256) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_RUNTIME_BINDING_FAIL' }
+  elseif ($ObservedFileCount -ne $ExpectedFileCount -or $ObservedTotalBytes -ne $ExpectedTotalBytes) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_INVENTORY_CARDINALITY_FAIL' }
+  elseif (-not $RepositoryIdentityPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_REPOSITORY_IDENTITY_FAIL' }
+  elseif (-not $ApplicationBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_APPLICATION_BINDING_FAIL' }
+  elseif (-not $SourceRootBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SOURCE_ROOT_BINDING_FAIL' }
+  elseif (-not $RuntimeBindingPass -or -not $SourceIntegrityPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SOURCE_INTEGRITY_FAIL' }
+  elseif (-not $RefreshInternalBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_INTERNAL_BINDING_FAIL' }
+  elseif (-not $MonitorTaskDefinitionExact -or $MonitorState -cne 'Disabled') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_MONITOR_STATE_FAIL' }
+  elseif ($ProductionServerState -cne 'Running' -or $ListenerCount -ne 1) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SERVER_STATE_FAIL' }
+  elseif ($CaptureAuthorizationCount -ne 0) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_CAPTURE_AUTHORIZATION_COLLISION' }
+  $pass = $null -eq $safeReasonCode
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_RESUME_PASS' } else { 'PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_NONRESUMABLE' }
+    pass = [bool]$pass; safeReasonCode = $safeReasonCode; attemptId = $ExpectedAttemptId; refreshNonce = $ExpectedRefreshNonce
+    quiescenceMutationPerformed = $false; refreshMutationPerformed = $false; sourceMutationPerformed = $false
+    refreshCheckpointReused = [bool]$pass; additionalRefreshAllowed = $false; automaticRetryAllowed = $false; wp2cAuthorized = $false
+  }
+}
+
 function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][string]$AuthorizationId,
@@ -381,6 +479,8 @@ Export-ModuleMember -Function @(
   'Get-Phase7BWorkPackage2OperatorContract',
   'Test-Phase7BWorkPackage2QuiescenceEvidence',
   'Test-Phase7BWorkPackage2ExactQuiescenceResume',
+  'Test-Phase7BAgeVersionOutput',
+  'Test-Phase7BWorkPackage2PostRefreshCheckpoint',
   'New-Phase7BWorkPackage2CaptureAuthorizationDocument',
   'Assert-Phase7BWorkPackage2CaptureAuthorization',
   'Use-Phase7BWorkPackage2CaptureAuthorization',

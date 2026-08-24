@@ -93,8 +93,9 @@ try {
     throw 'PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED'
   }
   $stage = 'validate-tools-destinations-and-lan'
-  $ageVersion = @(& $AgeExePath --version 2>&1) -join ' '
-  if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
+  $ageVersionLines = @(& $AgeExePath --version 2>&1)
+  $ageVersion = Test-Phase7BAgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE
+  if (-not $ageVersion.pass) { throw 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
   $localBase = [IO.Path]::GetFullPath($LocalOutputRoot).TrimEnd('\')
   $localDrive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($localBase).Substring(0,1)) -PSProvider FileSystem -ErrorAction Stop
   if ([int64]$localDrive.Free -lt [Math]::Max([int64]1GB, [int64]$plan.totalBytes) -or (Test-Path -LiteralPath (Join-Path $localBase $AttemptId))) { throw 'PHASE7B_WP2B_PRIMARY_DESTINATION_FAIL' }
