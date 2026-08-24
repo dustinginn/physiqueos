@@ -483,6 +483,25 @@ function Get-Phase7BWorkPackage2RecoveryDecision {
   }
 }
 
+function Test-Phase7BWorkPackage2AgeVersionOutput {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$OutputLines,
+    [Parameter(Mandatory = $true)][int]$ExitCode
+  )
+  $text = (@($OutputLines | ForEach-Object { [string]$_ }) -join ' ').Trim()
+  $match = [regex]::Match($text, '^(?i:(?:age\s+)?v?)(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)$')
+  $major = if ($match.Success) { [int]$match.Groups['major'].Value } else { -1 }
+  $minor = if ($match.Success) { [int]$match.Groups['minor'].Value } else { -1 }
+  $patch = if ($match.Success) { [int]$match.Groups['patch'].Value } else { -1 }
+  $pass = $ExitCode -eq 0 -and $match.Success -and $major -eq 1 -and $minor -ge 3
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2_AGE_VERSION_SUPPORTED' } else { 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
+    pass = [bool]$pass
+    normalizedVersion = if ($match.Success) { "$major.$minor.$patch" } else { '' }
+    outputFormat = if ($text -cmatch '^v[0-9]') { 'OFFICIAL_V_PREFIX' } elseif ($text -cmatch '^age v[0-9]') { 'LEGACY_AGE_V_PREFIX' } elseif ($text -cmatch '^age [0-9]') { 'LEGACY_AGE_PREFIX' } elseif ($text -cmatch '^[0-9]') { 'PLAIN_SEMVER' } else { 'UNRECOGNIZED' }
+  }
+}
+
 Export-ModuleMember -Function @(
   "Get-Phase7BWorkPackage2Contract",
   "ConvertTo-Phase7BCanonicalJson",
@@ -498,5 +517,6 @@ Export-ModuleMember -Function @(
   "Test-Phase7BWorkPackage2MediaFileSet",
   "Test-Phase7BWorkPackage2StagingFileSet",
   "Test-Phase7BWorkPackage2RestoreEvidence",
+  "Test-Phase7BWorkPackage2AgeVersionOutput",
   "Get-Phase7BWorkPackage2RecoveryDecision"
 )

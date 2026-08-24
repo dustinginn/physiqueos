@@ -14,8 +14,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 $contract = Get-Phase7BWorkPackage2Contract
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tmpRoot = (Resolve-Path (Join-Path $repositoryRoot ".tmp")).Path.TrimEnd('\')
@@ -34,8 +34,8 @@ try {
       (Get-Phase7BSha256 -LiteralPath $DescriptorPath) -ne $ExpectedDescriptorSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_DESCRIPTOR_HASH_MISMATCH" }
   if (-not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
-  $ageVersion = @(& $AgeExePath --version 2>&1) -join ' '
-  if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
+  $ageVersionLines = @(& $AgeExePath --version 2>&1)
+  if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
   $descriptor = Get-Content -LiteralPath $DescriptorPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
   if ([int]$descriptor.schemaVersion -ne 1 -or [string]$descriptor.classification -ne "PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS" -or
       [string]$descriptor.attemptId -ne $AttemptId -or [string]$descriptor.applicationCommit -ne $contract.applicationCommit -or

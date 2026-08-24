@@ -164,8 +164,15 @@ function Write-Phase7BSafeEvidenceFile {
   $parent = Split-Path -Parent ([IO.Path]::GetFullPath($LiteralPath))
   if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'PHASE7B_WP2_SAFE_EVIDENCE_PARENT_MISSING' }
   $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $Evidence))
-  $stream = New-Object IO.FileStream($LiteralPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-  try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+  $created = $false
+  try {
+    $stream = New-Object IO.FileStream($LiteralPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $created = $true
+    try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+  } catch {
+    if ($created -and (Test-Path -LiteralPath $LiteralPath -PathType Leaf)) { Remove-Item -LiteralPath $LiteralPath -Force -ErrorAction SilentlyContinue }
+    throw
+  }
   [pscustomobject][ordered]@{ classification = 'PHASE7B_WP2_SAFE_EVIDENCE_PERSISTED'; pass = $true; fileName = Split-Path -Leaf $LiteralPath; sha256 = Get-Phase7BSha256 -LiteralPath $LiteralPath; bytes = [int64]$bytes.Length }
 }
 
@@ -225,13 +232,21 @@ function Copy-Phase7BBoundedEncryptedReplica {
   if (Test-Path -LiteralPath $DestinationPath) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_EXISTS' }
   $parent = Split-Path -Parent ([IO.Path]::GetFullPath($DestinationPath))
   if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PARENT_MISSING' }
+  $destinationCreated = $false
   $input = [IO.File]::Open((Resolve-Path -LiteralPath $SourcePath).Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
   try {
     $output = New-Object IO.FileStream($DestinationPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 1048576, [IO.FileOptions]::WriteThrough)
+    $destinationCreated = $true
     try { $input.CopyTo($output, 1048576); $output.Flush($true) } finally { $output.Dispose() }
+  } catch {
+    if ($destinationCreated -and (Test-Path -LiteralPath $DestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue }
+    throw
   } finally { $input.Dispose() }
   $replica = Test-Phase7BEncryptedPacket -LiteralPath $DestinationPath -ExpectedSha256 $ExpectedSha256
-  if (-not $replica.pass -or $replica.packetBytes -ne $ExpectedBytes) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_MISMATCH' }
+  if (-not $replica.pass -or $replica.packetBytes -ne $ExpectedBytes) {
+    if ($destinationCreated -and (Test-Path -LiteralPath $DestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue }
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_MISMATCH'
+  }
   [pscustomobject][ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_COPY_READBACK_PASS'; pass = $true; packetSha256 = $replica.packetSha256; packetBytes = $replica.packetBytes; writeThrough = $true; automaticRetryAllowed = $false }
 }
 

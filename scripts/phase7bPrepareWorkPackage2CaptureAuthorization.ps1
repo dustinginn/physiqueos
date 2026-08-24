@@ -14,7 +14,9 @@ param(
   [Parameter(Mandatory = $true)][string]$LocalOutputRoot,
   [Parameter(Mandatory = $true)][string]$ReplicaUncRoot,
   [Parameter(Mandatory = $true)][string]$PrimaryHostIpv4,
+  [Parameter(Mandatory = $true)][ValidateRange(1,32)][int]$PrimaryHostPrefixLength,
   [Parameter(Mandatory = $true)][string]$LaptopIpv4,
+  [Parameter(Mandatory = $true)][ValidateRange(1,32)][int]$LaptopPrefixLength,
   [Parameter(Mandatory = $true)][string]$QuiescenceEvidencePath,
   [Parameter(Mandatory = $true)][string]$ExpectedQuiescenceEvidenceSha256,
   [Parameter()][string]$ExpectedQuiescenceEvidenceToolingCommit,
@@ -29,6 +31,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2OperatorLifecycle.psm
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bSecondComputerReplicaContract.psm1') -Force
 $stage = 'validate-input'
 try {
   if ($QuiescenceMode -ceq 'FRESH_ESTABLISH') {
@@ -101,11 +104,10 @@ try {
   if ([int64]$localDrive.Free -lt [Math]::Max([int64]1GB, [int64]$plan.totalBytes) -or (Test-Path -LiteralPath (Join-Path $localBase $AttemptId))) { throw 'PHASE7B_WP2B_PRIMARY_DESTINATION_FAIL' }
   $expectedShare = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
   if ($ReplicaUncRoot -cne "\\LAPTOP-4G5U0U2R\$expectedShare") { throw 'PHASE7B_WP2B_REPLICA_ROOT_BINDING_FAIL' }
-  $primaryAddresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object { [string]$_.IPAddress -eq $PrimaryHostIpv4 })
-  $laptopReachable = $false
-  try { $laptopReachable = [bool](Test-Connection -ComputerName $LaptopIpv4 -Count 1 -Quiet -ErrorAction Stop) } catch { $laptopReachable = $false }
-  if ($primaryAddresses.Count -ne 1 -or -not $laptopReachable) { throw 'PHASE7B_WP2B_PHYSICAL_LAN_REACHABILITY_FAIL' }
-  $evidence = [pscustomobject]@{ repositoryIdentityPass = $true; originParityPass = $true; trackedTreeClean = $true; planBindingPass = $true; inventoryBindingPass = $true; runtimeBindingPass = $true; requiredCollectionCount = 39; missingCollectionCount = 0; unknownCollectionCount = 0; missingMediaReferenceCount = 0; credentialSignalCount = 0; ageIdentityPass = $true; primaryDestinationPass = $true; laptopReachable = $true; quiescencePass = $true; sourceStableAcrossPreflight = $true }
+  $primaryAddresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object { [string]$_.IPAddress -eq $PrimaryHostIpv4 -and [int]$_.PrefixLength -eq $PrimaryHostPrefixLength })
+  $networkBinding = Test-Phase7BSecondComputerNetworkBinding -PrimaryIpv4 $PrimaryHostIpv4 -PrimaryPrefixLength $PrimaryHostPrefixLength -ReplicaIpv4 $LaptopIpv4 -ReplicaPrefixLength $LaptopPrefixLength
+  if ($primaryAddresses.Count -ne 1 -or -not $networkBinding.pass) { throw 'PHASE7B_WP2B_PHYSICAL_LAN_BINDING_FAIL' }
+  $evidence = [pscustomobject]@{ repositoryIdentityPass = $true; originParityPass = $true; trackedTreeClean = $true; planBindingPass = $true; inventoryBindingPass = $true; runtimeBindingPass = $true; requiredCollectionCount = 39; missingCollectionCount = 0; unknownCollectionCount = 0; missingMediaReferenceCount = 0; credentialSignalCount = 0; ageIdentityPass = $true; primaryDestinationPass = $true; laptopNetworkBindingPass = $true; laptopReachabilityDeferredToReceiver = $true; quiescencePass = $true; sourceStableAcrossPreflight = $true }
   if (-not (Test-Phase7BWorkPackage2StablePreflightEvidence -Evidence $evidence).pass) { throw 'PHASE7B_WP2B_STABLE_PREFLIGHT_FAIL' }
   $sourceRootSha = Get-Phase7BSha256 -Text $source.ToLowerInvariant()
   $localRootSha = Get-Phase7BSha256 -Text $localBase.ToLowerInvariant()
@@ -113,15 +115,17 @@ try {
   $agePathSha = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($AgeExePath).ToLowerInvariant())
   $issued = [DateTime]::UtcNow
   $document = New-Phase7BWorkPackage2CaptureAuthorizationDocument -AuthorizationId $AuthorizationId -AttemptId $AttemptId `
-    -ToolingCommit $head -CapturePlanSha256 $ExpectedCapturePlanSha256 -InventorySha256 $ExpectedInventorySha256 `
-    -SelectionSha256 $ExpectedSelectionSha256 -SourceRootSha256 $sourceRootSha -RuntimeRevision ([int64]$auditAfter.runtimeRevision) `
+    -ToolingCommit $head -CapturePlanSha256 $ExpectedCapturePlanSha256 -CapturePlanFileName (Split-Path -Leaf $CapturePlanPath) `
+    -InventorySha256 $ExpectedInventorySha256 `
+    -SelectionSha256 $ExpectedSelectionSha256 -SelectionFileName (Split-Path -Leaf $SelectionPath) -SourceRootSha256 $sourceRootSha -RuntimeRevision ([int64]$auditAfter.runtimeRevision) `
     -RuntimeSha256 ([string]$auditAfter.runtimeSha256) -AgeExePathSha256 $agePathSha -AgeExeSha256 $ExpectedAgeExeSha256 `
     -LocalOutputRootSha256 $localRootSha -ReplicaRootSha256 $replicaRootSha -ReplicaUncRoot $ReplicaUncRoot `
     -QuiescenceEvidenceSha256 $ExpectedQuiescenceEvidenceSha256 -QuiescenceEvidenceFileName (Split-Path -Leaf $QuiescenceEvidencePath) `
+    -QuiescenceEvidenceToolingCommit $ExpectedQuiescenceEvidenceToolingCommit `
     -ConsumptionMarkerFileName "$AuthorizationId.used.json" `
     -IssuedAt $issued -ExpiresAt $issued.AddHours(2)
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $document
-  [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; laptopIdentityDeferredToReceiver = $true; laptopReachable = $true; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
+  [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanFileName = Split-Path -Leaf $CapturePlanPath; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCapacityBytes = [Math]::Max([int64]1GB, ([int64]$plan.totalBytes * 2L) + [int64]64MB); laptopIpv4 = $LaptopIpv4; laptopIdentityDeferredToReceiver = $true; laptopReachabilityDeferredToReceiver = $true; primaryNetworkBindingPass = $true; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; mutationStarted = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4

@@ -110,18 +110,7 @@ function Test-Phase7BAgeVersionOutput {
     [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$OutputLines,
     [Parameter(Mandatory = $true)][int]$ExitCode
   )
-  $text = (@($OutputLines | ForEach-Object { [string]$_ }) -join ' ').Trim()
-  $match = [regex]::Match($text, '^(?i:(?:age\s+)?v?)(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)$')
-  $major = if ($match.Success) { [int]$match.Groups['major'].Value } else { -1 }
-  $minor = if ($match.Success) { [int]$match.Groups['minor'].Value } else { -1 }
-  $patch = if ($match.Success) { [int]$match.Groups['patch'].Value } else { -1 }
-  $pass = $ExitCode -eq 0 -and $match.Success -and $major -eq 1 -and $minor -ge 3
-  [pscustomobject][ordered]@{
-    classification = if ($pass) { 'PHASE7B_WP2_AGE_VERSION_SUPPORTED' } else { 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
-    pass = [bool]$pass
-    normalizedVersion = if ($match.Success) { "$major.$minor.$patch" } else { '' }
-    outputFormat = if ($text -cmatch '^v[0-9]') { 'OFFICIAL_V_PREFIX' } elseif ($text -cmatch '^age v[0-9]') { 'LEGACY_AGE_V_PREFIX' } elseif ($text -cmatch '^age [0-9]') { 'LEGACY_AGE_PREFIX' } elseif ($text -cmatch '^[0-9]') { 'PLAIN_SEMVER' } else { 'UNRECOGNIZED' }
-  }
+  Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines $OutputLines -ExitCode $ExitCode
 }
 
 function Test-Phase7BWorkPackage2PostRefreshCheckpoint {
@@ -209,8 +198,10 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     [Parameter(Mandatory = $true)][string]$AttemptId,
     [Parameter(Mandatory = $true)][string]$ToolingCommit,
     [Parameter(Mandatory = $true)][string]$CapturePlanSha256,
+    [Parameter(Mandatory = $true)][string]$CapturePlanFileName,
     [Parameter(Mandatory = $true)][string]$InventorySha256,
     [Parameter(Mandatory = $true)][string]$SelectionSha256,
+    [Parameter(Mandatory = $true)][string]$SelectionFileName,
     [Parameter(Mandatory = $true)][string]$SourceRootSha256,
     [Parameter(Mandatory = $true)][int64]$RuntimeRevision,
     [Parameter(Mandatory = $true)][string]$RuntimeSha256,
@@ -221,6 +212,7 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     [Parameter(Mandatory = $true)][string]$ReplicaUncRoot,
     [Parameter(Mandatory = $true)][string]$QuiescenceEvidenceSha256,
     [Parameter(Mandatory = $true)][string]$QuiescenceEvidenceFileName,
+    [Parameter(Mandatory = $true)][string]$QuiescenceEvidenceToolingCommit,
     [Parameter(Mandatory = $true)][string]$ConsumptionMarkerFileName,
     [Parameter(Mandatory = $true)][datetime]$IssuedAt,
     [Parameter(Mandatory = $true)][datetime]$ExpiresAt
@@ -232,6 +224,8 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
   if ($AuthorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or $AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
       @($hashes | Where-Object { $_ -notmatch '^[0-9a-f]{40}$' -and $_ -notmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
       $ToolingCommit -notmatch '^[0-9a-f]{40}$' -or $RuntimeRevision -lt 1 -or $ReplicaUncRoot -notmatch '^\\\\LAPTOP-4G5U0U2R\\P7B[0-9a-f]{8}\$$' -or
+      $QuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
+      @(@($CapturePlanFileName, $SelectionFileName) | Where-Object { $_ -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or $_ -notmatch [regex]::Escape($AttemptId) }).Count -gt 0 -or
       $QuiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
       $ConsumptionMarkerFileName -cne "$AuthorizationId.used.json" -or $ExpiresAt.ToUniversalTime() -le $IssuedAt.ToUniversalTime()) {
     throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_ARGUMENT_FAIL'
@@ -250,8 +244,10 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     windowsHostId = $wp2.windowsHostId
     manifestDigest = $wp2.manifestDigest
     capturePlanSha256 = $CapturePlanSha256
+    capturePlanFileName = $CapturePlanFileName
     sourceInventorySha256 = $InventorySha256
     selectionSha256 = $SelectionSha256
+    selectionFileName = $SelectionFileName
     sourceRootSha256 = $SourceRootSha256
     runtimeRevision = $RuntimeRevision
     runtimeSha256 = $RuntimeSha256
@@ -268,6 +264,7 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     founderDowntimeBegan = $operator.founderDowntimeBegan
     quiescenceEvidenceSha256 = $QuiescenceEvidenceSha256
     quiescenceEvidenceFileName = $QuiescenceEvidenceFileName
+    quiescenceEvidenceToolingCommit = $QuiescenceEvidenceToolingCommit
     consumptionMarkerFileName = $ConsumptionMarkerFileName
     packetSha256 = '0' * 64
     founderApproved = $true
@@ -302,7 +299,10 @@ function Assert-Phase7BWorkPackage2CaptureAuthorization {
       [string]$authorization.authorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or
       [string]$authorization.toolingCommit -ne $ExpectedToolingCommit -or [string]$authorization.ageExeSha256 -ne $ExpectedAgeExeSha256 -or
       [string]$authorization.quiescenceEvidenceSha256 -ne $ExpectedQuiescenceEvidenceSha256 -or
+      [string]$authorization.quiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
       [string]$authorization.quiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
+      [string]$authorization.capturePlanFileName -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or
+      [string]$authorization.selectionFileName -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or
       [string]$authorization.selectionSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$authorization.runtimeRevision -lt 1 -or
       [string]$authorization.runtimeSha256 -notmatch '^[0-9a-f]{64}$' -or [string]$authorization.ageExePathSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$authorization.replicaUncRoot -notmatch '^\\\\LAPTOP-4G5U0U2R\\P7B[0-9a-f]{8}\$$' -or
@@ -322,8 +322,15 @@ function Use-Phase7BWorkPackage2CaptureAuthorization {
   $marker = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$Authorization.consumptionMarkerFileName)
   $value = [ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CONSUMED'; pass = $true; authorizationId = [string]$Authorization.authorizationId; attemptId = [string]$Authorization.attemptId; consumedAt = [DateTime]::UtcNow.ToString('o'); automaticRetryAllowed = $false }
   $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $value))
-  $stream = New-Object IO.FileStream($marker, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-  try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+  $markerCreated = $false
+  try {
+    $stream = New-Object IO.FileStream($marker, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $markerCreated = $true
+    try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+  } catch {
+    if ($markerCreated -and (Test-Path -LiteralPath $marker -PathType Leaf)) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
+    throw
+  }
   [pscustomobject][ordered]@{ classification = $value.classification; pass = $true; markerFileName = Split-Path -Leaf $marker; markerSha256 = Get-Phase7BSha256 -LiteralPath $marker }
 }
 
@@ -471,7 +478,8 @@ function Test-Phase7BWorkPackage2StablePreflightEvidence {
     [int]$Evidence.requiredCollectionCount -eq 39 -and [int]$Evidence.missingCollectionCount -eq 0 -and
     [int]$Evidence.unknownCollectionCount -eq 0 -and [int]$Evidence.missingMediaReferenceCount -eq 0 -and
     [int]$Evidence.credentialSignalCount -eq 0 -and [bool]$Evidence.ageIdentityPass -and [bool]$Evidence.primaryDestinationPass -and
-    [bool]$Evidence.laptopReachable -and [bool]$Evidence.quiescencePass -and [bool]$Evidence.sourceStableAcrossPreflight
+    [bool]$Evidence.laptopNetworkBindingPass -and [bool]$Evidence.laptopReachabilityDeferredToReceiver -and
+    [bool]$Evidence.quiescencePass -and [bool]$Evidence.sourceStableAcrossPreflight
   [pscustomobject][ordered]@{ pass = [bool]$pass; classification = if ($pass) { 'PHASE7B_WP2B_STABLE_PREFLIGHT_PASS' } else { 'PHASE7B_WP2B_STABLE_PREFLIGHT_FAIL' } }
 }
 

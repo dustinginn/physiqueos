@@ -46,6 +46,13 @@ $stage = "validate-input"
 $plaintextRoot = $null
 $plainZipPath = $null
 $localPacketPath = $null
+$replicaPacketPath = $null
+$descriptorPath = $null
+$localAttemptRoot = $null
+$localAttemptRootCreated = $false
+$replicaPacketCreated = $false
+$descriptorCreated = $false
+$authorizationConsumed = $false
 $accepted = $false
 try {
   foreach ($requiredValue in @($AttemptId, $AuthorizationPath, $ExpectedAuthorizationSha256, $CapturePlanPath,
@@ -57,8 +64,8 @@ try {
       (Get-Phase7BSha256 -LiteralPath $CapturePlanPath) -ne $ExpectedCapturePlanSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_CAPTURE_PLAN_HASH_MISMATCH" }
   if (-not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
-  $ageVersion = @(& $AgeExePath --version 2>&1) -join " "
-  if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
+  $ageVersionLines = @(& $AgeExePath --version 2>&1)
+  if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
   if ($Host.Name -ne "ConsoleHost" -or -not [Environment]::UserInteractive) { throw "PHASE7B_WP2_INTERACTIVE_SECRET_CONSOLE_REQUIRED" }
 
   $source = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path.TrimEnd('\')
@@ -95,6 +102,7 @@ try {
     -ExpectedSourceRootSha256 $sourceRootSha256 -ExpectedCapturePlanSha256 $ExpectedCapturePlanSha256 `
     -ExpectedLocalOutputRootSha256 $localOutputRootSha256 -ExpectedReplicaRootSha256 $replicaRootSha256 `
     -ExpectedAgeExeSha256 $ExpectedAgeExeSha256.ToLowerInvariant() -ExpectedQuiescenceEvidenceSha256 ([string]$authorizationPreview.quiescenceEvidenceSha256)
+  if ((Split-Path -Leaf $CapturePlanPath) -cne [string]$authorization.capturePlanFileName) { throw 'PHASE7B_WP2_CAPTURE_PLAN_FILENAME_BINDING_MISMATCH' }
   $agePathSha256 = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($AgeExePath).ToLowerInvariant())
   if ([string]$authorization.ageExePathSha256 -ne $agePathSha256) { throw 'PHASE7B_WP2_AGE_PATH_IDENTITY_MISMATCH' }
   if ([string]$authorization.replicaUncRoot -ne [string]$replicaIdentity.providerRoot) { throw 'PHASE7B_WP2_REPLICA_MAPPING_IDENTITY_FAIL' }
@@ -107,7 +115,7 @@ try {
   if (-not (Test-Path -LiteralPath $quiescencePath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $quiescencePath) -ne [string]$authorization.quiescenceEvidenceSha256) { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_EVIDENCE_FAIL' }
   $quiescence = Get-Content -LiteralPath $quiescencePath -Raw | ConvertFrom-Json -ErrorAction Stop
-  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit $toolingCommit).pass) { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_EVIDENCE_FAIL' }
+  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence -ExpectedToolingCommit ([string]$authorization.quiescenceEvidenceToolingCommit)).pass) { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_EVIDENCE_FAIL' }
   $monitorTask = Get-ScheduledTask -TaskName 'PhysiqueOS Runtime Monitor' -ErrorAction Stop
   if ([string]$monitorTask.State -ne 'Disabled') { throw 'PHASE7B_WP2B_CAPTURE_QUIESCENCE_NOT_ESTABLISHED' }
 
@@ -115,9 +123,9 @@ try {
   $replicaAttemptRoot = $replicaBase
   if ((Test-Path -LiteralPath $localAttemptRoot) -or -not (Test-Path -LiteralPath $replicaAttemptRoot -PathType Container) -or
       @(Get-ChildItem -LiteralPath $replicaAttemptRoot -Force -ErrorAction Stop).Count -ne 0) { throw "PHASE7B_WP2_ATTEMPT_OUTPUT_EXISTS_OR_REPLICA_NOT_EMPTY" }
-  [void](Use-Phase7BWorkPackage2CaptureAuthorization -AuthorizationPath $AuthorizationPath -Authorization $authorization)
   $mutationStarted = $true
   New-Item -ItemType Directory -Path $localAttemptRoot -ErrorAction Stop | Out-Null
+  $localAttemptRootCreated = $true
   $plaintextRoot = Join-Path $localAttemptRoot ".plaintext-incomplete"
   New-Item -ItemType Directory -Path $plaintextRoot -ErrorAction Stop | Out-Null
 
@@ -226,6 +234,7 @@ try {
   $stage = "replicate-and-verify"
   $replicaPacketPath = Join-Path $replicaAttemptRoot (Split-Path -Leaf $localPacketPath)
   $replica = Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacketPath -DestinationPath $replicaPacketPath -ExpectedSha256 $packetSha -ExpectedBytes $packet.packetBytes
+  $replicaPacketCreated = $true
   if (-not $replica.pass) { throw $replica.classification }
 
   $descriptor = [ordered]@{
@@ -261,12 +270,19 @@ try {
   $descriptorPath = Join-Path $localAttemptRoot "$AttemptId-pending-descriptor.json"
   $descriptorBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $descriptor))
   $descriptorStream = New-Object IO.FileStream($descriptorPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  $descriptorCreated = $true
   try {
     $descriptorStream.Write($descriptorBytes, 0, $descriptorBytes.Length)
     $descriptorStream.Flush($true)
   } finally {
     $descriptorStream.Dispose()
   }
+  $stage = 'consume-authorization-after-complete-capture'
+  $markerPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$authorization.consumptionMarkerFileName)
+  if ((Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -cne $ExpectedAuthorizationSha256.ToLowerInvariant() -or
+      (Test-Path -LiteralPath $markerPath)) { throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CHANGED_OR_CONCURRENTLY_USED' }
+  [void](Use-Phase7BWorkPackage2CaptureAuthorization -AuthorizationPath $AuthorizationPath -Authorization $authorization)
+  $authorizationConsumed = $true
   $accepted = $true
   [ordered]@{
     classification = $descriptor.classification
@@ -297,7 +313,9 @@ try {
     safeLine = $_.InvocationInfo.ScriptLineNumber
     mutationStarted = $mutationStarted
     automaticRetryAllowed = $false
-    newFounderAuthorizationRequired = $mutationStarted
+    authorizationConsumed = $authorizationConsumed
+    exactSameAuthorizationReusableAfterCleanup = [bool](-not $authorizationConsumed)
+    newFounderAuthorizationRequired = $authorizationConsumed
   } | ConvertTo-Json -Depth 4
   exit 1
 } finally {
@@ -310,5 +328,19 @@ try {
   if (-not $accepted -and -not [string]::IsNullOrWhiteSpace($localPacketPath) -and (Test-Path -LiteralPath $localPacketPath)) {
     $fullPacket = [IO.Path]::GetFullPath($localPacketPath)
     if ($fullPacket -match [regex]::Escape($AttemptId)) { Remove-Item -LiteralPath $fullPacket -Force }
+  }
+  if (-not $accepted) {
+    foreach ($failedOutput in @(
+        [pscustomobject]@{ path = $descriptorPath; created = $descriptorCreated },
+        [pscustomobject]@{ path = $replicaPacketPath; created = $replicaPacketCreated })) {
+      if ($failedOutput.created -and -not [string]::IsNullOrWhiteSpace([string]$failedOutput.path) -and (Test-Path -LiteralPath ([string]$failedOutput.path) -PathType Leaf)) {
+        Remove-Item -LiteralPath ([string]$failedOutput.path) -Force
+      }
+    }
+    if ($localAttemptRootCreated -and -not [string]::IsNullOrWhiteSpace($localAttemptRoot) -and
+        (Test-Path -LiteralPath $localAttemptRoot -PathType Container) -and
+        @(Get-ChildItem -LiteralPath $localAttemptRoot -Force).Count -eq 0) {
+      Remove-Item -LiteralPath $localAttemptRoot -Force
+    }
   }
 }

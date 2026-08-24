@@ -20,6 +20,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestReconciliation.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
 $guestContract = Get-Phase7BIsolatedGuestContract
 $contract = Get-Phase7BWorkPackage2Contract
 $nonce = [Guid]::NewGuid().ToString("N")
@@ -210,8 +211,8 @@ try {
     if ([string]::IsNullOrWhiteSpace($AgeExePath) -or -not [IO.Path]::GetFullPath($AgeExePath).Equals([IO.Path]::GetFullPath($expectedStagedAge), [StringComparison]::OrdinalIgnoreCase) -or
         $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedAgeExeSha256.ToLowerInvariant() -ne [string]$descriptor.ageExeSha256 -or
         -not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
-    $ageVersion = @(& $AgeExePath --version 2>&1) -join ' '
-    if ($LASTEXITCODE -ne 0 -or $ageVersion -notmatch '(?i)\bage\s+v?1\.(?:3|[4-9]|[1-9][0-9])\.') { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
+    $ageVersionLines = @(& $AgeExePath --version 2>&1)
+    if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
     if ($Host.Name -ne "ConsoleHost" -or -not [Environment]::UserInteractive) { throw "PHASE7B_WP2_INTERACTIVE_SECRET_CONSOLE_REQUIRED" }
     $finalRestore = Join-Path $restore $contract.restoredPacketDirectoryName
     $incompleteRestore = Join-Path $restore ".incomplete-$AttemptId"

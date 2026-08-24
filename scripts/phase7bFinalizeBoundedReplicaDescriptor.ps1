@@ -8,17 +8,21 @@ param(
   [Parameter(Mandatory = $true)][string]$PrimaryTeardownEvidencePath,
   [Parameter(Mandatory = $true)][string]$ExpectedPrimaryTeardownEvidenceSha256,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement,
-  [Parameter(Mandatory = $true)][string]$OutputPath
+  [Parameter(Mandatory = $true)][string]$OutputPath,
+  [Parameter()][string]$ExactExistingDescriptorResumeAcknowledgement
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 $stage = 'validate-input'
 $mutationStarted = $false
 try {
-  if ($AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedPendingDescriptorSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedReplicaReceiptSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedPrimaryTeardownEvidenceSha256 -notmatch '^[0-9a-f]{64}$' -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -or (Test-Path -LiteralPath $OutputPath)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_ARGUMENT_FAIL' }
+  if ($AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedPendingDescriptorSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedReplicaReceiptSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedPrimaryTeardownEvidenceSha256 -notmatch '^[0-9a-f]{64}$' -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_ARGUMENT_FAIL' }
+  $resumeExisting = Test-Path -LiteralPath $OutputPath -PathType Leaf
+  if ($resumeExisting -and $ExactExistingDescriptorResumeAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_FINAL_DESCRIPTOR_READ_ONLY') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_EXISTING_REJECTED' }
+  if (-not $resumeExisting -and -not [string]::IsNullOrEmpty($ExactExistingDescriptorResumeAcknowledgement)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_RESUME_NOT_APPLICABLE' }
   if ((Get-Phase7BSha256 -LiteralPath $PendingDescriptorPath) -ne $ExpectedPendingDescriptorSha256 -or (Get-Phase7BSha256 -LiteralPath $ReplicaReceiptPath) -ne $ExpectedReplicaReceiptSha256 -or (Get-Phase7BSha256 -LiteralPath $PrimaryTeardownEvidencePath) -ne $ExpectedPrimaryTeardownEvidenceSha256) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_INPUT_HASH_FAIL' }
   $pending = Get-Content -LiteralPath $PendingDescriptorPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $receipt = Get-Content -LiteralPath $ReplicaReceiptPath -Raw | ConvertFrom-Json -ErrorAction Stop
@@ -38,10 +42,19 @@ try {
   $descriptor.replicaReceiptSha256 = $ExpectedReplicaReceiptSha256
   $descriptor.primarySessionTeardownEvidenceSha256 = $ExpectedPrimaryTeardownEvidenceSha256
   $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $descriptor))
-  $stream = New-Object IO.FileStream($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  if ($resumeExisting) {
+    $existingBytes = [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($OutputPath))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+      $expectedOutputSha = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+    } finally { $sha.Dispose() }
+    if ($existingBytes.Length -ne $bytes.Length -or (Get-Phase7BSha256 -LiteralPath $OutputPath) -cne $expectedOutputSha) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINAL_DESCRIPTOR_MISMATCH' }
+    [ordered]@{ classification = $descriptor.classification; pass = $true; attemptId = $AttemptId; descriptorFileName = Split-Path -Leaf $OutputPath; descriptorSha256 = Get-Phase7BSha256 -LiteralPath $OutputPath; packetSha256 = $descriptor.packetSha256; packetBytes = $descriptor.packetBytes; independentEncryptedReplicaPass = $true; sessionTornDown = $true; exactExistingDescriptorReused = $true; mutationPerformed = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
+    exit 0
+  }
   $mutationStarted = $true
-  try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
-  [ordered]@{ classification = $descriptor.classification; pass = $true; attemptId = $AttemptId; descriptorFileName = Split-Path -Leaf $OutputPath; descriptorSha256 = Get-Phase7BSha256 -LiteralPath $OutputPath; packetSha256 = $descriptor.packetSha256; packetBytes = $descriptor.packetBytes; independentEncryptedReplicaPass = $true; sessionTornDown = $true; mutationPerformed = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
+  $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $descriptor
+  [ordered]@{ classification = $descriptor.classification; pass = $true; attemptId = $AttemptId; descriptorFileName = $persisted.fileName; descriptorSha256 = $persisted.sha256; packetSha256 = $descriptor.packetSha256; packetBytes = $descriptor.packetBytes; independentEncryptedReplicaPass = $true; sessionTornDown = $true; exactExistingDescriptorReused = $false; mutationPerformed = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; mutationStarted = $mutationStarted; automaticRetryAllowed = $false; newFounderAuthorizationRequired = $mutationStarted } | ConvertTo-Json -Depth 4

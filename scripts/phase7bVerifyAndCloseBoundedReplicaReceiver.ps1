@@ -40,15 +40,19 @@ try {
   $diskSha = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName $contract.acceptedComputerName `
     -DiskNumber ([int]$disk.Number) -UniqueId ([string]$disk.UniqueId) -SerialNumber ([string]$disk.SerialNumber) `
     -FriendlyName ([string]$disk.FriendlyName) -DiskSizeBytes ([int64]$disk.Size) -BusType ([string]$disk.BusType)
-  $stage = 'mandatory-session-teardown'; $teardownAttempted = $true
-  Remove-SmbShare -Name $shareName -Force -Confirm:$false -ErrorAction Stop
-  Remove-NetFirewallRule -Name $ruleName -ErrorAction Stop
+  $stage = 'mandatory-session-teardown'
+  $initialShares = @(Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue)
+  $initialRules = @(Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue)
+  if ($initialShares.Count -gt 1 -or $initialRules.Count -gt 1) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_TEARDOWN_CARDINALITY_FAIL' }
+  $teardownResumed = $initialShares.Count -eq 0 -or $initialRules.Count -eq 0
+  if ($initialShares.Count -eq 1) { Remove-SmbShare -Name $shareName -Force -Confirm:$false -ErrorAction Stop; $teardownAttempted = $true }
+  if ($initialRules.Count -eq 1) { Remove-NetFirewallRule -Name $ruleName -ErrorAction Stop; $teardownAttempted = $true }
   if (@(Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue).Count -ne 0 -or @(Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue).Count -ne 0) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_TEARDOWN_FAIL' }
   $receipt = [pscustomobject][ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2_BOUNDED_REPLICA_INDEPENDENT_READBACK_PASS'; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; observedAt = [DateTime]::UtcNow.ToString('o'); evidenceFileName = Split-Path -Leaf $EvidenceOutputPath; packetFileName = "$AttemptId.zip.age"; packetSha256 = $packet.packetSha256; packetBytes = $packet.packetBytes; destinationBytesReread = $true; encryptedPacketOnly = $true; computerName = $contract.acceptedComputerName; hostIdentitySha256 = $hostSha; diskIdentitySha256 = $diskSha; driveRoot = 'D:\'; fileSystem = [string]$volume.FileSystemType; diskNumber = [int]$disk.Number; busType = [string]$disk.BusType; physicallyIndependent = $true; freeBytes = [int64]$volume.SizeRemaining; persistentAccountCreated = $false; persistentShareRetained = $false; persistentFirewallRuleRetained = $false; persistentMappingRetained = $false; credentialsPersisted = $false; rawProductionFilesAccepted = $false; sessionTornDown = $true; reportPersisted = $true; automaticRetryAllowed = $false }
   if (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 $ExpectedPacketSha256 -ExpectedPacketBytes $ExpectedPacketBytes).pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_RECEIPT_SELF_CHECK_FAIL' }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $EvidenceOutputPath -Evidence $receipt
   $transportBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $receipt))
-  [ordered]@{ classification = $receipt.classification; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; evidenceFileName = $persisted.fileName; evidenceSha256 = $persisted.sha256; evidenceTransportBase64 = [Convert]::ToBase64String($transportBytes); packetFileName = $receipt.packetFileName; packetSha256 = $receipt.packetSha256; packetBytes = $receipt.packetBytes; sessionTornDown = $true; reportPersisted = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 5
+  [ordered]@{ classification = $receipt.classification; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; evidenceFileName = $persisted.fileName; evidenceSha256 = $persisted.sha256; evidenceTransportBase64 = [Convert]::ToBase64String($transportBytes); packetFileName = $receipt.packetFileName; packetSha256 = $receipt.packetSha256; packetBytes = $receipt.packetBytes; sessionTornDown = $true; teardownResumed = [bool]$teardownResumed; reportPersisted = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 5
 } catch {
   if ($AttemptId -match '^phase7b-wp2-[0-9a-f]{32}$') {
     $shareName = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
