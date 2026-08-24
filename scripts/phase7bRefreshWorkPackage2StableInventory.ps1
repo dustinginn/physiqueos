@@ -43,7 +43,7 @@ function Get-Selection([string]$Root) {
       $entries.Add([pscustomobject][ordered]@{sourceRelativePath=$sourceRelative;logicalPath="$($prefix[$definition.category])/$categoryRelative"})
     }
   }
-  [pscustomobject]@{definitions=$definitions;entries=@($entries)}
+  [pscustomobject]@{definitions=$definitions;entries=[object[]]$entries.ToArray()}
 }
 try {
   if($QuiescenceMode -ceq 'FRESH_ESTABLISH'){

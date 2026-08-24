@@ -131,6 +131,51 @@ try {
     Assert-True ($nonrefreshable.classification -ceq 'PHASE7B_WP2B_NONREFRESHABLE_INVENTORY_FAILURE' -and -not $nonrefreshable.refreshAllowed) "integrity failure is nonrefreshable:$safeCode"
   }
 
+  $refreshScriptPath=Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1'
+  $refreshTokens=$null;$refreshErrors=$null
+  $refreshAst=[Management.Automation.Language.Parser]::ParseFile($refreshScriptPath,[ref]$refreshTokens,[ref]$refreshErrors)
+  Assert-True (@($refreshErrors).Count -eq 0) 'stable refresh PowerShell 5.1 AST'
+  $selectionFunctions=@($refreshAst.FindAll({param($node)$node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Get-Selection'},$true))
+  Assert-True ($selectionFunctions.Count -eq 1) 'stable refresh has exactly one source-owned selection function'
+  $selectionFixture=Join-Path $testRoot 'stable-selection-fixture'
+  foreach($relative in @('private\founder\evidence','private\founder\photos','private\founder\dexa')){New-Item -ItemType Directory -Path (Join-Path $selectionFixture $relative) -Force|Out-Null}
+  Write-Canonical (Join-Path $selectionFixture 'private\founder\runtime-store.json') ([ordered]@{version=1;revision=1})
+  Write-Canonical (Join-Path $selectionFixture 'private\founder\migration-control.json') ([ordered]@{schemaVersion=1})
+  foreach($relative in @('private\founder\evidence\fixture.txt','private\founder\photos\fixture.txt','private\founder\dexa\fixture.txt')){[IO.File]::WriteAllText((Join-Path $selectionFixture $relative),'synthetic',[Text.UTF8Encoding]::new($false))}
+  $selectionFunctionText=$selectionFunctions[0].Extent.Text
+  $escapedSelectionFixture=$selectionFixture.Replace("'","''")
+  $selectionProbe=@"
+`$ErrorActionPreference='Stop'
+Set-StrictMode -Version Latest
+$selectionFunctionText
+`$selection=Get-Selection '$escapedSelectionFixture'
+[ordered]@{classification='PHASE7B_WP2B_STABLE_SELECTION_PS51_PASS';pass=(`$selection.entries.Count-eq5);entryCount=`$selection.entries.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
+"@
+  $selectionEncoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($selectionProbe))
+  $selectionOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $selectionEncoded 2>&1)
+  $selectionExit=$LASTEXITCODE
+  $selectionResult=($selectionOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
+  Assert-True ($selectionExit -eq 0 -and [bool]$selectionResult.pass -and [string]$selectionResult.classification -ceq 'PHASE7B_WP2B_STABLE_SELECTION_PS51_PASS' -and [int]$selectionResult.entryCount -eq 5 -and -not [bool]$selectionResult.mutationPerformed) 'fresh Windows PowerShell 5.1 materializes the exact stable selection without generic-list binder failure'
+
+  $refreshCustomInvocations=@($refreshAst.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Where-Object{$_ -match '^(?:Assert|ConvertTo|Get|New|Test)-Phase7B'}|Sort-Object -Unique)
+  $expectedRefreshCustomInvocations=@('Assert-Phase7BWorkPackage2AttemptIdentity','Assert-Phase7BWorkPackage2StableRefreshOutputSet','ConvertTo-Phase7BCanonicalJson','Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BWorkPackage2QuiescenceEvidence')|Sort-Object
+  Assert-True (@(Compare-Object $expectedRefreshCustomInvocations $refreshCustomInvocations).Count -eq 0) 'stable refresh custom command inventory is complete and reviewed'
+  $moduleProbe=@"
+`$ErrorActionPreference='Stop'
+Set-StrictMode -Version Latest
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2OperatorLifecycle.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Contract.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.psm1' -Force
+`$names=@('$($expectedRefreshCustomInvocations -join "','")')
+`$resolved=@(`$names|ForEach-Object{[bool](Get-Command `$_ -CommandType Function -ErrorAction Stop)})
+[ordered]@{classification='PHASE7B_WP2B_STABLE_REFRESH_HELPERS_PS51_PASS';pass=(@(`$resolved|Where-Object{-not `$_}).Count-eq0);resolvedCommandCount=`$resolved.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
+"@
+  $moduleEncoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($moduleProbe))
+  $moduleOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $moduleEncoded 2>&1)
+  $moduleExit=$LASTEXITCODE
+  $moduleResult=($moduleOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
+  Assert-True ($moduleExit -eq 0 -and [bool]$moduleResult.pass -and [int]$moduleResult.resolvedCommandCount -eq $expectedRefreshCustomInvocations.Count -and -not [bool]$moduleResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every stable-refresh helper before first use'
+
   $parent=Join-Path $testRoot 'replica-parent';New-Item -ItemType Directory $parent|Out-Null;$pathContract=Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot $parent
   New-Item -ItemType Directory $pathContract.attemptRoot|Out-Null
   $localPacket=Join-Path $testRoot "$attempt.zip.age";[IO.File]::WriteAllBytes($localPacket,[Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`noperator-lifecycle"));$packetSha=Get-Phase7BSha256 -LiteralPath $localPacket;$packetBytes=(Get-Item $localPacket).Length
