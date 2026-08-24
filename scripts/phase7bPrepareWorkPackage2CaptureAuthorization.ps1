@@ -70,9 +70,12 @@ try {
   $auditAfter = $auditAfterText | ConvertFrom-Json -ErrorAction Stop
   $sourceStable = [string]$auditBefore.runtimeSha256 -eq [string]$auditAfter.runtimeSha256 -and
     [string]$auditBefore.controlSha256 -eq [string]$auditAfter.controlSha256 -and [string]$inventory.inventorySha256 -eq $ExpectedInventorySha256
-  if (-not [bool]$auditAfter.pass -or [int]$auditAfter.requiredCollectionPresentCount -ne 39 -or [int]$auditAfter.missingCollectionCount -ne 0 -or
-      [int]$auditAfter.unknownCollectionCount -ne 0 -or [int]$auditAfter.missingMediaReferenceCount -ne 0 -or -not $sourceStable -or
-      [string]$auditAfter.runtimeSha256 -ne [string]$selection.canonicalEvidence.runtimeSha256 -or
+  if (-not [bool]$auditAfter.pass -or [int]$auditAfter.requiredCollectionPresentCount -ne 39 -or
+      [int]$auditAfter.missingCollectionCount -ne 0 -or [int]$auditAfter.unknownCollectionCount -ne 0 -or
+      [int]$auditAfter.missingMediaReferenceCount -ne 0 -or [int]$auditAfter.credentialSignalCount -ne 0) {
+    throw 'PHASE7B_WP2B_CAPTURE_SOURCE_INTEGRITY_FAIL'
+  }
+  if (-not $sourceStable -or [string]$auditAfter.runtimeSha256 -ne [string]$selection.canonicalEvidence.runtimeSha256 -or
       [int64]$auditAfter.runtimeRevision -ne [int64]$selection.canonicalEvidence.runtimeRevision) {
     throw 'PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED'
   }

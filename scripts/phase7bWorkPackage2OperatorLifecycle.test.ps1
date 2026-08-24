@@ -58,10 +58,38 @@ try {
   Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId $exactAttempt -ObservedAttemptId $null } 'ATTEMPT_IDENTITY_MISMATCH' 'null observed attempt rejected'
   Assert-Throws { Assert-Phase7BWorkPackage2AttemptIdentity -ExpectedAttemptId 'PHASE7B-WP2-FC48221852204C188C414A18F6C42BBD' -ObservedAttemptId 'PHASE7B-WP2-FC48221852204C188C414A18F6C42BBD' } 'ATTEMPT_IDENTITY_MISMATCH' 'uppercase expected and observed attempt rejected'
   $refreshOutputRoot=Join-Path $testRoot 'stable-refresh-output';New-Item -ItemType Directory $refreshOutputRoot|Out-Null
-  $refreshOutput=Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -OutputDirectory $refreshOutputRoot
-  Assert-True ((Split-Path -Leaf $refreshOutput.selectionPath) -ceq "$exactAttempt-selection.json" -and (Split-Path -Leaf $refreshOutput.inventoryAuthorizationPath) -ceq "$exactAttempt-inventory-authorization.json" -and (Split-Path -Leaf $refreshOutput.capturePlanPath) -ceq "$exactAttempt-capture-plan.json") 'stable refresh output names bind exact attempt identity'
+  $refreshNonce='6'*32
+  $refreshOutput=Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -RefreshNonce $refreshNonce -OutputDirectory $refreshOutputRoot
+  Assert-True ((Split-Path -Leaf $refreshOutput.selectionPath) -ceq "$exactAttempt-refresh-$refreshNonce-selection.json" -and (Split-Path -Leaf $refreshOutput.inventoryAuthorizationPath) -ceq "$exactAttempt-refresh-$refreshNonce-inventory-authorization.json" -and (Split-Path -Leaf $refreshOutput.capturePlanPath) -ceq "$exactAttempt-refresh-$refreshNonce-capture-plan.json") 'stable refresh output names bind exact attempt identity and refresh nonce'
+  Assert-Throws { Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -RefreshNonce 'wrong' -OutputDirectory $refreshOutputRoot } 'STABLE_REFRESH_NONCE_REJECTED' 'stable refresh rejects malformed nonce'
   [IO.File]::WriteAllText($refreshOutput.selectionPath,'collision',[Text.UTF8Encoding]::new($false))
-  Assert-Throws { Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -OutputDirectory $refreshOutputRoot } 'STABLE_REFRESH_OUTPUT_COLLISION' 'stable refresh rejects existing exact-attempt output'
+  Assert-Throws { Assert-Phase7BWorkPackage2StableRefreshOutputSet -ExpectedAttemptId $exactAttempt -RefreshNonce $refreshNonce -OutputDirectory $refreshOutputRoot } 'STABLE_REFRESH_OUTPUT_COLLISION' 'stable refresh rejects existing exact-attempt refresh output'
+
+  $existingRoot=Join-Path $testRoot 'existing-inventory';New-Item -ItemType Directory $existingRoot|Out-Null
+  $existingSelection=Join-Path $existingRoot 'selection.json';$existingInventoryAuth=Join-Path $existingRoot 'inventory-authorization.json';$existingPlan=Join-Path $existingRoot 'capture-plan.json'
+  $sourceRootSha='7'*64
+  $wp2=Get-Phase7BWorkPackage2Contract
+  $missingDecision=Get-Phase7BWorkPackage2ExistingInventorySetDecision -ExpectedAttemptId $exactAttempt -ExpectedToolingCommit $tooling -ExpectedSourceRootSha256 $sourceRootSha -SelectionPath $existingSelection -InventoryAuthorizationPath $existingInventoryAuth -CapturePlanPath $existingPlan
+  Assert-True ($missingDecision.classification -ceq 'PHASE7B_WP2B_REFRESH_REQUIRED' -and -not $missingDecision.pass) 'absent exact-attempt inventory set explicitly requires refresh'
+  Write-Canonical $existingSelection ([ordered]@{classification='PHASE7B_WP2_WINDOWS_SELECTION';attemptId=$exactAttempt;toolingCommit=$tooling;applicationCommit=$wp2.applicationCommit;environmentId=$wp2.environmentId;vmDisplayName=$wp2.vmDisplayName;windowsHostId=$wp2.windowsHostId;manifestDigest=$wp2.manifestDigest;sourceRootSha256=$sourceRootSha;canonicalEvidence=[ordered]@{requiredCollectionPresentCount=39;missingCollectionCount=0;unknownCollectionCount=0;missingMediaReferenceCount=0};exclusionEvidence=[ordered]@{credentialSignalCount=0}})
+  $partialDecision=Get-Phase7BWorkPackage2ExistingInventorySetDecision -ExpectedAttemptId $exactAttempt -ExpectedToolingCommit $tooling -ExpectedSourceRootSha256 $sourceRootSha -SelectionPath $existingSelection -InventoryAuthorizationPath $existingInventoryAuth -CapturePlanPath $existingPlan
+  Assert-True ($partialDecision.classification -ceq 'PHASE7B_WP2B_NONREFRESHABLE_INVENTORY_FAILURE' -and -not $partialDecision.pass) 'partial inventory set is nonrefreshable integrity failure'
+  $existingSelectionSha=Get-Phase7BSha256 -LiteralPath $existingSelection
+  Write-Canonical $existingInventoryAuth ([ordered]@{classification=$wp2.authorizationClassification;attemptId=$exactAttempt;toolingCommit=$tooling;applicationCommit=$wp2.applicationCommit;environmentId=$wp2.environmentId;vmDisplayName=$wp2.vmDisplayName;windowsHostId=$wp2.windowsHostId;manifestDigest=$wp2.manifestDigest;sourceRootSha256=$sourceRootSha;authorizedStages=@([ordered]@{stage='WP2B_INVENTORY';mutationBudget=1});founderApproved=$true;automaticRetryAllowed=$false})
+  Write-Canonical $existingPlan ([ordered]@{classification='PHASE7B_WP2_CAPTURE_PLAN';attemptId=$exactAttempt;applicationCommit=$wp2.applicationCommit;environmentId=$wp2.environmentId;vmDisplayName=$wp2.vmDisplayName;windowsHostId=$wp2.windowsHostId;manifestDigest=$wp2.manifestDigest;selectionSha256=$existingSelectionSha;sourceInventorySha256=('8'*64);sourceRootSha256=$sourceRootSha;fileCount=1;totalBytes=1})
+  $candidateDecision=Get-Phase7BWorkPackage2ExistingInventorySetDecision -ExpectedAttemptId $exactAttempt -ExpectedToolingCommit $tooling -ExpectedSourceRootSha256 $sourceRootSha -SelectionPath $existingSelection -InventoryAuthorizationPath $existingInventoryAuth -CapturePlanPath $existingPlan
+  Assert-True ($candidateDecision.classification -ceq 'PHASE7B_WP2B_EXISTING_INVENTORY_CANDIDATE' -and $candidateDecision.pass) 'complete exact-attempt inventory candidate reaches dynamic reuse validation'
+  $wrongAttemptPlan=Get-Content -LiteralPath $existingPlan -Raw|ConvertFrom-Json;$wrongAttemptPlan.attemptId='phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';Write-Canonical $existingPlan $wrongAttemptPlan
+  $wrongAttemptDecision=Get-Phase7BWorkPackage2ExistingInventorySetDecision -ExpectedAttemptId $exactAttempt -ExpectedToolingCommit $tooling -ExpectedSourceRootSha256 $sourceRootSha -SelectionPath $existingSelection -InventoryAuthorizationPath $existingInventoryAuth -CapturePlanPath $existingPlan
+  Assert-True ($wrongAttemptDecision.classification -ceq 'PHASE7B_WP2B_NONREFRESHABLE_INVENTORY_FAILURE') 'attempt mismatch never falls through to refresh'
+  $reusableDecision=Resolve-Phase7BWorkPackage2StableInventoryPreflightDecision -ExitCode 0 -Result ([pscustomobject]@{classification='PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS';pass=$true})
+  Assert-True ($reusableDecision.classification -ceq 'PHASE7B_WP2B_EXISTING_INVENTORY_REUSABLE' -and -not $reusableDecision.refreshAllowed) 'stable preflight reuses existing inventory without refresh'
+  $refreshDecision=Resolve-Phase7BWorkPackage2StableInventoryPreflightDecision -ExitCode 1 -Result ([pscustomobject]@{classification='PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_FAIL';pass=$false;safeErrorCode='PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED'})
+  Assert-True ($refreshDecision.classification -ceq 'PHASE7B_WP2B_REFRESH_REQUIRED' -and $refreshDecision.refreshAllowed) 'only exact stale-binding classification permits refresh'
+  foreach($safeCode in @('PHASE7B_WP2B_CAPTURE_PREFLIGHT_PLAN_OR_SELECTION_FAIL','PHASE7B_WP2B_CAPTURE_PREFLIGHT_REPOSITORY_FAIL','PHASE7B_WP2B_CAPTURE_PREFLIGHT_FILE_BINDING_FAIL')){
+    $nonrefreshable=Resolve-Phase7BWorkPackage2StableInventoryPreflightDecision -ExitCode 1 -Result ([pscustomobject]@{classification='PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_FAIL';pass=$false;safeErrorCode=$safeCode})
+    Assert-True ($nonrefreshable.classification -ceq 'PHASE7B_WP2B_NONREFRESHABLE_INVENTORY_FAILURE' -and -not $nonrefreshable.refreshAllowed) "integrity failure is nonrefreshable:$safeCode"
+  }
 
   $parent=Join-Path $testRoot 'replica-parent';New-Item -ItemType Directory $parent|Out-Null;$pathContract=Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot $parent
   New-Item -ItemType Directory $pathContract.attemptRoot|Out-Null
@@ -93,6 +121,10 @@ try {
   Assert-True (-not ($sourceText -match '(?i)Start-Process.+(?:cmd|powershell).+exit')) 'no parent-host termination path'
   Assert-True ($sourceText.Contains('automaticRetryAllowed = $false') -and $sourceText.Contains('wp2cAuthorized = $false')) 'no retry and no WP2-C authority'
   Assert-True ($sourceText.Contains('PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED') -and $sourceText.Contains('PHASE7B_WP2B_POST_QUIESCENCE_STABLE_INVENTORY_PASS')) 'stale plan has one bounded post-quiescence refresh path'
+  $prepareSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2CaptureAuthorization.ps1')
+  Assert-True ($prepareSource.Contains('PHASE7B_WP2B_CAPTURE_SOURCE_INTEGRITY_FAIL') -and
+    $prepareSource.IndexOf('PHASE7B_WP2B_CAPTURE_SOURCE_INTEGRITY_FAIL') -lt $prepareSource.IndexOf('PHASE7B_WP2B_STABLE_BINDING_REFRESH_REQUIRED')) `
+    'missing collections media or credential signals remain nonrefreshable before stale-binding decision'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')
   Assert-True ($refreshSource.Contains('[Parameter(Mandatory = $true)][string]$ExpectedAttemptId')) 'stable refresh requires explicit expected attempt identity'
   Assert-True (-not $refreshSource.Contains('[guid]::NewGuid()')) 'stable refresh never generates or substitutes attempt identity'
