@@ -72,7 +72,8 @@ try {
   $hash2 = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash.ToLowerInvariant()
   Assert-True ($hash1 -ceq $hash2 -and $hash1 -match '^[0-9a-f]{64}$') 'tracked Stage 0 artifact hash is deterministic'
 
-  foreach ($functionName in @('Get-Phase7BStage0Sha256', 'Assert-Phase7BStage0Snapshot')) {
+  foreach ($functionName in @('Get-Phase7BStage0Sha256', 'Get-Phase7BStage0HostIdentitySha256',
+      'Get-Phase7BStage0DiskIdentitySha256', 'Assert-Phase7BStage0Snapshot')) {
     $functions = @($ast.FindAll({
       param($node)
       $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName
@@ -106,6 +107,39 @@ try {
   Assert-True ($source.Contains('mutationPerformed = $false') -and $source.Contains('reportPersisted = $false') -and
     $source.Contains('receiverOpened = $false') -and $source.Contains('automaticRetryAllowed = $false') -and
     $source.Contains('wp2cAuthorized = $false')) 'flat result preserves no-mutation authorization boundary'
+  Assert-True ($source.Contains('PHASE7B_WP2B_STAGE0_ARTIFACT_IDENTITY_FAIL') -and
+    $source.Contains('Get-FileHash -Algorithm SHA256 -LiteralPath $PSCommandPath')) 'Stage 0 verifies its own exact delivered bytes before host inspection'
+
+  function Get-V2ReferenceHostIdentitySha256([string]$ComputerName, [string]$Uuid, [string]$MachineGuid) {
+    $normalizedName = $ComputerName.ToLowerInvariant()
+    $normalizedUuid = $Uuid.ToLowerInvariant()
+    $normalizedMachineGuid = $MachineGuid.ToLowerInvariant()
+    Get-Phase7BStage0Sha256 -Text ($normalizedName + '|' + $normalizedUuid + '|' + $normalizedMachineGuid)
+  }
+  function Get-V2ReferenceDiskIdentitySha256([string]$ComputerName, [int]$DiskNumber,
+      [string]$UniqueId, [string]$SerialNumber, [string]$FriendlyName, [int64]$DiskSizeBytes,
+      [string]$BusType) {
+    $normalizedName = $ComputerName.ToLowerInvariant()
+    $normalizedUniqueId = $UniqueId.ToLowerInvariant()
+    $normalizedSerialNumber = $SerialNumber.ToLowerInvariant()
+    $normalizedFriendlyName = $FriendlyName.ToLowerInvariant()
+    $normalizedBusType = $BusType.ToLowerInvariant()
+    Get-Phase7BStage0Sha256 -Text ($normalizedName + '|' + [string]$DiskNumber + '|' +
+      $normalizedUniqueId + '|' + $normalizedSerialNumber + '|' + $normalizedFriendlyName + '|' +
+      [string]$DiskSizeBytes + '|' + $normalizedBusType)
+  }
+  $syntheticUuid = '01234567-89AB-CDEF-0123-456789ABCDEF'
+  $syntheticMachineGuid = 'FEDCBA98-7654-3210-FEDC-BA9876543210'
+  $v2Host = Get-V2ReferenceHostIdentitySha256 'LAPTOP-4G5U0U2R' $syntheticUuid $syntheticMachineGuid
+  $stage0Host = Get-Phase7BStage0HostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+    -Uuid $syntheticUuid -MachineGuid $syntheticMachineGuid
+  Assert-True ($v2Host -ceq $stage0Host) 'Stage 0 host computation is byte-identical to V2 attestation semantics'
+  $v2Disk = Get-V2ReferenceDiskIdentitySha256 'LAPTOP-4G5U0U2R' 0 'UNIQUE-ID' 'SERIAL-01' `
+    'Friendly Disk' ([int64]1000204886016) 'SATA'
+  $stage0Disk = Get-Phase7BStage0DiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+    -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
+    -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
+  Assert-True ($v2Disk -ceq $stage0Disk) 'Stage 0 disk computation is byte-identical to V2 attestation semantics'
 
   $valid = @{
     ObservedAttemptId = $attempt
@@ -152,10 +186,14 @@ try {
   $invalidIpv4 = $valid.Clone(); $invalidIpv4.ReplicaIpv4 = 'not-an-ip'
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @invalidIpv4 } 'PHASE7B_WP2B_LAPTOP_PRIVATE_LAN_IPV4_FAIL' 'invalid LAN address fails closed'
 
-  $wrongAttemptChild = Invoke-Child -Arguments @('-AttemptId', 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '-ExpectedToolingCommit', ('a' * 40))
+  $wrongAttemptChild = Invoke-Child -Arguments @('-AttemptId', 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '-ExpectedToolingCommit', ('a' * 40), '-ExpectedArtifactSha256', $hash1)
   Assert-True ($wrongAttemptChild.exitCode -ne 0 -and $wrongAttemptChild.text.Contains('PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL')) 'wrong attempt stops before live host inspection'
-  $malformedCommitChild = Invoke-Child -Arguments @('-AttemptId', $attempt, '-ExpectedToolingCommit', 'wrong')
+  $malformedCommitChild = Invoke-Child -Arguments @('-AttemptId', $attempt, '-ExpectedToolingCommit', 'wrong', '-ExpectedArtifactSha256', $hash1)
   Assert-True ($malformedCommitChild.exitCode -ne 0) 'malformed commit fails parameter binding before live inspection'
+  $wrongArtifactChild = Invoke-Child -Arguments @('-AttemptId', $attempt, '-ExpectedToolingCommit', ('a' * 40), '-ExpectedArtifactSha256', ('f' * 64))
+  Assert-True ($wrongArtifactChild.exitCode -ne 0 -and $wrongArtifactChild.text.Contains('PHASE7B_WP2B_STAGE0_ARTIFACT_IDENTITY_FAIL')) 'wrong delivered artifact identity fails before host inspection'
+  $missingArtifactChild = Invoke-Child -Arguments @('-AttemptId', $attempt, '-ExpectedToolingCommit', ('a' * 40))
+  Assert-True ($missingArtifactChild.exitCode -ne 0) 'missing delivered artifact identity fails parameter binding'
 
   $bootstrapCommit = 'd' * 40
   $download = Invoke-SyntheticBootstrapFlow -AuthorizedCommit $bootstrapCommit -RequestedCommit $bootstrapCommit `

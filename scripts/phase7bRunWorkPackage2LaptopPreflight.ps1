@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][ValidatePattern('^phase7b-wp2-[0-9a-f]{32}$')][string]$AttemptId,
-  [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedToolingCommit
+  [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedToolingCommit,
+  [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-f]{64}$')][string]$ExpectedArtifactSha256
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -25,6 +26,38 @@ function Get-Phase7BStage0Sha256 {
   } finally {
     $sha.Dispose()
   }
+}
+
+function Get-Phase7BStage0HostIdentitySha256 {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$ComputerName,
+    [Parameter(Mandatory = $true)][string]$Uuid,
+    [Parameter(Mandatory = $true)][string]$MachineGuid
+  )
+  $normalizedName = $ComputerName.ToLowerInvariant()
+  $normalizedUuid = $Uuid.ToLowerInvariant()
+  $normalizedMachineGuid = $MachineGuid.ToLowerInvariant()
+  Get-Phase7BStage0Sha256 -Text ($normalizedName + '|' + $normalizedUuid + '|' + $normalizedMachineGuid)
+}
+
+function Get-Phase7BStage0DiskIdentitySha256 {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$ComputerName,
+    [Parameter(Mandatory = $true)][int]$DiskNumber,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$UniqueId,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$SerialNumber,
+    [Parameter(Mandatory = $true)][string]$FriendlyName,
+    [Parameter(Mandatory = $true)][int64]$DiskSizeBytes,
+    [Parameter(Mandatory = $true)][string]$BusType
+  )
+  $normalizedName = $ComputerName.ToLowerInvariant()
+  $normalizedUniqueId = $UniqueId.ToLowerInvariant()
+  $normalizedSerialNumber = $SerialNumber.ToLowerInvariant()
+  $normalizedFriendlyName = $FriendlyName.ToLowerInvariant()
+  $normalizedBusType = $BusType.ToLowerInvariant()
+  Get-Phase7BStage0Sha256 -Text ($normalizedName + '|' + [string]$DiskNumber + '|' +
+    $normalizedUniqueId + '|' + $normalizedSerialNumber + '|' + $normalizedFriendlyName + '|' +
+    [string]$DiskSizeBytes + '|' + $normalizedBusType)
 }
 
 function Assert-Phase7BStage0Snapshot {
@@ -77,18 +110,31 @@ function Assert-Phase7BStage0Snapshot {
   $true
 }
 
-$stage = 'validate-operation-identity'
+$stage = 'validate-delivery-identity'
 try {
+  $actualArtifactSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $PSCommandPath -ErrorAction Stop).Hash.ToLowerInvariant()
+  if ($actualArtifactSha256 -cne $ExpectedArtifactSha256) { throw 'PHASE7B_WP2B_STAGE0_ARTIFACT_IDENTITY_FAIL' }
+
+  $stage = 'validate-operation-identity'
   if ($AttemptId -cne $acceptedAttemptId) { throw 'PHASE7B_WP2B_ATTEMPT_IDENTITY_FAIL' }
   if ($ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'PHASE7B_WP2B_TOOLING_COMMIT_IDENTITY_FAIL' }
 
   $stage = 'validate-host-identity'
   $products = @(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop)
   if ($products.Count -ne 1) { throw 'PHASE7B_WP2B_LAPTOP_PRODUCT_CARDINALITY_FAIL' }
+  $uuid = [string]$products[0].UUID
   $machineGuid = [string](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid
-  if ([string]::IsNullOrWhiteSpace($machineGuid)) { throw 'PHASE7B_WP2B_LAPTOP_MACHINE_GUID_FAIL' }
-  $hostIdentitySha256 = Get-Phase7BStage0Sha256 -Text ($acceptedComputerName.ToLowerInvariant() + '|' +
-    ([string]$products[0].UUID).ToLowerInvariant() + '|' + $machineGuid.ToLowerInvariant())
+  if ([string]::IsNullOrWhiteSpace($uuid) -or [string]::IsNullOrWhiteSpace($machineGuid)) {
+    throw 'PHASE7B_WP2B_LAPTOP_HOST_COMPONENT_MISSING'
+  }
+  $uuidGuid = [guid]::Empty
+  $machineGuidValue = [guid]::Empty
+  if (-not [guid]::TryParse($uuid, [ref]$uuidGuid) -or $uuidGuid -eq [guid]::Empty -or
+      -not [guid]::TryParse($machineGuid, [ref]$machineGuidValue) -or $machineGuidValue -eq [guid]::Empty) {
+    throw 'PHASE7B_WP2B_LAPTOP_HOST_COMPONENT_FORMAT_FAIL'
+  }
+  $hostIdentitySha256 = Get-Phase7BStage0HostIdentitySha256 -ComputerName $acceptedComputerName `
+    -Uuid $uuid -MachineGuid $machineGuid
   if ($hostIdentitySha256 -cne $acceptedHostIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' }
 
   $stage = 'validate-storage-identity'
@@ -103,10 +149,9 @@ try {
   $diskNumber = [int]$disk.Number
   $busType = [string]$disk.BusType
   $freeBytes = [int64]$volume.SizeRemaining
-  $diskIdentitySha256 = Get-Phase7BStage0Sha256 -Text ($acceptedComputerName.ToLowerInvariant() + '|' +
-    [string]$diskNumber + '|' + ([string]$disk.UniqueId).ToLowerInvariant() + '|' +
-    ([string]$disk.SerialNumber).ToLowerInvariant() + '|' + ([string]$disk.FriendlyName).ToLowerInvariant() + '|' +
-    [string]$disk.Size + '|' + $busType.ToLowerInvariant())
+  $diskIdentitySha256 = Get-Phase7BStage0DiskIdentitySha256 -ComputerName $acceptedComputerName `
+    -DiskNumber $diskNumber -UniqueId ([string]$disk.UniqueId) -SerialNumber ([string]$disk.SerialNumber) `
+    -FriendlyName ([string]$disk.FriendlyName) -DiskSizeBytes ([int64]$disk.Size) -BusType $busType
   if ($diskIdentitySha256 -cne $acceptedDiskIdentitySha256) { throw 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' }
   if ($fileSystem -cne $acceptedFileSystem -or $diskNumber -ne $acceptedDiskNumber -or $busType -cne $acceptedBusType) {
     throw 'PHASE7B_WP2B_LAPTOP_STORAGE_CONTRACT_FAIL'
@@ -153,6 +198,7 @@ try {
     pass = $true
     attemptId = $AttemptId
     toolingCommit = $ExpectedToolingCommit
+    artifactSha256 = $actualArtifactSha256
     computerName = $acceptedComputerName
     hostIdentitySha256 = $hostIdentitySha256
     diskIdentitySha256 = $diskIdentitySha256
