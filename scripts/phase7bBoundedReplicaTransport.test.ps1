@@ -12,10 +12,10 @@ function New-Evidence {
 }
 try {
   New-Item -ItemType Directory -Path $root | Out-Null
-  $authoritativeHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
-  $authoritativeDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
-  $historicalHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
-  $historicalDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+  $authoritativeHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+  $authoritativeDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+  $digitZeroHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+  $digitZeroDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
   $invalidTranscribedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
   $contract = Get-Phase7BBoundedReplicaTransportContract
   Assert-True ($contract.acceptedHostIdentitySha256 -ceq $authoritativeHostSha -and
@@ -26,35 +26,42 @@ try {
   foreach ($invalidIdentity in @($null, '', ('a' * 63), ('a' * 65), ('A' * 64), (('a' * 63) + 'g'))) {
     Assert-True (-not (Test-Phase7BSha256IdentityShape -Value $invalidIdentity)) 'malformed shared identity rejected'
   }
-  $fixtureHost = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+  $fixtureHost = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5UOU2R' `
     -Uuid '01234567-89AB-CDEF-0123-456789ABCDEF' -MachineGuid 'FEDCBA98-7654-3210-FEDC-BA9876543210'
-  Assert-True ($fixtureHost -ceq 'ff570bf96b4cc2331dc8b27086b8b51928b2e79af3bef7decea29b5335ae224f') `
+  Assert-True ($fixtureHost -ceq 'ac9d1de2394da0c4840e12a5dda9c31af0695fa129368c4941314ae8ef284663') `
     'shared real host hash-producing path matches fixed V2 fixture digest'
-  $fixtureDisk = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+  $digitZeroFixtureHost = Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+    -Uuid '01234567-89AB-CDEF-0123-456789ABCDEF' -MachineGuid 'FEDCBA98-7654-3210-FEDC-BA9876543210'
+  Assert-True ($digitZeroFixtureHost -cne $fixtureHost) 'digit-zero hostname produces a distinct host identity digest'
+  $fixtureDisk = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName 'LAPTOP-4G5UOU2R' -DiskNumber 0 `
     -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
     -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
-  Assert-True ($fixtureDisk -ceq 'a30f346e3f58de06dad4034b8eba9de3818a1464210539897740707c91eb6e28') `
+  Assert-True ($fixtureDisk -ceq 'd6b447b4e76618df4b90659befd20fb9790af53ffbf54e2f21cb9df8563ace8c') `
     'shared real disk hash-producing path matches fixed V2 fixture digest'
-  Assert-Throws { Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+  $digitZeroFixtureDisk = Get-Phase7BBoundedReplicaDiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+    -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
+    -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
+  Assert-True ($digitZeroFixtureDisk -cne $fixtureDisk) 'digit-zero hostname produces a distinct disk identity digest'
+  Assert-Throws { Get-Phase7BBoundedReplicaHostIdentitySha256 -ComputerName 'LAPTOP-4G5UOU2R' `
     -Uuid 'not-a-guid' -MachineGuid 'FEDCBA98-7654-3210-FEDC-BA9876543210' } 'HOST_COMPONENT_FORMAT_FAIL' `
     'malformed UUID fails shared host computation'
-  $acceptedName = 'LAPTOP-4G5U0U2R'
+  $acceptedName = 'LAPTOP-4G5UOU2R'
   Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value $acceptedName) -ceq $acceptedName) 'accepted scalar computer name canonicalized'
-  Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value 'laptop-4g5u0u2r') -ceq $acceptedName) 'computer name uses ordinal case-insensitive canonical identity'
+  Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value 'laptop-4g5uou2r') -ceq $acceptedName) 'computer name uses ordinal case-insensitive canonical identity'
   Assert-True ((ConvertTo-Phase7BCanonicalComputerName -Value (, $acceptedName)) -ceq $acceptedName) 'one-element string collection canonicalized'
   Assert-True (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $acceptedName -ExpectedComputerName $acceptedName).pass 'current accepted laptop name passes canonical identity'
-  Assert-True (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName 'laptop-4g5u0u2r' -ExpectedComputerName $acceptedName).pass 'case-only Windows hostname representation accepted'
+  Assert-True (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName 'laptop-4g5uou2r' -ExpectedComputerName $acceptedName).pass 'case-only Windows hostname representation accepted'
   foreach ($invalidName in @(
       $null, '', ' ',
-      ' LAPTOP-4G5U0U2R', 'LAPTOP-4G5U0U2R ', "LAPTOP-4G5U0U2R`0", "LAPTOP-4G5U0U2R`n", 'WRONG_HOST'
+      ' LAPTOP-4G5UOU2R', 'LAPTOP-4G5UOU2R ', "LAPTOP-4G5UOU2R`0", "LAPTOP-4G5UOU2R`n", 'LAPTOP-4G5U0U2R', 'WRONG_HOST'
     )) {
     Assert-True (-not (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName $invalidName -ExpectedComputerName $acceptedName).pass) 'invalid, malformed, or wrong computer name rejected'
   }
   Assert-True (-not (Test-Phase7BBoundedReplicaComputerIdentity -ObservedComputerName @($acceptedName, $acceptedName) -ExpectedComputerName $acceptedName).pass) 'multi-value computer name identity fails closed'
   Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value $null } 'SHAPE_INVALID' 'null computer name fails closed'
   Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value @('A', 'B') } 'SHAPE_INVALID' 'multi-value computer name fails closed'
-  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value ' LAPTOP-4G5U0U2R' } 'FORMAT_INVALID' 'leading whitespace fails closed'
-  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value "LAPTOP-4G5U0U2R`0" } 'FORMAT_INVALID' 'embedded null fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value ' LAPTOP-4G5UOU2R' } 'FORMAT_INVALID' 'leading whitespace fails closed'
+  Assert-Throws { ConvertTo-Phase7BCanonicalComputerName -Value "LAPTOP-4G5UOU2R`0" } 'FORMAT_INVALID' 'embedded null fails closed'
   $packet = Join-Path $root 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip.age'
   [IO.File]::WriteAllBytes($packet, [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`nsynthetic-ciphertext"))
   $sha = Get-Phase7BSha256 -LiteralPath $packet; $bytes = [int64](Get-Item $packet).Length
@@ -74,12 +81,12 @@ try {
   $evidence = New-Evidence
   Assert-True (Test-Phase7BBoundedReplicaDestinationEvidence -Evidence $evidence -RequiredBytes $bytes).pass 'accepted host and physical disk evidence'
   foreach ($case in @(
-      @{ property = 'hostIdentitySha256'; value = $historicalHostSha },
-      @{ property = 'diskIdentitySha256'; value = $historicalDiskSha },
+      @{ property = 'hostIdentitySha256'; value = $digitZeroHostSha },
+      @{ property = 'diskIdentitySha256'; value = $digitZeroDiskSha },
       @{ property = 'hostIdentitySha256'; value = $invalidTranscribedHostSha })) {
     $retired = New-Evidence; $retired.($case.property) = $case.value
     Assert-True (-not (Test-Phase7BBoundedReplicaDestinationEvidence -Evidence $retired -RequiredBytes $bytes).pass) `
-      "retired or malformed identity fails active destination gate:$($case.property)"
+      "digit-zero-derived or malformed identity fails active destination gate:$($case.property)"
   }
   foreach ($case in @(
       @{ property = 'computerName'; value = 'WRONG' }, @{ property = 'hostIdentitySha256'; value = '0' * 64 },
@@ -121,11 +128,11 @@ try {
   Assert-True (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $wrongReceipt -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass) 'independent readback hash mismatch rejected'
   $wrongReceiptName = $receipt.PSObject.Copy(); $wrongReceiptName.evidenceFileName = 'wrong.json'
   Assert-True (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $wrongReceiptName -ExpectedAttemptId $attempt -ExpectedPacketSha256 $sha -ExpectedPacketBytes $bytes).pass) 'receipt path identity mismatch rejected'
-  $primary = [pscustomobject]@{ classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attempt; evidenceNonce = ('b' * 32); evidenceFileName = "$attempt-primary-teardown-$('b' * 32).json"; observedAt = [DateTime]::UtcNow.ToString('o'); serverName = 'LAPTOP-4G5U0U2R'; shareName = 'P7Baaaaaaaa$'; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $true; automaticRetryAllowed = $false }
-  Assert-True (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primary -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass 'primary mapping and credential teardown accepted'
-  foreach ($property in @('matchingPsDriveCount','matchingSmbMappingCount','savedCredentialTargetCount')) { $bad = $primary.PSObject.Copy(); $bad.$property = 1; Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $bad -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) "primary teardown rejects $property residue" }
+  $primary = [pscustomobject]@{ classification = 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS'; pass = $true; attemptId = $attempt; evidenceNonce = ('b' * 32); evidenceFileName = "$attempt-primary-teardown-$('b' * 32).json"; observedAt = [DateTime]::UtcNow.ToString('o'); serverName = 'LAPTOP-4G5UOU2R'; shareName = 'P7Baaaaaaaa$'; matchingPsDriveCount = 0; matchingSmbMappingCount = 0; savedCredentialTargetCount = 0; mappingPersistent = $false; credentialsPersisted = $false; sessionTornDown = $true; mutationPerformed = $false; reportPersisted = $true; automaticRetryAllowed = $false }
+  Assert-True (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primary -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName 'P7Baaaaaaaa$').pass 'primary mapping and credential teardown accepted'
+  foreach ($property in @('matchingPsDriveCount','matchingSmbMappingCount','savedCredentialTargetCount')) { $bad = $primary.PSObject.Copy(); $bad.$property = 1; Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $bad -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) "primary teardown rejects $property residue" }
   $wrongTeardownName = $primary.PSObject.Copy(); $wrongTeardownName.evidenceFileName = 'wrong.json'
-  Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $wrongTeardownName -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) 'primary teardown path identity mismatch rejected'
+  Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $wrongTeardownName -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName 'P7Baaaaaaaa$').pass) 'primary teardown path identity mismatch rejected'
 
   $paths = @('phase7bBoundedReplicaTransport.psm1','phase7bPreflightBoundedReplicaDestination.ps1','phase7bOpenBoundedReplicaReceiver.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.test.ps1') | ForEach-Object { Join-Path $PSScriptRoot $_ }
   foreach ($path in $paths) { $tokens = $null; $errors = $null; [void][Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors); Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST:$(Split-Path -Leaf $path)" }

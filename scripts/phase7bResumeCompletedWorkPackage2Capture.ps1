@@ -49,6 +49,7 @@ try {
       [string]$marker.classification -cne 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CONSUMED' -or -not [bool]$marker.pass -or
       [string]$marker.authorizationId -cne [string]$authorization.authorizationId -or [string]$marker.attemptId -cne $AttemptId -or
       [bool]$marker.automaticRetryAllowed) { throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_BINDING_FAIL' }
+  $global:LASTEXITCODE = 0
   [ordered]@{
     classification = 'PHASE7B_WP2B_COMPLETED_CAPTURE_ACCEPTANCE_RESUME_PASS'
     pass = $true
@@ -69,5 +70,6 @@ try {
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2B_COMPLETED_CAPTURE_ACCEPTANCE_RESUME_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; mutationPerformed = $false; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 4
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 }

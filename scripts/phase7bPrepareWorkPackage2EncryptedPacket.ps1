@@ -38,7 +38,8 @@ if ($Operation -eq "Inspect") {
     persistentReplicaInfrastructureRequired = $false
     mutationPerformed = $false
   } | ConvertTo-Json -Depth 5
-  exit 0
+  $global:LASTEXITCODE = 0
+  return
 }
 
 $mutationStarted = $false
@@ -284,6 +285,7 @@ try {
   [void](Use-Phase7BWorkPackage2CaptureAuthorization -AuthorizationPath $AuthorizationPath -Authorization $authorization)
   $authorizationConsumed = $true
   $accepted = $true
+  $global:LASTEXITCODE = 0
   [ordered]@{
     classification = $descriptor.classification
     pass = $true
@@ -317,7 +319,8 @@ try {
     exactSameAuthorizationReusableAfterCleanup = [bool](-not $authorizationConsumed)
     newFounderAuthorizationRequired = $authorizationConsumed
   } | ConvertTo-Json -Depth 4
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 } finally {
   foreach ($plaintextPath in @($plainZipPath, $plaintextRoot)) {
     if (-not [string]::IsNullOrWhiteSpace($plaintextPath) -and (Test-Path -LiteralPath $plaintextPath)) {

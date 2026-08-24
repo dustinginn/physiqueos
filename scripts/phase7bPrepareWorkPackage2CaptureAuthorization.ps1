@@ -103,7 +103,7 @@ try {
   $localDrive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($localBase).Substring(0,1)) -PSProvider FileSystem -ErrorAction Stop
   if ([int64]$localDrive.Free -lt [Math]::Max([int64]1GB, [int64]$plan.totalBytes) -or (Test-Path -LiteralPath (Join-Path $localBase $AttemptId))) { throw 'PHASE7B_WP2B_PRIMARY_DESTINATION_FAIL' }
   $expectedShare = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
-  if ($ReplicaUncRoot -cne "\\LAPTOP-4G5U0U2R\$expectedShare") { throw 'PHASE7B_WP2B_REPLICA_ROOT_BINDING_FAIL' }
+  if ($ReplicaUncRoot -cne "\\LAPTOP-4G5UOU2R\$expectedShare") { throw 'PHASE7B_WP2B_REPLICA_ROOT_BINDING_FAIL' }
   $primaryAddresses = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object { [string]$_.IPAddress -eq $PrimaryHostIpv4 -and [int]$_.PrefixLength -eq $PrimaryHostPrefixLength })
   $networkBinding = Test-Phase7BSecondComputerNetworkBinding -PrimaryIpv4 $PrimaryHostIpv4 -PrimaryPrefixLength $PrimaryHostPrefixLength -ReplicaIpv4 $LaptopIpv4 -ReplicaPrefixLength $LaptopPrefixLength
   if ($primaryAddresses.Count -ne 1 -or -not $networkBinding.pass) { throw 'PHASE7B_WP2B_PHYSICAL_LAN_BINDING_FAIL' }

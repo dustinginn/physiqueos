@@ -52,6 +52,7 @@ try {
   if (-not (Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 $ExpectedPacketSha256 -ExpectedPacketBytes $ExpectedPacketBytes).pass) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_RECEIPT_SELF_CHECK_FAIL' }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $EvidenceOutputPath -Evidence $receipt
   $transportBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $receipt))
+  $global:LASTEXITCODE = 0
   [ordered]@{ classification = $receipt.classification; pass = $true; attemptId = $AttemptId; evidenceNonce = $EvidenceNonce; evidenceFileName = $persisted.fileName; evidenceSha256 = $persisted.sha256; evidenceTransportBase64 = [Convert]::ToBase64String($transportBytes); packetFileName = $receipt.packetFileName; packetSha256 = $receipt.packetSha256; packetBytes = $receipt.packetBytes; sessionTornDown = $true; teardownResumed = [bool]$teardownResumed; reportPersisted = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 5
 } catch {
   if ($AttemptId -match '^phase7b-wp2-[0-9a-f]{32}$') {
@@ -62,5 +63,6 @@ try {
   }
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2_BOUNDED_REPLICA_VERIFY_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_VERIFY_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; teardownAttempted = $teardownAttempted; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 }

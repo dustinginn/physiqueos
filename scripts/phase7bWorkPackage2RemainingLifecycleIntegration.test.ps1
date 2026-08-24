@@ -17,8 +17,18 @@ $paths = @(
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 foreach($path in $paths){
   $tokens=$null;$errors=$null
-  [void][Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+  $ast = [Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
   Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST: $(Split-Path -Leaf $path)"
+  if ((Split-Path -Leaf $path) -in @(
+      'phase7bPrepareWorkPackage2EncryptedPacket.ps1',
+      'phase7bResumeCompletedWorkPackage2Capture.ps1',
+      'phase7bVerifyAndCloseBoundedReplicaReceiver.ps1',
+      'phase7bVerifyPrimaryReplicaSessionClosed.ps1',
+      'phase7bImportBoundedReplicaReceipt.ps1',
+      'phase7bFinalizeBoundedReplicaDescriptor.ps1')) {
+    $rawExits = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.ExitStatementAst] }, $true))
+    Assert-True ($rawExits.Count -eq 0) "Founder-transitive source contains no raw exit: $(Split-Path -Leaf $path)"
+  }
 }
 $prepare = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2CaptureAuthorization.ps1') -Raw
 $capture = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1') -Raw
@@ -35,6 +45,12 @@ Assert-True ($capture.Contains('exactSameAuthorizationReusableAfterCleanup') -an
 Assert-True ($verify.Contains('teardownResumed') -and $verify.Contains('TEARDOWN_CARDINALITY_FAIL')) 'Stage4 exact partial-teardown resume is bounded'
 Assert-True ($import.Contains('WP2B_CAPTURE_RESUME_EXACT_EXISTING_SAFE_RECEIPT_READ_ONLY')) 'Stage5 can reuse an exact imported receipt after restart'
 Assert-True ($finalize.Contains('WP2B_CAPTURE_RESUME_EXACT_EXISTING_FINAL_DESCRIPTOR_READ_ONLY')) 'Stage5 can accept an exact final descriptor after caller failure'
+foreach ($hostSafeSource in @($capture,$captureResume,$verify,
+    (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bVerifyPrimaryReplicaSessionClosed.ps1') -Raw),
+    $import,$finalize)) {
+  Assert-True ($hostSafeSource.Contains('$global:LASTEXITCODE') -and -not ($hostSafeSource -match '(?m)^\s*exit\s+[01]\s*$')) `
+    'Founder-transitive source returns safe JSON/status without terminating ConsoleHost'
+}
 foreach($source in @($capture,(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2RestoreIso.ps1') -Raw),(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bIsolatedGuestRestoreInterface.ps1') -Raw))){
   Assert-True ($source.Contains('Test-Phase7BWorkPackage2AgeVersionOutput') -and -not ($source -match '(?i)\\bage\\s\+v\?1')) 'all capture/WP2C age consumers use the shared actual-output parser'
 }

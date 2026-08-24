@@ -223,7 +223,7 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     $AgeExePathSha256, $AgeExeSha256, $LocalOutputRootSha256, $ReplicaRootSha256, $QuiescenceEvidenceSha256)
   if ($AuthorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or $AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
       @($hashes | Where-Object { $_ -notmatch '^[0-9a-f]{40}$' -and $_ -notmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
-      $ToolingCommit -notmatch '^[0-9a-f]{40}$' -or $RuntimeRevision -lt 1 -or $ReplicaUncRoot -notmatch '^\\\\LAPTOP-4G5U0U2R\\P7B[0-9a-f]{8}\$$' -or
+      $ToolingCommit -notmatch '^[0-9a-f]{40}$' -or $RuntimeRevision -lt 1 -or $ReplicaUncRoot -notmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -or
       $QuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
       @(@($CapturePlanFileName, $SelectionFileName) | Where-Object { $_ -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or $_ -notmatch [regex]::Escape($AttemptId) }).Count -gt 0 -or
       $QuiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
@@ -307,7 +307,7 @@ function Assert-Phase7BWorkPackage2CaptureAuthorization {
       [string]$authorization.selectionFileName -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or
       [string]$authorization.selectionSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$authorization.runtimeRevision -lt 1 -or
       [string]$authorization.runtimeSha256 -notmatch '^[0-9a-f]{64}$' -or [string]$authorization.ageExePathSha256 -notmatch '^[0-9a-f]{64}$' -or
-      [string]$authorization.replicaUncRoot -notmatch '^\\\\LAPTOP-4G5U0U2R\\P7B[0-9a-f]{8}\$$' -or
+      [string]$authorization.replicaUncRoot -notmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -or
       [string]$authorization.replicaPathModel -ne 'EXACT_ATTEMPT_ROOT' -or -not [bool]$authorization.oneUseOnly -or
       [string]$authorization.founderMeaningfulDataThrough -ne $operator.founderMeaningfulDataThrough -or
       [string]$authorization.founderDowntimeBegan -ne $operator.founderDowntimeBegan -or [bool]$authorization.wp2cAuthorized -or

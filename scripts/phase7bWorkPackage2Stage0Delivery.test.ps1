@@ -2,10 +2,10 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $scriptPath = Join-Path $PSScriptRoot 'phase7bRunWorkPackage2LaptopPreflight.ps1'
 $attempt = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
-$acceptedHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
-$acceptedDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
-$historicalHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
-$historicalDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+$acceptedHostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+$acceptedDiskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
+$digitZeroHostSha = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
+$digitZeroDiskSha = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
 $invalidTranscribedHostSha = 'df354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "phase7b-stage0-delivery-$([guid]::NewGuid().ToString('N'))"
 $assertions = 0
@@ -85,14 +85,14 @@ try {
 
   Assert-True ($source.Contains($attempt)) 'wrapper binds exact authorized attempt'
   foreach ($binding in @(
-      'LAPTOP-4G5U0U2R',
+      'LAPTOP-4G5UOU2R',
       $acceptedHostSha,
       $acceptedDiskSha,
       "'NTFS'", "'SATA'", "'192.168.1.69'", '[int64]1GB')) {
     Assert-True ($source.Contains($binding)) "Stage 0 exact invariant retained:$binding"
   }
-  Assert-True (-not $source.Contains($historicalHostSha) -and -not $source.Contains($historicalDiskSha)) `
-    'historical identity digests are retired from active Stage 0 gates'
+  Assert-True (-not $source.Contains($digitZeroHostSha) -and -not $source.Contains($digitZeroDiskSha)) `
+    'digit-zero-derived identity digests are retired from active Stage 0 gates'
   Assert-True (-not ($source -cmatch ('(?<![0-9a-f])' + [regex]::Escape($invalidTranscribedHostSha) + '(?![0-9a-f])'))) `
     'invalid 63-character transcription is retired from active Stage 0 gates'
   Assert-True (-not $source.Contains('Get-Phase7BStage0SafeIdentityResult') -and
@@ -133,18 +133,25 @@ try {
   }
   $syntheticUuid = '01234567-89AB-CDEF-0123-456789ABCDEF'
   $syntheticMachineGuid = 'FEDCBA98-7654-3210-FEDC-BA9876543210'
-  $v2Host = Get-V2ReferenceHostIdentitySha256 'LAPTOP-4G5U0U2R' $syntheticUuid $syntheticMachineGuid
-  $stage0Host = Get-Phase7BStage0HostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+  $v2Host = Get-V2ReferenceHostIdentitySha256 'LAPTOP-4G5UOU2R' $syntheticUuid $syntheticMachineGuid
+  $stage0Host = Get-Phase7BStage0HostIdentitySha256 -ComputerName 'LAPTOP-4G5UOU2R' `
     -Uuid $syntheticUuid -MachineGuid $syntheticMachineGuid
-  Assert-True ($v2Host -ceq $stage0Host -and $stage0Host -ceq 'ff570bf96b4cc2331dc8b27086b8b51928b2e79af3bef7decea29b5335ae224f') `
+  Assert-True ($v2Host -ceq $stage0Host -and $stage0Host -ceq 'ac9d1de2394da0c4840e12a5dda9c31af0695fa129368c4941314ae8ef284663') `
     'Stage 0 real host hash-producing path matches fixed V2 fixture digest'
-  $v2Disk = Get-V2ReferenceDiskIdentitySha256 'LAPTOP-4G5U0U2R' 0 'UNIQUE-ID' 'SERIAL-01' `
+  $digitZeroStage0Host = Get-Phase7BStage0HostIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' `
+    -Uuid $syntheticUuid -MachineGuid $syntheticMachineGuid
+  Assert-True ($digitZeroStage0Host -cne $stage0Host) 'Stage 0 digit-zero hostname yields a distinct rejected host digest'
+  $v2Disk = Get-V2ReferenceDiskIdentitySha256 'LAPTOP-4G5UOU2R' 0 'UNIQUE-ID' 'SERIAL-01' `
     'Friendly Disk' ([int64]1000204886016) 'SATA'
-  $stage0Disk = Get-Phase7BStage0DiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+  $stage0Disk = Get-Phase7BStage0DiskIdentitySha256 -ComputerName 'LAPTOP-4G5UOU2R' -DiskNumber 0 `
     -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
     -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
-  Assert-True ($v2Disk -ceq $stage0Disk -and $stage0Disk -ceq 'a30f346e3f58de06dad4034b8eba9de3818a1464210539897740707c91eb6e28') `
+  Assert-True ($v2Disk -ceq $stage0Disk -and $stage0Disk -ceq 'd6b447b4e76618df4b90659befd20fb9790af53ffbf54e2f21cb9df8563ace8c') `
     'Stage 0 real disk hash-producing path matches fixed V2 fixture digest'
+  $digitZeroStage0Disk = Get-Phase7BStage0DiskIdentitySha256 -ComputerName 'LAPTOP-4G5U0U2R' -DiskNumber 0 `
+    -UniqueId 'UNIQUE-ID' -SerialNumber 'SERIAL-01' -FriendlyName 'Friendly Disk' `
+    -DiskSizeBytes ([int64]1000204886016) -BusType 'SATA'
+  Assert-True ($digitZeroStage0Disk -cne $stage0Disk) 'Stage 0 digit-zero hostname yields a distinct rejected disk digest'
 
   foreach ($validIdentity in @($acceptedHostSha, $acceptedDiskSha, $stage0Host, $stage0Disk)) {
     Assert-True ((Assert-Phase7BStage0Sha256Identity -Value $validIdentity -ErrorCode 'SHAPE_FAIL') -ceq $validIdentity) `
@@ -178,10 +185,10 @@ try {
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'wrong host with correct disk fails closed'
   $wrongDisk = $valid.Clone(); $wrongDisk.DiskIdentitySha256 = 'c' * 64
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @wrongDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'correct host with wrong disk fails closed'
-  $historicalHost = $valid.Clone(); $historicalHost.HostIdentitySha256 = $historicalHostSha
-  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'historical host identity is audit-only and fails active gate'
-  $historicalDisk = $valid.Clone(); $historicalDisk.DiskIdentitySha256 = $historicalDiskSha
-  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @historicalDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'historical disk identity is audit-only and fails active gate'
+  $digitZeroHost = $valid.Clone(); $digitZeroHost.HostIdentitySha256 = $digitZeroHostSha
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @digitZeroHost } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL' 'digit-zero-derived host identity is audit-only and fails active gate'
+  $digitZeroDisk = $valid.Clone(); $digitZeroDisk.DiskIdentitySha256 = $digitZeroDiskSha
+  Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @digitZeroDisk } 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL' 'digit-zero-derived disk identity is audit-only and fails active gate'
   $invalidTranscription = $valid.Clone(); $invalidTranscription.HostIdentitySha256 = $invalidTranscribedHostSha
   Assert-ThrowsCode { Assert-Phase7BStage0Snapshot @invalidTranscription } 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_SHAPE_FAIL' `
     'invalid 63-character host transcription fails shape gate'

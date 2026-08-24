@@ -46,9 +46,9 @@ function Get-Phase7BBoundedReplicaTransportContract {
     schemaVersion = 1
     classification = 'PHASE7B_WP2_BOUNDED_REPLICA_TRANSPORT_CONTRACT'
     transportClassification = 'EPHEMERAL_SMB_EXISTING_ACCOUNT_ONE_ENCRYPTED_PACKET'
-    acceptedComputerName = 'LAPTOP-4G5U0U2R'
-    acceptedHostIdentitySha256 = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
-    acceptedDiskIdentitySha256 = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
+    acceptedComputerName = 'LAPTOP-4G5UOU2R'
+    acceptedHostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+    acceptedDiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
     acceptedDriveRoot = 'D:\'
     acceptedFileSystem = 'NTFS'
     acceptedDiskNumber = 0

@@ -166,7 +166,7 @@ try {
   $expectedShareRoot = 'D:\Phase7B\replicas\379bb303\wp2b'
   $expectedReplicaRoot = "$expectedShareRoot\encrypted-replica"
   $expectedUnc = "\\$ExpectedComputerName\$ShareName\encrypted-replica"
-  if ($ExpectedComputerName -ne 'LAPTOP-4G5U0U2R' -or $ExpectedDiskNumber -ne 0 -or
+  if ($ExpectedComputerName -ne 'LAPTOP-4G5UOU2R' -or $ExpectedDiskNumber -ne 0 -or
       $ExpectedDiskBusType -ne 'SATA' -or $ExpectedFileSystem -ne 'NTFS' -or
       $ExpectedReplicaIpv4 -ne '192.168.1.68' -or $PrimaryHostIpv4 -ne '192.168.1.69' -or
       $ExpectedReplicaPrefixLength -ne 24 -or $PrimaryHostPrefixLength -ne 24 -or
@@ -222,7 +222,7 @@ try {
   if (Get-NetFirewallRule -Name $FirewallRuleName -ErrorAction SilentlyContinue) { throw 'PHASE7B_WP2_REPLICA_FIREWALL_ALREADY_EXISTS' }
 
   $stage = 'collect-interactive-password'
-  $password = Read-Host -Prompt 'Enter a new password for LAPTOP-4G5U0U2R\PhysiqueOSReplica' -AsSecureString
+  $password = Read-Host -Prompt 'Enter a new password for LAPTOP-4G5UOU2R\PhysiqueOSReplica' -AsSecureString
   if (-not (Test-InteractiveReplicaPassword -Password $password)) { throw 'PHASE7B_WP2_REPLICA_PASSWORD_POLICY_FAIL' }
 
   $stage = 'create-dedicated-account'

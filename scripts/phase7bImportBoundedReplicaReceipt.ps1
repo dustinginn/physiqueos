@@ -32,7 +32,8 @@ try {
       throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_EXISTING_BINDING_FAIL'
     }
     [ordered]@{ classification = 'PHASE7B_WP2B_SAFE_REPLICA_RECEIPT_IMPORT_PASS'; pass = $true; attemptId = $AttemptId; evidenceNonce = $ExpectedEvidenceNonce; evidenceFileName = Split-Path -Leaf $OutputPath; evidenceSha256 = $ExpectedEvidenceSha256; packetSha256 = $ExpectedPacketSha256; packetBytes = $ExpectedPacketBytes; exactExistingReceiptReused = $true; mutationPerformed = $false; plaintextFounderDataImported = $false; credentialsImported = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
-    exit 0
+    $global:LASTEXITCODE = 0
+    return
   }
   if (-not [string]::IsNullOrEmpty($ExactExistingReceiptResumeAcknowledgement)) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_RESUME_NOT_APPLICABLE' }
   if ($Host.Name -ne 'ConsoleHost' -or -not [Environment]::UserInteractive) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_INTERACTIVE_CONSOLE_REQUIRED' }
@@ -50,9 +51,11 @@ try {
   }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $receipt
   if ($persisted.sha256 -ne $ExpectedEvidenceSha256) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_READBACK_FAIL' }
+  $global:LASTEXITCODE = 0
   [ordered]@{ classification = 'PHASE7B_WP2B_SAFE_REPLICA_RECEIPT_IMPORT_PASS'; pass = $true; attemptId = $AttemptId; evidenceNonce = $ExpectedEvidenceNonce; evidenceFileName = $persisted.fileName; evidenceSha256 = $persisted.sha256; packetSha256 = $ExpectedPacketSha256; packetBytes = $ExpectedPacketBytes; exactExistingReceiptReused = $false; mutationPerformed = $true; plaintextFounderDataImported = $false; credentialsImported = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2B_SAFE_REPLICA_RECEIPT_IMPORT_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; safeExceptionType = $_.Exception.GetType().Name; safeLine = $_.InvocationInfo.ScriptLineNumber; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 }

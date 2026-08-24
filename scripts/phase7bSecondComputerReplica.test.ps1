@@ -27,11 +27,11 @@ function Import-SourceFunction([string]$Path, [string]$Name) {
 }
 
 $attemptId = 'phase7b-wp2-6cce4f4197ae4651a33ec123825326f9'
-# Historical pre-update attestation fixture retained for regression/audit only.
+# Authoritative letter-O physical-laptop identity fixture.
 $hostSha = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
 $diskSha = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
 $localRoot = 'D:\Phase7B\replicas\379bb303\wp2b\encrypted-replica'
-$uncRoot = '\\LAPTOP-4G5U0U2R\PhysiqueOS-Phase7B-WP2B$\encrypted-replica'
+$uncRoot = '\\LAPTOP-4G5UOU2R\PhysiqueOS-Phase7B-WP2B$\encrypted-replica'
 $shareName = 'PhysiqueOS-Phase7B-WP2B$'
 $primaryIp = '192.168.1.69'
 $attestationSha = 'a' * 64
@@ -42,7 +42,7 @@ Assert-True ($contract.requireEncryption -and $contract.encryptionSuppliesIntegr
 Assert-True (-not $contract.mappingPersistent -and -not $contract.saveCredentials) 'mapping and credentials are nonpersistent'
 
 $unc = Get-Phase7BSecondComputerReplicaUncIdentity -UncReplicaRoot $uncRoot
-Assert-True ($unc.serverName -eq 'LAPTOP-4G5U0U2R' -and $unc.shareName -eq $shareName) 'exact UNC identity parsed'
+Assert-True ($unc.serverName -eq 'LAPTOP-4G5UOU2R' -and $unc.shareName -eq $shareName) 'exact UNC identity parsed'
 Assert-Throws { Get-Phase7BSecondComputerReplicaUncIdentity -UncReplicaRoot 'D:\replica' } 'PHASE7B_WP2_REPLICA_UNC_INVALID' 'local path rejected as second-computer UNC'
 Assert-Throws { Get-Phase7BSecondComputerReplicaUncIdentity -UncReplicaRoot '\\bad host\share' } 'PHASE7B_WP2_REPLICA_UNC_IDENTITY_INVALID' 'ambiguous server identity rejected'
 
@@ -56,7 +56,7 @@ $attestation = [pscustomobject][ordered]@{
   classification = $contract.attestationClassification
   pass = $true
   attemptId = $attemptId
-  computerName = 'LAPTOP-4G5U0U2R'
+  computerName = 'LAPTOP-4G5UOU2R'
   hostIdentitySha256 = $hostSha
   diskIdentitySha256 = $diskSha
   localReplicaRoot = $localRoot
@@ -79,33 +79,33 @@ $attestation = [pscustomobject][ordered]@{
   transportClassification = $contract.transportClassification
   automaticRetryAllowed = $false
 }
-$accepted = Test-Phase7BSecondComputerReplicaAttestation -Attestation $attestation -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5U0U2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp
+$accepted = Test-Phase7BSecondComputerReplicaAttestation -Attestation $attestation -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5UOU2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp
 Assert-True $accepted.pass 'complete exact replica attestation accepted'
 $wrongDisk = $attestation.PSObject.Copy()
 $wrongDisk.diskIdentitySha256 = 'b' * 64
-Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $wrongDisk -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5U0U2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'wrong disk rejected'
+Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $wrongDisk -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5UOU2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'wrong disk rejected'
 $adminAccount = $attestation.PSObject.Copy()
 $adminAccount.replicaAccountIsAdministrator = $true
-Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $adminAccount -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5U0U2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'administrator replica account rejected'
+Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $adminAccount -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5UOU2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'administrator replica account rejected'
 $unencrypted = $attestation.PSObject.Copy()
 $unencrypted.shareEncryptData = $false
-Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $unencrypted -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5U0U2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'unencrypted share rejected'
+Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $unencrypted -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5UOU2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'unencrypted share rejected'
 $broadFirewall = $attestation.PSObject.Copy()
 $broadFirewall.firewallRemoteAddress = 'LocalSubnet'
-Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $broadFirewall -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5U0U2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'broad firewall scope rejected'
+Assert-True (-not (Test-Phase7BSecondComputerReplicaAttestation -Attestation $broadFirewall -ExpectedAttemptId $attemptId -ExpectedComputerName 'LAPTOP-4G5UOU2R' -ExpectedHostIdentitySha256 $hostSha -ExpectedDiskIdentitySha256 $diskSha -ExpectedLocalReplicaRoot $localRoot -ExpectedUncReplicaRoot $uncRoot -ExpectedShareName $shareName -ExpectedPrimaryIpv4 $primaryIp).pass) 'broad firewall scope rejected'
 
-$session = [pscustomobject]@{ serverName = 'LAPTOP-4G5U0U2R'; shareName = $shareName; dialect = '3.1.1'; encrypted = $true; signed = $false; credentialed = $true; guest = $false; mappingPersistent = $false; credentialsSaved = $false; writeThrough = $true; remoteAttestationSha256 = $attestationSha }
-$sessionResult = Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $session -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha
+$session = [pscustomobject]@{ serverName = 'LAPTOP-4G5UOU2R'; shareName = $shareName; dialect = '3.1.1'; encrypted = $true; signed = $false; credentialed = $true; guest = $false; mappingPersistent = $false; credentialsSaved = $false; writeThrough = $true; remoteAttestationSha256 = $attestationSha }
+$sessionResult = Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $session -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha
 Assert-True ($sessionResult.pass -and $sessionResult.encryptionSuppliesIntegrity) 'encrypted SMB 3.1.1 session accepted without redundant signing requirement'
 $plainSession = $session.PSObject.Copy()
 $plainSession.encrypted = $false
-Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $plainSession -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'unencrypted SMB session rejected'
+Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $plainSession -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'unencrypted SMB session rejected'
 $persistentSession = $session.PSObject.Copy()
 $persistentSession.mappingPersistent = $true
-Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $persistentSession -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'persistent mapping rejected'
+Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $persistentSession -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'persistent mapping rejected'
 $wrongAttestation = $session.PSObject.Copy()
 $wrongAttestation.remoteAttestationSha256 = 'b' * 64
-Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $wrongAttestation -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'wrong remote attestation rejected'
+Assert-True (-not (Test-Phase7BSecondComputerSmbSessionEvidence -Evidence $wrongAttestation -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $shareName -ExpectedAttestationSha256 $attestationSha).pass) 'wrong remote attestation rejected'
 
 $tracked = @(
   (Join-Path $PSScriptRoot 'phase7bSecondComputerReplicaContract.psm1'),
@@ -198,7 +198,7 @@ try {
 $preMutationArgs = @{
   Operation = 'ConfigureAndAttest'
   AttemptId = $attemptId
-  ExpectedComputerName = 'LAPTOP-4G5U0U2R'
+  ExpectedComputerName = 'LAPTOP-4G5UOU2R'
   ExpectedHostIdentitySha256 = $hostSha
   ExpectedDiskIdentitySha256 = $diskSha
   ExpectedDiskNumber = 0

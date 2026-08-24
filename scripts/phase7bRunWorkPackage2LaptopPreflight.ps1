@@ -8,9 +8,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $acceptedAttemptId = 'phase7b-wp2-fc48221852204c188c414a18f6c42bbd'
-$acceptedComputerName = 'LAPTOP-4G5U0U2R'
-$acceptedHostIdentitySha256 = 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1'
-$acceptedDiskIdentitySha256 = '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948'
+$acceptedComputerName = 'LAPTOP-4G5UOU2R'
+$acceptedHostIdentitySha256 = 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c'
+$acceptedDiskIdentitySha256 = '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896'
 $acceptedFileSystem = 'NTFS'
 $acceptedDiskNumber = 0
 $acceptedBusType = 'SATA'
@@ -97,10 +97,10 @@ function Assert-Phase7BStage0Snapshot {
     -ErrorCode 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_SHAPE_FAIL')
   [void](Assert-Phase7BStage0Sha256Identity -Value $DiskIdentitySha256 `
     -ErrorCode 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_SHAPE_FAIL')
-  if ($HostIdentitySha256 -cne 'ddf354efb3688588818f48ea7e46720eb7b716e7006ce02b9386786bc6cdc8e1') {
+  if ($HostIdentitySha256 -cne 'ea6696e8a0fc4d9242544568d62cd979fd57bd2478fac4f40755b3546776ac3c') {
     throw 'PHASE7B_WP2B_LAPTOP_HOST_IDENTITY_FAIL'
   }
-  if ($DiskIdentitySha256 -cne '3b660772000275e24aa13ba78712c518a898e701ebd3a443cee31776877ac948') {
+  if ($DiskIdentitySha256 -cne '336d31be1f1e6dd4bde254fae94ffebf2b23829520a26c2f5d9bc5deda169896') {
     throw 'PHASE7B_WP2B_LAPTOP_DISK_IDENTITY_FAIL'
   }
   if ($FileSystem -cne 'NTFS' -or $DiskNumber -ne 0 -or $BusType -cne 'SATA') {

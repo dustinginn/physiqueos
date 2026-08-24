@@ -31,7 +31,7 @@ try {
   $accepted = Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 ([string]$pending.packetSha256) -ExpectedPacketBytes ([int64]$pending.packetBytes)
   if (-not $accepted.pass) { throw $accepted.classification }
   $expectedShare = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
-  if (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primaryTeardown -ExpectedAttemptId $AttemptId -ExpectedServerName 'LAPTOP-4G5U0U2R' -ExpectedShareName $expectedShare).pass) { throw 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_REJECTED' }
+  if (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primaryTeardown -ExpectedAttemptId $AttemptId -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $expectedShare).pass) { throw 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_REJECTED' }
   $descriptor = [ordered]@{}
   foreach ($property in $pending.PSObject.Properties) { $descriptor[$property.Name] = $property.Value }
   $descriptor.schemaVersion = 1
@@ -50,13 +50,16 @@ try {
     } finally { $sha.Dispose() }
     if ($existingBytes.Length -ne $bytes.Length -or (Get-Phase7BSha256 -LiteralPath $OutputPath) -cne $expectedOutputSha) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINAL_DESCRIPTOR_MISMATCH' }
     [ordered]@{ classification = $descriptor.classification; pass = $true; attemptId = $AttemptId; descriptorFileName = Split-Path -Leaf $OutputPath; descriptorSha256 = Get-Phase7BSha256 -LiteralPath $OutputPath; packetSha256 = $descriptor.packetSha256; packetBytes = $descriptor.packetBytes; independentEncryptedReplicaPass = $true; sessionTornDown = $true; exactExistingDescriptorReused = $true; mutationPerformed = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
-    exit 0
+    $global:LASTEXITCODE = 0
+    return
   }
   $mutationStarted = $true
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $descriptor
+  $global:LASTEXITCODE = 0
   [ordered]@{ classification = $descriptor.classification; pass = $true; attemptId = $AttemptId; descriptorFileName = $persisted.fileName; descriptorSha256 = $persisted.sha256; packetSha256 = $descriptor.packetSha256; packetBytes = $descriptor.packetBytes; independentEncryptedReplicaPass = $true; sessionTornDown = $true; exactExistingDescriptorReused = $false; mutationPerformed = $true; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; mutationStarted = $mutationStarted; automaticRetryAllowed = $false; newFounderAuthorizationRequired = $mutationStarted } | ConvertTo-Json -Depth 4
-  exit 1
+  $global:LASTEXITCODE = 1
+  return
 }
