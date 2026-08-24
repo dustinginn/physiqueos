@@ -60,4 +60,50 @@ $receiverInspect=@(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -F
 $receiverInspectExit=$LASTEXITCODE
 $receiverInspectResult=($receiverInspect -join [Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
 Assert-True ($receiverInspectExit -eq 0 -and [bool]$receiverInspectResult.pass -and -not [bool]$receiverInspectResult.mutationPerformed) 'Stage2 exact source path is self-contained in fresh PowerShell 5.1'
+# Regression guard: every WP2B entry script's OWN top-of-file Import-Module block, replayed verbatim in a
+# fresh PowerShell 5.1 process, must leave every exported function from every shared module resolvable.
+# A nested `Import-Module ... -Force` inside a dependency module (as opposed to a plain re-import) can
+# silently shadow an already-loaded module's global bindings depending on import order, which previously
+# made Get-Phase7BSha256 unresolvable inside phase7bPrepareWorkPackage2CaptureAuthorization.ps1's own
+# import chain without ever throwing at import time.
+$sharedModules = @('phase7bIsolatedGuestContract','phase7bWorkPackage2Contract','phase7bBoundedReplicaTransport','phase7bWorkPackage2OperatorLifecycle','phase7bSecondComputerReplicaContract')
+function Get-ImportedModuleNames([string]$Text) {
+  @($sharedModules | Where-Object { $Text.Contains("Join-Path `$PSScriptRoot '$_.psm1'") -or $Text.Contains("Join-Path `$PSScriptRoot ""$_.psm1""") })
+}
+$moduleExports = @{}
+foreach ($moduleName in $sharedModules) {
+  $moduleText = Get-Content -LiteralPath (Join-Path $PSScriptRoot "$moduleName.psm1") -Raw
+  $exportMatch = [regex]::Match($moduleText, 'Export-ModuleMember\s+-Function\s+@\(([^)]*)\)', 'Singleline')
+  Assert-True $exportMatch.Success "$moduleName declares an Export-ModuleMember function list"
+  $moduleExports[$moduleName] = @([regex]::Matches($exportMatch.Groups[1].Value, "['""]([A-Za-z0-9-]+)['""]") | ForEach-Object { $_.Groups[1].Value })
+}
+Assert-True (@($moduleExports.Values | ForEach-Object { $_ } | Sort-Object -Unique).Count -ge 40) 'shared-module export surface collected for import-order regression guard'
+# Deliberately NOT the transitive closure: a module only reachable through another module's own internal
+# (nested) import is expected to be usable by that module's own functions, not necessarily callable by name
+# from the top-level script body. Only directly-imported modules' exports must resolve at script scope.
+
+$entryScripts = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'phase7b*.ps1' -File | Where-Object { $_.Name -notmatch '\.test\.ps1$' } | Where-Object {
+  @(Get-ImportedModuleNames (Get-Content -LiteralPath $_.FullName -Raw)).Count -ge 2
+})
+Assert-True ($entryScripts.Count -ge 8) 'discovered multiple WP2B entry scripts that import 2+ shared modules'
+
+foreach ($entry in $entryScripts) {
+  $entryText = Get-Content -LiteralPath $entry.FullName -Raw
+  $importLines = @([regex]::Matches($entryText, '(?m)^Import-Module\s+\(Join-Path\s+\$PSScriptRoot\s+[^\r\n]+\)\s*(?:-Force)?\s*$') | ForEach-Object { $_.Value })
+  Assert-True ($importLines.Count -ge 2) "$($entry.Name) has a detectable top-of-file import block"
+  $directModules = Get-ImportedModuleNames $entryText
+  $expectedFunctions = @($directModules | ForEach-Object { $moduleExports[$_] } | Sort-Object -Unique)
+  Assert-True ($expectedFunctions.Count -gt 0) "$($entry.Name) resolves a nonempty expected-function set"
+  $importBlock = ($importLines | ForEach-Object { $_ -replace '\$PSScriptRoot', "'$($PSScriptRoot.Replace("'","''"))'" }) -join [Environment]::NewLine
+  $probe = "`$ErrorActionPreference='Stop'`nSet-StrictMode -Version Latest`n$importBlock`n" +
+    "`$missing=@('$($expectedFunctions -join "','")')|Where-Object{-not (Get-Command `$_ -CommandType Function -ErrorAction SilentlyContinue)}`n" +
+    "[ordered]@{pass=(@(`$missing).Count -eq 0);missingCount=@(`$missing).Count;missing=@(`$missing)}|ConvertTo-Json -Compress"
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))
+  $result = @(& $ps51 -NoProfile -NonInteractive -EncodedCommand $encoded 2>&1)
+  $exit = $LASTEXITCODE
+  $parsed = $null
+  if ($exit -eq 0) { try { $parsed = ($result -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop } catch {} }
+  Assert-True ($exit -eq 0 -and $null -ne $parsed -and [bool]$parsed.pass) "$($entry.Name) real import chain resolves every directly-depended shared-module export in fresh PowerShell 5.1"
+}
+
 [ordered]@{classification='PHASE7B_WP2B_REMAINING_CONNECTED_LIFECYCLE_LOCAL_TESTS_PASS';pass=$true;assertions=$script:assertions;liveExecutionPerformed=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Compress

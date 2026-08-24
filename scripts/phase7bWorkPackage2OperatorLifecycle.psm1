@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
-Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1')
 
 function Get-Phase7BWorkPackage2OperatorContract {
   [CmdletBinding()] param()

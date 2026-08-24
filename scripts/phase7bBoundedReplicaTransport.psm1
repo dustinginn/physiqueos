@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
-Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 
 function Test-Phase7BSha256IdentityShape {
   [CmdletBinding()] param([Parameter(Mandatory = $true)][AllowNull()]$Value)

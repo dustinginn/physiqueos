@@ -150,6 +150,6 @@ try {
   }|ConvertTo-Json -Depth 5
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2B_POST_REFRESH_RESUME_EXCEPTION' }
-  [ordered]@{classification='PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_NONRESUMABLE';pass=$false;safeStage=$stage;safeErrorCode=$safeCode;attemptId=$ExpectedAttemptId;refreshNonce=$ExpectedRefreshNonce;quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false;additionalRefreshAllowed=$false;reportPersisted=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Depth 4
+  [ordered]@{classification='PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_NONRESUMABLE';pass=$false;safeStage=$stage;safeErrorCode=$safeCode;safeExceptionType=$_.Exception.GetType().Name;safeLine=$_.InvocationInfo.ScriptLineNumber;attemptId=$ExpectedAttemptId;refreshNonce=$ExpectedRefreshNonce;quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false;additionalRefreshAllowed=$false;reportPersisted=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Depth 4
   exit 1
 }
