@@ -143,6 +143,37 @@ try {
     Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match $case.code -and -not $rejected.additionalRefreshAllowed -and
       -not $rejected.quiescenceMutationPerformed -and -not $rejected.refreshMutationPerformed) "post-refresh checkpoint rejects:$($case.p)"
   }
+  $staleId='phase7b-wp2b-capture-auth-'+('b'*32)
+  $staleFile="$attempt-$staleId.json"
+  $staleHash='a'*64
+  $staleParameters=@{CandidateCount=1;ExpectedAttemptId=$attempt;ExpectedFileName=$staleFile;ExpectedSha256=$staleHash;ExpectedAuthorizationId=$staleId;ExpectedToolingCommit=$tooling;ObservedFileName=$staleFile;ObservedSha256=$staleHash;ObservedAuthorizationId=$staleId;ObservedAttemptId=$attempt;ObservedToolingCommit=$tooling;ConsumptionMarkerExists=$false}
+  $staleAccepted=Test-Phase7BExactStaleCaptureAuthorizationPrerequisite @staleParameters
+  Assert-True ($staleAccepted.pass -and $staleAccepted.staleAuthorizationValidated -and -not $staleAccepted.mutationPerformed) 'exact lone stale authorization is accepted for replacement continuation'
+  foreach($case in @(
+    @{name='zero';p='CandidateCount';v=0},
+    @{name='many';p='CandidateCount';v=2},
+    @{name='wrong-file';p='ObservedFileName';v='wrong.json'},
+    @{name='changed-hash';p='ObservedSha256';v=('0'*64)},
+    @{name='wrong-id';p='ObservedAuthorizationId';v=('phase7b-wp2b-capture-auth-'+('c'*32))},
+    @{name='wrong-attempt';p='ObservedAttemptId';v=('phase7b-wp2-'+('d'*32))},
+    @{name='wrong-tooling';p='ObservedToolingCommit';v=('0'*40)},
+    @{name='consumed';p='ConsumptionMarkerExists';v=$true}
+  )) {
+    $parameters=@{};$staleParameters.GetEnumerator()|ForEach-Object{$parameters[$_.Key]=$_.Value};$parameters[$case.p]=$case.v
+    $staleRejected=Test-Phase7BExactStaleCaptureAuthorizationPrerequisite @parameters
+    Assert-True (-not $staleRejected.pass -and -not $staleRejected.staleAuthorizationValidated -and -not $staleRejected.mutationPerformed) "stale authorization prerequisite rejects:$($case.name)"
+  }
+  $replacementParameters=New-PostRefreshParameters
+  $replacementParameters.CaptureAuthorizationCount=1
+  $replacementParameters.ReplacementAuthorizationContinuation=$true
+  $replacementParameters.StaleCaptureAuthorizationBindingPass=$true
+  $replacementDecision=Test-Phase7BWorkPackage2PostRefreshCheckpoint @replacementParameters
+  Assert-True ($replacementDecision.pass -and $replacementDecision.replacementAuthorizationContinuation -and $replacementDecision.staleCaptureAuthorizationValidated -and -not $replacementDecision.additionalRefreshAllowed) 'replacement checkpoint permits only the exact validated stale prerequisite'
+  foreach($case in @(@{count=0;binding=$false},@{count=1;binding=$false},@{count=2;binding=$true})) {
+    $parameters=New-PostRefreshParameters;$parameters.CaptureAuthorizationCount=$case.count;$parameters.ReplacementAuthorizationContinuation=$true;$parameters.StaleCaptureAuthorizationBindingPass=$case.binding
+    $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
+    Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match 'STALE_AUTHORIZATION_PREREQUISITE_FAIL') "replacement checkpoint rejects invalid stale prerequisite:$($case.count):$($case.binding)"
+  }
   $preflight=New-StableEvidence;Assert-True (Test-Phase7BWorkPackage2StablePreflightEvidence $preflight).pass 'complete stable preflight accepted'
   foreach($property in @('repositoryIdentityPass','originParityPass','trackedTreeClean','planBindingPass','inventoryBindingPass','runtimeBindingPass','ageIdentityPass','primaryDestinationPass','laptopNetworkBindingPass','laptopReachabilityDeferredToReceiver','quiescencePass','sourceStableAcrossPreflight')){$bad=New-StableEvidence;$bad.$property=$false;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects $property false"}
   foreach($property in @('missingCollectionCount','unknownCollectionCount','missingMediaReferenceCount','credentialSignalCount')){$bad=New-StableEvidence;$bad.$property=1;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects nonzero $property"}
@@ -307,7 +338,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshAst=[Management.Automation.Language.Parser]::ParseFile($postRefreshPath,[ref]$postRefreshTokens,[ref]$postRefreshErrors)
   Assert-True (@($postRefreshErrors).Count -eq 0) 'post-refresh checkpoint PowerShell 5.1 AST'
   $postRefreshCommands=@($postRefreshAst.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Where-Object{$_ -match '^(?:Get|New|Test)-Phase7B'}|Sort-Object -Unique)
-  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
+  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BExactStaleCaptureAuthorizationPrerequisite','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
   Assert-True (@(Compare-Object $expectedPostRefreshCommands $postRefreshCommands).Count -eq 0) 'post-refresh checkpoint custom command inventory is complete and reviewed'
   $postRefreshProbe=@"
 `$ErrorActionPreference='Stop'
@@ -315,7 +346,7 @@ Set-StrictMode -Version Latest
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2OperatorLifecycle.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Contract.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.psm1' -Force
-`$names=@('$($expectedPostRefreshCommands -join "','")','Test-Phase7BAgeVersionOutput')
+  `$names=@('$($expectedPostRefreshCommands -join "','")','Test-Phase7BAgeVersionOutput')
 `$resolved=@(`$names|ForEach-Object{[bool](Get-Command `$_ -CommandType Function -ErrorAction Stop)})
 [ordered]@{classification='PHASE7B_WP2B_POST_REFRESH_HELPERS_PS51_PASS';pass=(@(`$resolved|Where-Object{-not `$_}).Count-eq0);resolvedCommandCount=`$resolved.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
 "@
@@ -323,7 +354,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $postRefreshEncoded 2>&1)
   $postRefreshExit=$LASTEXITCODE
   $postRefreshResult=($postRefreshOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
-  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 5 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
+  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 6 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
   Assert-True (-not ($postRefreshSource -match '(?i)\b(?:Stop|Disable|Enable|Start|Register|Unregister|Set)-ScheduledTask\b|Write-Phase7BSafeEvidenceFile|phase7bRefreshWorkPackage2StableInventory|phase7bSetWorkPackage2CaptureQuiescence')) `
     'post-refresh checkpoint has no quiescence refresh evidence or task mutation path'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')

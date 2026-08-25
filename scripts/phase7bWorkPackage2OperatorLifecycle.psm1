@@ -113,6 +113,40 @@ function Test-Phase7BAgeVersionOutput {
   Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines $OutputLines -ExitCode $ExitCode
 }
 
+function Test-Phase7BExactStaleCaptureAuthorizationPrerequisite {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][int]$CandidateCount,
+    [Parameter(Mandatory = $true)][string]$ExpectedAttemptId,
+    [Parameter(Mandatory = $true)][string]$ExpectedFileName,
+    [Parameter(Mandatory = $true)][string]$ExpectedSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedAuthorizationId,
+    [Parameter(Mandatory = $true)][string]$ExpectedToolingCommit,
+    [string]$ObservedFileName = '',
+    [string]$ObservedSha256 = '',
+    [string]$ObservedAuthorizationId = '',
+    [string]$ObservedAttemptId = '',
+    [string]$ObservedToolingCommit = '',
+    [bool]$ConsumptionMarkerExists = $false
+  )
+  $expectedShapePass = $ExpectedAttemptId -cmatch '^phase7b-wp2-[0-9a-f]{32}$' -and
+    $ExpectedAuthorizationId -cmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -and
+    $ExpectedFileName -ceq "$ExpectedAttemptId-$ExpectedAuthorizationId.json" -and
+    $ExpectedSha256 -cmatch '^[0-9a-f]{64}$' -and $ExpectedToolingCommit -cmatch '^[0-9a-f]{40}$'
+  $pass = $expectedShapePass -and $CandidateCount -eq 1 -and
+    $ObservedFileName -ceq $ExpectedFileName -and $ObservedSha256 -ceq $ExpectedSha256 -and
+    $ObservedAuthorizationId -ceq $ExpectedAuthorizationId -and $ObservedAttemptId -ceq $ExpectedAttemptId -and
+    $ObservedToolingCommit -ceq $ExpectedToolingCommit -and -not $ConsumptionMarkerExists
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2B_EXACT_STALE_CAPTURE_AUTHORIZATION_PREREQUISITE_PASS' } else { 'PHASE7B_WP2B_EXACT_STALE_CAPTURE_AUTHORIZATION_PREREQUISITE_FAIL' }
+    pass = [bool]$pass
+    candidateCount = $CandidateCount
+    staleAuthorizationValidated = [bool]$pass
+    mutationPerformed = $false
+    automaticRetryAllowed = $false
+    wp2cAuthorized = $false
+  }
+}
+
 function Test-Phase7BWorkPackage2PostRefreshCheckpoint {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)]$Evidence,
@@ -159,7 +193,9 @@ function Test-Phase7BWorkPackage2PostRefreshCheckpoint {
     [Parameter(Mandatory = $true)][string]$MonitorState,
     [Parameter(Mandatory = $true)][string]$ProductionServerState,
     [Parameter(Mandatory = $true)][int]$ListenerCount,
-    [Parameter(Mandatory = $true)][int]$CaptureAuthorizationCount
+    [Parameter(Mandatory = $true)][int]$CaptureAuthorizationCount,
+    [bool]$ReplacementAuthorizationContinuation = $false,
+    [bool]$StaleCaptureAuthorizationBindingPass = $false
   )
   $safeReasonCode = $null
   $expectedStem = "$ExpectedAttemptId-refresh-$ExpectedRefreshNonce"
@@ -182,13 +218,21 @@ function Test-Phase7BWorkPackage2PostRefreshCheckpoint {
   elseif (-not $RefreshInternalBindingPass) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_INTERNAL_BINDING_FAIL' }
   elseif (-not $MonitorTaskDefinitionExact -or $MonitorState -cne 'Disabled') { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_MONITOR_STATE_FAIL' }
   elseif ($ProductionServerState -cne 'Running' -or $ListenerCount -ne 1) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_SERVER_STATE_FAIL' }
-  elseif ($CaptureAuthorizationCount -ne 0) { $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_CAPTURE_AUTHORIZATION_COLLISION' }
+  elseif ($ReplacementAuthorizationContinuation -and
+      ($CaptureAuthorizationCount -ne 1 -or -not $StaleCaptureAuthorizationBindingPass)) {
+    $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_STALE_AUTHORIZATION_PREREQUISITE_FAIL'
+  }
+  elseif (-not $ReplacementAuthorizationContinuation -and $CaptureAuthorizationCount -ne 0) {
+    $safeReasonCode = 'PHASE7B_WP2B_POST_REFRESH_CAPTURE_AUTHORIZATION_COLLISION'
+  }
   $pass = $null -eq $safeReasonCode
   [pscustomobject][ordered]@{
     classification = if ($pass) { 'PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_RESUME_PASS' } else { 'PHASE7B_WP2B_EXACT_POST_REFRESH_CHECKPOINT_NONRESUMABLE' }
     pass = [bool]$pass; safeReasonCode = $safeReasonCode; attemptId = $ExpectedAttemptId; refreshNonce = $ExpectedRefreshNonce
     quiescenceMutationPerformed = $false; refreshMutationPerformed = $false; sourceMutationPerformed = $false
-    refreshCheckpointReused = [bool]$pass; additionalRefreshAllowed = $false; automaticRetryAllowed = $false; wp2cAuthorized = $false
+    refreshCheckpointReused = [bool]$pass; replacementAuthorizationContinuation = $ReplacementAuthorizationContinuation
+    staleCaptureAuthorizationValidated = [bool]($ReplacementAuthorizationContinuation -and $StaleCaptureAuthorizationBindingPass)
+    additionalRefreshAllowed = $false; automaticRetryAllowed = $false; wp2cAuthorized = $false
   }
 }
 
@@ -486,6 +530,7 @@ function Test-Phase7BWorkPackage2StablePreflightEvidence {
 }
 
 Export-ModuleMember -Function @(
+  'Test-Phase7BExactStaleCaptureAuthorizationPrerequisite',
   'Get-Phase7BWorkPackage2OperatorContract',
   'Test-Phase7BWorkPackage2QuiescenceEvidence',
   'Test-Phase7BWorkPackage2ExactQuiescenceResume',

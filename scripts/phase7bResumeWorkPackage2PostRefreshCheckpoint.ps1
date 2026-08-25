@@ -24,6 +24,11 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedSourceInventorySha256,
   [Parameter(Mandatory = $true)][int]$ExpectedFileCount,
   [Parameter(Mandatory = $true)][int64]$ExpectedTotalBytes,
+  [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationFileName,
+  [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationId,
+  [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationToolingCommit,
+  [Parameter(Mandatory = $true)][string]$ReplacementAuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement
 )
 $ErrorActionPreference = 'Stop'
@@ -35,9 +40,14 @@ $stage = 'validate-input'
 try {
   $commits = @($ExpectedCurrentToolingCommit,$ExpectedRefreshToolingCommit,$ExpectedEvidenceToolingCommit,$ExpectedApplicationCommit)
   $hashes = @($ExpectedSourceRootSha256,$ExpectedRuntimeSha256,$ExpectedControlSha256,$ExpectedEvidenceSha256,
-    $ExpectedSelectionSha256,$ExpectedInventoryAuthorizationSha256,$ExpectedCapturePlanSha256,$ExpectedSourceInventorySha256)
+    $ExpectedSelectionSha256,$ExpectedInventoryAuthorizationSha256,$ExpectedCapturePlanSha256,$ExpectedSourceInventorySha256,
+    $ExpectedStaleCaptureAuthorizationSha256)
   if ($AuthorizationAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_POST_REFRESH_CHECKPOINT_READ_ONLY' -or
+      $ReplacementAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_STALE_AUTHORIZATION_READ_ONLY' -or
       $ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedRefreshNonce -cnotmatch '^[0-9a-f]{32}$' -or
+      $ExpectedStaleCaptureAuthorizationId -cnotmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or
+      $ExpectedStaleCaptureAuthorizationToolingCommit -cnotmatch '^[0-9a-f]{40}$' -or
+      $ExpectedStaleCaptureAuthorizationFileName -cne "$ExpectedAttemptId-$ExpectedStaleCaptureAuthorizationId.json" -or
       @($commits | Where-Object { $_ -cnotmatch '^[0-9a-f]{40}$' }).Count -gt 0 -or
       @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
       $ExpectedRuntimeRevision -lt 1 -or $ExpectedFileCount -lt 1 -or $ExpectedTotalBytes -lt 1) {
@@ -82,7 +92,32 @@ try {
   $observedCapturePlanSha256 = if (Test-Path -LiteralPath $capturePlanPath -PathType Leaf) { Get-Phase7BSha256 -LiteralPath $capturePlanPath } else { '' }
   $observedRefreshNonces = @($refreshArtifacts | ForEach-Object { if ($_.Name -match '-refresh-([0-9a-f]{32})-') { $Matches[1] } } | Sort-Object -Unique)
   $observedRefreshNonce = if ($observedRefreshNonces.Count -eq 1) { [string]$observedRefreshNonces[0] } else { '' }
-  $captureAuthorizationCount = @(Get-ChildItem -LiteralPath $evidenceDirectory -Filter "$ExpectedAttemptId-phase7b-wp2b-capture-auth-*.json" -File -ErrorAction Stop).Count
+  $captureAuthorizationCandidates = @(Get-ChildItem -LiteralPath $evidenceDirectory -Filter "$ExpectedAttemptId-phase7b-wp2b-capture-auth-*.json" -File -ErrorAction Stop)
+  $captureAuthorizationCount = $captureAuthorizationCandidates.Count
+  $observedStaleFileName = ''
+  $observedStaleSha256 = ''
+  $observedStaleAuthorizationId = ''
+  $observedStaleAttemptId = ''
+  $observedStaleToolingCommit = ''
+  $observedStaleMarkerExists = $false
+  if ($captureAuthorizationCount -eq 1) {
+    $candidate = $captureAuthorizationCandidates[0]
+    $observedStaleFileName = [string]$candidate.Name
+    $observedStaleSha256 = Get-Phase7BSha256 -LiteralPath $candidate.FullName
+    $candidateDocument = Get-Content -LiteralPath $candidate.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
+    $candidateMarkerPath = Join-Path $evidenceDirectory ([string]$candidateDocument.consumptionMarkerFileName)
+    $observedStaleAuthorizationId = [string]$candidateDocument.authorizationId
+    $observedStaleAttemptId = [string]$candidateDocument.attemptId
+    $observedStaleToolingCommit = [string]$candidateDocument.toolingCommit
+    $observedStaleMarkerExists = Test-Path -LiteralPath $candidateMarkerPath
+  }
+  $stalePrerequisite = Test-Phase7BExactStaleCaptureAuthorizationPrerequisite `
+    -CandidateCount $captureAuthorizationCount -ExpectedAttemptId $ExpectedAttemptId `
+    -ExpectedFileName $ExpectedStaleCaptureAuthorizationFileName -ExpectedSha256 $ExpectedStaleCaptureAuthorizationSha256 `
+    -ExpectedAuthorizationId $ExpectedStaleCaptureAuthorizationId -ExpectedToolingCommit $ExpectedStaleCaptureAuthorizationToolingCommit `
+    -ObservedFileName $observedStaleFileName -ObservedSha256 $observedStaleSha256 `
+    -ObservedAuthorizationId $observedStaleAuthorizationId -ObservedAttemptId $observedStaleAttemptId `
+    -ObservedToolingCommit $observedStaleToolingCommit -ConsumptionMarkerExists $observedStaleMarkerExists
 
   $selection = if ($observedSelectionSha256) { Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json -ErrorAction Stop } else { [pscustomobject]@{} }
   $inventoryAuthorization = if ($observedInventoryAuthorizationSha256) { Get-Content -LiteralPath $inventoryAuthorizationPath -Raw | ConvertFrom-Json -ErrorAction Stop } else { [pscustomobject]@{} }
@@ -130,7 +165,8 @@ try {
     -RepositoryIdentityPass $repositoryIdentityPass -ApplicationBindingPass $applicationBindingPass -SourceRootBindingPass $sourceRootBindingPass `
     -RuntimeBindingPass $runtimeBindingPass -SourceIntegrityPass $sourceIntegrityPass -RefreshInternalBindingPass $refreshInternalBindingPass `
     -MonitorTaskDefinitionExact $monitorTaskDefinitionExact -MonitorState ([string]$monitor.State) -ProductionServerState ([string]$productionServer.State) `
-    -ListenerCount $listenerCount -CaptureAuthorizationCount $captureAuthorizationCount
+    -ListenerCount $listenerCount -CaptureAuthorizationCount $captureAuthorizationCount `
+    -ReplacementAuthorizationContinuation $true -StaleCaptureAuthorizationBindingPass ([bool]$stalePrerequisite.pass)
   if (-not $decision.pass) {
     [ordered]@{classification=$decision.classification;pass=$false;safeStage=$stage;safeErrorCode=$decision.safeReasonCode;attemptId=$ExpectedAttemptId;refreshNonce=$ExpectedRefreshNonce;quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false;additionalRefreshAllowed=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Depth 4
     exit 1
@@ -144,6 +180,8 @@ try {
     capturePlanFileName=$ExpectedCapturePlanFileName;capturePlanSha256=$observedCapturePlanSha256;sourceInventorySha256=[string]$inventory.inventorySha256
     runtimeRevision=[int64]$auditAfter.runtimeRevision;runtimeSha256=[string]$auditAfter.runtimeSha256;fileCount=[int]$capturePlan.fileCount;totalBytes=[int64]$capturePlan.totalBytes
     refreshCheckpointReused=$true;refreshBudgetConsumed=$true;additionalRefreshAllowed=$false
+    replacementAuthorizationContinuation=$true;staleCaptureAuthorizationValidated=$true
+    staleCaptureAuthorizationFileName=$ExpectedStaleCaptureAuthorizationFileName;staleCaptureAuthorizationSha256=$ExpectedStaleCaptureAuthorizationSha256
     quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false
     monitorTaskDisabled=$true;productionServerLeftRunning=$true;productionListenerCount=1
     reportPersisted=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false
