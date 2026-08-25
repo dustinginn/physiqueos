@@ -28,6 +28,10 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationSha256,
   [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationId,
   [Parameter(Mandatory = $true)][string]$ExpectedStaleCaptureAuthorizationToolingCommit,
+  [string]$ExpectedSecondHistoricalCaptureAuthorizationFileName = '',
+  [string]$ExpectedSecondHistoricalCaptureAuthorizationSha256 = '',
+  [string]$ExpectedSecondHistoricalCaptureAuthorizationId = '',
+  [string]$ExpectedSecondHistoricalCaptureAuthorizationToolingCommit = '',
   [Parameter(Mandatory = $true)][string]$ReplacementAuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement
 )
@@ -38,16 +42,25 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Forc
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 $stage = 'validate-input'
 try {
+  $twoHistoricalRecovery = $ReplacementAuthorizationAcknowledgement -ceq 'WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_TWO_HISTORICAL_AUTHORIZATIONS_READ_ONLY'
   $commits = @($ExpectedCurrentToolingCommit,$ExpectedRefreshToolingCommit,$ExpectedEvidenceToolingCommit,$ExpectedApplicationCommit)
   $hashes = @($ExpectedSourceRootSha256,$ExpectedRuntimeSha256,$ExpectedControlSha256,$ExpectedEvidenceSha256,
     $ExpectedSelectionSha256,$ExpectedInventoryAuthorizationSha256,$ExpectedCapturePlanSha256,$ExpectedSourceInventorySha256,
     $ExpectedStaleCaptureAuthorizationSha256)
+  if ($twoHistoricalRecovery) { $hashes += $ExpectedSecondHistoricalCaptureAuthorizationSha256 }
   if ($AuthorizationAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_POST_REFRESH_CHECKPOINT_READ_ONLY' -or
-      $ReplacementAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_STALE_AUTHORIZATION_READ_ONLY' -or
+      (-not $twoHistoricalRecovery -and $ReplacementAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_STALE_AUTHORIZATION_READ_ONLY') -or
       $ExpectedAttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedRefreshNonce -cnotmatch '^[0-9a-f]{32}$' -or
       $ExpectedStaleCaptureAuthorizationId -cnotmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or
       $ExpectedStaleCaptureAuthorizationToolingCommit -cnotmatch '^[0-9a-f]{40}$' -or
       $ExpectedStaleCaptureAuthorizationFileName -cne "$ExpectedAttemptId-$ExpectedStaleCaptureAuthorizationId.json" -or
+      ($twoHistoricalRecovery -and ($ExpectedSecondHistoricalCaptureAuthorizationId -cnotmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or
+        $ExpectedSecondHistoricalCaptureAuthorizationToolingCommit -cnotmatch '^[0-9a-f]{40}$' -or
+        $ExpectedSecondHistoricalCaptureAuthorizationFileName -cne "$ExpectedAttemptId-$ExpectedSecondHistoricalCaptureAuthorizationId.json" -or
+        $ExpectedSecondHistoricalCaptureAuthorizationId -ceq $ExpectedStaleCaptureAuthorizationId -or
+        $ExpectedSecondHistoricalCaptureAuthorizationFileName -ceq $ExpectedStaleCaptureAuthorizationFileName)) -or
+      (-not $twoHistoricalRecovery -and @(@($ExpectedSecondHistoricalCaptureAuthorizationFileName,$ExpectedSecondHistoricalCaptureAuthorizationSha256,
+        $ExpectedSecondHistoricalCaptureAuthorizationId,$ExpectedSecondHistoricalCaptureAuthorizationToolingCommit) | Where-Object { $_ }).Count -ne 0) -or
       @($commits | Where-Object { $_ -cnotmatch '^[0-9a-f]{40}$' }).Count -gt 0 -or
       @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
       $ExpectedRuntimeRevision -lt 1 -or $ExpectedFileCount -lt 1 -or $ExpectedTotalBytes -lt 1) {
@@ -94,30 +107,36 @@ try {
   $observedRefreshNonce = if ($observedRefreshNonces.Count -eq 1) { [string]$observedRefreshNonces[0] } else { '' }
   $captureAuthorizationCandidates = @(Get-ChildItem -LiteralPath $evidenceDirectory -Filter "$ExpectedAttemptId-phase7b-wp2b-capture-auth-*.json" -File -ErrorAction Stop)
   $captureAuthorizationCount = $captureAuthorizationCandidates.Count
-  $observedStaleFileName = ''
-  $observedStaleSha256 = ''
-  $observedStaleAuthorizationId = ''
-  $observedStaleAttemptId = ''
-  $observedStaleToolingCommit = ''
-  $observedStaleMarkerExists = $false
-  if ($captureAuthorizationCount -eq 1) {
-    $candidate = $captureAuthorizationCandidates[0]
-    $observedStaleFileName = [string]$candidate.Name
-    $observedStaleSha256 = Get-Phase7BSha256 -LiteralPath $candidate.FullName
+  $observedHistoricalAuthorizations = @($captureAuthorizationCandidates | ForEach-Object {
+    $candidate = $_
     $candidateDocument = Get-Content -LiteralPath $candidate.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
     $candidateMarkerPath = Join-Path $evidenceDirectory ([string]$candidateDocument.consumptionMarkerFileName)
-    $observedStaleAuthorizationId = [string]$candidateDocument.authorizationId
-    $observedStaleAttemptId = [string]$candidateDocument.attemptId
-    $observedStaleToolingCommit = [string]$candidateDocument.toolingCommit
-    $observedStaleMarkerExists = Test-Path -LiteralPath $candidateMarkerPath
+    [pscustomobject][ordered]@{
+      fileName = [string]$candidate.Name; sha256 = Get-Phase7BSha256 -LiteralPath $candidate.FullName
+      authorizationId = [string]$candidateDocument.authorizationId; attemptId = [string]$candidateDocument.attemptId
+      toolingCommit = [string]$candidateDocument.toolingCommit
+      consumptionMarkerExists = Test-Path -LiteralPath $candidateMarkerPath
+    }
+  })
+  if ($twoHistoricalRecovery) {
+    $expectedHistoricalAuthorizations = @(
+      [pscustomobject]@{fileName=$ExpectedStaleCaptureAuthorizationFileName;sha256=$ExpectedStaleCaptureAuthorizationSha256;authorizationId=$ExpectedStaleCaptureAuthorizationId;toolingCommit=$ExpectedStaleCaptureAuthorizationToolingCommit},
+      [pscustomobject]@{fileName=$ExpectedSecondHistoricalCaptureAuthorizationFileName;sha256=$ExpectedSecondHistoricalCaptureAuthorizationSha256;authorizationId=$ExpectedSecondHistoricalCaptureAuthorizationId;toolingCommit=$ExpectedSecondHistoricalCaptureAuthorizationToolingCommit}
+    )
+    $historicalPrerequisite = Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $ExpectedAttemptId `
+      -ExpectedAuthorizations $expectedHistoricalAuthorizations -ObservedAuthorizations $observedHistoricalAuthorizations
+  } else {
+    $observedStale = if ($observedHistoricalAuthorizations.Count -eq 1) { $observedHistoricalAuthorizations[0] } else {
+      [pscustomobject]@{fileName='';sha256='';authorizationId='';attemptId='';toolingCommit='';consumptionMarkerExists=$false}
+    }
+    $historicalPrerequisite = Test-Phase7BExactStaleCaptureAuthorizationPrerequisite `
+      -CandidateCount $captureAuthorizationCount -ExpectedAttemptId $ExpectedAttemptId `
+      -ExpectedFileName $ExpectedStaleCaptureAuthorizationFileName -ExpectedSha256 $ExpectedStaleCaptureAuthorizationSha256 `
+      -ExpectedAuthorizationId $ExpectedStaleCaptureAuthorizationId -ExpectedToolingCommit $ExpectedStaleCaptureAuthorizationToolingCommit `
+      -ObservedFileName ([string]$observedStale.fileName) -ObservedSha256 ([string]$observedStale.sha256) `
+      -ObservedAuthorizationId ([string]$observedStale.authorizationId) -ObservedAttemptId ([string]$observedStale.attemptId) `
+      -ObservedToolingCommit ([string]$observedStale.toolingCommit) -ConsumptionMarkerExists ([bool]$observedStale.consumptionMarkerExists)
   }
-  $stalePrerequisite = Test-Phase7BExactStaleCaptureAuthorizationPrerequisite `
-    -CandidateCount $captureAuthorizationCount -ExpectedAttemptId $ExpectedAttemptId `
-    -ExpectedFileName $ExpectedStaleCaptureAuthorizationFileName -ExpectedSha256 $ExpectedStaleCaptureAuthorizationSha256 `
-    -ExpectedAuthorizationId $ExpectedStaleCaptureAuthorizationId -ExpectedToolingCommit $ExpectedStaleCaptureAuthorizationToolingCommit `
-    -ObservedFileName $observedStaleFileName -ObservedSha256 $observedStaleSha256 `
-    -ObservedAuthorizationId $observedStaleAuthorizationId -ObservedAttemptId $observedStaleAttemptId `
-    -ObservedToolingCommit $observedStaleToolingCommit -ConsumptionMarkerExists $observedStaleMarkerExists
 
   $selection = if ($observedSelectionSha256) { Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json -ErrorAction Stop } else { [pscustomobject]@{} }
   $inventoryAuthorization = if ($observedInventoryAuthorizationSha256) { Get-Content -LiteralPath $inventoryAuthorizationPath -Raw | ConvertFrom-Json -ErrorAction Stop } else { [pscustomobject]@{} }
@@ -166,7 +185,9 @@ try {
     -RuntimeBindingPass $runtimeBindingPass -SourceIntegrityPass $sourceIntegrityPass -RefreshInternalBindingPass $refreshInternalBindingPass `
     -MonitorTaskDefinitionExact $monitorTaskDefinitionExact -MonitorState ([string]$monitor.State) -ProductionServerState ([string]$productionServer.State) `
     -ListenerCount $listenerCount -CaptureAuthorizationCount $captureAuthorizationCount `
-    -ReplacementAuthorizationContinuation $true -StaleCaptureAuthorizationBindingPass ([bool]$stalePrerequisite.pass)
+    -ReplacementAuthorizationContinuation $true -StaleCaptureAuthorizationBindingPass ([bool](-not $twoHistoricalRecovery -and $historicalPrerequisite.pass)) `
+    -ExpectedHistoricalCaptureAuthorizationCount $(if ($twoHistoricalRecovery) { 2 } else { 1 }) `
+    -HistoricalCaptureAuthorizationBindingPass ([bool]($twoHistoricalRecovery -and $historicalPrerequisite.pass))
   if (-not $decision.pass) {
     [ordered]@{classification=$decision.classification;pass=$false;safeStage=$stage;safeErrorCode=$decision.safeReasonCode;attemptId=$ExpectedAttemptId;refreshNonce=$ExpectedRefreshNonce;quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false;additionalRefreshAllowed=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Depth 4
     exit 1
@@ -180,8 +201,11 @@ try {
     capturePlanFileName=$ExpectedCapturePlanFileName;capturePlanSha256=$observedCapturePlanSha256;sourceInventorySha256=[string]$inventory.inventorySha256
     runtimeRevision=[int64]$auditAfter.runtimeRevision;runtimeSha256=[string]$auditAfter.runtimeSha256;fileCount=[int]$capturePlan.fileCount;totalBytes=[int64]$capturePlan.totalBytes
     refreshCheckpointReused=$true;refreshBudgetConsumed=$true;additionalRefreshAllowed=$false
-    replacementAuthorizationContinuation=$true;staleCaptureAuthorizationValidated=$true
+    replacementAuthorizationContinuation=$true;staleCaptureAuthorizationValidated=[bool](-not $twoHistoricalRecovery)
+    historicalCaptureAuthorizationCount=$(if ($twoHistoricalRecovery) { 2 } else { 1 });historicalCaptureAuthorizationsValidated=$true
     staleCaptureAuthorizationFileName=$ExpectedStaleCaptureAuthorizationFileName;staleCaptureAuthorizationSha256=$ExpectedStaleCaptureAuthorizationSha256
+    secondHistoricalCaptureAuthorizationFileName=$(if ($twoHistoricalRecovery) { $ExpectedSecondHistoricalCaptureAuthorizationFileName } else { '' })
+    secondHistoricalCaptureAuthorizationSha256=$(if ($twoHistoricalRecovery) { $ExpectedSecondHistoricalCaptureAuthorizationSha256 } else { '' })
     quiescenceMutationPerformed=$false;refreshMutationPerformed=$false;sourceMutationPerformed=$false
     monitorTaskDisabled=$true;productionServerLeftRunning=$true;productionListenerCount=1
     reportPersisted=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false

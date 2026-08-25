@@ -163,12 +163,40 @@ try {
     $staleRejected=Test-Phase7BExactStaleCaptureAuthorizationPrerequisite @parameters
     Assert-True (-not $staleRejected.pass -and -not $staleRejected.staleAuthorizationValidated -and -not $staleRejected.mutationPerformed) "stale authorization prerequisite rejects:$($case.name)"
   }
+  $historicalExpected = @(
+    [pscustomobject]@{fileName=$staleFile;sha256=$staleHash;authorizationId=$staleId;toolingCommit=$tooling},
+    [pscustomobject]@{fileName="$attempt-phase7b-wp2b-capture-auth-$('c'*32).json";sha256=('d'*64);authorizationId="phase7b-wp2b-capture-auth-$('c'*32)";toolingCommit=('e'*40)}
+  )
+  $historicalObserved = @(
+    [pscustomobject]@{fileName=$historicalExpected[1].fileName;sha256=$historicalExpected[1].sha256;authorizationId=$historicalExpected[1].authorizationId;attemptId=$attempt;toolingCommit=$historicalExpected[1].toolingCommit;consumptionMarkerExists=$false},
+    [pscustomobject]@{fileName=$historicalExpected[0].fileName;sha256=$historicalExpected[0].sha256;authorizationId=$historicalExpected[0].authorizationId;attemptId=$attempt;toolingCommit=$historicalExpected[0].toolingCommit;consumptionMarkerExists=$false}
+  )
+  $historicalAccepted=Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $attempt -ExpectedAuthorizations $historicalExpected -ObservedAuthorizations $historicalObserved
+  Assert-True ($historicalAccepted.pass -and $historicalAccepted.historicalAuthorizationCount -eq 2 -and -not $historicalAccepted.mutationPerformed) 'exact two historical authorizations accepted independent of enumeration order'
+  Assert-True (-not (Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $attempt -ExpectedAuthorizations $historicalExpected -ObservedAuthorizations @($historicalObserved[0])).pass) 'missing historical authorization rejected'
+  Assert-True (-not (Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $attempt -ExpectedAuthorizations $historicalExpected -ObservedAuthorizations @($historicalObserved + [pscustomobject]@{fileName='unexpected.json'})).pass) 'unexpected third historical authorization rejected'
+  $changedHistorical = @($historicalObserved | ForEach-Object { $_.PSObject.Copy() }); $changedHistorical[0].sha256 = 'f'*64
+  Assert-True (-not (Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $attempt -ExpectedAuthorizations $historicalExpected -ObservedAuthorizations $changedHistorical).pass) 'altered historical authorization rejected'
+  $consumedHistorical = @($historicalObserved | ForEach-Object { $_.PSObject.Copy() }); $consumedHistorical[0].consumptionMarkerExists = $true
+  Assert-True (-not (Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite -ExpectedAttemptId $attempt -ExpectedAuthorizations $historicalExpected -ObservedAuthorizations $consumedHistorical).pass) 'consumed historical authorization rejected'
   $replacementParameters=New-PostRefreshParameters
   $replacementParameters.CaptureAuthorizationCount=1
   $replacementParameters.ReplacementAuthorizationContinuation=$true
   $replacementParameters.StaleCaptureAuthorizationBindingPass=$true
   $replacementDecision=Test-Phase7BWorkPackage2PostRefreshCheckpoint @replacementParameters
   Assert-True ($replacementDecision.pass -and $replacementDecision.replacementAuthorizationContinuation -and $replacementDecision.staleCaptureAuthorizationValidated -and -not $replacementDecision.additionalRefreshAllowed) 'replacement checkpoint permits only the exact validated stale prerequisite'
+  $historicalReplacementParameters=New-PostRefreshParameters
+  $historicalReplacementParameters.CaptureAuthorizationCount=2
+  $historicalReplacementParameters.ReplacementAuthorizationContinuation=$true
+  $historicalReplacementParameters.ExpectedHistoricalCaptureAuthorizationCount=2
+  $historicalReplacementParameters.HistoricalCaptureAuthorizationBindingPass=$true
+  $historicalReplacementDecision=Test-Phase7BWorkPackage2PostRefreshCheckpoint @historicalReplacementParameters
+  Assert-True ($historicalReplacementDecision.pass -and $historicalReplacementDecision.historicalCaptureAuthorizationCount -eq 2 -and $historicalReplacementDecision.historicalCaptureAuthorizationsValidated -and -not $historicalReplacementDecision.staleCaptureAuthorizationValidated) 'recovery checkpoint permits only the exact validated two-authorization history'
+  foreach($case in @(@{count=1;binding=$true},@{count=2;binding=$false},@{count=3;binding=$true})) {
+    $parameters=New-PostRefreshParameters;$parameters.CaptureAuthorizationCount=$case.count;$parameters.ReplacementAuthorizationContinuation=$true;$parameters.ExpectedHistoricalCaptureAuthorizationCount=2;$parameters.HistoricalCaptureAuthorizationBindingPass=$case.binding
+    $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
+    Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match 'STALE_AUTHORIZATION_PREREQUISITE_FAIL') "two-history recovery checkpoint rejects invalid prerequisite:$($case.count):$($case.binding)"
+  }
   foreach($case in @(@{count=0;binding=$false},@{count=1;binding=$false},@{count=2;binding=$true})) {
     $parameters=New-PostRefreshParameters;$parameters.CaptureAuthorizationCount=$case.count;$parameters.ReplacementAuthorizationContinuation=$true;$parameters.StaleCaptureAuthorizationBindingPass=$case.binding
     $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
@@ -337,8 +365,10 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshTokens=$null;$postRefreshErrors=$null
   $postRefreshAst=[Management.Automation.Language.Parser]::ParseFile($postRefreshPath,[ref]$postRefreshTokens,[ref]$postRefreshErrors)
   Assert-True (@($postRefreshErrors).Count -eq 0) 'post-refresh checkpoint PowerShell 5.1 AST'
+  Assert-True ($postRefreshSource.Contains('WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_TWO_HISTORICAL_AUTHORIZATIONS_READ_ONLY') -and
+    $postRefreshSource.Contains('Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite')) 'post-refresh checkpoint exposes only the explicit exact-two historical recovery acknowledgement'
   $postRefreshCommands=@($postRefreshAst.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Where-Object{$_ -match '^(?:Get|New|Test)-Phase7B'}|Sort-Object -Unique)
-  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BExactStaleCaptureAuthorizationPrerequisite','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
+  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BExactStaleCaptureAuthorizationPrerequisite','Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
   Assert-True (@(Compare-Object $expectedPostRefreshCommands $postRefreshCommands).Count -eq 0) 'post-refresh checkpoint custom command inventory is complete and reviewed'
   $postRefreshProbe=@"
 `$ErrorActionPreference='Stop'
@@ -354,7 +384,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $postRefreshEncoded 2>&1)
   $postRefreshExit=$LASTEXITCODE
   $postRefreshResult=($postRefreshOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
-  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 6 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
+  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 7 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
   Assert-True (-not ($postRefreshSource -match '(?i)\b(?:Stop|Disable|Enable|Start|Register|Unregister|Set)-ScheduledTask\b|Write-Phase7BSafeEvidenceFile|phase7bRefreshWorkPackage2StableInventory|phase7bSetWorkPackage2CaptureQuiescence')) `
     'post-refresh checkpoint has no quiescence refresh evidence or task mutation path'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')
