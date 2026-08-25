@@ -40,16 +40,79 @@ function Clear-Phase7BSecretCharacterBuffer {
 
 function Test-Phase7BAgeIdentityCharacters {
   [CmdletBinding()] param([Parameter(Mandatory = $true)][char[]]$Characters)
-  if ($Characters.Length -ne 74) { return $false }
+  if ($Characters.Length -lt 32 -or $Characters.Length -gt 256) { return $false }
   $prefix = 'AGE-SECRET-KEY-1'.ToCharArray()
+  if ($Characters.Length -lt $prefix.Length) { return $false }
   for ($index = 0; $index -lt $prefix.Length; $index++) {
     if ($Characters[$index] -cne $prefix[$index]) { return $false }
   }
-  $alphabet = '023456789ACDEFGHJKLMNPQRSTUVWXYZ'
-  for ($index = $prefix.Length; $index -lt $Characters.Length; $index++) {
-    if ($alphabet.IndexOf($Characters[$index]) -lt 0) { return $false }
+  for ($index = 0; $index -lt $Characters.Length; $index++) {
+    if ($Characters[$index] -eq [char]0 -or [char]::IsWhiteSpace($Characters[$index])) { return $false }
   }
   return $true
+}
+
+function ConvertTo-Phase7BAgeIdentityCandidate {
+  [CmdletBinding()] param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$RawValue)
+  $rawCharacters = $null
+  $normalizedCharacters = $null
+  try {
+    $rawCharacters = $RawValue.ToCharArray()
+    $start = 0
+    while ($start -lt $rawCharacters.Length -and [char]::IsWhiteSpace($rawCharacters[$start])) { $start++ }
+    $end = $rawCharacters.Length - 1
+    while ($end -ge $start -and [char]::IsWhiteSpace($rawCharacters[$end])) { $end-- }
+    if ($end -lt $start) { throw 'PHASE7B_WP2_AGE_IDENTITY_FORMAT_FAIL' }
+
+    $normalizedCharacters = New-Object char[] ($end - $start + 1)
+    [Array]::Copy($rawCharacters, $start, $normalizedCharacters, 0, $normalizedCharacters.Length)
+    if (-not (Test-Phase7BAgeIdentityCharacters -Characters $normalizedCharacters)) {
+      throw 'PHASE7B_WP2_AGE_IDENTITY_FORMAT_FAIL'
+    }
+    $result = [pscustomobject][ordered]@{
+      classification = 'PHASE7B_WP2_AGE_IDENTITY_CANDIDATE_NORMALIZED'
+      characters = $normalizedCharacters
+    }
+    $normalizedCharacters = $null
+    return $result
+  } finally {
+    Clear-Phase7BSecretCharacterBuffer -Characters $rawCharacters
+    Clear-Phase7BSecretCharacterBuffer -Characters $normalizedCharacters
+  }
+}
+
+function Resolve-Phase7BAgeIdentityDialogEntries {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$FirstRaw,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$SecondRaw
+  )
+  $firstCandidate = $null
+  $secondCandidate = $null
+  $firstSecure = $null
+  $secondSecure = $null
+  try {
+    $firstCandidate = ConvertTo-Phase7BAgeIdentityCandidate -RawValue $FirstRaw
+    $secondCandidate = ConvertTo-Phase7BAgeIdentityCandidate -RawValue $SecondRaw
+    if ($firstCandidate.characters.Length -ne $secondCandidate.characters.Length) {
+      throw 'PHASE7B_WP2_AGE_IDENTITY_CONFIRMATION_FAIL'
+    }
+    for ($index = 0; $index -lt $firstCandidate.characters.Length; $index++) {
+      if ($firstCandidate.characters[$index] -cne $secondCandidate.characters[$index]) {
+        throw 'PHASE7B_WP2_AGE_IDENTITY_CONFIRMATION_FAIL'
+      }
+    }
+    $firstSecure = ConvertTo-Phase7BSecureStringFromCharacters -Characters $firstCandidate.characters
+    $secondSecure = ConvertTo-Phase7BSecureStringFromCharacters -Characters $secondCandidate.characters
+    $result = [pscustomobject][ordered]@{ first = $firstSecure; second = $secondSecure }
+    $firstSecure = $null
+    $secondSecure = $null
+    return $result
+  } finally {
+    if ($null -ne $firstCandidate) { Clear-Phase7BSecretCharacterBuffer -Characters $firstCandidate.characters }
+    if ($null -ne $secondCandidate) { Clear-Phase7BSecretCharacterBuffer -Characters $secondCandidate.characters }
+    if ($null -ne $firstSecure) { $firstSecure.Dispose() }
+    if ($null -ne $secondSecure) { $secondSecure.Dispose() }
+  }
 }
 
 function Test-Phase7BSecureStringsEqual {
@@ -136,40 +199,38 @@ function Show-Phase7BAgeIdentityDialog {
     $form.Controls.Add($cancel)
     $form.CancelButton = $cancel
 
-    $script:phase7bIdentityAccepted = $false
     $ok.Add_Click({
-      if ($first.Text.Length -ne 74 -or $second.Text.Length -ne 74) {
-        $status.Text = 'Identity format is invalid.'
+      try {
+        $form.Tag = Resolve-Phase7BAgeIdentityDialogEntries -FirstRaw $first.Text -SecondRaw $second.Text
+      } catch {
+        if ($_.Exception.Message -match 'CONFIRMATION_FAIL') {
+          $status.Text = 'The two masked entries do not match.'
+        } else {
+          $status.Text = 'Identity format is invalid.'
+        }
         return
       }
-      if ($first.Text -cne $second.Text) {
-        $status.Text = 'The two masked entries do not match.'
-        return
-      }
-      $script:phase7bIdentityAccepted = $true
+      $first.Clear()
+      $second.Clear()
       $form.DialogResult = [Windows.Forms.DialogResult]::OK
       $form.Close()
     })
     $form.AcceptButton = $ok
     $result = $form.ShowDialog()
-    if ($result -ne [Windows.Forms.DialogResult]::OK -or -not $script:phase7bIdentityAccepted) {
+    if ($result -ne [Windows.Forms.DialogResult]::OK -or $null -eq $form.Tag) {
       throw 'PHASE7B_WP2_AGE_IDENTITY_ENTRY_CANCELLED'
     }
-    $firstCharacters = $first.Text.ToCharArray()
-    $secondCharacters = $second.Text.ToCharArray()
-    try {
-      [pscustomobject][ordered]@{
-        first = ConvertTo-Phase7BSecureStringFromCharacters -Characters $firstCharacters
-        second = ConvertTo-Phase7BSecureStringFromCharacters -Characters $secondCharacters
-      }
-    } finally {
-      Clear-Phase7BSecretCharacterBuffer -Characters $firstCharacters
-      Clear-Phase7BSecretCharacterBuffer -Characters $secondCharacters
-      $first.Clear()
-      $second.Clear()
-    }
+    $pair = $form.Tag
+    $form.Tag = $null
+    return $pair
   } finally {
-    Remove-Variable phase7bIdentityAccepted -Scope Script -ErrorAction SilentlyContinue
+    if ($null -ne $form.Tag) {
+      if ($null -ne $form.Tag.first) { $form.Tag.first.Dispose() }
+      if ($null -ne $form.Tag.second) { $form.Tag.second.Dispose() }
+      $form.Tag = $null
+    }
+    $first.Clear()
+    $second.Clear()
     $first.Dispose()
     $second.Dispose()
     $form.Dispose()
