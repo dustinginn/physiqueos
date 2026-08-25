@@ -351,11 +351,17 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   Assert-True ($prepareSource.Contains('[int]$PrimaryHostPrefixLength') -and $prepareSource.Contains('[int]$LaptopPrefixLength') -and
     $prepareSource.Contains('requiredCapacityBytes') -and $prepareSource.Contains('capturePlanFileName')) 'Stage 1 carries exact prefix capacity and capture-plan handoff fields'
   $captureSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1')
+  $ageBridgeSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bWindowsAgePassphraseBridge.psm1')
   Assert-True ($captureSource.Contains('Test-Phase7BWorkPackage2AgeVersionOutput') -and -not ($captureSource -match '\\bage\\s\+v\?1')) 'Stage 3 accepts official v-prefixed age output through shared parser'
   Assert-True ($captureSource.Contains('$authorization.quiescenceEvidenceToolingCommit') -and $captureSource.Contains('$authorization.capturePlanFileName')) 'Stage 3 consumes exact quiescence-commit and capture-plan filename bindings'
   Assert-True ($captureSource.LastIndexOf('Use-Phase7BWorkPackage2CaptureAuthorization') -gt $captureSource.IndexOf('Copy-Phase7BBoundedEncryptedReplica') -and
     $captureSource.LastIndexOf('Use-Phase7BWorkPackage2CaptureAuthorization') -gt $captureSource.IndexOf('$descriptorCreated = $true')) 'one-use authorization is consumed only after packet replica and descriptor completion'
   Assert-True ($captureSource.Contains('exactSameAuthorizationReusableAfterCleanup') -and $captureSource.Contains('$replicaPacketCreated') -and $captureSource.Contains('$descriptorCreated')) 'failed pre-consumption capture has exact cleanup and explicit authorization reuse classification'
+  Assert-True ($captureSource.Contains('Invoke-Phase7BAgeEncryptionWithSecureWindowsInput') -and -not $captureSource.Contains('& $AgeExePath -p')) 'capture uses only the secure source-owned age passphrase bridge'
+  Assert-True ($ageBridgeSource.Contains('WriteConsoleInputW') -and $ageBridgeSource.Contains('GetNumberOfConsoleInputEvents') -and
+    $ageBridgeSource.Contains('FlushConsoleInputBuffer')) 'age bridge count-checks and clears attached console input through bounded Win32 APIs'
+  Assert-True ($ageBridgeSource.Contains('UseSystemPasswordChar = $true') -and $ageBridgeSource.Contains('ShortcutsEnabled = $true') -and
+    $ageBridgeSource.Contains('PHASE7B_WP2_AGE_PASSPHRASE_MISMATCH')) 'age bridge provides masked paste entry with explicit confirmation'
   Assert-True ($captureSource.Contains('PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CHANGED_OR_CONCURRENTLY_USED') -and
     $captureSource.IndexOf('Assert-Phase7BWorkPackage2CaptureAuthorization') -lt $captureSource.IndexOf('$mutationStarted = $true')) 'authorization expiry is accepted once before mutation and only immutable hash/concurrency is rechecked at final consumption'
   $verifySource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bVerifyAndCloseBoundedReplicaReceiver.ps1')
