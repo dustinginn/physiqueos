@@ -115,6 +115,90 @@ function Resolve-Phase7BAgeIdentityDialogEntries {
   }
 }
 
+function Set-Phase7BAgeIdentityMaskState {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][object]$FirstControl,
+    [Parameter(Mandatory = $true)][object]$SecondControl,
+    [Parameter(Mandatory = $true)][bool]$Masked
+  )
+  $FirstControl.UseSystemPasswordChar = $Masked
+  $SecondControl.UseSystemPasswordChar = $Masked
+}
+
+function Add-Phase7BAgeIdentityCountHandlers {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][object]$FirstControl,
+    [Parameter(Mandatory = $true)][object]$SecondControl,
+    [Parameter(Mandatory = $true)][object]$FirstCountLabel,
+    [Parameter(Mandatory = $true)][object]$SecondCountLabel
+  )
+  $getMetadata = {
+    param([string]$RawValue)
+    $start = 0
+    while ($start -lt $RawValue.Length -and [char]::IsWhiteSpace($RawValue[$start])) { $start++ }
+    $end = $RawValue.Length - 1
+    while ($end -ge $start -and [char]::IsWhiteSpace($RawValue[$end])) { $end-- }
+    [pscustomobject][ordered]@{
+      rawLength = $RawValue.Length
+      normalizedLength = if ($end -ge $start) { $end - $start + 1 } else { 0 }
+    }
+  }.GetNewClosure()
+  $update = {
+    $firstMetadata = & $getMetadata $FirstControl.Text
+    $secondMetadata = & $getMetadata $SecondControl.Text
+    $FirstCountLabel.Text = 'Raw: {0} | Normalized: {1}' -f $firstMetadata.rawLength, $firstMetadata.normalizedLength
+    $SecondCountLabel.Text = 'Raw: {0} | Normalized: {1}' -f $secondMetadata.rawLength, $secondMetadata.normalizedLength
+  }.GetNewClosure()
+  $FirstControl.Add_TextChanged({ & $update }.GetNewClosure())
+  $SecondControl.Add_TextChanged({ & $update }.GetNewClosure())
+  & $update
+  return $update
+}
+
+function Add-Phase7BAgeIdentityRevealHandlers {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][object]$Form,
+    [Parameter(Mandatory = $true)][object]$RevealControl,
+    [Parameter(Mandatory = $true)][object]$FirstControl,
+    [Parameter(Mandatory = $true)][object]$SecondControl
+  )
+  $reveal = {
+    $FirstControl.UseSystemPasswordChar = $false
+    $SecondControl.UseSystemPasswordChar = $false
+  }.GetNewClosure()
+  $remask = {
+    $FirstControl.UseSystemPasswordChar = $true
+    $SecondControl.UseSystemPasswordChar = $true
+  }.GetNewClosure()
+
+  $RevealControl.Add_MouseDown({ & $reveal }.GetNewClosure())
+  $RevealControl.Add_MouseUp({ & $remask }.GetNewClosure())
+  $RevealControl.Add_MouseLeave({ & $remask }.GetNewClosure())
+  $RevealControl.Add_Click({ & $remask }.GetNewClosure())
+  $Form.Add_Deactivate({ & $remask }.GetNewClosure())
+  $Form.Add_FormClosing({ & $remask }.GetNewClosure())
+  $Form.Add_Resize({
+    if ($Form.WindowState -eq [Windows.Forms.FormWindowState]::Minimized) { & $remask }
+  }.GetNewClosure())
+  $Form.Add_KeyDown({
+    param($sender, $eventArguments)
+    if ($eventArguments.KeyCode -eq [Windows.Forms.Keys]::Escape) { & $remask }
+  }.GetNewClosure())
+
+  return [pscustomobject][ordered]@{ reveal = $reveal; remask = $remask }
+}
+
+function Invoke-Phase7BAgeIdentityDialogEntryValidation {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$FirstRaw,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$SecondRaw,
+    [Parameter(Mandatory = $true)][object]$FirstControl,
+    [Parameter(Mandatory = $true)][object]$SecondControl
+  )
+  Set-Phase7BAgeIdentityMaskState -FirstControl $FirstControl -SecondControl $SecondControl -Masked $true
+  return Resolve-Phase7BAgeIdentityDialogEntries -FirstRaw $FirstRaw -SecondRaw $SecondRaw
+}
+
 function Test-Phase7BSecureStringsEqual {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][Security.SecureString]$First,
@@ -143,18 +227,20 @@ function Show-Phase7BAgeIdentityDialog {
   $form = New-Object Windows.Forms.Form
   $first = New-Object Windows.Forms.TextBox
   $second = New-Object Windows.Forms.TextBox
+  $revealController = $null
   try {
     $form.Text = 'PhysiqueOS age recovery identity'
-    $form.Size = New-Object Drawing.Size(650, 260)
+    $form.Size = New-Object Drawing.Size(720, 275)
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
     $form.TopMost = $true
+    $form.KeyPreview = $true
 
     $instructions = New-Object Windows.Forms.Label
     $instructions.Location = New-Object Drawing.Point(18, 15)
-    $instructions.Size = New-Object Drawing.Size(600, 42)
+    $instructions.Size = New-Object Drawing.Size(670, 42)
     $instructions.Text = 'Paste the single Founder AGE-SECRET-KEY identity twice. The secret remains masked and is never written to disk or command-line arguments.'
     $form.Controls.Add($instructions)
 
@@ -164,10 +250,14 @@ function Show-Phase7BAgeIdentityDialog {
     $firstLabel.Text = 'Recovery identity'
     $form.Controls.Add($firstLabel)
     $first.Location = New-Object Drawing.Point(180, 65)
-    $first.Size = New-Object Drawing.Size(430, 22)
+    $first.Size = New-Object Drawing.Size(340, 22)
     $first.UseSystemPasswordChar = $true
     $first.ShortcutsEnabled = $true
     $form.Controls.Add($first)
+    $firstCount = New-Object Windows.Forms.Label
+    $firstCount.Location = New-Object Drawing.Point(530, 68)
+    $firstCount.Size = New-Object Drawing.Size(165, 20)
+    $form.Controls.Add($firstCount)
 
     $secondLabel = New-Object Windows.Forms.Label
     $secondLabel.Location = New-Object Drawing.Point(18, 106)
@@ -175,34 +265,49 @@ function Show-Phase7BAgeIdentityDialog {
     $secondLabel.Text = 'Confirm identity'
     $form.Controls.Add($secondLabel)
     $second.Location = New-Object Drawing.Point(180, 103)
-    $second.Size = New-Object Drawing.Size(430, 22)
+    $second.Size = New-Object Drawing.Size(340, 22)
     $second.UseSystemPasswordChar = $true
     $second.ShortcutsEnabled = $true
     $form.Controls.Add($second)
+    $secondCount = New-Object Windows.Forms.Label
+    $secondCount.Location = New-Object Drawing.Point(530, 106)
+    $secondCount.Size = New-Object Drawing.Size(165, 20)
+    $form.Controls.Add($secondCount)
 
     $status = New-Object Windows.Forms.Label
     $status.Location = New-Object Drawing.Point(18, 140)
-    $status.Size = New-Object Drawing.Size(592, 24)
+    $status.Size = New-Object Drawing.Size(670, 24)
     $status.Text = 'Both fields must contain the same single native age identity.'
     $form.Controls.Add($status)
 
+    $reveal = New-Object Windows.Forms.Button
+    $reveal.Location = New-Object Drawing.Point(365, 174)
+    $reveal.Size = New-Object Drawing.Size(125, 28)
+    $reveal.Text = 'Hold to reveal'
+    $reveal.TabStop = $false
+    $form.Controls.Add($reveal)
+
     $ok = New-Object Windows.Forms.Button
-    $ok.Location = New-Object Drawing.Point(438, 174)
+    $ok.Location = New-Object Drawing.Point(505, 174)
     $ok.Size = New-Object Drawing.Size(80, 28)
     $ok.Text = 'Verify'
     $form.Controls.Add($ok)
     $cancel = New-Object Windows.Forms.Button
-    $cancel.Location = New-Object Drawing.Point(530, 174)
+    $cancel.Location = New-Object Drawing.Point(597, 174)
     $cancel.Size = New-Object Drawing.Size(80, 28)
     $cancel.Text = 'Cancel'
     $cancel.DialogResult = [Windows.Forms.DialogResult]::Cancel
     $form.Controls.Add($cancel)
     $form.CancelButton = $cancel
 
+    $updateCounts = Add-Phase7BAgeIdentityCountHandlers -FirstControl $first -SecondControl $second -FirstCountLabel $firstCount -SecondCountLabel $secondCount
+    $revealController = Add-Phase7BAgeIdentityRevealHandlers -Form $form -RevealControl $reveal -FirstControl $first -SecondControl $second
+
     $ok.Add_Click({
       try {
-        $form.Tag = Resolve-Phase7BAgeIdentityDialogEntries -FirstRaw $first.Text -SecondRaw $second.Text
+        $form.Tag = Invoke-Phase7BAgeIdentityDialogEntryValidation -FirstRaw $first.Text -SecondRaw $second.Text -FirstControl $first -SecondControl $second
       } catch {
+        Set-Phase7BAgeIdentityMaskState -FirstControl $first -SecondControl $second -Masked $true
         if ($_.Exception.Message -match 'CONFIRMATION_FAIL') {
           $status.Text = 'The two masked entries do not match.'
         } else {
@@ -210,6 +315,7 @@ function Show-Phase7BAgeIdentityDialog {
         }
         return
       }
+      Set-Phase7BAgeIdentityMaskState -FirstControl $first -SecondControl $second -Masked $true
       $first.Clear()
       $second.Clear()
       $form.DialogResult = [Windows.Forms.DialogResult]::OK
@@ -224,6 +330,7 @@ function Show-Phase7BAgeIdentityDialog {
     $form.Tag = $null
     return $pair
   } finally {
+    Set-Phase7BAgeIdentityMaskState -FirstControl $first -SecondControl $second -Masked $true
     if ($null -ne $form.Tag) {
       if ($null -ne $form.Tag.first) { $form.Tag.first.Dispose() }
       if ($null -ne $form.Tag.second) { $form.Tag.second.Dispose() }
@@ -231,6 +338,7 @@ function Show-Phase7BAgeIdentityDialog {
     }
     $first.Clear()
     $second.Clear()
+    $revealController = $null
     $first.Dispose()
     $second.Dispose()
     $form.Dispose()

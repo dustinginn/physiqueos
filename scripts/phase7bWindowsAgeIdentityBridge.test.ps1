@@ -15,9 +15,13 @@ Assert-True (@($errors).Count -eq 0) 'native identity bridge parses under Window
 Assert-True (@($ast.FindAll({param($n)$n -is [Management.Automation.Language.ExitStatementAst]},$true)).Count -eq 0) 'native identity bridge has no raw exit'
 $source=Get-Content -LiteralPath $modulePath -Raw
 Assert-True ($source.Contains('UseSystemPasswordChar = $true') -and $source.Contains('ShortcutsEnabled = $true')) 'masked dialog supports paste and confirmation'
-Assert-True ($source.Contains('Resolve-Phase7BAgeIdentityDialogEntries -FirstRaw $first.Text -SecondRaw $second.Text')) 'the actual dialog click path uses the shared normalization resolver'
+Assert-True ($source.Contains('Invoke-Phase7BAgeIdentityDialogEntryValidation -FirstRaw $first.Text -SecondRaw $second.Text')) 'the actual dialog click path uses the shared normalization resolver and remask boundary'
 Assert-True ($source -notmatch '\$first\.Text\.Length\s+-ne\s+74|\$second\.Text\.Length\s+-ne\s+74') 'the raw TextBox fixed-length gate is removed'
 Assert-True ($source -notmatch '\$Characters\.Length\s+-ne\s+74|\$alphabet\s*=') 'the local guard no longer duplicates canonical length or alphabet parsing'
+Assert-True ($source.Contains("'Raw: {0} | Normalized: {1}'") -and $source.Contains('Add_TextChanged')) 'dialog shows live raw and normalized character counts'
+Assert-True ($source.Contains('$reveal.Text = ''Hold to reveal''') -and $source.Contains('Add_MouseDown') -and $source.Contains('Add_MouseUp') -and $source.Contains('Add_MouseLeave')) 'hold-to-reveal uses nonpersistent mouse press handlers'
+Assert-True ($source.Contains('Add_Deactivate') -and $source.Contains('Add_FormClosing') -and $source.Contains('FormWindowState]::Minimized') -and $source.Contains('Keys]::Escape')) 'focus, close, minimize, and Escape paths remask'
+Assert-True ($source -notmatch '(?i)Windows\.Forms\.Clipboard|Clipboard\]::|SetText\(|GetText\(') 'preview performs no clipboard read or mutation'
 Assert-True ($source.Contains("Arguments = '-y'") -and $source.Contains("Arguments = '--decrypt -i -")) 'official age tools receive native identity only through stdin'
 Assert-True ($source.Contains("Arguments = '-r '") -and $source.Contains('AgeRecipient')) 'encryption uses only the public recipient'
 Assert-True ($source.Contains('SecureStringToGlobalAllocUnicode') -and $source.Contains('ZeroFreeGlobalAllocUnicode') -and $source.Contains('[Array]::Clear')) 'transient identity buffers are cleared'
@@ -49,6 +53,63 @@ try{
     $pair=$null;$threw=$false
     try{$pair=Resolve-DialogText $FirstValue $SecondValue}catch{$threw=$_.Exception.Message -match $Expected}finally{Dispose-Pair $pair}
     Assert-True $threw $Message
+  }
+  function Invoke-ProtectedControlEvent($Control,[string]$MethodName,$EventArguments){
+    $method=$Control.GetType().GetMethod($MethodName,[Reflection.BindingFlags]'Instance,NonPublic')
+    if($null-eq $method){throw "CONTROL_EVENT_METHOD_MISSING:$MethodName"}
+    [void]$method.Invoke($Control,[object[]]@($EventArguments.PSObject.BaseObject))
+  }
+
+  $previewForm=New-Object Windows.Forms.Form
+  $previewButton=New-Object Windows.Forms.Button
+  $previewFirst=New-Object Windows.Forms.TextBox
+  $previewSecond=New-Object Windows.Forms.TextBox
+  $previewFirstCount=New-Object Windows.Forms.Label
+  $previewSecondCount=New-Object Windows.Forms.Label
+  try{
+    $previewFirst.UseSystemPasswordChar=$true;$previewSecond.UseSystemPasswordChar=$true
+    $countUpdater=& $module {param($one,$two,$oneLabel,$twoLabel) Add-Phase7BAgeIdentityCountHandlers -FirstControl $one -SecondControl $two -FirstCountLabel $oneLabel -SecondCountLabel $twoLabel} $previewFirst $previewSecond $previewFirstCount $previewSecondCount
+    $previewFirst.Text="  $identityText`r`n";$previewSecond.Text=$identityText
+    Assert-True ($previewFirstCount.Text -ceq 'Raw: 78 | Normalized: 74' -and $previewSecondCount.Text -ceq 'Raw: 74 | Normalized: 74') 'raw and normalized count metadata reflects actual TextBox content without revealing it'
+
+    $previewController=& $module {param($form,$button,$one,$two) Add-Phase7BAgeIdentityRevealHandlers -Form $form -RevealControl $button -FirstControl $one -SecondControl $two} $previewForm $previewButton $previewFirst $previewSecond
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'identity preview is masked by default'
+    $firstBefore=$previewFirst.Text;$secondBefore=$previewSecond.Text
+    $mouseArgs=New-Object Windows.Forms.MouseEventArgs([Windows.Forms.MouseButtons]::Left,1,1,1,0)
+    Invoke-ProtectedControlEvent $previewButton 'OnMouseDown' $mouseArgs
+    Assert-True (-not $previewFirst.UseSystemPasswordChar -and -not $previewSecond.UseSystemPasswordChar) 'mouse hold reveals both existing TextBoxes'
+    Invoke-ProtectedControlEvent $previewButton 'OnMouseUp' $mouseArgs
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'mouse release remasks both fields'
+
+    & $previewController.reveal
+    Invoke-ProtectedControlEvent $previewButton 'OnMouseLeave' ([EventArgs]::Empty)
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'mouse leave remasks both fields'
+    & $previewController.reveal
+    Invoke-ProtectedControlEvent $previewForm 'OnDeactivate' ([EventArgs]::Empty)
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'dialog deactivation remasks both fields'
+    & $previewController.reveal
+    $previewForm.WindowState=[Windows.Forms.FormWindowState]::Minimized
+    Invoke-ProtectedControlEvent $previewForm 'OnResize' ([EventArgs]::Empty)
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'minimizing the dialog remasks both fields'
+    $previewForm.WindowState=[Windows.Forms.FormWindowState]::Normal
+    & $previewController.reveal
+    $escapeArgs=New-Object Windows.Forms.KeyEventArgs([Windows.Forms.Keys]::Escape)
+    Invoke-ProtectedControlEvent $previewForm 'OnKeyDown' $escapeArgs
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'Escape remasks both fields'
+    & $previewController.reveal
+    $closingArgs=New-Object Windows.Forms.FormClosingEventArgs([Windows.Forms.CloseReason]::UserClosing,$false)
+    Invoke-ProtectedControlEvent $previewForm 'OnFormClosing' $closingArgs
+    Assert-True ($previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'cancel or form close remasks both fields'
+
+    & $previewController.reveal
+    $validationFailed=$false
+    try{[void](& $module {param($one,$two,$oneControl,$twoControl) Invoke-Phase7BAgeIdentityDialogEntryValidation -FirstRaw $one -SecondRaw $two -FirstControl $oneControl -SecondControl $twoControl} $identityText ($identityText+'EXTRA') $previewFirst $previewSecond)}catch{$validationFailed=$true}
+    Assert-True ($validationFailed -and $previewFirst.UseSystemPasswordChar -and $previewSecond.UseSystemPasswordChar) 'validation failure and exception path leave both fields masked'
+    Assert-True ($previewFirst.Text -ceq $firstBefore -and $previewSecond.Text -ceq $secondBefore) 'preview and validation metadata never modify TextBox secret content'
+    Assert-True ($previewFirstCount.Text -notmatch [regex]::Escape($identityText) -and $previewSecondCount.Text -notmatch [regex]::Escape($identityText)) 'count labels contain no identity characters'
+  }finally{
+    & $module {param($one,$two) Set-Phase7BAgeIdentityMaskState -FirstControl $one -SecondControl $two -Masked $true} $previewFirst $previewSecond
+    $previewFirst.Clear();$previewSecond.Clear();$previewFirst.Dispose();$previewSecond.Dispose();$previewFirstCount.Dispose();$previewSecondCount.Dispose();$previewButton.Dispose();$previewForm.Dispose()
   }
 
   Assert-DialogPass $identityText $identityText 'canonical identity passes the actual TextBox normalization path'
