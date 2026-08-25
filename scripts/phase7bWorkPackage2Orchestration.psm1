@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 
 function New-Phase7BWorkPackage2InvocationContractDocument {
@@ -25,6 +26,8 @@ function New-Phase7BWorkPackage2InvocationContractDocument {
     applicationCommit = $ApplicationCommit
     artifacts = $sorted
     retainedStage2Required = $true
+    securePassphraseBridgeRequired = $true
+    decryptRoundTripRequired = $true
     automaticRetryAllowed = $false
     wp2cAuthorized = $false
   }
@@ -43,6 +46,7 @@ function Assert-Phase7BWorkPackage2InvocationContract {
   if ([int]$document.schemaVersion -ne 1 -or [string]$document.classification -cne 'PHASE7B_WP2B_DURABLE_INVOCATION_CONTRACT' -or
       [string]$document.attemptId -cne $ExpectedAttemptId -or [string]$document.toolingCommit -cnotmatch '^[0-9a-f]{40}$' -or
       [string]$document.applicationCommit -cnotmatch '^[0-9a-f]{40}$' -or -not [bool]$document.retainedStage2Required -or
+      -not [bool]$document.securePassphraseBridgeRequired -or -not [bool]$document.decryptRoundTripRequired -or
       [bool]$document.automaticRetryAllowed -or [bool]$document.wp2cAuthorized) { throw 'PHASE7B_WP2B_INVOCATION_CONTRACT_BINDING_FAIL' }
   $document
 }

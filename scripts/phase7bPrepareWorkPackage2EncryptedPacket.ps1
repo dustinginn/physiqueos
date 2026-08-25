@@ -4,6 +4,8 @@ param(
   [Parameter()][string]$AttemptId,
   [Parameter()][string]$AuthorizationPath,
   [Parameter()][string]$ExpectedAuthorizationSha256,
+  [Parameter()][string]$ExpectedInvocationContractSha256,
+  [Parameter()][string]$ExpectedStage3LauncherSha256,
   [Parameter()][string]$CapturePlanPath,
   [Parameter()][string]$ExpectedCapturePlanSha256,
   [Parameter()][string]$SourceRoot,
@@ -62,10 +64,12 @@ $authorizationConsumed = $false
 $accepted = $false
 try {
   foreach ($requiredValue in @($AttemptId, $AuthorizationPath, $ExpectedAuthorizationSha256, $CapturePlanPath,
-      $ExpectedCapturePlanSha256, $SourceRoot, $LocalOutputDirectory, $ReplicaDirectory, $AgeExePath, $ExpectedAgeExeSha256)) {
+      $ExpectedInvocationContractSha256, $ExpectedStage3LauncherSha256, $ExpectedCapturePlanSha256, $SourceRoot,
+      $LocalOutputDirectory, $ReplicaDirectory, $AgeExePath, $ExpectedAgeExeSha256)) {
     if ([string]::IsNullOrWhiteSpace($requiredValue)) { throw "PHASE7B_WP2_CAPTURE_ARGUMENT_REQUIRED" }
   }
-  if ($ExpectedCapturePlanSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "PHASE7B_WP2_CAPTURE_HASH_ARGUMENT_INVALID" }
+  if ($ExpectedInvocationContractSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedStage3LauncherSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      $ExpectedCapturePlanSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $ExpectedAgeExeSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "PHASE7B_WP2_CAPTURE_HASH_ARGUMENT_INVALID" }
   if (-not (Test-Path -LiteralPath $CapturePlanPath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $CapturePlanPath) -ne $ExpectedCapturePlanSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_CAPTURE_PLAN_HASH_MISMATCH" }
   if (-not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or
@@ -106,6 +110,7 @@ try {
   $toolingCommit = (& git -C (Resolve-Path (Join-Path $PSScriptRoot '..')).Path rev-parse HEAD).Trim().ToLowerInvariant()
   $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 `
     -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $toolingCommit -ExpectedInventorySha256 $inventory.inventorySha256 `
+    -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
     -ExpectedSourceRootSha256 $sourceRootSha256 -ExpectedCapturePlanSha256 $ExpectedCapturePlanSha256 `
     -ExpectedLocalOutputRootSha256 $localOutputRootSha256 -ExpectedReplicaRootSha256 $replicaRootSha256 `
     -ExpectedAgeExeSha256 $ExpectedAgeExeSha256.ToLowerInvariant() -ExpectedQuiescenceEvidenceSha256 ([string]$authorizationPreview.quiescenceEvidenceSha256)
@@ -202,6 +207,10 @@ try {
     sourceInventorySha256 = $inventory.inventorySha256
     sourceRootSha256 = $sourceRootSha256
     capturePlanSha256 = $ExpectedCapturePlanSha256.ToLowerInvariant()
+    invocationContractSha256 = $ExpectedInvocationContractSha256.ToLowerInvariant()
+    stage3LauncherSha256 = $ExpectedStage3LauncherSha256.ToLowerInvariant()
+    securePassphraseBridgeRequired = $true
+    decryptRoundTripRequired = $true
     captureAuthorizationId = [string]$authorization.authorizationId
     captureAuthorizationSha256 = $ExpectedAuthorizationSha256.ToLowerInvariant()
     captureAuthorizationToolingCommit = $toolingCommit

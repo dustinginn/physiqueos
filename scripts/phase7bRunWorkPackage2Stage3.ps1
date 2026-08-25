@@ -10,9 +10,11 @@ param(
   [Parameter(Mandatory = $true)][string]$AgeExePath
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Orchestration.psm1') -Force
 $invocation=Assert-Phase7BWorkPackage2InvocationContract -LiteralPath $InvocationContractPath -ExpectedSha256 $ExpectedInvocationContractSha256 -ExpectedAttemptId $AttemptId
+if (-not [bool]$invocation.securePassphraseBridgeRequired -or -not [bool]$invocation.decryptRoundTripRequired) { throw 'PHASE7B_WP2B_STAGE3_INVOCATION_REQUIREMENT_FAIL' }
 $repositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $head=(& git -C $repositoryRoot rev-parse HEAD).Trim().ToLowerInvariant()
 $parity=(& git -C $repositoryRoot rev-list --left-right --count 'HEAD...origin/combined-app-platform-cutover').Trim()
@@ -21,8 +23,11 @@ if ($head -cne [string]$invocation.toolingCommit -or $parity -cne "0`t0" -or $di
 $self=@($invocation.artifacts|Where-Object{$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage3.ps1'})
 if ($self.Count -ne 1 -or (Get-Phase7BSha256 -LiteralPath $PSCommandPath) -cne [string]$self[0].sha256) { throw 'PHASE7B_WP2B_STAGE3_SELF_IDENTITY_FAIL' }
 if ((Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -cne $ExpectedAuthorizationSha256) { throw 'PHASE7B_WP2B_STAGE3_AUTHORIZATION_HASH_FAIL' }
-$authorization=Get-Content -LiteralPath $AuthorizationPath -Raw|ConvertFrom-Json -ErrorAction Stop
-if ([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head) { throw 'PHASE7B_WP2B_STAGE3_AUTHORIZATION_BINDING_FAIL' }
+$authorization=Assert-Phase7BWorkPackage2Authorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 -ExpectedStage 'WP2B_CAPTURE' -ExpectedAttemptId $AttemptId
+if ([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head -or
+    [string]$authorization.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
+    [string]$authorization.stage3LauncherSha256 -cne [string]$self[0].sha256 -or
+    -not [bool]$authorization.securePassphraseBridgeRequired -or -not [bool]$authorization.decryptRoundTripRequired) { throw 'PHASE7B_WP2B_STAGE3_AUTHORIZATION_BINDING_FAIL' }
 $markerPath=Join-Path (Split-Path -Parent $AuthorizationPath) ([string]$authorization.consumptionMarkerFileName)
 if (Test-Path -LiteralPath $markerPath) { throw 'PHASE7B_WP2B_STAGE3_AUTHORIZATION_ALREADY_USED' }
 $planPath=Join-Path (Split-Path -Parent $AuthorizationPath) ([string]$authorization.capturePlanFileName)
@@ -34,6 +39,7 @@ try {
   [void](New-PSDrive -Name P7BR -PSProvider FileSystem -Root ([string]$authorization.replicaUncRoot) -Credential $credential -Scope Global -ErrorAction Stop)
   $lines=@(& (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1') -Operation CaptureEncryptReplicate -AttemptId $AttemptId `
     -AuthorizationPath $AuthorizationPath -ExpectedAuthorizationSha256 $ExpectedAuthorizationSha256 -CapturePlanPath $planPath `
+    -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 ([string]$self[0].sha256) `
     -ExpectedCapturePlanSha256 ([string]$authorization.capturePlanSha256) -SourceRoot $repositoryRoot -LocalOutputDirectory $LocalOutputRoot `
     -ReplicaDirectory 'P7BR:\' -AgeExePath $AgeExePath -ExpectedAgeExeSha256 $ageSha 2>&1)
   $exitCode=$LASTEXITCODE;$text=$lines -join [Environment]::NewLine;$result=$text|ConvertFrom-Json -ErrorAction Stop

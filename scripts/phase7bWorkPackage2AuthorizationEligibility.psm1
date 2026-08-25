@@ -10,6 +10,7 @@ function Test-Phase7BWorkPackage2CaptureAuthorizationShape {
   $stages = @(if ($properties -contains 'authorizedStages') { @($Authorization.authorizedStages) })
   $required = @('schemaVersion','classification','authorizationId','attemptId','toolingCommit','authorizedStages',
     'expiresAt','oneUseOnly','automaticRetryAllowed','wp2cAuthorized','consumptionMarkerFileName',
+    'invocationContractSha256','stage3LauncherSha256','securePassphraseBridgeRequired','decryptRoundTripRequired',
     'capturePlanSha256','sourceInventorySha256','sourceRootSha256','localOutputRootSha256',
     'replicaRootSha256','ageExeSha256','quiescenceEvidenceSha256')
   $missing = @($required | Where-Object { $properties -notcontains $_ })
@@ -20,7 +21,8 @@ function Test-Phase7BWorkPackage2CaptureAuthorizationShape {
     [string]$Authorization.capturePlanSha256, [string]$Authorization.sourceInventorySha256,
     [string]$Authorization.sourceRootSha256, [string]$Authorization.localOutputRootSha256,
     [string]$Authorization.replicaRootSha256, [string]$Authorization.ageExeSha256,
-    [string]$Authorization.quiescenceEvidenceSha256
+    [string]$Authorization.quiescenceEvidenceSha256, [string]$Authorization.invocationContractSha256,
+    [string]$Authorization.stage3LauncherSha256
   ) })
   $pass = $missing.Count -eq 0 -and [int]$Authorization.schemaVersion -eq 1 -and
     [string]$Authorization.classification -ceq 'PHASE7B_WP2_STAGE_AUTHORIZATION' -and
@@ -29,6 +31,7 @@ function Test-Phase7BWorkPackage2CaptureAuthorizationShape {
     [string]$Authorization.toolingCommit -ceq $ExpectedToolingCommit -and
     $stages.Count -eq 1 -and [string]$stages[0].stage -ceq 'WP2B_CAPTURE' -and
     [int]$stages[0].mutationBudget -eq 1 -and [bool]$Authorization.oneUseOnly -and
+    [bool]$Authorization.securePassphraseBridgeRequired -and [bool]$Authorization.decryptRoundTripRequired -and
     -not [bool]$Authorization.automaticRetryAllowed -and -not [bool]$Authorization.wp2cAuthorized -and
     [string]$Authorization.consumptionMarkerFileName -ceq "$([string]$Authorization.authorizationId).used.json" -and
     $expiryPass -and @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -eq 0

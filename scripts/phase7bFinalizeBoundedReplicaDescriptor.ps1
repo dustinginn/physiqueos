@@ -10,6 +10,8 @@ param(
   [Parameter(Mandatory = $true)][string]$CaptureAuthorizationPath,
   [Parameter(Mandatory = $true)][string]$ExpectedCaptureAuthorizationSha256,
   [Parameter(Mandatory = $true)][string]$ExpectedToolingCommit,
+  [Parameter(Mandatory = $true)][string]$ExpectedInvocationContractSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedStage3LauncherSha256,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [Parameter()][string]$ExactExistingDescriptorResumeAcknowledgement
@@ -23,7 +25,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2OperatorLifecycle.psm
 $stage = 'validate-input'
 $mutationStarted = $false
 try {
-  if ($AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedPendingDescriptorSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedReplicaReceiptSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedPrimaryTeardownEvidenceSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedCaptureAuthorizationSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_ARGUMENT_FAIL' }
+  if ($AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedPendingDescriptorSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedReplicaReceiptSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedPrimaryTeardownEvidenceSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedCaptureAuthorizationSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or $ExpectedInvocationContractSha256 -notmatch '^[0-9a-f]{64}$' -or $ExpectedStage3LauncherSha256 -notmatch '^[0-9a-f]{64}$' -or $AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_ARGUMENT_FAIL' }
   $resumeExisting = Test-Path -LiteralPath $OutputPath -PathType Leaf
   if ($resumeExisting -and $ExactExistingDescriptorResumeAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_FINAL_DESCRIPTOR_READ_ONLY') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_EXISTING_REJECTED' }
   if (-not $resumeExisting -and -not [string]::IsNullOrEmpty($ExactExistingDescriptorResumeAcknowledgement)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_RESUME_NOT_APPLICABLE' }
@@ -35,10 +37,14 @@ try {
       [string]$pending.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$pending.plaintextZipBytes -lt 1 -or
       [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or
       [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes -or -not [bool]$pending.decryptRoundTripPass -or
+      [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
+      [string]$pending.stage3LauncherSha256 -cne $ExpectedStage3LauncherSha256 -or
+      -not [bool]$pending.securePassphraseBridgeRequired -or -not [bool]$pending.decryptRoundTripRequired -or
       [string]$pending.captureAuthorizationSha256 -cne $ExpectedCaptureAuthorizationSha256 -or
       [string]$pending.captureAuthorizationToolingCommit -cne $ExpectedToolingCommit) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_PENDING_DESCRIPTOR_FAIL' }
   $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $CaptureAuthorizationPath -ExpectedSha256 $ExpectedCaptureAuthorizationSha256 `
     -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit -ExpectedInventorySha256 ([string]$pending.sourceInventorySha256) `
+    -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
     -ExpectedSourceRootSha256 ([string]$pending.sourceRootSha256) -ExpectedCapturePlanSha256 ([string]$pending.capturePlanSha256) `
     -ExpectedLocalOutputRootSha256 ([string]$pending.localOutputRootSha256) -ExpectedReplicaRootSha256 ([string]$pending.replicaRootSha256) `
     -ExpectedAgeExeSha256 ([string]$pending.ageExeSha256) -ExpectedQuiescenceEvidenceSha256 ([string]$pending.quiescenceEvidenceSha256)

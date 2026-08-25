@@ -46,6 +46,8 @@ $import = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bImportBounde
 $finalize = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -Raw
 Assert-True (-not $prepare.Contains('Test-Connection') -and $prepare.Contains('laptopReachabilityDeferredToReceiver')) 'pre-Stage2 LAN proof is binding-only and does not require an unopened receiver'
 Assert-True ($prepare.Contains('capturePlanFileName') -and $prepare.Contains('requiredCapacityBytes') -and $prepare.Contains('laptopIpv4')) 'Stage1 emits every Stage2 and Stage3 nonsecret handoff'
+Assert-True ($prepare.Contains('Assert-Phase7BWorkPackage2InvocationContract') -and $prepare.Contains("scripts/phase7bRunWorkPackage2Stage3.ps1") -and
+  $prepare.Contains('-InvocationContractSha256 $ExpectedInvocationContractSha256') -and $prepare.Contains('-Stage3LauncherSha256 $stage3LauncherSha256')) 'authorization creation derives invocation and Stage3 bindings from the generated contract and tracked launcher'
 Assert-True ($capture.Contains('$authorization.capturePlanFileName') -and $capture.Contains('$authorization.quiescenceEvidenceToolingCommit')) 'Stage3 consumes exact authorization-bound filenames and evidence commit'
 Assert-True ($capture.Contains('Invoke-Phase7BAgeEncryptionWithSecureWindowsInput') -and -not $capture.Contains('& $AgeExePath -p')) 'Stage3 delegates age passphrase entry to the source-owned secure Windows bridge'
 Assert-True ($ageBridge.Contains('WriteConsoleInputW') -and $ageBridge.Contains('UseSystemPasswordChar') -and $ageBridge.Contains('ShortcutsEnabled')) 'secure age bridge uses masked paste-capable entry and deterministic Windows console injection'
@@ -143,5 +145,17 @@ foreach ($entry in $entryScripts) {
   if ($exit -eq 0) { try { $parsed = ($result -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop } catch {} }
   Assert-True ($exit -eq 0 -and $null -ne $parsed -and [bool]$parsed.pass) "$($entry.Name) real import chain resolves every directly-depended shared-module export in fresh PowerShell 5.1"
 }
+
+# Direct callers must import the module that owns the command. This intentionally does not
+# accept a transitive import as proof of ownership.
+foreach ($callerName in @('phase7bNewWorkPackage2InvocationContract.ps1','phase7bRunWorkPackage2Stage3.ps1',
+    'phase7bRunWorkPackage2Stage4.ps1','phase7bRunWorkPackage2Stage5.ps1','phase7bWorkPackage2Orchestration.psm1')) {
+  $callerText = Get-Content -LiteralPath (Join-Path $PSScriptRoot $callerName) -Raw
+  Assert-True ($callerText.Contains('Get-Phase7BSha256') -and
+    $callerText.Contains("Join-Path `$PSScriptRoot 'phase7bIsolatedGuestContract.psm1'")) "$callerName directly imports the owner of Get-Phase7BSha256"
+}
+$generatorSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bNewWorkPackage2InvocationContract.ps1') -Raw
+Assert-True ($generatorSource.Contains('Write-Phase7BSafeEvidenceFile') -and
+  $generatorSource.Contains("Join-Path `$PSScriptRoot 'phase7bBoundedReplicaTransport.psm1'")) 'generator directly imports the owner of Write-Phase7BSafeEvidenceFile'
 
 [ordered]@{classification='PHASE7B_WP2B_REMAINING_CONNECTED_LIFECYCLE_LOCAL_TESTS_PASS';pass=$true;assertions=$script:assertions;liveExecutionPerformed=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Compress

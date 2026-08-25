@@ -10,6 +10,7 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedEvidenceSha256
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Orchestration.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
@@ -17,16 +18,22 @@ $invocation=Assert-Phase7BWorkPackage2InvocationContract -LiteralPath $Invocatio
 $repositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $head=(& git -C $repositoryRoot rev-parse HEAD).Trim().ToLowerInvariant()
 $self=@($invocation.artifacts|Where-Object{$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage5.ps1'})
-if($head -cne [string]$invocation.toolingCommit -or $self.Count -ne 1 -or (Get-Phase7BSha256 -LiteralPath $PSCommandPath) -cne [string]$self[0].sha256 -or
+$stage3=@($invocation.artifacts|Where-Object{$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage3.ps1'})
+if($head -cne [string]$invocation.toolingCommit -or $self.Count -ne 1 -or $stage3.Count -ne 1 -or (Get-Phase7BSha256 -LiteralPath $PSCommandPath) -cne [string]$self[0].sha256 -or
    (Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -cne $ExpectedAuthorizationSha256 -or $EvidenceNonce -cnotmatch '^[0-9a-f]{32}$' -or $ExpectedEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$'){throw 'PHASE7B_WP2B_STAGE5_IDENTITY_FAIL'}
-$authorization=Get-Content -LiteralPath $AuthorizationPath -Raw|ConvertFrom-Json -ErrorAction Stop
-if([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head){throw 'PHASE7B_WP2B_STAGE5_AUTHORIZATION_BINDING_FAIL'}
+$authorization=Assert-Phase7BWorkPackage2Authorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 -ExpectedStage 'WP2B_CAPTURE' -ExpectedAttemptId $AttemptId
+if([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head -or
+   [string]$authorization.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
+   [string]$authorization.stage3LauncherSha256 -cne [string]$stage3[0].sha256 -or
+   -not [bool]$authorization.securePassphraseBridgeRequired -or -not [bool]$authorization.decryptRoundTripRequired){throw 'PHASE7B_WP2B_STAGE5_AUTHORIZATION_BINDING_FAIL'}
 $attemptRoot=Join-Path ([IO.Path]::GetFullPath($LocalOutputRoot).TrimEnd('\')) $AttemptId
 $packetPath=Join-Path $attemptRoot "$AttemptId.zip.age";$pendingPath=Join-Path $attemptRoot "$AttemptId-pending-descriptor.json"
 if(-not(Test-Path -LiteralPath $packetPath -PathType Leaf)-or -not(Test-Path -LiteralPath $pendingPath -PathType Leaf)){throw 'PHASE7B_WP2B_STAGE5_CAPTURE_INPUT_MISSING'}
 $packetSha=Get-Phase7BSha256 -LiteralPath $packetPath;$packetBytes=[int64](Get-Item -LiteralPath $packetPath).Length
 $pending=Get-Content -LiteralPath $pendingPath -Raw|ConvertFrom-Json -ErrorAction Stop
-if(-not [bool]$pending.decryptRoundTripPass -or [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes){throw 'PHASE7B_WP2B_STAGE5_ROUND_TRIP_BINDING_FAIL'}
+if(-not [bool]$pending.decryptRoundTripPass -or -not [bool]$pending.decryptRoundTripRequired -or -not [bool]$pending.securePassphraseBridgeRequired -or
+   [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or [string]$pending.stage3LauncherSha256 -cne [string]$stage3[0].sha256 -or
+   [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes){throw 'PHASE7B_WP2B_STAGE5_ROUND_TRIP_BINDING_FAIL'}
 $shareName="P7B$($AttemptId.Substring($AttemptId.Length-8))`$";$connections=@(Get-SmbConnection -ServerName 'LAPTOP-4G5UOU2R' -ErrorAction SilentlyContinue|Where-Object{$_.ShareName -eq $shareName})
 if($connections.Count -ne 0){throw 'PHASE7B_WP2B_STAGE5_SMB_RESIDUE_STOP'}
 $teardownPath=Join-Path $attemptRoot "$AttemptId-primary-teardown-$([guid]::NewGuid().ToString('N')).json"
@@ -42,6 +49,7 @@ $finalLines=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescripto
   -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $receiptPath -ExpectedReplicaReceiptSha256 $ExpectedEvidenceSha256 `
   -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 (Get-Phase7BSha256 -LiteralPath $teardownPath) `
   -CaptureAuthorizationPath $AuthorizationPath -ExpectedCaptureAuthorizationSha256 $ExpectedAuthorizationSha256 -ExpectedToolingCommit $head `
+  -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 ([string]$stage3[0].sha256) `
   -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $finalPath 2>&1)
 $finalExit=$LASTEXITCODE;$final=(($finalLines -join [Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop)
 if($finalExit -ne 0 -or -not [bool]$final.pass -or -not [bool]$final.decryptRoundTripPass -or -not [bool]$final.captureAuthorizationConsumed){throw 'PHASE7B_WP2B_STAGE5_FINALIZE_STOP'}

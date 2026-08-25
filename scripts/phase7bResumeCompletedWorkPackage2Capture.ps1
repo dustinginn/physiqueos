@@ -47,7 +47,10 @@ try {
       [string]$descriptor.referenceIndexSha256 -notmatch '^[0-9a-f]{64}$' -or [bool]$descriptor.automaticRetryAllowed -or
       [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$descriptor.plaintextZipBytes -lt 1 -or
       [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
-      [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes -or -not [bool]$descriptor.decryptRoundTripPass) {
+      [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes -or -not [bool]$descriptor.decryptRoundTripPass -or
+      [string]$descriptor.invocationContractSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+      [string]$descriptor.stage3LauncherSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+      -not [bool]$descriptor.securePassphraseBridgeRequired -or -not [bool]$descriptor.decryptRoundTripRequired) {
     throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_BINDING_FAIL'
   }
   $global:LASTEXITCODE = 0

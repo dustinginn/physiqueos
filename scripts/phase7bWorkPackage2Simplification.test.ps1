@@ -8,7 +8,7 @@ function Assert-True([bool]$value,[string]$message){if(-not $value){throw "ASSER
 function Write-Json([string]$path,$value){[IO.File]::WriteAllText($path,($value|ConvertTo-Json -Depth 12 -Compress),(New-Object Text.UTF8Encoding($false)))}
 function New-Authorization([string]$attempt,[string]$commit,[string]$id,[DateTime]$expires){
   $h='a'*64
-  [pscustomobject][ordered]@{schemaVersion=1;classification='PHASE7B_WP2_STAGE_AUTHORIZATION';captureAuthorizationClassification='PHASE7B_WP2B_CAPTURE_AUTHORIZATION';authorizationId=$id;attemptId=$attempt;toolingCommit=$commit;authorizedStages=@([pscustomobject]@{stage='WP2B_CAPTURE';mutationBudget=1});expiresAt=$expires.ToUniversalTime().ToString('o');oneUseOnly=$true;automaticRetryAllowed=$false;wp2cAuthorized=$false;consumptionMarkerFileName="$id.used.json";capturePlanSha256=$h;sourceInventorySha256=$h;sourceRootSha256=$h;localOutputRootSha256=$h;replicaRootSha256=$h;ageExeSha256=$h;quiescenceEvidenceSha256=$h}
+  [pscustomobject][ordered]@{schemaVersion=1;classification='PHASE7B_WP2_STAGE_AUTHORIZATION';captureAuthorizationClassification='PHASE7B_WP2B_CAPTURE_AUTHORIZATION';authorizationId=$id;attemptId=$attempt;toolingCommit=$commit;authorizedStages=@([pscustomobject]@{stage='WP2B_CAPTURE';mutationBudget=1});expiresAt=$expires.ToUniversalTime().ToString('o');oneUseOnly=$true;automaticRetryAllowed=$false;wp2cAuthorized=$false;consumptionMarkerFileName="$id.used.json";invocationContractSha256=$h;stage3LauncherSha256=$h;securePassphraseBridgeRequired=$true;decryptRoundTripRequired=$true;capturePlanSha256=$h;sourceInventorySha256=$h;sourceRootSha256=$h;localOutputRootSha256=$h;replicaRootSha256=$h;ageExeSha256=$h;quiescenceEvidenceSha256=$h}
 }
 $root=Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\.tmp')).Path "phase7b-wp2-simplification-$([guid]::NewGuid().ToString('N'))"
 try{
@@ -39,13 +39,17 @@ try{
   Assert-True (-not $wrongAttempt.eligible -and -not $wrongAttempt.currentBinding) 'wrong attempt cannot become current'
   $wrongCommit=Get-Phase7BWorkPackage2CaptureAuthorizationEligibility -LiteralPath $path -ExpectedAttemptId $attempt -ExpectedToolingCommit ('8'*40)
   Assert-True (-not $wrongCommit.eligible -and -not $wrongCommit.currentBinding) 'older tooling commit cannot execute as current'
-  foreach($case in @('wrong-stage','wrong-budget','automatic-retry')){
+  foreach($case in @('wrong-stage','wrong-budget','automatic-retry','bridge-false','roundtrip-false','bridge-absent','roundtrip-absent')){
     $caseRoot=Join-Path $root $case;[void](New-Item -ItemType Directory -Path $caseRoot)
     $caseId='phase7b-wp2b-capture-auth-'+(([string]$case.Length).PadLeft(32,'6'))
     $caseAuthorization=New-Authorization $attempt $current $caseId ([DateTime]::UtcNow.AddHours(1))
     if($case -ceq 'wrong-stage'){$caseAuthorization.authorizedStages[0].stage='WP2C_STAGE'}
     elseif($case -ceq 'wrong-budget'){$caseAuthorization.authorizedStages[0].mutationBudget=2}
-    else{$caseAuthorization.automaticRetryAllowed=$true}
+    elseif($case -ceq 'automatic-retry'){$caseAuthorization.automaticRetryAllowed=$true}
+    elseif($case -ceq 'bridge-false'){$caseAuthorization.securePassphraseBridgeRequired=$false}
+    elseif($case -ceq 'roundtrip-false'){$caseAuthorization.decryptRoundTripRequired=$false}
+    elseif($case -ceq 'bridge-absent'){$caseAuthorization.PSObject.Properties.Remove('securePassphraseBridgeRequired')}
+    else{$caseAuthorization.PSObject.Properties.Remove('decryptRoundTripRequired')}
     $casePath=Join-Path $caseRoot "$attempt-$caseId.json";Write-Json $casePath $caseAuthorization
     $invalid=Get-Phase7BWorkPackage2CaptureAuthorizationSet -EvidenceRoot $caseRoot -ExpectedAttemptId $attempt -ExpectedToolingCommit $current
     Assert-True (-not $invalid.pass -and $invalid.conflictingCurrentAuthorizationCount -eq 1 -and
