@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
+import { canonicalMediaCandidate } from "./canonicalReferenceProjection.js";
 import {
   comparePhase7BWorkPackage2ReferenceIndexes,
   createPhase7BWorkPackage2ReferenceIndex,
@@ -25,6 +26,18 @@ function create(overrides = {}) {
 }
 
 describe("Phase 7B WP2 reference index", () => {
+  it("distinguishes file-shaped canonical IDs and historical labels from required local media", () => {
+    expect(canonicalMediaCandidate("training|authoritative|IMG_1919.png", "id")).toBeNull();
+    expect(canonicalMediaCandidate("nutrition2026-07-25_breakfast_0_IMG_1641.jpeg", "evidenceIds")).toBeNull();
+    expect(canonicalMediaCandidate("IMG_1919.png", "sourceFileId")).toEqual({
+      normalized: "img_1919.png", basename: "img_1919.png", mustExist: false,
+    });
+    expect(canonicalMediaCandidate("private/founder/photos/required-photo.jpg", "mediaPath")).toEqual({
+      normalized: "private/founder/photos/required-photo.jpg", basename: "required-photo.jpg", mustExist: true,
+    });
+    expect(canonicalMediaCandidate("https://example.test/private.jpg", "mediaPath")).toBeNull();
+  });
+
   it("indexes all 39 collections including singleton, zero, one, and many records", () => {
     const index = create({ runtime: runtime({ goals: [{ id: "g1" }, { id: "g2" }], reminders: [{ id: "r1" }] }) });
     expect(index.collectionCount).toBe(39);

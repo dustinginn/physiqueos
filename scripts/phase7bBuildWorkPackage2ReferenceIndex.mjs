@@ -3,7 +3,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalJson, createPayloadHash } from "../src/contracts/v1/canonicalJson.js";
-import { buildCanonicalMediaReferenceIndex, canonicalMimeTypeFor } from "../src/platform/migration/canonicalReferenceProjection.js";
+import {
+  buildCanonicalMediaReferenceIndex,
+  canonicalMediaCandidate,
+  canonicalMimeTypeFor,
+  walkCanonicalStrings,
+} from "../src/platform/migration/canonicalReferenceProjection.js";
+import { FOUNDATION_REQUIRED_SOURCE_COLLECTIONS } from "../src/platform/migration/foundationSourceCollections.js";
 import { createPhase7BWorkPackage2ReferenceIndex } from "../src/platform/migration/phase7bWorkPackage2ReferenceIndex.js";
 
 const [inputPath, stagingRoot, outputPath] = process.argv.slice(2);
@@ -22,13 +28,19 @@ try {
   const runtimeBuffer = await readBoundFile(root, runtimeEntries[0]);
   const controlBuffer = await readBoundFile(root, controlEntries[0]);
   const runtime = JSON.parse(runtimeBuffer.toString("utf8"));
-  const references = buildCanonicalMediaReferenceIndex(runtime);
+  const references = buildCanonicalMediaReferenceIndex(runtime, { semanticMediaOnly: true });
   const mediaFiles = [];
+  const capturedMediaSourcePaths = new Set();
+  const capturedMediaNameCounts = new Map();
   for (const entry of mediaEntries) {
     const bytes = await readBoundFile(root, entry);
     const target = boundPath(root, entry.logicalPath);
     const stat = await fs.stat(target);
     const relativePath = entry.logicalPath.slice("windows/media/".length);
+    const sourceRelativePath = normalizeSourceRelativePath(entry.sourceRelativePath);
+    capturedMediaSourcePaths.add(sourceRelativePath);
+    const capturedBasename = path.posix.basename(sourceRelativePath);
+    capturedMediaNameCounts.set(capturedBasename, (capturedMediaNameCounts.get(capturedBasename) ?? 0) + 1);
     const keys = [relativePath.toLowerCase(), path.posix.basename(relativePath).toLowerCase()];
     mediaFiles.push({
       relativePath,
@@ -39,9 +51,21 @@ try {
       relationshipIds: [...new Set(keys.flatMap((key) => references.get(key) ?? []))].sort(),
     });
   }
-  const capturedMediaNames = new Set(mediaFiles.map((entry) => path.posix.basename(entry.relativePath).toLowerCase()));
-  const inferredMissingMedia = [...references.keys()]
-    .filter((key) => !key.includes("/") && /\.(?:jpe?g|png|webp|pdf|m4a|mp4)$/i.test(key) && !capturedMediaNames.has(key.toLowerCase()));
+  const inferredMissingMedia = [];
+  for (const collection of FOUNDATION_REQUIRED_SOURCE_COLLECTIONS) {
+    const source = runtime[collection];
+    const records = source == null ? [] : Array.isArray(source) ? source : [source];
+    for (const record of records) {
+      walkCanonicalStrings(record, (value, key) => {
+        const candidate = canonicalMediaCandidate(value, key);
+        const exactMatch = candidate?.mustExist && capturedMediaSourcePaths.has(candidate.normalized);
+        const uniqueBasenameMatch = candidate?.mustExist && capturedMediaNameCounts.get(candidate.basename) === 1;
+        if (candidate?.mustExist && !exactMatch && !uniqueBasenameMatch) {
+          inferredMissingMedia.push(candidate.basename);
+        }
+      });
+    }
+  }
   stage = "build-schema-identity";
   const schemaIdentity = await buildSchemaIdentity(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../db/migrations"));
   stage = "build-reference-index";
@@ -81,6 +105,14 @@ function boundPath(root, logicalPath) {
   const target = path.resolve(root, logicalPath.replaceAll("/", path.sep));
   if (!target.startsWith(`${root}${path.sep}`)) throw new Error("PHASE7B_WP2_REFERENCE_PATH_ESCAPE");
   return target;
+}
+function normalizeSourceRelativePath(value) {
+  if (typeof value !== "string") throw new Error("PHASE7B_WP2_REFERENCE_MEDIA_SOURCE_PATH_INVALID");
+  const normalized = value.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase();
+  if (!normalized || normalized.startsWith("../") || normalized.includes("/../") || path.posix.isAbsolute(normalized)) {
+    throw new Error("PHASE7B_WP2_REFERENCE_MEDIA_SOURCE_PATH_INVALID");
+  }
+  return normalized;
 }
 async function buildSchemaIdentity(root) {
   const names = (await fs.readdir(root)).filter((name) => /^\d+_[^.]+\.cjs$/.test(name)).sort();

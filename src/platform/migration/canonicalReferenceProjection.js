@@ -1,12 +1,13 @@
 import path from "node:path";
 
-export function buildCanonicalMediaReferenceIndex(collections) {
+export function buildCanonicalMediaReferenceIndex(collections, { semanticMediaOnly = false } = {}) {
   const index = new Map();
   for (const [collection, source] of Object.entries(collections)) {
     const records = source == null ? [] : Array.isArray(source) ? source : [source];
     records.forEach((record, position) => {
       const recordId = `${collection}:${resolveCanonicalRecordId(record, position)}`;
-      walkCanonicalStrings(record, (value) => {
+      walkCanonicalStrings(record, (value, field) => {
+        if (semanticMediaOnly && !canonicalMediaCandidate(value, field)) return;
         const normalized = value.replaceAll("\\", "/").toLowerCase();
         const base = path.posix.basename(normalized);
         if (!/\.[a-z0-9]{2,6}(?:$|\?)/i.test(base)) return;
@@ -19,6 +20,17 @@ export function buildCanonicalMediaReferenceIndex(collections) {
     });
   }
   return index;
+}
+
+export function canonicalMediaCandidate(value, key) {
+  if (typeof value !== "string" || /^https?:|^data:/i.test(value)) return null;
+  const normalized = value.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase().split("?")[0];
+  const basename = path.posix.basename(normalized);
+  if (!/\.(?:jpe?g|png|webp|pdf|m4a|mp4)$/i.test(basename)) return null;
+  const pathLike = normalized.includes("/") || /(?:file|path|artifact|reference|upload|photo|image|scan|media)/i.test(key);
+  const mustExist = normalized.startsWith("private/founder/") ||
+    /^(?:artifactPath|filePath|photoPath|imagePath|mediaPath|localPath|reference)$/i.test(key);
+  return pathLike ? { normalized, basename, mustExist } : null;
 }
 
 export function collectCanonicalRelationships(collections, ownerUserId) {

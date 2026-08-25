@@ -155,7 +155,12 @@ try {
     applicationCommit = $contract.applicationCommit
     observedAt = [DateTime]::UtcNow.ToString('o')
     missingReferencedMedia = @()
-    files = $publicFiles
+    files = @($inventory.files | ForEach-Object { [ordered]@{
+      sourceRelativePath = $_.sourceRelativePath
+      logicalPath = $_.logicalPath
+      bytes = $_.bytes
+      sha256 = $_.sha256
+    } })
   }
   $referenceInputBytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $referenceInput))
   $referenceInputStream = New-Object IO.FileStream($referenceInputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)

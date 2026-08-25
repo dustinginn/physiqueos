@@ -36,6 +36,16 @@ try {
   assert.equal(result.unknownCollectionCount, 1); assertions += 1;
 
   delete runtime.unexpectedCollection;
+  runtime[FOUNDATION_REQUIRED_SOURCE_COLLECTIONS[0]] = [{
+    id: "training|authoritative|IMG_1919.png",
+    evidenceIds: ["nutrition2026-07-25_breakfast_0_IMG_1641.jpeg"],
+    sourceFileId: "historical-source.pdf",
+  }];
+  await writeRuntime(runtime);
+  result = invoke();
+  assert.equal(result.pass, true); assertions += 1;
+  assert.equal(result.missingMediaReferenceCount, 0); assertions += 1;
+
   runtime[FOUNDATION_REQUIRED_SOURCE_COLLECTIONS[0]] = [{ id: "synthetic-1", filePath: "private/founder/photos/missing.jpg" }];
   await writeRuntime(runtime);
   result = invoke();

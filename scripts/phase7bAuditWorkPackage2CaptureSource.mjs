@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { canonicalMediaCandidate } from "../src/platform/migration/canonicalReferenceProjection.js";
 import {
   FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS,
   FOUNDATION_REQUIRED_SOURCE_COLLECTIONS,
@@ -33,7 +34,7 @@ try {
   for (const collection of FOUNDATION_REQUIRED_SOURCE_COLLECTIONS) {
     const records = runtime[collection] == null ? [] : Array.isArray(runtime[collection]) ? runtime[collection] : [runtime[collection]];
     records.forEach((record, index) => walkStrings(record, (value, key) => {
-      const candidate = mediaCandidate(value, key);
+      const candidate = canonicalMediaCandidate(value, key);
       if (!candidate) return;
       const exact = byPath.get(candidate.normalized);
       const named = byName.get(candidate.basename) ?? [];
@@ -81,14 +82,5 @@ function walkStrings(value, visitor, key = "") {
   if (typeof value === "string") return visitor(value, key);
   if (Array.isArray(value)) return value.forEach((entry) => walkStrings(entry, visitor, key));
   if (value && typeof value === "object") for (const [childKey, child] of Object.entries(value)) walkStrings(child, visitor, childKey);
-}
-function mediaCandidate(value, key) {
-  if (typeof value !== "string" || /^https?:|^data:/i.test(value)) return null;
-  const normalized = value.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase().split("?")[0];
-  const basename = path.posix.basename(normalized);
-  if (!/\.(?:jpe?g|png|webp|pdf|m4a|mp4)$/i.test(basename)) return null;
-  const pathLike = normalized.includes("/") || /(?:file|path|artifact|reference|upload|photo|image|scan|media)/i.test(key);
-  const mustExist = normalized.startsWith("private/founder/") || /^(?:artifactPath|filePath|photoPath|imagePath|mediaPath|localPath|reference)$/i.test(key);
-  return pathLike ? { normalized, basename, mustExist } : null;
 }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
