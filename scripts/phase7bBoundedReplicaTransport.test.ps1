@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 $root = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\.tmp')).Path "phase7b-bounded-replica-test-$([guid]::NewGuid().ToString('N'))"
 $script:assertions = 0
 function Assert-True([bool]$Condition, [string]$Message) { if (-not $Condition) { throw "ASSERTION_FAILED:$Message" }; $script:assertions++ }
@@ -65,6 +66,18 @@ try {
   $packet = Join-Path $root 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip.age'
   [IO.File]::WriteAllBytes($packet, [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`nsynthetic-ciphertext"))
   $sha = Get-Phase7BSha256 -LiteralPath $packet; $bytes = [int64](Get-Item $packet).Length
+  $nativePacket = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $packet
+  Assert-True ($nativePacket.pass -and $nativePacket.providerName -ceq 'FileSystem' -and
+    $nativePacket.nativePath -ceq [IO.Path]::GetFullPath($packet)) 'normal native local file resolves to exact native path'
+  Assert-Throws { Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath 'relative.age' } 'PATH_FORMAT_REJECTED' 'relative file path rejected'
+  Assert-Throws { Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath (Join-Path $root 'missing.age') } 'PATH_NOT_FOUND' 'missing native file rejected'
+  Assert-Throws { Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath "Microsoft.PowerShell.Core\FileSystem::$packet" } 'PATH_FORMAT_REJECTED' 'provider-qualified input rejected'
+  Assert-Throws { Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath 'HKCU:\Software' } 'PATH_PROVIDER_REJECTED' 'non-FileSystem provider rejected'
+  $packetDrive = [IO.Path]::GetPathRoot($packet).Substring(0, 1)
+  $packetUnc = "\\localhost\$packetDrive`$$($packet.Substring(2))"
+  $nativeUncPacket = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $packetUnc
+  Assert-True ($nativeUncPacket.pass -and $nativeUncPacket.nativePath -ceq $packetUnc -and
+    [IO.File]::Exists($nativeUncPacket.nativePath)) 'native loopback UNC file resolves without provider-qualified PathInfo syntax'
   $source = Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $packet -ExpectedSha256 $sha -ExpectedBytes $bytes
   Assert-True ($source.pass -and $source.encryptedPacketOnly) 'exact encrypted source accepted'
   Assert-True (-not (Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $packet -ExpectedSha256 ('f' * 64) -ExpectedBytes $bytes).pass) 'wrong source hash rejected'
@@ -122,6 +135,34 @@ try {
     $mappedDestination = 'P7BF:\mapped.age'
     $mappedCopy = Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $mappedDestination -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes
     Assert-True ($mappedCopy.pass -and (Test-Path -LiteralPath $mappedDestination) -and $mappedCopy.writeThrough) 'provider-aware bounded copy accepts exact PSDrive child and preserves write-through readback'
+    $mappedNative = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $mappedDestination
+    Assert-True ($mappedNative.pass -and $mappedNative.nativePath -ceq (Join-Path $mappedRoot 'mapped.age')) `
+      'multi-character FileSystem PSDrive resolves to underlying native ProviderPath'
+    $mappedPacket = Test-Phase7BEncryptedPacket -LiteralPath $mappedDestination -ExpectedSha256 $sha
+    Assert-True ($mappedPacket.pass -and $mappedPacket.packetBytes -eq $bytes) `
+      'exact line-333 encrypted packet readback accepts FileSystem PSDrive path through native ProviderPath'
+    $boundedModule = Get-Module phase7bBoundedReplicaTransport
+    $originalReadback = & $boundedModule { (Get-Command Test-Phase7BEncryptedPacket -CommandType Function).ScriptBlock }
+    $cleanupDestination = 'P7BF:\post-write-readback-failure.age'
+    try {
+      & $boundedModule {
+        function script:Test-Phase7BEncryptedPacket {
+          param([string]$LiteralPath, [string]$ExpectedSha256)
+          throw 'SYNTHETIC_POST_WRITE_READBACK_FAIL'
+        }
+      }
+      Assert-Throws {
+        Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $cleanupDestination `
+          -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes
+      } 'SYNTHETIC_POST_WRITE_READBACK_FAIL' 'post-write readback exception remains the surfaced failure after exact cleanup'
+      Assert-True (-not (Test-Path -LiteralPath $cleanupDestination)) `
+        'post-write readback exception removes the exact unaccepted destination packet'
+    } finally {
+      & $boundedModule {
+        param([scriptblock]$FunctionBody)
+        Set-Item -Path Function:\script:Test-Phase7BEncryptedPacket -Value $FunctionBody
+      } $originalReadback
+    }
     New-Item -ItemType Directory -Path 'P7BF:\nested' | Out-Null
     Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'P7BF:\nested\outside.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'OUTSIDE_BOUND_ROOT' 'destination below a nested directory is outside the exact bound receiver root'
     Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'P7BF:\..\outside-receiver\escape.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PATH_FORMAT_REJECTED' 'traversal syntax is rejected before provider resolution'
@@ -171,6 +212,18 @@ try {
   Assert-True ($operational.Contains('Get-Phase7BBoundedReplicaHostIdentitySha256') -and
     $operational.Contains('Get-Phase7BBoundedReplicaDiskIdentitySha256')) 'Stage 2 and Stage 4 share exact V2 hash-producing helpers'
   Assert-True ($operational.Contains('automaticRetryAllowed = $false')) 'automatic retry disabled'
+  $contractSource = Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
+  $boundedSource = Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1')
+  Assert-True ($contractSource.Contains('Resolve-Phase7BWorkPackage2NativeFilePath') -and
+    $contractSource.Contains('$resolved[0].ProviderPath') -and $contractSource.Contains('$resolved.Count -ne 1') -and
+    $contractSource.Contains("Provider.Name -cne 'FileSystem'")) `
+    'shared WP2 file resolver requires one FileSystem result and extracts native ProviderPath'
+  Assert-True (-not ($contractSource -match '\[IO\.(?:File|Compression\.ZipFile)\]::(?:OpenRead|Open)\(\(Resolve-Path[^\r\n]+\)\.Path') -and
+    -not ($boundedSource -match '\[IO\.File\]::Open\(\(Resolve-Path[^\r\n]+\)\.Path')) `
+    'transitive WP2 raw .NET readers no longer consume PathInfo.Path directly'
+  Assert-True ($boundedSource.Contains('PHASE7B_WP2_BOUNDED_REPLICA_READBACK_CLEANUP_FAIL') -and
+    $boundedSource.Contains('Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction Stop')) `
+    'post-write readback exceptions require exact destination cleanup or fail closed'
   Assert-True ($operational.Contains('Remove-SmbShare') -and $operational.Contains('Remove-NetFirewallRule')) 'ephemeral session teardown source-owned'
   Assert-True ($operational.Contains('RequiredCapacityBytes') -and -not (Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bOpenBoundedReplicaReceiver.ps1')).Contains('ExpectedPacketBytes')) 'receiver capacity does not claim pre-encryption ciphertext size'
 

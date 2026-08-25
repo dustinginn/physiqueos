@@ -287,7 +287,8 @@ function Copy-Phase7BBoundedEncryptedReplica {
   $parent = Split-Path -Parent $nativeDestinationPath
   if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PARENT_MISSING' }
   $destinationCreated = $false
-  $input = [IO.File]::Open((Resolve-Path -LiteralPath $SourcePath).Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  $nativeSource = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $SourcePath
+  $input = [IO.File]::Open([string]$nativeSource.nativePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
   try {
     $output = New-Object IO.FileStream($nativeDestinationPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 1048576, [IO.FileOptions]::WriteThrough)
     $destinationCreated = $true
@@ -296,10 +297,17 @@ function Copy-Phase7BBoundedEncryptedReplica {
     if ($destinationCreated -and (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction SilentlyContinue }
     throw
   } finally { $input.Dispose() }
-  $replica = Test-Phase7BEncryptedPacket -LiteralPath $nativeDestinationPath -ExpectedSha256 $ExpectedSha256
-  if (-not $replica.pass -or $replica.packetBytes -ne $ExpectedBytes) {
-    if ($destinationCreated -and (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction SilentlyContinue }
-    throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_MISMATCH'
+  try {
+    $replica = Test-Phase7BEncryptedPacket -LiteralPath $nativeDestinationPath -ExpectedSha256 $ExpectedSha256
+    if (-not $replica.pass -or $replica.packetBytes -ne $ExpectedBytes) {
+      throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_MISMATCH'
+    }
+  } catch {
+    if ($destinationCreated -and (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf)) {
+      try { Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction Stop } catch { throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_CLEANUP_FAIL' }
+    }
+    if (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_CLEANUP_FAIL' }
+    throw
   }
   [pscustomobject][ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_COPY_READBACK_PASS'; pass = $true; packetSha256 = $replica.packetSha256; packetBytes = $replica.packetBytes; writeThrough = $true; automaticRetryAllowed = $false }
 }

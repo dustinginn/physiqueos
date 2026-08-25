@@ -163,12 +163,48 @@ function Test-Phase7BWorkPackage2RelativePath {
   }
 }
 
+function Resolve-Phase7BWorkPackage2NativeFilePath {
+  [CmdletBinding()]
+  param([Parameter(Mandatory = $true)][string]$LiteralPath)
+
+  if ([string]::IsNullOrWhiteSpace($LiteralPath) -or $LiteralPath -match '[\x00-\x1f]' -or
+      $LiteralPath -match '::' -or
+      $LiteralPath -notmatch '^(?:[A-Za-z][A-Za-z0-9_-]*:\\|\\\\[^\\/:*?"<>|]+\\[^\\/:*?"<>|]+(?:\\|$))') {
+    throw 'PHASE7B_WP2_NATIVE_FILE_PATH_FORMAT_REJECTED'
+  }
+  try {
+    $resolved = @(Resolve-Path -LiteralPath $LiteralPath -ErrorAction Stop)
+  } catch {
+    throw 'PHASE7B_WP2_NATIVE_FILE_PATH_NOT_FOUND'
+  }
+  if ($resolved.Count -ne 1) { throw 'PHASE7B_WP2_NATIVE_FILE_PATH_CARDINALITY_REJECTED' }
+  if ([string]$resolved[0].Provider.Name -cne 'FileSystem') { throw 'PHASE7B_WP2_NATIVE_FILE_PATH_PROVIDER_REJECTED' }
+  $providerPath = [string]$resolved[0].ProviderPath
+  if ([string]::IsNullOrWhiteSpace($providerPath) -or $providerPath -match '[\x00-\x1f]' -or
+      -not [IO.Path]::IsPathRooted($providerPath)) {
+    throw 'PHASE7B_WP2_NATIVE_FILE_PATH_FORMAT_REJECTED'
+  }
+  try {
+    $nativePath = [IO.Path]::GetFullPath($providerPath)
+  } catch {
+    throw 'PHASE7B_WP2_NATIVE_FILE_PATH_FORMAT_REJECTED'
+  }
+  if (-not (Test-Path -LiteralPath $nativePath -PathType Leaf)) { throw 'PHASE7B_WP2_NATIVE_FILE_PATH_NOT_FOUND' }
+  [pscustomobject][ordered]@{
+    classification = 'PHASE7B_WP2_NATIVE_FILE_PATH_PASS'
+    pass = $true
+    nativePath = $nativePath
+    providerName = 'FileSystem'
+  }
+}
+
 function Test-Phase7BWorkPackage2CredentialSignal {
   [CmdletBinding()]
   param([Parameter(Mandatory = $true)][string]$LiteralPath)
 
   if (-not (Test-Path -LiteralPath $LiteralPath -PathType Leaf)) { throw "PHASE7B_WP2_SOURCE_FILE_NOT_FOUND" }
-  $stream = [IO.File]::OpenRead((Resolve-Path -LiteralPath $LiteralPath).Path)
+  $nativePath = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $LiteralPath
+  $stream = [IO.File]::OpenRead([string]$nativePath.nativePath)
   $signal = $false
   $tail = ""
   $pattern = '(?i)(?:BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY|dop_v1_[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|(?:AWS|DO|DIGITALOCEAN|NGROK|SPACES)_[A-Z0-9_]*(?:SECRET|TOKEN|KEY)\s*[=:]\s*[^\s"'']{12,}|["'']?(?:password|passphrase|api[_-]?token|access[_-]?token|secret[_-]?key|private[_-]?key)["'']?\s*[:=]\s*["''][^"'']{12,}["'']|postgres(?:ql)?://[^\s"'']+:[^\s"'']+@)'
@@ -299,7 +335,8 @@ function Expand-Phase7BSafePacketZip {
   Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $root = [IO.Path]::GetFullPath($DestinationRoot).TrimEnd('\')
-  $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $LiteralPath).Path)
+  $nativePath = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $LiteralPath
+  $archive = [IO.Compression.ZipFile]::OpenRead([string]$nativePath.nativePath)
   try {
     $seen = @{}
     foreach ($entry in @($archive.Entries)) {
@@ -330,7 +367,8 @@ function Test-Phase7BEncryptedPacket {
 
   if ($ExpectedSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "PHASE7B_WP2_PACKET_SHA256_INVALID" }
   if (-not (Test-Path -LiteralPath $LiteralPath -PathType Leaf)) { throw "PHASE7B_WP2_PACKET_NOT_FOUND" }
-  $stream = [IO.File]::OpenRead((Resolve-Path -LiteralPath $LiteralPath).Path)
+  $nativePath = Resolve-Phase7BWorkPackage2NativeFilePath -LiteralPath $LiteralPath
+  $stream = [IO.File]::OpenRead([string]$nativePath.nativePath)
   try {
     $buffer = New-Object byte[] 22
     $read = $stream.Read($buffer, 0, $buffer.Length)
@@ -507,6 +545,7 @@ Export-ModuleMember -Function @(
   "ConvertTo-Phase7BCanonicalJson",
   "Assert-Phase7BWorkPackage2Authorization",
   "Test-Phase7BWorkPackage2RelativePath",
+  "Resolve-Phase7BWorkPackage2NativeFilePath",
   "Test-Phase7BWorkPackage2CredentialSignal",
   "New-Phase7BWorkPackage2Inventory",
   "New-Phase7BDeterministicPacketZip",
