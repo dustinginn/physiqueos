@@ -220,31 +220,85 @@ function Test-Phase7BBoundedReplicaDestinationEvidence {
   }
 }
 
+function Resolve-Phase7BBoundedReplicaDestinationPath {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$DestinationPath,
+    [Parameter(Mandatory = $true)][string]$DestinationRoot
+  )
+  foreach ($candidate in @($DestinationPath, $DestinationRoot)) {
+    if ([string]::IsNullOrWhiteSpace($candidate) -or $candidate -match '[\x00-\x1f]' -or
+        $candidate -match '::' -or $candidate -match '(?:^|[\\/])\.\.?(?:[\\/]|$)' -or
+        $candidate -notmatch '^(?:[A-Za-z][A-Za-z0-9_-]*:\\|\\\\[^\\/:*?"<>|]+\\[^\\/:*?"<>|]+(?:\\|$))') {
+      throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PATH_FORMAT_REJECTED'
+    }
+  }
+  $leaf = Split-Path -Leaf $DestinationPath
+  $parentPath = Split-Path -Parent $DestinationPath
+  if ([string]::IsNullOrWhiteSpace($leaf) -or [string]::IsNullOrWhiteSpace($parentPath) -or
+      [IO.Path]::GetExtension($leaf) -ine '.age' -or $leaf.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PATH_FORMAT_REJECTED'
+  }
+  try {
+    $resolvedRoots = @(Resolve-Path -LiteralPath $DestinationRoot -ErrorAction Stop)
+    $resolvedParents = @(Resolve-Path -LiteralPath $parentPath -ErrorAction Stop)
+  } catch {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PARENT_MISSING'
+  }
+  if ($resolvedRoots.Count -ne 1 -or $resolvedParents.Count -ne 1 -or
+      [string]$resolvedRoots[0].Provider.Name -cne 'FileSystem' -or
+      [string]$resolvedParents[0].Provider.Name -cne 'FileSystem') {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PROVIDER_REJECTED'
+  }
+  $nativeRoot = [IO.Path]::GetFullPath([string]$resolvedRoots[0].ProviderPath)
+  $nativeParent = [IO.Path]::GetFullPath([string]$resolvedParents[0].ProviderPath)
+  $rootComparison = $nativeRoot.TrimEnd('\')
+  $parentComparison = $nativeParent.TrimEnd('\')
+  if (-not $rootComparison.Equals($parentComparison, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_OUTSIDE_BOUND_ROOT'
+  }
+  $nativeDestination = [IO.Path]::GetFullPath((Join-Path $nativeRoot $leaf))
+  $destinationParentComparison = ([IO.Path]::GetDirectoryName($nativeDestination)).TrimEnd('\')
+  if (-not $rootComparison.Equals($destinationParentComparison, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_OUTSIDE_BOUND_ROOT'
+  }
+  [pscustomobject][ordered]@{
+    classification = 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PATH_PASS'
+    pass = $true
+    nativeDestinationPath = $nativeDestination
+    nativeDestinationRoot = $nativeRoot
+    providerName = 'FileSystem'
+    directChild = $true
+  }
+}
+
 function Copy-Phase7BBoundedEncryptedReplica {
   [CmdletBinding()] param(
     [Parameter(Mandatory = $true)][string]$SourcePath,
     [Parameter(Mandatory = $true)][string]$DestinationPath,
+    [Parameter(Mandatory = $true)][string]$DestinationRoot,
     [Parameter(Mandatory = $true)][string]$ExpectedSha256,
     [Parameter(Mandatory = $true)][int64]$ExpectedBytes
   )
   $source = Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $SourcePath -ExpectedSha256 $ExpectedSha256 -ExpectedBytes $ExpectedBytes
   if (-not $source.pass) { throw $source.classification }
-  if (Test-Path -LiteralPath $DestinationPath) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_EXISTS' }
-  $parent = Split-Path -Parent ([IO.Path]::GetFullPath($DestinationPath))
+  $destination = Resolve-Phase7BBoundedReplicaDestinationPath -DestinationPath $DestinationPath -DestinationRoot $DestinationRoot
+  $nativeDestinationPath = [string]$destination.nativeDestinationPath
+  if (Test-Path -LiteralPath $nativeDestinationPath) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_EXISTS' }
+  $parent = Split-Path -Parent $nativeDestinationPath
   if (-not (Test-Path -LiteralPath $parent -PathType Container)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_DESTINATION_PARENT_MISSING' }
   $destinationCreated = $false
   $input = [IO.File]::Open((Resolve-Path -LiteralPath $SourcePath).Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
   try {
-    $output = New-Object IO.FileStream($DestinationPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 1048576, [IO.FileOptions]::WriteThrough)
+    $output = New-Object IO.FileStream($nativeDestinationPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 1048576, [IO.FileOptions]::WriteThrough)
     $destinationCreated = $true
     try { $input.CopyTo($output, 1048576); $output.Flush($true) } finally { $output.Dispose() }
   } catch {
-    if ($destinationCreated -and (Test-Path -LiteralPath $DestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue }
+    if ($destinationCreated -and (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction SilentlyContinue }
     throw
   } finally { $input.Dispose() }
-  $replica = Test-Phase7BEncryptedPacket -LiteralPath $DestinationPath -ExpectedSha256 $ExpectedSha256
+  $replica = Test-Phase7BEncryptedPacket -LiteralPath $nativeDestinationPath -ExpectedSha256 $ExpectedSha256
   if (-not $replica.pass -or $replica.packetBytes -ne $ExpectedBytes) {
-    if ($destinationCreated -and (Test-Path -LiteralPath $DestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue }
+    if ($destinationCreated -and (Test-Path -LiteralPath $nativeDestinationPath -PathType Leaf)) { Remove-Item -LiteralPath $nativeDestinationPath -Force -ErrorAction SilentlyContinue }
     throw 'PHASE7B_WP2_BOUNDED_REPLICA_READBACK_MISMATCH'
   }
   [pscustomobject][ordered]@{ classification = 'PHASE7B_WP2_BOUNDED_REPLICA_COPY_READBACK_PASS'; pass = $true; packetSha256 = $replica.packetSha256; packetBytes = $replica.packetBytes; writeThrough = $true; automaticRetryAllowed = $false }

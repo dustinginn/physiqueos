@@ -321,7 +321,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Authorizati
   $parent=Join-Path $testRoot 'replica-parent';New-Item -ItemType Directory $parent|Out-Null;$pathContract=Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot $parent
   New-Item -ItemType Directory $pathContract.attemptRoot|Out-Null
   $localPacket=Join-Path $testRoot "$attempt.zip.age";[IO.File]::WriteAllBytes($localPacket,[Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`noperator-lifecycle"));$packetSha=Get-Phase7BSha256 -LiteralPath $localPacket;$packetBytes=(Get-Item $localPacket).Length
-  $copy=Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacket -DestinationPath $pathContract.packetPath -ExpectedSha256 $packetSha -ExpectedBytes $packetBytes
+  $copy=Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacket -DestinationPath $pathContract.packetPath -DestinationRoot $pathContract.attemptRoot -ExpectedSha256 $packetSha -ExpectedBytes $packetBytes
   Assert-True ($copy.pass -and (Split-Path -Parent $pathContract.packetPath) -eq $pathContract.attemptRoot) 'synthetic receiver to exact attempt root copy pass'
   Assert-True ($pathContract.packetPath -notmatch ([regex]::Escape("$attempt\$attempt\"))) 'synthetic lifecycle catches duplicate attempt directory composition'
   Assert-True (-not (Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $pathContract.packetPath -ExpectedSha256 $packetSha -ExpectedBytes ($packetBytes+1)).pass) 'post-encryption exact size mismatch rejected'

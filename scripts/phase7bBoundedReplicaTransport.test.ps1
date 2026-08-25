@@ -101,9 +101,9 @@ try {
   }
 
   $replica = Join-Path $root 'replica.age'
-  $copy = Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $replica -ExpectedSha256 $sha -ExpectedBytes $bytes
+  $copy = Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $replica -DestinationRoot $root -ExpectedSha256 $sha -ExpectedBytes $bytes
   Assert-True ($copy.pass -and $copy.packetSha256 -eq $sha -and $copy.writeThrough) 'bounded synthetic copy and readback pass'
-  Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $replica -ExpectedSha256 $sha -ExpectedBytes $bytes } 'DESTINATION_EXISTS' 'destination overwrite rejected'
+  Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $replica -DestinationRoot $root -ExpectedSha256 $sha -ExpectedBytes $bytes } 'DESTINATION_EXISTS' 'destination overwrite rejected'
   $partial = Join-Path $root 'partial.age'; [IO.File]::WriteAllBytes($partial, [Text.Encoding]::ASCII.GetBytes('age-encryption.org/v1'))
   Assert-True (-not (Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath $partial -ExpectedSha256 $sha -ExpectedBytes $bytes).pass) 'partial copy rejected'
   $mismatch = Join-Path $root 'mismatch.age'; Copy-Item $packet $mismatch; [IO.File]::AppendAllText($mismatch, 'x')
@@ -111,11 +111,33 @@ try {
   Assert-Throws { Test-Phase7BBoundedEncryptedReplicaSource -LiteralPath (Join-Path $root 'missing.age') -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PACKET_NOT_FOUND' 'readback failure rejects'
 
   $attempt = 'phase7b-wp2-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-  New-PSDrive -Name P7BF -PSProvider FileSystem -Root $root | Out-Null
+  $mappedRoot = Join-Path $root 'mapped-receiver'; New-Item -ItemType Directory -Path $mappedRoot | Out-Null
+  $outsideRoot = Join-Path $root 'outside-receiver'; New-Item -ItemType Directory -Path $outsideRoot | Out-Null
+  New-PSDrive -Name P7BF -PSProvider FileSystem -Root $mappedRoot | Out-Null
+  New-PSDrive -Name P7BO -PSProvider FileSystem -Root $outsideRoot | Out-Null
   try {
     $mappedIdentity = Get-Phase7BReplicaDirectoryIdentity -LiteralPath 'P7BF:\'
-    Assert-True ($mappedIdentity.localPath -eq 'P7BF:\' -and $mappedIdentity.providerRoot -eq $root -and $mappedIdentity.providerRootSha256 -eq (Get-Phase7BSha256 -Text $root.ToLowerInvariant())) 'nonpersistent PSDrive resolves to exact provider attempt root'
-  } finally { Remove-PSDrive -Name P7BF -Force }
+    Assert-True ($mappedIdentity.localPath -eq 'P7BF:\' -and $mappedIdentity.providerRoot -eq $mappedRoot -and $mappedIdentity.providerRootSha256 -eq (Get-Phase7BSha256 -Text $mappedRoot.ToLowerInvariant())) 'nonpersistent PSDrive resolves to exact provider attempt root'
+    Assert-Throws { [IO.Path]::GetFullPath('P7BF:\mapped.age') } 'format is not supported' 'real Windows PowerShell 5.1 failure form reproduced for multi-character PSDrive path'
+    $mappedDestination = 'P7BF:\mapped.age'
+    $mappedCopy = Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $mappedDestination -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes
+    Assert-True ($mappedCopy.pass -and (Test-Path -LiteralPath $mappedDestination) -and $mappedCopy.writeThrough) 'provider-aware bounded copy accepts exact PSDrive child and preserves write-through readback'
+    New-Item -ItemType Directory -Path 'P7BF:\nested' | Out-Null
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'P7BF:\nested\outside.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'OUTSIDE_BOUND_ROOT' 'destination below a nested directory is outside the exact bound receiver root'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'P7BF:\..\outside-receiver\escape.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PATH_FORMAT_REJECTED' 'traversal syntax is rejected before provider resolution'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'P7BO:\escape.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'OUTSIDE_BOUND_ROOT' 'different filesystem PSDrive cannot escape the bound receiver root'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'HKCU:\Software\bad.age' -DestinationRoot 'HKCU:\Software' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PROVIDER_REJECTED' 'unexpected non-filesystem provider rejected'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath '\\server-only\bad.age' -DestinationRoot '\\server-only' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PATH_FORMAT_REJECTED' 'malformed UNC root rejected before network resolution'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath 'relative.age' -DestinationRoot 'P7BF:\' -ExpectedSha256 $sha -ExpectedBytes $bytes } 'PATH_FORMAT_REJECTED' 'relative destination rejected'
+    $sourceRejectedDestination = 'P7BF:\source-rejected.age'
+    Assert-Throws { Copy-Phase7BBoundedEncryptedReplica -SourcePath $packet -DestinationPath $sourceRejectedDestination -DestinationRoot 'P7BF:\' -ExpectedSha256 ('0' * 64) -ExpectedBytes $bytes } 'SOURCE_FAIL' 'source mismatch fails before destination creation'
+    Assert-True (-not (Test-Path -LiteralPath $sourceRejectedDestination) -and
+      -not (Test-Path -LiteralPath 'P7BF:\nested\outside.age') -and -not (Test-Path -LiteralPath 'P7BO:\escape.age')) `
+      'all rejected copies leave no synthetic destination residue'
+  } finally {
+    Remove-PSDrive -Name P7BO -Force -ErrorAction SilentlyContinue
+    Remove-PSDrive -Name P7BF -Force -ErrorAction SilentlyContinue
+  }
   $pathsContract = Get-Phase7BBoundedReplicaAttemptRoot -AttemptId $attempt -ReplicaParentRoot 'D:\Phase7B\wp2-replica'
   Assert-True ($pathsContract.pathModel -eq 'EXACT_ATTEMPT_ROOT' -and $pathsContract.attemptRoot -eq "D:\Phase7B\wp2-replica\$attempt" -and
     $pathsContract.packetPath -eq "D:\Phase7B\wp2-replica\$attempt\$attempt.zip.age") 'canonical attempt root appends attempt exactly once'

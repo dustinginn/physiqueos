@@ -140,7 +140,7 @@ exit /b %ERRORLEVEL%
   [IO.File]::WriteAllBytes($capturedPacket, [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`nsynthetic-ciphertext"))
   $packetSha = Get-Phase7BSha256 -LiteralPath $capturedPacket; $packetBytes = [int64](Get-Item $capturedPacket).Length
   $capturedReplica = Join-Path $replicaOutput "$attemptId.zip.age"
-  $copyResult = Copy-Phase7BBoundedEncryptedReplica -SourcePath $capturedPacket -DestinationPath $capturedReplica -ExpectedSha256 $packetSha -ExpectedBytes $packetBytes
+  $copyResult = Copy-Phase7BBoundedEncryptedReplica -SourcePath $capturedPacket -DestinationPath $capturedReplica -DestinationRoot $replicaOutput -ExpectedSha256 $packetSha -ExpectedBytes $packetBytes
   Assert-True ($copyResult.pass -and (Split-Path -Parent $capturedReplica) -eq $replicaOutput) "synthetic exact-attempt-root capture/copy avoids duplicate attempt nesting"
   Assert-True (Test-Phase7BPacketReplica -LocalPacketPath $capturedPacket -ReplicaPacketPath $capturedReplica -ExpectedSha256 $packetSha).pass "synthetic capture readback verifies both encrypted copies"
   $finalTooling='a'*40;$finalInvocation='6'*64;$finalStage3='7'*64;$finalAuthorizationId='phase7b-wp2b-capture-auth-'+('e'*32);$finalQuiescence='b'*64

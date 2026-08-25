@@ -295,7 +295,8 @@ try {
 
   $stage = "replicate-and-verify"
   $replicaPacketPath = Join-Path $replicaAttemptRoot (Split-Path -Leaf $localPacketPath)
-  $replica = Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacketPath -DestinationPath $replicaPacketPath -ExpectedSha256 $packetSha -ExpectedBytes $packet.packetBytes
+  $replica = Copy-Phase7BBoundedEncryptedReplica -SourcePath $localPacketPath -DestinationPath $replicaPacketPath `
+    -DestinationRoot $replicaAttemptRoot -ExpectedSha256 $packetSha -ExpectedBytes $packet.packetBytes
   $replicaPacketCreated = $true
   if (-not $replica.pass) { throw $replica.classification }
 
