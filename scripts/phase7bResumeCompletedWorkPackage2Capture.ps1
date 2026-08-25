@@ -37,18 +37,19 @@ try {
   $markerPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$authorization.consumptionMarkerFileName)
   $stage = 'validate-complete-capture-tuple'
   if (-not (Test-Path -LiteralPath $packetPath -PathType Leaf) -or -not (Test-Path -LiteralPath $descriptorPath -PathType Leaf) -or
-      -not (Test-Path -LiteralPath $markerPath -PathType Leaf)) { throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_INPUT_MISSING' }
+      (Test-Path -LiteralPath $markerPath -PathType Leaf)) { throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_INPUT_MISSING_OR_ALREADY_CONSUMED' }
   $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json -ErrorAction Stop
-  $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $packetSha = Get-Phase7BSha256 -LiteralPath $packetPath
   $packetBytes = [int64](Get-Item -LiteralPath $packetPath).Length
   if ([string]$descriptor.classification -cne 'PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK' -or
       [string]$descriptor.attemptId -cne $AttemptId -or [string]$descriptor.capturePlanSha256 -cne $ExpectedCapturePlanSha256 -or
       [string]$descriptor.packetSha256 -cne $packetSha -or [int64]$descriptor.packetBytes -ne $packetBytes -or
       [string]$descriptor.referenceIndexSha256 -notmatch '^[0-9a-f]{64}$' -or [bool]$descriptor.automaticRetryAllowed -or
-      [string]$marker.classification -cne 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CONSUMED' -or -not [bool]$marker.pass -or
-      [string]$marker.authorizationId -cne [string]$authorization.authorizationId -or [string]$marker.attemptId -cne $AttemptId -or
-      [bool]$marker.automaticRetryAllowed) { throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_BINDING_FAIL' }
+      [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$descriptor.plaintextZipBytes -lt 1 -or
+      [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
+      [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes -or -not [bool]$descriptor.decryptRoundTripPass) {
+    throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_BINDING_FAIL'
+  }
   $global:LASTEXITCODE = 0
   [ordered]@{
     classification = 'PHASE7B_WP2B_COMPLETED_CAPTURE_ACCEPTANCE_RESUME_PASS'
@@ -61,7 +62,8 @@ try {
     pendingDescriptorSha256 = Get-Phase7BSha256 -LiteralPath $descriptorPath
     referenceSemanticSha256 = [string]$descriptor.referenceIndexSha256
     captureAuthorizationId = [string]$authorization.authorizationId
-    captureAuthorizationConsumed = $true
+    decryptRoundTripPass = $true
+    captureAuthorizationConsumed = $false
     captureMutationPerformed = $false
     exactCompletedCaptureReused = $true
     automaticRetryAllowed = $false

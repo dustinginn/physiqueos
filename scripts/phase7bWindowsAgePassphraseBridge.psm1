@@ -96,15 +96,17 @@ public static class Phase7BWindowsConsoleInputBridge
         }
     }
 
-    public static int WriteConfirmedPassphraseLines(char[] passphrase)
+    public static int WritePassphraseLines(char[] passphrase, int lineCount)
     {
         if (passphrase == null || passphrase.Length == 0)
             throw new ArgumentException("A nonempty passphrase is required.", "passphrase");
+        if (lineCount < 1 || lineCount > 2)
+            throw new ArgumentOutOfRangeException("lineCount");
 
-        int recordCount = checked((passphrase.Length + 1) * 2);
+        int recordCount = checked((passphrase.Length + 1) * lineCount);
         INPUT_RECORD[] records = new INPUT_RECORD[recordCount];
         int offset = 0;
-        for (int line = 0; line < 2; line++)
+        for (int line = 0; line < lineCount; line++)
         {
             for (int index = 0; index < passphrase.Length; index++)
             {
@@ -153,6 +155,7 @@ function New-Phase7BSecureStringFromText {
 }
 
 function Show-Phase7BAgePassphraseDialog {
+  param([ValidateSet('encryption','decrypt verification')][string]$Purpose = 'encryption')
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
 
@@ -160,7 +163,7 @@ function Show-Phase7BAgePassphraseDialog {
   $first = New-Object Windows.Forms.TextBox
   $confirmation = New-Object Windows.Forms.TextBox
   try {
-    $form.Text = 'PhysiqueOS encrypted capture passphrase'
+    $form.Text = "PhysiqueOS age passphrase - $Purpose"
     $form.StartPosition = [Windows.Forms.FormStartPosition]::CenterScreen
     $form.FormBorderStyle = [Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MinimizeBox = $false
@@ -171,7 +174,7 @@ function Show-Phase7BAgePassphraseDialog {
     $message = New-Object Windows.Forms.Label
     $message.Location = New-Object Drawing.Point(18, 14)
     $message.Size = New-Object Drawing.Size(524, 48)
-    $message.Text = 'Paste the existing Founder-controlled age passphrase twice. Both masked entries must contain 16-256 printable ASCII characters and exactly match before age starts.'
+    $message.Text = "Paste the existing Founder-controlled age passphrase twice for $Purpose. Both masked entries must contain 16-256 printable ASCII characters and exactly match before age starts."
 
     $firstLabel = New-Object Windows.Forms.Label
     $firstLabel.Location = New-Object Drawing.Point(18, 72)
@@ -370,7 +373,7 @@ function Invoke-Phase7BAgeEncryptionWithSecureWindowsInput {
   Initialize-Phase7BWindowsConsoleInputBridge
   $pendingProvider = { [Phase7BWindowsConsoleInputBridge]::GetPendingInputRecordCount() }
   $clearer = { [Phase7BWindowsConsoleInputBridge]::ClearPendingInputRecords() }
-  $writer = { param([char[]]$Passphrase) [Phase7BWindowsConsoleInputBridge]::WriteConfirmedPassphraseLines($Passphrase) }
+  $writer = { param([char[]]$Passphrase) [Phase7BWindowsConsoleInputBridge]::WritePassphraseLines($Passphrase, 2) }
   $invoker = {
     param([string]$Executable, [string]$OutputFile, [string]$InputFile)
     & $Executable -p -o $OutputFile $InputFile
@@ -381,4 +384,125 @@ function Invoke-Phase7BAgeEncryptionWithSecureWindowsInput {
     -InputClearer $clearer -InputWriter $writer -AgeInvoker $invoker
 }
 
-Export-ModuleMember -Function Invoke-Phase7BAgeEncryptionWithSecureWindowsInput
+function Invoke-Phase7BAgeDecryptionToHashBridgeCore {
+  param(
+    [Parameter(Mandatory = $true)][string]$AgeExePath,
+    [Parameter(Mandatory = $true)][string]$CiphertextPath,
+    [Parameter(Mandatory = $true)][scriptblock]$PromptProvider,
+    [Parameter(Mandatory = $true)][scriptblock]$PendingInputProvider,
+    [Parameter(Mandatory = $true)][scriptblock]$InputClearer,
+    [Parameter(Mandatory = $true)][scriptblock]$InputWriter,
+    [Parameter(Mandatory = $true)][scriptblock]$AgeInvoker
+  )
+  $safeErrorCode = $null
+  $ageLaunched = $false
+  $ageResult = $null
+  $firstSecure = $null
+  $confirmationSecure = $null
+  $firstBuffer = $null
+  $confirmationBuffer = $null
+  $cleanupPass = $true
+  try {
+    if ([int](& $PendingInputProvider) -ne 0) { throw 'PHASE7B_WP2_AGE_CONSOLE_INPUT_CONTAMINATED' }
+    $prompt = & $PromptProvider
+    if ($null -eq $prompt -or [bool]$prompt.cancelled) { throw 'PHASE7B_WP2_AGE_PASSPHRASE_CANCELLED' }
+    $firstSecure = $prompt.first
+    $confirmationSecure = $prompt.confirmation
+    if ($null -eq $firstSecure -or $null -eq $confirmationSecure) { throw 'PHASE7B_WP2_AGE_PASSPHRASE_PROMPT_INVALID' }
+    $firstBuffer = ConvertTo-Phase7BSecretCharacterBuffer -SecureValue $firstSecure
+    $confirmationBuffer = ConvertTo-Phase7BSecretCharacterBuffer -SecureValue $confirmationSecure
+    if ($firstBuffer.Length -lt $script:Phase7BAgePassphraseMinimumCharacters -or $firstBuffer.Length -gt $script:Phase7BAgePassphraseMaximumCharacters -or
+        $confirmationBuffer.Length -ne $firstBuffer.Length) { throw 'PHASE7B_WP2_AGE_PASSPHRASE_MISMATCH' }
+    for ($index = 0; $index -lt $firstBuffer.Length; $index++) {
+      if ([int]$firstBuffer[$index] -lt 0x20 -or [int]$firstBuffer[$index] -gt 0x7e) { throw 'PHASE7B_WP2_AGE_PASSPHRASE_CHARACTER_SET_UNSUPPORTED' }
+      if ($firstBuffer[$index] -cne $confirmationBuffer[$index]) { throw 'PHASE7B_WP2_AGE_PASSPHRASE_MISMATCH' }
+    }
+    if ([int](& $PendingInputProvider) -ne 0) { throw 'PHASE7B_WP2_AGE_CONSOLE_INPUT_CONTAMINATED' }
+    $expectedRecords = $firstBuffer.Length + 1
+    if ([int](& $InputWriter $firstBuffer) -ne $expectedRecords -or [int](& $PendingInputProvider) -ne $expectedRecords) {
+      throw 'PHASE7B_WP2_AGE_CONSOLE_INPUT_PARTIAL_WRITE'
+    }
+    $ageLaunched = $true
+    $ageResult = & $AgeInvoker $AgeExePath $CiphertextPath
+    if ($null -eq $ageResult -or [int]$ageResult.exitCode -ne 0) { throw 'PHASE7B_WP2_AGE_DECRYPTION_FAILED' }
+    if ([string]$ageResult.sha256 -cnotmatch '^[0-9a-f]{64}$' -or [int64]$ageResult.bytes -lt 1) { throw 'PHASE7B_WP2_AGE_DECRYPT_STREAM_IDENTITY_FAIL' }
+    if ([int](& $PendingInputProvider) -ne 0) { throw 'PHASE7B_WP2_AGE_CONSOLE_INPUT_NOT_FULLY_CONSUMED' }
+  } catch {
+    $safeErrorCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2_AGE_DECRYPT_TO_HASH_BRIDGE_EXCEPTION' }
+  } finally {
+    try { & $InputClearer; if ([int](& $PendingInputProvider) -ne 0) { $cleanupPass = $false } } catch { $cleanupPass = $false }
+    Clear-Phase7BSecretCharacterBuffer -Buffer $firstBuffer
+    Clear-Phase7BSecretCharacterBuffer -Buffer $confirmationBuffer
+    if ($null -ne $firstSecure) { $firstSecure.Dispose() }
+    if ($null -ne $confirmationSecure) { $confirmationSecure.Dispose() }
+    Remove-Variable prompt,firstSecure,confirmationSecure,firstBuffer,confirmationBuffer -ErrorAction SilentlyContinue
+  }
+  if (-not $cleanupPass) { $safeErrorCode = 'PHASE7B_WP2_AGE_CONSOLE_INPUT_CLEANUP_FAIL' }
+  $pass = [string]::IsNullOrWhiteSpace($safeErrorCode)
+  [pscustomobject][ordered]@{
+    classification = if ($pass) { 'PHASE7B_WP2_AGE_DECRYPT_TO_HASH_PASS' } else { 'PHASE7B_WP2_AGE_DECRYPT_TO_HASH_FAIL' }
+    pass = $pass; safeErrorCode = $safeErrorCode; ageLaunched = $ageLaunched
+    ageExitCode = if ($null -ne $ageResult) { [int]$ageResult.exitCode } else { $null }
+    decryptedStreamSha256 = if ($pass) { [string]$ageResult.sha256 } else { '' }
+    decryptedStreamBytes = if ($pass) { [int64]$ageResult.bytes } else { [int64]0 }
+    explicitPassphraseConfirmationSupplied = $pass; autogeneratedPassphrasePathReachable = $false
+    commandLineSecretUsed = $false; environmentSecretUsed = $false; plaintextSecretFileUsed = $false; reportSecretUsed = $false
+    consoleInputCleanupPass = $cleanupPass; automaticRetryAllowed = $false
+  }
+}
+
+function Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput {
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$AgeExePath,
+    [Parameter(Mandatory = $true)][string]$CiphertextPath
+  )
+  if ($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5 -or
+      $Host.Name -cne 'ConsoleHost' -or -not [Environment]::UserInteractive -or [Console]::IsInputRedirected -or
+      -not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or -not (Test-Path -LiteralPath $CiphertextPath -PathType Leaf) -or
+      $AgeExePath.Contains('"') -or $CiphertextPath.Contains('"')) {
+    return [pscustomobject][ordered]@{ classification='PHASE7B_WP2_AGE_DECRYPT_TO_HASH_FAIL';pass=$false;safeErrorCode='PHASE7B_WP2_AGE_DECRYPT_TO_HASH_PATH_OR_CONSOLE_FAIL';ageLaunched=$false;automaticRetryAllowed=$false }
+  }
+  Initialize-Phase7BWindowsConsoleInputBridge
+  $pendingProvider = { [Phase7BWindowsConsoleInputBridge]::GetPendingInputRecordCount() }
+  $clearer = { [Phase7BWindowsConsoleInputBridge]::ClearPendingInputRecords() }
+  $writer = { param([char[]]$Passphrase) [Phase7BWindowsConsoleInputBridge]::WritePassphraseLines($Passphrase, 1) }
+  $promptProvider = { Show-Phase7BAgePassphraseDialog -Purpose 'decrypt verification' }
+  $invoker = {
+    param([string]$Executable, [string]$CiphertextFile)
+    $start = New-Object Diagnostics.ProcessStartInfo
+    $start.FileName = $Executable
+    $start.Arguments = "--decrypt `"$CiphertextFile`""
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $false
+    $start.RedirectStandardInput = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $false
+    $process = New-Object Diagnostics.Process
+    $process.StartInfo = $start
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $buffer = New-Object byte[] 65536
+    $count = [int64]0
+    try {
+      if (-not $process.Start()) { throw 'PHASE7B_WP2_AGE_DECRYPT_PROCESS_START_FAIL' }
+      $stream = $process.StandardOutput.BaseStream
+      while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+        [void]$sha.TransformBlock($buffer, 0, $read, $null, 0)
+        $count += $read
+      }
+      [void]$sha.TransformFinalBlock((New-Object byte[] 0), 0, 0)
+      $process.WaitForExit()
+      [pscustomobject]@{ exitCode=[int]$process.ExitCode;sha256=([BitConverter]::ToString($sha.Hash)).Replace('-','').ToLowerInvariant();bytes=$count }
+    } finally {
+      [Array]::Clear($buffer, 0, $buffer.Length)
+      $sha.Dispose()
+      $process.Dispose()
+    }
+  }
+  Invoke-Phase7BAgeDecryptionToHashBridgeCore -AgeExePath $AgeExePath -CiphertextPath $CiphertextPath `
+    -PromptProvider $promptProvider -PendingInputProvider $pendingProvider -InputClearer $clearer -InputWriter $writer -AgeInvoker $invoker
+}
+
+Export-ModuleMember -Function @(
+  'Invoke-Phase7BAgeEncryptionWithSecureWindowsInput',
+  'Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput'
+)

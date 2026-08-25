@@ -75,7 +75,10 @@ function Read-BoundDescriptor {
       [string]$descriptor.environmentId -ne $contract.environmentId -or [string]$descriptor.vmDisplayName -ne $contract.vmDisplayName -or
       [string]$descriptor.packetFileName -ne (Split-Path -Leaf $PacketPath) -or [string]$descriptor.packetSha256 -ne $ExpectedSha256.ToLowerInvariant() -or -not [bool]$descriptor.localEncryptedCopyPass -or
       -not [bool]$descriptor.independentEncryptedReplicaPass -or [string]$descriptor.ageFileName -ne $contract.ageMediaFileName -or
-      [string]$descriptor.ageExeSha256 -notmatch '^[0-9a-f]{64}$') { throw "PHASE7B_WP2_DESCRIPTOR_BINDING_MISMATCH" }
+      [string]$descriptor.ageExeSha256 -notmatch '^[0-9a-f]{64}$' -or -not [bool]$descriptor.decryptRoundTripPass -or
+      [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or
+      [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
+      [int64]$descriptor.plaintextZipBytes -lt 1 -or [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes) { throw "PHASE7B_WP2_DESCRIPTOR_BINDING_MISMATCH" }
   $descriptor
 }
 

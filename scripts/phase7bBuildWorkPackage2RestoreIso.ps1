@@ -41,7 +41,10 @@ try {
       [string]$descriptor.attemptId -ne $AttemptId -or [string]$descriptor.applicationCommit -ne $contract.applicationCommit -or
       [string]$descriptor.environmentId -ne $contract.environmentId -or [string]$descriptor.vmDisplayName -ne $contract.vmDisplayName -or
       [string]$descriptor.packetFileName -ne (Split-Path -Leaf $PacketPath) -or [string]$descriptor.packetSha256 -ne $ExpectedPacketSha256.ToLowerInvariant() -or
-      -not [bool]$descriptor.localEncryptedCopyPass -or -not [bool]$descriptor.independentEncryptedReplicaPass) {
+      -not [bool]$descriptor.localEncryptedCopyPass -or -not [bool]$descriptor.independentEncryptedReplicaPass -or
+      -not [bool]$descriptor.decryptRoundTripPass -or [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or
+      [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
+      [int64]$descriptor.plaintextZipBytes -lt 1 -or [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes) {
     throw "PHASE7B_WP2_DESCRIPTOR_BINDING_MISMATCH"
   }
   [void](Assert-Phase7BWorkPackage2Authorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 `

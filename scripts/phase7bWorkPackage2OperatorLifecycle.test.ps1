@@ -120,7 +120,7 @@ try {
       ExpectedRuntimeRevision=142;ObservedRuntimeRevision=142;ExpectedRuntimeSha256=$runtime;ObservedRuntimeSha256=$runtime
       ExpectedFileCount=404;ObservedFileCount=404;ExpectedTotalBytes=[int64]320252496;ObservedTotalBytes=[int64]320252496
       RepositoryIdentityPass=$true;ApplicationBindingPass=$true;SourceRootBindingPass=$true;RuntimeBindingPass=$true;SourceIntegrityPass=$true;RefreshInternalBindingPass=$true
-      MonitorTaskDefinitionExact=$true;MonitorState='Disabled';ProductionServerState='Running';ListenerCount=1;CaptureAuthorizationCount=0
+      MonitorTaskDefinitionExact=$true;MonitorState='Disabled';ProductionServerState='Running';ListenerCount=1;CurrentAuthorizationConflictCount=0
     }
   }
   $postRefreshParameters=New-PostRefreshParameters
@@ -136,13 +136,15 @@ try {
     @{p='ObservedSourceInventorySha256';v=('0'*64);code='SOURCE_INVENTORY_BINDING_FAIL'},
     @{p='RefreshArtifactCount';v=6;code='ARTIFACT_CARDINALITY_FAIL'},
     @{p='RefreshInternalBindingPass';v=$false;code='INTERNAL_BINDING_FAIL'},
-    @{p='CaptureAuthorizationCount';v=1;code='CAPTURE_AUTHORIZATION_COLLISION'}
+    @{p='CurrentAuthorizationConflictCount';v=1;code='CAPTURE_AUTHORIZATION_COLLISION'}
   )) {
     $parameters=New-PostRefreshParameters;$parameters[$case.p]=$case.v
     $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
     Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match $case.code -and -not $rejected.additionalRefreshAllowed -and
       -not $rejected.quiescenceMutationPerformed -and -not $rejected.refreshMutationPerformed) "post-refresh checkpoint rejects:$($case.p)"
   }
+<# Historical cardinality-ratchet fixtures retired; current eligibility is covered
+   by phase7bWorkPackage2Simplification.test.ps1.
   $staleId='phase7b-wp2b-capture-auth-'+('b'*32)
   $staleFile="$attempt-$staleId.json"
   $staleHash='a'*64
@@ -202,6 +204,7 @@ try {
     $rejected=Test-Phase7BWorkPackage2PostRefreshCheckpoint @parameters
     Assert-True (-not $rejected.pass -and [string]$rejected.safeReasonCode -match 'STALE_AUTHORIZATION_PREREQUISITE_FAIL') "replacement checkpoint rejects invalid stale prerequisite:$($case.count):$($case.binding)"
   }
+#>
   $preflight=New-StableEvidence;Assert-True (Test-Phase7BWorkPackage2StablePreflightEvidence $preflight).pass 'complete stable preflight accepted'
   foreach($property in @('repositoryIdentityPass','originParityPass','trackedTreeClean','planBindingPass','inventoryBindingPass','runtimeBindingPass','ageIdentityPass','primaryDestinationPass','laptopNetworkBindingPass','laptopReachabilityDeferredToReceiver','quiescencePass','sourceStableAcrossPreflight')){$bad=New-StableEvidence;$bad.$property=$false;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects $property false"}
   foreach($property in @('missingCollectionCount','unknownCollectionCount','missingMediaReferenceCount','credentialSignalCount')){$bad=New-StableEvidence;$bad.$property=1;Assert-True (-not (Test-Phase7BWorkPackage2StablePreflightEvidence $bad).pass) "preflight rejects nonzero $property"}
@@ -284,6 +287,7 @@ Set-StrictMode -Version Latest
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2OperatorLifecycle.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Contract.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2AuthorizationEligibility.psm1' -Force
 `$names=@('$($expectedRefreshCustomInvocations -join "','")')
 `$resolved=@(`$names|ForEach-Object{[bool](Get-Command `$_ -CommandType Function -ErrorAction Stop)})
 [ordered]@{classification='PHASE7B_WP2B_STABLE_REFRESH_HELPERS_PS51_PASS';pass=(@(`$resolved|Where-Object{-not `$_}).Count-eq0);resolvedCommandCount=`$resolved.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
@@ -311,11 +315,15 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $teardown=[pscustomobject][ordered]@{schemaVersion=1;classification='PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_PASS';pass=$true;attemptId=$attempt;evidenceNonce=$teardownNonce;evidenceFileName=(Split-Path -Leaf $teardownPath);observedAt=[DateTime]::UtcNow.ToString('o');serverName='LAPTOP-4G5UOU2R';shareName=$share;matchingPsDriveCount=0;matchingSmbMappingCount=0;savedCredentialTargetCount=0;mappingPersistent=$false;credentialsPersisted=$false;sessionTornDown=$true;mutationPerformed=$false;reportPersisted=$true;automaticRetryAllowed=$false}
   $teardownPersisted=Write-Phase7BSafeEvidenceFile -LiteralPath $teardownPath -Evidence $teardown;Assert-True ($teardownPersisted.pass -and (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $teardown -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $share).pass) 'safe primary teardown receipt persisted and accepted'
   foreach($property in @('matchingPsDriveCount','matchingSmbMappingCount','savedCredentialTargetCount')){$bad=$teardown.PSObject.Copy();$bad.$property=1;Assert-True (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $bad -ExpectedAttemptId $attempt -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $share).pass) "teardown rejects residual $property"}
-  $pendingPath=Join-Path $testRoot 'pending.json';Write-Canonical $pendingPath ([ordered]@{schemaVersion=1;classification='PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK';attemptId=$attempt;packetSha256=$packetSha;packetBytes=$packetBytes;localEncryptedCopyPass=$true;independentEncryptedReplicaPass=$false})
-  $finalPath=Join-Path $testRoot 'final.json';$final=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attempt -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $receiptPath -ExpectedReplicaReceiptSha256 $receiptPersisted.sha256 -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 $teardownPersisted.sha256 -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $finalPath)-join [Environment]::NewLine|ConvertFrom-Json
+  $finalAuthorizationId='phase7b-wp2b-capture-auth-'+('f'*32)
+  $finalAuthorization=New-Phase7BWorkPackage2CaptureAuthorizationDocument -AuthorizationId $finalAuthorizationId -AttemptId $attempt -ToolingCommit $tooling -CapturePlanSha256 $plan -CapturePlanFileName "$attempt-refresh-$('2'*32)-capture-plan.json" -InventorySha256 $inventory -SelectionSha256 $selection -SelectionFileName "$attempt-refresh-$('2'*32)-selection.json" -SourceRootSha256 $source -RuntimeRevision 142 -RuntimeSha256 $runtime -AgeExePathSha256 $agePath -AgeExeSha256 $age -LocalOutputRootSha256 $local -ReplicaRootSha256 $replica -ReplicaUncRoot $unc -QuiescenceEvidenceSha256 $quiescenceSha -QuiescenceEvidenceFileName "phase7b-wp2b-quiescence-$('1'*32).json" -QuiescenceEvidenceToolingCommit $tooling -ConsumptionMarkerFileName "$finalAuthorizationId.used.json" -IssuedAt ([DateTime]::UtcNow.AddMinutes(-1)) -ExpiresAt ([DateTime]::UtcNow.AddHours(1))
+  $finalAuthorizationPath=Join-Path $testRoot 'final-authorization.json';Write-Canonical $finalAuthorizationPath $finalAuthorization;$finalAuthorizationSha=Get-Phase7BSha256 -LiteralPath $finalAuthorizationPath
+  $plainSha='6'*64;$plainBytes=[int64]8192
+  $pendingPath=Join-Path $testRoot 'pending.json';Write-Canonical $pendingPath ([ordered]@{schemaVersion=1;classification='PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK';attemptId=$attempt;packetSha256=$packetSha;packetBytes=$packetBytes;localEncryptedCopyPass=$true;independentEncryptedReplicaPass=$false;plaintextZipSha256=$plainSha;plaintextZipBytes=$plainBytes;decryptedStreamSha256=$plainSha;decryptedStreamBytes=$plainBytes;decryptRoundTripPass=$true;captureAuthorizationId=$finalAuthorizationId;captureAuthorizationSha256=$finalAuthorizationSha;captureAuthorizationToolingCommit=$tooling;sourceInventorySha256=$inventory;sourceRootSha256=$source;capturePlanSha256=$plan;localOutputRootSha256=$local;replicaRootSha256=$replica;ageExeSha256=$age;quiescenceEvidenceSha256=$quiescenceSha})
+  $finalPath=Join-Path $testRoot 'final.json';$final=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attempt -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $receiptPath -ExpectedReplicaReceiptSha256 $receiptPersisted.sha256 -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 $teardownPersisted.sha256 -CaptureAuthorizationPath $finalAuthorizationPath -ExpectedCaptureAuthorizationSha256 $finalAuthorizationSha -ExpectedToolingCommit $tooling -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $finalPath)-join [Environment]::NewLine|ConvertFrom-Json
   Assert-True ($final.pass -and $final.independentEncryptedReplicaPass -and $final.sessionTornDown) 'synthetic lifecycle final descriptor pass'
   $wrongFinal=Join-Path $testRoot 'wrong-final.json';$wrongReceipt=$receiptPath+'.wrong';Copy-Item $receiptPath $wrongReceipt;[IO.File]::AppendAllText($wrongReceipt,' ')
-  $failure=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attempt -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $wrongReceipt -ExpectedReplicaReceiptSha256 $receiptPersisted.sha256 -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 $teardownPersisted.sha256 -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $wrongFinal)-join [Environment]::NewLine|ConvertFrom-Json
+  $failure=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $attempt -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 (Get-Phase7BSha256 -LiteralPath $pendingPath) -ReplicaReceiptPath $wrongReceipt -ExpectedReplicaReceiptSha256 $receiptPersisted.sha256 -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 $teardownPersisted.sha256 -CaptureAuthorizationPath $finalAuthorizationPath -ExpectedCaptureAuthorizationSha256 $finalAuthorizationSha -ExpectedToolingCommit $tooling -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $wrongFinal)-join [Environment]::NewLine|ConvertFrom-Json
   Assert-True (-not $failure.pass -and -not (Test-Path $wrongFinal)) 'descriptor rejects wrong receipt hash before mutation'
   $paths=@('phase7bWorkPackage2OperatorLifecycle.psm1','phase7bSetWorkPackage2CaptureQuiescence.ps1','phase7bResumeWorkPackage2CaptureQuiescence.ps1','phase7bRefreshWorkPackage2StableInventory.ps1','phase7bPrepareWorkPackage2CaptureAuthorization.ps1','phase7bImportBoundedReplicaReceipt.ps1','phase7bWorkPackage2OperatorLifecycle.test.ps1')|ForEach-Object{Join-Path $PSScriptRoot $_}
   foreach($path in $paths){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors);Assert-True (@($errors).Count -eq 0) "PowerShell 5.1 AST:$(Split-Path -Leaf $path)"}
@@ -354,8 +362,8 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $ageBridgeSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bWindowsAgePassphraseBridge.psm1')
   Assert-True ($captureSource.Contains('Test-Phase7BWorkPackage2AgeVersionOutput') -and -not ($captureSource -match '\\bage\\s\+v\?1')) 'Stage 3 accepts official v-prefixed age output through shared parser'
   Assert-True ($captureSource.Contains('$authorization.quiescenceEvidenceToolingCommit') -and $captureSource.Contains('$authorization.capturePlanFileName')) 'Stage 3 consumes exact quiescence-commit and capture-plan filename bindings'
-  Assert-True ($captureSource.LastIndexOf('Use-Phase7BWorkPackage2CaptureAuthorization') -gt $captureSource.IndexOf('Copy-Phase7BBoundedEncryptedReplica') -and
-    $captureSource.LastIndexOf('Use-Phase7BWorkPackage2CaptureAuthorization') -gt $captureSource.IndexOf('$descriptorCreated = $true')) 'one-use authorization is consumed only after packet replica and descriptor completion'
+  Assert-True (-not $captureSource.Contains('Use-Phase7BWorkPackage2CaptureAuthorization') -and
+    $captureSource.Contains('Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput')) 'Stage3 verifies decrypt round trip and leaves authorization unconsumed'
   Assert-True ($captureSource.Contains('exactSameAuthorizationReusableAfterCleanup') -and $captureSource.Contains('$replicaPacketCreated') -and $captureSource.Contains('$descriptorCreated')) 'failed pre-consumption capture has exact cleanup and explicit authorization reuse classification'
   Assert-True ($captureSource.Contains('Invoke-Phase7BAgeEncryptionWithSecureWindowsInput') -and -not $captureSource.Contains('& $AgeExePath -p')) 'capture uses only the secure source-owned age passphrase bridge'
   Assert-True ($ageBridgeSource.Contains('WriteConsoleInputW') -and $ageBridgeSource.Contains('GetNumberOfConsoleInputEvents') -and
@@ -363,7 +371,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   Assert-True ($ageBridgeSource.Contains('UseSystemPasswordChar = $true') -and $ageBridgeSource.Contains('ShortcutsEnabled = $true') -and
     $ageBridgeSource.Contains('PHASE7B_WP2_AGE_PASSPHRASE_MISMATCH')) 'age bridge provides masked paste entry with explicit confirmation'
   Assert-True ($captureSource.Contains('PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CHANGED_OR_CONCURRENTLY_USED') -and
-    $captureSource.IndexOf('Assert-Phase7BWorkPackage2CaptureAuthorization') -lt $captureSource.IndexOf('$mutationStarted = $true')) 'authorization expiry is accepted once before mutation and only immutable hash/concurrency is rechecked at final consumption'
+    $captureSource.IndexOf('Assert-Phase7BWorkPackage2CaptureAuthorization') -lt $captureSource.IndexOf('$mutationStarted = $true')) 'authorization expiry is accepted before mutation and immutable hash/marker state is rechecked before Stage3 returns'
   $verifySource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bVerifyAndCloseBoundedReplicaReceiver.ps1')
   Assert-True ($verifySource.Contains('$teardownResumed') -and $verifySource.Contains('$initialShares.Count -eq 0') -and $verifySource.Contains('$initialRules.Count -eq 0')) 'Stage 4 supports exact receipt persistence after a verified partial teardown'
   $postRefreshPath=Join-Path $PSScriptRoot 'phase7bResumeWorkPackage2PostRefreshCheckpoint.ps1'
@@ -371,10 +379,10 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshTokens=$null;$postRefreshErrors=$null
   $postRefreshAst=[Management.Automation.Language.Parser]::ParseFile($postRefreshPath,[ref]$postRefreshTokens,[ref]$postRefreshErrors)
   Assert-True (@($postRefreshErrors).Count -eq 0) 'post-refresh checkpoint PowerShell 5.1 AST'
-  Assert-True ($postRefreshSource.Contains('WP2B_CAPTURE_REPLACEMENT_VALIDATE_EXACT_TWO_HISTORICAL_AUTHORIZATIONS_READ_ONLY') -and
-    $postRefreshSource.Contains('Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite')) 'post-refresh checkpoint exposes only the explicit exact-two historical recovery acknowledgement'
+  Assert-True ($postRefreshSource.Contains('Get-Phase7BWorkPackage2CaptureAuthorizationSet') -and
+    -not $postRefreshSource.Contains('ExpectedHistoricalCaptureAuthorizationCount')) 'post-refresh checkpoint ignores historical cardinality and checks only current conflicts'
   $postRefreshCommands=@($postRefreshAst.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Where-Object{$_ -match '^(?:Get|New|Test)-Phase7B'}|Sort-Object -Unique)
-  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Test-Phase7BExactStaleCaptureAuthorizationPrerequisite','Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
+  $expectedPostRefreshCommands=@('Get-Phase7BSha256','Get-Phase7BWorkPackage2Contract','New-Phase7BWorkPackage2Inventory','Get-Phase7BWorkPackage2CaptureAuthorizationSet','Test-Phase7BWorkPackage2PostRefreshCheckpoint')|Sort-Object
   Assert-True (@(Compare-Object $expectedPostRefreshCommands $postRefreshCommands).Count -eq 0) 'post-refresh checkpoint custom command inventory is complete and reviewed'
   $postRefreshProbe=@"
 `$ErrorActionPreference='Stop'
@@ -382,6 +390,7 @@ Set-StrictMode -Version Latest
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2OperatorLifecycle.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2Contract.psm1' -Force
 Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.psm1' -Force
+Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bWorkPackage2AuthorizationEligibility.psm1' -Force
   `$names=@('$($expectedPostRefreshCommands -join "','")','Test-Phase7BAgeVersionOutput')
 `$resolved=@(`$names|ForEach-Object{[bool](Get-Command `$_ -CommandType Function -ErrorAction Stop)})
 [ordered]@{classification='PHASE7B_WP2B_POST_REFRESH_HELPERS_PS51_PASS';pass=(@(`$resolved|Where-Object{-not `$_}).Count-eq0);resolvedCommandCount=`$resolved.Count;mutationPerformed=`$false}|ConvertTo-Json -Compress
@@ -390,7 +399,7 @@ Import-Module '$($PSScriptRoot.Replace("'","''"))\phase7bIsolatedGuestContract.p
   $postRefreshOutput=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -EncodedCommand $postRefreshEncoded 2>&1)
   $postRefreshExit=$LASTEXITCODE
   $postRefreshResult=($postRefreshOutput-join[Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
-  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 7 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
+  Assert-True ($postRefreshExit -eq 0 -and [bool]$postRefreshResult.pass -and [int]$postRefreshResult.resolvedCommandCount -eq 6 -and -not [bool]$postRefreshResult.mutationPerformed) 'fresh Windows PowerShell 5.1 resolves every post-refresh checkpoint and age helper'
   Assert-True (-not ($postRefreshSource -match '(?i)\b(?:Stop|Disable|Enable|Start|Register|Unregister|Set)-ScheduledTask\b|Write-Phase7BSafeEvidenceFile|phase7bRefreshWorkPackage2StableInventory|phase7bSetWorkPackage2CaptureQuiescence')) `
     'post-refresh checkpoint has no quiescence refresh evidence or task mutation path'
   $refreshSource=Get-Content -Raw (Join-Path $PSScriptRoot 'phase7bRefreshWorkPackage2StableInventory.ps1')

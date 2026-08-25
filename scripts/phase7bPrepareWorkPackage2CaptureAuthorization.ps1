@@ -32,6 +32,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -F
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bSecondComputerReplicaContract.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2AuthorizationEligibility.psm1') -Force
 $stage = 'validate-input'
 try {
   if ($QuiescenceMode -ceq 'FRESH_ESTABLISH') {
@@ -54,6 +55,9 @@ try {
       -not $authorizationParent.Equals((Split-Path -Parent ([IO.Path]::GetFullPath($QuiescenceEvidencePath))), [StringComparison]::OrdinalIgnoreCase)) {
     throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_EVIDENCE_ROOT_FAIL'
   }
+  $authorizationSet = Get-Phase7BWorkPackage2CaptureAuthorizationSet -EvidenceRoot $authorizationParent `
+    -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit
+  if (-not $authorizationSet.pass) { throw 'PHASE7B_WP2B_CAPTURE_CURRENT_AUTHORIZATION_CONFLICT' }
   $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path.TrimEnd('\')
   $source = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path.TrimEnd('\')
   $head = (& git -C $repositoryRoot rev-parse HEAD).Trim().ToLowerInvariant()
@@ -124,6 +128,13 @@ try {
     -QuiescenceEvidenceToolingCommit $ExpectedQuiescenceEvidenceToolingCommit `
     -ConsumptionMarkerFileName "$AuthorizationId.used.json" `
     -IssuedAt $issued -ExpiresAt $issued.AddHours(24)
+  # Close the validation-to-create race. Historical files do not participate; a
+  # newly appeared eligible or malformed current-attempt/current-commit binding does.
+  $authorizationSetBeforeCreate = Get-Phase7BWorkPackage2CaptureAuthorizationSet -EvidenceRoot $authorizationParent `
+    -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit
+  if (-not $authorizationSetBeforeCreate.pass -or (Test-Path -LiteralPath $OutputPath)) {
+    throw 'PHASE7B_WP2B_CAPTURE_CURRENT_AUTHORIZATION_CONFLICT'
+  }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $document
   [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanFileName = Split-Path -Leaf $CapturePlanPath; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCapacityBytes = [Math]::Max([int64]1GB, ([int64]$plan.totalBytes * 2L) + [int64]64MB); laptopIpv4 = $LaptopIpv4; laptopIdentityDeferredToReceiver = $true; laptopReachabilityDeferredToReceiver = $true; primaryNetworkBindingPass = $true; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
 } catch {

@@ -71,7 +71,8 @@ try {
   if (-not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or
       (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
   $ageVersionLines = @(& $AgeExePath --version 2>&1)
-  if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
+  $ageVersion = Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE
+  if (-not $ageVersion.pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
   if ($Host.Name -ne "ConsoleHost" -or -not [Environment]::UserInteractive) { throw "PHASE7B_WP2_INTERACTIVE_SECRET_CONSOLE_REQUIRED" }
 
   $source = (Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop).Path.TrimEnd('\')
@@ -201,6 +202,10 @@ try {
     sourceInventorySha256 = $inventory.inventorySha256
     sourceRootSha256 = $sourceRootSha256
     capturePlanSha256 = $ExpectedCapturePlanSha256.ToLowerInvariant()
+    captureAuthorizationId = [string]$authorization.authorizationId
+    captureAuthorizationSha256 = $ExpectedAuthorizationSha256.ToLowerInvariant()
+    captureAuthorizationToolingCommit = $toolingCommit
+    quiescenceEvidenceSha256 = [string]$authorization.quiescenceEvidenceSha256
     localOutputRootSha256 = $localOutputRootSha256
     replicaRootSha256 = $replicaRootSha256
     replicaClassification = 'OFF_MACHINE_OR_INDEPENDENT_STORAGE'
@@ -231,7 +236,10 @@ try {
   }
   $plainZipPath = Join-Path $localAttemptRoot "$AttemptId.zip"
   $zipFiles = @($inventory.files | ForEach-Object { [pscustomobject]@{ logicalPath = $_.logicalPath } }) + @([pscustomobject]@{ logicalPath = 'reference-index.json' })
-  [void](New-Phase7BDeterministicPacketZip -SourceRoot $plaintextRoot -Files $zipFiles -ManifestPath $manifestPath -OutputPath $plainZipPath)
+  $zipIdentity = New-Phase7BDeterministicPacketZip -SourceRoot $plaintextRoot -Files $zipFiles -ManifestPath $manifestPath -OutputPath $plainZipPath
+  if ([string]$zipIdentity.sha256 -cnotmatch '^[0-9a-f]{64}$' -or [int64]$zipIdentity.bytes -lt 1) {
+    throw 'PHASE7B_WP2_PLAINTEXT_ZIP_IDENTITY_FAIL'
+  }
 
   $stage = "interactive-age-encryption"
   $localPacketPath = Join-Path $localAttemptRoot "$AttemptId$($contract.packetExtension)"
@@ -245,6 +253,16 @@ try {
   $packetSha = Get-Phase7BSha256 -LiteralPath $localPacketPath
   $packet = Test-Phase7BEncryptedPacket -LiteralPath $localPacketPath -ExpectedSha256 $packetSha
   if (-not $packet.pass) { throw $packet.classification }
+
+  $stage = 'interactive-age-decrypt-to-hash-verification'
+  Write-Host 'PHASE7B_WP2_REENTER_PASSPHRASE_IN_MASKED_WINDOWS_DIALOG_FOR_DECRYPT_VERIFICATION'
+  $roundTrip = Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput -AgeExePath $AgeExePath -CiphertextPath $localPacketPath
+  if (-not [bool]$roundTrip.pass -or [string]$roundTrip.classification -cne 'PHASE7B_WP2_AGE_DECRYPT_TO_HASH_PASS' -or
+      [string]$roundTrip.decryptedStreamSha256 -cne [string]$zipIdentity.sha256 -or
+      [int64]$roundTrip.decryptedStreamBytes -ne [int64]$zipIdentity.bytes) {
+    if ([string]$roundTrip.safeErrorCode -match '^PHASE7B_') { throw [string]$roundTrip.safeErrorCode }
+    throw 'PHASE7B_WP2_AGE_DECRYPT_ROUND_TRIP_MISMATCH'
+  }
 
   $stage = "replicate-and-verify"
   $replicaPacketPath = Join-Path $replicaAttemptRoot (Split-Path -Leaf $localPacketPath)
@@ -270,8 +288,14 @@ try {
     packetFileName = Split-Path -Leaf $localPacketPath
     packetSha256 = $packetSha
     packetBytes = $packet.packetBytes
+    plaintextZipSha256 = [string]$zipIdentity.sha256
+    plaintextZipBytes = [int64]$zipIdentity.bytes
+    decryptedStreamSha256 = [string]$roundTrip.decryptedStreamSha256
+    decryptedStreamBytes = [int64]$roundTrip.decryptedStreamBytes
+    decryptRoundTripPass = $true
     ageFileName = $contract.ageMediaFileName
     ageExeSha256 = $ExpectedAgeExeSha256.ToLowerInvariant()
+    ageVersion = [string]$ageVersion.normalizedVersion
     referenceIndexVersion = 'phase7b-wp2-reference-index-v1'
     referenceIndexSha256 = [string]$referenceResult.referenceIndexSha256
     referenceIndexFileSha256 = $referenceFileSha256
@@ -292,12 +316,10 @@ try {
   } finally {
     $descriptorStream.Dispose()
   }
-  $stage = 'consume-authorization-after-complete-capture'
+  $stage = 'verify-authorization-remains-unconsumed'
   $markerPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$authorization.consumptionMarkerFileName)
   if ((Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -cne $ExpectedAuthorizationSha256.ToLowerInvariant() -or
       (Test-Path -LiteralPath $markerPath)) { throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CHANGED_OR_CONCURRENTLY_USED' }
-  [void](Use-Phase7BWorkPackage2CaptureAuthorization -AuthorizationPath $AuthorizationPath -Authorization $authorization)
-  $authorizationConsumed = $true
   $accepted = $true
   $global:LASTEXITCODE = 0
   [ordered]@{
@@ -307,6 +329,11 @@ try {
     packetFileName = $descriptor.packetFileName
     packetSha256 = $packetSha
     packetBytes = $packet.packetBytes
+    plaintextZipSha256 = [string]$zipIdentity.sha256
+    plaintextZipBytes = [int64]$zipIdentity.bytes
+    decryptedStreamSha256 = [string]$roundTrip.decryptedStreamSha256
+    decryptedStreamBytes = [int64]$roundTrip.decryptedStreamBytes
+    decryptRoundTripPass = $true
     referenceIndexSha256 = [string]$referenceResult.referenceIndexSha256
     referenceIndexRecordCount = [int]$referenceResult.recordCount
     descriptorFileName = Split-Path -Leaf $descriptorPath
@@ -315,6 +342,7 @@ try {
     fileCount = $inventory.fileCount
     replicaCopyPass = $true
     independentReplicaPass = $false
+    captureAuthorizationConsumed = $false
     plaintextSecretPersisted = $false
     automaticRetryAllowed = $false
   } | ConvertTo-Json -Depth 5
