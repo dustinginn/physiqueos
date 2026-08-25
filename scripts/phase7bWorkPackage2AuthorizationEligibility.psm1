@@ -8,33 +8,54 @@ function Test-Phase7BWorkPackage2CaptureAuthorizationShape {
   )
   $properties = @($Authorization.PSObject.Properties.Name)
   $stages = @(if ($properties -contains 'authorizedStages') { @($Authorization.authorizedStages) })
-  $required = @('schemaVersion','classification','authorizationId','attemptId','toolingCommit','authorizedStages',
-    'expiresAt','oneUseOnly','automaticRetryAllowed','wp2cAuthorized','consumptionMarkerFileName',
-    'invocationContractSha256','stage3LauncherSha256','securePassphraseBridgeRequired','decryptRoundTripRequired',
-    'capturePlanSha256','sourceInventorySha256','sourceRootSha256','localOutputRootSha256',
-    'replicaRootSha256','ageExeSha256','quiescenceEvidenceSha256')
+  $required = @('schemaVersion','classification','captureAuthorizationClassification','authorizationId','attemptId','toolingCommit','authorizedStages',
+    'issuedAt','expiresAt','maximumAuthorizationLifetimeHours','oneUseOnly','automaticRetryAllowed','wp2cAuthorized','consumptionMarkerFileName',
+    'invocationContractSha256','stage3LauncherSha256','ageEncryptionMode','ageRecipient','ageIdentityInputMode',
+    'nativeRecipientRequired','agePluginRequired','ageVersion','ageKeygenPathSha256','ageKeygenSha256','ageKeygenVersion','decryptRoundTripRequired',
+    'applicationCommit','environmentId','vmDisplayName','windowsHostId','manifestDigest','capturePlanSha256','sourceInventorySha256',
+    'selectionSha256','sourceRootSha256','runtimeRevision','runtimeSha256','localOutputRootSha256','replicaRootSha256',
+    'replicaUncRoot','replicaPathModel','laptopHostIdentitySha256','laptopDiskIdentitySha256','ageExePathSha256','ageExeSha256',
+    'quiescenceEvidenceSha256','quiescenceEvidenceFileName','quiescenceEvidenceToolingCommit','founderApproved')
   $missing = @($required | Where-Object { $properties -notcontains $_ })
   $expiry = [DateTime]::MinValue
+  $issued = [DateTime]::MinValue
   $expiryPass = $false
-  if ($missing.Count -eq 0) { $expiryPass = [DateTime]::TryParse([string]$Authorization.expiresAt, [ref]$expiry) }
+  $issuedPass = $false
+  if ($missing.Count -eq 0) {
+    $expiryPass = [DateTime]::TryParse([string]$Authorization.expiresAt, [ref]$expiry)
+    $issuedPass = [DateTime]::TryParse([string]$Authorization.issuedAt, [ref]$issued)
+  }
   $hashes = @(if ($missing.Count -eq 0) { @(
     [string]$Authorization.capturePlanSha256, [string]$Authorization.sourceInventorySha256,
     [string]$Authorization.sourceRootSha256, [string]$Authorization.localOutputRootSha256,
     [string]$Authorization.replicaRootSha256, [string]$Authorization.ageExeSha256,
     [string]$Authorization.quiescenceEvidenceSha256, [string]$Authorization.invocationContractSha256,
-    [string]$Authorization.stage3LauncherSha256
+    [string]$Authorization.stage3LauncherSha256, [string]$Authorization.ageKeygenPathSha256,
+    [string]$Authorization.ageKeygenSha256, [string]$Authorization.selectionSha256,
+    [string]$Authorization.runtimeSha256, [string]$Authorization.ageExePathSha256,
+    [string]$Authorization.laptopHostIdentitySha256, [string]$Authorization.laptopDiskIdentitySha256
   ) })
   $pass = $missing.Count -eq 0 -and [int]$Authorization.schemaVersion -eq 1 -and
     [string]$Authorization.classification -ceq 'PHASE7B_WP2_STAGE_AUTHORIZATION' -and
     [string]$Authorization.authorizationId -cmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -and
     [string]$Authorization.attemptId -ceq $ExpectedAttemptId -and
     [string]$Authorization.toolingCommit -ceq $ExpectedToolingCommit -and
+    [string]$Authorization.captureAuthorizationClassification -ceq 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION' -and
+    [string]$Authorization.applicationCommit -cmatch '^[0-9a-f]{40}$' -and [int64]$Authorization.runtimeRevision -gt 0 -and
     $stages.Count -eq 1 -and [string]$stages[0].stage -ceq 'WP2B_CAPTURE' -and
     [int]$stages[0].mutationBudget -eq 1 -and [bool]$Authorization.oneUseOnly -and
-    [bool]$Authorization.securePassphraseBridgeRequired -and [bool]$Authorization.decryptRoundTripRequired -and
+    [string]$Authorization.ageEncryptionMode -ceq 'native-recipient-v1' -and
+    [string]$Authorization.ageRecipient -cmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -and
+    [string]$Authorization.ageIdentityInputMode -ceq 'stdin' -and [bool]$Authorization.nativeRecipientRequired -and
+    -not [bool]$Authorization.agePluginRequired -and [string]$Authorization.ageVersion -ceq '1.3.1' -and
+    [string]$Authorization.ageKeygenVersion -ceq '1.3.1' -and [bool]$Authorization.decryptRoundTripRequired -and
     -not [bool]$Authorization.automaticRetryAllowed -and -not [bool]$Authorization.wp2cAuthorized -and
     [string]$Authorization.consumptionMarkerFileName -ceq "$([string]$Authorization.authorizationId).used.json" -and
-    $expiryPass -and @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -eq 0
+    [string]$Authorization.replicaUncRoot -cmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -and
+    [string]$Authorization.replicaPathModel -ceq 'EXACT_ATTEMPT_ROOT' -and [bool]$Authorization.founderApproved -and
+    [int]$Authorization.maximumAuthorizationLifetimeHours -eq 24 -and $issuedPass -and $expiryPass -and
+    $expiry.ToUniversalTime() -gt $issued.ToUniversalTime() -and $expiry.ToUniversalTime() -le $issued.ToUniversalTime().AddHours(24) -and
+    @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -eq 0
   [pscustomobject][ordered]@{
     pass = [bool]$pass
     expiryUtc = if ($expiryPass) { $expiry.ToUniversalTime() } else { $null }

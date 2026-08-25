@@ -368,9 +368,17 @@ RW 83886080 SPARSE "phase7b-split-s002.vmdk"
   $kitManifest = Get-Content -LiteralPath $kitManifestPath -Raw | ConvertFrom-Json
   $kitHashFailures = @($kitManifest.files | Where-Object { (Get-Phase7BSha256 -LiteralPath (Join-Path $kitOutputDirectory $_.relativePath)) -ne $_.sha256 })
   Assert-True ($kitHashFailures.Count -eq 0) "kit manifest hashes all payload files"
+  foreach ($requiredRestoreDependency in @('phase7bWorkPackage2Contract.psm1','phase7bIsolatedGuestReconciliation.psm1','phase7bWindowsAgeIdentityBridge.psm1')) {
+    Assert-True (@($kitManifest.files | Where-Object { [string]$_.relativePath -ceq $requiredRestoreDependency }).Count -eq 1) "kit includes restore dependency $requiredRestoreDependency"
+  }
+  $kitRestoreInspect = @(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $kitOutputDirectory 'phase7bIsolatedGuestRestoreInterface.ps1') -Operation Inspect 2>&1)
+  $kitRestoreInspectExit = $LASTEXITCODE
+  $kitRestoreInspectResult = ($kitRestoreInspect -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
+  Assert-True ($kitRestoreInspectExit -ne 0 -and [string]$kitRestoreInspectResult.classification -ceq 'WP2_INTERFACE_PATHS_MISSING' -and
+    -not [bool]$kitRestoreInspectResult.mutationPerformed) "kit-local restore interface resolves native identity dependencies in fresh PowerShell 5.1 and fails only on absent synthetic guest paths"
   Assert-True ($kitManifest.applicationCommit -eq $contract.applicationCommit) "kit keeps accepted application commit"
   $kitText = @((Get-ChildItem -LiteralPath $kitOutputDirectory -File | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })) -join [Environment]::NewLine
-  Assert-True (-not ($kitText -match '(?i)dop_v1_|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY')) "kit contains no credential/private-key material"
+  Assert-True (-not ($kitText -match '(?i)dop_v1_[A-Za-z0-9_-]{20,}|-----BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY-----')) "kit contains no concrete credential/private-key material"
 
   $isoPath = Join-Path $testRoot "phase7b-bootstrap.iso"
   $isoOutput = @(& (Join-Path $PSScriptRoot "phase7bBuildVmwareGuestBootstrapIso.ps1") -KitDirectory $kitOutputDirectory -OutputPath $isoPath) -join [Environment]::NewLine

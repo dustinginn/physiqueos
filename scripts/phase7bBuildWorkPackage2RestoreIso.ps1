@@ -43,7 +43,11 @@ try {
       [string]$descriptor.packetFileName -ne (Split-Path -Leaf $PacketPath) -or [string]$descriptor.packetSha256 -ne $ExpectedPacketSha256.ToLowerInvariant() -or
       -not [bool]$descriptor.localEncryptedCopyPass -or -not [bool]$descriptor.independentEncryptedReplicaPass -or
       -not [bool]$descriptor.decryptRoundTripPass -or -not [bool]$descriptor.decryptRoundTripRequired -or
-      -not [bool]$descriptor.securePassphraseBridgeRequired -or [string]$descriptor.invocationContractSha256 -notmatch '^[0-9a-f]{64}$' -or
+      [string]$descriptor.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$descriptor.ageRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
+      [string]$descriptor.ageIdentityInputMode -cne 'stdin' -or -not [bool]$descriptor.nativeRecipientRequired -or
+      [bool]$descriptor.agePluginRequired -or [string]$descriptor.ageVersion -cne '1.3.1' -or
+      [string]$descriptor.ageKeygenVersion -cne '1.3.1' -or [string]$descriptor.invocationContractSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$descriptor.stage3LauncherSha256 -notmatch '^[0-9a-f]{64}$' -or [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
       [int64]$descriptor.plaintextZipBytes -lt 1 -or [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes) {

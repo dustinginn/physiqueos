@@ -39,7 +39,11 @@ try {
       [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes -or -not [bool]$pending.decryptRoundTripPass -or
       [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
       [string]$pending.stage3LauncherSha256 -cne $ExpectedStage3LauncherSha256 -or
-      -not [bool]$pending.securePassphraseBridgeRequired -or -not [bool]$pending.decryptRoundTripRequired -or
+      [string]$pending.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$pending.ageRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
+      [string]$pending.ageIdentityInputMode -cne 'stdin' -or -not [bool]$pending.nativeRecipientRequired -or
+      [bool]$pending.agePluginRequired -or [string]$pending.ageVersion -cne '1.3.1' -or
+      [string]$pending.ageKeygenVersion -cne '1.3.1' -or -not [bool]$pending.decryptRoundTripRequired -or
       [string]$pending.captureAuthorizationSha256 -cne $ExpectedCaptureAuthorizationSha256 -or
       [string]$pending.captureAuthorizationToolingCommit -cne $ExpectedToolingCommit) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_PENDING_DESCRIPTOR_FAIL' }
   $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $CaptureAuthorizationPath -ExpectedSha256 $ExpectedCaptureAuthorizationSha256 `
@@ -47,7 +51,8 @@ try {
     -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
     -ExpectedSourceRootSha256 ([string]$pending.sourceRootSha256) -ExpectedCapturePlanSha256 ([string]$pending.capturePlanSha256) `
     -ExpectedLocalOutputRootSha256 ([string]$pending.localOutputRootSha256) -ExpectedReplicaRootSha256 ([string]$pending.replicaRootSha256) `
-    -ExpectedAgeExeSha256 ([string]$pending.ageExeSha256) -ExpectedQuiescenceEvidenceSha256 ([string]$pending.quiescenceEvidenceSha256)
+    -ExpectedAgeExeSha256 ([string]$pending.ageExeSha256) -ExpectedAgeKeygenSha256 ([string]$pending.ageKeygenSha256) `
+    -ExpectedAgeRecipient ([string]$pending.ageRecipient) -ExpectedQuiescenceEvidenceSha256 ([string]$pending.quiescenceEvidenceSha256)
   if ([string]$authorization.authorizationId -cne [string]$pending.captureAuthorizationId) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_AUTHORIZATION_BINDING_FAIL' }
   $accepted = Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 ([string]$pending.packetSha256) -ExpectedPacketBytes ([int64]$pending.packetBytes)
   if (-not $accepted.pass) { throw $accepted.classification }

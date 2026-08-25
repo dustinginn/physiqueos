@@ -8,7 +8,7 @@ function Assert-True([bool]$value,[string]$message){if(-not $value){throw "ASSER
 function Write-Json([string]$path,$value){[IO.File]::WriteAllText($path,($value|ConvertTo-Json -Depth 12 -Compress),(New-Object Text.UTF8Encoding($false)))}
 function New-Authorization([string]$attempt,[string]$commit,[string]$id,[DateTime]$expires){
   $h='a'*64
-  [pscustomobject][ordered]@{schemaVersion=1;classification='PHASE7B_WP2_STAGE_AUTHORIZATION';captureAuthorizationClassification='PHASE7B_WP2B_CAPTURE_AUTHORIZATION';authorizationId=$id;attemptId=$attempt;toolingCommit=$commit;authorizedStages=@([pscustomobject]@{stage='WP2B_CAPTURE';mutationBudget=1});expiresAt=$expires.ToUniversalTime().ToString('o');oneUseOnly=$true;automaticRetryAllowed=$false;wp2cAuthorized=$false;consumptionMarkerFileName="$id.used.json";invocationContractSha256=$h;stage3LauncherSha256=$h;securePassphraseBridgeRequired=$true;decryptRoundTripRequired=$true;capturePlanSha256=$h;sourceInventorySha256=$h;sourceRootSha256=$h;localOutputRootSha256=$h;replicaRootSha256=$h;ageExeSha256=$h;quiescenceEvidenceSha256=$h}
+  [pscustomobject][ordered]@{schemaVersion=1;classification='PHASE7B_WP2_STAGE_AUTHORIZATION';captureAuthorizationClassification='PHASE7B_WP2B_CAPTURE_AUTHORIZATION';authorizationId=$id;attemptId=$attempt;toolingCommit=$commit;authorizedStages=@([pscustomobject]@{stage='WP2B_CAPTURE';mutationBudget=1});issuedAt=$expires.AddHours(-1).ToUniversalTime().ToString('o');expiresAt=$expires.ToUniversalTime().ToString('o');maximumAuthorizationLifetimeHours=24;oneUseOnly=$true;automaticRetryAllowed=$false;wp2cAuthorized=$false;consumptionMarkerFileName="$id.used.json";invocationContractSha256=$h;stage3LauncherSha256=$h;ageEncryptionMode='native-recipient-v1';ageRecipient=('age1'+('q'*58));ageIdentityInputMode='stdin';nativeRecipientRequired=$true;agePluginRequired=$false;ageVersion='1.3.1';ageKeygenPathSha256=$h;ageKeygenSha256=$h;ageKeygenVersion='1.3.1';decryptRoundTripRequired=$true;applicationCommit=('b'*40);environmentId='production';vmDisplayName='PhysiqueOS';windowsHostId='host';manifestDigest=$h;capturePlanSha256=$h;sourceInventorySha256=$h;selectionSha256=$h;sourceRootSha256=$h;runtimeRevision=1;runtimeSha256=$h;localOutputRootSha256=$h;replicaRootSha256=$h;replicaUncRoot='\\LAPTOP-4G5UOU2R\P7B11111111$';replicaPathModel='EXACT_ATTEMPT_ROOT';laptopHostIdentitySha256=$h;laptopDiskIdentitySha256=$h;ageExePathSha256=$h;ageExeSha256=$h;quiescenceEvidenceSha256=$h;quiescenceEvidenceFileName=('phase7b-wp2b-quiescence-'+('c'*32)+'.json');quiescenceEvidenceToolingCommit=$commit;founderApproved=$true}
 }
 $root=Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\.tmp')).Path "phase7b-wp2-simplification-$([guid]::NewGuid().ToString('N'))"
 try{
@@ -39,16 +39,18 @@ try{
   Assert-True (-not $wrongAttempt.eligible -and -not $wrongAttempt.currentBinding) 'wrong attempt cannot become current'
   $wrongCommit=Get-Phase7BWorkPackage2CaptureAuthorizationEligibility -LiteralPath $path -ExpectedAttemptId $attempt -ExpectedToolingCommit ('8'*40)
   Assert-True (-not $wrongCommit.eligible -and -not $wrongCommit.currentBinding) 'older tooling commit cannot execute as current'
-  foreach($case in @('wrong-stage','wrong-budget','automatic-retry','bridge-false','roundtrip-false','bridge-absent','roundtrip-absent')){
+  foreach($case in @('wrong-stage','wrong-budget','automatic-retry','native-false','plugin-true','mode-wrong','roundtrip-false','native-absent','roundtrip-absent')){
     $caseRoot=Join-Path $root $case;[void](New-Item -ItemType Directory -Path $caseRoot)
     $caseId='phase7b-wp2b-capture-auth-'+(([string]$case.Length).PadLeft(32,'6'))
     $caseAuthorization=New-Authorization $attempt $current $caseId ([DateTime]::UtcNow.AddHours(1))
     if($case -ceq 'wrong-stage'){$caseAuthorization.authorizedStages[0].stage='WP2C_STAGE'}
     elseif($case -ceq 'wrong-budget'){$caseAuthorization.authorizedStages[0].mutationBudget=2}
     elseif($case -ceq 'automatic-retry'){$caseAuthorization.automaticRetryAllowed=$true}
-    elseif($case -ceq 'bridge-false'){$caseAuthorization.securePassphraseBridgeRequired=$false}
+    elseif($case -ceq 'native-false'){$caseAuthorization.nativeRecipientRequired=$false}
+    elseif($case -ceq 'plugin-true'){$caseAuthorization.agePluginRequired=$true}
+    elseif($case -ceq 'mode-wrong'){$caseAuthorization.ageEncryptionMode='passphrase'}
     elseif($case -ceq 'roundtrip-false'){$caseAuthorization.decryptRoundTripRequired=$false}
-    elseif($case -ceq 'bridge-absent'){$caseAuthorization.PSObject.Properties.Remove('securePassphraseBridgeRequired')}
+    elseif($case -ceq 'native-absent'){$caseAuthorization.PSObject.Properties.Remove('nativeRecipientRequired')}
     else{$caseAuthorization.PSObject.Properties.Remove('decryptRoundTripRequired')}
     $casePath=Join-Path $caseRoot "$attempt-$caseId.json";Write-Json $casePath $caseAuthorization
     $invalid=Get-Phase7BWorkPackage2CaptureAuthorizationSet -EvidenceRoot $caseRoot -ExpectedAttemptId $attempt -ExpectedToolingCommit $current
@@ -57,8 +59,9 @@ try{
   }
 
   $artifacts=@([pscustomobject]@{relativePath='scripts/a.ps1';sha256='a'*64;bytes=12},[pscustomobject]@{relativePath='scripts/b.psm1';sha256='b'*64;bytes=34})
-  $one=New-Phase7BWorkPackage2InvocationContractDocument -AttemptId $attempt -ToolingCommit $current -ApplicationCommit ('5'*40) -Artifacts $artifacts
-  $two=New-Phase7BWorkPackage2InvocationContractDocument -AttemptId $attempt -ToolingCommit $current -ApplicationCommit ('5'*40) -Artifacts @($artifacts[1],$artifacts[0])
+  $contractArgs=@{AttemptId=$attempt;ToolingCommit=$current;ApplicationCommit=('5'*40);AgeRecipient=('age1'+('q'*58));AgeExePathSha256=('6'*64);AgeExeSha256=('7'*64);AgeVersion='1.3.1';AgeKeygenPathSha256=('8'*64);AgeKeygenSha256=('9'*64);AgeKeygenVersion='1.3.1'}
+  $one=New-Phase7BWorkPackage2InvocationContractDocument @contractArgs -Artifacts $artifacts
+  $two=New-Phase7BWorkPackage2InvocationContractDocument @contractArgs -Artifacts @($artifacts[1],$artifacts[0])
   Assert-True (($one|ConvertTo-Json -Depth 12 -Compress) -ceq ($two|ConvertTo-Json -Depth 12 -Compress)) 'orchestration regeneration is deterministic independent of input enumeration'
   $generatedContractPath=Join-Path $root 'ignored-generated-invocation-contract.json'
   Write-Json $generatedContractPath $one;$firstGeneratedHash=(Get-FileHash -LiteralPath $generatedContractPath -Algorithm SHA256).Hash
@@ -68,13 +71,13 @@ try{
 
   $capture=Get-Content (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1') -Raw
   $finalize=Get-Content (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -Raw
-  $bridge=Get-Content (Join-Path $PSScriptRoot 'phase7bWindowsAgePassphraseBridge.psm1') -Raw
+  $bridge=Get-Content (Join-Path $PSScriptRoot 'phase7bWindowsAgeIdentityBridge.psm1') -Raw
   $operator=Get-Content (Join-Path $PSScriptRoot 'phase7bWorkPackage2OperatorLifecycle.psm1') -Raw
-  Assert-True ($capture.Contains('plaintextZipSha256') -and $capture.Contains('decryptedStreamSha256') -and $capture.Contains('Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput')) 'Stage3 binds plaintext and decrypted stream identities'
-  Assert-True ($capture.IndexOf('Invoke-Phase7BAgeDecryptionToHashWithSecureWindowsInput') -lt $capture.IndexOf('Copy-Phase7BBoundedEncryptedReplica')) 'decrypt verification precedes replica mutation'
+  Assert-True ($capture.Contains('plaintextZipSha256') -and $capture.Contains('decryptedStreamSha256') -and $capture.Contains('Invoke-Phase7BAgeNativeIdentityDecryptionToHash')) 'Stage3 binds plaintext and decrypted stream identities'
+  Assert-True ($capture.IndexOf('Invoke-Phase7BAgeNativeIdentityDecryptionToHash') -lt $capture.IndexOf('Copy-Phase7BBoundedEncryptedReplica')) 'decrypt verification precedes replica mutation'
   Assert-True (-not $capture.Contains('Use-Phase7BWorkPackage2CaptureAuthorization') -and $finalize.Contains('Use-Phase7BWorkPackage2CaptureAuthorization')) 'authorization consumption occurs at Stage5 finalization'
-  Assert-True ($bridge.Contains('RedirectStandardOutput = $true') -and $bridge.Contains('StandardOutput.BaseStream') -and -not $bridge.Contains('RedirectStandardInput = $true')) 'binary decrypt hashes stdout without redirected secret input'
-  Assert-True ($bridge -notmatch '(?i)AGE_PASSPHRASE\s*=|SetEnvironmentVariable|--passphrase-file') 'no secret environment or file channel'
+  Assert-True ($bridge.Contains('RedirectStandardOutput = $true') -and $bridge.Contains('StandardOutput.BaseStream') -and $bridge.Contains('RedirectStandardInput = $true')) 'binary decrypt hashes stdout and supplies the identity only through stdin'
+  Assert-True ($bridge -notmatch '(?i)AGE_PASSPHRASE\s*=|SetEnvironmentVariable|--passphrase-file|WriteConsoleInputW') 'no secret environment, file, or ConsoleHost injection channel'
   Assert-True (-not $operator.Contains('Test-Phase7BExactStaleCaptureAuthorizationPrerequisite') -and
     -not $operator.Contains('Test-Phase7BExactTwoHistoricalCaptureAuthorizationPrerequisite')) 'historical exact-one/exact-two authorization ratchets are removed'
   foreach($name in @('phase7bRunWorkPackage2Stage3.ps1','phase7bRunWorkPackage2Stage4.ps1','phase7bRunWorkPackage2Stage5.ps1','phase7bNewWorkPackage2InvocationContract.ps1')){

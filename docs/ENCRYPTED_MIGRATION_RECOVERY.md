@@ -10,6 +10,12 @@ off-machine replica, restore, and key-custody gates. It does not authorize a
 write fence, migration, canonical-store switch, production authentication,
 Phase 7, Native Baseline, or SwiftUI.
 
+## Current WP2B native-recipient policy
+
+The passphrase and `age-plugin-batchpass` details below describe retained historical recovery packets. New Phase 7B WP2B packets use native age X25519 recipient encryption instead. The current invocation contract and one-use authorization bind the exact non-secret `age1...` recipient, native-recipient mode, stdin identity mode, and exact `age.exe` and `age-keygen.exe` identities. Before Stage-3 mutation, a masked two-field dialog collects exactly one `AGE-SECRET-KEY-...` identity and `age-keygen -y` derives the bound recipient with the identity supplied only through redirected stdin. Encryption needs only the public recipient. Decrypt-to-hash verification supplies the retained identity to `age --decrypt -i -` through redirected stdin and must match the deterministic plaintext ZIP SHA-256 and bytes before replication.
+
+The Founder must retain that native secret identity in durable recovery custody independent of the Primary PC. It must never appear in Git, contracts, authorizations, evidence, reports, logs, command lines, environment variables, temporary plaintext identity files, or migration packets. A different Windows machine with the verified age binary and the custodied identity can recover the packet; the model is not DPAPI-, account-, or machine-bound. The earlier Founder passphrase remains necessary for the historical passphrase-encrypted artifacts documented below and is not a substitute for the native identity.
+
 ## Preserved production state
 
 - repository branch/checkpoint at capture: `phase6-compatibility-release` / `c55141dd53dabf3d0d7da2b82ec50f8beaae8b5e`;

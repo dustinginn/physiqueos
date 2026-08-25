@@ -30,6 +30,10 @@ Canonical recovery does not depend on the original Desktop location. The full
 path-by-path source disposition is recorded in
 `deployment/cumulative-production-reconciliation-20260808.json`.
 
+## Phase 7B WP2B recovery identity custody
+
+New WP2B packets use an authorization-bound native age public recipient. Recovery requires the corresponding Founder-custodied `AGE-SECRET-KEY-...` identity, retained outside the Primary PC. The secret identity is not part of a repository backup, packet, invocation contract, authorization, report, command line, environment variable, or temporary plaintext file. The public `age1...` recipient may be recorded so a recovery operator can identify the required custody item. A different Windows machine can recover the packet with the exact verified age tool and identity; recovery is not tied to the original Windows account or DPAPI state. Historical passphrase-encrypted packets still require their historical passphrase and documented plugin workflow.
+
 ## Create a backup
 
 The normal End Work Session workflow is local-first:

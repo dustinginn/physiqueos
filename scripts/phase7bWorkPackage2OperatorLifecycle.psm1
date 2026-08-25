@@ -214,6 +214,11 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     [Parameter(Mandatory = $true)][string]$RuntimeSha256,
     [Parameter(Mandatory = $true)][string]$AgeExePathSha256,
     [Parameter(Mandatory = $true)][string]$AgeExeSha256,
+    [Parameter(Mandatory = $true)][string]$AgeVersion,
+    [Parameter(Mandatory = $true)][string]$AgeKeygenPathSha256,
+    [Parameter(Mandatory = $true)][string]$AgeKeygenSha256,
+    [Parameter(Mandatory = $true)][string]$AgeKeygenVersion,
+    [Parameter(Mandatory = $true)][string]$AgeRecipient,
     [Parameter(Mandatory = $true)][string]$LocalOutputRootSha256,
     [Parameter(Mandatory = $true)][string]$ReplicaRootSha256,
     [Parameter(Mandatory = $true)][string]$ReplicaUncRoot,
@@ -227,11 +232,14 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
   $wp2 = Get-Phase7BWorkPackage2Contract
   $operator = Get-Phase7BWorkPackage2OperatorContract
   $hashes = @($ToolingCommit, $InvocationContractSha256, $Stage3LauncherSha256, $CapturePlanSha256, $InventorySha256, $SelectionSha256, $SourceRootSha256, $RuntimeSha256,
-    $AgeExePathSha256, $AgeExeSha256, $LocalOutputRootSha256, $ReplicaRootSha256, $QuiescenceEvidenceSha256)
+    $AgeExePathSha256, $AgeExeSha256, $AgeKeygenPathSha256, $AgeKeygenSha256,
+    $LocalOutputRootSha256, $ReplicaRootSha256, $QuiescenceEvidenceSha256)
   if ($AuthorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or $AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
       @($hashes | Where-Object { $_ -notmatch '^[0-9a-f]{40}$' -and $_ -notmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
       $ToolingCommit -notmatch '^[0-9a-f]{40}$' -or $InvocationContractSha256 -notmatch '^[0-9a-f]{64}$' -or
-      $Stage3LauncherSha256 -notmatch '^[0-9a-f]{64}$' -or $RuntimeRevision -lt 1 -or $ReplicaUncRoot -notmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -or
+      $Stage3LauncherSha256 -notmatch '^[0-9a-f]{64}$' -or $AgeRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
+      $AgeVersion -cne '1.3.1' -or $AgeKeygenVersion -cne '1.3.1' -or
+      $RuntimeRevision -lt 1 -or $ReplicaUncRoot -notmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -or
       $QuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
       @(@($CapturePlanFileName, $SelectionFileName) | Where-Object { $_ -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or $_ -notmatch [regex]::Escape($AttemptId) }).Count -gt 0 -or
       $QuiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
@@ -249,7 +257,11 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     toolingCommit = $ToolingCommit
     invocationContractSha256 = $InvocationContractSha256
     stage3LauncherSha256 = $Stage3LauncherSha256
-    securePassphraseBridgeRequired = $true
+    ageEncryptionMode = 'native-recipient-v1'
+    ageRecipient = $AgeRecipient
+    ageIdentityInputMode = 'stdin'
+    nativeRecipientRequired = $true
+    agePluginRequired = $false
     decryptRoundTripRequired = $true
     applicationCommit = $wp2.applicationCommit
     environmentId = $wp2.environmentId
@@ -266,6 +278,10 @@ function New-Phase7BWorkPackage2CaptureAuthorizationDocument {
     runtimeSha256 = $RuntimeSha256
     ageExePathSha256 = $AgeExePathSha256
     ageExeSha256 = $AgeExeSha256
+    ageVersion = $AgeVersion
+    ageKeygenPathSha256 = $AgeKeygenPathSha256
+    ageKeygenSha256 = $AgeKeygenSha256
+    ageKeygenVersion = $AgeKeygenVersion
     localOutputRootSha256 = $LocalOutputRootSha256
     replicaRootSha256 = $ReplicaRootSha256
     replicaUncRoot = $ReplicaUncRoot
@@ -304,26 +320,35 @@ function Assert-Phase7BWorkPackage2CaptureAuthorization {
     [Parameter(Mandatory = $true)][string]$ExpectedLocalOutputRootSha256,
     [Parameter(Mandatory = $true)][string]$ExpectedReplicaRootSha256,
     [Parameter(Mandatory = $true)][string]$ExpectedAgeExeSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedAgeKeygenSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedAgeRecipient,
     [Parameter(Mandatory = $true)][string]$ExpectedQuiescenceEvidenceSha256
   )
   $authorization = Assert-Phase7BWorkPackage2Authorization -LiteralPath $LiteralPath -ExpectedSha256 $ExpectedSha256 `
     -ExpectedStage 'WP2B_CAPTURE' -ExpectedAttemptId $ExpectedAttemptId -ExpectedSourceInventorySha256 $ExpectedInventorySha256 `
     -ExpectedSourceRootSha256 $ExpectedSourceRootSha256 -ExpectedCapturePlanSha256 $ExpectedCapturePlanSha256 `
     -ExpectedLocalOutputRootSha256 $ExpectedLocalOutputRootSha256 -ExpectedReplicaRootSha256 $ExpectedReplicaRootSha256
-  if ($ExpectedInvocationContractSha256 -cnotmatch '^[0-9a-f]{64}$' -or $ExpectedStage3LauncherSha256 -cnotmatch '^[0-9a-f]{64}$') {
+  if ($ExpectedInvocationContractSha256 -cnotmatch '^[0-9a-f]{64}$' -or $ExpectedStage3LauncherSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+      $ExpectedAgeKeygenSha256 -cnotmatch '^[0-9a-f]{64}$' -or $ExpectedAgeRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$') {
     throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_BINDING_MISMATCH'
   }
   $operator = Get-Phase7BWorkPackage2OperatorContract
-  $requiredBindingProperties = @('invocationContractSha256','stage3LauncherSha256','securePassphraseBridgeRequired','decryptRoundTripRequired')
+  $requiredBindingProperties = @('invocationContractSha256','stage3LauncherSha256','ageEncryptionMode','ageRecipient','ageIdentityInputMode',
+    'nativeRecipientRequired','agePluginRequired','ageVersion','ageKeygenPathSha256','ageKeygenSha256','ageKeygenVersion','decryptRoundTripRequired')
   if (@($requiredBindingProperties | Where-Object { @($authorization.PSObject.Properties.Name) -notcontains $_ }).Count -ne 0) {
     throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_BINDING_MISMATCH'
   }
   if ([string]$authorization.captureAuthorizationClassification -ne $operator.authorizationClassification -or
       [string]$authorization.authorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or
       [string]$authorization.toolingCommit -ne $ExpectedToolingCommit -or [string]$authorization.ageExeSha256 -ne $ExpectedAgeExeSha256 -or
+      [string]$authorization.ageKeygenSha256 -cne $ExpectedAgeKeygenSha256 -or
+      [string]$authorization.ageRecipient -cne $ExpectedAgeRecipient -or
       [string]$authorization.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
       [string]$authorization.stage3LauncherSha256 -cne $ExpectedStage3LauncherSha256 -or
-      -not [bool]$authorization.securePassphraseBridgeRequired -or -not [bool]$authorization.decryptRoundTripRequired -or
+      [string]$authorization.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$authorization.ageIdentityInputMode -cne 'stdin' -or -not [bool]$authorization.nativeRecipientRequired -or
+      [bool]$authorization.agePluginRequired -or [string]$authorization.ageVersion -cne '1.3.1' -or
+      [string]$authorization.ageKeygenVersion -cne '1.3.1' -or -not [bool]$authorization.decryptRoundTripRequired -or
       [string]$authorization.quiescenceEvidenceSha256 -ne $ExpectedQuiescenceEvidenceSha256 -or
       [string]$authorization.quiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
       [string]$authorization.quiescenceEvidenceFileName -notmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$' -or
@@ -331,6 +356,7 @@ function Assert-Phase7BWorkPackage2CaptureAuthorization {
       [string]$authorization.selectionFileName -notmatch '^[A-Za-z0-9._-]{1,180}\.json$' -or
       [string]$authorization.selectionSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$authorization.runtimeRevision -lt 1 -or
       [string]$authorization.runtimeSha256 -notmatch '^[0-9a-f]{64}$' -or [string]$authorization.ageExePathSha256 -notmatch '^[0-9a-f]{64}$' -or
+      [string]$authorization.ageKeygenPathSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$authorization.replicaUncRoot -notmatch '^\\\\LAPTOP-4G5UOU2R\\P7B[0-9a-f]{8}\$$' -or
       [string]$authorization.replicaPathModel -ne 'EXACT_ATTEMPT_ROOT' -or -not [bool]$authorization.oneUseOnly -or
       [string]$authorization.founderMeaningfulDataThrough -ne $operator.founderMeaningfulDataThrough -or

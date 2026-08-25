@@ -13,6 +13,9 @@ param(
   [Parameter(Mandatory = $true)][string]$SourceRoot,
   [Parameter(Mandatory = $true)][string]$AgeExePath,
   [Parameter(Mandatory = $true)][string]$ExpectedAgeExeSha256,
+  [Parameter(Mandatory = $true)][string]$AgeKeygenPath,
+  [Parameter(Mandatory = $true)][string]$ExpectedAgeKeygenSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedAgeRecipient,
   [Parameter(Mandatory = $true)][string]$LocalOutputRoot,
   [Parameter(Mandatory = $true)][string]$ReplicaUncRoot,
   [Parameter(Mandatory = $true)][string]$PrimaryHostIpv4,
@@ -47,11 +50,12 @@ try {
       $QuiescenceResumeAuthorizationAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_QUIESCENCE_READ_ONLY') {
     throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_RESUME_AUTHORIZATION_FAIL'
   }
-  $hashArguments = @($ExpectedToolingCommit, $ExpectedInvocationContractSha256, $ExpectedCapturePlanSha256, $ExpectedSelectionSha256, $ExpectedInventorySha256, $ExpectedAgeExeSha256, $ExpectedQuiescenceEvidenceSha256)
+  $hashArguments = @($ExpectedToolingCommit, $ExpectedInvocationContractSha256, $ExpectedCapturePlanSha256, $ExpectedSelectionSha256, $ExpectedInventorySha256, $ExpectedAgeExeSha256, $ExpectedAgeKeygenSha256, $ExpectedQuiescenceEvidenceSha256)
   if ($AuthorizationAcknowledgement -ne 'WP2B_CAPTURE_PREPARE_ONE_USE_AUTHORIZATION_EXACTLY_ONCE' -or
       $AuthorizationId -notmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or $AttemptId -notmatch '^phase7b-wp2-[0-9a-f]{32}$' -or
       @($hashArguments | Where-Object { $_ -notmatch '^[0-9a-f]{40}$' -and $_ -notmatch '^[0-9a-f]{64}$' }).Count -gt 0 -or
       $ExpectedToolingCommit -notmatch '^[0-9a-f]{40}$' -or $ExpectedQuiescenceEvidenceToolingCommit -notmatch '^[0-9a-f]{40}$' -or
+      $ExpectedAgeRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
       (Test-Path -LiteralPath $OutputPath)) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_ARGUMENT_FAIL' }
   $authorizationParent = Split-Path -Parent ([IO.Path]::GetFullPath($OutputPath))
   if (-not (Test-Path -LiteralPath $authorizationParent -PathType Container) -or
@@ -70,13 +74,18 @@ try {
   if ($head -ne $ExpectedToolingCommit -or $branch -ne 'combined-app-platform-cutover' -or $delta -ne "0`t0" -or $dirty.Count -ne 0) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_REPOSITORY_FAIL' }
   $stage = 'validate-static-bindings'
   foreach ($binding in @(@($InvocationContractPath, $ExpectedInvocationContractSha256), @($CapturePlanPath, $ExpectedCapturePlanSha256), @($SelectionPath, $ExpectedSelectionSha256),
-      @($QuiescenceEvidencePath, $ExpectedQuiescenceEvidenceSha256), @($AgeExePath, $ExpectedAgeExeSha256))) {
+      @($QuiescenceEvidencePath, $ExpectedQuiescenceEvidenceSha256), @($AgeExePath, $ExpectedAgeExeSha256),
+      @($AgeKeygenPath, $ExpectedAgeKeygenSha256))) {
     if (-not (Test-Path -LiteralPath $binding[0] -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $binding[0]) -ne $binding[1]) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_FILE_BINDING_FAIL' }
   }
   $invocation = Assert-Phase7BWorkPackage2InvocationContract -LiteralPath $InvocationContractPath `
     -ExpectedSha256 $ExpectedInvocationContractSha256 -ExpectedAttemptId $AttemptId
   if ([string]$invocation.toolingCommit -cne $head -or [string]$invocation.applicationCommit -cne [string](Get-Phase7BWorkPackage2Contract).applicationCommit -or
-      -not [bool]$invocation.securePassphraseBridgeRequired -or
+      [string]$invocation.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$invocation.ageRecipient -cne $ExpectedAgeRecipient -or [string]$invocation.ageIdentityInputMode -cne 'stdin' -or
+      -not [bool]$invocation.nativeRecipientRequired -or [bool]$invocation.agePluginRequired -or
+      [string]$invocation.ageExeSha256 -cne $ExpectedAgeExeSha256 -or
+      [string]$invocation.ageKeygenSha256 -cne $ExpectedAgeKeygenSha256 -or
       -not [bool]$invocation.decryptRoundTripRequired) { throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_INVOCATION_TOOLING_FAIL' }
   $stage3Artifacts = @($invocation.artifacts | Where-Object { [string]$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage3.ps1' })
   $stage3Path = Join-Path $PSScriptRoot 'phase7bRunWorkPackage2Stage3.ps1'
@@ -118,6 +127,9 @@ try {
   $ageVersionLines = @(& $AgeExePath --version 2>&1)
   $ageVersion = Test-Phase7BAgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE
   if (-not $ageVersion.pass) { throw 'PHASE7B_WP2_AGE_VERSION_UNSUPPORTED' }
+  $ageKeygenVersionLines = @(& $AgeKeygenPath --version 2>&1)
+  $ageKeygenVersion = Test-Phase7BAgeVersionOutput -OutputLines @($ageKeygenVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE
+  if (-not $ageKeygenVersion.pass) { throw 'PHASE7B_WP2_AGE_KEYGEN_VERSION_UNSUPPORTED' }
   $localBase = [IO.Path]::GetFullPath($LocalOutputRoot).TrimEnd('\')
   $localDrive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($localBase).Substring(0,1)) -PSProvider FileSystem -ErrorAction Stop
   if ([int64]$localDrive.Free -lt [Math]::Max([int64]1GB, [int64]$plan.totalBytes) -or (Test-Path -LiteralPath (Join-Path $localBase $AttemptId))) { throw 'PHASE7B_WP2B_PRIMARY_DESTINATION_FAIL' }
@@ -132,13 +144,18 @@ try {
   $localRootSha = Get-Phase7BSha256 -Text $localBase.ToLowerInvariant()
   $replicaRootSha = Get-Phase7BSha256 -Text $ReplicaUncRoot.ToLowerInvariant()
   $agePathSha = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($AgeExePath).ToLowerInvariant())
+  $ageKeygenPathSha = Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($AgeKeygenPath).ToLowerInvariant())
+  if ([string]$invocation.ageExePathSha256 -cne $agePathSha -or [string]$invocation.ageKeygenPathSha256 -cne $ageKeygenPathSha) {
+    throw 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_AGE_PATH_BINDING_FAIL'
+  }
   $issued = [DateTime]::UtcNow
   $document = New-Phase7BWorkPackage2CaptureAuthorizationDocument -AuthorizationId $AuthorizationId -AttemptId $AttemptId `
     -ToolingCommit $head -InvocationContractSha256 $ExpectedInvocationContractSha256 -Stage3LauncherSha256 $stage3LauncherSha256 `
     -CapturePlanSha256 $ExpectedCapturePlanSha256 -CapturePlanFileName (Split-Path -Leaf $CapturePlanPath) `
     -InventorySha256 $ExpectedInventorySha256 `
     -SelectionSha256 $ExpectedSelectionSha256 -SelectionFileName (Split-Path -Leaf $SelectionPath) -SourceRootSha256 $sourceRootSha -RuntimeRevision ([int64]$auditAfter.runtimeRevision) `
-    -RuntimeSha256 ([string]$auditAfter.runtimeSha256) -AgeExePathSha256 $agePathSha -AgeExeSha256 $ExpectedAgeExeSha256 `
+    -RuntimeSha256 ([string]$auditAfter.runtimeSha256) -AgeExePathSha256 $agePathSha -AgeExeSha256 $ExpectedAgeExeSha256 -AgeVersion ([string]$ageVersion.normalizedVersion) `
+    -AgeKeygenPathSha256 $ageKeygenPathSha -AgeKeygenSha256 $ExpectedAgeKeygenSha256 -AgeKeygenVersion ([string]$ageKeygenVersion.normalizedVersion) -AgeRecipient $ExpectedAgeRecipient `
     -LocalOutputRootSha256 $localRootSha -ReplicaRootSha256 $replicaRootSha -ReplicaUncRoot $ReplicaUncRoot `
     -QuiescenceEvidenceSha256 $ExpectedQuiescenceEvidenceSha256 -QuiescenceEvidenceFileName (Split-Path -Leaf $QuiescenceEvidencePath) `
     -QuiescenceEvidenceToolingCommit $ExpectedQuiescenceEvidenceToolingCommit `
@@ -152,7 +169,7 @@ try {
     throw 'PHASE7B_WP2B_CAPTURE_CURRENT_AUTHORIZATION_CONFLICT'
   }
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $document
-  [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; invocationContractSha256 = $ExpectedInvocationContractSha256; stage3LauncherSha256 = $stage3LauncherSha256; securePassphraseBridgeRequired = $true; decryptRoundTripRequired = $true; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanFileName = Split-Path -Leaf $CapturePlanPath; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCapacityBytes = [Math]::Max([int64]1GB, ([int64]$plan.totalBytes * 2L) + [int64]64MB); laptopIpv4 = $LaptopIpv4; laptopIdentityDeferredToReceiver = $true; laptopReachabilityDeferredToReceiver = $true; primaryNetworkBindingPass = $true; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
+  [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_PASS'; pass = $true; authorizationId = $AuthorizationId; attemptId = $AttemptId; authorizationFileName = $persisted.fileName; authorizationSha256 = $persisted.sha256; toolingCommit = $head; invocationContractSha256 = $ExpectedInvocationContractSha256; stage3LauncherSha256 = $stage3LauncherSha256; ageEncryptionMode = 'native-recipient-v1'; ageRecipient = $ExpectedAgeRecipient; ageIdentityInputMode = 'stdin'; nativeRecipientRequired = $true; agePluginRequired = $false; decryptRoundTripRequired = $true; runtimeRevision = [int64]$auditAfter.runtimeRevision; runtimeSha256 = [string]$auditAfter.runtimeSha256; capturePlanFileName = Split-Path -Leaf $CapturePlanPath; capturePlanSha256 = $ExpectedCapturePlanSha256; sourceInventorySha256 = $ExpectedInventorySha256; selectionSha256 = $ExpectedSelectionSha256; requiredCapacityBytes = [Math]::Max([int64]1GB, ([int64]$plan.totalBytes * 2L) + [int64]64MB); laptopIpv4 = $LaptopIpv4; laptopIdentityDeferredToReceiver = $true; laptopReachabilityDeferredToReceiver = $true; primaryNetworkBindingPass = $true; requiredCollectionCount = 39; missingMediaReferenceCount = 0; credentialSignalCount = 0; quiescencePass = $true; sourceStableAcrossPreflight = $true; automaticRetryAllowed = $false; wp2cAuthorized = $false } | ConvertTo-Json -Depth 5
 } catch {
   $safeCode = if ($_.Exception.Message -match '^PHASE7B_') { $_.Exception.Message } else { 'PHASE7B_WP2B_CAPTURE_PREFLIGHT_EXCEPTION' }
   [ordered]@{ classification = 'PHASE7B_WP2B_STABLE_PREFLIGHT_AND_AUTHORIZATION_FAIL'; pass = $false; safeStage = $stage; safeErrorCode = $safeCode; safeExceptionType = $_.Exception.GetType().Name; safeLine = $_.InvocationInfo.ScriptLineNumber; mutationStarted = $false; automaticRetryAllowed = $false } | ConvertTo-Json -Depth 4

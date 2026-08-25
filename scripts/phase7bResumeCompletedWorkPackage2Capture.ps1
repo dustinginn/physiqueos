@@ -50,7 +50,11 @@ try {
       [int64]$descriptor.decryptedStreamBytes -ne [int64]$descriptor.plaintextZipBytes -or -not [bool]$descriptor.decryptRoundTripPass -or
       [string]$descriptor.invocationContractSha256 -cnotmatch '^[0-9a-f]{64}$' -or
       [string]$descriptor.stage3LauncherSha256 -cnotmatch '^[0-9a-f]{64}$' -or
-      -not [bool]$descriptor.securePassphraseBridgeRequired -or -not [bool]$descriptor.decryptRoundTripRequired) {
+      [string]$descriptor.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$descriptor.ageRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
+      [string]$descriptor.ageIdentityInputMode -cne 'stdin' -or -not [bool]$descriptor.nativeRecipientRequired -or
+      [bool]$descriptor.agePluginRequired -or [string]$descriptor.ageVersion -cne '1.3.1' -or
+      [string]$descriptor.ageKeygenVersion -cne '1.3.1' -or -not [bool]$descriptor.decryptRoundTripRequired) {
     throw 'PHASE7B_WP2B_COMPLETED_CAPTURE_RESUME_BINDING_FAIL'
   }
   $global:LASTEXITCODE = 0

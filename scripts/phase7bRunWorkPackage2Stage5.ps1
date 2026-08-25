@@ -25,13 +25,19 @@ $authorization=Assert-Phase7BWorkPackage2Authorization -LiteralPath $Authorizati
 if([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head -or
    [string]$authorization.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
    [string]$authorization.stage3LauncherSha256 -cne [string]$stage3[0].sha256 -or
-   -not [bool]$authorization.securePassphraseBridgeRequired -or -not [bool]$authorization.decryptRoundTripRequired){throw 'PHASE7B_WP2B_STAGE5_AUTHORIZATION_BINDING_FAIL'}
+   [string]$authorization.ageEncryptionMode -cne 'native-recipient-v1' -or
+   [string]$authorization.ageRecipient -cne [string]$invocation.ageRecipient -or
+   [string]$authorization.ageIdentityInputMode -cne 'stdin' -or -not [bool]$authorization.nativeRecipientRequired -or
+   [bool]$authorization.agePluginRequired -or -not [bool]$authorization.decryptRoundTripRequired){throw 'PHASE7B_WP2B_STAGE5_AUTHORIZATION_BINDING_FAIL'}
 $attemptRoot=Join-Path ([IO.Path]::GetFullPath($LocalOutputRoot).TrimEnd('\')) $AttemptId
 $packetPath=Join-Path $attemptRoot "$AttemptId.zip.age";$pendingPath=Join-Path $attemptRoot "$AttemptId-pending-descriptor.json"
 if(-not(Test-Path -LiteralPath $packetPath -PathType Leaf)-or -not(Test-Path -LiteralPath $pendingPath -PathType Leaf)){throw 'PHASE7B_WP2B_STAGE5_CAPTURE_INPUT_MISSING'}
 $packetSha=Get-Phase7BSha256 -LiteralPath $packetPath;$packetBytes=[int64](Get-Item -LiteralPath $packetPath).Length
 $pending=Get-Content -LiteralPath $pendingPath -Raw|ConvertFrom-Json -ErrorAction Stop
-if(-not [bool]$pending.decryptRoundTripPass -or -not [bool]$pending.decryptRoundTripRequired -or -not [bool]$pending.securePassphraseBridgeRequired -or
+if(-not [bool]$pending.decryptRoundTripPass -or -not [bool]$pending.decryptRoundTripRequired -or
+   [string]$pending.ageEncryptionMode -cne 'native-recipient-v1' -or [string]$pending.ageRecipient -cne [string]$invocation.ageRecipient -or
+   [string]$pending.ageIdentityInputMode -cne 'stdin' -or -not [bool]$pending.nativeRecipientRequired -or [bool]$pending.agePluginRequired -or
+   [string]$pending.ageVersion -cne '1.3.1' -or [string]$pending.ageKeygenVersion -cne '1.3.1' -or
    [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or [string]$pending.stage3LauncherSha256 -cne [string]$stage3[0].sha256 -or
    [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes){throw 'PHASE7B_WP2B_STAGE5_ROUND_TRIP_BINDING_FAIL'}
 $shareName="P7B$($AttemptId.Substring($AttemptId.Length-8))`$";$connections=@(Get-SmbConnection -ServerName 'LAPTOP-4G5UOU2R' -ErrorAction SilentlyContinue|Where-Object{$_.ShareName -eq $shareName})

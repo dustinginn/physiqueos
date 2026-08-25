@@ -12,6 +12,7 @@ param(
   [Parameter()][string]$ExpectedDescriptorSha256,
   [Parameter()][string]$AgeExePath,
   [Parameter()][string]$ExpectedAgeExeSha256,
+  [Parameter()][Security.SecureString]$AgeIdentity,
   [Parameter()][string]$ReportPath
 )
 
@@ -21,6 +22,7 @@ Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -For
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestReconciliation.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "phase7bWindowsAgeIdentityBridge.psm1") -Force
 $guestContract = Get-Phase7BIsolatedGuestContract
 $contract = Get-Phase7BWorkPackage2Contract
 $nonce = [Guid]::NewGuid().ToString("N")
@@ -76,7 +78,11 @@ function Read-BoundDescriptor {
       [string]$descriptor.packetFileName -ne (Split-Path -Leaf $PacketPath) -or [string]$descriptor.packetSha256 -ne $ExpectedSha256.ToLowerInvariant() -or -not [bool]$descriptor.localEncryptedCopyPass -or
       -not [bool]$descriptor.independentEncryptedReplicaPass -or [string]$descriptor.ageFileName -ne $contract.ageMediaFileName -or
       [string]$descriptor.ageExeSha256 -notmatch '^[0-9a-f]{64}$' -or -not [bool]$descriptor.decryptRoundTripPass -or
-      -not [bool]$descriptor.decryptRoundTripRequired -or -not [bool]$descriptor.securePassphraseBridgeRequired -or
+      -not [bool]$descriptor.decryptRoundTripRequired -or [string]$descriptor.ageEncryptionMode -cne 'native-recipient-v1' -or
+      [string]$descriptor.ageRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
+      [string]$descriptor.ageIdentityInputMode -cne 'stdin' -or -not [bool]$descriptor.nativeRecipientRequired -or
+      [bool]$descriptor.agePluginRequired -or [string]$descriptor.ageVersion -cne '1.3.1' -or
+      [string]$descriptor.ageKeygenVersion -cne '1.3.1' -or
       [string]$descriptor.invocationContractSha256 -notmatch '^[0-9a-f]{64}$' -or [string]$descriptor.stage3LauncherSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$descriptor.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or
       [string]$descriptor.decryptedStreamSha256 -cne [string]$descriptor.plaintextZipSha256 -or
@@ -218,16 +224,15 @@ try {
         -not (Test-Path -LiteralPath $AgeExePath -PathType Leaf) -or (Get-Phase7BSha256 -LiteralPath $AgeExePath) -ne $ExpectedAgeExeSha256.ToLowerInvariant()) { throw "PHASE7B_WP2_AGE_IDENTITY_MISMATCH" }
     $ageVersionLines = @(& $AgeExePath --version 2>&1)
     if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
-    if ($Host.Name -ne "ConsoleHost" -or -not [Environment]::UserInteractive) { throw "PHASE7B_WP2_INTERACTIVE_SECRET_CONSOLE_REQUIRED" }
+    if ($null -eq $AgeIdentity -or $AgeIdentity.Length -ne 74) { throw "PHASE7B_WP2_AGE_IDENTITY_REQUIRED" }
     $finalRestore = Join-Path $restore $contract.restoredPacketDirectoryName
     $incompleteRestore = Join-Path $restore ".incomplete-$AttemptId"
     $temporaryZip = Join-Path $restore ".decrypted-$AttemptId.zip"
     if ((Test-Path -LiteralPath $finalRestore) -or (Test-Path -LiteralPath $incompleteRestore) -or (Test-Path -LiteralPath $temporaryZip)) { throw "PHASE7B_WP2_RESTORE_DESTINATION_NOT_FRESH" }
-    $stage = "interactive-age-decryption"
+    $stage = "native-identity-age-decryption"
     $mutationStarted = $true
-    Write-Host "PHASE7B_WP2_ENTER_PASSPHRASE_IN_AGE_TTY"
-    & $AgeExePath -d -o $temporaryZip $resolvedPacket
-    if ($LASTEXITCODE -ne 0) { throw "PHASE7B_WP2_AGE_DECRYPTION_FAILED" }
+    $decryptResult = Invoke-Phase7BAgeNativeIdentityDecryptionToFile -AgeExePath $AgeExePath -CiphertextPath $resolvedPacket -OutputPath $temporaryZip -Identity $AgeIdentity
+    if (-not [bool]$decryptResult.pass) { throw "PHASE7B_WP2_AGE_DECRYPTION_FAILED" }
     $stage = "extract-and-verify"
     [void](Expand-Phase7BSafePacketZip -LiteralPath $temporaryZip -DestinationRoot $incompleteRestore)
     $verified = Test-RestoredPacket -Root $incompleteRestore

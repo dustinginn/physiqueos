@@ -23,7 +23,7 @@ try {
     'phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.psm1',
     'phase7bWorkPackage2Contract.psm1','phase7bWorkPackage2OperatorLifecycle.psm1',
     'phase7bWorkPackage2AuthorizationEligibility.psm1','phase7bWorkPackage2Orchestration.psm1',
-    'phase7bWindowsAgePassphraseBridge.psm1','phase7bIsolatedGuestContract.psm1','phase7bSecondComputerReplicaContract.psm1'
+    'phase7bWindowsAgeIdentityBridge.psm1','phase7bIsolatedGuestContract.psm1','phase7bSecondComputerReplicaContract.psm1'
   )
   foreach ($name in $requiredNames) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $syntheticScripts $name)
@@ -39,12 +39,18 @@ try {
   & git -C $syntheticRoot update-ref refs/remotes/origin/combined-app-platform-cutover $syntheticCommit
   $outputRoot = Join-Path $syntheticRoot '.tmp'
   [void](New-Item -ItemType Directory -Path $outputRoot)
+  $fakeAge=Join-Path $outputRoot 'age.cmd';$fakeKeygen=Join-Path $outputRoot 'age-keygen.cmd'
+  [IO.File]::WriteAllText($fakeAge,"@echo off`r`necho v1.3.1`r`n",(New-Object Text.ASCIIEncoding))
+  [IO.File]::WriteAllText($fakeKeygen,"@echo off`r`necho v1.3.1`r`n",(New-Object Text.ASCIIEncoding))
+  $fakeAgeSha=Get-Phase7BSha256 -LiteralPath $fakeAge;$fakeKeygenSha=Get-Phase7BSha256 -LiteralPath $fakeKeygen
+  $recipient='age1'+('q'*58)
 
   $firstPath = Join-Path $outputRoot 'invocation-one.json'
   $priorErrorPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   $firstLines = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $syntheticScripts 'phase7bNewWorkPackage2InvocationContract.ps1') `
-    -AttemptId $attemptId -OutputPath $firstPath 2>&1)
+    -AttemptId $attemptId -OutputPath $firstPath -AgeRecipient $recipient -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeSha `
+    -AgeKeygenPath $fakeKeygen -ExpectedAgeKeygenSha256 $fakeKeygenSha 2>&1)
   $firstExit = $LASTEXITCODE
   $ErrorActionPreference = $priorErrorPreference
   if ($firstExit -ne 0) { throw "FRESH_PS51_GENERATOR_FAIL:$($firstLines -join '|')" }
@@ -53,7 +59,11 @@ try {
   Assert-True ((Test-Path -LiteralPath $firstPath -PathType Leaf) -and [string]$first.sha256 -ceq (Get-Phase7BSha256 -LiteralPath $firstPath)) 'generator persists exactly hash-bound contract'
   $contract = Get-Content -LiteralPath $firstPath -Raw | ConvertFrom-Json -ErrorAction Stop
   Assert-True ([string]$contract.toolingCommit -ceq $syntheticCommit -and [string]$contract.attemptId -ceq $attemptId) 'generated contract binds synthetic repository and attempt'
-  Assert-True ([bool]$contract.securePassphraseBridgeRequired -and [bool]$contract.decryptRoundTripRequired) 'generated contract binds secure bridge and decrypt round trip'
+  Assert-True ([int]$contract.schemaVersion -eq 2 -and [string]$contract.ageEncryptionMode -ceq 'native-recipient-v1' -and
+    [string]$contract.ageRecipient -ceq $recipient -and [string]$contract.ageIdentityInputMode -ceq 'stdin' -and
+    [bool]$contract.nativeRecipientRequired -and -not [bool]$contract.agePluginRequired -and [bool]$contract.decryptRoundTripRequired) 'generated contract binds native recipient and decrypt round trip'
+  Assert-True ([string]$contract.ageExeSha256 -ceq $fakeAgeSha -and [string]$contract.ageKeygenSha256 -ceq $fakeKeygenSha) 'generated contract binds exact age and age-keygen executables'
+  Assert-True ([string]$contract.ageVersion -ceq '1.3.1' -and [string]$contract.ageKeygenVersion -ceq '1.3.1') 'generated contract machine-derives both trusted executable versions'
   foreach ($stage in 3..5) {
     $relativePath = "scripts/phase7bRunWorkPackage2Stage$stage.ps1"
     $artifact = @($contract.artifacts | Where-Object { [string]$_.relativePath -ceq $relativePath })
@@ -68,7 +78,8 @@ try {
   $secondPath = Join-Path $outputRoot 'invocation-two.json'
   $ErrorActionPreference = 'Continue'
   $secondLines = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $syntheticScripts 'phase7bNewWorkPackage2InvocationContract.ps1') `
-    -AttemptId $attemptId -OutputPath $secondPath 2>&1)
+    -AttemptId $attemptId -OutputPath $secondPath -AgeRecipient $recipient -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeSha `
+    -AgeKeygenPath $fakeKeygen -ExpectedAgeKeygenSha256 $fakeKeygenSha 2>&1)
   $secondExit = $LASTEXITCODE
   $ErrorActionPreference = $priorErrorPreference
   if ($secondExit -ne 0) { throw "SECOND_FRESH_PS51_GENERATOR_FAIL:$($secondLines -join '|')" }

@@ -13,6 +13,9 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 $sourceFiles = @(
   "phase7bIsolatedGuestContract.psm1",
+  "phase7bWorkPackage2Contract.psm1",
+  "phase7bIsolatedGuestReconciliation.psm1",
+  "phase7bWindowsAgeIdentityBridge.psm1",
   "phase7bIsolatedGuestBootstrap.ps1",
   "phase7bIsolatedGuestRestoreInterface.ps1",
   "Invoke-Phase7BGuestBootstrap.ps1"
