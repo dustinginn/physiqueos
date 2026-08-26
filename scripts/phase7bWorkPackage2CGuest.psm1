@@ -52,6 +52,19 @@ function Assert-Phase7BWP2CInstalledTooling {
   }
 }
 
+function Assert-Phase7BWP2CGuestRoots {
+  param([string]$RepositoryRoot,[string]$IsolatedRoot)
+  # Independent authoritative roots: the checkout is not isolated restore data.
+  # Reuse the exact source-owned root contract; never infer one owner from another.
+  foreach($root in @($RepositoryRoot,$IsolatedRoot)) { [void](Assert-Phase7BWP2CLocalPath $root) }
+  Assert-Phase7BWP2C (Test-Phase7BGuestPathContract -RepositoryRoot $RepositoryRoot -IsolatedRoot $IsolatedRoot).pass 'GUEST_ROOT_BINDING'
+  foreach($root in @($RepositoryRoot,$IsolatedRoot)) {
+    Assert-Phase7BWP2C (Test-Path -LiteralPath $root -PathType Container) 'ROOT_MISSING'
+    $item=Get-Item -LiteralPath $root -Force -ErrorAction Stop
+    Assert-Phase7BWP2C ($item.PSIsContainer -and $item.PSProvider.Name -ceq 'FileSystem' -and $item.FullName.TrimEnd('\') -ieq $root.TrimEnd('\')) 'GUEST_ROOT_LOCATION'
+  }
+}
+
 function Get-Phase7BWP2CGuestObservation {
   param($Contract)
   $b=$Contract.bindings;$fixed=Get-Phase7BIsolatedGuestContract
@@ -59,8 +72,9 @@ function Get-Phase7BWP2CGuestObservation {
   # Wrong physical machine fails before probing guest paths or running any helper.
   Assert-Phase7BWP2C ($computer.Manufacturer -ceq 'VMware, Inc.' -and $computer.Model -match '^VMware') 'WRONG_MACHINE'
   $identity=Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop
-  [void](Assert-Phase7BWP2CLocalPath $fixed.repositoryRoot $fixed.isolatedRoot)
+  Assert-Phase7BWP2CGuestRoots $fixed.repositoryRoot $fixed.isolatedRoot
   $markerPath=Join-Path $fixed.isolatedRoot 'guest-identity-marker.json'
+  [void](Assert-Phase7BWP2CLocalPath $markerPath $fixed.isolatedRoot)
   $marker=Read-Phase7BWP2CBoundJson $markerPath $b.guestMarkerSha256
   Assert-Phase7BWP2C ($marker.schemaVersion -eq 1 -and $marker.applicationCommit -ceq $fixed.applicationCommit -and $marker.manifestDigest -ceq $fixed.manifestDigest -and $marker.windowsHostId -ceq $fixed.windowsHostId -and $marker.windowsRuntimeId -ceq $fixed.windowsRuntimeId) 'GUEST_MARKER_CONTENT'
   $os=Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
@@ -78,8 +92,10 @@ function Get-Phase7BWP2CGuestObservation {
   Assert-Phase7BWP2C ($LASTEXITCODE -eq 0) 'APPLICATION_REPOSITORY'
   $tasks=@(foreach($name in @($fixed.productionTaskName,$fixed.monitorTaskName,$fixed.ngrokTaskName)){Get-ScheduledTask -TaskName $name -ErrorAction Stop})
   $taskEvidence=Test-Phase7BInertTaskSet -TaskProjections @($tasks | ForEach-Object {Get-Phase7BReconciliationTaskProjection -TaskName $_.TaskName -Task @($_)}) -Contract $fixed
-  $runtime=Get-Content -LiteralPath (Join-Path $fixed.repositoryRoot 'logs\physiqueos-runtime-control.json') -Raw -ErrorAction Stop | ConvertFrom-Json
-  $ngrok=Get-Content -LiteralPath (Join-Path $fixed.repositoryRoot 'logs\physiqueos-ngrok-control.json') -Raw -ErrorAction Stop | ConvertFrom-Json
+  $runtimePath=Assert-Phase7BWP2CLocalPath (Join-Path $fixed.repositoryRoot 'logs\physiqueos-runtime-control.json') $fixed.repositoryRoot
+  $ngrokPath=Assert-Phase7BWP2CLocalPath (Join-Path $fixed.repositoryRoot 'logs\physiqueos-ngrok-control.json') $fixed.repositoryRoot
+  $runtime=Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
+  $ngrok=Get-Content -LiteralPath $ngrokPath -Raw -ErrorAction Stop | ConvertFrom-Json
   $license=@(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f'" -ErrorAction Stop | Where-Object {$_.PartialProductKey -and $_.Name -like 'Windows*' -and $_.LicenseStatus -eq 1})
   Assert-Phase7BWP2C ($license.Count -eq 1) 'WINDOWS_LICENSE_UNRESOLVED'
   $processes=@(Get-CimInstance Win32_Process -ErrorAction Stop)
@@ -106,6 +122,7 @@ function Get-Phase7BWP2CGuestObservation {
   $restoreDisk=@($drives | Where-Object {$_.DeviceID -ceq $b.restoreRoot.Substring(0,2)})[0]
   $scan=New-Object 'Collections.Generic.Stack[string]';$scan.Push($fixed.repositoryRoot)
   while($scan.Count -gt 0){foreach($child in @(Get-ChildItem -LiteralPath $scan.Pop() -Force -ErrorAction Stop)){
+    [void](Assert-Phase7BWP2CLocalPath $child.FullName $fixed.repositoryRoot)
     Assert-Phase7BWP2C (-not ($child.Attributes -band [IO.FileAttributes]::ReparsePoint)) 'REPOSITORY_REPARSE_PATH'
     if($child.PSIsContainer -and $child.Name -notin @('.git','node_modules','.next','logs')){$scan.Push($child.FullName)}
   }}
