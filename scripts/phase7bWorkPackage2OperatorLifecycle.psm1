@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Orchestration.psm1')
 
 function Get-Phase7BWorkPackage2OperatorContract {
   [CmdletBinding()] param()
@@ -369,6 +370,141 @@ function Assert-Phase7BWorkPackage2CaptureAuthorization {
   $authorization
 }
 
+function Assert-Phase7BWorkPackage2PendingFinalizationInput {
+  # Read-only producer/consumer boundary. Never repair or reserialize accepted pending evidence.
+  [CmdletBinding()] param(
+    [Parameter(Mandatory = $true)][string]$AttemptId,
+    [Parameter(Mandatory = $true)][string]$PendingDescriptorPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedPendingDescriptorSha256,
+    [Parameter(Mandatory = $true)][string]$InvocationContractPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedInvocationContractSha256,
+    [Parameter(Mandatory = $true)][string]$CaptureAuthorizationPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedCaptureAuthorizationSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedToolingCommit,
+    [Parameter(Mandatory = $true)][string]$ExpectedStage3LauncherSha256,
+    [Parameter(Mandatory = $true)][string]$ExpectedPacketSha256,
+    [Parameter(Mandatory = $true)][int64]$ExpectedPacketBytes
+  )
+  $hashes = @($ExpectedPendingDescriptorSha256, $ExpectedInvocationContractSha256,
+    $ExpectedCaptureAuthorizationSha256, $ExpectedStage3LauncherSha256, $ExpectedPacketSha256)
+  if ($AttemptId -cnotmatch '^phase7b-wp2-[0-9a-f]{32}$' -or $ExpectedToolingCommit -cnotmatch '^[0-9a-f]{40}$' -or
+      $ExpectedPacketBytes -lt 1 -or @($hashes | Where-Object { $_ -cnotmatch '^[0-9a-f]{64}$' }).Count -ne 0) {
+    throw 'PHASE7B_WP2_PENDING_FINALIZATION_ARGUMENT_FAIL'
+  }
+  if ((Get-Phase7BSha256 -LiteralPath $PendingDescriptorPath) -cne $ExpectedPendingDescriptorSha256) {
+    throw 'PHASE7B_WP2_PENDING_FINALIZATION_HASH_FAIL'
+  }
+  $pending = Get-Content -LiteralPath $PendingDescriptorPath -Raw | ConvertFrom-Json -ErrorAction Stop
+  # Exact native-recipient schema v1 emitted by the tracked Stage 3 producer. The four
+  # authorization duplicates were never emitted by that producer. No other omission or
+  # extension is accepted; all four duplicates, when present, must agree with their owners.
+  $owned = @('schemaVersion','classification','attemptId','applicationCommit','environmentId','vmDisplayName',
+    'windowsHostId','manifestDigest','invocationContractSha256','stage3LauncherSha256','sourceInventorySha256',
+    'sourceRootSha256','capturePlanSha256','localOutputRootSha256','replicaRootSha256','replicaClassification',
+    'packetFileName','packetSha256','packetBytes','plaintextZipSha256','plaintextZipBytes','decryptedStreamSha256',
+    'decryptedStreamBytes','decryptRoundTripPass','decryptRoundTripRequired','ageEncryptionMode','ageRecipient',
+    'ageIdentityInputMode','nativeRecipientRequired','agePluginRequired','ageFileName','ageExeSha256','ageVersion',
+    'ageKeygenSha256','ageKeygenVersion','referenceIndexVersion','referenceIndexSha256','referenceIndexFileSha256',
+    'localEncryptedCopyPass','independentEncryptedReplicaPass','independentLaptopReadbackRequired',
+    'ephemeralTransportTeardownRequired','plaintextSecretPersisted','automaticRetryAllowed')
+  $duplicates = @('captureAuthorizationId','captureAuthorizationSha256','captureAuthorizationToolingCommit','quiescenceEvidenceSha256')
+  $properties = @($pending.PSObject.Properties.Name)
+  $duplicateCount = @($duplicates | Where-Object { $properties -ccontains $_ }).Count
+  if (@($owned | Where-Object { $properties -cnotcontains $_ }).Count -ne 0 -or
+      @($properties | Where-Object { $owned -cnotcontains $_ -and $duplicates -cnotcontains $_ }).Count -ne 0 -or
+      $duplicateCount -notin @(0,4)) { throw 'PHASE7B_WP2_PENDING_FINALIZATION_SHAPE_FAIL' }
+  foreach ($name in @('schemaVersion','packetBytes','plaintextZipBytes','decryptedStreamBytes')) {
+    $value = $pending.PSObject.Properties[$name].Value
+    if ($value -isnot [int] -and $value -isnot [long]) { throw 'PHASE7B_WP2_PENDING_FINALIZATION_SHAPE_FAIL' }
+  }
+  $trueFields = @('localEncryptedCopyPass','independentLaptopReadbackRequired','ephemeralTransportTeardownRequired',
+    'decryptRoundTripPass','decryptRoundTripRequired','nativeRecipientRequired')
+  $falseFields = @('independentEncryptedReplicaPass','plaintextSecretPersisted','automaticRetryAllowed','agePluginRequired')
+  foreach ($name in $trueFields + $falseFields) {
+    $value = $pending.PSObject.Properties[$name].Value
+    if ($value -isnot [bool] -or $value -ne ($trueFields -ccontains $name)) { throw 'PHASE7B_WP2_PENDING_FINALIZATION_FLAGS_FAIL' }
+  }
+  $pendingHashes = @('manifestDigest','invocationContractSha256','stage3LauncherSha256','sourceInventorySha256',
+    'sourceRootSha256','capturePlanSha256','localOutputRootSha256','replicaRootSha256','packetSha256',
+    'plaintextZipSha256','decryptedStreamSha256','ageExeSha256','ageKeygenSha256','referenceIndexSha256','referenceIndexFileSha256')
+  foreach ($name in $pendingHashes) {
+    if ($pending.PSObject.Properties[$name].Value -isnot [string] -or
+        [string]$pending.PSObject.Properties[$name].Value -cnotmatch '^[0-9a-f]{64}$') { throw 'PHASE7B_WP2_PENDING_FINALIZATION_BINDING_FAIL' }
+  }
+  $contract = Get-Phase7BWorkPackage2Contract
+  if ([int]$pending.schemaVersion -ne 1 -or
+      [string]$pending.classification -cne 'PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK' -or
+      [string]$pending.attemptId -cne $AttemptId -or [string]$pending.applicationCommit -cne $contract.applicationCommit -or
+      [string]$pending.environmentId -cne $contract.environmentId -or [string]$pending.vmDisplayName -cne $contract.vmDisplayName -or
+      [string]$pending.windowsHostId -cne $contract.windowsHostId -or [string]$pending.manifestDigest -cne $contract.manifestDigest -or
+      [string]$pending.packetFileName -cne "$AttemptId.zip.age" -or [string]$pending.packetSha256 -cne $ExpectedPacketSha256 -or
+      [int64]$pending.packetBytes -ne $ExpectedPacketBytes -or [int64]$pending.plaintextZipBytes -lt 1 -or
+      [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or
+      [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes -or
+      [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
+      [string]$pending.stage3LauncherSha256 -cne $ExpectedStage3LauncherSha256 -or
+      [string]$pending.ageEncryptionMode -cne 'native-recipient-v1' -or [string]$pending.ageIdentityInputMode -cne 'stdin' -or
+      [string]$pending.ageVersion -cne '1.3.1' -or [string]$pending.ageKeygenVersion -cne '1.3.1' -or
+      [string]$pending.ageFileName -cne $contract.ageMediaFileName -or
+      [string]$pending.replicaClassification -cne 'OFF_MACHINE_OR_INDEPENDENT_STORAGE' -or
+      [string]$pending.referenceIndexVersion -cne 'phase7b-wp2-reference-index-v1') { throw 'PHASE7B_WP2_PENDING_FINALIZATION_BINDING_FAIL' }
+  $invocation = Assert-Phase7BWorkPackage2InvocationContract -LiteralPath $InvocationContractPath `
+    -ExpectedSha256 $ExpectedInvocationContractSha256 -ExpectedAttemptId $AttemptId
+  $stage3 = @($invocation.artifacts | Where-Object { $_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage3.ps1' })
+  if ($stage3.Count -ne 1 -or [string]$stage3[0].sha256 -cne $ExpectedStage3LauncherSha256 -or
+      [string]$invocation.toolingCommit -cne $ExpectedToolingCommit -or
+      [string]$invocation.applicationCommit -cne [string]$pending.applicationCommit -or
+      [string]$invocation.ageRecipient -cne [string]$pending.ageRecipient -or
+      [string]$invocation.ageExeSha256 -cne [string]$pending.ageExeSha256 -or
+      [string]$invocation.ageKeygenSha256 -cne [string]$pending.ageKeygenSha256) { throw 'PHASE7B_WP2_PENDING_FINALIZATION_INVOCATION_FAIL' }
+  # Read the hash-selected authorization first, before using its bounded evidence filename.
+  $preview = Assert-Phase7BWorkPackage2Authorization -LiteralPath $CaptureAuthorizationPath `
+    -ExpectedSha256 $ExpectedCaptureAuthorizationSha256 -ExpectedStage 'WP2B_CAPTURE' -ExpectedAttemptId $AttemptId
+  if ([string]$preview.quiescenceEvidenceFileName -cnotmatch '^phase7b-wp2b-quiescence-[0-9a-f]{32}\.json$') {
+    throw 'PHASE7B_WP2_PENDING_FINALIZATION_QUIESCENCE_FAIL'
+  }
+  $quiescencePath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($CaptureAuthorizationPath))) ([string]$preview.quiescenceEvidenceFileName)
+  $quiescenceSha = Get-Phase7BSha256 -LiteralPath $quiescencePath
+  $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $CaptureAuthorizationPath `
+    -ExpectedSha256 $ExpectedCaptureAuthorizationSha256 -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit `
+    -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
+    -ExpectedInventorySha256 ([string]$pending.sourceInventorySha256) -ExpectedSourceRootSha256 ([string]$pending.sourceRootSha256) `
+    -ExpectedCapturePlanSha256 ([string]$pending.capturePlanSha256) -ExpectedLocalOutputRootSha256 ([string]$pending.localOutputRootSha256) `
+    -ExpectedReplicaRootSha256 ([string]$pending.replicaRootSha256) -ExpectedAgeExeSha256 ([string]$pending.ageExeSha256) `
+    -ExpectedAgeKeygenSha256 ([string]$pending.ageKeygenSha256) -ExpectedAgeRecipient ([string]$pending.ageRecipient) `
+    -ExpectedQuiescenceEvidenceSha256 $quiescenceSha
+  $quiescence = Get-Content -LiteralPath $quiescencePath -Raw | ConvertFrom-Json -ErrorAction Stop
+  if (-not (Test-Phase7BWorkPackage2QuiescenceEvidence -Evidence $quiescence `
+      -ExpectedToolingCommit ([string]$authorization.quiescenceEvidenceToolingCommit)).pass -or
+      [string]$authorization.quiescenceEvidenceFileName -cne "phase7b-wp2b-quiescence-$([string]$quiescence.nonce).json" -or
+      [string]$authorization.ageExePathSha256 -cne [string]$invocation.ageExePathSha256 -or
+      [string]$authorization.ageKeygenPathSha256 -cne [string]$invocation.ageKeygenPathSha256) {
+    throw 'PHASE7B_WP2_PENDING_FINALIZATION_QUIESCENCE_OR_AGE_FAIL'
+  }
+  $bindings = [ordered]@{
+    captureAuthorizationId = [string]$authorization.authorizationId
+    captureAuthorizationSha256 = $ExpectedCaptureAuthorizationSha256
+    captureAuthorizationToolingCommit = [string]$authorization.toolingCommit
+    quiescenceEvidenceSha256 = $quiescenceSha
+  }
+  if ($duplicateCount -eq 4) {
+    foreach ($name in $duplicates) {
+      if ($pending.PSObject.Properties[$name].Value -isnot [string] -or
+          [string]$pending.PSObject.Properties[$name].Value -cne [string]$bindings[$name]) {
+        throw 'PHASE7B_WP2_PENDING_FINALIZATION_DUPLICATE_BINDING_FAIL'
+      }
+    }
+  }
+  [pscustomobject]@{
+    pass = $true
+    pendingDescriptorShape = if ($duplicateCount -eq 0) { 'NATIVE_RECIPIENT_V1_PRODUCER' } else { 'NATIVE_RECIPIENT_V1_AUTHORIZATION_DUPLICATES' }
+    pending = $pending
+    authorization = $authorization
+    authoritativeBindings = $bindings
+    mutationPerformed = $false
+  }
+}
+
 function Use-Phase7BWorkPackage2CaptureAuthorization {
   [CmdletBinding()] param([Parameter(Mandatory = $true)][string]$AuthorizationPath, [Parameter(Mandatory = $true)]$Authorization)
   $marker = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$Authorization.consumptionMarkerFileName)
@@ -536,6 +672,7 @@ function Test-Phase7BWorkPackage2StablePreflightEvidence {
 }
 
 Export-ModuleMember -Function @(
+  'Assert-Phase7BWorkPackage2PendingFinalizationInput',
   'Get-Phase7BWorkPackage2OperatorContract',
   'Test-Phase7BWorkPackage2QuiescenceEvidence',
   'Test-Phase7BWorkPackage2ExactQuiescenceResume',

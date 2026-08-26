@@ -22,6 +22,14 @@ The accepted retained Stage-2 receiver is continuation state and is not recreate
 
 Minimum WP2 closeout evidence is: capture and deterministic ZIP identity; successful encryption and decrypt-to-hash match; ciphertext identity; independent replica readback; receipt; primary and laptop transport teardown; one-use authorization consumption; and later WP2-C isolated decrypt, restore, and operational verification.
 
+### Pending-descriptor compatibility and finalization
+
+The native-recipient schema-v1 Stage 3 pending descriptor owns capture, packet, and decrypt-round-trip evidence. Its exact 44-property producer shape does not duplicate capture authorization ID/hash/tooling commit or quiescence hash. Stage 5 must not rewrite that accepted evidence. Its shared read-only preflight/finalizer validator recognizes exactly that shape, or that same shape with all four exact authorization duplicates; partial duplicates, contradictory duplicates, unknown properties, and unknown schemas fail closed.
+
+Authorization identity comes from the independently hash-selected, unexpired, unused capture authorization. Quiescence identity comes from the existing file named by that authorization, with its actual file hash and evidence contract checked against the authorization's original quiescence tooling lineage. The invocation contract is independently hash-validated and must agree on attempt, tooling, Stage 3, native recipient, and age identities. The final descriptor records those authoritative values without changing the pending descriptor. Validation runs before primary teardown evidence is written and again before finalization. Durable ordering remains primary teardown evidence, imported receipt, final descriptor, then marker-only authorization consumption. Pending evidence remains retained.
+
+Schema compatibility does not grant cross-commit execution authority. A published correction leaves prior invocation/authorization bytes as truthful historical evidence; it does not make them current under the new tooling commit. A separately reviewed and authorized provenance-preserving Stage 5 binding is required before executing corrected tooling against a successful earlier capture. Do not regenerate the packet/pending/receipt or replace authorization merely to bypass that boundary. Marker-to-descriptor hash binding remains a possible separate hardening task, not part of schema compatibility.
+
 ## Remaining migration map
 
 1. Complete WP2B capture, replica verification, teardown, and authorization consumption.

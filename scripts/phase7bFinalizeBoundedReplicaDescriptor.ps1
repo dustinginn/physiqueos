@@ -10,8 +10,11 @@ param(
   [Parameter(Mandatory = $true)][string]$CaptureAuthorizationPath,
   [Parameter(Mandatory = $true)][string]$ExpectedCaptureAuthorizationSha256,
   [Parameter(Mandatory = $true)][string]$ExpectedToolingCommit,
+  [Parameter(Mandatory = $true)][string]$InvocationContractPath,
   [Parameter(Mandatory = $true)][string]$ExpectedInvocationContractSha256,
   [Parameter(Mandatory = $true)][string]$ExpectedStage3LauncherSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedPacketSha256,
+  [Parameter(Mandatory = $true)][int64]$ExpectedPacketBytes,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [Parameter()][string]$ExactExistingDescriptorResumeAcknowledgement
@@ -30,36 +33,23 @@ try {
   if ($resumeExisting -and $ExactExistingDescriptorResumeAcknowledgement -cne 'WP2B_CAPTURE_RESUME_EXACT_EXISTING_FINAL_DESCRIPTOR_READ_ONLY') { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_EXISTING_REJECTED' }
   if (-not $resumeExisting -and -not [string]::IsNullOrEmpty($ExactExistingDescriptorResumeAcknowledgement)) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_RESUME_NOT_APPLICABLE' }
   if ((Get-Phase7BSha256 -LiteralPath $PendingDescriptorPath) -ne $ExpectedPendingDescriptorSha256 -or (Get-Phase7BSha256 -LiteralPath $ReplicaReceiptPath) -ne $ExpectedReplicaReceiptSha256 -or (Get-Phase7BSha256 -LiteralPath $PrimaryTeardownEvidencePath) -ne $ExpectedPrimaryTeardownEvidenceSha256) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_FINALIZE_INPUT_HASH_FAIL' }
-  $pending = Get-Content -LiteralPath $PendingDescriptorPath -Raw | ConvertFrom-Json -ErrorAction Stop
+  $validated = Assert-Phase7BWorkPackage2PendingFinalizationInput -AttemptId $AttemptId `
+    -PendingDescriptorPath $PendingDescriptorPath -ExpectedPendingDescriptorSha256 $ExpectedPendingDescriptorSha256 `
+    -InvocationContractPath $InvocationContractPath -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 `
+    -CaptureAuthorizationPath $CaptureAuthorizationPath -ExpectedCaptureAuthorizationSha256 $ExpectedCaptureAuthorizationSha256 `
+    -ExpectedToolingCommit $ExpectedToolingCommit -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
+    -ExpectedPacketSha256 $ExpectedPacketSha256 -ExpectedPacketBytes $ExpectedPacketBytes
+  $pending = $validated.pending
+  $authorization = $validated.authorization
   $receipt = Get-Content -LiteralPath $ReplicaReceiptPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $primaryTeardown = Get-Content -LiteralPath $PrimaryTeardownEvidencePath -Raw | ConvertFrom-Json -ErrorAction Stop
-  if ([string]$pending.classification -ne 'PHASE7B_WP2_ENCRYPTED_PACKET_REPLICA_COPY_PENDING_INDEPENDENT_READBACK' -or [string]$pending.attemptId -ne $AttemptId -or -not [bool]$pending.localEncryptedCopyPass -or [bool]$pending.independentEncryptedReplicaPass -or
-      [string]$pending.plaintextZipSha256 -notmatch '^[0-9a-f]{64}$' -or [int64]$pending.plaintextZipBytes -lt 1 -or
-      [string]$pending.decryptedStreamSha256 -cne [string]$pending.plaintextZipSha256 -or
-      [int64]$pending.decryptedStreamBytes -ne [int64]$pending.plaintextZipBytes -or -not [bool]$pending.decryptRoundTripPass -or
-      [string]$pending.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
-      [string]$pending.stage3LauncherSha256 -cne $ExpectedStage3LauncherSha256 -or
-      [string]$pending.ageEncryptionMode -cne 'native-recipient-v1' -or
-      [string]$pending.ageRecipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$' -or
-      [string]$pending.ageIdentityInputMode -cne 'stdin' -or -not [bool]$pending.nativeRecipientRequired -or
-      [bool]$pending.agePluginRequired -or [string]$pending.ageVersion -cne '1.3.1' -or
-      [string]$pending.ageKeygenVersion -cne '1.3.1' -or -not [bool]$pending.decryptRoundTripRequired -or
-      [string]$pending.captureAuthorizationSha256 -cne $ExpectedCaptureAuthorizationSha256 -or
-      [string]$pending.captureAuthorizationToolingCommit -cne $ExpectedToolingCommit) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_PENDING_DESCRIPTOR_FAIL' }
-  $authorization = Assert-Phase7BWorkPackage2CaptureAuthorization -LiteralPath $CaptureAuthorizationPath -ExpectedSha256 $ExpectedCaptureAuthorizationSha256 `
-    -ExpectedAttemptId $AttemptId -ExpectedToolingCommit $ExpectedToolingCommit -ExpectedInventorySha256 ([string]$pending.sourceInventorySha256) `
-    -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 $ExpectedStage3LauncherSha256 `
-    -ExpectedSourceRootSha256 ([string]$pending.sourceRootSha256) -ExpectedCapturePlanSha256 ([string]$pending.capturePlanSha256) `
-    -ExpectedLocalOutputRootSha256 ([string]$pending.localOutputRootSha256) -ExpectedReplicaRootSha256 ([string]$pending.replicaRootSha256) `
-    -ExpectedAgeExeSha256 ([string]$pending.ageExeSha256) -ExpectedAgeKeygenSha256 ([string]$pending.ageKeygenSha256) `
-    -ExpectedAgeRecipient ([string]$pending.ageRecipient) -ExpectedQuiescenceEvidenceSha256 ([string]$pending.quiescenceEvidenceSha256)
-  if ([string]$authorization.authorizationId -cne [string]$pending.captureAuthorizationId) { throw 'PHASE7B_WP2_BOUNDED_REPLICA_AUTHORIZATION_BINDING_FAIL' }
   $accepted = Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 ([string]$pending.packetSha256) -ExpectedPacketBytes ([int64]$pending.packetBytes)
   if (-not $accepted.pass) { throw $accepted.classification }
   $expectedShare = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
   if (-not (Test-Phase7BPrimaryReplicaSessionTeardownEvidence -Evidence $primaryTeardown -ExpectedAttemptId $AttemptId -ExpectedServerName 'LAPTOP-4G5UOU2R' -ExpectedShareName $expectedShare).pass) { throw 'PHASE7B_WP2_PRIMARY_REPLICA_SESSION_TEARDOWN_REJECTED' }
   $descriptor = [ordered]@{}
   foreach ($property in $pending.PSObject.Properties) { $descriptor[$property.Name] = $property.Value }
+  foreach ($name in $validated.authoritativeBindings.Keys) { $descriptor[$name] = $validated.authoritativeBindings[$name] }
   $descriptor.schemaVersion = 1
   $descriptor.classification = 'PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS'
   $descriptor.independentEncryptedReplicaPass = $true
