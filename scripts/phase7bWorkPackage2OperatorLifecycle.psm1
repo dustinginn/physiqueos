@@ -507,6 +507,9 @@ function Assert-Phase7BWorkPackage2PendingFinalizationInput {
 
 function Use-Phase7BWorkPackage2CaptureAuthorization {
   [CmdletBinding()] param([Parameter(Mandatory = $true)][string]$AuthorizationPath, [Parameter(Mandatory = $true)]$Authorization)
+  # Recheck immediately before marker creation, not only at preflight. A delayed closure
+  # may leave a descriptor requiring review; it must never silently extend capture authority.
+  if([DateTime]::UtcNow -ge [DateTime]::Parse([string]$Authorization.expiresAt).ToUniversalTime()) { throw 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_EXPIRED_BEFORE_CONSUMPTION' }
   $marker = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($AuthorizationPath))) ([string]$Authorization.consumptionMarkerFileName)
   $value = [ordered]@{ schemaVersion = 1; classification = 'PHASE7B_WP2B_CAPTURE_AUTHORIZATION_CONSUMED'; pass = $true; authorizationId = [string]$Authorization.authorizationId; attemptId = [string]$Authorization.attemptId; consumedAt = [DateTime]::UtcNow.ToString('o'); automaticRetryAllowed = $false }
   $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $value))

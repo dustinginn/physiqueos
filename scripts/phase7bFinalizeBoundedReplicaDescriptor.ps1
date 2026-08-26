@@ -17,7 +17,12 @@ param(
   [Parameter(Mandatory = $true)][int64]$ExpectedPacketBytes,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement,
   [Parameter(Mandatory = $true)][string]$OutputPath,
-  [Parameter()][string]$ExactExistingDescriptorResumeAcknowledgement
+  [Parameter()][string]$ExactExistingDescriptorResumeAcknowledgement,
+  [Parameter()][string]$ContinuationBindingPath,
+  [Parameter()][string]$ExpectedContinuationBindingSha256,
+  [Parameter()][string]$FinalizationToolingCommit,
+  [Parameter()][string]$LocalPacketPath,
+  [Parameter()][string]$FounderContinuationAcknowledgement
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -25,6 +30,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -F
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2OperatorLifecycle.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Stage5Continuation.psm1') -Force
 $stage = 'validate-input'
 $mutationStarted = $false
 try {
@@ -43,6 +49,19 @@ try {
   $authorization = $validated.authorization
   $receipt = Get-Content -LiteralPath $ReplicaReceiptPath -Raw | ConvertFrom-Json -ErrorAction Stop
   $primaryTeardown = Get-Content -LiteralPath $PrimaryTeardownEvidencePath -Raw | ConvertFrom-Json -ErrorAction Stop
+  $continuation=$null
+  if(-not [string]::IsNullOrEmpty($ContinuationBindingPath)){
+    if($FounderContinuationAcknowledgement -cne 'WP2B_STAGE5_FINALIZE_ACCEPTED_CAPTURE_LINEAGE_EXACTLY_ONCE' -or $resumeExisting){throw 'PHASE7B_WP2_STAGE5_CONTINUATION_GO_OR_RESIDUE_FAIL'}
+    $captureInputs=@{AttemptId=$AttemptId;PendingDescriptorPath=$PendingDescriptorPath;ExpectedPendingDescriptorSha256=$ExpectedPendingDescriptorSha256;
+      InvocationContractPath=$InvocationContractPath;ExpectedInvocationContractSha256=$ExpectedInvocationContractSha256;
+      CaptureAuthorizationPath=$CaptureAuthorizationPath;ExpectedCaptureAuthorizationSha256=$ExpectedCaptureAuthorizationSha256;
+      ExpectedToolingCommit=$ExpectedToolingCommit;ExpectedStage3LauncherSha256=$ExpectedStage3LauncherSha256;
+      ExpectedPacketSha256=$ExpectedPacketSha256;ExpectedPacketBytes=$ExpectedPacketBytes}
+    $continuation=Assert-Phase7BStage5ContinuationBinding -LiteralPath $ContinuationBindingPath -ExpectedSha256 $ExpectedContinuationBindingSha256 `
+      -CaptureInputs $captureInputs -PacketPath $LocalPacketPath -ReceiptTransportPath $ReplicaReceiptPath `
+      -ExpectedReceiptSha256 $ExpectedReplicaReceiptSha256 -ExpectedReceiptNonce ([string]$receipt.evidenceNonce) -FinalizationToolingCommit $FinalizationToolingCommit
+  }elseif(-not [string]::IsNullOrEmpty($ExpectedContinuationBindingSha256) -or -not [string]::IsNullOrEmpty($FinalizationToolingCommit) -or
+      -not [string]::IsNullOrEmpty($LocalPacketPath) -or -not [string]::IsNullOrEmpty($FounderContinuationAcknowledgement)){throw 'PHASE7B_WP2_STAGE5_PARTIAL_CONTINUATION_FAIL'}
   $accepted = Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 ([string]$pending.packetSha256) -ExpectedPacketBytes ([int64]$pending.packetBytes)
   if (-not $accepted.pass) { throw $accepted.classification }
   $expectedShare = "P7B$($AttemptId.Substring($AttemptId.Length - 8))`$"
@@ -57,6 +76,11 @@ try {
   $descriptor.ephemeralTransportTeardownRequired = $false
   $descriptor.replicaReceiptSha256 = $ExpectedReplicaReceiptSha256
   $descriptor.primarySessionTeardownEvidenceSha256 = $ExpectedPrimaryTeardownEvidenceSha256
+  if($null -ne $continuation){
+    $descriptor.stage5Provenance=[ordered]@{schemaVersion=1;bindingSha256=$ExpectedContinuationBindingSha256;binding=$continuation;
+      founderAcknowledgement=$FounderContinuationAcknowledgement;finalizedAt=[DateTime]::UtcNow.ToString('o')}
+    if(-not (Test-Phase7BWorkPackage2FinalizationProvenance -Descriptor ([pscustomobject]($descriptor|ConvertTo-Json -Depth 20|ConvertFrom-Json))).pass){throw 'PHASE7B_WP2_STAGE5_PROVENANCE_FAIL'}
+  }
   $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes((ConvertTo-Phase7BCanonicalJson -InputObject $descriptor))
   if ($resumeExisting) {
     $existingBytes = [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($OutputPath))

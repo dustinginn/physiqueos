@@ -1,3 +1,4 @@
+[CmdletBinding()] param([switch]$FixturesOnly)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 if ($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5) { throw 'WINDOWS_PS51_REQUIRED' }
@@ -23,7 +24,7 @@ function New-Case([string]$Name) {
   Write-Json $qPath $quiescence
   $invPath=Join-Path $root 'invocation.json'
   $inv=New-Phase7BWorkPackage2InvocationContractDocument -AttemptId $attempt -ToolingCommit $tooling -ApplicationCommit $contract.applicationCommit `
-    -Artifacts @([pscustomobject]@{relativePath='scripts/phase7bRunWorkPackage2Stage3.ps1';sha256=$stage3;bytes=8503}) `
+    -Artifacts @([pscustomobject]@{relativePath='scripts/phase7bRunWorkPackage2Stage3.ps1';sha256=$stage3;bytes=8503},[pscustomobject]@{relativePath='scripts/phase7bRunWorkPackage2Stage4.ps1';sha256=('d'*64);bytes=3757}) `
     -AgeRecipient ('age1'+('q'*58)) -AgeExePathSha256 ('1'*64) -AgeExeSha256 ('2'*64) -AgeVersion '1.3.1' `
     -AgeKeygenPathSha256 ('3'*64) -AgeKeygenSha256 ('4'*64) -AgeKeygenVersion '1.3.1'
   Write-Json $invPath $inv
@@ -66,6 +67,7 @@ function Invoke-SyntheticFinalizer($Case,[switch]$Resume) {
   if($Resume){$args.ExactExistingDescriptorResumeAcknowledgement='WP2B_CAPTURE_RESUME_EXACT_EXISTING_FINAL_DESCRIPTOR_READ_ONLY'}
   (@(& $finalizer @args) -join [Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop
 }
+if($FixturesOnly){return}
 try {
   [void](New-Item -ItemType Directory -Path $testRoot)
   $s=New-Case 'accepted-shape'

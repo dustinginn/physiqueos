@@ -7,7 +7,8 @@ param(
   [Parameter(Mandatory = $true)][int64]$ExpectedPacketBytes,
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [Parameter(Mandatory = $true)][string]$AuthorizationAcknowledgement,
-  [Parameter()][string]$ExactExistingReceiptResumeAcknowledgement
+  [Parameter()][string]$ExactExistingReceiptResumeAcknowledgement,
+  [Parameter()][string]$EvidenceInputPath
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -36,10 +37,16 @@ try {
     return
   }
   if (-not [string]::IsNullOrEmpty($ExactExistingReceiptResumeAcknowledgement)) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_RESUME_NOT_APPLICABLE' }
-  if ($Host.Name -ne 'ConsoleHost' -or -not [Environment]::UserInteractive) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_INTERACTIVE_CONSOLE_REQUIRED' }
   $stage = 'read-safe-transport'
-  $encoded = Read-Host 'Paste evidenceTransportBase64 from the accepted laptop safe projection'
-  $bytes = [Convert]::FromBase64String($encoded)
+  if(-not [string]::IsNullOrEmpty($EvidenceInputPath)){
+    $length=[int64](Get-Item -LiteralPath $EvidenceInputPath).Length
+    if($length -lt 1 -or $length -gt 65536){throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_SIZE_FAIL'}
+    $bytes=[IO.File]::ReadAllBytes([IO.Path]::GetFullPath($EvidenceInputPath))
+  }else{
+    if ($Host.Name -ne 'ConsoleHost' -or -not [Environment]::UserInteractive) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_INTERACTIVE_CONSOLE_REQUIRED' }
+    $encoded = Read-Host 'Paste evidenceTransportBase64 from the accepted laptop safe projection'
+    $bytes = [Convert]::FromBase64String($encoded)
+  }
   $sha = [Security.Cryptography.SHA256]::Create()
   try { $actualSha = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
   if ($actualSha -ne $ExpectedEvidenceSha256) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_HASH_FAIL' }
@@ -49,6 +56,7 @@ try {
       -not (Test-Phase7BBoundedReplicaReceipt -Receipt $receipt -ExpectedAttemptId $AttemptId -ExpectedPacketSha256 $ExpectedPacketSha256 -ExpectedPacketBytes $ExpectedPacketBytes).pass) {
     throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_BINDING_FAIL'
   }
+  if((Get-Phase7BSha256 -Text (ConvertTo-Phase7BCanonicalJson $receipt)) -cne $ExpectedEvidenceSha256){throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_NONCANONICAL_FAIL'}
   $persisted = Write-Phase7BSafeEvidenceFile -LiteralPath $OutputPath -Evidence $receipt
   if ($persisted.sha256 -ne $ExpectedEvidenceSha256) { throw 'PHASE7B_WP2B_REPLICA_RECEIPT_IMPORT_READBACK_FAIL' }
   $global:LASTEXITCODE = 0

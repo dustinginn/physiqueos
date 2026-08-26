@@ -37,6 +37,7 @@ try {
   $ageVersionLines = @(& $AgeExePath --version 2>&1)
   if (-not (Test-Phase7BWorkPackage2AgeVersionOutput -OutputLines @($ageVersionLines | ForEach-Object { [string]$_ }) -ExitCode $LASTEXITCODE).pass) { throw "PHASE7B_WP2_AGE_VERSION_UNSUPPORTED" }
   $descriptor = Get-Content -LiteralPath $DescriptorPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+  if (-not (Test-Phase7BWorkPackage2FinalizationProvenance -Descriptor $descriptor).pass) { throw 'PHASE7B_WP2_STAGE5_PROVENANCE_FAIL' }
   if ([int]$descriptor.schemaVersion -ne 1 -or [string]$descriptor.classification -ne "PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS" -or
       [string]$descriptor.attemptId -ne $AttemptId -or [string]$descriptor.applicationCommit -ne $contract.applicationCommit -or
       [string]$descriptor.environmentId -ne $contract.environmentId -or [string]$descriptor.vmDisplayName -ne $contract.vmDisplayName -or

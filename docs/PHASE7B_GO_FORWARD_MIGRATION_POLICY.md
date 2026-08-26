@@ -30,6 +30,8 @@ Authorization identity comes from the independently hash-selected, unexpired, un
 
 Schema compatibility does not grant cross-commit execution authority. A published correction leaves prior invocation/authorization bytes as truthful historical evidence; it does not make them current under the new tooling commit. A separately reviewed and authorized provenance-preserving Stage 5 binding is required before executing corrected tooling against a successful earlier capture. Do not regenerate the packet/pending/receipt or replace authorization merely to bypass that boundary. Marker-to-descriptor hash binding remains a possible separate hardening task, not part of schema compatibility.
 
+The Stage-5-only continuation design is specified in [PHASE7B_STAGE5_CONTINUATION_DESIGN.md](PHASE7B_STAGE5_CONTINUATION_DESIGN.md). Its binding records original capture and current finalization provenance separately, grants no execution authority, and ultimately consumes only the original authorization while still unexpired. Receipt transport and binding creation require separate Founder review before an explicit Stage-5 execution GO.
+
 ## Remaining migration map
 
 1. Complete WP2B capture, replica verification, teardown, and authorization consumption.

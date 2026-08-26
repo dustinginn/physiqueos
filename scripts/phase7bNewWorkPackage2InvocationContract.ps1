@@ -26,7 +26,7 @@ $names = @(
   'phase7bPrepareWorkPackage2EncryptedPacket.ps1','phase7bVerifyAndCloseBoundedReplicaReceiver.ps1',
   'phase7bImportBoundedReplicaReceipt.ps1','phase7bVerifyPrimaryReplicaSessionClosed.ps1',
   'phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bBoundedReplicaTransport.psm1',
-  'phase7bWorkPackage2Contract.psm1','phase7bWorkPackage2OperatorLifecycle.psm1',
+  'phase7bWorkPackage2Contract.psm1','phase7bWorkPackage2OperatorLifecycle.psm1','phase7bWorkPackage2Stage5Continuation.psm1',
   'phase7bWorkPackage2AuthorizationEligibility.psm1','phase7bWorkPackage2Orchestration.psm1',
   'phase7bWindowsAgeIdentityBridge.psm1','phase7bIsolatedGuestContract.psm1','phase7bSecondComputerReplicaContract.psm1'
 )

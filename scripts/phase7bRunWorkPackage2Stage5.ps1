@@ -7,7 +7,11 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedAuthorizationSha256,
   [Parameter(Mandatory = $true)][string]$LocalOutputRoot,
   [Parameter(Mandatory = $true)][string]$EvidenceNonce,
-  [Parameter(Mandatory = $true)][string]$ExpectedEvidenceSha256
+  [Parameter(Mandatory = $true)][string]$ExpectedEvidenceSha256,
+  [Parameter()][string]$ContinuationBindingPath,
+  [Parameter()][string]$ExpectedContinuationBindingSha256,
+  [Parameter()][string]$ReceiptTransportPath,
+  [Parameter()][string]$FounderContinuationAcknowledgement
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1') -Force
@@ -15,15 +19,32 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1') -Forc
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Orchestration.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bBoundedReplicaTransport.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2OperatorLifecycle.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Stage5Continuation.psm1') -Force
 $invocation=Assert-Phase7BWorkPackage2InvocationContract -LiteralPath $InvocationContractPath -ExpectedSha256 $ExpectedInvocationContractSha256 -ExpectedAttemptId $AttemptId
 $repositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $head=(& git -C $repositoryRoot rev-parse HEAD).Trim().ToLowerInvariant()
 $self=@($invocation.artifacts|Where-Object{$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage5.ps1'})
 $stage3=@($invocation.artifacts|Where-Object{$_.relativePath -ceq 'scripts/phase7bRunWorkPackage2Stage3.ps1'})
-if($head -cne [string]$invocation.toolingCommit -or $self.Count -ne 1 -or $stage3.Count -ne 1 -or (Get-Phase7BSha256 -LiteralPath $PSCommandPath) -cne [string]$self[0].sha256 -or
+$continuationMode=-not [string]::IsNullOrEmpty($ContinuationBindingPath)
+$captureCommit=$head
+if($continuationMode){
+  if($ExpectedContinuationBindingSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+      (Get-Phase7BSha256 -LiteralPath $ContinuationBindingPath) -cne $ExpectedContinuationBindingSha256 -or
+      [string]::IsNullOrEmpty($ReceiptTransportPath) -or
+      $FounderContinuationAcknowledgement -cne 'WP2B_STAGE5_FINALIZE_ACCEPTED_CAPTURE_LINEAGE_EXACTLY_ONCE') {throw 'PHASE7B_WP2B_STAGE5_CONTINUATION_ARGUMENT_FAIL'}
+  $binding=Get-Content -LiteralPath $ContinuationBindingPath -Raw|ConvertFrom-Json -ErrorAction Stop
+  $captureCommit=[string]$binding.capture.toolingCommit
+  $branch=(& git -C $repositoryRoot branch --show-current).Trim()
+  $parity=(& git -C $repositoryRoot rev-list --left-right --count HEAD...origin/combined-app-platform-cutover).Trim()
+  $dirty=@(& git -C $repositoryRoot status --short --untracked-files=no)
+  if($branch -cne 'combined-app-platform-cutover' -or $parity -cne "0`t0" -or $dirty.Count -ne 0){throw 'PHASE7B_WP2B_STAGE5_REPOSITORY_FAIL'}
+}elseif(-not [string]::IsNullOrEmpty($ExpectedContinuationBindingSha256) -or -not [string]::IsNullOrEmpty($ReceiptTransportPath) -or
+    -not [string]::IsNullOrEmpty($FounderContinuationAcknowledgement)){throw 'PHASE7B_WP2B_STAGE5_PARTIAL_CONTINUATION_FAIL'}
+if($captureCommit -cne [string]$invocation.toolingCommit -or $self.Count -ne 1 -or $stage3.Count -ne 1 -or
+   (-not $continuationMode -and (Get-Phase7BSha256 -LiteralPath $PSCommandPath) -cne [string]$self[0].sha256) -or
    (Get-Phase7BSha256 -LiteralPath $AuthorizationPath) -cne $ExpectedAuthorizationSha256 -or $EvidenceNonce -cnotmatch '^[0-9a-f]{32}$' -or $ExpectedEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$'){throw 'PHASE7B_WP2B_STAGE5_IDENTITY_FAIL'}
 $authorization=Assert-Phase7BWorkPackage2Authorization -LiteralPath $AuthorizationPath -ExpectedSha256 $ExpectedAuthorizationSha256 -ExpectedStage 'WP2B_CAPTURE' -ExpectedAttemptId $AttemptId
-if([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $head -or
+if([string]$authorization.attemptId -cne $AttemptId -or [string]$authorization.toolingCommit -cne $captureCommit -or
    [string]$authorization.invocationContractSha256 -cne $ExpectedInvocationContractSha256 -or
    [string]$authorization.stage3LauncherSha256 -cne [string]$stage3[0].sha256 -or
    [string]$authorization.ageEncryptionMode -cne 'native-recipient-v1' -or
@@ -48,8 +69,23 @@ $pendingSha=Get-Phase7BSha256 -LiteralPath $pendingPath
   -PendingDescriptorPath $pendingPath -ExpectedPendingDescriptorSha256 $pendingSha `
   -InvocationContractPath $InvocationContractPath -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 `
   -CaptureAuthorizationPath $AuthorizationPath -ExpectedCaptureAuthorizationSha256 $ExpectedAuthorizationSha256 `
-  -ExpectedToolingCommit $head -ExpectedStage3LauncherSha256 ([string]$stage3[0].sha256) `
+  -ExpectedToolingCommit $captureCommit -ExpectedStage3LauncherSha256 ([string]$stage3[0].sha256) `
   -ExpectedPacketSha256 $packetSha -ExpectedPacketBytes $packetBytes)
+$continuationArguments=@{};$receiptArguments=@{}
+if($continuationMode){
+  $captureInputs=@{AttemptId=$AttemptId;PendingDescriptorPath=$pendingPath;ExpectedPendingDescriptorSha256=$pendingSha;
+    InvocationContractPath=$InvocationContractPath;ExpectedInvocationContractSha256=$ExpectedInvocationContractSha256;
+    CaptureAuthorizationPath=$AuthorizationPath;ExpectedCaptureAuthorizationSha256=$ExpectedAuthorizationSha256;
+    ExpectedToolingCommit=$captureCommit;ExpectedStage3LauncherSha256=[string]$stage3[0].sha256;ExpectedPacketSha256=$packetSha;ExpectedPacketBytes=$packetBytes}
+  [void](Assert-Phase7BStage5ContinuationBinding -LiteralPath $ContinuationBindingPath -ExpectedSha256 $ExpectedContinuationBindingSha256 `
+    -CaptureInputs $captureInputs -PacketPath $packetPath -ReceiptTransportPath $ReceiptTransportPath `
+    -ExpectedReceiptSha256 $ExpectedEvidenceSha256 -ExpectedReceiptNonce $EvidenceNonce -FinalizationToolingCommit $head)
+  if((Get-Phase7BSha256 -Text ([IO.Path]::GetFullPath($LocalOutputRoot).TrimEnd('\').ToLowerInvariant())) -cne [string]$authorization.localOutputRootSha256){throw 'PHASE7B_WP2B_STAGE5_OUTPUT_ROOT_FAIL'}
+  Assert-Phase7BStage5ClosureStartState -PacketPath $packetPath -PendingDescriptorPath $pendingPath
+  $continuationArguments=@{ContinuationBindingPath=$ContinuationBindingPath;ExpectedContinuationBindingSha256=$ExpectedContinuationBindingSha256;
+    FinalizationToolingCommit=$head;LocalPacketPath=$packetPath;FounderContinuationAcknowledgement=$FounderContinuationAcknowledgement}
+  $receiptArguments=@{EvidenceInputPath=$ReceiptTransportPath}
+}
 $shareName="P7B$($AttemptId.Substring($AttemptId.Length-8))`$";$connections=@(Get-SmbConnection -ServerName 'LAPTOP-4G5UOU2R' -ErrorAction SilentlyContinue|Where-Object{$_.ShareName -eq $shareName})
 if($connections.Count -ne 0){throw 'PHASE7B_WP2B_STAGE5_SMB_RESIDUE_STOP'}
 $teardownPath=Join-Path $attemptRoot "$AttemptId-primary-teardown-$([guid]::NewGuid().ToString('N')).json"
@@ -57,14 +93,14 @@ $teardownLines=@(& (Join-Path $PSScriptRoot 'phase7bVerifyPrimaryReplicaSessionC
 $teardownExit=$LASTEXITCODE;$teardown=(($teardownLines -join [Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop)
 if($teardownExit -ne 0 -or -not [bool]$teardown.pass){throw 'PHASE7B_WP2B_STAGE5_PRIMARY_TEARDOWN_STOP'}
 $receiptPath=Join-Path $attemptRoot "$AttemptId-replica-receipt-$EvidenceNonce.json"
-$importLines=@(& (Join-Path $PSScriptRoot 'phase7bImportBoundedReplicaReceipt.ps1') -AttemptId $AttemptId -ExpectedEvidenceNonce $EvidenceNonce -ExpectedEvidenceSha256 $ExpectedEvidenceSha256 -ExpectedPacketSha256 $packetSha -ExpectedPacketBytes $packetBytes -OutputPath $receiptPath -AuthorizationAcknowledgement 'WP2B_CAPTURE_IMPORT_SAFE_REPLICA_RECEIPT_EXACTLY_ONCE' 2>&1)
+$importLines=@(& (Join-Path $PSScriptRoot 'phase7bImportBoundedReplicaReceipt.ps1') @receiptArguments -AttemptId $AttemptId -ExpectedEvidenceNonce $EvidenceNonce -ExpectedEvidenceSha256 $ExpectedEvidenceSha256 -ExpectedPacketSha256 $packetSha -ExpectedPacketBytes $packetBytes -OutputPath $receiptPath -AuthorizationAcknowledgement 'WP2B_CAPTURE_IMPORT_SAFE_REPLICA_RECEIPT_EXACTLY_ONCE' 2>&1)
 $importExit=$LASTEXITCODE;$import=(($importLines -join [Environment]::NewLine)|ConvertFrom-Json -ErrorAction Stop)
 if($importExit -ne 0 -or -not [bool]$import.pass){throw 'PHASE7B_WP2B_STAGE5_RECEIPT_IMPORT_STOP'}
 $finalPath=Join-Path $attemptRoot "$AttemptId-descriptor.json"
-$finalLines=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') -AttemptId $AttemptId -PendingDescriptorPath $pendingPath `
+$finalLines=@(& (Join-Path $PSScriptRoot 'phase7bFinalizeBoundedReplicaDescriptor.ps1') @continuationArguments -AttemptId $AttemptId -PendingDescriptorPath $pendingPath `
   -ExpectedPendingDescriptorSha256 $pendingSha -ReplicaReceiptPath $receiptPath -ExpectedReplicaReceiptSha256 $ExpectedEvidenceSha256 `
   -PrimaryTeardownEvidencePath $teardownPath -ExpectedPrimaryTeardownEvidenceSha256 (Get-Phase7BSha256 -LiteralPath $teardownPath) `
-  -CaptureAuthorizationPath $AuthorizationPath -ExpectedCaptureAuthorizationSha256 $ExpectedAuthorizationSha256 -ExpectedToolingCommit $head `
+  -CaptureAuthorizationPath $AuthorizationPath -ExpectedCaptureAuthorizationSha256 $ExpectedAuthorizationSha256 -ExpectedToolingCommit $captureCommit `
   -InvocationContractPath $InvocationContractPath -ExpectedInvocationContractSha256 $ExpectedInvocationContractSha256 -ExpectedStage3LauncherSha256 ([string]$stage3[0].sha256) `
   -ExpectedPacketSha256 $packetSha -ExpectedPacketBytes $packetBytes `
   -AuthorizationAcknowledgement 'WP2B_CAPTURE_FINALIZE_INDEPENDENT_REPLICA_EXACTLY_ONCE' -OutputPath $finalPath 2>&1)

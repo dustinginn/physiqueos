@@ -21,6 +21,9 @@ $paths = @(
   'phase7bRunWorkPackage2Stage3.ps1',
   'phase7bRunWorkPackage2Stage4.ps1',
   'phase7bRunWorkPackage2Stage5.ps1'
+  'phase7bNewWorkPackage2Stage5ContinuationBinding.ps1'
+  'phase7bWorkPackage2Stage5Continuation.psm1'
+  'phase7bWorkPackage2ReceiptReturn.ps1'
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 foreach($path in $paths){
   $tokens=$null;$errors=$null
@@ -111,6 +114,7 @@ $sharedModules = @(
   'phase7bWorkPackage2AuthorizationEligibility',
   'phase7bWorkPackage2Orchestration',
   'phase7bWindowsAgeIdentityBridge'
+  'phase7bWorkPackage2Stage5Continuation'
 )
 function Get-ImportedModuleNames([string]$Text) {
   @($sharedModules | Where-Object { $Text.Contains("Join-Path `$PSScriptRoot '$_.psm1'") -or $Text.Contains("Join-Path `$PSScriptRoot ""$_.psm1""") })
@@ -162,5 +166,18 @@ foreach ($callerName in @('phase7bNewWorkPackage2InvocationContract.ps1','phase7
 $generatorSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bNewWorkPackage2InvocationContract.ps1') -Raw
 Assert-True ($generatorSource.Contains('Write-Phase7BSafeEvidenceFile') -and
   $generatorSource.Contains("Join-Path `$PSScriptRoot 'phase7bBoundedReplicaTransport.psm1'")) 'generator directly imports the owner of Write-Phase7BSafeEvidenceFile'
+
+foreach($callerName in @('phase7bNewWorkPackage2Stage5ContinuationBinding.ps1','phase7bWorkPackage2Stage5Continuation.psm1',
+    'phase7bFinalizeBoundedReplicaDescriptor.ps1','phase7bRunWorkPackage2Stage5.ps1','phase7bImportBoundedReplicaReceipt.ps1')){
+  $callerText=Get-Content -LiteralPath (Join-Path $PSScriptRoot $callerName) -Raw
+  $tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseInput($callerText,[ref]$tokens,[ref]$errors)
+  $direct=Get-ImportedModuleNames $callerText
+  $calls=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object{$_.GetCommandName()}|Sort-Object -Unique)
+  foreach($owner in $sharedModules){
+    if($callerName -ceq "$owner.psm1"){continue}
+    $used=@($calls|Where-Object{$moduleExports[$owner] -ccontains $_})
+    Assert-True ($used.Count -eq 0 -or $direct -ccontains $owner) "$callerName directly owns every command dependency from $owner"
+  }
+}
 
 [ordered]@{classification='PHASE7B_WP2B_REMAINING_CONNECTED_LIFECYCLE_LOCAL_TESTS_PASS';pass=$true;assertions=$script:assertions;liveExecutionPerformed=$false;automaticRetryAllowed=$false;wp2cAuthorized=$false}|ConvertTo-Json -Compress

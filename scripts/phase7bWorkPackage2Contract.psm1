@@ -433,6 +433,78 @@ function Test-Phase7BWorkPackage2ReferenceIndexFile {
   [pscustomobject][ordered]@{ pass = [bool]$pass; classification = if ($pass) { 'PHASE7B_WP2_REFERENCE_INDEX_FILE_PASS' } else { 'PHASE7B_WP2_REFERENCE_INDEX_FILE_FAIL' }; referenceIndexSha256 = if ($pass) { $ExpectedSemanticSha256 } else { $null }; collectionCount = if ($pass) { 39 } else { 0 }; recordCount = if ($pass) { $recordTotal } else { 0 } }
 }
 
+function Get-Phase7BWorkPackage2FinalizationArtifactNames {
+  [CmdletBinding()] param()
+  @('phase7bRunWorkPackage2Stage5.ps1','phase7bFinalizeBoundedReplicaDescriptor.ps1',
+    'phase7bWorkPackage2Stage5Continuation.psm1','phase7bWorkPackage2OperatorLifecycle.psm1','phase7bWorkPackage2AuthorizationEligibility.psm1',
+    'phase7bWorkPackage2Orchestration.psm1','phase7bWorkPackage2Contract.psm1',
+    'phase7bIsolatedGuestContract.psm1','phase7bBoundedReplicaTransport.psm1',
+    'phase7bSecondComputerReplicaContract.psm1','phase7bImportBoundedReplicaReceipt.ps1',
+    'phase7bVerifyPrimaryReplicaSessionClosed.ps1')
+}
+
+function Test-Phase7BWorkPackage2FinalizationProvenance {
+  # Portable verification: restore does not need the dead primary host or an unexpired
+  # capture authorization. It checks the hash-bound closure recorded while it WAS valid.
+  [CmdletBinding()] param([Parameter(Mandatory=$true)]$Descriptor)
+  try {
+    if(@($Descriptor.PSObject.Properties.Name) -cnotcontains 'stage5Provenance'){
+      return [pscustomobject]@{pass=$true;classification='PHASE7B_WP2_LEGACY_DESCRIPTOR_WITHOUT_CONTINUATION'}
+    }
+    function Assert-Shape($Value,[string[]]$Names){
+      if($null -eq $Value -or @(Compare-Object @($Value.PSObject.Properties.Name) $Names -CaseSensitive).Count -ne 0){throw 'SHAPE'}
+    }
+    $p=$Descriptor.stage5Provenance;$b=$p.binding;$c=$b.capture;$f=$b.finalization;$r=$b.receipt
+    Assert-Shape $p @('schemaVersion','bindingSha256','binding','founderAcknowledgement','finalizedAt')
+    Assert-Shape $b @('schemaVersion','classification','attemptId','executionAuthorized','founderExecutionAuthorizationRequired','stage5Only','automaticRetryAllowed','wp2cAuthorized','capture','finalization','receipt')
+    Assert-Shape $c @('toolingCommit','invocationContractSha256','stage3','stage4','authorizationId','authorizationSha256','authorizationPathSha256',
+      'authorizationIssuedAt','authorizationExpiresAt','pendingDescriptorSha256','packetSha256','packetBytes','plaintextZipSha256','plaintextZipBytes',
+      'decryptedStreamSha256','decryptedStreamBytes','decryptRoundTripPass','ageEncryptionMode','ageRecipient','ageExeSha256','ageKeygenSha256',
+      'sourceInventorySha256','capturePlanSha256','quiescenceEvidenceSha256','quiescenceToolingCommit')
+    Assert-Shape $f @('toolingCommit','artifacts');Assert-Shape $r @('nonce','sha256','bytes','fileName')
+    foreach($identity in @($c.stage3,$c.stage4)){Assert-Shape $identity @('sha256','bytes')}
+    if($p.schemaVersion -isnot [int] -or $p.schemaVersion -ne 1 -or $b.schemaVersion -isnot [int] -or $b.schemaVersion -ne 1 -or
+        [string]$b.classification -cne 'PHASE7B_WP2B_STAGE5_CONTINUATION_BINDING' -or
+        [string]$p.founderAcknowledgement -cne 'WP2B_STAGE5_FINALIZE_ACCEPTED_CAPTURE_LINEAGE_EXACTLY_ONCE' -or
+        [string]$b.attemptId -cne [string]$Descriptor.attemptId){throw 'IDENTITY'}
+    foreach($name in @('executionAuthorized','automaticRetryAllowed','wp2cAuthorized')){if($b.$name -isnot [bool] -or $b.$name){throw 'FLAGS'}}
+    foreach($name in @('founderExecutionAuthorizationRequired','stage5Only')){if($b.$name -isnot [bool] -or -not $b.$name){throw 'FLAGS'}}
+    if($c.decryptRoundTripPass -isnot [bool] -or -not $c.decryptRoundTripPass){throw 'ROUNDTRIP'}
+    foreach($hash in @($p.bindingSha256,$c.invocationContractSha256,$c.stage3.sha256,$c.stage4.sha256,$c.authorizationSha256,$c.authorizationPathSha256,
+        $c.pendingDescriptorSha256,$c.packetSha256,$c.plaintextZipSha256,$c.decryptedStreamSha256,$c.ageExeSha256,$c.ageKeygenSha256,
+        $c.sourceInventorySha256,$c.capturePlanSha256,$c.quiescenceEvidenceSha256,$r.sha256)){
+      if($hash -isnot [string] -or $hash -cnotmatch '^[0-9a-f]{64}$'){throw 'HASH'}
+    }
+    foreach($commit in @($c.toolingCommit,$c.quiescenceToolingCommit,$f.toolingCommit)){if($commit -isnot [string] -or $commit -cnotmatch '^[0-9a-f]{40}$'){throw 'COMMIT'}}
+    foreach($count in @($c.packetBytes,$c.plaintextZipBytes,$c.decryptedStreamBytes,$c.stage3.bytes,$c.stage4.bytes,$r.bytes)){
+      if(($count -isnot [int] -and $count -isnot [long]) -or $count -lt 1){throw 'BYTES'}
+    }
+    $artifacts=@($f.artifacts);$expected=@(Get-Phase7BWorkPackage2FinalizationArtifactNames|ForEach-Object{"scripts/$_"})
+    if($artifacts.Count -ne $expected.Count -or @(Compare-Object @($artifacts.relativePath) $expected -CaseSensitive).Count -ne 0){throw 'ARTIFACTS'}
+    foreach($artifact in $artifacts){
+      Assert-Shape $artifact @('relativePath','sha256','bytes')
+      if([string]$artifact.sha256 -cnotmatch '^[0-9a-f]{64}$' -or ($artifact.bytes -isnot [int] -and $artifact.bytes -isnot [long]) -or $artifact.bytes -lt 1){throw 'ARTIFACT_IDENTITY'}
+    }
+    if((Get-Phase7BSha256 -Text (ConvertTo-Phase7BCanonicalJson $b)) -cne [string]$p.bindingSha256 -or
+        [string]$c.authorizationId -cnotmatch '^phase7b-wp2b-capture-auth-[0-9a-f]{32}$' -or [string]$r.nonce -cnotmatch '^[0-9a-f]{32}$' -or
+        [string]$r.fileName -cne "$($b.attemptId)-replica-receipt-$($r.nonce).json" -or
+        [string]$c.stage3.sha256 -cne [string]$Descriptor.stage3LauncherSha256 -or
+        [string]$c.authorizationId -cne [string]$Descriptor.captureAuthorizationId -or
+        [string]$c.authorizationSha256 -cne [string]$Descriptor.captureAuthorizationSha256 -or
+        [string]$c.toolingCommit -cne [string]$Descriptor.captureAuthorizationToolingCommit -or
+        [string]$r.sha256 -cne [string]$Descriptor.replicaReceiptSha256){throw 'CROSS_BINDING'}
+    foreach($name in @('invocationContractSha256','packetSha256','plaintextZipSha256','decryptedStreamSha256','ageEncryptionMode','ageRecipient',
+        'ageExeSha256','ageKeygenSha256','sourceInventorySha256','capturePlanSha256','quiescenceEvidenceSha256')){
+      if([string]$c.$name -cne [string]$Descriptor.$name){throw 'CAPTURE_BINDING'}
+    }
+    foreach($name in @('packetBytes','plaintextZipBytes','decryptedStreamBytes')){if([int64]$c.$name -ne [int64]$Descriptor.$name){throw 'CAPTURE_BYTES'}}
+    $issued=[DateTime]::Parse([string]$c.authorizationIssuedAt).ToUniversalTime();$expiry=[DateTime]::Parse([string]$c.authorizationExpiresAt).ToUniversalTime()
+    $closed=[DateTime]::Parse([string]$p.finalizedAt).ToUniversalTime()
+    if($issued -ge $expiry -or ($expiry-$issued).TotalHours -gt 24 -or $closed -lt $issued -or $closed -ge $expiry){throw 'CLOSURE_TIME'}
+    [pscustomobject]@{pass=$true;classification='PHASE7B_WP2_STAGE5_PROVENANCE_PASS'}
+  }catch{[pscustomobject]@{pass=$false;classification='PHASE7B_WP2_STAGE5_PROVENANCE_FAIL'}}
+}
+
 function Test-Phase7BWorkPackage2MediaFileSet {
   [CmdletBinding()]
   param(
@@ -541,6 +613,8 @@ function Test-Phase7BWorkPackage2AgeVersionOutput {
 }
 
 Export-ModuleMember -Function @(
+  'Get-Phase7BWorkPackage2FinalizationArtifactNames',
+  'Test-Phase7BWorkPackage2FinalizationProvenance',
   "Get-Phase7BWorkPackage2Contract",
   "ConvertTo-Phase7BCanonicalJson",
   "Assert-Phase7BWorkPackage2Authorization",
