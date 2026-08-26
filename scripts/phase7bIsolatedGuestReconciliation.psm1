@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 
 function Assert-Phase7BReconciliationInvariant {
   param(

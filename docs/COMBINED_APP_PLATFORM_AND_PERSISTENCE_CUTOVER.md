@@ -2,6 +2,11 @@
 
 Status: implementation and isolated rehearsal design only. This document is not a production migration authorization. Windows, legacy JSON, and local production media remain authoritative until a new, exact combined-cutover authorization is issued.
 
+For current WP2-C controls, [PHASE7B_GO_FORWARD_MIGRATION_POLICY.md](PHASE7B_GO_FORWARD_MIGRATION_POLICY.md)
+and [PHASE7B_WP2C_READINESS_DESIGN.md](PHASE7B_WP2C_READINESS_DESIGN.md) supersede older
+embedded-authorization restore-media and standalone guest-restore assumptions below.
+WP2-C ends with inert recovery verification, not application or database startup.
+
 ## Why the transition is combined
 
 A persistence-only transition cannot complete while the accepted PostgreSQL firewall permits only App Platform and the Windows serving runtime cannot consume the new canonical store. Moving the full application first also cannot complete because App Platform's ephemeral filesystem cannot provide the shared, durable semantics required by the legacy JSON and media implementation. A bridge or a temporary durable legacy store would create another authority plane and an immediate second migration.

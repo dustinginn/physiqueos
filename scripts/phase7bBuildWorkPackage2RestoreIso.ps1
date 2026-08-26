@@ -13,6 +13,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# The embedded-authorization ISO format cannot bind its own final ISO hash.
+# Retained only to reject legacy invocations; use the non-circular WP2-C builder.
+throw 'PHASE7B_WP2C_LEGACY_RESTORE_MEDIA_RETIRED'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot "phase7bWorkPackage2Contract.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "phase7bIsolatedGuestContract.psm1") -Force

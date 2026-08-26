@@ -34,6 +34,16 @@ The Stage-5-only continuation design is specified in [PHASE7B_STAGE5_CONTINUATIO
 
 ## Remaining migration map
 
+WP2-C readiness, offline media, provisional 1Password entry, pre-mutation isolation,
+host/guest one-use state and inert restore closeout are specified in
+[PHASE7B_WP2C_READINESS_DESIGN.md](PHASE7B_WP2C_READINESS_DESIGN.md).
+Preparation and execution require separate Founder GOs. The external host claim
+survives guest rollback; copied offline media is not an independent anti-rollback
+counter. No guest-only retry, memory snapshot containing identity material,
+automatic revert or late-phase authority follows from WP2-C. Native identity entry
+remains prohibited until the exact provisional workflow passes separately authorized
+synthetic guest tests and the Founder separately approves real use.
+
 1. Complete WP2B capture, replica verification, teardown, and authorization consumption.
 2. Complete WP2-C isolated restore and evidence acceptance.
 3. Run the synthetic migration rehearsal and reconcile results without changing canonical authority.

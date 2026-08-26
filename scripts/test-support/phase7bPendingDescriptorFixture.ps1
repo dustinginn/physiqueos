@@ -1,5 +1,24 @@
 # Synthetic test support only. Evaluate the actual producer's descriptor expression, never
 # its capture body. This prevents fixtures from adding fields the producer does not emit.
+function New-Phase7BSyntheticPacketManifest {
+  param($Authorization,[object[]]$Files,$ReferenceResult,[string]$ReferencePath)
+  $tokens=$null;$errors=$null
+  $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '..\phase7bPrepareWorkPackage2EncryptedPacket.ps1'),[ref]$tokens,[ref]$errors)
+  $assignments=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -ceq '$packetManifest'},$true))
+  if(@($errors).Count -ne 0 -or $assignments.Count -ne 1){throw 'SYNTHETIC_MANIFEST_PRODUCER_SHAPE'}
+  $rhs=$assignments[0].Right
+  if(@($rhs.FindAll({param($n)$n -is [Management.Automation.Language.CommandAst] -or ($n -is [Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Value -cne 'ToLowerInvariant')},$true)).Count -ne 0){throw 'SYNTHETIC_MANIFEST_NOT_PURE'}
+  $contract=Get-Phase7BWorkPackage2Contract;$AttemptId=$Authorization.attemptId
+  [int64]$total=0;foreach($file in $Files){$total+=[int64]$file.bytes}
+  $inventory=[pscustomobject]@{inventorySha256=$Authorization.sourceInventorySha256;fileCount=$Files.Count;totalBytes=$total}
+  $publicFiles=$Files;$sourceRootSha256=$Authorization.sourceRootSha256;$ExpectedCapturePlanSha256=$Authorization.capturePlanSha256
+  $ExpectedInvocationContractSha256=$Authorization.invocationContractSha256;$ExpectedStage3LauncherSha256=$Authorization.stage3LauncherSha256
+  $AgeRecipient=$Authorization.ageRecipient;$ExpectedAuthorizationSha256='a'*64;$toolingCommit=$Authorization.toolingCommit
+  $localOutputRootSha256=$Authorization.localOutputRootSha256;$replicaRootSha256=$Authorization.replicaRootSha256
+  $referenceFileSha256=Get-Phase7BSha256 -LiteralPath $ReferencePath;$referenceFileBytes=[int64](Get-Item -LiteralPath $ReferencePath).Length
+  [pscustomobject](& ([scriptblock]::Create($rhs.Extent.Text)))
+}
+
 function New-Phase7BSyntheticPendingDescriptor {
   param([Parameter(Mandatory = $true)]$Authorization,
     [Parameter(Mandatory = $true)][string]$PacketSha256,

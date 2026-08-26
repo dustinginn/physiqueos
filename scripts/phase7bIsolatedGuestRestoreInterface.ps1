@@ -33,9 +33,10 @@ $stage = "initialize"
 $temporaryZip = $null
 $incompleteRestore = $null
 
-if ($Operation -in @("StageEncryptedPacket", "DecryptAndRestore") -and
-    ([string]::IsNullOrWhiteSpace($AuthorizationPath) -or [string]::IsNullOrWhiteSpace($ExpectedAuthorizationSha256))) {
-  throw "PHASE7B_WORK_PACKAGE2_NOT_AUTHORIZED"
+if ($Operation -in @('StageEncryptedPacket','DecryptAndRestore','VerifyRestore')) {
+  # Retired independently callable mutation path. Modern WP2-C entry owns preflight,
+  # host/guest claims and completion. Legacy descriptor readers remain read-only.
+  throw 'PHASE7B_WORK_PACKAGE2_NOT_AUTHORIZED_USE_WP2C_GUEST_ENTRY'
 }
 
 $incoming = Join-Path $guestContract.isolatedRoot "incoming"

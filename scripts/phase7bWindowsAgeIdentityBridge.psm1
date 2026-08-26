@@ -221,7 +221,8 @@ function Test-Phase7BSecureStringsEqual {
 }
 
 function Show-Phase7BAgeIdentityDialog {
-  [CmdletBinding()] param()
+  [CmdletBinding()] param([switch]$GuestEntry,[switch]$SyntheticObservationOnly)
+  if ($SyntheticObservationOnly -and -not $GuestEntry) { throw 'PHASE7B_WP2_SYNTHETIC_GUEST_ONLY' }
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   $form = New-Object Windows.Forms.Form
@@ -242,6 +243,8 @@ function Show-Phase7BAgeIdentityDialog {
     $instructions.Location = New-Object Drawing.Point(18, 15)
     $instructions.Size = New-Object Drawing.Size(670, 42)
     $instructions.Text = 'Paste the single Founder AGE-SECRET-KEY identity twice. The secret remains masked and is never written to disk or command-line arguments.'
+    if ($GuestEntry) { $instructions.Text = 'Isolated guest: use only the separately synthetic-validated input method. Check destination focus before each field. This dialog cannot prevent host-side misdelivery.' }
+    if ($SyntheticObservationOnly) { $instructions.Text = 'SYNTHETIC ONLY: enter the public invalid test value, never a real identity. The same guest dialog controls are under focus/target testing.' }
     $form.Controls.Add($instructions)
 
     $firstLabel = New-Object Windows.Forms.Label
@@ -286,6 +289,7 @@ function Show-Phase7BAgeIdentityDialog {
     $reveal.Text = 'Hold to reveal'
     $reveal.TabStop = $false
     $form.Controls.Add($reveal)
+    if ($GuestEntry) { $reveal.Visible = $false }
 
     $ok = New-Object Windows.Forms.Button
     $ok.Location = New-Object Drawing.Point(505, 174)
@@ -304,6 +308,11 @@ function Show-Phase7BAgeIdentityDialog {
     $revealController = Add-Phase7BAgeIdentityRevealHandlers -Form $form -RevealControl $reveal -FirstControl $first -SecondControl $second
 
     $ok.Add_Click({
+      if ($SyntheticObservationOnly) {
+        $form.DialogResult = [Windows.Forms.DialogResult]::OK
+        $form.Close()
+        return
+      }
       try {
         $form.Tag = Invoke-Phase7BAgeIdentityDialogEntryValidation -FirstRaw $first.Text -SecondRaw $second.Text -FirstControl $first -SecondControl $second
       } catch {
@@ -321,8 +330,13 @@ function Show-Phase7BAgeIdentityDialog {
       $form.DialogResult = [Windows.Forms.DialogResult]::OK
       $form.Close()
     })
-    $form.AcceptButton = $ok
+    if (-not $GuestEntry) { $form.AcceptButton = $ok }
     $result = $form.ShowDialog()
+    if ($SyntheticObservationOnly) {
+      # This path never returns a SecureString or invokes age. Invalid fixed value only.
+      $expectedSynthetic = 'AGE-SECRET-KEY-' + ('I' * 59)
+      return [pscustomobject][ordered]@{firstFieldExact=($first.Text -ceq $expectedSynthetic);secondFieldExact=($second.Text -ceq $expectedSynthetic);firstCount=$first.Text.Length;secondCount=$second.Text.Length;dialogConfirmed=($result -eq [Windows.Forms.DialogResult]::OK);syntheticObservationOnly=$true}
+    }
     if ($result -ne [Windows.Forms.DialogResult]::OK -or $null -eq $form.Tag) {
       throw 'PHASE7B_WP2_AGE_IDENTITY_ENTRY_CANCELLED'
     }
@@ -389,12 +403,13 @@ function Request-Phase7BVerifiedAgeIdentity {
     [Parameter(Mandatory = $true)][string]$AgeKeygenPath,
     [Parameter(Mandatory = $true)][string]$ExpectedAgeRecipient,
     [Parameter()][scriptblock]$PromptProvider,
-    [Parameter()][scriptblock]$RecipientDeriver
+    [Parameter()][scriptblock]$RecipientDeriver,
+    [Parameter()][switch]$GuestEntry
   )
   if (-not (Test-Path -LiteralPath $AgeKeygenPath -PathType Leaf) -or -not (Test-Phase7BAgeRecipientShape -Value $ExpectedAgeRecipient)) {
     throw 'PHASE7B_WP2_AGE_IDENTITY_VERIFICATION_ARGUMENT_FAIL'
   }
-  if ($null -eq $PromptProvider) { $PromptProvider = { Show-Phase7BAgeIdentityDialog } }
+  if ($null -eq $PromptProvider) { $PromptProvider = { Show-Phase7BAgeIdentityDialog -GuestEntry:$GuestEntry } }
   if ($null -eq $RecipientDeriver) {
     $RecipientDeriver = { param($path, $identity) Invoke-Phase7BAgeKeygenRecipientDerivation -AgeKeygenPath $path -Identity $identity }
   }
@@ -588,7 +603,13 @@ function Invoke-Phase7BAgeNativeIdentityDecryptionToFile {
   }
 }
 
+function Show-Phase7BGuestSyntheticIdentityObservation {
+  [CmdletBinding()] param()
+  Show-Phase7BAgeIdentityDialog -GuestEntry -SyntheticObservationOnly
+}
+
 Export-ModuleMember -Function @(
+  'Show-Phase7BGuestSyntheticIdentityObservation',
   'Test-Phase7BAgeRecipientShape',
   'Request-Phase7BVerifiedAgeIdentity',
   'Assert-Phase7BAgeIdentityRecipient',

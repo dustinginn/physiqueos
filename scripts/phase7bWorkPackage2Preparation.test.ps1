@@ -197,6 +197,15 @@ exit /b %ERRORLEVEL%
   Assert-True ($builtNodeReference.mediaCount -eq 2 -and $builtNodeReference.relationshipCount -ge 1) "Node reference builder ignores file-shaped canonical IDs and historical labels while binding present required media"
   $crossRuntimeReference = Test-Phase7BWorkPackage2ReferenceIndexFile -LiteralPath $nodeReferencePath -ExpectedFileSha256 (Get-Phase7BSha256 -LiteralPath $nodeReferencePath) -ExpectedSemanticSha256 $nodeReferenceOutput.referenceIndexSha256 -ExpectedBytes (Get-Item $nodeReferencePath).Length
   Assert-True $crossRuntimeReference.pass "PowerShell 5.1 restore verifier accepts Node canonical reference digest"
+  Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
+  $actualManifest=New-Phase7BSyntheticPacketManifest -Authorization $finalAuthorization -Files $nodeReferenceFiles -ReferenceResult $nodeReferenceOutput -ReferencePath $nodeReferencePath
+  Write-JsonNoBom (Join-Path $nodeReferenceRoot 'packet-manifest.json') $actualManifest
+  Remove-Item -LiteralPath $nodeReferenceInputPath
+  $restoredPacket=Test-Phase7BWP2CRestoredPacket -Root $nodeReferenceRoot -AttemptId $attemptId
+  Assert-True ($restoredPacket.pass -and $restoredPacket.fileCount -eq $nodeReferenceFiles.Count) 'current WP2C consumer verifies actual Stage3 manifest producer and Node reference index'
+  $extraRestored=Join-Path $nodeReferenceRoot 'unexpected.json';Write-JsonNoBom $extraRestored @{}
+  Assert-Throws {Test-Phase7BWP2CRestoredPacket -Root $nodeReferenceRoot -AttemptId $attemptId} 'UNEXPECTED_FILE_SET' 'WP2C restored extra file rejected'
+  Remove-Item -LiteralPath $extraRestored
   $missingReferenceRoot = Join-Path $testRoot 'node-reference-missing'; New-Item -ItemType Directory -Path @((Join-Path $missingReferenceRoot 'windows\canonical'),(Join-Path $missingReferenceRoot 'windows\control'),(Join-Path $missingReferenceRoot 'windows\media')) -Force | Out-Null
   Copy-Item (Join-Path $nodeReferenceRoot 'windows\canonical\runtime.json') (Join-Path $missingReferenceRoot 'windows\canonical\runtime.json'); Copy-Item (Join-Path $nodeReferenceRoot 'windows\control\migration-control.json') (Join-Path $missingReferenceRoot 'windows\control\migration-control.json')
   $missingReferenceFiles = @(); foreach ($logicalPath in @('windows/canonical/runtime.json','windows/control/migration-control.json')) { $physicalPath = Join-Path $missingReferenceRoot $logicalPath.Replace('/','\'); $missingReferenceFiles += [ordered]@{ sourceRelativePath = $logicalPath.Replace('windows/','canonical/'); logicalPath = $logicalPath; bytes = (Get-Item $physicalPath).Length; sha256 = Get-Phase7BSha256 -LiteralPath $physicalPath } }
@@ -269,13 +278,8 @@ exit /b %ERRORLEVEL%
   $mediaAuthPath = Join-Path $testRoot 'media-authorization.json'
   $mediaAuthHash = New-Authorization -Path $mediaAuthPath -Stage 'WP2C_MEDIA' -AttemptId $attemptId -InventorySha $two.inventorySha256 -PacketSha $packetSha
   $isoPath = Join-Path $testRoot 'phase7b-wp2-fixture.iso'
-  $isoOutput = @(& (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2RestoreIso.ps1') -AttemptId $attemptId -AuthorizationPath $mediaAuthPath -ExpectedAuthorizationSha256 $mediaAuthHash -PacketPath $encrypted -ExpectedPacketSha256 $packetSha -DescriptorPath $descriptorPath -ExpectedDescriptorSha256 $descriptorHash -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeHash -OutputPath $isoPath) -join [Environment]::NewLine
-  $isoResult = $isoOutput | ConvertFrom-Json
-  Assert-True ($isoResult.pass -and $isoResult.classification -eq 'PHASE7B_WP2_RESTORE_MEDIA_BUILT') "synthetic two-file restore media built"
-  Assert-True ($isoResult.fileCount -eq 3 -and $isoResult.primaryVolumeLabel -eq 'P7B_WP2' -and $isoResult.jolietVolumeLabel -eq 'P7B_WP2') "restore media exact file count and labels"
-  Assert-True ($isoResult.ageFileName -eq 'age.exe' -and $isoResult.ageExeSha256 -eq $fakeAgeHash) "restore media binds exact offline age executable"
-  Assert-True (@($isoResult.embeddedAuthorizedStages).Count -eq 4 -and $isoResult.mediaDescriptorSha256 -match '^[0-9a-f]{64}$') "media descriptor embeds exact offline guest stage authorizations"
-  Assert-True (-not $isoResult.credentialsIncluded -and -not $isoResult.plaintextIncluded) "restore media excludes credentials and plaintext"
+  Assert-Throws { & (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2RestoreIso.ps1') -AttemptId $attemptId -AuthorizationPath $mediaAuthPath -ExpectedAuthorizationSha256 $mediaAuthHash -PacketPath $encrypted -ExpectedPacketSha256 $packetSha -DescriptorPath $descriptorPath -ExpectedDescriptorSha256 $descriptorHash -AgeExePath $fakeAge -ExpectedAgeExeSha256 $fakeAgeHash -OutputPath $isoPath } 'PHASE7B_WP2C_LEGACY_RESTORE_MEDIA_RETIRED' 'circular embedded-authorization media path retired'
+  Assert-True (-not (Test-Path -LiteralPath $isoPath)) 'retired builder creates no media; current media tested through source-produced finalization fixture'
 
   $captureInspect = @(& (Join-Path $PSScriptRoot 'phase7bPrepareWorkPackage2EncryptedPacket.ps1') -Operation Inspect) -join [Environment]::NewLine | ConvertFrom-Json
   Assert-True ($captureInspect.pass -and $captureInspect.interactiveSecretPromptRequired -and $captureInspect.ageEncryptionMode -eq 'native-recipient-v1' -and -not $captureInspect.plaintextSecretFilePermitted) "capture tool advertises native identity no-file secret boundary"
