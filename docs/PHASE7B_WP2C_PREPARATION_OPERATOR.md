@@ -153,6 +153,19 @@ their outputs belong to the selected continuation directory. The current operato
 revalidates both lineages on each call; no silent latest-context selection.
 The full remaining procedure below is identical for both entries.
 
+If a separately published semantic VM-binding correction is required after an
+authorized VMware optical save, STOP using the block above. A separate Founder GO
+must select the exact immutable parent continuation and exact stopped raw VMX pin,
+then invoke operator mode `CreateVmBindingContinuation` once. That mode creates a
+new `wp2c\vm-bindings\<preparedStateId>\<currentCommit>` context and distinct
+`tooling-semantic-current.iso`; it never edits the parent continuation or original
+session. Require
+`PHASE7B_WP2C_PREPARATION_VM_BINDING_CONTINUATION_NONEXECUTABLE`, created=true,
+then use only exact `VmBindingPath` and `VmBindingSha256` parameters for every
+later `Prep` mode. The source-owned refreshed offline handoff must be generated
+and reviewed before any boot. Parent/current media, a legacy whole-VMX hash or a
+manually selected latest context are never substitutes.
+
 Create a temporary host 1Password Login item with ONLY the public invalid test
 value below in its password field, using that field's supported Type in window
 action (not whole-login Auto-Type). No TOTP/automatic submission. Do not assume a
@@ -371,6 +384,9 @@ For a continuation, preparation.json additionally carries `preparationLineage`:
 the exact continuation path/hash/bytes, original session/init commit/operator/
 ISO/manifest and current continuation commit/operator/Host/ISO/manifest. The
 original directory is never the output destination and remains byte-identical.
+For a semantic VM-binding continuation this is schema version 2 and additionally
+binds the immutable parent continuation, its legacy VM config hash, and the exact
+semantic mode/hash plus stopped raw VMX identity used at bridge creation.
 
 Preserve final JSON/identities, close test canary windows, and later remove the
 temporary synthetic 1Password item yourself if desired (never the real recovery

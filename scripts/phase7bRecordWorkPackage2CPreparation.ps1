@@ -7,6 +7,7 @@ param(
   [Parameter(Mandatory=$true)][string]$FounderReviewPath,[Parameter(Mandatory=$true)][string]$FounderReviewSha256,
   [Parameter(Mandatory=$true)][string]$VmxPath,[Parameter(Mandatory=$true)][string]$SnapshotMetadataPath,
   [string]$ContinuationPath,[string]$ContinuationSha256,
+  [string]$VmBindingPath,[string]$VmBindingSha256,
   [Parameter(Mandatory=$true)][string]$OutputDirectory,[Parameter(Mandatory=$true)][switch]$FounderPreparationReviewed
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -29,8 +30,12 @@ $returned=ConvertFrom-Phase7BWP2CPreparationReturnText (Get-Content -LiteralPath
 $review=Read-Phase7BWP2CBoundJson $FounderReviewPath $FounderReviewSha256
 $observation=Get-Phase7BWP2CHostObservation $VmxPath $SnapshotMetadataPath
 $result=New-Phase7BWP2CPreparationHandoffEvidence $plan $returned $review $observation $media $carrier.descriptorIdentity
-Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and ($OutputDirectory -notmatch '(?i)[\\/]continuations[\\/]' -or [bool]$ContinuationPath)) 'CONTINUATION_SELECTION_REQUIRED'
-if($ContinuationPath){
+Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and -not ($ContinuationPath -and $VmBindingPath) -and ($OutputDirectory -notmatch '(?i)[\\/]continuations[\\/]' -or $ContinuationPath -or $VmBindingPath)) 'CONTINUATION_SELECTION_REQUIRED'
+if($VmBindingPath){
+  $continuation=Read-Phase7BWP2CVmBindingContinuation $VmBindingPath $VmBindingSha256 (Split-Path -Parent $PSScriptRoot)
+  Assert-Phase7BWP2C ($OutputDirectory -ceq (Join-Path $continuation.root 'accepted') -and $PreparationContentRoot -ceq (Join-Path $continuation.root 'preparation.iso.content') -and $ToolingMediaPath -ceq $continuation.document.current.toolingMediaPath) 'CONTINUATION_RECORDER_PATH'
+  Add-Phase7BWP2CPreparationLineage $result.preparation $plan $continuation $VmBindingPath
+}elseif($ContinuationPath){
   $continuation=Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256 (Split-Path -Parent $PSScriptRoot)
   Assert-Phase7BWP2C ($OutputDirectory -ceq (Join-Path $continuation.root 'accepted') -and $PreparationContentRoot -ceq (Join-Path $continuation.root 'preparation.iso.content') -and $ToolingMediaPath -ceq $continuation.document.current.toolingMediaPath) 'CONTINUATION_RECORDER_PATH'
   Add-Phase7BWP2CPreparationLineage $result.preparation $plan $continuation $ContinuationPath

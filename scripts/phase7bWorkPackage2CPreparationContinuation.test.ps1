@@ -28,6 +28,7 @@ function Observe-Host {
 }
 function Invoke-Operator([hashtable]$Arguments){
   $output=New-Object 'Collections.Generic.List[string]'
+  $errorBefore=@($Error)
   try { & {
     function Import-Module {param($Name)}
     function New-Object {param($TypeName,$ArgumentList);if($TypeName -ceq 'Security.Principal.WindowsPrincipal'){$p=[pscustomobject]@{};$p|Add-Member ScriptMethod IsInRole {$true};return $p};Microsoft.PowerShell.Utility\New-Object @PSBoundParameters}
@@ -41,7 +42,12 @@ function Invoke-Operator([hashtable]$Arguments){
     # Overrides above are synthetic OS, publication and historical checkout
     # boundaries only. The actual Initialize/BuildTooling/remaining modes run.
     & $operatorPath @Arguments -FounderPreparationApproved
-  } | ForEach-Object {$output.Add([string]$_)} }catch{throw ('SYNTHETIC_OPERATOR_FAIL:'+($output -join "`n")+':'+$_.Exception.Message)}
+  } | ForEach-Object {$output.Add([string]$_)} }catch{
+    $chain=New-Object 'Collections.Generic.List[string]';$e=$_.Exception
+    while($e){$chain.Add($e.GetType().Name+':'+$e.Message);$e=$e.InnerException}
+    foreach($record in @($Error|Where-Object {$_ -notin $errorBefore}|Select-Object -First 6)){$chain.Add('ErrorRecord:'+$record.Exception.GetType().Name+':'+$record.Exception.Message)}
+    throw ('SYNTHETIC_OPERATOR_FAIL:'+($output -join "`n")+':'+($chain -join ' -> '))
+  }
   $output.ToArray()
 }
 function Read-Current {Read-Phase7BWP2CPreparationContinuation $made.path $made.identity.sha256 $repo}
@@ -54,7 +60,7 @@ try {
   [IO.File]::WriteAllText((Join-Path $s.root 'synthetic.vmdk'),"createType=`"monolithicSparse`"`nRW 167772160 SPARSE `"synthetic-extent.vmdk`"`n")
   [IO.File]::WriteAllText($snapshotPath,"snapshot.current = `"2`"`nsnapshot0.uid = `"1`"`nsnapshot0.displayName = `"S0-clean-windows-pre-bootstrap`"`nsnapshot1.uid = `"2`"`nsnapshot1.displayName = `"S1-physiqueos-bootstrap-inert`"`n")
   $fixed=Get-Phase7BIsolatedGuestContract;$oldMedia=Join-Path $originalRoot 'tooling.iso'
-  $v=@{'displayname'=$fixed.vmDisplayName;'uuid.bios'='56 4d 29 d3 c2 39 b8 6b-4b e4 ce 8c a3 00 80 a4';'memsize'='4096';'numvcpus'='2';'firmware'='efi';'uefi.secureboot.enabled'='TRUE';'guestos'='windows11-64';'managedvm.autoaddvtpm'='software';'ethernet0.connectiontype'='nat';'ethernet0.startconnected'='FALSE';'isolation.tools.copy.disable'='TRUE';'isolation.tools.paste.disable'='TRUE';'isolation.tools.dnd.disable'='TRUE';'isolation.tools.hgfsserverset.disable'='TRUE';'sharedfolder.maxnum'='0';'usb.restrictions.defaultallow'='FALSE';'scsi0:0.filename'='synthetic.vmdk';'scsi0:0.present'='TRUE';'sata0:0.devicetype'='cdrom-image';'sata0:0.present'='TRUE';'sata0:0.filename'=$oldMedia;'sata0:0.startconnected'='FALSE';'sata0:1.devicetype'='cdrom-image';'sata0:1.present'='TRUE';'sata0:1.filename'=$oldMedia}
+  $v=@{'displayname'=$fixed.vmDisplayName;'uuid.bios'='56 4d 29 d3 c2 39 b8 6b-4b e4 ce 8c a3 00 80 a4';'memsize'='4096';'numvcpus'='2';'firmware'='efi';'uefi.secureboot.enabled'='TRUE';'guestos'='windows11-64';'managedvm.autoaddvtpm'='software';'ethernet0.present'='TRUE';'ethernet0.connectiontype'='nat';'ethernet0.startconnected'='FALSE';'isolation.tools.copy.disable'='TRUE';'isolation.tools.paste.disable'='TRUE';'isolation.tools.dnd.disable'='TRUE';'isolation.tools.hgfsserverset.disable'='TRUE';'sharedfolder.maxnum'='0';'usb.restrictions.defaultallow'='FALSE';'scsi0:0.filename'='synthetic.vmdk';'scsi0:0.present'='TRUE';'sata0:0.devicetype'='cdrom-image';'sata0:0.present'='TRUE';'sata0:0.filename'=$oldMedia;'sata0:0.startconnected'='FALSE';'sata0:1.devicetype'='cdrom-image';'sata0:1.present'='TRUE';'sata0:1.filename'=$oldMedia}
   Save-Vmx $v
   $hostModule=Get-Module phase7bWorkPackage2CHost;$continuationModule=Get-Module phase7bWorkPackage2CPreparationContinuation
   $pathValidator=(Get-Command Assert-Phase7BWP2CLocalPath).ScriptBlock;$toolProducer=(Get-Command New-Phase7BWP2CToolingContent).ScriptBlock
@@ -137,16 +143,39 @@ try {
   Assert-True ((Read-Current).identity.sha256 -ceq $made.identity.sha256) 'historical count does not gate exact selected current context'
   $badHistory=Clone $historical;$badHistory.PSObject.Properties.Remove('nonExecutable');Write-Json (Join-Path $other 'continuation.json') $badHistory
   Reject {Read-Current} 'malformed historical context is not ignored by cardinality policy';Write-Json (Join-Path $other 'continuation.json') $historical
-  # Actual preboot must reject stale optical media even with valid continuation.
-  $args=@{SessionRoot=$selected.root;ContinuationPath=$made.path;ContinuationSha256=$made.identity.sha256}
-  Reject {Read-Phase7BWP2CPreparationContinuation $made.path ('0'*64) $repo} 'wrong selected context hash'
-  Reject {Invoke-Operator @{Mode='PreBootBaseline';SessionRoot=$selected.root}} 'explicit continuation selection required'
+  # Reproduce the published live defect with an actual source-produced parent
+  # continuation shape: its legacy whole-VMX identity no longer matches after
+  # VMware saves an authorized optical projection plus benign runtime metadata.
+  $v['sata0:0.filename']=$c.current.toolingMediaPath;$v['sata0:1.filename']=$c.current.toolingMediaPath;Save-Vmx $v
+  $legacy=Clone $c;$legacy.vm.configSha256='f'*64;Write-Json $made.path $legacy;$parentId=Get-Phase7BWP2CIdentity $made.path
+  Reject {Read-Phase7BWP2CPreparationContinuation $made.path $parentId.sha256 $repo} 'legacy whole-VMX binding reproduces current resumption defect'
+  $v['guestinfo.detailed.data']='benign-runtime-serialization';Save-Vmx $v
+  $bridgeCommit='d'*40;$publicationCommit=$bridgeCommit;$global:phase7bContinuationTest.commit=$bridgeCommit
+  $bridgeRaw=Invoke-Operator @{Mode='CreateVmBindingContinuation';SessionRoot=$selected.root;ContinuationPath=$made.path;ContinuationSha256=$parentId.sha256;StoppedVmxSha256=(Get-Phase7BWP2CIdentity $vmxPath).sha256;ToolingCommit=$bridgeCommit}
+  $bridgeJson=@($bridgeRaw|Where-Object {$_ -notmatch '^& \('}) -join "`n";$bridgeMade=$bridgeJson|ConvertFrom-Json
+  Assert-True ($bridgeMade.created -and $bridgeMade.classification -ceq 'PHASE7B_WP2C_PREPARATION_VM_BINDING_CONTINUATION_NONEXECUTABLE') 'actual create-new VM-binding bridge operator'
+  $selected=Read-Phase7BWP2CVmBindingContinuation $bridgeMade.path $bridgeMade.identity.sha256 $repo;$c=$selected.document
+  Assert-True ($selected.binding.parent.legacyVmConfigSha256 -ceq ('f'*64) -and $selected.binding.vm.semanticMode -ceq 'wp2c-semantic-vmx-v2') 'bridge preserves legacy mismatch and current semantic identity separately'
+  Assert-True ($selected.binding.vm.stoppedVmx.sha256 -ceq (Get-Phase7BWP2CIdentity $vmxPath).sha256 -and $c.current.toolingMediaPath -cne $legacy.current.toolingMediaPath) 'bridge pins stopped raw VMX and distinct current tooling'
+  Assert-True ((Get-Phase7BWP2CObjectHash (Get-Phase7BWP2CDependencyManifest $PSScriptRoot)) -ceq (Get-Phase7BWP2CObjectHash $selected.binding.current.toolingManifest) -and @($selected.binding.current.toolingManifest.files).Count -eq 12) 'bridge current 15-file tooling closure deterministically regenerated'
+  $bridgeAgain=New-Phase7BWP2CVmBindingContinuation $made.path $parentId.sha256 $selected.binding.vm.stoppedVmx.sha256 $repo $bridgeCommit
+  Assert-True (-not $bridgeAgain.created -and $bridgeAgain.identity.sha256 -ceq $bridgeMade.identity.sha256) 'exact compatible bridge is returned without another write'
+  Reject {New-Phase7BWP2CVmBindingContinuation $made.path $parentId.sha256 ('0'*64) $repo $bridgeCommit} 'existing bridge cannot be selected with wrong stopped VMX pin'
+  $bridgeBytes=[IO.File]::ReadAllBytes($bridgeMade.path);$bridgeDoc=Clone $selected.binding;$bridgeDoc.vm.semanticSha256='0'*64;Write-Json $bridgeMade.path $bridgeDoc
+  Reject {Read-Phase7BWP2CVmBindingContinuation $bridgeMade.path (Get-Phase7BWP2CIdentity $bridgeMade.path).sha256 $repo} 'malformed semantic bridge rejected';[IO.File]::WriteAllBytes($bridgeMade.path,$bridgeBytes)
+  $bridgeMediaBytes=[IO.File]::ReadAllBytes($c.current.toolingMediaPath);[IO.File]::AppendAllText($c.current.toolingMediaPath,'changed')
+  Reject {Read-Phase7BWP2CVmBindingContinuation $bridgeMade.path $bridgeMade.identity.sha256 $repo} 'bridge replacement ISO changed';[IO.File]::WriteAllBytes($c.current.toolingMediaPath,$bridgeMediaBytes)
+  # Actual preboot must reject both stale original and stale parent media, then
+  # consume only the exact current bridge selection and media identity.
+  $args=@{SessionRoot=$selected.root;VmBindingPath=$bridgeMade.path;VmBindingSha256=$bridgeMade.identity.sha256}
+  Reject {Read-Phase7BWP2CVmBindingContinuation $bridgeMade.path ('0'*64) $repo} 'wrong selected bridge hash'
+  Reject {Invoke-Operator @{Mode='PreBootBaseline';SessionRoot=$selected.root}} 'explicit VM-binding selection required'
   Reject {Invoke-Operator @{Mode='PreBootBaseline';SessionRoot=$originalRoot}} 'old original session cannot masquerade as current'
-  Reject {Invoke-Operator (@{Mode='PreBootBaseline'}+$args)} 'old ISO cannot satisfy current baseline'
+  Reject {Invoke-Operator (@{Mode='PreBootBaseline'}+$args)} 'parent continuation ISO cannot satisfy bridge baseline'
   $v['sata0:0.filename']=$c.current.toolingMediaPath;$v['sata0:1.filename']=$c.current.toolingMediaPath;Save-Vmx $v
   $preboot=Invoke-Operator (@{Mode='PreBootBaseline'}+$args)
-  Assert-True (($preboot -join "`n") -match 'PHASE7B_WP2C_PREPARATION_PREBOOT_PASS') 'actual baseline accepts continuation media and omitted optical default'
-  Assert-True (($raw -join "`n").Contains($c.current.toolingManifestIdentity.sha256)) 'generated baseline command uses current manifest pin'
+  Assert-True (($preboot -join "`n") -match 'PHASE7B_WP2C_PREPARATION_PREBOOT_PASS') 'actual baseline accepts bridge media and omitted optical default'
+  Assert-True (($bridgeRaw -join "`n").Contains($c.current.toolingManifestIdentity.sha256)) 'generated baseline command uses bridge-current manifest pin'
   $fixtureLines=@(& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'phase7bWorkPackage2CCollector.test.ps1') -ExportSourceFixture)
   if($LASTEXITCODE -ne 0){throw 'COLLECTOR_FIXTURE'}
   $fixture=$fixtureLines -join "`n"|ConvertFrom-Json;$baseline=$fixture.baseline
@@ -158,10 +187,10 @@ try {
   $planOutput=Invoke-Operator (@{Mode='BuildPreparation'}+$args)
   Assert-True (($planOutput -join "`n") -match 'PHASE7B_WP2C_MEDIA_CREATED') 'actual later BuildPreparation succeeds without Initialize'
   $plan=Get-Content (Join-Path $selected.root 'preparation-plan.json') -Raw|ConvertFrom-Json
-  Assert-True ($plan.bindings.toolingCommit -ceq $currentCommit -and $plan.bindings.toolingMedia.sha256 -ceq $c.current.toolingMedia.sha256 -and $plan.bindings.preparedStateId -ceq $original.settings.preparedStateId) 'plan carries current tooling and original lifecycle ID'
-  $preparation=[pscustomobject]@{wp2cExecuted=$false};Add-Phase7BWP2CPreparationLineage $preparation $plan (Read-Current) $made.path
-  Assert-True ($preparation.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $preparation.preparationLineage.currentToolingCommit -ceq $currentCommit -and $preparation.preparationLineage.continuation.sha256 -ceq $made.identity.sha256) 'recorder lineage adapter binds both source-produced lineages'
-  $badPlan=Clone $plan;$badPlan.bindings.toolingMedia=$c.original.toolingMedia;Reject {Add-Phase7BWP2CPreparationLineage ([pscustomobject]@{}) $badPlan (Read-Current) $made.path} 'recorder rejects stale tooling plan'
+  Assert-True ($plan.bindings.toolingCommit -ceq $bridgeCommit -and $plan.bindings.toolingMedia.sha256 -ceq $c.current.toolingMedia.sha256 -and $plan.bindings.preparedStateId -ceq $original.settings.preparedStateId) 'plan carries bridge-current tooling and original lifecycle ID'
+  $preparation=[pscustomobject]@{wp2cExecuted=$false};Add-Phase7BWP2CPreparationLineage $preparation $plan $selected $bridgeMade.path
+  Assert-True ($preparation.preparationLineage.schemaVersion -eq 2 -and $preparation.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $preparation.preparationLineage.currentToolingCommit -ceq $bridgeCommit -and $preparation.preparationLineage.continuation.sha256 -ceq $bridgeMade.identity.sha256 -and $preparation.preparationLineage.parentContinuation.sha256 -ceq $parentId.sha256) 'recorder lineage adapter binds original, parent and semantic bridge lineages'
+  $badPlan=Clone $plan;$badPlan.bindings.toolingMedia=$c.original.toolingMedia;Reject {Add-Phase7BWP2CPreparationLineage ([pscustomobject]@{}) $badPlan $selected $bridgeMade.path} 'recorder rejects stale tooling plan'
   $v['sata0:0.startconnected']='TRUE';$v['sata0:1.filename']=Join-Path $selected.root 'preparation.iso';Save-Vmx $v
   $secondBoot=Invoke-Operator (@{Mode='PreBoot'}+$args)
   Assert-True (($secondBoot -join "`n") -match 'PHASE7B_WP2C_PREPARATION_PREBOOT_PASS') 'actual second preboot accepts current tools plus preparation carrier'
@@ -189,7 +218,7 @@ try {
   $recorded=Invoke-Operator (@{Mode='Record'}+$args)
   Assert-True (($recorded -join "`n") -match 'PHASE7B_WP2C_PREPARATION_RECORDED_NONEXECUTABLE') 'actual operator -> recorder -> accepted evidence'
   $accepted=Get-Content (Join-Path $selected.root 'accepted\preparation.json') -Raw|ConvertFrom-Json
-  Assert-True ($accepted.preparationLineage.continuation.sha256 -ceq $made.identity.sha256 -and $accepted.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $accepted.preparationLineage.currentToolingCommit -ceq $currentCommit -and -not $accepted.wp2cExecuted) 'durable final evidence preserves both lineages and nonexecution'
+  Assert-True ($accepted.preparationLineage.continuation.sha256 -ceq $bridgeMade.identity.sha256 -and $accepted.preparationLineage.parentContinuation.sha256 -ceq $parentId.sha256 -and $accepted.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $accepted.preparationLineage.currentToolingCommit -ceq $bridgeCommit -and -not $accepted.wp2cExecuted) 'durable final evidence preserves original, parent and semantic bridge lineages and nonexecution'
   Assert-True (@(Get-ChildItem (Join-Path $selected.root 'accepted')).Count -eq 4) 'unchanged exact four-file closeout'
   Reject {Invoke-Operator (@{Mode='Record'}+$args)} 'accepted evidence cannot be overwritten'
   Assert-True ($inventoryPin -ceq (Get-Phase7BWP2CObjectHash (Get-Phase7BWP2COriginalPreparationInventory $originalRoot))) 'all original files unchanged after full synthetic continuation'

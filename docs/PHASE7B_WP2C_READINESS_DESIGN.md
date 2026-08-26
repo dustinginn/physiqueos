@@ -159,12 +159,18 @@ clipboard/drag/drop disablement; guest observations alone cannot prove those hos
 settings. Guest gates separately require no up adapter, external default route,
 external established TCP connection, network drive or mapped connection.
 
-The VMX identity uses versioned `wp2c-offline-optical-projection-v1`. It hashes the
-entire parsed VMX except the filenames and connection flags of exactly two
-present `cdrom-image` slots. This avoids binding an as-yet-unbuilt control ISO into
-the authorization. All other configuration, including disk, slot identities,
-CPU/RAM, NIC and integration controls, remains bound. Raw VMX SHA is retained as
-diagnostic evidence. Only those optical fields may change after preparation.
+The current VMX identity uses versioned `wp2c-semantic-vmx-v2`. It is an explicit
+allowlist, not a hash of VMware's serialized file. It binds VM/guest UUID and
+display identity, firmware/Secure Boot/TPM/encryption presence, CPU/RAM, the
+single virtual disk/controller topology, NIC type and disconnected state,
+clipboard/drag/drop/HGFS/shared-folder controls, USB restrictions and the exact
+two-slot optical topology. Exactly enumerated VMware runtime/serialization fields
+(for example clean-shutdown bookkeeping, NUMA/vMotion cache values and opaque
+encrypted-configuration serialization) are excluded; unknown fields, duplicate
+assignments and malformed lines reject. The actual phase-specific optical paths,
+media hashes and effective connection states remain separately and exactly
+validated. Raw stopped VMX SHA is retained as diagnostic/create-time evidence,
+not used as a stable cross-save semantic identity.
 
 Optical connection interpretation is shared by VMX projection, preparation
 baseline/second-boot selection and execution boot-media checks. Only a present
@@ -248,13 +254,50 @@ All later baseline, plan, preparation media, review, return and accepted evidenc
 live under the continuation directory, retaining the original preparedStateId.
 Only in-memory operator settings select current tooling; original session JSON
 is not rewritten. Approved later optical attachment may change filenames/connection
-flags, but the existing VM projection and media checks still reject unsafe drift.
+flags, but the semantic VM projection and exact media checks still reject unsafe drift.
 Both boots, synthetic test, shutdown and four-file recorder remain unchanged.
 The recorder adds `preparationLineage` to preparation.json binding the exact
 continuation and both original/current commits, operators, ISO and manifest
 identities. It validates that lineage before any accepted-evidence write.
 Guest/restore/execution schemas, claim semantics, snapshots and authority do not
 change. Continuation creation grants no permission to boot, install or restore.
+
+### Stopped-VM semantic-binding continuation
+
+A legacy continuation may have been created with the version-1 whole parsed-VMX
+projection before VMware saved an authorized optical selection. VMware may rewrite
+benign runtime/serialization fields during that save, so replaying its legacy
+`configSha256` can reject before the exact optical policy is reached. Never revert
+approved optical paths merely to reproduce stale serialization.
+
+`CreateVmBindingContinuation` is the single create-new host-only bridge for that
+pre-baseline condition. It reads the selected parent continuation as immutable
+historical provenance, requires its original inventory/media/VMSD and current
+published source to remain exact, pins the current stopped raw VMX, and runs the
+full semantic-v2 VM, cold/S1, NIC/integration and first-boot media gates before its
+first write. It then creates
+`wp2c/vm-bindings/<preparedStateId>/<currentCommit>/`, including a distinct
+`tooling-semantic-current.iso`, and writes `vm-binding.json` last. The shorter
+root is intentional for Windows PowerShell 5.1/.NET Framework path limits;
+`parent.path` and `parent.identity` provide provenance rather than directory
+nesting.
+
+The bridge classification is
+`PHASE7B_WP2C_PREPARATION_VM_BINDING_CONTINUATION_NONEXECUTABLE`. Its parent block
+retains the exact legacy continuation and legacy config hash; its current block
+binds the new commit/operator/Host/dependency closure/manifest/media; its VM block
+binds semantic mode/hash, current stopped raw VMX, VMSD, guest identity and S1.
+The same nonExecutable/preparationOnly true and automaticRetryAllowed/
+wp2cExecutionAuthorized/laterMigrationAuthorized false authority flags apply.
+Existing exact bridge state is reported without writes; partial, changed or
+conflicting state stops without cleanup. No latest-context selection exists.
+
+All resumed operator modes require the exact bridge path and SHA through
+`VmBindingPath`/`VmBindingSha256`. The parent or original tooling ISO cannot satisfy
+the bridge's preboot gate. Accepted preparation lineage becomes schema version 2
+and retains original initialization, parent continuation, legacy VM hash, current
+semantic binding and current tooling identities. This bridge neither boots the VM
+nor grants preparation resumption or WP2-C execution.
 
 After attachment and before boot, the host boot-permit entry independently checks
 the exact two local ISO paths, full ISO hashes, optical connection flags, projected

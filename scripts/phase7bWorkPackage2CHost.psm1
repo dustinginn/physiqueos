@@ -19,19 +19,61 @@ function Read-Phase7BWP2COpticalVmx {
   $before=Get-Phase7BSha256 -LiteralPath $LiteralPath
   $vmx=Read-Phase7BVmx $LiteralPath
   $slots=@(Get-Phase7BWP2COpticalSlots $vmx);$seen=@{}
-  # The shared legacy reader retains the last duplicate. Optical defaulting
-  # must not turn a malformed/contradictory connection observation into omission.
+  # The shared legacy reader retains the last duplicate. A semantic binding
+  # must never let a duplicate security setting become an order-dependent value.
   foreach($line in Get-Content -LiteralPath $LiteralPath){
-    if($line -match '^\s*((?:sata|ide|scsi|nvme)\d+:\d+)\.(present|devicetype|filename|startconnected)\b'){
-      $slot=$matches[1].ToLowerInvariant();$key=$slot+'.'+$matches[2].ToLowerInvariant()
-      if($slot -in $slots){
-        Assert-Phase7BWP2C ($line -match ('^\s*'+[regex]::Escape($key)+'\s*=\s*"[^"\r\n]*"\s*$') -and -not $seen.ContainsKey($key)) 'OPTICAL_VMX_AMBIGUOUS'
-        $seen[$key]=$true
-      }
-    }
+    if($line -match '^\s*(?:#.*)?$'){continue}
+    Assert-Phase7BWP2C ($line -match '^\s*([^#][^=]*?)\s*=\s*"([^"\r\n]*)"\s*$') 'VMX_MALFORMED_ASSIGNMENT'
+    $key=$matches[1].Trim().ToLowerInvariant()
+    Assert-Phase7BWP2C (-not $seen.ContainsKey($key)) 'VMX_DUPLICATE_ASSIGNMENT'
+    $seen[$key]=$true
   }
   Assert-Phase7BWP2C ((Get-Phase7BSha256 -LiteralPath $LiteralPath) -ceq $before) 'OPTICAL_VMX_CHANGED'
   $vmx
+}
+
+function Get-Phase7BWP2CVmxSemanticPolicy {
+  # Explicit field ownership. Known VMware runtime/serialization values may
+  # change when Workstation saves an otherwise equivalent powered-off VMX; only
+  # their narrowly defined presence contract is authoritative. Every other
+  # recognized field is hashed, and every unrecognized field fails closed.
+  [pscustomobject][ordered]@{
+    schemaVersion=2
+    mode='wp2c-semantic-vmx-v2'
+    ignoredExact=@(
+      'cleanshutdown','softpoweroff','guestinfo.detailed.data',
+      'toolsinstallmanager.lastinstallerror','toolsinstallmanager.updatecounter',
+      'vm.lastpowerrequesttimestamp','monitor.phys_bits_used','vmxstats.filename',
+      'encryption.data','encryption.keysafe'
+    )
+    ignoredPatterns=@('^numa\.autosize\.','^vmotion\.')
+    boundPatterns=@(
+      '^\.encoding$','^config\.version$','^virtualhw\.(?:version|productcompatibility)$',
+      '^displayname$','^guestos$','^firmware$','^uefi\.secureboot\.enabled$',
+      '^(?:numvcpus|memsize|mem\.hotadd|cpuid\.corespersocket)$',
+      '^(?:uuid\.(?:bios|location)|encryptedvm\.guid|vm\.createdate|vm\.genid|vm\.genidx|vmx\.encryptiontype)$',
+      '^(?:nvram|extendedconfigfile)$','^vtpm\.(?:present|ekcrt|ekcsr)$','^managedvm\.autoaddvtpm$',
+      '^ethernet0\.(?:present|connectiontype|startconnected|virtualdev|addresstype|generatedaddress|generatedaddressoffset|pcislotnumber)$',
+      '^isolation\.tools\.(?:copy|paste|dnd|hgfsserverset)\.disable$','^sharedfolder\.maxnum$',
+      '^usb\.restrictions\.defaultallow$','^(?:usb|usb_xhci|ehci)\.(?:present|pcislotnumber)$',
+      '^usb_xhci:\d+\.(?:present|devicetype|parent|port)$','^floppy0\.present$',
+      '^(?:nvme|scsi|sata|ide)\d+\.(?:present|pcislotnumber|virtualdev|subnqnuuid)$',
+      '^(?:nvme|scsi|sata|ide)\d+:\d+\.(?:present|filename|redo|devicetype|startconnected)$',
+      '^pcibridge\d+\.(?:present|pcislotnumber|virtualdev|functions)$','^vmci0\.(?:present|id)$',
+      '^(?:sound\.(?:present|autodetect|filename|virtualdev|pcislotnumber)|sensor\.location|hpet0\.present)$',
+      '^mks\.enable3d$','^svga\.(?:graphicsmemorykb|guestbackedprimaryaware|vramsize)$',
+      '^tools\.(?:capability\.verifiedsamltoken|remindinstall|synctime)$',
+      '^powertype\.(?:poweroff|poweron|reset|suspend)$'
+    )
+  }
+}
+
+function Test-Phase7BWP2CVmxPolicyKey {
+  param([string]$Key,$Policy)
+  if($Key -cin @($Policy.ignoredExact)){return 'ignored'}
+  foreach($pattern in @($Policy.ignoredPatterns)){if($Key -cmatch $pattern){return 'ignored'}}
+  foreach($pattern in @($Policy.boundPatterns)){if($Key -cmatch $pattern){return 'bound'}}
+  'unknown'
 }
 
 function Get-Phase7BWP2COpticalConnection {
@@ -51,16 +93,39 @@ function Get-Phase7BWP2COpticalConnection {
 
 function Get-Phase7BWP2CVmxIdentity {
   param([hashtable]$Vmx)
+  $policy=Get-Phase7BWP2CVmxSemanticPolicy
   $slots=@(Get-Phase7BWP2COpticalSlots $Vmx)
   Assert-Phase7BWP2C ($slots.Count -eq 2) 'TWO_READONLY_OPTICAL_SLOTS_REQUIRED'
-  $projection=[ordered]@{}
-  foreach($key in @($Vmx.Keys|Sort-Object)){$projection[$key]=[string]$Vmx[$key]}
+  Assert-Phase7BWP2C (Test-Phase7BVmxContract $Vmx).pass 'VM_SEMANTIC_CONTRACT'
+  Assert-Phase7BWP2C ($Vmx['ethernet0.present'] -ceq 'TRUE' -and $Vmx['ethernet0.startconnected'] -ceq 'FALSE') 'VM_SEMANTIC_NETWORK'
+  Assert-Phase7BWP2C (@($Vmx.Keys|Where-Object {$_ -cmatch '^ethernet[1-9][0-9]*\.'}).Count -eq 0) 'VM_SEMANTIC_EXTRA_NIC'
+  $diskKeys=@($Vmx.Keys|Where-Object {$_ -cmatch '^(?:nvme|scsi|sata|ide)\d+:\d+\.filename$' -and [string]$Vmx[$_] -cmatch '(?i)\.vmdk$'})
+  Assert-Phase7BWP2C ($diskKeys.Count -eq 1) 'VM_SEMANTIC_SINGLE_DISK'
+  $diskSlot=$diskKeys[0].Substring(0,$diskKeys[0].Length-'.filename'.Length)
+  Assert-Phase7BWP2C ($Vmx[$diskSlot+'.present'] -ceq 'TRUE') 'VM_SEMANTIC_DISK_PRESENT'
+  $encryptionKeys=@($Vmx.Keys|Where-Object {$_ -cmatch '^encryption\.'})
+  Assert-Phase7BWP2C (@(Compare-Object @('encryption.data','encryption.keysafe') @($encryptionKeys|Sort-Object)).Count -eq 0 -or $encryptionKeys.Count -eq 0) 'VM_SEMANTIC_ENCRYPTION_FIELDS'
+  if($encryptionKeys.Count -eq 2){
+    Assert-Phase7BWP2C (-not [string]::IsNullOrWhiteSpace([string]$Vmx['encryption.data']) -and -not [string]::IsNullOrWhiteSpace([string]$Vmx['encryption.keysafe'])) 'VM_SEMANTIC_ENCRYPTION_FIELDS'
+  }
+  $bound=[ordered]@{}
+  $ignored=New-Object 'Collections.Generic.List[string]'
+  foreach($key in @($Vmx.Keys|Sort-Object)){
+    $ownership=Test-Phase7BWP2CVmxPolicyKey ([string]$key) $policy
+    Assert-Phase7BWP2C ($ownership -cne 'unknown') 'VM_SEMANTIC_UNKNOWN_FIELD'
+    if($ownership -ceq 'ignored'){$ignored.Add([string]$key);continue}
+    $bound[$key]=[string]$Vmx[$key]
+  }
   foreach($slot in $slots){
     [void](Get-Phase7BWP2COpticalConnection $Vmx $slot)
-    $projection[$slot+'.filename']='<EXACT_MEDIA_VERIFIED_SEPARATELY>'
-    $projection[$slot+'.startconnected']='<MUST_BE_TRUE_AT_BOOT_PERMIT>'
+    $bound[$slot+'.filename']='<EXACT_PHASE_MEDIA_VERIFIED_SEPARATELY>'
+    $bound[$slot+'.startconnected']='<EXACT_PHASE_CONNECTION_VERIFIED_SEPARATELY>'
   }
-  [pscustomobject]@{mode='wp2c-offline-optical-projection-v1';sha256=Get-Phase7BWP2CObjectHash $projection;opticalSlots=$slots}
+  $projection=[pscustomobject][ordered]@{
+    schemaVersion=2;mode=$policy.mode;securityRelevant=$bound
+    encryptedConfiguration=if($encryptionKeys.Count -eq 2){'PRESENT'}else{'ABSENT'}
+  }
+  [pscustomobject]@{schemaVersion=2;mode=$policy.mode;sha256=Get-Phase7BWP2CObjectHash $projection;opticalSlots=$slots;ignoredFields=@($ignored);projection=$projection}
 }
 
 function Assert-Phase7BWP2CPreparationBootMedia {

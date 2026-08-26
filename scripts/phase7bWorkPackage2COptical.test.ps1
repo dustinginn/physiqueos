@@ -78,7 +78,7 @@ try {
   [IO.File]::WriteAllText((Join-Path $s.root 'synthetic.vmdk'),"createType=`"monolithicSparse`"`nRW 167772160 SPARSE `"synthetic-extent.vmdk`"`n")
   [IO.File]::WriteAllText($snapshotPath,"snapshot.current = `"2`"`nsnapshot0.uid = `"1`"`nsnapshot0.displayName = `"S0-clean-windows-pre-bootstrap`"`nsnapshot1.uid = `"2`"`nsnapshot1.displayName = `"S1-physiqueos-bootstrap-inert`"`n")
   $fixed=Get-Phase7BIsolatedGuestContract
-  $v=@{'displayname'=$fixed.vmDisplayName;'memsize'='4096';'numvcpus'='2';'firmware'='efi';'uefi.secureboot.enabled'='TRUE';'guestos'='windows11-64';'managedvm.autoaddvtpm'='software';'ethernet0.connectiontype'='nat';'ethernet0.startconnected'='FALSE';'isolation.tools.copy.disable'='TRUE';'isolation.tools.paste.disable'='TRUE';'isolation.tools.dnd.disable'='TRUE';'isolation.tools.hgfsserverset.disable'='TRUE';'sharedfolder.maxnum'='0';'usb.restrictions.defaultallow'='FALSE';'scsi0:0.filename'='synthetic.vmdk';'scsi0:0.present'='TRUE';'sata0:0.devicetype'='cdrom-image';'sata0:0.present'='TRUE';'sata0:0.filename'=$tools;'sata0:0.startconnected'='FALSE';'sata0:1.devicetype'='cdrom-image';'sata0:1.present'='TRUE';'sata0:1.filename'=$tools}
+  $v=@{'displayname'=$fixed.vmDisplayName;'memsize'='4096';'numvcpus'='2';'firmware'='efi';'uefi.secureboot.enabled'='TRUE';'guestos'='windows11-64';'managedvm.autoaddvtpm'='software';'ethernet0.present'='TRUE';'ethernet0.connectiontype'='nat';'ethernet0.startconnected'='FALSE';'isolation.tools.copy.disable'='TRUE';'isolation.tools.paste.disable'='TRUE';'isolation.tools.dnd.disable'='TRUE';'isolation.tools.hgfsserverset.disable'='TRUE';'sharedfolder.maxnum'='0';'usb.restrictions.defaultallow'='FALSE';'scsi0:0.filename'='synthetic.vmdk';'scsi0:0.present'='TRUE';'sata0:0.devicetype'='cdrom-image';'sata0:0.present'='TRUE';'sata0:0.filename'=$tools;'sata0:0.startconnected'='FALSE';'sata0:1.devicetype'='cdrom-image';'sata0:1.present'='TRUE';'sata0:1.filename'=$tools}
   Save-Vmx $v
   $parsed=Read-Phase7BWP2COpticalVmx $vmxPath
   Assert-True (-not $parsed.ContainsKey('sata0:1.startconnected') -and $parsed['sata0:0.startconnected'] -ceq 'FALSE') 'actual parser preserves exact failed saved representation'
@@ -126,9 +126,14 @@ try {
     }
     Save-Vmx $bad;Check-Operator 'PreBootBaseline' $false ('actual baseline rejects '+$change)
   }
-  foreach($line in @('sata0:1.startConnected = TRUE','sata0:1.startConnected.extra = "FALSE"',('sata0:1.startConnected = "TRUE"'+"`n"+'SATA0:1.startConnected = "FALSE"'),'sata0:1.present = "FALSE"')){
-    Save-Vmx $v;[IO.File]::AppendAllText($vmxPath,"`n"+$line+"`n")
-    Check-Operator 'PreBootBaseline' $false 'actual entry rejects malformed/duplicate optical assignment' 'PHASE7B_WP2C_OPTICAL_VMX_AMBIGUOUS'
+  foreach($case in @(
+    @('sata0:1.startConnected = TRUE','PHASE7B_WP2C_VMX_MALFORMED_ASSIGNMENT'),
+    @('sata0:1.startConnected.extra = "FALSE"','PHASE7B_WP2C_VM_SEMANTIC_UNKNOWN_FIELD'),
+    @(('sata0:1.startConnected = "TRUE"'+"`n"+'SATA0:1.startConnected = "FALSE"'),'PHASE7B_WP2C_VMX_DUPLICATE_ASSIGNMENT'),
+    @('sata0:1.present = "FALSE"','PHASE7B_WP2C_VMX_DUPLICATE_ASSIGNMENT')
+  )){
+    Save-Vmx $v;[IO.File]::AppendAllText($vmxPath,"`n"+$case[0]+"`n")
+    Check-Operator 'PreBootBaseline' $false 'actual entry rejects malformed/duplicate/unknown VMX assignment' $case[1]
   }
   Save-Vmx $v
   # Actual collector/finalizer/plan/carrier producers supply the second-boot
@@ -171,7 +176,7 @@ try {
   $execution['sata0:1.startconnected']='TRUE';Assert-Phase7BWP2CBootMedia $execution $vmxPath $tools $prep $binding (Get-Phase7BWP2CIdentity $prep).sha256
   Assert-True $true 'execution explicit TRUE still accepted'
   $bad=$v.Clone();$bad.Remove('ethernet0.startconnected');Save-Vmx $bad
-  Assert-True (-not (Test-Phase7BWP2CHostObservation (Observe-Host) $observation).pass) 'NIC omission never becomes safe disconnected state'
+  Reject {Observe-Host} 'NIC omission never becomes safe disconnected state'
   $manifest=Get-Phase7BWP2CDependencyManifest
   Assert-True ('phase7bWorkPackage2CHost.psm1' -in @($manifest.files.name) -and @($manifest.files).Count -eq 12) 'changed host module belongs to unchanged 15-file tooling membership'
   $result=[ordered]@{classification='PHASE7B_WP2C_OPTICAL_DEFAULT_TESTS_PASS';pass=$true;assertions=$script:assertions;publishedFailureReproduced=$true;actualBaselineEntry=$true;actualSecondBootEntry=$true;actualHostCollector=$true;executionMediaConsumer=$true;liveVmAccess=$false;liveSessionModified=$false;mediaMounted=$false;wp2cExecuted=$false}
