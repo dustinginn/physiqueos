@@ -55,4 +55,12 @@ Check ($recorder.IndexOf('New-Phase7BWP2CPreparationHandoffEvidence') -lt $recor
 $operator=Get-Content (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationOperator.ps1') -Raw
 Check ($operator -notmatch 'vmrun|Start-VM|Stop-VM|Set-Net|Set-VM|Invoke-Phase7BAge|New-Phase7BWP2CExecutionClaim') 'prep operator has no power/network/crypto/claim action'
 Check ($operator -notmatch 'Remove-Item|Stop-Process|Stop-Service|Restart-Computer') 'prep operator no cleanup or automatic RAM management'
+$continuation=Get-Content (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationContinuation.psm1') -Raw
+Check ($continuation -notmatch 'Remove-Item|Set-Content|vmrun|Start-VM|Stop-VM|Set-Net|Set-VM|Stop-Process|Invoke-Phase7BAge|New-Phase7BWP2CExecutionClaim') 'continuation no cleanup/power/network/secret/claim operation'
+Check ($continuation.IndexOf("'CONTINUATION_COLD_ISOLATION'") -lt $continuation.IndexOf('New-Item -ItemType Directory')) 'continuation cold isolation before first mutation'
+Check ($continuation.IndexOf("'CONTINUATION_ORIGINAL_VM'") -lt $continuation.IndexOf('New-Item -ItemType Directory')) 'original VM pins before first mutation'
+Check ($continuation.IndexOf('$resultId=Write-Phase7BWP2CCreateNewJson') -lt $continuation.IndexOf('$id=Write-Phase7BWP2CCreateNewJson $path $c')) 'replacement media complete before context finalization'
+Check ($recorder.IndexOf('Add-Phase7BWP2CPreparationLineage') -lt $recorder.IndexOf('New-Item -ItemType Directory')) 'continuation lineage validated before accepted evidence'
+Check ($operator.Contains('Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256') -and $operator.Contains("'CONTINUATION_SELECTION_REQUIRED'")) 'explicit hash-bound context selection'
+Check (@($guest.files.name|Where-Object {$_ -match 'Continuation'}).Count -eq 0 -and @($guest.files).Count -eq 12) 'continuation host only; guest payload unchanged'
 [ordered]@{classification='PHASE7B_WP2C_SAFETY_TESTS_PASS';pass=$true;assertions=$count;freshDesktopImportChecks=$true;liveMutationPerformed=$false}|ConvertTo-Json -Compress

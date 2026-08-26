@@ -56,7 +56,12 @@ clean shutdown, offline plan creation, then the install/test boot. This avoids
 inventing marker/Git/OS/Tools identities. Both boots belong to the one future
 preparation authority; neither runs restore. No snapshot revert is performed.
 
-Run this host initialization block ONLY after preparation GO. It derives current
+Choose exactly one entry: NEW initialization below, or the preserved-session
+continuation section immediately after it. **For the preserved
+wp2c-prepared-ff8a79e8ac1d46f8b9348a97579c0c35 session, SKIP the initialization
+block entirely.** Do not rerun Initialize or BuildTooling on that directory.
+
+Run this host initialization block ONLY for a NEW session after preparation GO. It derives current
 source identities; verify the printed commit is the one named in that GO. The
 session directory is create-new. Do not reuse an existing directory.
 
@@ -75,6 +80,7 @@ function Prep([string]$mode){
   & $op -Mode $mode -SessionRoot $session -FounderPreparationApproved
 }
 $session='C:\Phase7B\host-evidence\379bb303\wp2c\preparation-handoff'
+$toolingMedia=Join-Path $session 'tooling.iso'
 $vm='C:\Users\dusti\Documents\Virtual Machines\phase7b-isolated-windows-restore-379bb303\phase7b-isolated-windows-restore-379bb303'
 $ageRoot='C:\Users\dusti\AppData\Local\Microsoft\WinGet\Packages\FiloSottile.age_Microsoft.Winget.Source_8wekyb3d8bbwe\age'
 $descriptor='C:\Phase7B\host-evidence\379bb303\wp2b\encrypted-primary\phase7b-wp2-fc48221852204c188c414a18f6c42bbd\phase7b-wp2-fc48221852204c188c414a18f6c42bbd-descriptor.json'
@@ -88,6 +94,64 @@ notepad.exe (Join-Path $session 'tooling-step.txt')
 Require INITIALIZED and PHASE7B_WP2C_MEDIA_CREATED, kind Tooling. Save all this
 procedure to Notepad before the RAM checkpoint. tooling-step.txt contains the
 complete guest baseline command and machine-generated pins. Do not edit pins.
+
+### Alternative entry: immutable preserved-session continuation
+
+Use ONLY after publication and a separate explicit continuation GO. Before that
+GO, the read-only review supplies one hash-bound non-executable JSON pin file with
+`originalRoot`, `sessionSha256`, `inventorySha256`, `vmxSha256`, `toolingCommit`
+and `operator` (sha256/bytes). Its pins come from the preserved-file audit and
+published checkout, not freshly blessing changed evidence. It is review input,
+not an execution authorization or a live continuation context. A later compact
+Founder launcher may supply its exact path/hash without hand-transcribing pins.
+
+PRIMARY: NEW elevated x64 Windows PowerShell 5.1 ConsoleHost,
+`powershell.exe -NoProfile`. Keep this shell through closeout. The following
+replaces ONLY the initialization block; all later sections use the same `Prep`
+function. Do not run both entries. No VM action occurs in context creation.
+
+```powershell
+$ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
+if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.ToString() -notlike '5.1.*' -or -not [Environment]::Is64BitProcess){throw 'PS51_X64_REQUIRED'}
+$repo='C:\Users\dusti\Documents\GitHub\physiqueos'
+$op=Join-Path $repo 'scripts\phase7bWorkPackage2CPreparationOperator.ps1'
+$reviewPath=Read-Host 'Exact separately reviewed NONSECRET continuation pin-file path'
+$reviewSha=Read-Host 'Exact reviewed pin-file SHA256 (not a secret)'
+if($reviewSha -cnotmatch '^[0-9a-f]{64}$' -or (Get-FileHash -LiteralPath $reviewPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $reviewSha){throw 'REVIEW_PIN_MISMATCH'}
+$review=Get-Content -LiteralPath $reviewPath -Raw | ConvertFrom-Json
+$opHash=$review.operator.sha256; $opBytes=$review.operator.bytes
+if((Get-Item -LiteralPath $op).Length -ne $opBytes -or (Get-FileHash -LiteralPath $op -Algorithm SHA256).Hash.ToLowerInvariant() -cne $opHash){throw 'OPERATOR_CHANGED'}
+# Create once. On ANY failure stop; do not rerun or delete partial output.
+$creation=@(& $op -Mode CreateContinuation -SessionRoot $review.originalRoot -OriginalSessionSha256 $review.sessionSha256 -OriginalInventorySha256 $review.inventorySha256 -OriginalVmxSha256 $review.vmxSha256 -ToolingCommit $review.toolingCommit -FounderPreparationApproved)
+$creation
+# Require CONTINUATION_NONEXECUTABLE and created=true. EXISTS is read-only
+# reporting, not permission to repeat a boot. Stop for review on EXISTS.
+$created=$creation[-1] | ConvertFrom-Json
+if($created.classification -cne 'PHASE7B_WP2C_PREPARATION_CONTINUATION_NONEXECUTABLE' -or $created.created -cne $true){throw 'CONTINUATION_REVIEW_REQUIRED'}
+Import-Module (Join-Path $repo 'scripts\phase7bWorkPackage2CPreparationContinuation.psm1')
+$original=Read-Phase7BWP2COriginalPreparation $review.originalRoot $review.sessionSha256 $review.inventorySha256
+$session=Get-Phase7BWP2CContinuationRoot $review.originalRoot $original.settings.preparedStateId $review.toolingCommit
+$continuationPath=Join-Path $session 'continuation.json'
+$continuationSha=$created.identity.sha256
+if($created.path -cne $continuationPath){throw 'CONTINUATION_PATH_MISMATCH'}
+$selected=Read-Phase7BWP2CPreparationContinuation $continuationPath $continuationSha $repo
+$toolingMedia=$selected.document.current.toolingMediaPath
+function Prep([string]$mode){
+  if((Get-Item -LiteralPath $op).Length -ne $opBytes -or (Get-FileHash -LiteralPath $op -Algorithm SHA256).Hash.ToLowerInvariant() -cne $opHash){throw 'OPERATOR_CHANGED'}
+  & $op -Mode $mode -SessionRoot $session -ContinuationPath $continuationPath -ContinuationSha256 $continuationSha -FounderPreparationApproved
+}
+$toolingMedia
+notepad.exe (Join-Path $repo 'docs\PHASE7B_WP2C_PREPARATION_OPERATOR.md')
+```
+
+Save the complete generated guest baseline command and tooling-CD discovery line
+from that output to Notepad BEFORE closing applications. It uses the current
+manifest pin. Do not use the original session's tooling-step.txt or OPERATOR.md.
+The original ISO remains untouched historical evidence. The new path ends in
+`tooling-current.iso`, not the original `tooling.iso`. All later `Prep` modes and
+their outputs belong to the selected continuation directory. The current operator
+revalidates both lineages on each call; no silent latest-context selection.
+The full remaining procedure below is identical for both entries.
 
 Create a temporary host 1Password Login item with ONLY the public invalid test
 value below in its password field, using that field's supported Type in window
@@ -116,8 +180,8 @@ Under the separately granted preparation authority only, use powered-off VM
 Settings to retain NAT type but clear network adapter Connected and Connect at
 power on. Use TWO existing/approved SATA CD/DVD image devices, not a third:
 
-- First: ISO = session tooling.iso; Connect at power on checked.
-- Second: add one CD/DVD device only if absent; ISO = the same tooling.iso for
+- First: ISO = the exact `$toolingMedia` path printed/selected above; Connect at power on checked.
+- Second: add one CD/DVD device only if absent; ISO = the same current tooling media for
   now, Connect at power on unchecked. Do not attach any old/recovery ISO.
 
 Two slots are already required by the published host preparation contract. The
@@ -190,7 +254,7 @@ session commands, all pins derived locally; nothing needs another chat reply.
 
 ## Second RAM gate, install and full guest inspection
 
-Powered Off VMware UI: first CD stays tooling.iso, connected. Second CD becomes
+Powered Off VMware UI: first CD stays at `$toolingMedia`, connected. Second CD becomes
 session preparation.iso, Connect at power on checked. Network remains disconnected.
 Do not change anything else. No recovery media is present.
 
@@ -302,6 +366,11 @@ RAM/config/S1/evaluation/capacity/HGFS/runtime/offline/shutdown. Non-execution f
 remain wp2cExecuted=false, packetDecrypted=false, executionClaimCreated=false,
 authorizationConsumed=false; handoff realIdentityUsed=false and
 invalidSyntheticValueOnly=true. This is NOT WP2-C restore PASS.
+
+For a continuation, preparation.json additionally carries `preparationLineage`:
+the exact continuation path/hash/bytes, original session/init commit/operator/
+ISO/manifest and current continuation commit/operator/Host/ISO/manifest. The
+original directory is never the output destination and remains byte-identical.
 
 Preserve final JSON/identities, close test canary windows, and later remove the
 temporary synthetic 1Password item yourself if desired (never the real recovery

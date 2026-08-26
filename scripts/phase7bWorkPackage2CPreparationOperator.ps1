@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Initialize','BuildTooling','Ram','PreBootBaseline','ImportBaseline','BuildPreparation','PreBoot','EntryReview','ImportReturn','Record')][string]$Mode,
+  [Parameter(Mandatory=$true)][ValidateSet('Initialize','BuildTooling','CreateContinuation','Ram','PreBootBaseline','ImportBaseline','BuildPreparation','PreBoot','EntryReview','ImportReturn','Record')][string]$Mode,
   [string]$SessionRoot,[string]$ToolingCommit,[string]$VmxPath,[string]$SnapshotMetadataPath,
   [string]$DescriptorPath,[string]$DescriptorSha256,[string]$AgePath,[string]$AgeKeygenPath,
+  [string]$OriginalSessionSha256,[string]$OriginalInventorySha256,[string]$OriginalVmxSha256,
+  [string]$ContinuationPath,[string]$ContinuationSha256,
   [switch]$FounderPreparationApproved
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -12,6 +14,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CHost.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationContinuation.psm1')
 
 function Read-OperatorJson([string]$Name) {
   $path=Join-Path $SessionRoot $Name
@@ -59,6 +62,15 @@ try {
   $fixed=Get-Phase7BIsolatedGuestContract
   [void](Assert-Phase7BWP2CLocalPath $SessionRoot 'C:\Phase7B\host-evidence\379bb303\wp2c')
   $repo=Split-Path -Parent $PSScriptRoot
+  $continuation=$null
+  Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and (-not $ContinuationPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation'))) 'CONTINUATION_EXPLICIT_SELECTION'
+  if($Mode -ceq 'CreateContinuation'){
+    $made=New-Phase7BWP2CPreparationContinuation $SessionRoot $OriginalSessionSha256 $OriginalInventorySha256 $OriginalVmxSha256 $repo $ToolingCommit
+    $selected=Read-Phase7BWP2CPreparationContinuation $made.path $made.identity.sha256 $repo
+    Show-GuestCommands $selected.settings $selected.tooling.content $null
+    $made|ConvertTo-Json -Depth 5
+    return
+  }
   if($Mode -ceq 'Initialize'){
     Assert-Phase7BWP2CPublishedRepository $repo $ToolingCommit
     [void](Assert-Phase7BWP2CLocalPath $VmxPath);[void](Assert-Phase7BWP2CLocalPath $SnapshotMetadataPath (Split-Path -Parent $VmxPath))
@@ -80,7 +92,15 @@ try {
     [ordered]@{classification='PHASE7B_WP2C_PREPARATION_OPERATOR_INITIALIZED';session=$id;preparedStateId=$settings.preparedStateId;vmBooted=$false;wp2cExecuted=$false}|ConvertTo-Json -Depth 4
     return
   }
-  $settings=Read-OperatorJson 'session.json'
+  $toolsPath=Join-Path $SessionRoot 'tooling.iso'
+  if($ContinuationPath){
+    $continuation=Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256 $repo
+    Assert-Phase7BWP2C ($SessionRoot -ceq $continuation.root) 'CONTINUATION_SESSION_ROOT'
+    $settings=$continuation.settings;$toolsPath=$continuation.document.current.toolingMediaPath
+  }else{
+    Assert-Phase7BWP2C ($SessionRoot -notmatch '(?i)[\\/]continuations[\\/]') 'CONTINUATION_SELECTION_REQUIRED'
+    $settings=Read-OperatorJson 'session.json'
+  }
   Assert-Phase7BWP2C ($settings.kind -ceq 'wp2c-preparation-operator-session' -and $settings.schemaVersion -eq 1) 'PREPARATION_OPERATOR_SESSION'
   Assert-Phase7BWP2CPublishedRepository $repo $settings.toolingCommit
   Assert-Phase7BWP2CFile $PSCommandPath $settings.operator
@@ -112,7 +132,7 @@ try {
       Assert-ColdHardware
       $tool=Read-OperatorJson 'tooling-result.json'
       $baselinePath=Join-Path $SessionRoot 'baseline.json';$planPath=Join-Path $SessionRoot 'preparation-plan.json'
-      $raw=& (Join-Path $PSScriptRoot 'phase7bNewWorkPackage2CPreparationPlan.ps1') -BaselinePath $baselinePath -BaselineSha256 (Get-Phase7BWP2CIdentity $baselinePath).sha256 -DescriptorPath $settings.descriptorPath -DescriptorSha256 $settings.descriptorSha256 -ToolingMediaPath (Join-Path $SessionRoot 'tooling.iso') -ToolingMediaSha256 $tool.identity.sha256 -AgePath $settings.agePath -AgeKeygenPath $settings.ageKeygenPath -ToolingCommit $settings.toolingCommit -PreparedStateId $settings.preparedStateId -VmxPath $VmxPath -SnapshotMetadataPath $SnapshotMetadataPath -OutputPath $planPath -FounderPreparationApproved
+      $raw=& (Join-Path $PSScriptRoot 'phase7bNewWorkPackage2CPreparationPlan.ps1') -BaselinePath $baselinePath -BaselineSha256 (Get-Phase7BWP2CIdentity $baselinePath).sha256 -DescriptorPath $settings.descriptorPath -DescriptorSha256 $settings.descriptorSha256 -ToolingMediaPath $toolsPath -ToolingMediaSha256 $tool.identity.sha256 -AgePath $settings.agePath -AgeKeygenPath $settings.ageKeygenPath -ToolingCommit $settings.toolingCommit -PreparedStateId $settings.preparedStateId -VmxPath $VmxPath -SnapshotMetadataPath $SnapshotMetadataPath -OutputPath $planPath -FounderPreparationApproved
       $planResult=($raw -join "`n")|ConvertFrom-Json
       [void](Save-OperatorJson 'preparation-inputs.json' ([pscustomobject]@{planPath=$planPath;planSha256=$planResult.identity.sha256}))
       $raw=& (Join-Path $PSScriptRoot 'phase7bBuildWorkPackage2CMedia.ps1') -Kind Preparation -InputsPath (Join-Path $SessionRoot 'preparation-inputs.json') -OutputPath (Join-Path $SessionRoot 'preparation.iso') -FounderMediaPreparationApproved
@@ -127,7 +147,7 @@ try {
       $cold=Get-Phase7BWP2CHostObservation $VmxPath $SnapshotMetadataPath
       Assert-Phase7BWP2C (Test-Phase7BWP2CHostObservation $cold $cold).pass 'PREPARATION_HOST_ISOLATION'
       $vmx=Read-Phase7BWP2COpticalVmx $VmxPath
-      $tool=Read-OperatorJson 'tooling-result.json';$toolsPath=Join-Path $SessionRoot 'tooling.iso'
+      $tool=Read-OperatorJson 'tooling-result.json'
       Assert-Phase7BWP2CFile $toolsPath $tool.identity
       $prepPath=$null
       if($Mode -ceq 'PreBoot'){
@@ -169,7 +189,9 @@ try {
     }
     'Record' {
       $prep=Read-OperatorJson 'preparation-result.json';$reviewPath=Join-Path $SessionRoot 'founder-review.json'
-      & (Join-Path $PSScriptRoot 'phase7bRecordWorkPackage2CPreparation.ps1') -PreparationContentRoot ((Join-Path $SessionRoot 'preparation.iso')+'.content') -PreparationDescriptorSha256 $prep.content.descriptorIdentity.sha256 -PreparationMediaPath (Join-Path $SessionRoot 'preparation.iso') -PreparationMediaSha256 $prep.identity.sha256 -ToolingMediaPath (Join-Path $SessionRoot 'tooling.iso') -ReturnTextPath (Join-Path $SessionRoot 'return.txt') -FounderReviewPath $reviewPath -FounderReviewSha256 (Get-Phase7BWP2CIdentity $reviewPath).sha256 -VmxPath $VmxPath -SnapshotMetadataPath $SnapshotMetadataPath -OutputDirectory (Join-Path $SessionRoot 'accepted') -FounderPreparationReviewed
+      $lineageArgs=@{}
+      if($continuation){$lineageArgs=@{ContinuationPath=$ContinuationPath;ContinuationSha256=$ContinuationSha256}}
+      & (Join-Path $PSScriptRoot 'phase7bRecordWorkPackage2CPreparation.ps1') -PreparationContentRoot ((Join-Path $SessionRoot 'preparation.iso')+'.content') -PreparationDescriptorSha256 $prep.content.descriptorIdentity.sha256 -PreparationMediaPath (Join-Path $SessionRoot 'preparation.iso') -PreparationMediaSha256 $prep.identity.sha256 -ToolingMediaPath $toolsPath -ReturnTextPath (Join-Path $SessionRoot 'return.txt') -FounderReviewPath $reviewPath -FounderReviewSha256 (Get-Phase7BWP2CIdentity $reviewPath).sha256 -VmxPath $VmxPath -SnapshotMetadataPath $SnapshotMetadataPath -OutputDirectory (Join-Path $SessionRoot 'accepted') -FounderPreparationReviewed @lineageArgs
     }
   }
 } catch {

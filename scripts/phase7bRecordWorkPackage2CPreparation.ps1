@@ -6,6 +6,7 @@ param(
   [Parameter(Mandatory=$true)][string]$ReturnTextPath,
   [Parameter(Mandatory=$true)][string]$FounderReviewPath,[Parameter(Mandatory=$true)][string]$FounderReviewSha256,
   [Parameter(Mandatory=$true)][string]$VmxPath,[Parameter(Mandatory=$true)][string]$SnapshotMetadataPath,
+  [string]$ContinuationPath,[string]$ContinuationSha256,
   [Parameter(Mandatory=$true)][string]$OutputDirectory,[Parameter(Mandatory=$true)][switch]$FounderPreparationReviewed
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -13,6 +14,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CHost.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationContinuation.psm1')
 Assert-Phase7BWP2C $FounderPreparationReviewed.IsPresent 'PREPARATION_REVIEW_REQUIRED'
 $carrier=Read-Phase7BWP2CPreparationContent $PreparationContentRoot $PreparationDescriptorSha256
 $plan=$carrier.plan
@@ -27,6 +29,12 @@ $returned=ConvertFrom-Phase7BWP2CPreparationReturnText (Get-Content -LiteralPath
 $review=Read-Phase7BWP2CBoundJson $FounderReviewPath $FounderReviewSha256
 $observation=Get-Phase7BWP2CHostObservation $VmxPath $SnapshotMetadataPath
 $result=New-Phase7BWP2CPreparationHandoffEvidence $plan $returned $review $observation $media $carrier.descriptorIdentity
+Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and ($OutputDirectory -notmatch '(?i)[\\/]continuations[\\/]' -or [bool]$ContinuationPath)) 'CONTINUATION_SELECTION_REQUIRED'
+if($ContinuationPath){
+  $continuation=Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256 (Split-Path -Parent $PSScriptRoot)
+  Assert-Phase7BWP2C ($OutputDirectory -ceq (Join-Path $continuation.root 'accepted') -and $PreparationContentRoot -ceq (Join-Path $continuation.root 'preparation.iso.content') -and $ToolingMediaPath -ceq $continuation.document.current.toolingMediaPath) 'CONTINUATION_RECORDER_PATH'
+  Add-Phase7BWP2CPreparationLineage $result.preparation $plan $continuation $ContinuationPath
+}
 [void](Assert-Phase7BWP2CLocalPath $OutputDirectory 'C:\Phase7B\host-evidence\379bb303\wp2c')
 Assert-Phase7BWP2C (-not (Test-Path -LiteralPath $OutputDirectory)) 'PREPARATION_OUTPUT_COLLISION'
 # All bytes/schema/context/host checks precede this first host evidence mutation.

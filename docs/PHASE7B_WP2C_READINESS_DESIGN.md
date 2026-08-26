@@ -184,10 +184,77 @@ A correction to `phase7bWorkPackage2CHost.psm1` also changes the guest tooling
 closure: that module is shipped on tooling media. Existing session/media bytes
 remain immutable historical preparation evidence, not current patched tooling.
 After publication the original session's commit/operator bindings reject direct
-continuation. A separately reviewed create-new continuation context and new
-tooling media would be needed, binding the original session/media/S1 provenance
-without overwriting them or rerunning Initialize. No such continuation/rebinding
-is granted or implemented by the optical compatibility correction.
+reuse. The host-only preparation continuation below bridges that exact
+pre-baseline state. The optical correction alone did not grant continuation.
+
+### Pre-baseline preparation continuation
+
+`phase7bWorkPackage2CPreparationContinuation.psm1` and the operator's explicit
+`CreateContinuation` mode implement a separate, non-executable provenance bridge.
+It requires a later Founder continuation GO; publication is not that GO.
+The original directory is never written, renamed, deleted or rebound. Initialize
+and BuildTooling are not rerun against it. Original commit/operator/ISO/manifest
+remain original-lineage evidence, not current tools.
+
+Eligibility independently pins the selected original session JSON, deterministic
+recursive file inventory and current saved VMX. It validates the original exact
+pre-baseline file set, all original media/content bytes, descriptor, age binaries,
+VM UUID, host identity, unchanged VMSD, current S1 and preserved S0, cold state,
+no suspended state, disconnected NIC and existing isolation/optical policy.
+Any baseline/token, plan, accepted evidence, unexpected file, reparse or drift
+rejects before creation. No RAM threshold is needed merely to create a context;
+the unchanged >=7 GiB gates run immediately before EACH later boot.
+
+The deterministic location is
+`wp2c/continuations/<original-preparedStateId>/<current-published-commit>/`.
+The first mutation creates that new directory without overwrite. Its replacement
+`tooling-current.iso` uses the existing builder and exact 15-file guest closure.
+The current patched Host module is in that closure; the continuation module is
+host-only, never a sixteenth guest payload. Partial output is retained for
+read-only reconciliation, never automatically deleted or retried.
+
+`continuation.json` is canonical schemaVersion 1, kind
+`wp2c-preparation-continuation`, classification
+`PHASE7B_WP2C_PREPARATION_CONTINUATION_NONEXECUTABLE`. It binds:
+
+- `original`: session ID/root/metadata, initialization commit/operator, complete
+  inventory and its SHA, original ISO/manifest, descriptor/attempt/application/
+  environment, baselineCaptured=false, planCreated=false, preparationAccepted=false.
+- `current`: actual published continuation commit/operator/Host identities,
+  machine-derived host dependency closure and guest tooling manifest, replacement
+  ISO path/identity, manifest identity and tooling-result identity.
+- `vm`: reviewed raw original VMX, original VMSD, stable optical-excluding config
+  identity, guest UUID identity and S1 name; plus createdAt.
+- nonExecutable=true, preparationOnly=true, automaticRetryAllowed=false,
+  wp2cExecutionAuthorized=false, laterMigrationAuthorized=false.
+
+The context is written LAST, after replacement media and rechecking original
+bytes/VM pins. Canonical inventories/manifests are deterministic; creation time
+and ISO filesystem metadata are recorded once, not claimed reproducible. The
+current commit must be the publication containing this implementation (a
+descendant of the reviewed `48af694a...` optical baseline), never falsely attributed
+to a commit lacking the new operator.
+
+Every later mode requires the exact continuation path AND SHA, current published
+source/closures, untouched original inventory and current selected media. There
+is no latest-context lookup or automatic migration. A compatible existing context
+returns `PHASE7B_WP2C_PREPARATION_CONTINUATION_EXISTS` without writing; that is not
+a retry instruction. Partial, malformed or conflicting registry entries stop.
+Well-formed historical contexts of other commits do not gate eligibility by count.
+Creating another context also rejects progress artifacts in a prior continuation;
+it cannot restart from the frozen original after a prior baseline/plan/closeout.
+
+All later baseline, plan, preparation media, review, return and accepted evidence
+live under the continuation directory, retaining the original preparedStateId.
+Only in-memory operator settings select current tooling; original session JSON
+is not rewritten. Approved later optical attachment may change filenames/connection
+flags, but the existing VM projection and media checks still reject unsafe drift.
+Both boots, synthetic test, shutdown and four-file recorder remain unchanged.
+The recorder adds `preparationLineage` to preparation.json binding the exact
+continuation and both original/current commits, operators, ISO and manifest
+identities. It validates that lineage before any accepted-evidence write.
+Guest/restore/execution schemas, claim semantics, snapshots and authority do not
+change. Continuation creation grants no permission to boot, install or restore.
 
 After attachment and before boot, the host boot-permit entry independently checks
 the exact two local ISO paths, full ISO hashes, optical connection flags, projected
