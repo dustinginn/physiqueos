@@ -4,18 +4,79 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 
+function Get-Phase7BWP2COpticalSlots {
+  param([hashtable]$Vmx)
+  # Count physical/unsupported optical attachments too; never hide a third
+  # device merely because it is not one of the two approved image devices.
+  @($Vmx.Keys|Where-Object {
+    ($_ -match '^(sata|ide|scsi|nvme)\d+:\d+\.devicetype$' -and [string]$Vmx[$_] -match '^cdrom-') -or
+    ($_ -match '^(sata|ide|scsi|nvme)\d+:\d+\.filename$' -and [string]$Vmx[$_] -match '\.iso$')
+  }|ForEach-Object {$_ -replace '\.(devicetype|filename)$',''}|Sort-Object -Unique)
+}
+
+function Read-Phase7BWP2COpticalVmx {
+  param([string]$LiteralPath)
+  $before=Get-Phase7BSha256 -LiteralPath $LiteralPath
+  $vmx=Read-Phase7BVmx $LiteralPath
+  $slots=@(Get-Phase7BWP2COpticalSlots $vmx);$seen=@{}
+  # The shared legacy reader retains the last duplicate. Optical defaulting
+  # must not turn a malformed/contradictory connection observation into omission.
+  foreach($line in Get-Content -LiteralPath $LiteralPath){
+    if($line -match '^\s*((?:sata|ide|scsi|nvme)\d+:\d+)\.(present|devicetype|filename|startconnected)\b'){
+      $slot=$matches[1].ToLowerInvariant();$key=$slot+'.'+$matches[2].ToLowerInvariant()
+      if($slot -in $slots){
+        Assert-Phase7BWP2C ($line -match ('^\s*'+[regex]::Escape($key)+'\s*=\s*"[^"\r\n]*"\s*$') -and -not $seen.ContainsKey($key)) 'OPTICAL_VMX_AMBIGUOUS'
+        $seen[$key]=$true
+      }
+    }
+  }
+  Assert-Phase7BWP2C ((Get-Phase7BSha256 -LiteralPath $LiteralPath) -ceq $before) 'OPTICAL_VMX_CHANGED'
+  $vmx
+}
+
+function Get-Phase7BWP2COpticalConnection {
+  param([hashtable]$Vmx,[string]$Slot)
+  Assert-Phase7BWP2C ($Slot -cmatch '^(sata|ide)\d+:\d+$' -and
+    $Vmx[$Slot+'.devicetype'] -ceq 'cdrom-image' -and $Vmx[$Slot+'.present'] -ceq 'TRUE' -and
+    $Vmx.ContainsKey($Slot+'.filename') -and [string]$Vmx[$Slot+'.filename'] -match '^.+\.iso$') 'OPTICAL_SLOT_POLICY'
+  $key=$Slot+'.startconnected'
+  $explicit=$Vmx.ContainsKey($key)
+  if($explicit){Assert-Phase7BWP2C ($Vmx[$key] -is [string] -and $Vmx[$key] -cin @('TRUE','FALSE')) 'OPTICAL_START_CONNECTED_VALUE'}
+  # VMware CD/DVD startConnected defaults to TRUE when omitted; present image
+  # device context above is mandatory. No default is applied to NICs or disks.
+  # Vendor explanation: Darius Davis, VMware Workstation forum, 2013-09-29,
+  # thread e805adfb-9291-48a8-ada2-525494421e57 (linked in readiness design).
+  [pscustomobject]@{slot=$Slot;startConnected=if($explicit){$Vmx[$key] -ceq 'TRUE'}else{$true};representation=if($explicit){'EXPLICIT_'+$Vmx[$key]}else{'OMITTED_IMAGE_DEFAULT_TRUE'}}
+}
+
 function Get-Phase7BWP2CVmxIdentity {
   param([hashtable]$Vmx)
-  $slots=@($Vmx.Keys|Where-Object {$_ -match '^(sata|ide)\d+:\d+\.devicetype$' -and [string]$Vmx[$_] -ceq 'cdrom-image'}|ForEach-Object {$_ -replace '\.devicetype$',''}|Sort-Object)
+  $slots=@(Get-Phase7BWP2COpticalSlots $Vmx)
   Assert-Phase7BWP2C ($slots.Count -eq 2) 'TWO_READONLY_OPTICAL_SLOTS_REQUIRED'
   $projection=[ordered]@{}
   foreach($key in @($Vmx.Keys|Sort-Object)){$projection[$key]=[string]$Vmx[$key]}
   foreach($slot in $slots){
-    Assert-Phase7BWP2C ($Vmx[$slot+'.present'] -ceq 'TRUE' -and $Vmx[$slot+'.startconnected'] -in @('TRUE','FALSE') -and $Vmx.ContainsKey($slot+'.filename')) 'OPTICAL_SLOT_POLICY'
+    [void](Get-Phase7BWP2COpticalConnection $Vmx $slot)
     $projection[$slot+'.filename']='<EXACT_MEDIA_VERIFIED_SEPARATELY>'
     $projection[$slot+'.startconnected']='<MUST_BE_TRUE_AT_BOOT_PERMIT>'
   }
   [pscustomobject]@{mode='wp2c-offline-optical-projection-v1';sha256=Get-Phase7BWP2CObjectHash $projection;opticalSlots=$slots}
+}
+
+function Assert-Phase7BWP2CPreparationBootMedia {
+  param([hashtable]$Vmx,[string]$ToolingMediaPath,[string]$PreparationMediaPath)
+  $identity=Get-Phase7BWP2CVmxIdentity $Vmx
+  $expected=@(Assert-Phase7BWP2CLocalPath $ToolingMediaPath)
+  if($PreparationMediaPath){$expected+=@(Assert-Phase7BWP2CLocalPath $PreparationMediaPath);Assert-Phase7BWP2C ($expected[0] -cne $expected[1]) 'PREPARATION_MEDIA_DISTINCT'}
+  $actual=@(foreach($slot in $identity.opticalSlots){
+    $path=Assert-Phase7BWP2CLocalPath ([string]$Vmx[$slot+'.filename'])
+    # Even a disconnected spare slot may contain only approved preparation
+    # media. Baseline: both name tooling, exactly one connected. Second boot:
+    # tooling + preparation control, both connected. Never a recovery ISO.
+    Assert-Phase7BWP2C ($path -cin $expected) 'PREPARATION_BOOT_MEDIA'
+    if((Get-Phase7BWP2COpticalConnection $Vmx $slot).startConnected){$path}
+  })
+  Assert-Phase7BWP2C ($actual.Count -eq $expected.Count -and @(Compare-Object @($expected|Sort-Object) @($actual|Sort-Object)).Count -eq 0) 'PREPARATION_BOOT_MEDIA'
 }
 
 function Get-Phase7BWP2CExpectedGuestIdentity {
@@ -43,7 +104,7 @@ function Assert-Phase7BWP2CBootMedia {
   $expected=@([IO.Path]::GetFullPath($RecoveryMediaPath),[IO.Path]::GetFullPath($ControlMediaPath))
   Assert-Phase7BWP2C ($expected[0] -cne $expected[1]) 'BOOT_MEDIA_DISTINCT'
   $actual=@(foreach($slot in $identity.opticalSlots){
-    Assert-Phase7BWP2C ($Vmx[$slot+'.startconnected'] -ceq 'TRUE') 'BOOT_MEDIA_NOT_CONNECTED'
+    Assert-Phase7BWP2C (Get-Phase7BWP2COpticalConnection $Vmx $slot).startConnected 'BOOT_MEDIA_NOT_CONNECTED'
     $path=[string]$Vmx[$slot+'.filename'];if(-not [IO.Path]::IsPathRooted($path)){$path=Join-Path (Split-Path -Parent $VmxPath) $path}
     Assert-Phase7BWP2CLocalPath $path
   })
@@ -62,7 +123,7 @@ function Get-Phase7BWP2CHostObservation {
   param([string]$VmxPath,[string]$SnapshotMetadataPath)
   [void](Assert-Phase7BWP2CLocalPath $VmxPath)
   [void](Assert-Phase7BWP2CLocalPath $SnapshotMetadataPath (Split-Path -Parent $VmxPath))
-  $vmx=Read-Phase7BVmx $VmxPath;$fixed=Get-Phase7BIsolatedGuestContract
+  $vmx=Read-Phase7BWP2COpticalVmx $VmxPath;$fixed=Get-Phase7BIsolatedGuestContract
   foreach($key in @($vmx.Keys|Where-Object {$_ -match '^(scsi|sata|nvme|ide)\d+:\d+\.filename$' -and [string]$vmx[$_] -match '\.vmdk$'})) {
     [void](Assert-Phase7BWP2CLocalPath (Join-Path (Split-Path -Parent $VmxPath) ([string]$vmx[$key])) (Split-Path -Parent $VmxPath))
   }

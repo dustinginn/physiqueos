@@ -126,18 +126,17 @@ try {
       Assert-Phase7BWP2C $ram.pass 'PREBOOT_RAM_STOP'
       $cold=Get-Phase7BWP2CHostObservation $VmxPath $SnapshotMetadataPath
       Assert-Phase7BWP2C (Test-Phase7BWP2CHostObservation $cold $cold).pass 'PREPARATION_HOST_ISOLATION'
-      $vmx=Read-Phase7BVmx $VmxPath;$projection=Get-Phase7BWP2CVmxIdentity $vmx
+      $vmx=Read-Phase7BWP2COpticalVmx $VmxPath
       $tool=Read-OperatorJson 'tooling-result.json';$toolsPath=Join-Path $SessionRoot 'tooling.iso'
       Assert-Phase7BWP2CFile $toolsPath $tool.identity
-      $expected=@($toolsPath)
+      $prepPath=$null
       if($Mode -ceq 'PreBoot'){
         $prep=Read-OperatorJson 'preparation-result.json';$prepPath=Join-Path $SessionRoot 'preparation.iso'
-        Assert-Phase7BWP2CFile $prepPath $prep.identity;$expected+=@($prepPath)
+        Assert-Phase7BWP2CFile $prepPath $prep.identity
         $carrier=Read-Phase7BWP2CPreparationContent ($prepPath+'.content') $prep.content.descriptorIdentity.sha256
         Assert-Phase7BWP2C (Test-Phase7BWP2CHostObservation $cold $carrier.plan.bindings).pass 'PREPARATION_HOST_ISOLATION'
       }
-      $actual=@(foreach($slot in $projection.opticalSlots){if($vmx[$slot+'.startconnected'] -ceq 'TRUE'){[IO.Path]::GetFullPath([string]$vmx[$slot+'.filename'])}})
-      Assert-Phase7BWP2C (@(Compare-Object @($expected|Sort-Object) @($actual|Sort-Object)).Count -eq 0) 'PREPARATION_BOOT_MEDIA'
+      Assert-Phase7BWP2CPreparationBootMedia $vmx $toolsPath $prepPath
       [ordered]@{classification='PHASE7B_WP2C_PREPARATION_PREBOOT_PASS';vmBooted=$false;wp2cExecuted=$false;mode=$Mode;checkedAt=[datetime]::UtcNow.ToString('o')}|ConvertTo-Json
     }
     'EntryReview' {

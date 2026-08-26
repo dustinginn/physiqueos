@@ -166,6 +166,29 @@ the authorization. All other configuration, including disk, slot identities,
 CPU/RAM, NIC and integration controls, remains bound. Raw VMX SHA is retained as
 diagnostic evidence. Only those optical fields may change after preparation.
 
+Optical connection interpretation is shared by VMX projection, preparation
+baseline/second-boot selection and execution boot-media checks. Only a present
+SATA/IDE `cdrom-image` device with a nonempty ISO filename may use VMware's
+omitted `startConnected` default TRUE. Explicit TRUE/FALSE remain distinct;
+empty/null/malformed values, duplicate/invalid optical VMX assignments, absent
+devices, unsupported optical types and extra slots reject. No NIC/disk default
+is introduced. The narrow default follows the
+[VMware employee explanation of CD/DVD startConnected omission](https://community.broadcom.com/vmware-cloud-foundation/communities/community-home/digestviewer/viewthread?CommunityKey=fb707ac3-9412-4fad-b7af-018f5da56d9f&GroupId=7171&MessageKey=e805adfb-9291-48a8-ada2-525494421e57).
+The current powered-off saved representation is regression-tested without boot.
+Baseline requires both optical filenames to name the exact tooling ISO and
+exactly one effective connection; second boot requires tooling plus preparation
+ISO and both connected. A disconnected recovery/unknown ISO is not an approved
+spare. Full media hashes/bytes and all hardware/isolation gates remain mandatory.
+
+A correction to `phase7bWorkPackage2CHost.psm1` also changes the guest tooling
+closure: that module is shipped on tooling media. Existing session/media bytes
+remain immutable historical preparation evidence, not current patched tooling.
+After publication the original session's commit/operator bindings reject direct
+continuation. A separately reviewed create-new continuation context and new
+tooling media would be needed, binding the original session/media/S1 provenance
+without overwriting them or rerunning Initialize. No such continuation/rebinding
+is granted or implemented by the optical compatibility correction.
+
 After attachment and before boot, the host boot-permit entry independently checks
 the exact two local ISO paths, full ISO hashes, optical connection flags, projected
 VMX identity, S1 metadata, powered-off state, hardware and isolation. It then writes
