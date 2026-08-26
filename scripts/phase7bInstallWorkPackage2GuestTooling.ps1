@@ -5,6 +5,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestReconciliation.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
 Assert-Phase7BWP2C $FounderPreparationApproved.IsPresent 'FOUNDER_PREPARATION_REQUIRED'
 Assert-Phase7BWP2C ($PSVersionTable.PSEdition -ceq 'Desktop' -and $PSVersionTable.PSVersion.Major -eq 5 -and $PSVersionTable.PSVersion.Minor -eq 1) 'PS51_REQUIRED'
 $principal=New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -30,8 +31,8 @@ $tasks=@(foreach($name in @($fixed.productionTaskName,$fixed.monitorTaskName,$fi
 Assert-Phase7BWP2C (Test-Phase7BInertTaskSet -TaskProjections @($tasks|ForEach-Object {Get-Phase7BReconciliationTaskProjection -TaskName $_.TaskName -Task @($_)}) -Contract $fixed).pass 'PREPARATION_TASKS_NOT_INERT'
 Assert-Phase7BWP2C (@(Get-Process -ErrorAction Stop|Where-Object {$_.ProcessName -in @('node','ngrok','postgres','mysqld','sqlservr','mongod')}).Count -eq 0) 'PREPARATION_RUNTIME_ACTIVE'
 Assert-Phase7BWP2C (@(Get-NetTCPConnection -ErrorAction Stop|Where-Object {$_.LocalPort -eq 3000 -and $_.State -eq 'Listen'}).Count -eq 0) 'PREPARATION_LISTENER_ACTIVE'
-$shares=@(& 'C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe' 2>$null|Where-Object {-not [string]::IsNullOrWhiteSpace([string]$_)})
-Assert-Phase7BWP2C ($LASTEXITCODE -eq 0 -and $shares.Count -eq 0) 'PREPARATION_HGFS'
+$hgfsObservation=Get-Phase7BWP2CHgfsObservation $computer
+Assert-Phase7BWP2C (Test-Phase7BWP2CHgfsObservation $hgfsObservation) 'PREPARATION_HGFS'
 $disk=Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'" -ErrorAction Stop
 $needed=[int64]$AgeBytes+$AgeKeygenBytes+1GB;foreach($file in $manifest.files){$needed+=[int64]$file.bytes}
 Assert-Phase7BWP2C ($disk.DriveType -eq 3 -and $disk.FileSystem -ceq 'NTFS' -and $disk.FreeSpace -ge $needed) 'TOOLING_CAPACITY'

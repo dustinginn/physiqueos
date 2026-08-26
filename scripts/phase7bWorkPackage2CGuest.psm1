@@ -5,6 +5,75 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestReconciliation.psm1'
 Import-Module (Join-Path $PSScriptRoot 'phase7bWindowsAgeIdentityBridge.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 
+function Get-Phase7BWP2CHgfsObservation {
+  param($Computer)
+  # Read-only machine boundaries shared by installer and full guest collector.
+  # Exit interpretation belongs exclusively to Test-Phase7BVmwareGuestIdentity.
+  $tools=@(Get-Service VMTools -ErrorAction Stop)
+  $toolsExe='C:\Program Files\VMware\VMware Tools\vmtoolsd.exe'
+  $client='C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe'
+  $available=Test-Path -LiteralPath $client -PathType Leaf
+  $folders=@();$exitCode=-1
+  if($available){
+    # Do not inherit a stale native exit code if no result was observed.
+    # Native commands update the GLOBAL automatic variable in Windows PS5.1;
+    # a local assignment would shadow it even after a successful invocation.
+    $global:LASTEXITCODE=$null
+    $folders=@(& $client 2>$null | Where-Object {-not [string]::IsNullOrWhiteSpace([string]$_)})
+    Assert-Phase7BWP2C ($global:LASTEXITCODE -is [int]) 'HGFS_EXIT_UNOBSERVED'
+    $exitCode=$global:LASTEXITCODE
+  }
+  $driver=@(Get-CimInstance Win32_SystemDriver -Filter "Name='vmhgfs'" -ErrorAction Stop)
+  $disks=@(Get-CimInstance Win32_LogicalDisk -ErrorAction Stop)
+  $connections=@(Get-CimInstance Win32_NetworkConnection -ErrorAction Stop)
+  $hgfsPattern='(?i)(vmware-host|\\\.host|hgfs)'
+  $exposed=@(Get-PSDrive -ErrorAction Stop | Where-Object {
+    $_.Provider.Name -match $hgfsPattern -or [string]$_.Root -match $hgfsPattern -or
+    ($_.PSObject.Properties.Name -contains 'DisplayRoot' -and [string]$_.DisplayRoot -match $hgfsPattern)
+  })
+  [pscustomobject][ordered]@{
+    manufacturer=[string]$Computer.Manufacturer;model=[string]$Computer.Model
+    toolsServicePresent=($tools.Count -eq 1)
+    toolsServiceRunning=($tools.Count -eq 1 -and $tools[0].Status -eq 'Running')
+    toolsExecutablePresent=(Test-Path -LiteralPath $toolsExe -PathType Leaf)
+    sharedFolderEnumerationAvailable=[bool]$available;sharedFolderEnumerationExitCode=$exitCode
+    sharedFolderNames=@($folders | ForEach-Object {[string]$_})
+    hgfsDriverPresent=($driver.Count -eq 1 -and $driver[0].Name -ceq 'vmhgfs')
+    hgfsDriverRunning=($driver.Count -eq 1 -and $driver[0].Name -ceq 'vmhgfs' -and $driver[0].State -eq 'Running')
+    mappedHgfsDiskCount=@($disks | Where-Object {[string]$_.ProviderName -match $hgfsPattern}).Count
+    mappedHgfsConnectionCount=@($connections | Where-Object {[string]$_.RemoteName -match $hgfsPattern}).Count
+    providerPathCount=$exposed.Count
+  }
+}
+
+function Test-Phase7BWP2CHgfsObservation {
+  param($Observation)
+  # Never trust a caller's pass/status flag. Reevaluate the raw corroboration
+  # using the existing contract; its EMPTY_EXIT_1_CORROBORATED label alone is
+  # insufficient. Missing/null/coerced observations are not corroboration.
+  try {
+    $o=$Observation;$parameters=@{}
+    foreach($name in @('manufacturer','model')){
+      if($o.$name -isnot [string] -or [string]::IsNullOrWhiteSpace($o.$name)){return $false}
+      $parameters[$name]=$o.$name
+    }
+    foreach($name in @('toolsServicePresent','toolsServiceRunning','toolsExecutablePresent','sharedFolderEnumerationAvailable','hgfsDriverPresent','hgfsDriverRunning')){
+      if($o.$name -isnot [bool]){return $false};$parameters[$name]=$o.$name
+    }
+    if($o.sharedFolderEnumerationExitCode -isnot [int]){return $false}
+    $parameters.sharedFolderEnumerationExitCode=$o.sharedFolderEnumerationExitCode
+    if($o.sharedFolderNames -isnot [array]){return $false}
+    $parameters.sharedFolderNames=$o.sharedFolderNames
+    foreach($name in @('mappedHgfsDiskCount','mappedHgfsConnectionCount','providerPathCount')){
+      if(($o.$name -isnot [int] -and $o.$name -isnot [long]) -or $o.$name -lt 0 -or $o.$name -gt [int]::MaxValue){return $false}
+    }
+    $parameters.mappedHgfsDiskCount=$o.mappedHgfsDiskCount
+    $parameters.mappedHgfsConnectionCount=$o.mappedHgfsConnectionCount
+    $identity=Test-Phase7BVmwareGuestIdentity @parameters
+    return ($identity.pass -ceq $true -and $o.providerPathCount -eq 0)
+  } catch {return $false}
+}
+
 function Test-Phase7BWP2CGuestObservation {
   param($Observation,$Bindings,[switch]$AfterRestore)
   # Pure evaluator for source-collected observations, not an execution-entry override.
@@ -21,7 +90,11 @@ function Test-Phase7BWP2CGuestObservation {
     evaluation=($o.osBuild -ceq $b.guestOsBuild -and $o.osCaption -ceq $b.guestOsCaption -and $o.licenseStatus -eq 1 -and $o.evaluationMinutesRemaining -ge 1440)
     resources=($o.memoryMiB -ge 3584 -and $o.memoryMiB -le 4096 -and $o.vcpuCount -eq 2)
     tools=($o.toolsRunning -ceq $true -and $o.toolsVersion -ceq $b.vmwareToolsVersion)
-    noIntegration=($o.hgfsEnumerationExitCode -eq 0 -and $o.hgfsFolderCount -eq 0 -and $o.networkDriveCount -eq 0 -and $o.smbConnectionCount -eq 0)
+    noIntegration=((Test-Phase7BWP2CHgfsObservation $o.hgfsObservation) -and
+      $o.hgfsObservation.manufacturer -ceq $o.manufacturer -and $o.hgfsObservation.model -ceq $o.model -and
+      $o.hgfsObservation.toolsServiceRunning -ceq $o.toolsRunning -and
+      $o.hgfsEnumerationExitCode -eq $o.hgfsObservation.sharedFolderEnumerationExitCode -and
+      $o.hgfsFolderCount -eq 0 -and $o.networkDriveCount -eq 0 -and $o.smbConnectionCount -eq 0)
     network=($o.upAdapterCount -eq 0 -and $o.externalRouteCount -eq 0 -and $o.establishedExternalConnectionCount -eq 0)
     inert=($o.tasksExactAndDisabled -ceq $true -and $o.controlsStopped -ceq $true -and $o.applicationProcessCount -eq 0 -and $o.port3000Count -eq 0 -and $o.databaseProcessCount -eq 0)
     credentials=($o.credentialExclusionsPass -ceq $true)
@@ -78,11 +151,8 @@ function Get-Phase7BWP2CGuestObservation {
   $marker=Read-Phase7BWP2CBoundJson $markerPath $b.guestMarkerSha256
   Assert-Phase7BWP2C ($marker.schemaVersion -eq 1 -and $marker.applicationCommit -ceq $fixed.applicationCommit -and $marker.manifestDigest -ceq $fixed.manifestDigest -and $marker.windowsHostId -ceq $fixed.windowsHostId -and $marker.windowsRuntimeId -ceq $fixed.windowsRuntimeId) 'GUEST_MARKER_CONTENT'
   $os=Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
-  $tools=Get-Service VMTools -ErrorAction Stop
   $toolsExe='C:\Program Files\VMware\VMware Tools\vmtoolsd.exe'
-  $hgfs='C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe'
-  Assert-Phase7BWP2C ((Test-Path -LiteralPath $toolsExe -PathType Leaf) -and (Test-Path -LiteralPath $hgfs -PathType Leaf)) 'TOOLS_REQUIRED'
-  $folders=@(& $hgfs 2>$null | Where-Object {-not [string]::IsNullOrWhiteSpace([string]$_)});$hgfsExit=$LASTEXITCODE
+  $hgfsObservation=Get-Phase7BWP2CHgfsObservation $computer
   Assert-Phase7BWP2CInstalledTooling $Contract
   $git='C:\Program Files\Git\cmd\git.exe'
   Assert-Phase7BWP2CFile $git $b.git
@@ -142,8 +212,9 @@ function Get-Phase7BWP2CGuestObservation {
     psEdition=$PSVersionTable.PSEdition;psVersion=$PSVersionTable.PSVersion.ToString();is64Bit=[Environment]::Is64BitProcess;frameworkReady=$true
     osBuild=[string]$os.BuildNumber;osCaption=[string]$os.Caption;licenseStatus=[int]$license[0].LicenseStatus;evaluationMinutesRemaining=[int]$license[0].GracePeriodRemaining
     memoryMiB=[int64]([math]::Round($computer.TotalPhysicalMemory/1MB));vcpuCount=[int]$computer.NumberOfLogicalProcessors
-    toolsRunning=($tools.Status -eq 'Running');toolsVersion=(Get-Item -LiteralPath $toolsExe).VersionInfo.FileVersion
-    hgfsEnumerationExitCode=$hgfsExit;hgfsFolderCount=$folders.Count;networkDriveCount=$networkDrives.Count;smbConnectionCount=$networkConnections.Count
+    toolsRunning=$hgfsObservation.toolsServiceRunning;toolsVersion=(Get-Item -LiteralPath $toolsExe).VersionInfo.FileVersion
+    hgfsObservation=$hgfsObservation
+    hgfsEnumerationExitCode=$hgfsObservation.sharedFolderEnumerationExitCode;hgfsFolderCount=@($hgfsObservation.sharedFolderNames).Count;networkDriveCount=$networkDrives.Count;smbConnectionCount=$networkConnections.Count
     upAdapterCount=$adapters.Count;externalRouteCount=$routes.Count;establishedExternalConnectionCount=@($connections | Where-Object {$_.State -eq 'Established' -and $_.RemoteAddress -notin @('127.0.0.1','::1')}).Count
     tasksExactAndDisabled=($tasks.Count -eq 3 -and $taskEvidence.pass);controlsStopped=($runtime.desiredState -ceq 'stopped' -and $ngrok.ngrokDesiredState -ceq 'stopped')
     applicationProcessCount=@($processes | Where-Object {$_.Name -in @('node.exe','ngrok.exe')}).Count

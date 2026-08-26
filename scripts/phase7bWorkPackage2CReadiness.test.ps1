@@ -78,7 +78,27 @@ try {
   Assert-True ((Get-Phase7BWP2CExecutionState $ledger $a.authorizationId) -ceq 'COMPLETED_TERMINAL') 'completion terminal'
   Assert-Rejected {Complete-Phase7BWP2CExecution $ledger $a $hostClaim.identity.sha256 ('9'*64)} 'completion cannot repeat'
   $o=[pscustomobject]@{manufacturer='VMware, Inc.';model='VMware Virtual Platform';computerName=$b.guestComputerName;guestIdentitySha256=$b.guestIdentitySha256;applicationCommit=$b.applicationCommit;repositoryClean=$true;markerSha256=$b.guestMarkerSha256;toolingManifestSha256=$b.toolingManifestSha256;installedFilesExact=$true;psEdition='Desktop';psVersion='5.1.26100.1';is64Bit=$true;frameworkReady=$true;osBuild=$b.guestOsBuild;osCaption=$b.guestOsCaption;licenseStatus=1;evaluationMinutesRemaining=10000;memoryMiB=4095;vcpuCount=2;toolsRunning=$true;toolsVersion=$b.vmwareToolsVersion;hgfsEnumerationExitCode=0;hgfsFolderCount=0;networkDriveCount=0;smbConnectionCount=0;upAdapterCount=0;externalRouteCount=0;establishedExternalConnectionCount=0;tasksExactAndDisabled=$true;controlsStopped=$true;applicationProcessCount=0;port3000Count=0;databaseProcessCount=0;credentialExclusionsPass=$true;localNtfsRoots=$true;pathOwnershipPass=$true;incomingFreeBytes=[int64]10GB;restoreFreeBytes=[int64]10GB;incomingChildCount=0;restoreChildCount=0}
-  Assert-True (Test-Phase7BWP2CGuestObservation $o $b).pass 'source gate accepts exact inert guest observation'
+  # Obtain the corroboration shape from the real producer under synthetic OS
+  # boundaries, not a hand-maintained pass flag or a legacy exit-code fixture.
+  $hgfsObservation=& (Get-Module phase7bWorkPackage2CGuest) {
+    function Get-Service {param($Name,$ErrorAction);[pscustomobject]@{Status='Running'}}
+    function Test-Path {param($LiteralPath,$PathType);$true}
+    function Get-CimInstance {
+      param($ClassName,$Filter,$ErrorAction)
+      switch($ClassName){
+        'Win32_SystemDriver' {[pscustomobject]@{Name='vmhgfs';State='Running'}}
+        'Win32_LogicalDisk' {}
+        'Win32_NetworkConnection' {}
+        default {throw 'UNEXPECTED_HGFS_FIXTURE_QUERY'}
+      }
+    }
+    function Get-PSDrive {param($ErrorAction)}
+    Set-Item -LiteralPath 'Function:C:\Program Files\VMware\VMware Tools\VMwareHgfsClient.exe' -Value {& C:\Windows\System32\cmd.exe /d /c exit 1}
+    Get-Phase7BWP2CHgfsObservation ([pscustomobject]@{Manufacturer='VMware, Inc.';Model='VMware Virtual Platform'})
+  }
+  $o | Add-Member NoteProperty hgfsObservation $hgfsObservation
+  $o.hgfsEnumerationExitCode=1
+  Assert-True (Test-Phase7BWP2CGuestObservation $o $b).pass 'source gate accepts source-produced corroborated exit1 observation'
   foreach($field in @('manufacturer','computerName','guestIdentitySha256','applicationCommit','markerSha256','toolingManifestSha256','osBuild','toolsVersion')){$bad=Copy-Value $o;$bad.$field='wrong';Assert-True (-not (Test-Phase7BWP2CGuestObservation $bad $b).pass) "gate rejects $field"}
   foreach($field in @('repositoryClean','installedFilesExact','frameworkReady','toolsRunning','tasksExactAndDisabled','controlsStopped','credentialExclusionsPass','localNtfsRoots','pathOwnershipPass')){$bad=Copy-Value $o;$bad.$field=$false;Assert-True (-not (Test-Phase7BWP2CGuestObservation $bad $b).pass) "gate rejects $field"}
   foreach($field in @('hgfsFolderCount','networkDriveCount','smbConnectionCount','upAdapterCount','externalRouteCount','establishedExternalConnectionCount','applicationProcessCount','port3000Count','databaseProcessCount','incomingChildCount','restoreChildCount')){$bad=Copy-Value $o;$bad.$field=1;Assert-True (-not (Test-Phase7BWP2CGuestObservation $bad $b).pass) "gate rejects $field"}
@@ -109,6 +129,10 @@ try {
   $guestReport=[pscustomobject]@{schemaVersion=1;kind='wp2c-guest-preparation-observation';observation=$o;wp2cExecuted=$false;packetDecrypted=$false;executionClaimCreated=$false;authorizationConsumed=$false}
   $prep=New-Phase7BWP2CPreparationEvidence $pb $ho $guestReport $entry -FounderReviewed
   Assert-True (-not $prep.wp2cExecuted -and -not $prep.executionClaimCreated) 'source-produced preparation is not execution'
+  foreach($field in @('clipboardDisabled','dragDropDisabled','sharedFoldersDisabled')){
+    $badHost=Copy-Value $ho;$badHost.$field=$false
+    Assert-Rejected {New-Phase7BWP2CPreparationEvidence $pb $badHost $guestReport $entry -FounderReviewed} ('corroborated guest exit1 cannot override host '+$field)
+  }
   $prepPath=Join-Path $root 'preparation.json';$pb.preparationEvidenceSha256=(Write-Phase7BWP2CCreateNewJson $prepPath $prep).sha256
   $entryPath=Join-Path $root 'entry.json';[void](Write-Phase7BWP2CCreateNewJson $entryPath $entry)
   $pc=New-Phase7BWP2CInvocationContract $pb $manifest $hostArtifacts
