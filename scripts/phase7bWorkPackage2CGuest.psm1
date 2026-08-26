@@ -235,6 +235,103 @@ function Assert-Phase7BWP2CGuestPreMutation {
   $observation
 }
 
+function Get-Phase7BWP2CGuestPreparationBaseline {
+  param([string]$ExpectedGuestIdentitySha256)
+  # Read-only acquisition when accepted historical evidence lacks hashes/builds.
+  # It establishes inputs for preparation, never claims installed tooling PASS.
+  $fixed=Get-Phase7BIsolatedGuestContract
+  $computer=Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+  Assert-Phase7BWP2C ($computer.Manufacturer -ceq 'VMware, Inc.' -and $computer.Model -match '^VMware') 'WRONG_MACHINE'
+  $uuid=(Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop).UUID
+  $guestHash=Get-Phase7BWP2CObjectHash ([string]$uuid).ToLowerInvariant()
+  Assert-Phase7BWP2C ($guestHash -ceq $ExpectedGuestIdentitySha256) 'WRONG_GUEST'
+  Assert-Phase7BWP2CGuestRoots $fixed.repositoryRoot $fixed.isolatedRoot
+  $markerPath=Assert-Phase7BWP2CLocalPath (Join-Path $fixed.isolatedRoot 'guest-identity-marker.json') $fixed.isolatedRoot
+  $marker=Get-Content -LiteralPath $markerPath -Raw -ErrorAction Stop|ConvertFrom-Json
+  Assert-Phase7BWP2C ($marker.schemaVersion -eq 1 -and $marker.applicationCommit -ceq $fixed.applicationCommit -and $marker.manifestDigest -ceq $fixed.manifestDigest -and $marker.windowsHostId -ceq $fixed.windowsHostId -and $marker.windowsRuntimeId -ceq $fixed.windowsRuntimeId) 'GUEST_MARKER_CONTENT'
+  Assert-Phase7BWP2C (Test-Phase7BWP2CHgfsObservation (Get-Phase7BWP2CHgfsObservation $computer)) 'PREPARATION_HGFS'
+  Assert-Phase7BWP2C (@(Get-NetAdapter -IncludeHidden -ErrorAction Stop|Where-Object {$_.Status -eq 'Up'}).Count -eq 0) 'NETWORK_NOT_DISCONNECTED'
+  $os=Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+  $git='C:\Program Files\Git\cmd\git.exe'
+  $head=@(& $git --no-optional-locks -C $fixed.repositoryRoot rev-parse HEAD 2>$null)
+  Assert-Phase7BWP2C ($LASTEXITCODE -eq 0 -and $head.Count -eq 1 -and $head[0] -ceq $fixed.applicationCommit) 'APPLICATION_REPOSITORY'
+  $baseline=[pscustomobject][ordered]@{
+    schemaVersion=1;kind='wp2c-guest-preparation-baseline';guestIdentitySha256=$guestHash;guestComputerName=[string]$computer.Name
+    guestMarkerSha256=Get-Phase7BSha256 -LiteralPath $markerPath;applicationCommit=$fixed.applicationCommit;environmentId=$fixed.environmentId
+    guestOsBuild=[string]$os.BuildNumber;guestOsCaption=[string]$os.Caption
+    vmwareToolsVersion=(Get-Item -LiteralPath 'C:\Program Files\VMware\VMware Tools\vmtoolsd.exe').VersionInfo.FileVersion
+    git=Get-Phase7BWP2CIdentity $git;observedAt=[datetime]::UtcNow.ToString('o');mutationPerformed=$false
+  }
+  Assert-Phase7BWP2CPreparationBaseline $baseline
+  $baseline
+}
+
+function New-Phase7BWP2CPreparationGuestReport {
+  param($Plan,[string]$PlanSha256)
+  Assert-Phase7BWP2CPreparationPlan $Plan
+  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan) -ceq $PlanSha256) 'PREPARATION_PLAN_HASH'
+  $observation=Assert-Phase7BWP2CGuestPreMutation $Plan
+  [pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-guest-preparation-observation';planSha256=$PlanSha256;observation=$observation;observedAt=[datetime]::UtcNow.ToString('o');wp2cExecuted=$false;packetDecrypted=$false;executionClaimCreated=$false;authorizationConsumed=$false;reportPersisted=$false}
+}
+
+function Assert-Phase7BWP2CPreparationReturnShape {
+  param($Value)
+  Assert-Phase7BWP2CExactProperties $Value @('schemaVersion','kind','preparedStateId','plan','preparationControlDescriptor','report','reportIdentity','syntheticObservations','realIdentityUsed','invalidSyntheticValueOnly')
+  Assert-Phase7BWP2C ($Value.schemaVersion -eq 1 -and $Value.kind -ceq 'wp2c-preparation-return' -and $Value.preparedStateId -cmatch '^wp2c-prepared-[0-9a-f]{32}$') 'PREPARATION_RETURN_SHAPE'
+  Assert-Phase7BWP2CBoolean $Value.realIdentityUsed $false 'PREPARATION_SECRET_FORBIDDEN'
+  Assert-Phase7BWP2CBoolean $Value.invalidSyntheticValueOnly $true 'PREPARATION_SYNTHETIC_REQUIRED'
+  foreach($name in @('plan','preparationControlDescriptor','reportIdentity')){
+    Assert-Phase7BWP2CExactProperties $Value.$name @('sha256','bytes')
+    Assert-Phase7BWP2C ($Value.$name.sha256 -cmatch '^[0-9a-f]{64}$' -and $Value.$name.bytes -is [ValueType] -and $Value.$name.bytes -gt 0 -and $Value.$name.bytes -le 32768) 'PREPARATION_RETURN_IDENTITY'
+  }
+  $r=$Value.report
+  Assert-Phase7BWP2CExactProperties $r @('schemaVersion','kind','planSha256','observation','observedAt','wp2cExecuted','packetDecrypted','executionClaimCreated','authorizationConsumed','reportPersisted')
+  Assert-Phase7BWP2C ($r.schemaVersion -eq 1 -and $r.kind -ceq 'wp2c-guest-preparation-observation' -and $r.planSha256 -ceq $Value.plan.sha256) 'PREPARATION_RETURN_REPORT'
+  foreach($name in @('wp2cExecuted','packetDecrypted','executionClaimCreated','authorizationConsumed','reportPersisted')){Assert-Phase7BWP2CBoolean $r.$name $false 'PREPARATION_IS_NOT_EXECUTION'}
+  [void][datetimeoffset]::Parse($r.observedAt)
+  $o=$r.observation
+  $strings=@('manufacturer','model','computerName','guestIdentitySha256','applicationCommit','markerSha256','toolingManifestSha256','psEdition','psVersion','osBuild','osCaption','toolsVersion')
+  $booleans=@('repositoryClean','installedFilesExact','is64Bit','frameworkReady','toolsRunning','tasksExactAndDisabled','controlsStopped','credentialExclusionsPass','localNtfsRoots','pathOwnershipPass')
+  $numbers=@('licenseStatus','evaluationMinutesRemaining','memoryMiB','vcpuCount','hgfsEnumerationExitCode','hgfsFolderCount','networkDriveCount','smbConnectionCount','upAdapterCount','externalRouteCount','establishedExternalConnectionCount','applicationProcessCount','port3000Count','databaseProcessCount','incomingFreeBytes','restoreFreeBytes','incomingChildCount','restoreChildCount')
+  Assert-Phase7BWP2CExactProperties $o ($strings+$booleans+$numbers+@('hgfsObservation'))
+  foreach($name in $strings){Assert-Phase7BWP2C ($o.$name -is [string] -and $o.$name -cmatch '^[A-Za-z0-9., ()-]{1,100}$') 'PREPARATION_RETURN_FIELD'}
+  foreach($name in $booleans){Assert-Phase7BWP2C ($o.$name -is [bool]) 'PREPARATION_RETURN_FIELD'}
+  foreach($name in $numbers){Assert-Phase7BWP2C (($o.$name -is [int] -or $o.$name -is [long]) -and $o.$name -ge 0) 'PREPARATION_RETURN_FIELD'}
+  Assert-Phase7BWP2CExactProperties $o.hgfsObservation @('manufacturer','model','toolsServicePresent','toolsServiceRunning','toolsExecutablePresent','sharedFolderEnumerationAvailable','sharedFolderEnumerationExitCode','sharedFolderNames','hgfsDriverPresent','hgfsDriverRunning','mappedHgfsDiskCount','mappedHgfsConnectionCount','providerPathCount')
+  Assert-Phase7BWP2C (Test-Phase7BWP2CHgfsObservation $o.hgfsObservation) 'PREPARATION_RETURN_HGFS'
+  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $r) -ceq $Value.reportIdentity.sha256 -and [Text.Encoding]::UTF8.GetByteCount((ConvertTo-Phase7BCanonicalJson $r)) -eq $Value.reportIdentity.bytes) 'PREPARATION_RETURN_REPORT_HASH'
+  Assert-Phase7BWP2C ($Value.syntheticObservations -is [array] -and @($Value.syntheticObservations).Count -eq 3) 'PREPARATION_SYNTHETIC_CASES'
+  $cases=@('first-field','canary','interrupt')
+  for($i=0;$i -lt 3;$i++){
+    $s=$Value.syntheticObservations[$i]
+    Assert-Phase7BWP2CExactProperties $s @('classification','case','dialog','guestClipboardSequenceUnchanged','hostDestinationBehaviorVerified','hostClipboardVerified','realIdentityRequested','reportPersisted','universalFocusGuarantee','wp2cExecuted')
+    Assert-Phase7BWP2C ($s.classification -ceq 'PHASE7B_WP2C_SYNTHETIC_ENTRY_OBSERVATION_ONLY' -and $s.case -ceq $cases[$i]) 'PREPARATION_SYNTHETIC_CASES'
+    foreach($name in @('hostDestinationBehaviorVerified','hostClipboardVerified','realIdentityRequested','reportPersisted','universalFocusGuarantee','wp2cExecuted')){Assert-Phase7BWP2CBoolean $s.$name $false 'PREPARATION_SYNTHETIC_CASES'}
+    Assert-Phase7BWP2CBoolean $s.guestClipboardSequenceUnchanged $true 'PREPARATION_SYNTHETIC_CLIPBOARD'
+    Assert-Phase7BWP2CExactProperties $s.dialog @('firstFieldExact','secondFieldExact','firstCount','secondCount','dialogConfirmed','syntheticObservationOnly')
+    Assert-Phase7BWP2CBoolean $s.dialog.syntheticObservationOnly $true 'PREPARATION_SYNTHETIC_CASES'
+    foreach($name in @('firstFieldExact','secondFieldExact','dialogConfirmed')){Assert-Phase7BWP2C ($s.dialog.$name -is [bool]) 'PREPARATION_SYNTHETIC_CASES'}
+    foreach($name in @('firstCount','secondCount')){Assert-Phase7BWP2C ($s.dialog.$name -is [int] -and $s.dialog.$name -ge 0 -and $s.dialog.$name -le 74) 'PREPARATION_SYNTHETIC_CASES'}
+    if($i -eq 0){Assert-Phase7BWP2C ($s.dialog.firstFieldExact -and $s.dialog.secondFieldExact -and $s.dialog.dialogConfirmed -and $s.dialog.firstCount -eq 74 -and $s.dialog.secondCount -eq 74) 'PREPARATION_SYNTHETIC_EXACT'}
+    else {Assert-Phase7BWP2C (-not $s.dialog.dialogConfirmed) 'PREPARATION_SYNTHETIC_CANCEL'}
+  }
+}
+
+function New-Phase7BWP2CPreparationReturn {
+  param($Plan,$DescriptorIdentity,$Report,[object[]]$SyntheticObservations)
+  Assert-Phase7BWP2CPreparationPlan $Plan
+  Assert-Phase7BWP2C (Test-Phase7BWP2CGuestObservation $Report.observation $Plan.bindings).pass 'GUEST_PREPARATION_NOT_INERT'
+  $document=[pscustomobject][ordered]@{
+    schemaVersion=1;kind='wp2c-preparation-return';preparedStateId=$Plan.bindings.preparedStateId
+    plan=[pscustomobject]@{sha256=Get-Phase7BWP2CObjectHash $Plan;bytes=[Text.Encoding]::UTF8.GetByteCount((ConvertTo-Phase7BCanonicalJson $Plan))}
+    preparationControlDescriptor=$DescriptorIdentity;report=$Report
+    reportIdentity=[pscustomobject]@{sha256=Get-Phase7BWP2CObjectHash $Report;bytes=[Text.Encoding]::UTF8.GetByteCount((ConvertTo-Phase7BCanonicalJson $Report))}
+    syntheticObservations=@($SyntheticObservations);realIdentityUsed=$false;invalidSyntheticValueOnly=$true
+  }
+  Assert-Phase7BWP2CPreparationReturnShape $document
+  $document
+}
+
 function Assert-Phase7BWP2CEntryValidation {
   param($Evidence,$Bindings)
   Assert-Phase7BWP2C ($Evidence.schemaVersion -eq 1 -and $Evidence.kind -ceq 'wp2c-synthetic-entry-validation' -and $Evidence.method -ceq '1password-type-in-window-provisional-v1' -and $Evidence.guestIdentitySha256 -ceq $Bindings.guestIdentitySha256 -and $Evidence.toolingManifestSha256 -ceq $Bindings.toolingManifestSha256) 'ENTRY_VALIDATION_BINDING'

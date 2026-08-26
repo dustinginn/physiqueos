@@ -131,8 +131,15 @@ solved by deleting data automatically.
 
 `phase7bInspectWorkPackage2CGuestPreparation.ps1` performs real read-only guest
 observations after installation. `phase7bRecordWorkPackage2CPreparation.ps1`
-validates their shape/results plus current powered-off host observations and
-Founder-reviewed synthetic entry evidence before writing create-new evidence.
+accepts the checksum-verified, schema-checked nonsecret preparation return, not
+arbitrary caller-selected report objects. It validates the actual observations
+plus current powered-off host observations and Founder-reviewed synthetic entry
+evidence before writing create-new evidence. The complete offline baseline/plan/
+inspection/synthetic/return procedure is frozen in
+[the preparation operator guide](PHASE7B_WP2C_PREPARATION_OPERATOR.md). Preparation
+control is distinct from the execution control carrier below; no restore claim
+or execution authorization is needed for preparation. All instructions are saved
+before the RAM/boot gate; Codex need not remain open during guest operation.
 Preparation binds prepared-state ID, guest identity, tooling manifest, S1 metadata,
 entry-validation identity, guest observations, host observations and timestamp.
 It explicitly records `wp2cExecuted=false`, `packetDecrypted=false`,
@@ -165,7 +172,7 @@ VMX identity, S1 metadata, powered-off state, hardware and isolation. It then wr
 one create-new boot permit outside the VM. It does not attach media or boot the VM.
 All existing S0/S1 snapshots remain untouched by these source tools.
 
-## Three distinct media trust surfaces
+## Separate preparation and execution media trust surfaces
 
 1. **Tooling ISO**, `P7B_C_TOOLS`: the actual transitive tracked import/script-call
    closure of the guest restore, installer, preparation inspector and synthetic
@@ -183,6 +190,14 @@ All existing S0/S1 snapshots remain untouched by these source tools.
    `host-claim.json`, `preparation.json`, `identity-entry-validation.json`.
    It contains no secret, packet or executable. Its hash is recorded by the later
    host boot permit, not recursively embedded into the authorization it carries.
+4. **Preparation-only control ISO**, `P7B_C_PREP`: exactly
+   `preparation-plan.json` and `preparation-control.json`. It contains the
+   deterministic observation plan and its identity/manifest/correlation pins,
+   never a packet, secret, execution authorization or claim. It occupies the
+   second optical slot alongside tooling during preparation only. The 15-file
+   tooling payload remains unchanged in membership. Prepared observations and
+   synthetic results return separately through the bounded nonsecret WP2CP1
+   checksum adapter described in the operator guide, not writable ISO semantics.
 
 Build/hash tooling media and recovery media first, generate the invocation,
 create the execution authorization, claim on the host under the one-shot execution

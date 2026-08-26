@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 
 function Get-Phase7BWP2CVmxIdentity {
   param([hashtable]$Vmx)
@@ -15,6 +16,24 @@ function Get-Phase7BWP2CVmxIdentity {
     $projection[$slot+'.startconnected']='<MUST_BE_TRUE_AT_BOOT_PERMIT>'
   }
   [pscustomobject]@{mode='wp2c-offline-optical-projection-v1';sha256=Get-Phase7BWP2CObjectHash $projection;opticalSlots=$slots}
+}
+
+function Get-Phase7BWP2CExpectedGuestIdentity {
+  param([hashtable]$Vmx)
+  # VMware uuid.bios is the SMBIOS byte sequence. Guid(byte[]) applies the
+  # SMBIOS/Windows UUID field byte order; never bind the host's own UUID here.
+  $hex=([string]$Vmx['uuid.bios']) -replace '[ -]',''
+  Assert-Phase7BWP2C ($hex -cmatch '^[0-9a-fA-F]{32}$') 'VM_GUEST_UUID'
+  $bytes=New-Object byte[] 16
+  for($i=0;$i -lt 16;$i++){$bytes[$i]=[Convert]::ToByte($hex.Substring($i*2,2),16)}
+  $uuid=New-Object Guid(,$bytes)
+  Get-Phase7BWP2CObjectHash $uuid.ToString().ToLowerInvariant()
+}
+
+function Get-Phase7BWP2CPreparationRam {
+  $os=Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+  $available=[int64]$os.FreePhysicalMemory*1024
+  [pscustomobject][ordered]@{classification=if($available -ge 7GB){'PHASE7B_WP2C_PREBOOT_RAM_PASS'}else{'PHASE7B_WP2C_PREBOOT_RAM_FAIL'};pass=($available -ge 7GB);availableBytes=$available;requiredBytes=[int64]7GB;availableGiB=[math]::Round($available/1GB,2);requiredGiB=7;vmBooted=$false;mutationPerformed=$false}
 }
 
 function Assert-Phase7BWP2CBootMedia {
@@ -93,6 +112,52 @@ function New-Phase7BWP2CPreparationEvidence {
   $p=[pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-preparation';preparedStateId=$Bindings.preparedStateId;guestIdentitySha256=$Bindings.guestIdentitySha256;toolingManifestSha256=$Bindings.toolingManifestSha256;snapshotSha256=$Bindings.snapshotSha256;identityEntryValidationSha256=Get-Phase7BWP2CObjectHash $EntryEvidence;hostObservation=$HostObservation;guestObservation=$GuestReport.observation;guestReportSha256=Get-Phase7BWP2CObjectHash $GuestReport;guestChecksAccepted=$true;founderReviewed=$true;shutdownVerified=$HostObservation.poweredOff;noMemorySnapshot=(-not $HostObservation.memorySnapshotPresent);evaluationAccepted=$true;capacityAccepted=$true;wp2cExecuted=$false;packetDecrypted=$false;executionClaimCreated=$false;authorizationConsumed=$false;recordedAt=[datetime]::UtcNow.ToString('o')}
   Assert-Phase7BWP2CPreparation $p $Bindings
   $p
+}
+
+function New-Phase7BWP2CPreparationEntryEvidence {
+  param($Plan,$Returned,$FounderReview)
+  Assert-Phase7BWP2CPreparationPlan $Plan
+  Assert-Phase7BWP2CPreparationReturnShape $Returned
+  $r=$FounderReview;$b=$Plan.bindings
+  $manual=@('wrongFieldTestPass','guestFocusLossTestPass','hostFocusChangeTestPass','minimizationTestPass','cancellationTestPass','interruptionTestPass','canaryTestPass','noToolingSecretFileWrites','noTotp','automaticSubmissionDisabled')
+  Assert-Phase7BWP2CExactProperties $r (@('schemaVersion','kind','preparedStateId','onePasswordVersion','vmwareVersion','clipboardSequenceBefore','clipboardSequenceAfter','founderReviewed','realIdentityUsed','invalidSyntheticValueOnly','unexpectedDestinationInput','reviewedAt')+$manual)
+  Assert-Phase7BWP2C ($r.schemaVersion -eq 1 -and $r.kind -ceq 'wp2c-preparation-founder-review' -and $r.preparedStateId -ceq $b.preparedStateId) 'PREPARATION_FOUNDER_REVIEW'
+  foreach($name in ($manual+@('founderReviewed','invalidSyntheticValueOnly'))){Assert-Phase7BWP2CBoolean $r.$name $true 'PREPARATION_FOUNDER_REVIEW'}
+  foreach($name in @('realIdentityUsed','unexpectedDestinationInput')){Assert-Phase7BWP2CBoolean $r.$name $false 'PREPARATION_FOUNDER_REVIEW'}
+  foreach($name in @('clipboardSequenceBefore','clipboardSequenceAfter')){Assert-Phase7BWP2C ($r.$name -is [ValueType] -and [long]$r.$name -ge 0 -and [long]$r.$name -le [uint32]::MaxValue) 'PREPARATION_CLIPBOARD_OBSERVATION'}
+  Assert-Phase7BWP2C ($r.clipboardSequenceBefore -eq $r.clipboardSequenceAfter) 'PREPARATION_CLIPBOARD_CHANGED'
+  foreach($name in @('onePasswordVersion','vmwareVersion')){Assert-Phase7BWP2C ($r.$name -cmatch '^[0-9][0-9A-Za-z. ()-]{0,79}$') 'PREPARATION_REVIEW_VERSION'}
+  [void][datetimeoffset]::Parse($r.reviewedAt)
+  $entry=[ordered]@{schemaVersion=1;kind='wp2c-synthetic-entry-validation';method=$b.identityEntryMethod;guestIdentitySha256=$b.guestIdentitySha256;toolingManifestSha256=$b.toolingManifestSha256
+    invalidSyntheticValueOnly=$true;firstFieldExact=$Returned.syntheticObservations[0].dialog.firstFieldExact;secondFieldExact=$Returned.syntheticObservations[0].dialog.secondFieldExact
+    hostClipboardUnchanged=$true;guestClipboardUnchanged=(@($Returned.syntheticObservations|Where-Object {-not $_.guestClipboardSequenceUnchanged}).Count -eq 0)
+    realIdentityUsed=$false;unexpectedDestinationInput=$false;universalFocusGuarantee=$false;founderReviewed=$true
+    onePasswordVersion=$r.onePasswordVersion;vmwareVersion=$r.vmwareVersion;guestDialogVersion=$b.toolingManifestSha256;testedAt=$r.reviewedAt
+  }
+  foreach($name in $manual){$entry[$name]=$r.$name}
+  Assert-Phase7BWP2CEntryValidation ([pscustomobject]$entry) $b
+  [pscustomobject]$entry
+}
+
+function New-Phase7BWP2CPreparationHandoffEvidence {
+  param($Plan,$Returned,$FounderReview,$HostObservation,$PreparationMedia,$PreparationDescriptor)
+  Assert-Phase7BWP2CPreparationPlan $Plan
+  Assert-Phase7BWP2CPreparationReturnShape $Returned
+  Assert-Phase7BWP2C ($Returned.preparedStateId -ceq $Plan.bindings.preparedStateId -and
+    $Returned.plan.sha256 -ceq (Get-Phase7BWP2CObjectHash $Plan) -and $Returned.plan.bytes -eq [Text.Encoding]::UTF8.GetByteCount((ConvertTo-Phase7BCanonicalJson $Plan)) -and
+    $Returned.preparationControlDescriptor.sha256 -ceq $PreparationDescriptor.sha256 -and $Returned.preparationControlDescriptor.bytes -eq $PreparationDescriptor.bytes) 'PREPARATION_RETURN_BINDING'
+  Assert-Phase7BWP2C ($PreparationMedia.sha256 -cmatch '^[0-9a-f]{64}$' -and [int64]$PreparationMedia.bytes -gt 0) 'PREPARATION_MEDIA_IDENTITY'
+  $entry=New-Phase7BWP2CPreparationEntryEvidence $Plan $Returned $FounderReview
+  $b=ConvertTo-Phase7BCanonicalJson $Plan.bindings|ConvertFrom-Json
+  $b|Add-Member NoteProperty identityEntryValidationSha256 (Get-Phase7BWP2CObjectHash $entry)
+  $p=New-Phase7BWP2CPreparationEvidence $b $HostObservation $Returned.report $entry -FounderReviewed
+  $handoff=[pscustomobject][ordered]@{
+    schemaVersion=1;plan=$Returned.plan;preparationControlMedia=$PreparationMedia;preparationControlDescriptor=$PreparationDescriptor
+    toolingMedia=$b.toolingMedia;returnSha256=Get-Phase7BWP2CObjectHash $Returned;founderReviewSha256=Get-Phase7BWP2CObjectHash $FounderReview
+    reportIdentity=$Returned.reportIdentity;realIdentityUsed=$false;invalidSyntheticValueOnly=$true
+  }
+  $p|Add-Member NoteProperty preparationHandoff $handoff
+  [pscustomobject]@{preparation=$p;entry=$entry;report=$Returned.report}
 }
 
 function Test-Phase7BWP2CSnapshotTransition {

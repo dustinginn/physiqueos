@@ -103,6 +103,95 @@ function Get-Phase7BWP2CHostEntryPoints {
   @('phase7bClaimWorkPackage2CHostExecution.ps1','phase7bPermitWorkPackage2CGuestBoot.ps1','phase7bCompleteWorkPackage2CHostExecution.ps1','phase7bImportWorkPackage2CGuestEvidence.ps1','phase7bPrepareWorkPackage2CAuthorization.ps1','phase7bNewWorkPackage2CInvocationContract.ps1','phase7bBuildWorkPackage2CMedia.ps1','phase7bRecordWorkPackage2CPreparation.ps1')
 }
 
+# Preparation inputs are data, not an execution invocation/authorization. Keep
+# their producer here so the existing 15-file guest closure does not grow.
+function Assert-Phase7BWP2CExactProperties {
+  param($Value,[string[]]$Names)
+  Assert-Phase7BWP2C ($null -ne $Value -and $Value -isnot [string] -and
+    @(Compare-Object @($Names|Sort-Object) @($Value.PSObject.Properties.Name|Sort-Object)).Count -eq 0) 'PREPARATION_SCHEMA'
+}
+
+function Get-Phase7BWP2CPreparationBaselineFields {
+  @('guestIdentitySha256','guestComputerName','guestMarkerSha256','guestOsBuild','guestOsCaption','vmwareToolsVersion','git')
+}
+
+function Assert-Phase7BWP2CPreparationBaseline {
+  param($Baseline)
+  $fixed=Get-Phase7BIsolatedGuestContract
+  Assert-Phase7BWP2CExactProperties $Baseline (@('schemaVersion','kind','applicationCommit','environmentId','observedAt','mutationPerformed')+(Get-Phase7BWP2CPreparationBaselineFields))
+  Assert-Phase7BWP2C ($Baseline.schemaVersion -eq 1 -and $Baseline.kind -ceq 'wp2c-guest-preparation-baseline' -and
+    $Baseline.applicationCommit -ceq $fixed.applicationCommit -and $Baseline.environmentId -ceq $fixed.environmentId) 'PREPARATION_BASELINE'
+  Assert-Phase7BWP2CBoolean $Baseline.mutationPerformed $false 'PREPARATION_BASELINE'
+  foreach($name in @('guestIdentitySha256','guestMarkerSha256')){Assert-Phase7BWP2C ($Baseline.$name -cmatch '^[0-9a-f]{64}$') 'PREPARATION_BASELINE'}
+  Assert-Phase7BWP2C ($Baseline.guestComputerName -cmatch '^[A-Z0-9-]{1,15}$' -and $Baseline.guestOsBuild -cmatch '^\d{4,6}$' -and
+    $Baseline.guestOsCaption -cmatch '^Microsoft Windows 11 [A-Za-z ]{1,64}$' -and $Baseline.vmwareToolsVersion -cmatch '^[0-9A-Za-z., ()-]{1,80}$') 'PREPARATION_BASELINE'
+  Assert-Phase7BWP2CExactProperties $Baseline.git @('sha256','bytes')
+  Assert-Phase7BWP2C ($Baseline.git.sha256 -cmatch '^[0-9a-f]{64}$' -and [int64]$Baseline.git.bytes -gt 0) 'PREPARATION_BASELINE'
+  [void][datetimeoffset]::Parse($Baseline.observedAt)
+}
+
+function New-Phase7BWP2CPreparationPlan {
+  param($Baseline,$FinalDescriptor,$FinalDescriptorIdentity,$ToolingMedia,$Age,$AgeKeygen,
+    [string]$SourceDirectory,[string]$ToolingCommit,[string]$PreparedStateId,
+    [string]$HostIdentitySha256,[string]$VmConfigSha256,[string]$SnapshotSha256)
+  Assert-Phase7BWP2CPreparationBaseline $Baseline
+  $fixed=Get-Phase7BIsolatedGuestContract;$d=$FinalDescriptor
+  Assert-Phase7BWP2C ($d.classification -ceq 'PHASE7B_WP2_ENCRYPTED_PACKET_AND_REPLICA_PASS' -and
+    $d.applicationCommit -ceq $fixed.applicationCommit -and $d.environmentId -ceq $fixed.environmentId -and
+    $d.decryptRoundTripPass -ceq $true -and $d.plaintextZipSha256 -ceq $d.decryptedStreamSha256 -and
+    $d.plaintextZipBytes -eq $d.decryptedStreamBytes -and (Test-Phase7BWorkPackage2FinalizationProvenance $d).pass) 'PREPARATION_DESCRIPTOR'
+  $manifest=Get-Phase7BWP2CDependencyManifest $SourceDirectory
+  $b=[ordered]@{
+    attemptId=$d.attemptId;applicationCommit=$fixed.applicationCommit;environmentId=$fixed.environmentId;vmDisplayName=$fixed.vmDisplayName
+    toolingCommit=$ToolingCommit;preparedStateId=$PreparedStateId;hostIdentitySha256=$HostIdentitySha256;vmConfigSha256=$VmConfigSha256;snapshotSha256=$SnapshotSha256
+    snapshotName='S1-physiqueos-bootstrap-inert';toolingManifestSha256=Get-Phase7BWP2CObjectHash $manifest
+    toolingMedia=$ToolingMedia;finalDescriptor=$FinalDescriptorIdentity;age=$Age;ageKeygen=$AgeKeygen
+    packet=[pscustomobject]@{sha256=$d.packetSha256;bytes=[int64]$d.packetBytes}
+    plaintextZip=[pscustomobject]@{sha256=$d.plaintextZipSha256;bytes=[int64]$d.plaintextZipBytes};maximumExpandedBytes=[int64]$d.plaintextZipBytes
+    networkPolicy='disconnected-v1';identityEntryMethod='1password-type-in-window-provisional-v1'
+    incomingRoot=Join-Path $fixed.isolatedRoot 'incoming';restoreRoot=Join-Path $fixed.isolatedRoot 'restore\canonical';stateRoot=Join-Path $fixed.isolatedRoot 'wp2c-state'
+    toolingRoot=Join-Path $fixed.isolatedRoot ('tooling\'+(Get-Phase7BWP2CObjectHash $manifest))
+  }
+  foreach($name in Get-Phase7BWP2CPreparationBaselineFields){$b[$name]=$Baseline.$name}
+  $plan=[pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-preparation-observation-plan';bindings=[pscustomobject]$b;toolingManifest=$manifest;baselineSha256=Get-Phase7BWP2CObjectHash $Baseline;executionAuthorityIncluded=$false}
+  Assert-Phase7BWP2CPreparationPlan $plan
+  $plan
+}
+
+function Assert-Phase7BWP2CPreparationPlan {
+  param($Plan)
+  Assert-Phase7BWP2CExactProperties $Plan @('schemaVersion','kind','bindings','toolingManifest','baselineSha256','executionAuthorityIncluded')
+  Assert-Phase7BWP2C ($Plan.schemaVersion -eq 1 -and $Plan.kind -ceq 'wp2c-preparation-observation-plan' -and $Plan.baselineSha256 -cmatch '^[0-9a-f]{64}$') 'PREPARATION_PLAN'
+  Assert-Phase7BWP2CBoolean $Plan.executionAuthorityIncluded $false 'PREPARATION_IS_NOT_EXECUTION'
+  $b=$Plan.bindings;$fixed=Get-Phase7BIsolatedGuestContract
+  $names=@('attemptId','applicationCommit','environmentId','vmDisplayName','toolingCommit','preparedStateId','hostIdentitySha256','vmConfigSha256','snapshotSha256','snapshotName','toolingManifestSha256','toolingMedia','finalDescriptor','age','ageKeygen','packet','plaintextZip','maximumExpandedBytes','networkPolicy','identityEntryMethod','incomingRoot','restoreRoot','stateRoot','toolingRoot')+(Get-Phase7BWP2CPreparationBaselineFields)
+  Assert-Phase7BWP2CExactProperties $b $names
+  Assert-Phase7BWP2C ($b.attemptId -cmatch '^phase7b-wp2-[0-9a-f]{32}$' -and $b.toolingCommit -cmatch '^[0-9a-f]{40}$' -and $b.preparedStateId -cmatch '^wp2c-prepared-[0-9a-f]{32}$') 'PREPARATION_PLAN_BINDING'
+  Assert-Phase7BWP2C ($b.applicationCommit -ceq $fixed.applicationCommit -and $b.environmentId -ceq $fixed.environmentId -and $b.vmDisplayName -ceq $fixed.vmDisplayName -and $b.snapshotName -ceq 'S1-physiqueos-bootstrap-inert') 'PREPARATION_PLAN_BINDING'
+  foreach($name in @('hostIdentitySha256','vmConfigSha256','snapshotSha256','toolingManifestSha256','guestIdentitySha256','guestMarkerSha256')){Assert-Phase7BWP2C ($b.$name -cmatch '^[0-9a-f]{64}$') 'PREPARATION_PLAN_BINDING'}
+  foreach($name in @('toolingMedia','finalDescriptor','age','ageKeygen','packet','plaintextZip','git')){
+    Assert-Phase7BWP2CExactProperties $b.$name @('sha256','bytes')
+    Assert-Phase7BWP2C ($b.$name.sha256 -cmatch '^[0-9a-f]{64}$' -and $b.$name.bytes -is [ValueType] -and [int64]$b.$name.bytes -gt 0) 'PREPARATION_PLAN_BINDING'
+  }
+  Assert-Phase7BWP2C ($b.maximumExpandedBytes -eq $b.plaintextZip.bytes -and $b.networkPolicy -ceq 'disconnected-v1' -and $b.identityEntryMethod -ceq '1password-type-in-window-provisional-v1') 'PREPARATION_PLAN_POLICY'
+  foreach($pair in @(@('incomingRoot','incoming'),@('restoreRoot','restore\canonical'),@('stateRoot','wp2c-state'),@('toolingRoot',('tooling\'+$b.toolingManifestSha256)))){
+    Assert-Phase7BWP2C ($b.($pair[0]) -ceq (Join-Path $fixed.isolatedRoot $pair[1])) 'PREPARATION_PLAN_ROOT'
+  }
+  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan.toolingManifest) -ceq $b.toolingManifestSha256 -and @($Plan.toolingManifest.files).Count -eq 12 -and $Plan.toolingManifest.secretsIncluded -ceq $false) 'PREPARATION_TOOLING_MANIFEST'
+  Assert-Phase7BWP2CExactProperties $Plan.toolingManifest @('schemaVersion','kind','entryPoints','files','secretsIncluded')
+  Assert-Phase7BWP2C ($Plan.toolingManifest.schemaVersion -eq 1 -and $Plan.toolingManifest.kind -ceq 'wp2c-tooling-manifest') 'PREPARATION_TOOLING_MANIFEST'
+  foreach($file in $Plan.toolingManifest.files){
+    Assert-Phase7BWP2CExactProperties $file @('name','sha256','bytes')
+    Assert-Phase7BWP2C ($file.name -cmatch '^phase7b[A-Za-z0-9]+\.(ps1|psm1)$' -and $file.sha256 -cmatch '^[0-9a-f]{64}$' -and [int64]$file.bytes -gt 0) 'PREPARATION_TOOLING_MANIFEST'
+  }
+  foreach($name in $Plan.toolingManifest.entryPoints){Assert-Phase7BWP2C ($name -cmatch '^phase7b[A-Za-z0-9]+\.ps1$') 'PREPARATION_TOOLING_MANIFEST'}
+  # Reject unknown strings/secret-shaped content before any persistence/return.
+  $baseline=[ordered]@{schemaVersion=1;kind='wp2c-guest-preparation-baseline';applicationCommit=$b.applicationCommit;environmentId=$b.environmentId;observedAt='2000-01-01T00:00:00Z';mutationPerformed=$false}
+  foreach($name in Get-Phase7BWP2CPreparationBaselineFields){$baseline[$name]=$b.$name}
+  Assert-Phase7BWP2CPreparationBaseline ([pscustomobject]$baseline)
+  Assert-Phase7BWP2C ((ConvertTo-Phase7BCanonicalJson $Plan) -notmatch 'AGE-SECRET-KEY-') 'PREPARATION_SECRET_FORBIDDEN'
+}
+
 function Assert-Phase7BWP2CPublishedRepository {
   param([string]$RepositoryRoot,[string]$ExpectedCommit)
   $branch=@(& git --no-optional-locks -C $RepositoryRoot branch --show-current)

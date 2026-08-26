@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$ReproducePublishedDefect,[switch]$HgfsRegression)
+param([switch]$ReproducePublishedDefect,[switch]$HgfsRegression,[switch]$ExportSourceFixture)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion -lt [version]'5.1'){throw 'WINDOWS_PS51_REQUIRED'}
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
@@ -32,10 +32,10 @@ $fixture=@{
 $fixture.marker.schemaVersion=1
 $bindings=[pscustomobject]@{
   guestComputerName=$fixture.computerName;guestIdentitySha256=Get-Phase7BWP2CObjectHash $fixture.uuid
-  applicationCommit=$fixed.applicationCommit;guestMarkerSha256=$fixture.markerHash;toolingManifestSha256='7'*64
+  applicationCommit=$fixed.applicationCommit;guestMarkerSha256=$fixture.markerHash;toolingManifestSha256=Get-Phase7BWP2CObjectHash $sourceManifest
   guestOsBuild='26200';guestOsCaption='Microsoft Windows 11 Enterprise Evaluation';vmwareToolsVersion='synthetic-tools'
   incomingRoot=Join-Path $fixed.isolatedRoot 'incoming';restoreRoot=Join-Path $fixed.isolatedRoot 'restore\canonical'
-  stateRoot=Join-Path $fixed.isolatedRoot 'wp2c-state';toolingRoot=Join-Path $fixed.isolatedRoot ('tooling\'+('7'*64))
+  stateRoot=Join-Path $fixed.isolatedRoot 'wp2c-state';toolingRoot=Join-Path $fixed.isolatedRoot ('tooling\'+(Get-Phase7BWP2CObjectHash $sourceManifest))
   packet=[pscustomobject]@{bytes=[int64]4097};plaintextZip=[pscustomobject]@{bytes=[int64]4097};maximumExpandedBytes=[int64]8192
   git=[pscustomobject]@{sha256='8'*64;bytes=4097}
 }
@@ -109,6 +109,7 @@ $filesystemMocks={
     $s=$global:phase7bSyntheticCollectorFixture;$s.reads.Add($LiteralPath)
     if($LiteralPath -ceq (Join-Path $s.fixed.repositoryRoot 'logs\physiqueos-runtime-control.json')){'{"desiredState":"stopped"}'}
     elseif($LiteralPath -ceq (Join-Path $s.fixed.repositoryRoot 'logs\physiqueos-ngrok-control.json')){'{"ngrokDesiredState":"stopped"}'}
+    elseif($LiteralPath -ceq (Join-Path $s.fixed.isolatedRoot 'guest-identity-marker.json')){$s.marker|ConvertTo-Json}
     else {throw 'UNEXPECTED_CONTENT_READ'}
   }
   function script:Get-NetTCPConnection {param($ErrorAction)}
@@ -137,6 +138,21 @@ $filesystemMocks={
     $s=$global:phase7bSyntheticCollectorFixture;$s.nativeCalls++;$global:LASTEXITCODE=0
     if($args[0] -cne '--no-optional-locks' -or $args[1] -cne '-C' -or $args[2] -cne $s.fixed.repositoryRoot){throw 'UNEXPECTED_GIT_ARGUMENTS'}
     if($args[3] -ceq 'rev-parse'){$s.head}elseif($args[3] -ceq 'status'){if($s.dirty){' M synthetic'}}else{throw 'UNEXPECTED_GIT_OPERATION'}
+  }
+}
+
+# The public inspector now owns optical selection. Substitute only that read-only
+# boundary, retaining actual collector/pre-mutation behavior for these OS fixtures.
+function Invoke-SyntheticPreparationInspector {
+  & $guestModule {
+    function Import-Module {param($Name);if([IO.Path]::GetFileName($Name) -notin @('phase7bIsolatedGuestContract.psm1','phase7bWorkPackage2Contract.psm1','phase7bWorkPackage2CContract.psm1','phase7bWorkPackage2CGuest.psm1','phase7bWorkPackage2CMedia.psm1')){throw 'UNEXPECTED_INSPECTOR_IMPORT'}}
+    function Read-Phase7BWP2CPreparationOptical {
+      param($OpticalRoot,$DescriptorSha256)
+      if($OpticalRoot -cne 'F:\' -or $DescriptorSha256 -cne ('9'*64)){throw 'UNEXPECTED_PREPARATION_OPTICAL'}
+      $s=$global:phase7bSyntheticCollectorFixture
+      [pscustomobject]@{plan=$s.plan;descriptor=[pscustomobject]@{plan=[pscustomobject]@{sha256=$s.planHash}}}
+    }
+    & $global:phase7bSyntheticCollectorFixture.inspector -PreparationOpticalRoot 'F:\' -PreparationDescriptorSha256 ('9'*64)
   }
 }
 
@@ -171,7 +187,8 @@ try {
       }
     }
     $inspector=Join-Path $PSScriptRoot 'phase7bInspectWorkPackage2CGuestPreparation.ps1'
-    $report=(& $inspector -ObservationPlanPath $fixture.planPath -ObservationPlanSha256 $fixture.planHash)|ConvertFrom-Json
+    $fixture.inspector=$inspector
+    $report=(Invoke-SyntheticPreparationInspector)|ConvertFrom-Json
     Check ($report.kind -ceq 'wp2c-guest-preparation-observation' -and $report.observation.pathOwnershipPass) 'actual preparation inspector passes separate roots'
     foreach($name in @('wp2cExecuted','packetDecrypted','executionClaimCreated','authorizationConsumed','reportPersisted')){Check ($report.$name -ceq $false) ('inspector nonmutation '+$name)}
 
@@ -276,7 +293,7 @@ try {
         if($case.pass){
           Check ($installed.boundaryReached -and $installed.message -ceq 'SYNTHETIC_INSTALLER_MUTATION_BOUNDARY') ('installer preflight '+$case.label+': '+$installed.message+' '+$installed.trace)
           Check (Assert-Phase7BWP2CGuestPreMutation $plan).pathOwnershipPass ('entry '+$case.label)
-          Check ((& $inspector -ObservationPlanPath $fixture.planPath -ObservationPlanSha256 $fixture.planHash|ConvertFrom-Json).observation.pathOwnershipPass) ('inspector '+$case.label)
+          Check ((Invoke-SyntheticPreparationInspector|ConvertFrom-Json).observation.pathOwnershipPass) ('inspector '+$case.label)
           $parameters=@{};foreach($p in $observation.hgfsObservation.PSObject.Properties){if($p.Name -cne 'providerPathCount'){$parameters[$p.Name]=$p.Value}}
           $legacy=Test-Phase7BVmwareGuestIdentity @parameters
           Check $legacy.pass ('existing identity validator '+$case.label)
@@ -284,7 +301,7 @@ try {
         }else{
           Check (-not $installed.boundaryReached -and $installed.message -ceq 'PHASE7B_WP2C_PREPARATION_HGFS') ('installer rejects '+$case.label+': '+$installed.message)
           Reject {Assert-Phase7BWP2CGuestPreMutation $plan} 'GUEST_PREMUTATION_INERT_FAIL'
-          Reject {& $inspector -ObservationPlanPath $fixture.planPath -ObservationPlanSha256 $fixture.planHash} 'GUEST_PREPARATION_NOT_INERT'
+          Reject {Invoke-SyntheticPreparationInspector} 'GUEST_PREMUTATION_INERT_FAIL'
         }
         foreach($key in $saved.Keys){$fixture[$key]=$saved[$key]}
       }
@@ -364,7 +381,7 @@ try {
       $badObservation=Get-Phase7BWP2CGuestObservation $plan
       Check (-not (Test-Phase7BWP2CGuestObservation $badObservation $bindings).pass) ('collector exposes wrong identity '+$field)
       Reject {Assert-Phase7BWP2CGuestPreMutation $plan} 'GUEST_PREMUTATION_INERT_FAIL'
-      Reject {& $inspector -ObservationPlanPath $fixture.planPath -ObservationPlanSha256 $fixture.planHash} 'GUEST_PREPARATION_NOT_INERT'
+      Reject {Invoke-SyntheticPreparationInspector} 'GUEST_PREMUTATION_INERT_FAIL'
       $fixture[$field]=$saved
     }
     $fixture.marker.applicationCommit='wrong';Reject {Get-Phase7BWP2CGuestObservation $plan} 'GUEST_MARKER_CONTENT';$fixture.marker.applicationCommit=$fixed.applicationCommit
@@ -375,7 +392,15 @@ try {
     $fixture.manufacturer='VMware, Inc.'
     Check (Assert-Phase7BWP2CGuestPreMutation $plan).pathOwnershipPass 'final restored synthetic fixture passes'
   }
-  [ordered]@{classification='PHASE7B_WP2C_COLLECTOR_TESTS_PASS';pass=$true;assertions=$script:assertions;publishedDefectReproduced=[bool]$ReproducePublishedDefect;actualCollectorInvoked=$true;liveGuestAccessed=$false;liveMutationPerformed=$false}|ConvertTo-Json -Compress
+  if($ExportSourceFixture){
+    $baseline=& $guestModule {
+      function Get-Phase7BWP2CIdentity {param($LiteralPath);if($LiteralPath -cne 'C:\Program Files\Git\cmd\git.exe'){throw 'UNEXPECTED_BASELINE_BINARY'};[pscustomobject]@{sha256='8'*64;bytes=4097}}
+      Get-Phase7BWP2CGuestPreparationBaseline (Get-Phase7BWP2CObjectHash $global:phase7bSyntheticCollectorFixture.uuid)
+    }
+    [ordered]@{baseline=$baseline;observation=Get-Phase7BWP2CGuestObservation $plan}|ConvertTo-Json -Depth 12 -Compress
+  }else{
+    [ordered]@{classification='PHASE7B_WP2C_COLLECTOR_TESTS_PASS';pass=$true;assertions=$script:assertions;publishedDefectReproduced=[bool]$ReproducePublishedDefect;actualCollectorInvoked=$true;liveGuestAccessed=$false;liveMutationPerformed=$false}|ConvertTo-Json -Compress
+  }
 } finally {
   # Dispose mocked module instances; no filesystem artifacts/claims to clean.
   Remove-Module phase7bWorkPackage2CGuest,phase7bWorkPackage2CContract -Force

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][ValidateSet('Tooling','Recovery','Control')][string]$Kind,[Parameter(Mandatory=$true)][string]$InputsPath,[Parameter(Mandatory=$true)][string]$OutputPath,[Parameter(Mandatory=$true)][switch]$FounderMediaPreparationApproved)
+param([Parameter(Mandatory=$true)][ValidateSet('Tooling','Recovery','Control','Preparation')][string]$Kind,[Parameter(Mandatory=$true)][string]$InputsPath,[Parameter(Mandatory=$true)][string]$OutputPath,[Parameter(Mandatory=$true)][switch]$FounderMediaPreparationApproved)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1')
@@ -8,6 +8,10 @@ $inputs=Get-Content -LiteralPath $InputsPath -Raw -ErrorAction Stop | ConvertFro
 $content=$OutputPath+'.content'
 Assert-Phase7BWP2C (-not (Test-Path -LiteralPath $OutputPath) -and -not (Test-Path -LiteralPath $content)) 'MEDIA_DESTINATION_EXISTS'
 switch($Kind){
+  'Preparation' {
+    $result=New-Phase7BWP2CPreparationContent $inputs.planPath $inputs.planSha256 $content
+    $label='P7B_C_PREP'
+  }
   'Tooling' {
     Assert-Phase7BWP2CFile $inputs.agePath $inputs.age
     Assert-Phase7BWP2CFile $inputs.ageKeygenPath $inputs.ageKeygen

@@ -5,7 +5,8 @@ $count=0
 function Check([bool]$Value,[string]$Code){if(-not $Value){throw ('WP2C_SAFETY_TEST:'+ $Code)};$script:count++}
 $guest=Get-Phase7BWP2CDependencyManifest $PSScriptRoot
 $hostManifest=Get-Phase7BWP2CDependencyManifest $PSScriptRoot (Get-Phase7BWP2CHostEntryPoints)
-foreach($name in @(@($guest.files.name)+@($hostManifest.files.name)|Sort-Object -Unique)) {
+$preparationOnly=@('phase7bNewWorkPackage2CPreparationPlan.ps1','phase7bWorkPackage2CPreparationOperator.ps1')
+foreach($name in @(@($guest.files.name)+@($hostManifest.files.name)+$preparationOnly|Sort-Object -Unique)) {
   $path=Join-Path $PSScriptRoot $name;$tokens=$null;$errors=$null
   $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
   Check (@($errors).Count -eq 0) ('parse '+$name)
@@ -46,4 +47,12 @@ Check ($bridge.Contains('if ($GuestEntry) { $reveal.Visible = $false }')) 'guest
 $harness=Get-Content (Join-Path $PSScriptRoot 'phase7bTestWorkPackage2GuestIdentityEntry.ps1') -Raw
 Check ($harness.Contains('Show-Phase7BGuestSyntheticIdentityObservation') -and $bridge.Contains('Show-Phase7BAgeIdentityDialog -GuestEntry -SyntheticObservationOnly')) 'synthetic test uses real guest UI'
 Check ($harness -notmatch 'WriteAll|Set-Content|Out-File|StandardInput|Invoke-Phase7BAge') 'synthetic UI writes neither files nor cryptographic input'
+$preparationEntry=Get-Content (Join-Path $PSScriptRoot 'phase7bInspectWorkPackage2CGuestPreparation.ps1') -Raw
+Check ($preparationEntry.IndexOf('Read-Phase7BWP2CPreparationOptical') -lt $preparationEntry.IndexOf('Assert-Phase7BWP2CGuestPreMutation')) 'prep optical validation before real collector'
+Check ($preparationEntry.IndexOf('Assert-Phase7BWP2CGuestPreMutation') -lt $preparationEntry.IndexOf('New-Item -ItemType Directory')) 'prep real collector before output mutation'
+$recorder=Get-Content (Join-Path $PSScriptRoot 'phase7bRecordWorkPackage2CPreparation.ps1') -Raw
+Check ($recorder.IndexOf('New-Phase7BWP2CPreparationHandoffEvidence') -lt $recorder.IndexOf('New-Item -ItemType Directory')) 'checked returned bytes before host evidence mutation'
+$operator=Get-Content (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationOperator.ps1') -Raw
+Check ($operator -notmatch 'vmrun|Start-VM|Stop-VM|Set-Net|Set-VM|Invoke-Phase7BAge|New-Phase7BWP2CExecutionClaim') 'prep operator has no power/network/crypto/claim action'
+Check ($operator -notmatch 'Remove-Item|Stop-Process|Stop-Service|Restart-Computer') 'prep operator no cleanup or automatic RAM management'
 [ordered]@{classification='PHASE7B_WP2C_SAFETY_TESTS_PASS';pass=$true;assertions=$count;freshDesktopImportChecks=$true;liveMutationPerformed=$false}|ConvertTo-Json -Compress

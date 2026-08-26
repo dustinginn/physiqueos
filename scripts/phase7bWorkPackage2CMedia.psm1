@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2Contract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
 
 function Assert-Phase7BWP2CExactFileSet {
   param([string]$Root,[string[]]$Names)
@@ -76,7 +77,7 @@ function New-Phase7BWP2CControlContent {
 }
 
 function New-Phase7BWP2COpticalImage {
-  param([string]$ContentRoot,[ValidateSet('P7B_C_TOOLS','P7B_C_RESTORE','P7B_C_CONTROL')][string]$Label,[string]$OutputPath)
+  param([string]$ContentRoot,[ValidateSet('P7B_C_TOOLS','P7B_C_RESTORE','P7B_C_CONTROL','P7B_C_PREP')][string]$Label,[string]$OutputPath)
   [void](Assert-Phase7BWP2CLocalPath $ContentRoot)
   [void](Assert-Phase7BWP2CLocalPath $OutputPath)
   Assert-Phase7BWP2C (-not (Test-Path -LiteralPath $OutputPath) -and [IO.Path]::GetExtension($OutputPath) -ceq '.iso') 'ISO_OUTPUT_COLLISION'
@@ -117,6 +118,89 @@ public static class Phase7BWP2CImageWriter {
     $stream=$null;$result=$null;$imageRoot=$null;$fs=$null
     [GC]::Collect();[GC]::WaitForPendingFinalizers()
   }
+}
+
+function New-Phase7BWP2CPreparationContent {
+  param([string]$PlanPath,[string]$PlanSha256,[string]$Destination)
+  [void](Assert-Phase7BWP2CLocalPath $Destination)
+  Assert-Phase7BWP2C (-not (Test-Path -LiteralPath $Destination)) 'MEDIA_DESTINATION_EXISTS'
+  $plan=Read-Phase7BWP2CBoundJson $PlanPath $PlanSha256
+  Assert-Phase7BWP2CPreparationPlan $plan
+  $descriptor=[pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-preparation-control';plan=Get-Phase7BWP2CIdentity $PlanPath;preparedStateId=$plan.bindings.preparedStateId;toolingManifestSha256=$plan.bindings.toolingManifestSha256;executionAuthorityIncluded=$false;packetIncluded=$false;secretIncluded=$false}
+  New-Item -ItemType Directory -Path $Destination -ErrorAction Stop | Out-Null
+  [IO.File]::Copy($PlanPath,(Join-Path $Destination 'preparation-plan.json'),$false)
+  Assert-Phase7BWP2CFile (Join-Path $Destination 'preparation-plan.json') $descriptor.plan
+  $identity=Write-Phase7BWP2CCreateNewJson (Join-Path $Destination 'preparation-control.json') $descriptor
+  Assert-Phase7BWP2CExactFileSet $Destination @('preparation-plan.json','preparation-control.json')
+  [pscustomobject]@{descriptor=$descriptor;descriptorIdentity=$identity;planIdentity=$descriptor.plan;fileCount=2}
+}
+
+function Read-Phase7BWP2CPreparationContent {
+  param([string]$Root,[string]$DescriptorSha256)
+  # Pure file consumer shared by synthetic tests and the optical-only entry.
+  Assert-Phase7BWP2CExactFileSet $Root @('preparation-plan.json','preparation-control.json')
+  $d=Read-Phase7BWP2CBoundJson (Join-Path $Root 'preparation-control.json') $DescriptorSha256
+  Assert-Phase7BWP2CExactProperties $d @('schemaVersion','kind','plan','preparedStateId','toolingManifestSha256','executionAuthorityIncluded','packetIncluded','secretIncluded')
+  Assert-Phase7BWP2C ($d.schemaVersion -eq 1 -and $d.kind -ceq 'wp2c-preparation-control') 'PREPARATION_CARRIER'
+  foreach($name in @('executionAuthorityIncluded','packetIncluded','secretIncluded')){Assert-Phase7BWP2CBoolean $d.$name $false 'PREPARATION_CARRIER'}
+  Assert-Phase7BWP2CExactProperties $d.plan @('sha256','bytes')
+  Assert-Phase7BWP2CFile (Join-Path $Root 'preparation-plan.json') $d.plan
+  $plan=Read-Phase7BWP2CBoundJson (Join-Path $Root 'preparation-plan.json') $d.plan.sha256
+  Assert-Phase7BWP2CPreparationPlan $plan
+  Assert-Phase7BWP2C ($d.preparedStateId -ceq $plan.bindings.preparedStateId -and $d.toolingManifestSha256 -ceq $plan.bindings.toolingManifestSha256) 'PREPARATION_CARRIER_BINDING'
+  [pscustomobject]@{plan=$plan;descriptor=$d;descriptorIdentity=Get-Phase7BWP2CIdentity (Join-Path $Root 'preparation-control.json')}
+}
+
+function Read-Phase7BWP2CPreparationOptical {
+  param([string]$OpticalRoot,[string]$DescriptorSha256)
+  Assert-Phase7BWP2C ($OpticalRoot -cmatch '^[A-Z]:\\$') 'OPTICAL_ROOT_REQUIRED'
+  $drives=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=5' -ErrorAction Stop|Where-Object {$_.DeviceID -ceq $OpticalRoot.Substring(0,2) -and $_.VolumeName -ceq 'P7B_C_PREP'})
+  Assert-Phase7BWP2C ($drives.Count -eq 1) 'PREPARATION_OPTICAL_REQUIRED'
+  Read-Phase7BWP2CPreparationContent $OpticalRoot $DescriptorSha256
+}
+
+# Lossless NONSECRET console return. This is a checksum/encoding, not a new
+# authentication protocol. Whitespace from screenshot text capture is ignored;
+# no character correction, guessed hash, script evaluation or clipboard API.
+function ConvertTo-Phase7BWP2CPreparationReturnText {
+  param($Document)
+  if($Document.kind -ceq 'wp2c-guest-preparation-baseline'){Assert-Phase7BWP2CPreparationBaseline $Document}else{Assert-Phase7BWP2CPreparationReturnShape $Document}
+  $json=ConvertTo-Phase7BCanonicalJson $Document
+  Assert-Phase7BWP2C ($Document.kind -in @('wp2c-guest-preparation-baseline','wp2c-preparation-return') -and $json -notmatch 'AGE-SECRET-KEY-' -and $json.Length -le 32768) 'PREPARATION_RETURN_SHAPE'
+  $bytes=[Text.Encoding]::UTF8.GetBytes($json);$memory=New-Object IO.MemoryStream
+  try {
+    $zip=New-Object IO.Compression.GZipStream($memory,[IO.Compression.CompressionMode]::Compress,$true)
+    try{$zip.Write($bytes,0,$bytes.Length)}finally{$zip.Dispose()}
+    $payload=[Convert]::ToBase64String($memory.ToArray())
+    $text='WP2CP1:'+ $bytes.Length+':'+(Get-Phase7BWP2CObjectHash $Document)+':'+$payload
+    Assert-Phase7BWP2C ($text.Length -le 16384) 'PREPARATION_RETURN_TOO_LARGE'
+    $text
+  } finally{$memory.Dispose()}
+}
+
+function ConvertFrom-Phase7BWP2CPreparationReturnText {
+  param([string]$Text)
+  Assert-Phase7BWP2C ($Text.Length -le 20000) 'PREPARATION_RETURN_TOO_LARGE'
+  $compact=$Text -replace '\s',''
+  Assert-Phase7BWP2C ($compact -cmatch '^WP2CP1:([1-9][0-9]{0,4}):([0-9a-f]{64}):([A-Za-z0-9+/]+={0,2})$') 'PREPARATION_RETURN_ENCODING'
+  $length=[int]$Matches[1];$hash=$Matches[2];$payload=$Matches[3]
+  Assert-Phase7BWP2C ($length -le 32768 -and $compact.Length -le 16384) 'PREPARATION_RETURN_TOO_LARGE'
+  $inputStream=New-Object IO.MemoryStream(,[Convert]::FromBase64String($payload));$output=New-Object IO.MemoryStream
+  try {
+    $zip=New-Object IO.Compression.GZipStream($inputStream,[IO.Compression.CompressionMode]::Decompress)
+    try {
+      $buffer=New-Object byte[] 1024
+      while(($count=$zip.Read($buffer,0,$buffer.Length)) -gt 0){Assert-Phase7BWP2C ($output.Length+$count -le $length) 'PREPARATION_RETURN_EXPANSION';$output.Write($buffer,0,$count)}
+    } finally {$zip.Dispose()}
+    Assert-Phase7BWP2C ($output.Length -eq $length) 'PREPARATION_RETURN_BYTES'
+    $json=(New-Object Text.UTF8Encoding($false,$true)).GetString($output.ToArray())
+    Assert-Phase7BWP2C ($json -notmatch 'AGE-SECRET-KEY-') 'PREPARATION_SECRET_FORBIDDEN'
+    $document=$json|ConvertFrom-Json -ErrorAction Stop
+    # Canonical equality rejects duplicate-key/alternative textual encodings.
+    Assert-Phase7BWP2C ($json -ceq (ConvertTo-Phase7BCanonicalJson $document) -and (Get-Phase7BWP2CObjectHash $document) -ceq $hash -and $document.kind -in @('wp2c-guest-preparation-baseline','wp2c-preparation-return')) 'PREPARATION_RETURN_CHECKSUM'
+    if($document.kind -ceq 'wp2c-guest-preparation-baseline'){Assert-Phase7BWP2CPreparationBaseline $document}else{Assert-Phase7BWP2CPreparationReturnShape $document}
+    $document
+  } finally {$inputStream.Dispose();$output.Dispose()}
 }
 
 Export-ModuleMember -Function *-Phase7BWP2C*
