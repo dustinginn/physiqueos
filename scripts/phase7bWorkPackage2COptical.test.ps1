@@ -178,7 +178,9 @@ try {
   $bad=$v.Clone();$bad.Remove('ethernet0.startconnected');Save-Vmx $bad
   Reject {Observe-Host} 'NIC omission never becomes safe disconnected state'
   $manifest=Get-Phase7BWP2CDependencyManifest
-  Assert-True ('phase7bWorkPackage2CHost.psm1' -in @($manifest.files.name) -and @($manifest.files).Count -eq 12) 'changed host module belongs to unchanged 15-file tooling membership'
+  Assert-True ('phase7bWorkPackage2CHost.psm1' -in @($manifest.files.name) -and
+    'phase7bRunWorkPackage2CGuestBaseline.ps1' -in @($manifest.files.name) -and
+    @($manifest.files).Count -eq 13) 'host module retained and baseline launcher is sole tooling membership addition'
   $result=[ordered]@{classification='PHASE7B_WP2C_OPTICAL_DEFAULT_TESTS_PASS';pass=$true;assertions=$script:assertions;publishedFailureReproduced=$true;actualBaselineEntry=$true;actualSecondBootEntry=$true;actualHostCollector=$true;executionMediaConsumer=$true;liveVmAccess=$false;liveSessionModified=$false;mediaMounted=$false;wp2cExecuted=$false}
 } finally {
   if(Test-Path -LiteralPath $testRoot){$resolved=(Resolve-Path -LiteralPath $testRoot).Path;if(-not $resolved.StartsWith((Join-Path $repo '.tmp\phase7b-finalization-tests-'),[StringComparison]::OrdinalIgnoreCase)){throw 'SYNTHETIC_CLEANUP_BOUNDARY'};Remove-Item -LiteralPath $resolved -Recurse -Force}

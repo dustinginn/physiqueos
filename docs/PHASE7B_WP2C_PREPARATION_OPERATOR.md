@@ -7,8 +7,10 @@ real identity, execution authorization, claim, completion or restore belongs her
 
 ## Architecture and trust boundary
 
-The tooling ISO remains exactly 15 files: the machine-derived 12-file PowerShell
-import/call closure, age.exe, age-keygen.exe and wp2c-tooling-manifest.json. The
+Historical tooling ISOs remain exact 15-file evidence. Current generic tooling
+media contains the machine-derived 13-file PowerShell import/call closure,
+age.exe, age-keygen.exe and wp2c-tooling-manifest.json (16 files). A create-new
+baseline-handoff ISO adds only wp2c-baseline-binding.json (17 files). The
 manifest has schemaVersion, kind, entryPoints, files[{name,sha256,bytes}] and
 secretsIncluded=false. Host-only operator/plan/recorder scripts are not payload.
 
@@ -166,6 +168,15 @@ later `Prep` mode. The source-owned refreshed offline handoff must be generated
 and reviewed before any boot. Parent/current media, a legacy whole-VMX hash or a
 manually selected latest context are never substitutes.
 
+If the selected semantic media predates the guest-local baseline launcher, a
+separate Founder GO must create exactly one baseline-handoff continuation before
+another boot. `CreateBaselineHandoffContinuation` reads the semantic bridge as
+immutable parent provenance and creates
+`wp2c\baseline-handoffs\<preparedStateId>\<currentCommit>\`, distinct
+`tooling-baseline-current.iso`, and `baseline-handoff.json`. Every resumed mode
+then requires the exact `BaselineHandoffPath` and `BaselineHandoffSha256`.
+Historical media is never overwritten and no latest handoff is auto-selected.
+
 Create a temporary host 1Password Login item with ONLY the public invalid test
 value below in its password field, using that field's supported Type in window
 action (not whole-login Auto-Type). No TOTP/automatic submission. Do not assume a
@@ -231,9 +242,16 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
 ```
 
-Run the complete baseline command printed in tooling-step.txt. Clipboard sharing
-stays disabled: type the short nonsecret commands/pins from Notepad, never a real
-identity. If pin entry is wrong the command stops. Do not use VMware Paste.
+For current baseline-handoff media, type this short guest-local command; the two
+authoritative pins come from the immutable binding on `P7B_C_TOOLS`, not operator
+transcription:
+
+```powershell
+$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq 'P7B_C_TOOLS'});if($t.Count-ne 1){throw 'TOOLS_CD'};& ($t[0].DeviceID+'\phase7bRunWorkPackage2CGuestBaseline.ps1') -FounderPreparationApproved
+```
+
+Clipboard sharing stays disabled. Do not use VMware Paste. Missing, duplicate,
+modified, wrong-guest or wrong-tooling binding/media stops before Baseline.
 The command reads only guest identity, marker, repository HEAD, Git/OS/Tools and
 offline HGFS state; it neither installs tooling nor writes guest evidence.
 

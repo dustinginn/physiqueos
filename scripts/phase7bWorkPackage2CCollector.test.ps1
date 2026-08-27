@@ -217,6 +217,7 @@ try {
             $s.manifest
           }
           function Get-Phase7BWP2CDependencyManifest {param($SourceDirectory);if($SourceDirectory -cne 'E:\'){throw 'UNEXPECTED_MEDIA_ROOT'};$s.manifest}
+          function Get-Phase7BWP2CToolingMediaFileNames {param($ToolingRoot,$Manifest);if($ToolingRoot -cne 'E:\' -or (Get-Phase7BWP2CObjectHash $Manifest) -cne $s.manifestHash){throw 'UNEXPECTED_MEDIA_FILE_SET'};@($Manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json')}
           function Assert-Phase7BWP2CFile {param($LiteralPath,$Identity);if($LiteralPath -notin @('E:\age.exe','E:\age-keygen.exe')){throw 'UNEXPECTED_MEDIA_BINARY'}}
           function Assert-Phase7BWP2CExactFileSet {param($Root,$Names);if($Root -cne 'E:\'){throw 'UNEXPECTED_FILE_SET'}}
           function Get-Phase7BSha256 {param($LiteralPath);if($LiteralPath -cne (Join-Path $s.fixed.isolatedRoot 'guest-identity-marker.json')){throw 'UNEXPECTED_IDENTITY_READ'};$s.markerHash}

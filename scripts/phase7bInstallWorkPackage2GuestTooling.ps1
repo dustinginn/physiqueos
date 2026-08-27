@@ -23,8 +23,13 @@ Assert-Phase7BWP2C (@(Get-NetAdapter -IncludeHidden -ErrorAction Stop | Where-Ob
 $manifest=Read-Phase7BWP2CBoundJson (Join-Path $OpticalRoot 'wp2c-tooling-manifest.json') $ManifestSha256
 $actual=Get-Phase7BWP2CDependencyManifest $OpticalRoot
 Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $actual) -ceq $ManifestSha256) 'TOOLING_CLOSURE'
-$names=@($manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json')
-Assert-Phase7BWP2CExactFileSet $OpticalRoot $names
+$opticalNames=Get-Phase7BWP2CToolingMediaFileNames $OpticalRoot $manifest
+Assert-Phase7BWP2CExactFileSet $OpticalRoot $opticalNames
+if('wp2c-baseline-binding.json' -cin $opticalNames){
+  $baselineBinding=(Read-Phase7BWP2CBaselineBinding $OpticalRoot).document
+  Assert-Phase7BWP2C ($baselineBinding.toolingManifestSha256 -ceq $ManifestSha256 -and
+    $baselineBinding.guestIdentitySha256 -ceq $ExpectedGuestIdentitySha256) 'BASELINE_BINDING_ARGUMENTS'
+}
 Assert-Phase7BWP2CFile (Join-Path $OpticalRoot 'age.exe') ([pscustomobject]@{sha256=$AgeSha256;bytes=$AgeBytes})
 Assert-Phase7BWP2CFile (Join-Path $OpticalRoot 'age-keygen.exe') ([pscustomobject]@{sha256=$AgeKeygenSha256;bytes=$AgeKeygenBytes})
 $tasks=@(foreach($name in @($fixed.productionTaskName,$fixed.monitorTaskName,$fixed.ngrokTaskName)){Get-ScheduledTask -TaskName $name -ErrorAction Stop})

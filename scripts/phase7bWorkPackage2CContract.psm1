@@ -52,7 +52,9 @@ function Read-Phase7BWP2CBoundJson {
 function Assert-Phase7BWP2CLocalPath {
   param([string]$LiteralPath,[string]$WithinRoot)
   Assert-Phase7BWP2C ($LiteralPath -match '^[A-Za-z]:\\' -and $LiteralPath.Substring(2) -notmatch '[:*?]' -and $LiteralPath -notmatch '(^|[\\/])\.\.?([\\/]|$)') 'LOCAL_PATH_REQUIRED'
-  $full = [IO.Path]::GetFullPath($LiteralPath).TrimEnd('\')
+  $fullWithRoot = [IO.Path]::GetFullPath($LiteralPath)
+  $full = $fullWithRoot.TrimEnd('\')
+  $pathRoot = [IO.Path]::GetPathRoot($fullWithRoot).TrimEnd('\')
   if ($WithinRoot) {
     $root = [IO.Path]::GetFullPath($WithinRoot).TrimEnd('\')
     Assert-Phase7BWP2C ($full.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)) 'PATH_ESCAPE'
@@ -63,14 +65,17 @@ function Assert-Phase7BWP2CLocalPath {
       $item = Get-Item -LiteralPath $cursor -Force -ErrorAction Stop
       Assert-Phase7BWP2C (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) 'REPARSE_PATH'
     }
-    $cursor = Split-Path -Parent $cursor
+    if ($cursor -ceq $pathRoot) { break }
+    $parent = Split-Path -Parent $cursor
+    if (-not $parent -or $parent -ceq $cursor) { break }
+    $cursor = $parent
   }
   $full
 }
 
 function Get-Phase7BWP2CDependencyManifest {
   param([string]$SourceDirectory=$PSScriptRoot,
-    [string[]]$EntryPoints=@('phase7bRunWorkPackage2GuestRestore.ps1','phase7bInstallWorkPackage2GuestTooling.ps1','phase7bInspectWorkPackage2CGuestPreparation.ps1','phase7bTestWorkPackage2GuestIdentityEntry.ps1'))
+    [string[]]$EntryPoints=@('phase7bRunWorkPackage2GuestRestore.ps1','phase7bInstallWorkPackage2GuestTooling.ps1','phase7bInspectWorkPackage2CGuestPreparation.ps1','phase7bTestWorkPackage2GuestIdentityEntry.ps1','phase7bRunWorkPackage2CGuestBaseline.ps1'))
   $pending = New-Object 'Collections.Generic.Queue[string]'
   foreach ($name in $EntryPoints) { $pending.Enqueue($name) }
   $seen = @{}
@@ -104,11 +109,73 @@ function Get-Phase7BWP2CHostEntryPoints {
 }
 
 # Preparation inputs are data, not an execution invocation/authorization. Keep
-# their producer here so the existing 15-file guest closure does not grow.
+# their producer here; the baseline launcher is the only intentional addition
+# to the current guest tooling closure.
 function Assert-Phase7BWP2CExactProperties {
   param($Value,[string[]]$Names)
   Assert-Phase7BWP2C ($null -ne $Value -and $Value -isnot [string] -and
     @(Compare-Object @($Names|Sort-Object) @($Value.PSObject.Properties.Name|Sort-Object)).Count -eq 0) 'PREPARATION_SCHEMA'
+}
+
+function Assert-Phase7BWP2CBaselineBinding {
+  param($Binding)
+  $fixed=Get-Phase7BIsolatedGuestContract
+  Assert-Phase7BWP2CExactProperties $Binding @(
+    'schemaVersion','kind','classification','applicationCommit','environmentId',
+    'preparedStateId','operation','toolingCommit','toolingManifestSha256',
+    'guestIdentitySha256','semanticVm','parentBridge','founderPreparationApprovalRequired',
+    'nonExecutable','preparationOnly','restoreAuthorized','wp2cExecutionAuthorized',
+    'laterMigrationAuthorized'
+  )
+  Assert-Phase7BWP2C ($Binding.schemaVersion -eq 1 -and
+    $Binding.kind -ceq 'wp2c-guest-baseline-binding' -and
+    $Binding.classification -ceq 'PHASE7B_WP2C_GUEST_BASELINE_BINDING_NONEXECUTABLE' -and
+    $Binding.applicationCommit -ceq $fixed.applicationCommit -and
+    $Binding.environmentId -ceq $fixed.environmentId -and
+    $Binding.preparedStateId -cmatch '^wp2c-prepared-[0-9a-f]{32}$' -and
+    $Binding.operation -ceq 'Baseline' -and $Binding.toolingCommit -cmatch '^[0-9a-f]{40}$') 'BASELINE_BINDING_SCHEMA'
+  foreach($name in @('toolingManifestSha256','guestIdentitySha256')){
+    Assert-Phase7BWP2C ($Binding.$name -cmatch '^[0-9a-f]{64}$') 'BASELINE_BINDING_HASH'
+  }
+  Assert-Phase7BWP2CExactProperties $Binding.semanticVm @('mode','sha256')
+  Assert-Phase7BWP2C ($Binding.semanticVm.mode -ceq 'wp2c-semantic-vmx-v2' -and
+    $Binding.semanticVm.sha256 -cmatch '^[0-9a-f]{64}$') 'BASELINE_BINDING_VM'
+  Assert-Phase7BWP2CExactProperties $Binding.parentBridge @('sha256','bytes')
+  Assert-Phase7BWP2C ($Binding.parentBridge.sha256 -cmatch '^[0-9a-f]{64}$' -and
+    $Binding.parentBridge.bytes -is [ValueType] -and [int64]$Binding.parentBridge.bytes -gt 0) 'BASELINE_BINDING_PARENT'
+  foreach($name in @('founderPreparationApprovalRequired','nonExecutable','preparationOnly')){
+    Assert-Phase7BWP2CBoolean $Binding.$name $true 'BASELINE_BINDING_AUTHORITY'
+  }
+  foreach($name in @('restoreAuthorized','wp2cExecutionAuthorized','laterMigrationAuthorized')){
+    Assert-Phase7BWP2CBoolean $Binding.$name $false 'BASELINE_BINDING_AUTHORITY'
+  }
+  Assert-Phase7BWP2C ((ConvertTo-Phase7BCanonicalJson $Binding) -notmatch
+    'AGE-SECRET-KEY-|password|passphrase|credential') 'BASELINE_BINDING_SECRET'
+}
+
+function Read-Phase7BWP2CBaselineBinding {
+  param([string]$ToolingRoot,[string]$ExpectedSha256)
+  $root=Assert-Phase7BWP2CLocalPath $ToolingRoot
+  $path=Join-Path $root 'wp2c-baseline-binding.json'
+  Assert-Phase7BWP2C (Test-Path -LiteralPath $path -PathType Leaf) 'BASELINE_BINDING_MISSING'
+  $identity=Get-Phase7BWP2CIdentity $path
+  if($ExpectedSha256){Assert-Phase7BWP2C ($identity.sha256 -ceq $ExpectedSha256) 'BASELINE_BINDING_HASH'}
+  Assert-Phase7BWP2C ($identity.bytes -le 16KB) 'BASELINE_BINDING_SIZE'
+  $raw=Get-Content -LiteralPath $path -Raw -ErrorAction Stop
+  $binding=$raw|ConvertFrom-Json -ErrorAction Stop
+  Assert-Phase7BWP2C ($raw -ceq (ConvertTo-Phase7BCanonicalJson $binding)) 'BASELINE_BINDING_CANONICAL'
+  Assert-Phase7BWP2CBaselineBinding $binding
+  [pscustomobject]@{document=$binding;identity=$identity;path=$path}
+}
+
+function Get-Phase7BWP2CToolingMediaFileNames {
+  param([string]$ToolingRoot,$Manifest)
+  $names=@($Manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json')
+  if(Test-Path -LiteralPath (Join-Path $ToolingRoot 'wp2c-baseline-binding.json') -PathType Leaf){
+    [void](Read-Phase7BWP2CBaselineBinding $ToolingRoot)
+    $names+=@('wp2c-baseline-binding.json')
+  }
+  @($names)
 }
 
 function Get-Phase7BWP2CPreparationBaselineFields {
@@ -177,7 +244,7 @@ function Assert-Phase7BWP2CPreparationPlan {
   foreach($pair in @(@('incomingRoot','incoming'),@('restoreRoot','restore\canonical'),@('stateRoot','wp2c-state'),@('toolingRoot',('tooling\'+$b.toolingManifestSha256)))){
     Assert-Phase7BWP2C ($b.($pair[0]) -ceq (Join-Path $fixed.isolatedRoot $pair[1])) 'PREPARATION_PLAN_ROOT'
   }
-  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan.toolingManifest) -ceq $b.toolingManifestSha256 -and @($Plan.toolingManifest.files).Count -eq 12 -and $Plan.toolingManifest.secretsIncluded -ceq $false) 'PREPARATION_TOOLING_MANIFEST'
+  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan.toolingManifest) -ceq $b.toolingManifestSha256 -and @($Plan.toolingManifest.files).Count -eq 13 -and $Plan.toolingManifest.secretsIncluded -ceq $false) 'PREPARATION_TOOLING_MANIFEST'
   Assert-Phase7BWP2CExactProperties $Plan.toolingManifest @('schemaVersion','kind','entryPoints','files','secretsIncluded')
   Assert-Phase7BWP2C ($Plan.toolingManifest.schemaVersion -eq 1 -and $Plan.toolingManifest.kind -ceq 'wp2c-tooling-manifest') 'PREPARATION_TOOLING_MANIFEST'
   foreach($file in $Plan.toolingManifest.files){

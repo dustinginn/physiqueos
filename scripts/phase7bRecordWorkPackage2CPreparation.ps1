@@ -8,6 +8,7 @@ param(
   [Parameter(Mandatory=$true)][string]$VmxPath,[Parameter(Mandatory=$true)][string]$SnapshotMetadataPath,
   [string]$ContinuationPath,[string]$ContinuationSha256,
   [string]$VmBindingPath,[string]$VmBindingSha256,
+  [string]$BaselineHandoffPath,[string]$BaselineHandoffSha256,
   [Parameter(Mandatory=$true)][string]$OutputDirectory,[Parameter(Mandatory=$true)][switch]$FounderPreparationReviewed
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -30,8 +31,16 @@ $returned=ConvertFrom-Phase7BWP2CPreparationReturnText (Get-Content -LiteralPath
 $review=Read-Phase7BWP2CBoundJson $FounderReviewPath $FounderReviewSha256
 $observation=Get-Phase7BWP2CHostObservation $VmxPath $SnapshotMetadataPath
 $result=New-Phase7BWP2CPreparationHandoffEvidence $plan $returned $review $observation $media $carrier.descriptorIdentity
-Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and -not ($ContinuationPath -and $VmBindingPath) -and ($OutputDirectory -notmatch '(?i)[\\/]continuations[\\/]' -or $ContinuationPath -or $VmBindingPath)) 'CONTINUATION_SELECTION_REQUIRED'
-if($VmBindingPath){
+Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and
+  ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and
+  ([bool]$BaselineHandoffPath -eq [bool]$BaselineHandoffSha256) -and
+  @(@($ContinuationPath,$VmBindingPath,$BaselineHandoffPath)|Where-Object {$_}).Count -le 1 -and
+  ($OutputDirectory -notmatch '(?i)[\\/](?:continuations|vm-bindings|baseline-handoffs)[\\/]' -or $ContinuationPath -or $VmBindingPath -or $BaselineHandoffPath)) 'CONTINUATION_SELECTION_REQUIRED'
+if($BaselineHandoffPath){
+  $continuation=Read-Phase7BWP2CBaselineHandoffContinuation $BaselineHandoffPath $BaselineHandoffSha256 (Split-Path -Parent $PSScriptRoot)
+  Assert-Phase7BWP2C ($OutputDirectory -ceq (Join-Path $continuation.root 'accepted') -and $PreparationContentRoot -ceq (Join-Path $continuation.root 'preparation.iso.content') -and $ToolingMediaPath -ceq $continuation.document.current.toolingMediaPath) 'CONTINUATION_RECORDER_PATH'
+  Add-Phase7BWP2CPreparationLineage $result.preparation $plan $continuation $BaselineHandoffPath
+}elseif($VmBindingPath){
   $continuation=Read-Phase7BWP2CVmBindingContinuation $VmBindingPath $VmBindingSha256 (Split-Path -Parent $PSScriptRoot)
   Assert-Phase7BWP2C ($OutputDirectory -ceq (Join-Path $continuation.root 'accepted') -and $PreparationContentRoot -ceq (Join-Path $continuation.root 'preparation.iso.content') -and $ToolingMediaPath -ceq $continuation.document.current.toolingMediaPath) 'CONTINUATION_RECORDER_PATH'
   Add-Phase7BWP2CPreparationLineage $result.preparation $plan $continuation $VmBindingPath

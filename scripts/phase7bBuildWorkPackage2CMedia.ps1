@@ -15,7 +15,9 @@ switch($Kind){
   'Tooling' {
     Assert-Phase7BWP2CFile $inputs.agePath $inputs.age
     Assert-Phase7BWP2CFile $inputs.ageKeygenPath $inputs.ageKeygen
-    $result=New-Phase7BWP2CToolingContent $PSScriptRoot $inputs.agePath $inputs.ageKeygenPath $content
+    $baselineBinding=$null
+    if($inputs.PSObject.Properties.Name -contains 'baselineBinding'){$baselineBinding=$inputs.baselineBinding}
+    $result=New-Phase7BWP2CToolingContent $PSScriptRoot $inputs.agePath $inputs.ageKeygenPath $content $baselineBinding
     $label='P7B_C_TOOLS'
   }
   'Recovery' {

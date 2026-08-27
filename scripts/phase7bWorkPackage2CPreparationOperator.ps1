@@ -1,11 +1,12 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Initialize','BuildTooling','CreateContinuation','CreateVmBindingContinuation','Ram','PreBootBaseline','ImportBaseline','BuildPreparation','PreBoot','EntryReview','ImportReturn','Record')][string]$Mode,
+  [Parameter(Mandatory=$true)][ValidateSet('Initialize','BuildTooling','CreateContinuation','CreateVmBindingContinuation','CreateBaselineHandoffContinuation','Ram','PreBootBaseline','ImportBaseline','BuildPreparation','PreBoot','EntryReview','ImportReturn','Record')][string]$Mode,
   [string]$SessionRoot,[string]$ToolingCommit,[string]$VmxPath,[string]$SnapshotMetadataPath,
   [string]$DescriptorPath,[string]$DescriptorSha256,[string]$AgePath,[string]$AgeKeygenPath,
   [string]$OriginalSessionSha256,[string]$OriginalInventorySha256,[string]$OriginalVmxSha256,
   [string]$ContinuationPath,[string]$ContinuationSha256,
   [string]$VmBindingPath,[string]$VmBindingSha256,[string]$StoppedVmxSha256,
+  [string]$BaselineHandoffPath,[string]$BaselineHandoffSha256,
   [switch]$FounderPreparationApproved
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -41,9 +42,14 @@ function Assert-ColdHardware {
 }
 function Show-GuestCommands($Settings,$Tooling,$Preparation) {
   Write-Host 'Guest: NEW elevated Windows PowerShell 5.1 Desktop ConsoleHost, powershell.exe -NoProfile. These are guest commands, NOT host commands.'
+  Write-Host 'Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force'
   Write-Host '$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_TOOLS''}); if($t.Count -ne 1){throw ''TOOLS_CD''}; $t=$t[0].DeviceID+''\'''
   if($null -eq $Preparation){
-    Write-Output ('& ($t+''phase7bInspectWorkPackage2CGuestPreparation.ps1'') -Operation Baseline -ExpectedGuestIdentitySha256 '''+$Settings.expectedGuestIdentitySha256+''' -ExpectedToolingManifestSha256 '''+$Tooling.manifestIdentity.sha256+''' -FounderPreparationApproved')
+    if($Tooling.PSObject.Properties.Name -contains 'baselineBindingIdentity'){
+      Write-Output '& ($t+''phase7bRunWorkPackage2CGuestBaseline.ps1'') -FounderPreparationApproved'
+    }else{
+      Write-Output ('& ($t+''phase7bInspectWorkPackage2CGuestPreparation.ps1'') -Operation Baseline -ExpectedGuestIdentitySha256 '''+$Settings.expectedGuestIdentitySha256+''' -ExpectedToolingManifestSha256 '''+$Tooling.manifestIdentity.sha256+''' -FounderPreparationApproved')
+    }
   }else{
     Write-Host '$p=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_PREP''}); if($p.Count -ne 1){throw ''PREP_CD''}; $p=$p[0].DeviceID+''\'''
     Write-Output ('$pin='''+$Preparation.descriptorIdentity.sha256+'''')
@@ -64,10 +70,14 @@ try {
   [void](Assert-Phase7BWP2CLocalPath $SessionRoot 'C:\Phase7B\host-evidence\379bb303\wp2c')
   $repo=Split-Path -Parent $PSScriptRoot
   $continuation=$null
-  Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and -not ($ContinuationPath -and $VmBindingPath)) 'CONTINUATION_EXPLICIT_SELECTION'
+  Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and
+    ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and
+    ([bool]$BaselineHandoffPath -eq [bool]$BaselineHandoffSha256) -and
+    @(@($ContinuationPath,$VmBindingPath,$BaselineHandoffPath)|Where-Object {$_}).Count -le 1) 'CONTINUATION_EXPLICIT_SELECTION'
   Assert-Phase7BWP2C (-not $ContinuationPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
-  Assert-Phase7BWP2C (-not $VmBindingPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation','CreateVmBindingContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
-  Assert-Phase7BWP2C (-not $StoppedVmxSha256 -or $Mode -ceq 'CreateVmBindingContinuation') 'VM_BINDING_CONTINUATION_INPUT'
+  Assert-Phase7BWP2C (-not $VmBindingPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
+  Assert-Phase7BWP2C (-not $BaselineHandoffPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation','CreateVmBindingContinuation','CreateBaselineHandoffContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
+  Assert-Phase7BWP2C (-not $StoppedVmxSha256 -or $Mode -in @('CreateVmBindingContinuation','CreateBaselineHandoffContinuation')) 'VM_BINDING_CONTINUATION_INPUT'
   if($Mode -ceq 'CreateContinuation'){
     $made=New-Phase7BWP2CPreparationContinuation $SessionRoot $OriginalSessionSha256 $OriginalInventorySha256 $OriginalVmxSha256 $repo $ToolingCommit
     $selected=Read-Phase7BWP2CPreparationContinuation $made.path $made.identity.sha256 $repo
@@ -79,6 +89,14 @@ try {
     Assert-Phase7BWP2C ($ContinuationPath -and $SessionRoot -ceq (Split-Path -Parent $ContinuationPath) -and $StoppedVmxSha256 -cmatch '^[0-9a-f]{64}$') 'VM_BINDING_CONTINUATION_INPUT'
     $made=New-Phase7BWP2CVmBindingContinuation $ContinuationPath $ContinuationSha256 $StoppedVmxSha256 $repo $ToolingCommit
     $selected=Read-Phase7BWP2CVmBindingContinuation $made.path $made.identity.sha256 $repo
+    Show-GuestCommands $selected.settings $selected.tooling.content $null
+    $made|ConvertTo-Json -Depth 5
+    return
+  }
+  if($Mode -ceq 'CreateBaselineHandoffContinuation'){
+    Assert-Phase7BWP2C ($VmBindingPath -and $SessionRoot -ceq (Split-Path -Parent $VmBindingPath) -and $StoppedVmxSha256 -cmatch '^[0-9a-f]{64}$') 'BASELINE_HANDOFF_INPUT'
+    $made=New-Phase7BWP2CBaselineHandoffContinuation $VmBindingPath $VmBindingSha256 $StoppedVmxSha256 $repo $ToolingCommit
+    $selected=Read-Phase7BWP2CBaselineHandoffContinuation $made.path $made.identity.sha256 $repo
     Show-GuestCommands $selected.settings $selected.tooling.content $null
     $made|ConvertTo-Json -Depth 5
     return
@@ -105,7 +123,11 @@ try {
     return
   }
   $toolsPath=Join-Path $SessionRoot 'tooling.iso'
-  if($VmBindingPath){
+  if($BaselineHandoffPath){
+    $continuation=Read-Phase7BWP2CBaselineHandoffContinuation $BaselineHandoffPath $BaselineHandoffSha256 $repo
+    Assert-Phase7BWP2C ($SessionRoot -ceq $continuation.root) 'CONTINUATION_SESSION_ROOT'
+    $settings=$continuation.settings;$toolsPath=$continuation.document.current.toolingMediaPath
+  }elseif($VmBindingPath){
     $continuation=Read-Phase7BWP2CVmBindingContinuation $VmBindingPath $VmBindingSha256 $repo
     Assert-Phase7BWP2C ($SessionRoot -ceq $continuation.root) 'CONTINUATION_SESSION_ROOT'
     $settings=$continuation.settings;$toolsPath=$continuation.document.current.toolingMediaPath
@@ -206,7 +228,8 @@ try {
     'Record' {
       $prep=Read-OperatorJson 'preparation-result.json';$reviewPath=Join-Path $SessionRoot 'founder-review.json'
       $lineageArgs=@{}
-      if($VmBindingPath){$lineageArgs=@{VmBindingPath=$VmBindingPath;VmBindingSha256=$VmBindingSha256}}
+      if($BaselineHandoffPath){$lineageArgs=@{BaselineHandoffPath=$BaselineHandoffPath;BaselineHandoffSha256=$BaselineHandoffSha256}}
+      elseif($VmBindingPath){$lineageArgs=@{VmBindingPath=$VmBindingPath;VmBindingSha256=$VmBindingSha256}}
       elseif($continuation){$lineageArgs=@{ContinuationPath=$ContinuationPath;ContinuationSha256=$ContinuationSha256}}
       & (Join-Path $PSScriptRoot 'phase7bRecordWorkPackage2CPreparation.ps1') -PreparationContentRoot ((Join-Path $SessionRoot 'preparation.iso')+'.content') -PreparationDescriptorSha256 $prep.content.descriptorIdentity.sha256 -PreparationMediaPath (Join-Path $SessionRoot 'preparation.iso') -PreparationMediaSha256 $prep.identity.sha256 -ToolingMediaPath $toolsPath -ReturnTextPath (Join-Path $SessionRoot 'return.txt') -FounderReviewPath $reviewPath -FounderReviewSha256 (Get-Phase7BWP2CIdentity $reviewPath).sha256 -VmxPath $VmxPath -SnapshotMetadataPath $SnapshotMetadataPath -OutputDirectory (Join-Path $SessionRoot 'accepted') -FounderPreparationReviewed @lineageArgs
     }

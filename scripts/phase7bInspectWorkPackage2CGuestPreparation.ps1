@@ -22,10 +22,19 @@ if($Operation -in @('Baseline','Install')){
   $disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=5' -ErrorAction Stop|Where-Object {$_.DeviceID -ceq $cd.Substring(0,2) -and $_.VolumeName -ceq 'P7B_C_TOOLS'})
   Assert-Phase7BWP2C ($disks.Count -eq 1) 'TOOLING_OPTICAL_REQUIRED'
   $manifest=Get-Phase7BWP2CDependencyManifest $PSScriptRoot
-  Assert-Phase7BWP2CExactFileSet $PSScriptRoot (@($manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json'))
+  $baselineBinding=$null
+  if(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'wp2c-baseline-binding.json') -PathType Leaf){
+    $baselineBinding=(Read-Phase7BWP2CBaselineBinding $PSScriptRoot).document
+  }
+  Assert-Phase7BWP2CExactFileSet $PSScriptRoot (Get-Phase7BWP2CToolingMediaFileNames $PSScriptRoot $manifest)
 }
 if($Operation -ceq 'Baseline'){
   Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $manifest) -ceq $ExpectedToolingManifestSha256) 'PREPARATION_TOOLING_MANIFEST'
+  if($null -ne $baselineBinding){
+    Assert-Phase7BWP2C ($baselineBinding.operation -ceq 'Baseline' -and
+      $baselineBinding.toolingManifestSha256 -ceq $ExpectedToolingManifestSha256 -and
+      $baselineBinding.guestIdentitySha256 -ceq $ExpectedGuestIdentitySha256) 'BASELINE_BINDING_ARGUMENTS'
+  }
   $baseline=Get-Phase7BWP2CGuestPreparationBaseline $ExpectedGuestIdentitySha256
   $text=ConvertTo-Phase7BWP2CPreparationReturnText $baseline
   for($offset=0;$offset -lt $text.Length;$offset+=80){Write-Output $text.Substring($offset,[math]::Min(80,$text.Length-$offset))}
@@ -36,6 +45,10 @@ $carrier=Read-Phase7BWP2CPreparationOptical $PreparationOpticalRoot $Preparation
 $plan=$carrier.plan;$b=$plan.bindings
 if($Operation -ceq 'Install'){
   Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $manifest) -ceq $b.toolingManifestSha256) 'PREPARATION_TOOLING_MANIFEST'
+  if($null -ne $baselineBinding){
+    Assert-Phase7BWP2C ($baselineBinding.toolingManifestSha256 -ceq $b.toolingManifestSha256 -and
+      $baselineBinding.guestIdentitySha256 -ceq $b.guestIdentitySha256) 'BASELINE_BINDING_ARGUMENTS'
+  }
   & (Join-Path $PSScriptRoot 'phase7bInstallWorkPackage2GuestTooling.ps1') -OpticalRoot $cd -ManifestSha256 $b.toolingManifestSha256 -ExpectedGuestIdentitySha256 $b.guestIdentitySha256 -ExpectedMarkerSha256 $b.guestMarkerSha256 -AgeSha256 $b.age.sha256 -AgeBytes $b.age.bytes -AgeKeygenSha256 $b.ageKeygen.sha256 -AgeKeygenBytes $b.ageKeygen.bytes -FounderPreparationApproved
   return
 }

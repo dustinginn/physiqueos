@@ -214,9 +214,11 @@ the unchanged >=7 GiB gates run immediately before EACH later boot.
 The deterministic location is
 `wp2c/continuations/<original-preparedStateId>/<current-published-commit>/`.
 The first mutation creates that new directory without overwrite. Its replacement
-`tooling-current.iso` uses the existing builder and exact 15-file guest closure.
-The current patched Host module is in that closure; the continuation module is
-host-only, never a sixteenth guest payload. Partial output is retained for
+`tooling-current.iso` uses the existing builder and its recorded exact guest
+closure. Historical 15-file media remains immutable. Current generic tooling
+media has 16 files; a create-new baseline-handoff medium has 17, adding only the
+non-executable baseline binding. The continuation module remains host-only.
+Partial output is retained for
 read-only reconciliation, never automatically deleted or retried.
 
 `continuation.json` is canonical schemaVersion 1, kind
@@ -292,12 +294,34 @@ wp2cExecutionAuthorized/laterMigrationAuthorized false authority flags apply.
 Existing exact bridge state is reported without writes; partial, changed or
 conflicting state stops without cleanup. No latest-context selection exists.
 
-All resumed operator modes require the exact bridge path and SHA through
-`VmBindingPath`/`VmBindingSha256`. The parent or original tooling ISO cannot satisfy
-the bridge's preboot gate. Accepted preparation lineage becomes schema version 2
-and retains original initialization, parent continuation, legacy VM hash, current
-semantic binding and current tooling identities. This bridge neither boots the VM
-nor grants preparation resumption or WP2-C execution.
+### Guest-local baseline tooling handoff
+
+The semantic bridge remains immutable parent evidence. When its tooling predates
+the guest-local Baseline launcher, `CreateBaselineHandoffContinuation` creates one
+new `wp2c/baseline-handoffs/<preparedStateId>/<currentCommit>/` addendum and
+distinct `tooling-baseline-current.iso`. The ISO contains the current 13-script
+closure, age binaries, manifest, and exactly one canonical
+`wp2c-baseline-binding.json` (17 files total). The binding is nonsecret and
+non-executable; it pins the accepted guest identity and independently generated
+tooling-manifest hash, operation=Baseline, semantic VM identity and parent bridge.
+It explicitly grants no restore, WP2-C execution or later-migration authority.
+
+The guest launcher requires Windows PowerShell 5.1 Desktop x64 ConsoleHost,
+Administrator, process-only ExecutionPolicy Bypass, FounderPreparationApproved,
+and exactly one `P7B_C_TOOLS` optical volume. It validates the binding, manifest,
+dependency closure and exact file set, then invokes the existing Baseline entry
+once with those pins. It has no operation selector, retry, network, clipboard,
+shared-folder, packet, identity-entry or restore path. Final ISO identity remains
+host/bridge-bound, avoiding a self-hash cycle. Later preparation evidence uses
+lineage schema 3 to preserve original initialization, semantic bridge and current
+baseline-handoff identities separately.
+
+Bridge-only resumed modes require exact `VmBindingPath`/`VmBindingSha256`; after a
+baseline handoff they instead require exact `BaselineHandoffPath`/
+`BaselineHandoffSha256`. Parent or original tooling cannot satisfy the selected
+preboot gate. Accepted lineage is schema 2 for a bridge and schema 3 for a handoff,
+retaining every prior provenance layer. Neither artifact boots the VM nor grants
+preparation resumption or WP2-C execution.
 
 After attachment and before boot, the host boot-permit entry independently checks
 the exact two local ISO paths, full ISO hashes, optical connection flags, projected
@@ -327,8 +351,9 @@ All existing S0/S1 snapshots remain untouched by these source tools.
    `preparation-plan.json` and `preparation-control.json`. It contains the
    deterministic observation plan and its identity/manifest/correlation pins,
    never a packet, secret, execution authorization or claim. It occupies the
-   second optical slot alongside tooling during preparation only. The 15-file
-   tooling payload remains unchanged in membership. Prepared observations and
+   second optical slot alongside tooling during preparation only. Historical
+   15-file tooling remains immutable; current tooling adds the narrow baseline
+   launcher and baseline-handoff media adds its non-executable binding. Prepared observations and
    synthetic results return separately through the bounded nonsecret WP2CP1
    checksum adapter described in the operator guide, not writable ISO semantics.
 

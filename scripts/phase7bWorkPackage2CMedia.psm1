@@ -11,7 +11,7 @@ function Assert-Phase7BWP2CExactFileSet {
 }
 
 function New-Phase7BWP2CToolingContent {
-  param([string]$SourceDirectory,[string]$AgePath,[string]$AgeKeygenPath,[string]$Destination)
+  param([string]$SourceDirectory,[string]$AgePath,[string]$AgeKeygenPath,[string]$Destination,$BaselineBinding)
   [void](Assert-Phase7BWP2CLocalPath $Destination)
   Assert-Phase7BWP2C (-not (Test-Path -LiteralPath $Destination)) 'MEDIA_DESTINATION_EXISTS'
   $manifest=Get-Phase7BWP2CDependencyManifest $SourceDirectory
@@ -29,8 +29,14 @@ function New-Phase7BWP2CToolingContent {
   Assert-Phase7BWP2CFile (Join-Path $Destination 'age.exe') $ageIdentity
   Assert-Phase7BWP2CFile (Join-Path $Destination 'age-keygen.exe') $keygenIdentity
   $manifestIdentity=Write-Phase7BWP2CCreateNewJson (Join-Path $Destination 'wp2c-tooling-manifest.json') $manifest
-  Assert-Phase7BWP2CExactFileSet $Destination (@($manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json'))
-  [pscustomobject]@{manifest=$manifest;manifestIdentity=$manifestIdentity;age=$ageIdentity;ageKeygen=$keygenIdentity}
+  $result=[ordered]@{manifest=$manifest;manifestIdentity=$manifestIdentity;age=$ageIdentity;ageKeygen=$keygenIdentity}
+  if($null -ne $BaselineBinding){
+    Assert-Phase7BWP2CBaselineBinding $BaselineBinding
+    Assert-Phase7BWP2C ($BaselineBinding.toolingManifestSha256 -ceq $manifestIdentity.sha256) 'BASELINE_BINDING_MANIFEST'
+    $result.baselineBindingIdentity=Write-Phase7BWP2CCreateNewJson (Join-Path $Destination 'wp2c-baseline-binding.json') $BaselineBinding
+  }
+  Assert-Phase7BWP2CExactFileSet $Destination (Get-Phase7BWP2CToolingMediaFileNames $Destination $manifest)
+  [pscustomobject]$result
 }
 
 function New-Phase7BWP2CRecoveryContent {

@@ -62,5 +62,7 @@ Check ($continuation.IndexOf("'CONTINUATION_ORIGINAL_VM'") -lt $continuation.Ind
 Check ($continuation.IndexOf('$resultId=Write-Phase7BWP2CCreateNewJson') -lt $continuation.IndexOf('$id=Write-Phase7BWP2CCreateNewJson $path $c')) 'replacement media complete before context finalization'
 Check ($recorder.IndexOf('Add-Phase7BWP2CPreparationLineage') -lt $recorder.IndexOf('New-Item -ItemType Directory')) 'continuation lineage validated before accepted evidence'
 Check ($operator.Contains('Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256') -and $operator.Contains("'CONTINUATION_SELECTION_REQUIRED'")) 'explicit hash-bound context selection'
-Check (@($guest.files.name|Where-Object {$_ -match 'Continuation'}).Count -eq 0 -and @($guest.files).Count -eq 12) 'continuation host only; guest payload unchanged'
+Check (@($guest.files.name|Where-Object {$_ -match 'Continuation'}).Count -eq 0 -and
+  'phase7bRunWorkPackage2CGuestBaseline.ps1' -cin @($guest.files.name) -and
+  @($guest.files).Count -eq 13) 'continuation host only; baseline launcher is sole guest closure addition'
 [ordered]@{classification='PHASE7B_WP2C_SAFETY_TESTS_PASS';pass=$true;assertions=$count;freshDesktopImportChecks=$true;liveMutationPerformed=$false}|ConvertTo-Json -Compress
