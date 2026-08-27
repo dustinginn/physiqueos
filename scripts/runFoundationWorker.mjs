@@ -14,17 +14,12 @@ import { createPostgresCombinedRuntimeAuthorityStore } from "../src/platform/cut
 import { createAuthorityGatedWorker } from "../src/platform/jobs/AuthorityGatedWorker.js";
 import { readSpacesConfig } from "../src/platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../src/platform/object-storage/SpacesPrivateObjectProvider.js";
-import {
-  SIMPLIFIED_PROVIDER_OPERATION_TOPIC,
-  createPostgresSimplifiedProviderMigrationOperationStore,
-  createSimplifiedProviderMigrationWorkerHandler,
-} from "../src/platform/cutover/simplified/SimplifiedProviderMigrationOperation.js";
-import { executeSimplifiedProviderMigration } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationExecution.js";
-import { createSimplifiedProviderMigrationTransport } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationTransport.js";
-import { simplifiedProviderMigrationValidationContext } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationProductComposition.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
+const simplifiedMigration = process.env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED === "1"
+  ? await loadSimplifiedMigrationModules()
+  : null;
 const databaseConfig = readDatabaseConfig();
 const pool = createPostgresPool(databaseConfig);
 const buildIdentity = readBuildIdentity();
@@ -47,8 +42,8 @@ if (compatibilityMode) {
   }
 }
 
-const simplifiedOperationStore = process.env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED === "1"
-  ? createPostgresSimplifiedProviderMigrationOperationStore({
+const simplifiedOperationStore = simplifiedMigration
+  ? simplifiedMigration.createPostgresSimplifiedProviderMigrationOperationStore({
       pool,
       ownerUserId: required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID"),
     })
@@ -95,17 +90,17 @@ const handlers = Object.freeze({
     }),
   } : {}),
   ...(simplifiedOperationStore ? {
-    [SIMPLIFIED_PROVIDER_OPERATION_TOPIC]: createSimplifiedProviderMigrationWorkerHandler({
+    [simplifiedMigration.SIMPLIFIED_PROVIDER_OPERATION_TOPIC]: simplifiedMigration.createSimplifiedProviderMigrationWorkerHandler({
       store: simplifiedOperationStore,
-      validationContext: simplifiedProviderMigrationValidationContext(process.env),
-      executeMigration: executeSimplifiedProviderMigration,
+      validationContext: simplifiedMigration.simplifiedProviderMigrationValidationContext(process.env),
+      executeMigration: simplifiedMigration.executeSimplifiedProviderMigration,
       createEnvironment: async () => {
         const objectProvider = createSpacesPrivateObjectProvider(readSpacesConfig(process.env));
         return Object.freeze({
           env: process.env,
           pool,
           objectProvider,
-          transport: createSimplifiedProviderMigrationTransport({ objectProvider }),
+          transport: simplifiedMigration.createSimplifiedProviderMigrationTransport({ objectProvider }),
           transportSummary: (transport) => Object.freeze({
             byteLength: transport.byteLength,
             sha256: transport.sha256,
@@ -142,15 +137,39 @@ const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
     })
   : worker;
 
-for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
-
-try {
-  await runWorkerLoop({ worker: effectiveWorker, signal: controller.signal });
-} catch (error) {
-  logger.error("worker.crashed", { code: error?.code ?? "WORKER_CRASHED" });
-  process.exitCode = 1;
-} finally {
+if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
+  process.stdout.write(`${JSON.stringify({
+    status: "PROVIDER_WORKER_APPLICATION_LOOP_READY",
+    workerPid: process.pid,
+    simplifiedMigrationHandlerRegistered: Boolean(simplifiedOperationStore),
+    migrationCoordinatorProcessModel: "in-process-existing-worker",
+  })}\n`);
   await pool.end();
+} else {
+  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
+  try {
+    await runWorkerLoop({ worker: effectiveWorker, signal: controller.signal });
+  } catch (error) {
+    logger.error("worker.crashed", { code: error?.code ?? "WORKER_CRASHED" });
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
+  }
+}
+
+async function loadSimplifiedMigrationModules() {
+  const operation = await import("../src/platform/cutover/simplified/SimplifiedProviderMigrationOperation.js");
+  const execution = await import("../src/platform/cutover/simplified/SimplifiedProviderMigrationExecution.js");
+  const transport = await import("../src/platform/cutover/simplified/SimplifiedProviderMigrationTransport.js");
+  const composition = await import("../src/platform/cutover/simplified/SimplifiedProviderMigrationProductComposition.js");
+  return Object.freeze({
+    SIMPLIFIED_PROVIDER_OPERATION_TOPIC: operation.SIMPLIFIED_PROVIDER_OPERATION_TOPIC,
+    createPostgresSimplifiedProviderMigrationOperationStore: operation.createPostgresSimplifiedProviderMigrationOperationStore,
+    createSimplifiedProviderMigrationWorkerHandler: operation.createSimplifiedProviderMigrationWorkerHandler,
+    executeSimplifiedProviderMigration: execution.executeSimplifiedProviderMigration,
+    createSimplifiedProviderMigrationTransport: transport.createSimplifiedProviderMigrationTransport,
+    simplifiedProviderMigrationValidationContext: composition.simplifiedProviderMigrationValidationContext,
+  });
 }
 
 function readMaximumAttempts(value) {
