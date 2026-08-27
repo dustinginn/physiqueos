@@ -216,8 +216,9 @@ The deterministic location is
 The first mutation creates that new directory without overwrite. Its replacement
 `tooling-current.iso` uses the existing builder and its recorded exact guest
 closure. Historical 15-file media remains immutable. Current generic tooling
-media has 16 files; a create-new baseline-handoff medium has 17, adding only the
-non-executable baseline binding. The continuation module remains host-only.
+media has 17 files, including the root-level `b.cmd` Baseline entry point; a
+create-new baseline-handoff medium has 18, adding only the non-executable
+baseline binding. The continuation module remains host-only.
 Partial output is retained for
 read-only reconciliation, never automatically deleted or retried.
 
@@ -300,13 +301,16 @@ The semantic bridge remains immutable parent evidence. When its tooling predates
 the guest-local Baseline launcher, `CreateBaselineHandoffContinuation` creates one
 new `wp2c/baseline-handoffs/<preparedStateId>/<currentCommit>/` addendum and
 distinct `tooling-baseline-current.iso`. The ISO contains the current 13-script
-closure, age binaries, manifest, and exactly one canonical
-`wp2c-baseline-binding.json` (17 files total). The binding is nonsecret and
+closure, root-level `b.cmd`, age binaries, manifest, and exactly one canonical
+`wp2c-baseline-binding.json` (18 files total). The binding is nonsecret and
 non-executable; it pins the accepted guest identity and independently generated
 tooling-manifest hash, operation=Baseline, semantic VM identity and parent bridge.
 It explicitly grants no restore, WP2-C execution or later-migration authority.
 
-The guest launcher requires Windows PowerShell 5.1 Desktop x64 ConsoleHost,
+The root-level `b.cmd` is an ergonomic entry point only: after visually selecting
+the `P7B_C_TOOLS` drive, the Founder types `X:\b`. It invokes System32 Windows
+PowerShell with `-NoProfile`, process-only ExecutionPolicy Bypass and the existing
+Baseline launcher. That authoritative guest launcher requires Windows PowerShell 5.1 Desktop x64 ConsoleHost,
 Administrator, process-only ExecutionPolicy Bypass, FounderPreparationApproved,
 and exactly one `P7B_C_TOOLS` optical volume. It validates the binding, manifest,
 dependency closure and exact file set, then invokes the existing Baseline entry
@@ -363,14 +367,15 @@ GO, then create the control carrier. No self-hash or authorization/ISO cycle exi
 Recovery and control media occupy the two read-only optical slots during execution.
 The guest binaries live only in the exact prepared tooling directory.
 
-The current derived tooling closure is 12 PowerShell files (15 payload files with
-the two binaries and manifest):
+The current derived tooling closure is 13 PowerShell files plus `b.cmd` (17
+generic payload files with the two binaries and manifest):
 
 ```text
 phase7bInspectWorkPackage2CGuestPreparation.ps1
 phase7bInstallWorkPackage2GuestTooling.ps1
 phase7bIsolatedGuestContract.psm1
 phase7bIsolatedGuestReconciliation.psm1
+phase7bRunWorkPackage2CGuestBaseline.ps1
 phase7bRunWorkPackage2GuestRestore.ps1
 phase7bTestWorkPackage2GuestIdentityEntry.ps1
 phase7bWindowsAgeIdentityBridge.psm1
@@ -379,6 +384,7 @@ phase7bWorkPackage2CGuest.psm1
 phase7bWorkPackage2CHost.psm1
 phase7bWorkPackage2CMedia.psm1
 phase7bWorkPackage2Contract.psm1
+b.cmd
 age.exe
 age-keygen.exe
 wp2c-tooling-manifest.json

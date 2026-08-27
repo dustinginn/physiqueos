@@ -6,7 +6,7 @@ function Check([bool]$Value,[string]$Code){if(-not $Value){throw ('WP2C_SAFETY_T
 $guest=Get-Phase7BWP2CDependencyManifest $PSScriptRoot
 $hostManifest=Get-Phase7BWP2CDependencyManifest $PSScriptRoot (Get-Phase7BWP2CHostEntryPoints)
 $preparationOnly=@('phase7bNewWorkPackage2CPreparationPlan.ps1','phase7bWorkPackage2CPreparationOperator.ps1')
-foreach($name in @(@($guest.files.name)+@($hostManifest.files.name)+$preparationOnly|Sort-Object -Unique)) {
+foreach($name in @(@($guest.files.name|Where-Object {$_ -cmatch '\.(?:ps1|psm1)$'})+@($hostManifest.files.name)+$preparationOnly|Sort-Object -Unique)) {
   $path=Join-Path $PSScriptRoot $name;$tokens=$null;$errors=$null
   $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
   Check (@($errors).Count -eq 0) ('parse '+$name)
@@ -64,5 +64,9 @@ Check ($recorder.IndexOf('Add-Phase7BWP2CPreparationLineage') -lt $recorder.Inde
 Check ($operator.Contains('Read-Phase7BWP2CPreparationContinuation $ContinuationPath $ContinuationSha256') -and $operator.Contains("'CONTINUATION_SELECTION_REQUIRED'")) 'explicit hash-bound context selection'
 Check (@($guest.files.name|Where-Object {$_ -match 'Continuation'}).Count -eq 0 -and
   'phase7bRunWorkPackage2CGuestBaseline.ps1' -cin @($guest.files.name) -and
-  @($guest.files).Count -eq 13) 'continuation host only; baseline launcher is sole guest closure addition'
+  'b.cmd' -cin @($guest.files.name) -and
+  @($guest.files).Count -eq 14) 'continuation host only; authoritative and ergonomic Baseline launchers are the narrow guest additions'
+$batch=Get-Content (Join-Path $PSScriptRoot 'b.cmd') -Raw
+Check ($batch -match '(?i)^@echo off\r?\n"%SystemRoot%\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0phase7bRunWorkPackage2CGuestBaseline\.ps1" -FounderPreparationApproved\r?\n$') 'batch launcher exact supported path'
+Check ($batch -notmatch '(?i)restore|packet|AGE-SECRET-KEY|password|passphrase|credential|clipboard|invoke-webrequest|invoke-restmethod') 'batch launcher has no restore, packet, secret, clipboard or network path'
 [ordered]@{classification='PHASE7B_WP2C_SAFETY_TESTS_PASS';pass=$true;assertions=$count;freshDesktopImportChecks=$true;liveMutationPerformed=$false}|ConvertTo-Json -Compress

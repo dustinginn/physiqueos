@@ -42,15 +42,17 @@ function Assert-ColdHardware {
 }
 function Show-GuestCommands($Settings,$Tooling,$Preparation) {
   Write-Host 'Guest: NEW elevated Windows PowerShell 5.1 Desktop ConsoleHost, powershell.exe -NoProfile. These are guest commands, NOT host commands.'
-  Write-Host 'Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force'
-  Write-Host '$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_TOOLS''}); if($t.Count -ne 1){throw ''TOOLS_CD''}; $t=$t[0].DeviceID+''\'''
   if($null -eq $Preparation){
     if($Tooling.PSObject.Properties.Name -contains 'baselineBindingIdentity'){
-      Write-Output '& ($t+''phase7bRunWorkPackage2CGuestBaseline.ps1'') -FounderPreparationApproved'
+      Write-Host 'Visually identify the optical drive labeled P7B_C_TOOLS, then type X:\b with X replaced by that displayed drive letter.'
     }else{
+      Write-Host 'Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force'
+      Write-Host '$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_TOOLS''}); if($t.Count -ne 1){throw ''TOOLS_CD''}; $t=$t[0].DeviceID+''\'''
       Write-Output ('& ($t+''phase7bInspectWorkPackage2CGuestPreparation.ps1'') -Operation Baseline -ExpectedGuestIdentitySha256 '''+$Settings.expectedGuestIdentitySha256+''' -ExpectedToolingManifestSha256 '''+$Tooling.manifestIdentity.sha256+''' -FounderPreparationApproved')
     }
   }else{
+    Write-Host 'Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force'
+    Write-Host '$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_TOOLS''}); if($t.Count -ne 1){throw ''TOOLS_CD''}; $t=$t[0].DeviceID+''\'''
     Write-Host '$p=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq ''P7B_C_PREP''}); if($p.Count -ne 1){throw ''PREP_CD''}; $p=$p[0].DeviceID+''\'''
     Write-Output ('$pin='''+$Preparation.descriptorIdentity.sha256+'''')
     Write-Host '& ($t+''phase7bInspectWorkPackage2CGuestPreparation.ps1'') -Operation Install -PreparationOpticalRoot $p -PreparationDescriptorSha256 $pin -FounderPreparationApproved'

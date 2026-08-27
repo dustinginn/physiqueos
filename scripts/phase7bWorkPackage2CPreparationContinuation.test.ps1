@@ -133,7 +133,7 @@ try {
   $selected=Read-Current;$c=$selected.document
   Assert-True ($c.current.toolingMediaPath -cne $oldMedia -and (Get-Phase7BWP2CIdentity $oldMedia).sha256 -ceq $original.origin.toolingMedia.sha256) 'distinct replacement ISO and preserved original'
   Assert-True ($c.original.initializationCommit -ceq $oldCommit -and $c.current.toolingCommit -ceq $currentCommit -and $selected.settings.preparedStateId -ceq $original.settings.preparedStateId) 'two lineages; same prepared lifecycle ID'
-  Assert-True ($c.current.hostModule.sha256 -ceq (Get-Phase7BWP2CIdentity (Join-Path $PSScriptRoot 'phase7bWorkPackage2CHost.psm1')).sha256 -and @($c.current.toolingManifest.files).Count -eq 13) 'current Host plus baseline launcher in current guest closure'
+  Assert-True ($c.current.hostModule.sha256 -ceq (Get-Phase7BWP2CIdentity (Join-Path $PSScriptRoot 'phase7bWorkPackage2CHost.psm1')).sha256 -and @($c.current.toolingManifest.files).Count -eq 14 -and 'b.cmd' -cin @($c.current.toolingManifest.files.name)) 'current Host plus authoritative and ergonomic baseline launchers in current guest closure'
   Assert-True ($c.current.toolingManifestIdentity.sha256 -cne $original.origin.toolingManifest.sha256) 'historical manifest not current'
   Assert-True ((Get-Phase7BWP2CObjectHash (Get-Phase7BWP2CDependencyManifest $PSScriptRoot)) -ceq $c.current.toolingManifestIdentity.sha256) 'current closure deterministic regeneration'
   $replacementBytes=[IO.File]::ReadAllBytes($c.current.toolingMediaPath);[IO.File]::AppendAllText($c.current.toolingMediaPath,'changed')
@@ -170,7 +170,7 @@ try {
   $selected=Read-Phase7BWP2CVmBindingContinuation $bridgeMade.path $bridgeMade.identity.sha256 $repo;$c=$selected.document
   Assert-True ($selected.binding.parent.legacyVmConfigSha256 -ceq ('f'*64) -and $selected.binding.vm.semanticMode -ceq 'wp2c-semantic-vmx-v2') 'bridge preserves legacy mismatch and current semantic identity separately'
   Assert-True ($selected.binding.vm.stoppedVmx.sha256 -ceq (Get-Phase7BWP2CIdentity $vmxPath).sha256 -and $c.current.toolingMediaPath -cne $legacy.current.toolingMediaPath) 'bridge pins stopped raw VMX and distinct current tooling'
-  Assert-True ((Get-Phase7BWP2CObjectHash (Get-Phase7BWP2CDependencyManifest $PSScriptRoot)) -ceq (Get-Phase7BWP2CObjectHash $selected.binding.current.toolingManifest) -and @($selected.binding.current.toolingManifest.files).Count -eq 13) 'bridge current tooling closure deterministically regenerated'
+  Assert-True ((Get-Phase7BWP2CObjectHash (Get-Phase7BWP2CDependencyManifest $PSScriptRoot)) -ceq (Get-Phase7BWP2CObjectHash $selected.binding.current.toolingManifest) -and @($selected.binding.current.toolingManifest.files).Count -eq 14) 'bridge current tooling closure deterministically regenerated'
   $bridgeAgain=New-Phase7BWP2CVmBindingContinuation $made.path $parentId.sha256 $selected.binding.vm.stoppedVmx.sha256 $repo $bridgeCommit
   Assert-True (-not $bridgeAgain.created -and $bridgeAgain.identity.sha256 -ceq $bridgeMade.identity.sha256) 'exact compatible bridge is returned without another write'
   Reject {New-Phase7BWP2CVmBindingContinuation $made.path $parentId.sha256 ('0'*64) $repo $bridgeCommit} 'existing bridge cannot be selected with wrong stopped VMX pin'
@@ -188,10 +188,11 @@ try {
   Assert-True ($handoffMade.created -and $handoffMade.classification -ceq 'PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE') 'actual create-new baseline-handoff operator'
   $selected=Read-Phase7BWP2CBaselineHandoffContinuation $handoffMade.path $handoffMade.identity.sha256 $repo;$c=$selected.document
   Assert-True ($selected.baselineHandoff.parent.identity.sha256 -ceq $bridgeMade.identity.sha256 -and $selected.baselineHandoff.current.toolingMediaPath -cne $selected.parent.document.current.toolingMediaPath) 'handoff preserves semantic bridge parent and distinct media'
-  Assert-True (@($selected.baselineHandoff.current.toolingManifest.files).Count -eq 13 -and @($selected.tooling.content.manifest.files).Count -eq 13 -and @(Get-ChildItem ($selected.baselineHandoff.current.toolingMediaPath+'.content')).Count -eq 17) 'handoff has thirteen-script closure and exact seventeen-file media'
+  Assert-True (@($selected.baselineHandoff.current.toolingManifest.files).Count -eq 14 -and @($selected.tooling.content.manifest.files).Count -eq 14 -and @(Get-ChildItem ($selected.baselineHandoff.current.toolingMediaPath+'.content')).Count -eq 18) 'handoff has thirteen-script plus b.cmd closure and exact eighteen-file media'
   Assert-True ($selected.baselineHandoff.current.baselineBinding.guestIdentitySha256 -ceq $original.settings.expectedGuestIdentitySha256 -and $selected.baselineHandoff.current.baselineBinding.toolingManifestSha256 -ceq $selected.baselineHandoff.current.toolingManifestIdentity.sha256) 'handoff binding uses source-owned guest and tooling pins'
   Assert-True (-not $selected.baselineHandoff.current.baselineBinding.restoreAuthorized -and -not $selected.baselineHandoff.current.baselineBinding.wp2cExecutionAuthorized -and -not $selected.baselineHandoff.current.baselineBinding.laterMigrationAuthorized) 'handoff binding grants no execution authority'
-  Assert-True (($handoffRaw -join "`n") -match "phase7bRunWorkPackage2CGuestBaseline.ps1'\) -FounderPreparationApproved" -and ($handoffRaw -join "`n") -notmatch '-ExpectedGuestIdentitySha256') 'generated guest command is short and carries no transcribed pins'
+  $operatorText=Get-Content -LiteralPath $operatorPath -Raw
+  Assert-True ($operatorText.Contains('type X:\b with X replaced') -and ($handoffRaw -join "`n") -notmatch '-ExpectedGuestIdentitySha256') 'generated guest instruction is four characters after visual drive selection and carries no transcribed pins'
   $handoffAgain=New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 $selected.baselineHandoff.vm.stoppedVmx.sha256 $repo $handoffCommit
   Assert-True (-not $handoffAgain.created -and $handoffAgain.identity.sha256 -ceq $handoffMade.identity.sha256) 'compatible handoff returned without another write'
   Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 ('0'*64) $repo $handoffCommit} 'existing handoff rejects wrong stopped VMX pin'

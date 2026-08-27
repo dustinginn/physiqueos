@@ -9,8 +9,9 @@ real identity, execution authorization, claim, completion or restore belongs her
 
 Historical tooling ISOs remain exact 15-file evidence. Current generic tooling
 media contains the machine-derived 13-file PowerShell import/call closure,
-age.exe, age-keygen.exe and wp2c-tooling-manifest.json (16 files). A create-new
-baseline-handoff ISO adds only wp2c-baseline-binding.json (17 files). The
+the root-level `b.cmd` Baseline entry point, age.exe, age-keygen.exe and
+wp2c-tooling-manifest.json (17 files). A create-new baseline-handoff ISO adds
+only wp2c-baseline-binding.json (18 files). The
 manifest has schemaVersion, kind, entryPoints, files[{name,sha256,bytes}] and
 secretsIncluded=false. Host-only operator/plan/recorder scripts are not payload.
 
@@ -235,22 +236,20 @@ does not boot the VM. Founder now powers on the exact VM in VMware UI.
 ## Guest baseline, return, clean shutdown
 
 ISOLATED GUEST: NEW elevated x64 Windows PowerShell 5.1, powershell.exe -NoProfile.
-If policy blocks the reviewed script, set only this shell's process policy:
+Visually identify the optical drive labeled `P7B_C_TOOLS`, then replace `X` with
+that displayed drive letter and type exactly four characters:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-$ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
+X:\b
 ```
 
-For current baseline-handoff media, type this short guest-local command; the two
-authoritative pins come from the immutable binding on `P7B_C_TOOLS`, not operator
-transcription:
+`b.cmd` starts System32 Windows PowerShell with `-NoProfile` and process-only
+`-ExecutionPolicy Bypass`, then invokes only the authoritative Baseline launcher.
+The authoritative launcher, not the operator, discovers exactly one tooling
+volume and validates the externally bound guest and tooling identities.
 
-```powershell
-$t=@(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=5"|Where-Object {$_.VolumeName -ceq 'P7B_C_TOOLS'});if($t.Count-ne 1){throw 'TOOLS_CD'};& ($t[0].DeviceID+'\phase7bRunWorkPackage2CGuestBaseline.ps1') -FounderPreparationApproved
-```
-
-Clipboard sharing stays disabled. Do not use VMware Paste. Missing, duplicate,
+Clipboard sharing stays disabled. Do not use VMware Paste. A wrong drive or
+missing, duplicate,
 modified, wrong-guest or wrong-tooling binding/media stops before Baseline.
 The command reads only guest identity, marker, repository HEAD, Git/OS/Tools and
 offline HGFS state; it neither installs tooling nor writes guest evidence.

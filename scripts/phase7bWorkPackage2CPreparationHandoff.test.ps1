@@ -27,7 +27,7 @@ try {
   $again=New-Phase7BWP2CPreparationPlan $baseline $descriptor (Get-Phase7BWP2CIdentity $s.finalPath) $toolingId (Id 'b') (Id 'c') $PSScriptRoot ('d'*40) ('wp2c-prepared-'+('e'*32)) ('f'*64) ('a'*64) ('b'*64)
   $againId=Write-Phase7BWP2CCreateNewJson (Join-Path $s.root 'plan-again.json') $again
   Assert-True ($planId.sha256 -ceq $againId.sha256 -and $planId.bytes -eq $againId.bytes) 'deterministic canonical plan bytes'
-  Assert-True (@($plan.toolingManifest.files).Count -eq 13) 'current tooling closure is 13 PS plus two binaries plus manifest'
+  Assert-True (@($plan.toolingManifest.files).Count -eq 14 -and 'b.cmd' -cin @($plan.toolingManifest.files.name)) 'current tooling closure is 13 PS plus b.cmd, two binaries and manifest'
   $content=Join-Path $s.root 'prep-content'
   $made=New-Phase7BWP2CPreparationContent $planPath $planId.sha256 $content
   $received=Read-Phase7BWP2CPreparationContent $content $made.descriptorIdentity.sha256
@@ -162,7 +162,7 @@ try {
   foreach($block in $blocks){[void][Management.Automation.Language.Parser]::ParseInput($block.Groups[1].Value,[ref]$tokens,[ref]$parseErrors);Assert-True (@($parseErrors).Count -eq 0) 'guide block PS51 parse'}
   if($AgeExePath -and $AgeKeygenPath){
     $tools=Join-Path $s.root 'tooling';$toolResult=New-Phase7BWP2CToolingContent $PSScriptRoot $AgeExePath $AgeKeygenPath $tools
-    Assert-True (@(Get-ChildItem -LiteralPath $tools).Count -eq 16) 'actual generic tooling producer is exactly 16 files'
+    Assert-True (@(Get-ChildItem -LiteralPath $tools).Count -eq 17) 'actual generic tooling producer is exactly 17 files'
     [IO.File]::Copy($planPath,(Join-Path $tools 'preparation-plan.json'))
     Reject {Assert-Phase7BWP2CExactFileSet $tools (@($toolResult.manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json'))} 'plan still forbidden on tooling media'
   }

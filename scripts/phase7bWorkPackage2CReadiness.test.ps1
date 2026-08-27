@@ -179,7 +179,7 @@ try {
   $order=@('Assert-Phase7BWP2CGuestPreMutation $c','Request-Phase7BVerifiedAgeIdentity','New-Phase7BWP2CExecutionClaim','[IO.File]::Copy','Invoke-Phase7BAgeNativeIdentityDecryptionToFile','Assert-Phase7BWP2CZipBounds','Expand-Phase7BSafePacketZip','Test-Phase7BWP2CRestoredPacket','Write-Phase7BWP2CCreateNewJson $evidencePath','Complete-Phase7BWP2CExecution')
   $previous=-1;foreach($needle in $order){$index=$source.IndexOf($needle);Assert-True ($index -gt $previous) "source ordering $needle";$previous=$index}
   Assert-True ($source.LastIndexOf('Assert-Phase7BWP2CGuestPreMutation $c',$source.IndexOf('New-Phase7BWP2CExecutionClaim')) -gt $source.IndexOf('Request-Phase7BVerifiedAgeIdentity')) 'preflight repeated after identity before claim'
-  foreach($file in @($manifest.files)+@($hostArtifacts.files)){
+  foreach($file in @($manifest.files|Where-Object {$_.name -cmatch '\.(?:ps1|psm1)$'})+@($hostArtifacts.files)){
     $path=Join-Path $PSScriptRoot $file.name;$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
     Assert-True (@($errors).Count -eq 0) "PS5.1 AST $($file.name)"
     Assert-True (@($ast.FindAll({param($n)$n -is [Management.Automation.Language.ExitStatementAst]},$true)).Count -eq 0) "no raw exit $($file.name)"

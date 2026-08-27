@@ -45,8 +45,8 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
   Assert-Phase7BWP2CBaselineBinding $binding;Check $true 'source-produced binding accepted'
   $media=Join-Path $root 'media'
   $made=New-Phase7BWP2CToolingContent $source $AgeExePath $AgeKeygenPath $media $binding
-  Check (@($made.manifest.files).Count -eq 13) 'current closure has thirteen PowerShell files'
-  Check (@(Get-ChildItem -LiteralPath $media).Count -eq 17) 'bound tooling media has exact seventeen-file inventory'
+  Check (@($made.manifest.files).Count -eq 14 -and 'b.cmd' -cin @($made.manifest.files.name)) 'current closure has thirteen PowerShell files plus the bound batch launcher'
+  Check (@(Get-ChildItem -LiteralPath $media).Count -eq 18) 'bound tooling media has exact eighteen-file inventory'
   Check ($made.manifestIdentity.sha256 -ceq $binding.toolingManifestSha256) 'binding manifest pin is independently producer-derived'
   $read=Read-Phase7BWP2CBaselineBinding $media $made.baselineBindingIdentity.sha256
   Check ($read.document.guestIdentitySha256 -ceq ('c'*64) -and $read.document.operation -ceq 'Baseline') 'binding preserves authoritative guest and operation pins'
@@ -82,6 +82,14 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
   Check (@([regex]::Matches($text,"phase7bInspectWorkPackage2CGuestPreparation\.ps1")).Count -eq 1 -and $text -match '-Operation Baseline') 'launcher invokes Baseline entry exactly once'
   Check ($text -notmatch '(?i)Restore|AGE-SECRET-KEY|Invoke-WebRequest|Invoke-RestMethod|Get-Clipboard|Set-Clipboard|\\\\[A-Za-z0-9]|New-PSDrive') 'launcher has no restore secret network clipboard share path'
 
+  $batchPath=Join-Path $PSScriptRoot 'b.cmd'
+  $batchBytes=[IO.File]::ReadAllBytes($batchPath)
+  $batchText=[Text.Encoding]::ASCII.GetString($batchBytes)
+  $expectedBatch='@echo off'+[Environment]::NewLine+'"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0phase7bRunWorkPackage2CGuestBaseline.ps1" -FounderPreparationApproved'+[Environment]::NewLine
+  Check ($batchBytes.Length -gt 0 -and -not ($batchBytes[0] -eq 0xEF -and $batchBytes.Length -ge 3 -and $batchBytes[1] -eq 0xBB -and $batchBytes[2] -eq 0xBF)) 'batch launcher is nonempty and has no UTF-8 BOM'
+  Check ($batchText -ceq $expectedBatch) 'batch launcher is the exact reviewed CRLF wrapper'
+  Check (@([regex]::Matches($batchText,'phase7bRunWorkPackage2CGuestBaseline\.ps1')).Count -eq 1 -and $batchText -notmatch '(?i)restore|packet|AGE-SECRET-KEY|clipboard|invoke-webrequest|invoke-restmethod|\\\\') 'batch launcher invokes only the authoritative Baseline launcher'
+
   $driveName='Q';$existing=Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue
   if($existing){throw 'SYNTHETIC_DRIVE_COLLISION'}
   & "$env:SystemRoot\System32\subst.exe" ($driveName+':') $media
@@ -98,6 +106,11 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
       }
       Microsoft.PowerShell.Utility\New-Object @PSBoundParameters
     }
+    $shortOutput=@(& "$env:SystemRoot\System32\cmd.exe" /d /c 'Q:\b 2>&1');$shortExit=$LASTEXITCODE
+    Check ($shortExit -ne 0 -and ($shortOutput -join "`n") -match 'PHASE7B_WP2C_BASELINE_LAUNCHER_(ADMIN|TOOLING_VOLUME)') 'actual X:\b resolves b.cmd and reaches the authoritative launcher on the synthetic wrong host'
+    $explicitOutput=@(& "$env:SystemRoot\System32\cmd.exe" /d /c 'Q:\b.cmd 2>&1');$explicitExit=$LASTEXITCODE
+    Check ($explicitExit -ne 0 -and ($explicitOutput -join "`n") -match 'PHASE7B_WP2C_BASELINE_LAUNCHER_(ADMIN|TOOLING_VOLUME)') 'actual X:\b.cmd resolves and reaches the same authoritative launcher'
+    Reject {& 'R:\b'} 'wrong drive fails without wildcard selection'
     $output=@(& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved)
     Check ($global:phase7bBaselineHandoffInvocationCount -eq 1) 'actual launcher invokes synthetic Baseline boundary exactly once'
     Check ($global:phase7bBaselineHandoffArguments.operation -ceq 'Baseline' -and $global:phase7bBaselineHandoffArguments.guest -ceq ('c'*64) -and $global:phase7bBaselineHandoffArguments.manifest -ceq $binding.toolingManifestSha256 -and $global:phase7bBaselineHandoffArguments.approved) 'actual launcher forwards exact immutable pins and approval'
@@ -106,6 +119,20 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
     Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'zero tooling volumes rejected'
     function Get-CimInstance {param($ClassName,$Filter,$ErrorAction);@([pscustomobject]@{DeviceID='Q:';VolumeName='P7B_C_TOOLS'},[pscustomobject]@{DeviceID='R:';VolumeName='P7B_C_TOOLS'})}
     Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'multiple tooling volumes rejected'
+    $batchMedia=Join-Path $media 'b.cmd';$savedBatch=[IO.File]::ReadAllBytes($batchMedia)
+    Remove-Item -LiteralPath $batchMedia
+    $missingOutput=@(& "$env:SystemRoot\System32\cmd.exe" /d /c 'Q:\b 2>&1');$missingExit=$LASTEXITCODE
+    Check ($missingExit -ne 0 -and ($missingOutput -join "`n") -notmatch 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED') 'drive without b.cmd fails before Baseline'
+    function Get-CimInstance {param($ClassName,$Filter,$ErrorAction);[pscustomobject]@{DeviceID='Q:';VolumeName='P7B_C_TOOLS'}}
+    Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'missing b.cmd violates exact bound manifest closure'
+    [IO.File]::WriteAllBytes($batchMedia,$savedBatch)
+    [IO.File]::AppendAllText($batchMedia,'modified')
+    Check ((Get-Phase7BWP2CObjectHash (Get-Phase7BWP2CDependencyManifest $media)) -cne $binding.toolingManifestSha256) 'modified b.cmd invalidates the externally bound tooling manifest'
+    Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'modified b.cmd is rejected by the authoritative launcher manifest pin'
+    [IO.File]::WriteAllBytes($batchMedia,$savedBatch)
+    $global:phase7bBaselineHandoffExpectedGuest='d'*64
+    Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'wrong guest remains rejected downstream of the externally bound pin'
+    $global:phase7bBaselineHandoffExpectedGuest='c'*64
   } finally {
     & "$env:SystemRoot\System32\subst.exe" ($driveName+':') /D
     if($LASTEXITCODE -ne 0){throw 'SYNTHETIC_SUBST_REMOVE'}

@@ -75,15 +75,21 @@ function Assert-Phase7BWP2CLocalPath {
 
 function Get-Phase7BWP2CDependencyManifest {
   param([string]$SourceDirectory=$PSScriptRoot,
-    [string[]]$EntryPoints=@('phase7bRunWorkPackage2GuestRestore.ps1','phase7bInstallWorkPackage2GuestTooling.ps1','phase7bInspectWorkPackage2CGuestPreparation.ps1','phase7bTestWorkPackage2GuestIdentityEntry.ps1','phase7bRunWorkPackage2CGuestBaseline.ps1'))
+    [string[]]$EntryPoints=@('b.cmd','phase7bRunWorkPackage2GuestRestore.ps1','phase7bInstallWorkPackage2GuestTooling.ps1','phase7bInspectWorkPackage2CGuestPreparation.ps1','phase7bTestWorkPackage2GuestIdentityEntry.ps1','phase7bRunWorkPackage2CGuestBaseline.ps1'))
   $pending = New-Object 'Collections.Generic.Queue[string]'
   foreach ($name in $EntryPoints) { $pending.Enqueue($name) }
   $seen = @{}
   while ($pending.Count -gt 0) {
     $name = $pending.Dequeue()
-    Assert-Phase7BWP2C ($name -cmatch '^phase7b[A-Za-z0-9]+\.(ps1|psm1)$') 'DEPENDENCY_PATH'
+    Assert-Phase7BWP2C ($name -ceq 'b.cmd' -or $name -cmatch '^phase7b[A-Za-z0-9]+\.(ps1|psm1)$') 'DEPENDENCY_PATH'
     if ($seen.ContainsKey($name)) { continue }
     $path = Join-Path $SourceDirectory $name
+    # The single batch entry point is manifest-bound but has no transitive
+    # imports: it may invoke only the separately parsed Baseline launcher.
+    if($name -ceq 'b.cmd'){
+      $seen[$name]=Get-Phase7BWP2CIdentity $path
+      continue
+    }
     $tokens=$null; $errors=$null
     $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
     Assert-Phase7BWP2C (@($errors).Count -eq 0) 'DEPENDENCY_PARSE'
@@ -109,8 +115,8 @@ function Get-Phase7BWP2CHostEntryPoints {
 }
 
 # Preparation inputs are data, not an execution invocation/authorization. Keep
-# their producer here; the baseline launcher is the only intentional addition
-# to the current guest tooling closure.
+# their producer here; the authoritative Baseline launcher and its manifest-bound
+# b.cmd ergonomic entry point are the only intentional guest closure additions.
 function Assert-Phase7BWP2CExactProperties {
   param($Value,[string[]]$Names)
   Assert-Phase7BWP2C ($null -ne $Value -and $Value -isnot [string] -and
@@ -244,14 +250,14 @@ function Assert-Phase7BWP2CPreparationPlan {
   foreach($pair in @(@('incomingRoot','incoming'),@('restoreRoot','restore\canonical'),@('stateRoot','wp2c-state'),@('toolingRoot',('tooling\'+$b.toolingManifestSha256)))){
     Assert-Phase7BWP2C ($b.($pair[0]) -ceq (Join-Path $fixed.isolatedRoot $pair[1])) 'PREPARATION_PLAN_ROOT'
   }
-  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan.toolingManifest) -ceq $b.toolingManifestSha256 -and @($Plan.toolingManifest.files).Count -eq 13 -and $Plan.toolingManifest.secretsIncluded -ceq $false) 'PREPARATION_TOOLING_MANIFEST'
+  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $Plan.toolingManifest) -ceq $b.toolingManifestSha256 -and @($Plan.toolingManifest.files).Count -eq 14 -and $Plan.toolingManifest.secretsIncluded -ceq $false) 'PREPARATION_TOOLING_MANIFEST'
   Assert-Phase7BWP2CExactProperties $Plan.toolingManifest @('schemaVersion','kind','entryPoints','files','secretsIncluded')
   Assert-Phase7BWP2C ($Plan.toolingManifest.schemaVersion -eq 1 -and $Plan.toolingManifest.kind -ceq 'wp2c-tooling-manifest') 'PREPARATION_TOOLING_MANIFEST'
   foreach($file in $Plan.toolingManifest.files){
     Assert-Phase7BWP2CExactProperties $file @('name','sha256','bytes')
-    Assert-Phase7BWP2C ($file.name -cmatch '^phase7b[A-Za-z0-9]+\.(ps1|psm1)$' -and $file.sha256 -cmatch '^[0-9a-f]{64}$' -and [int64]$file.bytes -gt 0) 'PREPARATION_TOOLING_MANIFEST'
+    Assert-Phase7BWP2C (($file.name -ceq 'b.cmd' -or $file.name -cmatch '^phase7b[A-Za-z0-9]+\.(ps1|psm1)$') -and $file.sha256 -cmatch '^[0-9a-f]{64}$' -and [int64]$file.bytes -gt 0) 'PREPARATION_TOOLING_MANIFEST'
   }
-  foreach($name in $Plan.toolingManifest.entryPoints){Assert-Phase7BWP2C ($name -cmatch '^phase7b[A-Za-z0-9]+\.ps1$') 'PREPARATION_TOOLING_MANIFEST'}
+  foreach($name in $Plan.toolingManifest.entryPoints){Assert-Phase7BWP2C ($name -ceq 'b.cmd' -or $name -cmatch '^phase7b[A-Za-z0-9]+\.ps1$') 'PREPARATION_TOOLING_MANIFEST'}
   # Reject unknown strings/secret-shaped content before any persistence/return.
   $baseline=[ordered]@{schemaVersion=1;kind='wp2c-guest-preparation-baseline';applicationCommit=$b.applicationCommit;environmentId=$b.environmentId;observedAt='2000-01-01T00:00:00Z';mutationPerformed=$false}
   foreach($name in Get-Phase7BWP2CPreparationBaselineFields){$baseline[$name]=$b.$name}
