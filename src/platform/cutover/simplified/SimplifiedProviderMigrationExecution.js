@@ -51,7 +51,7 @@ export async function executeSimplifiedProviderMigration({
 
   try {
     await observePhase("PACKAGE_VALIDATION_STARTED");
-    const packageData = await readAndValidateCanonicalPackage(packageRoot);
+    const packageData = await readAndValidateCanonicalPackage(packageRoot, { observePhase });
     await observePhase("PACKAGE_VALIDATION_COMPLETE", {
       collectionCount: Object.keys(packageData.collections).length,
       mediaCount: packageData.manifest.files.length,
@@ -105,12 +105,14 @@ export async function executeSimplifiedProviderMigration({
       const imported = await importCanonicalPackage({
         pool,
         packageRoot,
+        packageData,
         expectedSourceIdentity: packageData.manifest.source,
         requireMigrationOperationId: true,
         targetAuthorization,
       });
       const media = await migrateCanonicalPackageMediaToSpaces({
         packageRoot,
+        packageData,
         visitSourceEntries: mediaSource.visit,
         pool,
         objectProvider,
@@ -286,7 +288,7 @@ async function assertProviderStillPreWrite(pool) {
 }
 
 async function verifyPrivateParity({ pool, objectProvider, packageRoot, packageData, ownerUserId, targetAuthorization }) {
-  const canonical = await validateCanonicalImport({ pool, packageRoot, targetAuthorization });
+  const canonical = await validateCanonicalImport({ pool, packageRoot, packageData, targetAuthorization });
   const mediaRows = await pool.query(
     "SELECT id,byte_length,sha256,storage_key,provider_version FROM physiqueos.canonical_media_objects WHERE owner_user_id=$1 ORDER BY id",
     [ownerUserId],

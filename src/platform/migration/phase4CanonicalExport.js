@@ -18,6 +18,7 @@ import {
   canonicalMimeTypeFor,
   collectCanonicalRelationships,
 } from "./canonicalReferenceProjection.js";
+import { readCanonicalRuntimeJson } from "./readCanonicalRuntimeJson.js";
 
 export const PHASE4_PACKAGE_VERSION = "phase4-canonical-package-v2";
 
@@ -114,10 +115,11 @@ export async function exportCanonicalPackage({ runtimePath, mediaRoot = null, ou
   return Object.freeze({ manifest, runtimeFile, manifestFile, sourceSha256 });
 }
 
-export async function readAndValidateCanonicalPackage(packageRoot) {
+export async function readAndValidateCanonicalPackage(packageRoot, { observePhase = async () => undefined } = {}) {
   const root = path.resolve(packageRoot);
   const manifest = JSON.parse(await fs.readFile(path.join(root, "manifest.json"), "utf8"));
-  const collections = JSON.parse(await fs.readFile(path.join(root, "canonical-runtime.json"), "utf8"));
+  const collections = await readCanonicalRuntimeJson(path.join(root, "canonical-runtime.json"), { observePhase });
+  await observePhase("CANONICAL_DIGEST_STARTED");
   const { semanticDigest, ...unsigned } = manifest;
   if (createPayloadHash(unsigned) !== semanticDigest) throw new Error("Canonical package manifest digest mismatch.");
   if (manifest.criticalValues?.canonicalStateDigest !== createPayloadHash(collections)) {
@@ -131,6 +133,8 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
   if (manifest.criticalValues?.applicationContextDigest !== createPayloadHash(applicationContext)) {
     throw new Error("Canonical package application-context digest mismatch.");
   }
+  await observePhase("CANONICAL_DIGEST_COMPLETE");
+  await observePhase("CANONICAL_CONTRACT_VALIDATION_STARTED");
   validateSerializableMigrationSourceIdentity(manifest.source);
   validateMigrationSourceKeys(collections);
   if (manifest.manifestVersion !== "2" || manifest.collectionInventory?.contractVersion !== FOUNDATION_COLLECTION_CONTRACT_VERSION) {
@@ -149,6 +153,7 @@ export async function readAndValidateCanonicalPackage(packageRoot) {
   if (missing.length) throw new Error(`Canonical package is missing required collections: ${missing.join(", ")}`);
   const extra = [...actual].filter((name) => !expected.has(name));
   if (extra.length) throw new Error(`Canonical package contains noncanonical collections: ${extra.join(", ")}`);
+  await observePhase("CANONICAL_CONTRACT_VALIDATION_COMPLETE", { collectionCount: actual.size });
   return Object.freeze({ root, manifest, collections });
 }
 

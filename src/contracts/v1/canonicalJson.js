@@ -6,7 +6,7 @@ export function canonicalJson(value) {
 
 export function createPayloadHash(value) {
   const hash = createHash("sha256");
-  updateCanonicalHash(hash, value, "$");
+  updateCanonicalHash(hash, value, []);
   return hash.digest("hex");
 }
 
@@ -20,7 +20,7 @@ function updateCanonicalHash(hash, value, path) {
     return;
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new TypeError(`${path} must contain only finite numbers.`);
+    if (!Number.isFinite(value)) throw new TypeError(`${formatPath(path)} must contain only finite numbers.`);
     hash.update(JSON.stringify(Object.is(value, -0) ? 0 : value));
     return;
   }
@@ -28,7 +28,9 @@ function updateCanonicalHash(hash, value, path) {
     hash.update("[");
     value.forEach((entry, index) => {
       if (index) hash.update(",");
-      updateCanonicalHash(hash, entry, `${path}[${index}]`);
+      path.push(index);
+      updateCanonicalHash(hash, entry, path);
+      path.pop();
     });
     hash.update("]");
     return;
@@ -36,23 +38,36 @@ function updateCanonicalHash(hash, value, path) {
   if (typeof value === "object") {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
-      throw new TypeError(`${path} must contain only JSON objects.`);
+      throw new TypeError(`${formatPath(path)} must contain only JSON objects.`);
     }
     hash.update("{");
     Object.keys(value).sort().forEach((key, index) => {
       const entry = value[key];
       if (entry === undefined || typeof entry === "function" || typeof entry === "symbol" || typeof entry === "bigint") {
-        throw new TypeError(`${path}.${key} is not JSON serializable.`);
+        path.push(key);
+        const invalidPath = formatPath(path);
+        path.pop();
+        throw new TypeError(`${invalidPath} is not JSON serializable.`);
       }
       if (index) hash.update(",");
       hash.update(JSON.stringify(key));
       hash.update(":");
-      updateCanonicalHash(hash, entry, `${path}.${key}`);
+      path.push(key);
+      updateCanonicalHash(hash, entry, path);
+      path.pop();
     });
     hash.update("}");
     return;
   }
-  throw new TypeError(`${path} is not JSON serializable.`);
+  throw new TypeError(`${formatPath(path)} is not JSON serializable.`);
+}
+
+function formatPath(segments) {
+  let result = "$";
+  for (const segment of segments) {
+    result += typeof segment === "number" ? `[${segment}]` : `.${segment}`;
+  }
+  return result;
 }
 
 function normalizeCanonicalValue(value, path) {

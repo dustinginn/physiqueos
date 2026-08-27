@@ -14,9 +14,10 @@ export async function importCanonicalPackage({
   expectedSourceIdentity = null,
   requireMigrationOperationId = false,
   targetAuthorization = null,
+  packageData: suppliedPackageData = null,
 } = {}) {
   if (!pool?.connect) throw new Error("Phase 4 import requires a PostgreSQL pool.");
-  const packageData = await readAndValidateCanonicalPackage(packageRoot);
+  const packageData = suppliedPackageData ?? await readAndValidateCanonicalPackage(packageRoot);
   if (expectedSourceIdentity) {
     assertMigrationSourceIdentityMatches(packageData.manifest.source, expectedSourceIdentity, { requireMigrationOperationId });
   }
@@ -137,8 +138,8 @@ async function upsertApplicationContext(client, ownerUserId, context = {}) {
   );
 }
 
-export async function validateCanonicalImport({ pool, packageRoot, targetAuthorization = null }) {
-  const packageData = await readAndValidateCanonicalPackage(packageRoot);
+export async function validateCanonicalImport({ pool, packageRoot, packageData: suppliedPackageData = null, targetAuthorization = null }) {
+  const packageData = suppliedPackageData ?? await readAndValidateCanonicalPackage(packageRoot);
   const owner = validateOwner(packageData.collections);
   const client = await pool.connect();
   try {

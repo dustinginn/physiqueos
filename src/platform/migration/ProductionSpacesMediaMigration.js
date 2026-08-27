@@ -22,6 +22,7 @@ export async function migrateCanonicalPackageMediaToSpaces({
   fetchImpl = globalThis.fetch,
   readSourceBytes = null,
   visitSourceEntries = null,
+  packageData: suppliedPackageData = null,
 } = {}) {
   if (!pool?.query || !objectProvider?.beginMultipartUpload || typeof fetchImpl !== "function") {
     throw new Error("Production media migration requires PostgreSQL, Spaces, and fetch adapters.");
@@ -29,7 +30,7 @@ export async function migrateCanonicalPackageMediaToSpaces({
   if (typeof visitSourceEntries !== "function" && typeof readSourceBytes !== "function" && !snapshotMediaRoot) {
     throw new Error("Production media migration requires a bounded source visitor, snapshotMediaRoot, or readSourceBytes.");
   }
-  const packageData = await readAndValidateCanonicalPackage(packageRoot);
+  const packageData = suppliedPackageData ?? await readAndValidateCanonicalPackage(packageRoot);
   const mediaRoot = snapshotMediaRoot ? path.resolve(snapshotMediaRoot) : null;
   const readEntryBytes = typeof readSourceBytes === "function" ? readSourceBytes : async (entry) => {
     const absolutePath = path.resolve(mediaRoot, ...entry.relativePath.split("/"));

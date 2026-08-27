@@ -41,8 +41,10 @@ describe("production Spaces media migration", () => {
       return { objectCount: 1, byteLength: fixture.bytes.length };
     });
     try {
+      await fs.rm(fixture.packageRoot, { recursive: true, force: true });
       await expect(migrateCanonicalPackageMediaToSpaces({
         packageRoot: fixture.packageRoot,
+        packageData: fixture.packageData,
         visitSourceEntries,
         pool,
         objectProvider: provider,
@@ -91,7 +93,8 @@ async function packageFixture() {
     files: [{ relativePath: "evidence.png", size: bytes.length, sha256, mimeType: "image/png", ownerUserId: "owner", relationshipIds: [], migrationResult: "pending", validationResult: "pending" }],
     result: "pending", validationResult: "pending",
   };
-  await fs.writeFile(path.join(packageRoot, "manifest.json"), canonicalJson({ ...unsigned, semanticDigest: createPayloadHash(unsigned) }));
+  const manifest = { ...unsigned, semanticDigest: createPayloadHash(unsigned) };
+  await fs.writeFile(path.join(packageRoot, "manifest.json"), canonicalJson(manifest));
   await fs.writeFile(path.join(packageRoot, "canonical-runtime.json"), canonicalJson(collections));
-  return { root, packageRoot, mediaRoot, bytes, sha256 };
+  return { root, packageRoot, mediaRoot, bytes, sha256, packageData: { root: packageRoot, manifest, collections } };
 }

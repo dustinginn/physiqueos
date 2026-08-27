@@ -19,6 +19,14 @@ describe("in-process simplified provider migration operation", () => {
     const request = validateSimplifiedProviderMigrationRequest(input(), context());
     const executeMigration = vi.fn(async ({ observePhase }) => {
       await observePhase("PACKAGE_VALIDATION_STARTED");
+      await observePhase("CANONICAL_FILE_READ_STARTED");
+      await observePhase("CANONICAL_FILE_READ_COMPLETE", { byteLength: 31320677 });
+      await observePhase("CANONICAL_JSON_PARSE_STARTED");
+      await observePhase("CANONICAL_JSON_PARSE_COMPLETE");
+      await observePhase("CANONICAL_DIGEST_STARTED");
+      await observePhase("CANONICAL_DIGEST_COMPLETE");
+      await observePhase("CANONICAL_CONTRACT_VALIDATION_STARTED");
+      await observePhase("CANONICAL_CONTRACT_VALIDATION_COMPLETE", { collectionCount: 39 });
       await observePhase("PACKAGE_VALIDATION_COMPLETE", { collectionCount: 39, mediaCount: 402 });
       await observePhase("MEDIA_VALIDATION_STARTED", { mediaCount: 402 });
       await observePhase("MEDIA_ARCHIVE_PROGRESS", { mediaCount: 402, mediaBytes: 288919315 });
@@ -70,6 +78,14 @@ describe("in-process simplified provider migration operation", () => {
       "ARCHIVE_LIST_COMPLETE",
       "RUNNER_ENTRY",
       "PACKAGE_VALIDATION_STARTED",
+      "CANONICAL_FILE_READ_STARTED",
+      "CANONICAL_FILE_READ_COMPLETE",
+      "CANONICAL_JSON_PARSE_STARTED",
+      "CANONICAL_JSON_PARSE_COMPLETE",
+      "CANONICAL_DIGEST_STARTED",
+      "CANONICAL_DIGEST_COMPLETE",
+      "CANONICAL_CONTRACT_VALIDATION_STARTED",
+      "CANONICAL_CONTRACT_VALIDATION_COMPLETE",
       "PACKAGE_VALIDATION_COMPLETE",
       "MEDIA_VALIDATION_STARTED",
       "MEDIA_ARCHIVE_PROGRESS",
@@ -128,6 +144,9 @@ describe("in-process simplified provider migration operation", () => {
     const cli = fs.readFileSync("scripts/runSimplifiedProviderMigration.mjs", "utf8");
     expect(`${worker}\n${operation}\n${execution}`).not.toMatch(/process\.execPath|spawn\([^)]*(?:node|npm)|execFile\([^)]*(?:node|npm)|process\.exit\s*\(/i);
     expect(execution).toContain("export async function executeSimplifiedProviderMigration");
+    expect(execution).toMatch(/importCanonicalPackage\(\{[\s\S]*?packageData,/);
+    expect(execution).toMatch(/migrateCanonicalPackageMediaToSpaces\(\{[\s\S]*?packageData,/);
+    expect(execution).toContain("validateCanonicalImport({ pool, packageRoot, packageData, targetAuthorization })");
     expect(cli).toContain("executeSimplifiedProviderMigration");
     expect(cli).not.toContain("process.exit");
   });

@@ -1,9 +1,12 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import { canonicalJson, createPayloadHash } from "../../contracts/v1/canonicalJson.js";
 import { FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS, FOUNDATION_SOURCE_COLLECTIONS } from "./foundationSourceCollections.js";
 import { PHASE4_PACKAGE_VERSION, captureReadOnlyFounderSnapshot, exportCanonicalPackage, readAndValidateCanonicalPackage } from "./phase4CanonicalExport.js";
+import { readCanonicalRuntimeJson } from "./readCanonicalRuntimeJson.js";
 import { createFixedBuildIdentityProvider, deriveTrustedMigrationSourceIdentity } from "./MigrationSourceIdentity.js";
 import { importCanonicalPackage } from "./phase4CanonicalImport.js";
 
@@ -28,13 +31,27 @@ describe("Phase 4 deterministic copy-only export", () => {
       expect(first.manifest.collectionInventory.excluded.every((entry) => entry.sourcePresent === false)).toBe(true);
       expect(Object.keys(JSON.parse(await fs.readFile(first.runtimeFile, "utf8")))).not.toEqual(expect.arrayContaining(["operatingRhythm", "adaptiveTrustProfile", "milestones"]));
       expect(first.manifest.files[0]).toMatchObject({ relativePath: "photo.jpg", ownerUserId: "synthetic-user", mimeType: "image/jpeg" });
-      await expect(readAndValidateCanonicalPackage(path.join(root, "package-a"))).resolves.toMatchObject({ manifest: { validationResult: "pending" } });
+      const observePhase = vi.fn(async () => undefined);
+      const packageData = await readAndValidateCanonicalPackage(path.join(root, "package-a"), { observePhase });
+      expect(packageData).toMatchObject({ manifest: { validationResult: "pending" } });
+      expect(observePhase.mock.calls.map(([phase]) => phase)).toEqual([
+        "CANONICAL_FILE_READ_STARTED",
+        "CANONICAL_JSON_PARSE_STARTED",
+        "CANONICAL_FILE_READ_COMPLETE",
+        "CANONICAL_JSON_PARSE_COMPLETE",
+        "CANONICAL_DIGEST_STARTED",
+        "CANONICAL_DIGEST_COMPLETE",
+        "CANONICAL_CONTRACT_VALIDATION_STARTED",
+        "CANONICAL_CONTRACT_VALIDATION_COMPLETE",
+      ]);
       const wrongExpectedIdentity = structuredClone(sourceIdentity);
       wrongExpectedIdentity.application.buildId = "stale-pre-fence-build";
       const connect = vi.fn();
+      await fs.rm(path.join(root, "package-a"), { recursive: true, force: true });
       await expect(importCanonicalPackage({
         pool: { connect },
         packageRoot: path.join(root, "package-a"),
+        packageData,
         expectedSourceIdentity: wrongExpectedIdentity,
       })).rejects.toThrow(/source identity mismatch/i);
       expect(connect).not.toHaveBeenCalled();
@@ -79,6 +96,40 @@ describe("Phase 4 deterministic copy-only export", () => {
       await fs.writeFile(runtimeFile, JSON.stringify(runtime));
       await expect(exportCanonicalPackage({ runtimePath: runtimeFile, outputRoot: path.join(root, "package"), sourceIdentity: await identity(runtimeFile) })).rejects.toThrow("missing required collections: goals");
     } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
+});
+
+describe("canonical package hashing memory repair", () => {
+  it("parses top-level canonical collections incrementally across tiny UTF-8 chunks", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "physiqueos-canonical-stream-"));
+    try {
+      const file = path.join(root, "canonical-runtime.json");
+      const expected = { user: { id: "founder-ü", note: "escaped \\\" value" }, goals: [{ id: "g1", nested: { enabled: true } }], empty: [] };
+      await fs.writeFile(file, `${JSON.stringify(expected)}\n`);
+      await expect(readCanonicalRuntimeJson(file, { highWaterMark: 7 })).resolves.toEqual(expected);
+      await fs.writeFile(file, '{"user":{},"user":{}}');
+      await expect(readCanonicalRuntimeJson(file, { highWaterMark: 5 })).rejects.toThrow(/duplicate collection user/i);
+      await fs.writeFile(file, '{"user":{},}');
+      await expect(readCanonicalRuntimeJson(file, { highWaterMark: 4 })).rejects.toThrow(/trailing object separator/i);
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
+
+  it("retains exact digest semantics for a large nested runtime shape", () => {
+    const value = {
+      collections: Array.from({ length: 4000 }, (_, index) => ({
+        id: `record-${index}`,
+        payload: "x".repeat(1024),
+        nested: { index, enabled: index % 2 === 0, values: [index, null, `v-${index}`] },
+      })),
+    };
+    expect(createPayloadHash(value)).toBe(createHash("sha256").update(canonicalJson(value)).digest("hex"));
+  });
+
+  it("retains precise lazy error paths", () => {
+    expect(() => createPayloadHash({ collections: [{ nested: { invalid: Number.POSITIVE_INFINITY } }] }))
+      .toThrow("$.collections[0].nested.invalid must contain only finite numbers.");
+    expect(() => createPayloadHash({ collections: [{ invalid: undefined }] }))
+      .toThrow("$.collections[0].invalid is not JSON serializable.");
   });
 });
 
