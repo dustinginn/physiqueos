@@ -17,7 +17,13 @@ const PROVIDER_COMMIT = "e".repeat(40);
 describe("in-process simplified provider migration operation", () => {
   it("invokes the migration function exactly once inside the existing worker and cleans transport", async () => {
     const request = validateSimplifiedProviderMigrationRequest(input(), context());
-    const executeMigration = vi.fn(async () => ({ ready: true, phase: "pre-import", firstPostgresWriteAt: null, authorityTransferred: false }));
+    const executeMigration = vi.fn(async ({ observePhase }) => {
+      await observePhase("PACKAGE_VALIDATION_STARTED");
+      await observePhase("PACKAGE_VALIDATION_COMPLETE", { collectionCount: 39, mediaCount: 402 });
+      await observePhase("PREIMPORT_GATE_STARTED");
+      await observePhase("PREIMPORT_GATE_COMPLETE", { ready: true });
+      return { ready: true, phase: "pre-import", firstPostgresWriteAt: null, authorityTransferred: false };
+    });
     const cleanup = vi.fn(async () => ({ deletedExactVersion: true, localRemoved: true }));
     const store = operationStore();
     const handler = createSimplifiedProviderMigrationWorkerHandler({
@@ -26,7 +32,13 @@ describe("in-process simplified provider migration operation", () => {
       executeMigration,
       createEnvironment: async () => ({
         env: {}, pool: { query: vi.fn() }, objectProvider: {},
-        transport: { materialize: vi.fn(async () => ({ packageRoot: "/tmp/package", mediaRoot: "/tmp/media", cleanup })) },
+        transport: { materialize: vi.fn(async (_input, { observePhase }) => {
+          await observePhase("TRANSPORT_STREAM_HASH_STARTED", { expectedByteLength: 321998848 });
+          await observePhase("TRANSPORT_STREAM_HASH_COMPLETE", { byteLength: 321998848 });
+          await observePhase("ARCHIVE_LIST_STARTED");
+          await observePhase("ARCHIVE_LIST_COMPLETE", { entryCount: 412 });
+          return { packageRoot: "/tmp/package", mediaRoot: "/tmp/media", cleanup };
+        }) },
         transportSummary: () => ({ privateVersionedSpace: true }),
         close: vi.fn(),
       }),
@@ -45,6 +57,23 @@ describe("in-process simplified provider migration operation", () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
     expect(store.succeed).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ state: "succeeded", inProcess: true, workerPid: process.pid });
+    expect(store.markPhase.mock.calls.map(([, marker]) => marker.phase)).toEqual([
+      "ENVIRONMENT_CONSTRUCTION_STARTED",
+      "ENVIRONMENT_CONSTRUCTION_COMPLETE",
+      "TRANSPORT_STREAM_HASH_STARTED",
+      "TRANSPORT_STREAM_HASH_COMPLETE",
+      "ARCHIVE_LIST_STARTED",
+      "ARCHIVE_LIST_COMPLETE",
+      "RUNNER_ENTRY",
+      "PACKAGE_VALIDATION_STARTED",
+      "PACKAGE_VALIDATION_COMPLETE",
+      "PREIMPORT_GATE_STARTED",
+      "PREIMPORT_GATE_COMPLETE",
+      "RUNNER_EXIT",
+      "TRANSPORT_CLEANUP_STARTED",
+      "TRANSPORT_CLEANUP_COMPLETE",
+    ]);
+    expect(result.diagnosticPhases.every((marker) => marker.memory.rss > 0 && marker.workerPid === process.pid)).toBe(true);
   });
 
   it("converts a migration exception to a structured failed operation and remains callable", async () => {
@@ -107,6 +136,7 @@ function payload(request) {
 function operationStore() {
   return {
     markRunning: vi.fn(async (commandId) => ({ result: { commandId, state: "running" } })),
+    markPhase: vi.fn(async () => ({})),
     succeed: vi.fn(async () => ({})),
     fail: vi.fn(async () => ({})),
   };

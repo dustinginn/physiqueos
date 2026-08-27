@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { canonicalJson, createPayloadHash } from "./canonicalJson";
@@ -19,6 +20,20 @@ describe("Phase 1 application contracts", () => {
   it("hashes canonical JSON independently of object key order", () => {
     expect(canonicalJson({ z: 1, a: { y: 2, x: 3 } })).toBe('{"a":{"x":3,"y":2},"z":1}');
     expect(createPayloadHash({ b: 2, a: 1 })).toBe(createPayloadHash({ a: 1, b: 2 }));
+  });
+
+  it("streams canonical hashing without constructing the complete canonical JSON string", () => {
+    const value = {
+      records: Array.from({ length: 8_000 }, (_, index) => ({
+        id: `record-${index}`,
+        nested: { z: index, a: `payload-${index}-${"x".repeat(128)}` },
+      })),
+    };
+    const expected = createHash("sha256").update(canonicalJson(value)).digest("hex");
+    expect(createPayloadHash(value)).toBe(expected);
+    const source = fs.readFileSync(new URL("./canonicalJson.js", import.meta.url), "utf8");
+    const implementation = source.slice(source.indexOf("export function createPayloadHash"), source.indexOf("function updateCanonicalHash"));
+    expect(implementation).not.toContain("canonicalJson(value)");
   });
 
   it("returns stable problem details and hides unclassified error details", () => {

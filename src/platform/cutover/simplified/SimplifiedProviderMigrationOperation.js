@@ -6,6 +6,28 @@ import { SIMPLIFIED_PROVIDER_PHASES } from "./SimplifiedProviderMigrationExecuti
 export const SIMPLIFIED_PROVIDER_OPERATION_VERSION = "simplified-provider-migration-operation-v1";
 export const SIMPLIFIED_PROVIDER_OPERATION_TOPIC = "operations.simplified-provider-migration";
 export const SIMPLIFIED_PROVIDER_OPERATION_PAYLOAD_VERSION = "simplified-provider-migration-outbox-v1";
+export const SIMPLIFIED_PROVIDER_DIAGNOSTIC_PHASES = Object.freeze([
+  "ENVIRONMENT_CONSTRUCTION_STARTED",
+  "ENVIRONMENT_CONSTRUCTION_COMPLETE",
+  "TRANSPORT_STREAM_HASH_STARTED",
+  "TRANSPORT_STREAM_HASH_COMPLETE",
+  "ARCHIVE_LIST_STARTED",
+  "ARCHIVE_LIST_COMPLETE",
+  "ARCHIVE_EXTRACT_STARTED",
+  "ARCHIVE_EXTRACT_COMPLETE",
+  "ARCHIVE_LAYOUT_VALIDATION_STARTED",
+  "ARCHIVE_LAYOUT_VALIDATION_COMPLETE",
+  "RUNNER_ENTRY",
+  "PACKAGE_VALIDATION_STARTED",
+  "PACKAGE_VALIDATION_COMPLETE",
+  "MEDIA_VALIDATION_STARTED",
+  "MEDIA_VALIDATION_COMPLETE",
+  "PREIMPORT_GATE_STARTED",
+  "PREIMPORT_GATE_COMPLETE",
+  "RUNNER_EXIT",
+  "TRANSPORT_CLEANUP_STARTED",
+  "TRANSPORT_CLEANUP_COMPLETE",
+]);
 
 export function validateSimplifiedProviderMigrationRequest(input = {}, context = {}) {
   const request = Object.freeze({
@@ -121,6 +143,18 @@ export function createPostgresSimplifiedProviderMigrationOperationStore({
       if (!row) throw operationError("SIMPLIFIED_PROVIDER_OPERATION_NOT_RUNNABLE", "The provider operation is missing or no longer runnable.");
       return mapOperation(row);
     },
+    async markPhase(commandId, marker) {
+      const at = clock();
+      const row = (await pool.query(
+        `UPDATE physiqueos.operations SET version=version+1,updated_at=$4,
+           result=jsonb_set(result,'{diagnosticPhases}',
+             COALESCE(result->'diagnosticPhases','[]'::jsonb) || $3::jsonb,true)
+         WHERE id=$1 AND operation_type=$2 AND status='running' RETURNING *`,
+        [commandId, SIMPLIFIED_PROVIDER_OPERATION_VERSION, JSON.stringify([marker]), at],
+      )).rows[0];
+      if (!row) throw operationError("SIMPLIFIED_PROVIDER_OPERATION_NOT_RUNNABLE", "The provider operation could not record its diagnostic phase.");
+      return mapOperation(row);
+    },
     async succeed(commandId, result) {
       const at = clock();
       const row = (await pool.query(
@@ -169,7 +203,7 @@ export function createSimplifiedProviderMigrationWorkerHandler({
   logger,
   clock = () => new Date(),
 } = {}) {
-  if (!store?.markRunning || !store?.succeed || !store?.fail) throw new Error("Simplified provider worker requires durable operation storage.");
+  if (!store?.markRunning || !store?.markPhase || !store?.succeed || !store?.fail) throw new Error("Simplified provider worker requires durable operation storage.");
   if (typeof createEnvironment !== "function" || typeof executeMigration !== "function") throw new Error("Simplified provider worker requires in-process environment and execution functions.");
   return async function handle({ messageId, payloadVersion, payload }) {
     if (payloadVersion !== SIMPLIFIED_PROVIDER_OPERATION_PAYLOAD_VERSION) {
@@ -180,11 +214,27 @@ export function createSimplifiedProviderMigrationWorkerHandler({
       throw operationError("SIMPLIFIED_PROVIDER_PAYLOAD_FINGERPRINT_MISMATCH", "The simplified provider operation fingerprint is invalid.");
     }
     const running = await store.markRunning(request.commandId);
+    const diagnosticPhases = [];
+    const observePhase = async (phase, details = {}) => {
+      const marker = diagnosticMarker(phase, details, clock);
+      diagnosticPhases.push(marker);
+      await store.markPhase(request.commandId, marker);
+      logger?.info?.("simplified_provider_migration.phase", {
+        commandId: request.commandId,
+        phase: marker.phase,
+        rss: marker.memory.rss,
+        heapUsed: marker.memory.heapUsed,
+        maxRssBytes: marker.memory.maxRssBytes,
+      });
+    };
     let environment;
     let materialized;
     try {
+      await observePhase("ENVIRONMENT_CONSTRUCTION_STARTED");
       environment = await createEnvironment({ request });
-      materialized = await environment.transport.materialize(request.transport);
+      await observePhase("ENVIRONMENT_CONSTRUCTION_COMPLETE");
+      materialized = await environment.transport.materialize(request.transport, { observePhase });
+      await observePhase("RUNNER_ENTRY");
       const execution = await executeMigration({
         phase: request.phase,
         execute: request.execute,
@@ -192,15 +242,20 @@ export function createSimplifiedProviderMigrationWorkerHandler({
         pool: environment.pool,
         objectProvider: environment.objectProvider,
         args: toExecutionArgs(request, materialized, messageId),
+        observePhase,
       });
+      await observePhase("RUNNER_EXIT");
+      await observePhase("TRANSPORT_CLEANUP_STARTED");
       const cleanup = await materialized.cleanup();
       materialized = null;
+      await observePhase("TRANSPORT_CLEANUP_COMPLETE", cleanup);
       const result = Object.freeze({
         ...running.result,
         state: "succeeded",
         completedAt: clock().toISOString(),
         execution: safeExecutionResult(execution),
         transport: { ...environment.transportSummary(request.transport), ...cleanup },
+        diagnosticPhases,
         inProcess: true,
         workerPid: process.pid,
       });
@@ -214,6 +269,7 @@ export function createSimplifiedProviderMigrationWorkerHandler({
         ...running.result,
         state: "failed",
         completedAt: clock().toISOString(),
+        diagnosticPhases,
         inProcess: true,
         workerPid: process.pid,
       });
@@ -329,6 +385,35 @@ function safeProblem(error) {
     code: /^[A-Z0-9_]{3,80}$/.test(code) ? code : "SIMPLIFIED_PROVIDER_OPERATION_FAILED",
     message: "The in-process provider migration operation failed; inspect protected worker logs.",
   });
+}
+function diagnosticMarker(phase, details, clock) {
+  if (!SIMPLIFIED_PROVIDER_DIAGNOSTIC_PHASES.includes(phase)) {
+    throw operationError("SIMPLIFIED_PROVIDER_DIAGNOSTIC_PHASE_INVALID", "The provider diagnostic phase is invalid.");
+  }
+  const memory = process.memoryUsage();
+  const maximumRss = process.resourceUsage().maxRSS;
+  return Object.freeze({
+    phase,
+    observedAt: clock().toISOString(),
+    workerPid: process.pid,
+    memory: Object.freeze({
+      rss: memory.rss,
+      heapTotal: memory.heapTotal,
+      heapUsed: memory.heapUsed,
+      external: memory.external,
+      arrayBuffers: memory.arrayBuffers,
+      maxRssBytes: process.platform === "linux" ? maximumRss * 1024 : maximumRss,
+    }),
+    details: safeDiagnosticDetails(details),
+  });
+}
+function safeDiagnosticDetails(details) {
+  const safe = {};
+  for (const [key, value] of Object.entries(details ?? {})) {
+    if (/^(?:expectedByteLength|byteLength|archiveBytes|entryCount|listingBytes|extractedBytes|extractedFiles|temporaryFreeBytes|temporaryTotalBytes|collectionCount|mediaCount|mediaBytes|deletedExactVersion|localRemoved|ready)$/.test(key)
+      && (value === null || ["string", "number", "boolean"].includes(typeof value))) safe[key] = value;
+  }
+  return Object.freeze(safe);
 }
 function requiredPhase(value) {
   const phase = required(value, "phase");

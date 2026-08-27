@@ -31,6 +31,7 @@ export async function executeSimplifiedProviderMigration({
   env = process.env,
   pool: suppliedPool = null,
   objectProvider: suppliedObjectProvider = null,
+  observePhase = async () => undefined,
 } = {}) {
   assertPhase(phase, execute);
   assertSimplifiedProviderExecutionBoundary(env);
@@ -48,17 +49,27 @@ export async function executeSimplifiedProviderMigration({
   const operationId = required(args.migrationOperationId, "migrationOperationId");
 
   try {
+    await observePhase("PACKAGE_VALIDATION_STARTED");
     const packageData = await readAndValidateCanonicalPackage(packageRoot);
+    await observePhase("PACKAGE_VALIDATION_COMPLETE", {
+      collectionCount: Object.keys(packageData.collections).length,
+      mediaCount: packageData.manifest.files.length,
+    });
     const ownerUserId = String(packageData.collections.user?.id ?? "");
     assertPackageIdentity(packageData.manifest, args, operationId);
+    await observePhase("MEDIA_VALIDATION_STARTED", { mediaCount: packageData.manifest.files.length });
     const mediaSource = await verifyMediaSnapshot({ packageData, mediaRoot });
+    await observePhase("MEDIA_VALIDATION_COMPLETE", {
+      mediaCount: mediaSource.objectCount,
+      mediaBytes: mediaSource.byteLength,
+    });
     const databaseName = (await pool.query("SELECT current_database() AS database")).rows[0]?.database;
     const migrationNames = (await pool.query(
       "SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY run_on,id",
     )).rows.map((row) => row.name);
     assertSimplifiedSchema(migrationNames);
     const preImport = ["pre-import", "import-and-validate"].includes(phase)
-      ? await inspectPreImport({
+      ? await inspectPreImportObserved({
           pool,
           objectProvider,
           packageData,
@@ -66,6 +77,7 @@ export async function executeSimplifiedProviderMigration({
           syntheticUserId: required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID"),
           createMediaObjectId: createPhase4MediaObjectId,
           currentOutboxMessageId: args.currentOutboxMessageId ?? null,
+          observePhase,
         })
       : null;
     if (!preImport) await assertProviderStillPreWrite(pool);
@@ -143,6 +155,13 @@ export async function executeSimplifiedProviderMigration({
     if (ownsObjectProvider) objectProvider.close();
     if (ownsPool) await pool.end();
   }
+}
+
+async function inspectPreImportObserved(input) {
+  await input.observePhase("PREIMPORT_GATE_STARTED");
+  const result = await inspectPreImport(input);
+  await input.observePhase("PREIMPORT_GATE_COMPLETE", { ready: result.ready === true });
+  return result;
 }
 
 async function verifyMediaSnapshot({ packageData, mediaRoot }) {

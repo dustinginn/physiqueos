@@ -15,7 +15,7 @@ export function createSimplifiedProviderMigrationTransport({
     throw new Error("Simplified migration transport requires private versioned object access.");
   }
   return Object.freeze({
-    async materialize(input = {}) {
+    async materialize(input = {}, { observePhase = async () => undefined } = {}) {
       const objectKey = requireTransportKey(input.objectKey);
       const expectedByteLength = requireInteger(input.byteLength, "byteLength", 1, MAXIMUM_TRANSPORT_BYTES);
       const expectedSha256 = requireDigest(input.sha256, "sha256");
@@ -25,6 +25,10 @@ export function createSimplifiedProviderMigrationTransport({
       let providerVersion = null;
       let cleaned = false;
       try {
+        await observePhase("TRANSPORT_STREAM_HASH_STARTED", {
+          expectedByteLength,
+          ...await temporaryStorage(root),
+        });
         const downloaded = await objectProvider.downloadObjectToFile({
           objectKey,
           destination: archive,
@@ -32,11 +36,28 @@ export function createSimplifiedProviderMigrationTransport({
           expectedSha256,
         });
         providerVersion = downloaded.providerVersion;
+        await observePhase("TRANSPORT_STREAM_HASH_COMPLETE", {
+          byteLength: downloaded.byteLength,
+          archiveBytes: (await fs.stat(archive)).size,
+          ...await temporaryStorage(root),
+        });
+        await observePhase("ARCHIVE_LIST_STARTED");
         const entries = await tarEntries({ archive, spawnProcess });
+        await observePhase("ARCHIVE_LIST_COMPLETE", {
+          entryCount: entries.length,
+          listingBytes: Buffer.byteLength(entries.join("\n")),
+        });
+        await observePhase("ARCHIVE_LAYOUT_VALIDATION_STARTED");
         const packageDirectory = validateArchiveEntries(entries);
+        await observePhase("ARCHIVE_LAYOUT_VALIDATION_COMPLETE", { entryCount: entries.length });
         await fs.mkdir(extracted);
+        await observePhase("ARCHIVE_EXTRACT_STARTED", await temporaryStorage(root));
         await runTar(spawnProcess, ["-xf", archive, "-C", extracted]);
-        await assertNoLinksOrSpecialFiles(extracted);
+        const extractedInventory = await assertNoLinksOrSpecialFiles(extracted);
+        await observePhase("ARCHIVE_EXTRACT_COMPLETE", {
+          ...extractedInventory,
+          ...await temporaryStorage(root),
+        });
         const packageRoot = path.join(extracted, packageDirectory);
         const mediaRoot = path.join(extracted, "media");
         await Promise.all([
@@ -125,6 +146,8 @@ function runTar(spawnProcess, args, { captureStdout = false } = {}) {
 }
 
 async function assertNoLinksOrSpecialFiles(root) {
+  let extractedBytes = 0;
+  let extractedFiles = 0;
   async function walk(directory) {
     const entries = await fs.readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
@@ -134,9 +157,22 @@ async function assertNoLinksOrSpecialFiles(root) {
         throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive contains a link or special file.");
       }
       if (stat.isDirectory()) await walk(target);
+      else {
+        extractedBytes += stat.size;
+        extractedFiles += 1;
+      }
     }
   }
   await walk(root);
+  return Object.freeze({ extractedBytes, extractedFiles });
+}
+
+async function temporaryStorage(root) {
+  const stats = await fs.statfs(root);
+  return Object.freeze({
+    temporaryFreeBytes: Number(stats.bavail) * Number(stats.bsize),
+    temporaryTotalBytes: Number(stats.blocks) * Number(stats.bsize),
+  });
 }
 
 async function requireFile(target) {

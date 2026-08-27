@@ -25,11 +25,12 @@ describe("simplified provider private transport", () => {
       deleteObject,
     };
     const transport = createSimplifiedProviderMigrationTransport({ objectProvider });
+    const observePhase = vi.fn(async () => undefined);
     const materialized = await transport.materialize({
       objectKey: "migration-staging/simplified-rev142-20260827/accepted-package.tar",
       byteLength: fixture.bytes,
       sha256: fixture.sha256,
-    });
+    }, { observePhase });
     expect(fs.existsSync(path.join(materialized.packageRoot, "manifest.json"))).toBe(true);
     expect(fs.existsSync(path.join(materialized.mediaRoot, "photos", "photo.jpg"))).toBe(true);
     await expect(materialized.cleanup()).resolves.toEqual({ deletedExactVersion: true, localRemoved: true });
@@ -38,6 +39,17 @@ describe("simplified provider private transport", () => {
       providerVersion: "version-exact-1",
     });
     expect(fs.existsSync(materialized.packageRoot)).toBe(false);
+    expect(observePhase.mock.calls.map(([phase]) => phase)).toEqual([
+      "TRANSPORT_STREAM_HASH_STARTED",
+      "TRANSPORT_STREAM_HASH_COMPLETE",
+      "ARCHIVE_LIST_STARTED",
+      "ARCHIVE_LIST_COMPLETE",
+      "ARCHIVE_LAYOUT_VALIDATION_STARTED",
+      "ARCHIVE_LAYOUT_VALIDATION_COMPLETE",
+      "ARCHIVE_EXTRACT_STARTED",
+      "ARCHIVE_EXTRACT_COMPLETE",
+    ]);
+    expect(observePhase.mock.calls.at(-1)[1]).toMatchObject({ extractedFiles: 3, extractedBytes: expect.any(Number) });
   });
 
   it("does not accept an unsafe key or an unbounded transport size", async () => {
