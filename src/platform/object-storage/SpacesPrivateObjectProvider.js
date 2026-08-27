@@ -12,6 +12,10 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { rm } from "node:fs/promises";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { requirePrivateMediaObjectId } from "../../contracts/v1/mediaIdentifiers.js";
 
 const MAX_READ_SECONDS = 300;
@@ -69,6 +73,43 @@ export function createSpacesPrivateObjectProvider(config, { client, healthClient
         sha256: await hashBody(content.Body),
         etag: stripQuotes(result.ETag), providerVersion: result.VersionId ?? providerVersion,
       });
+    },
+    async downloadObjectToFile({ objectKey, providerVersion = null, destination, expectedByteLength, expectedSha256 }) {
+      const head = await s3.send(new HeadObjectCommand({
+        Bucket: config.bucket,
+        Key: objectKey,
+        VersionId: providerVersion ?? undefined,
+      }));
+      const exactVersion = head.VersionId ?? providerVersion;
+      if (!exactVersion || Number(head.ContentLength) !== Number(expectedByteLength)) {
+        throw providerHealthError("OBJECT_DOWNLOAD_IDENTITY_MISMATCH", "Private object size/version did not match the expected transport identity.");
+      }
+      const result = await s3.send(new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: objectKey,
+        VersionId: exactVersion,
+      }));
+      const hash = createHash("sha256");
+      let byteLength = 0;
+      const meter = new Transform({
+        transform(chunk, _encoding, callback) {
+          byteLength += chunk.length;
+          hash.update(chunk);
+          callback(null, chunk);
+        },
+      });
+      try {
+        await pipeline(result.Body, meter, createWriteStream(destination, { flags: "wx" }));
+        const sha256 = hash.digest("hex");
+        if (byteLength !== Number(expectedByteLength) || sha256 !== String(expectedSha256).toLowerCase()) {
+          throw providerHealthError("OBJECT_DOWNLOAD_IDENTITY_MISMATCH", "Private object content did not match the expected transport identity.");
+        }
+        return Object.freeze({ objectKey, providerVersion: exactVersion, byteLength, sha256 });
+      } catch (error) {
+        await rm(destination, { force: true }).catch(() => undefined);
+        error.providerVersion ??= exactVersion;
+        throw error;
+      }
     },
     async authorizeRead({ objectKey, providerVersion = null, expiresInSeconds = MAX_READ_SECONDS }) {
       const expiresIn = clampSeconds(expiresInSeconds, MAX_READ_SECONDS);

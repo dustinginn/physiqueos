@@ -33,6 +33,12 @@ export const COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX = "/api/v1/operations/co
 export const PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH = "/api/v1/operations/production-migration-dry-runs";
 const PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID = /^[A-Za-z0-9._:-]{8,160}$/;
 
+// The simplified provider migration command is also machine-to-provider and retains the same
+// operations-bearer authentication inside its exact routes. Exempt only its collection POST and
+// one command-status segment from the Founder cookie middleware.
+export const SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH = "/api/v1/operations/simplified-provider-migrations";
+const SIMPLIFIED_PROVIDER_MIGRATION_COMMAND_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
+
 const PUBLIC_EXACT_PATHS = new Set([
   "/api/v1/health/live",
   "/api/v1/health/ready",
@@ -59,6 +65,10 @@ export function isPublicPath(pathname) {
   if (pathname === PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH) return true;
   if (pathname.startsWith(`${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/`)) {
     return PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID.test(pathname.slice(PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH.length + 1));
+  }
+  if (pathname === SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH) return true;
+  if (pathname.startsWith(`${SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH}/`)) {
+    return SIMPLIFIED_PROVIDER_MIGRATION_COMMAND_ID.test(pathname.slice(SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH.length + 1));
   }
   return false;
 }

@@ -12,6 +12,16 @@ import { createProviderMigrationDryRunWorkerHandler } from "../src/platform/cuto
 import { PROVIDER_MIGRATION_DRY_RUN_TOPIC } from "../src/platform/cutover/ProviderMigrationDryRunContract.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "../src/platform/cutover/PostgresCombinedRuntimeAuthorityStore.js";
 import { createAuthorityGatedWorker } from "../src/platform/jobs/AuthorityGatedWorker.js";
+import { readSpacesConfig } from "../src/platform/object-storage/spacesConfig.js";
+import { createSpacesPrivateObjectProvider } from "../src/platform/object-storage/SpacesPrivateObjectProvider.js";
+import {
+  SIMPLIFIED_PROVIDER_OPERATION_TOPIC,
+  createPostgresSimplifiedProviderMigrationOperationStore,
+  createSimplifiedProviderMigrationWorkerHandler,
+} from "../src/platform/cutover/simplified/SimplifiedProviderMigrationOperation.js";
+import { executeSimplifiedProviderMigration } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationExecution.js";
+import { createSimplifiedProviderMigrationTransport } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationTransport.js";
+import { simplifiedProviderMigrationValidationContext } from "../src/platform/cutover/simplified/SimplifiedProviderMigrationProductComposition.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
@@ -36,6 +46,13 @@ if (compatibilityMode) {
     throw error;
   }
 }
+
+const simplifiedOperationStore = process.env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED === "1"
+  ? createPostgresSimplifiedProviderMigrationOperationStore({
+      pool,
+      ownerUserId: required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID"),
+    })
+  : null;
 
 const handlers = Object.freeze({
   "foundation.synthetic": async ({ messageId }) => logger.info("foundation.synthetic", { messageId }),
@@ -74,6 +91,29 @@ const handlers = Object.freeze({
           sha256: required(process.env.PHYSIQUEOS_EXPECTED_FINAL_BACKUP_SHA256SUMS_SHA256, "PHYSIQUEOS_EXPECTED_FINAL_BACKUP_SHA256SUMS_SHA256"),
         }),
       }),
+      logger,
+    }),
+  } : {}),
+  ...(simplifiedOperationStore ? {
+    [SIMPLIFIED_PROVIDER_OPERATION_TOPIC]: createSimplifiedProviderMigrationWorkerHandler({
+      store: simplifiedOperationStore,
+      validationContext: simplifiedProviderMigrationValidationContext(process.env),
+      executeMigration: executeSimplifiedProviderMigration,
+      createEnvironment: async () => {
+        const objectProvider = createSpacesPrivateObjectProvider(readSpacesConfig(process.env));
+        return Object.freeze({
+          env: process.env,
+          pool,
+          objectProvider,
+          transport: createSimplifiedProviderMigrationTransport({ objectProvider }),
+          transportSummary: (transport) => Object.freeze({
+            byteLength: transport.byteLength,
+            sha256: transport.sha256,
+            privateVersionedSpace: true,
+          }),
+          close: async () => objectProvider.close(),
+        });
+      },
       logger,
     }),
   } : {}),
