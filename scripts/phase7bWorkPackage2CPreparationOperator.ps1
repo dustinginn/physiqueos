@@ -7,6 +7,7 @@ param(
   [string]$ContinuationPath,[string]$ContinuationSha256,
   [string]$VmBindingPath,[string]$VmBindingSha256,[string]$StoppedVmxSha256,
   [string]$BaselineHandoffPath,[string]$BaselineHandoffSha256,
+  [string]$ImmediateBaselineHandoffPath,[string]$ImmediateBaselineHandoffSha256,
   [switch]$FounderPreparationApproved
 )
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
@@ -75,10 +76,12 @@ try {
   Assert-Phase7BWP2C (([bool]$ContinuationPath -eq [bool]$ContinuationSha256) -and
     ([bool]$VmBindingPath -eq [bool]$VmBindingSha256) -and
     ([bool]$BaselineHandoffPath -eq [bool]$BaselineHandoffSha256) -and
+    ([bool]$ImmediateBaselineHandoffPath -eq [bool]$ImmediateBaselineHandoffSha256) -and
     @(@($ContinuationPath,$VmBindingPath,$BaselineHandoffPath)|Where-Object {$_}).Count -le 1) 'CONTINUATION_EXPLICIT_SELECTION'
   Assert-Phase7BWP2C (-not $ContinuationPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
   Assert-Phase7BWP2C (-not $VmBindingPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
   Assert-Phase7BWP2C (-not $BaselineHandoffPath -or $Mode -notin @('Initialize','BuildTooling','CreateContinuation','CreateVmBindingContinuation','CreateBaselineHandoffContinuation')) 'CONTINUATION_EXPLICIT_SELECTION'
+  Assert-Phase7BWP2C (-not $ImmediateBaselineHandoffPath -or $Mode -ceq 'CreateBaselineHandoffContinuation') 'BASELINE_HANDOFF_IMMEDIATE_PARENT_INPUT'
   Assert-Phase7BWP2C (-not $StoppedVmxSha256 -or $Mode -in @('CreateVmBindingContinuation','CreateBaselineHandoffContinuation')) 'VM_BINDING_CONTINUATION_INPUT'
   if($Mode -ceq 'CreateContinuation'){
     $made=New-Phase7BWP2CPreparationContinuation $SessionRoot $OriginalSessionSha256 $OriginalInventorySha256 $OriginalVmxSha256 $repo $ToolingCommit
@@ -97,7 +100,7 @@ try {
   }
   if($Mode -ceq 'CreateBaselineHandoffContinuation'){
     Assert-Phase7BWP2C ($VmBindingPath -and $SessionRoot -ceq (Split-Path -Parent $VmBindingPath) -and $StoppedVmxSha256 -cmatch '^[0-9a-f]{64}$') 'BASELINE_HANDOFF_INPUT'
-    $made=New-Phase7BWP2CBaselineHandoffContinuation $VmBindingPath $VmBindingSha256 $StoppedVmxSha256 $repo $ToolingCommit
+    $made=New-Phase7BWP2CBaselineHandoffContinuation $VmBindingPath $VmBindingSha256 $StoppedVmxSha256 $repo $ToolingCommit $ImmediateBaselineHandoffPath $ImmediateBaselineHandoffSha256
     $selected=Read-Phase7BWP2CBaselineHandoffContinuation $made.path $made.identity.sha256 $repo
     Show-GuestCommands $selected.settings $selected.tooling.content $null
     $made|ConvertTo-Json -Depth 5

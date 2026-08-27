@@ -295,12 +295,22 @@ function Get-Phase7BWP2CBaselineHandoffRoot {
 function Assert-Phase7BWP2CBaselineHandoffShape {
   param($Handoff)
   $h=$Handoff
-  Assert-Phase7BWP2CExactProperties $h @('schemaVersion','kind','classification','parent','current','vm','createdAt','nonExecutable','preparationOnly','automaticRetryAllowed','wp2cExecutionAuthorized','laterMigrationAuthorized')
-  Assert-Phase7BWP2C ($h.schemaVersion -eq 1 -and
+  $schemaVersion=if('schemaVersion' -in @($h.PSObject.Properties.Name)){[int]$h.schemaVersion}else{-1}
+  $properties=@('schemaVersion','kind','classification','parent','current','vm','createdAt','nonExecutable','preparationOnly','automaticRetryAllowed','wp2cExecutionAuthorized','laterMigrationAuthorized')
+  if($schemaVersion -eq 2){$properties=@('schemaVersion','kind','classification','parent','immediateBaselineHandoffParent','current','vm','createdAt','nonExecutable','preparationOnly','automaticRetryAllowed','wp2cExecutionAuthorized','laterMigrationAuthorized')}
+  Assert-Phase7BWP2CExactProperties $h $properties
+  Assert-Phase7BWP2C ($schemaVersion -in @(1,2) -and
     $h.kind -ceq 'wp2c-preparation-baseline-handoff-continuation' -and
     $h.classification -ceq 'PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE') 'BASELINE_HANDOFF_SCHEMA'
   Assert-Phase7BWP2CExactProperties $h.parent @('path','identity','toolingCommit','toolingMedia','semanticVm')
   Assert-Phase7BWP2CExactProperties $h.parent.semanticVm @('mode','sha256')
+  if($schemaVersion -eq 2){
+    Assert-Phase7BWP2CExactProperties $h.immediateBaselineHandoffParent @('path','identity','toolingCommit','toolingMediaPath','toolingMedia','baselineBindingIdentity','semanticVm')
+    Assert-Phase7BWP2CExactProperties $h.immediateBaselineHandoffParent.semanticVm @('mode','sha256')
+    Assert-Phase7BWP2C ($h.immediateBaselineHandoffParent.toolingCommit -cmatch '^[0-9a-f]{40}$' -and
+      $h.immediateBaselineHandoffParent.semanticVm.mode -ceq 'wp2c-semantic-vmx-v2' -and
+      $h.immediateBaselineHandoffParent.semanticVm.sha256 -cmatch '^[0-9a-f]{64}$') 'BASELINE_HANDOFF_IMMEDIATE_PARENT'
+  }
   Assert-Phase7BWP2CExactProperties $h.current @('toolingCommit','operator','hostModule','hostDependencies','toolingManifest','toolingManifestIdentity','toolingMediaPath','toolingMedia','toolingResult','baselineBinding','baselineBindingIdentity')
   Assert-Phase7BWP2CExactProperties $h.vm @('semanticMode','semanticSha256','stoppedVmx','vmsd','guestIdentitySha256','snapshotName')
   Assert-Phase7BWP2C ($h.parent.semanticVm.mode -ceq 'wp2c-semantic-vmx-v2' -and
@@ -315,7 +325,7 @@ function Assert-Phase7BWP2CBaselineHandoffShape {
 }
 
 function Read-Phase7BWP2CBaselineHandoffContinuation {
-  param([string]$Path,[string]$Sha256,[string]$RepositoryRoot)
+  param([string]$Path,[string]$Sha256,[string]$RepositoryRoot,[switch]$HistoricalOnly)
   [void](Assert-Phase7BWP2CLocalPath $Path 'C:\Phase7B\host-evidence\379bb303\wp2c')
   $h=Read-Phase7BWP2CBoundJson $Path $Sha256;Assert-Phase7BWP2CBaselineHandoffShape $h
   $parent=Read-Phase7BWP2CVmBindingContinuation $h.parent.path $h.parent.identity.sha256 $RepositoryRoot -HistoricalOnly
@@ -324,17 +334,34 @@ function Read-Phase7BWP2CBaselineHandoffContinuation {
     (Get-Phase7BWP2CObjectHash $parent.document.current.toolingMedia) -ceq (Get-Phase7BWP2CObjectHash $h.parent.toolingMedia) -and
     $parent.binding.vm.semanticMode -ceq $h.parent.semanticVm.mode -and
     $parent.binding.vm.semanticSha256 -ceq $h.parent.semanticVm.sha256) 'BASELINE_HANDOFF_PARENT'
+  $immediate=$null
+  if($h.schemaVersion -eq 2){
+    $i=$h.immediateBaselineHandoffParent
+    $immediate=Read-Phase7BWP2CBaselineHandoffContinuation $i.path $i.identity.sha256 $RepositoryRoot -HistoricalOnly
+    Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $immediate.identity) -ceq (Get-Phase7BWP2CObjectHash $i.identity) -and
+      $immediate.baselineHandoff.current.toolingCommit -ceq $i.toolingCommit -and
+      $immediate.baselineHandoff.current.toolingMediaPath -ceq $i.toolingMediaPath -and
+      (Get-Phase7BWP2CObjectHash $immediate.baselineHandoff.current.toolingMedia) -ceq (Get-Phase7BWP2CObjectHash $i.toolingMedia) -and
+      (Get-Phase7BWP2CObjectHash $immediate.baselineHandoff.current.baselineBindingIdentity) -ceq (Get-Phase7BWP2CObjectHash $i.baselineBindingIdentity) -and
+      $immediate.baselineHandoff.vm.semanticMode -ceq $i.semanticVm.mode -and
+      $immediate.baselineHandoff.vm.semanticSha256 -ceq $i.semanticVm.sha256 -and
+      (Get-Phase7BWP2CObjectHash $immediate.baselineHandoff.parent.identity) -ceq (Get-Phase7BWP2CObjectHash $h.parent.identity)) 'BASELINE_HANDOFF_IMMEDIATE_PARENT'
+  }
   $root=Get-Phase7BWP2CBaselineHandoffRoot $parent.settings.preparedStateId $h.current.toolingCommit
   Assert-Phase7BWP2C ((Assert-Phase7BWP2CLocalPath $Path) -ceq (Join-Path $root 'baseline-handoff.json')) 'BASELINE_HANDOFF_PATH'
-  Assert-Phase7BWP2CPublishedRepository $RepositoryRoot $h.current.toolingCommit
   $source=Join-Path $RepositoryRoot 'scripts'
-  Assert-Phase7BWP2CFile (Join-Path $source 'phase7bWorkPackage2CPreparationOperator.ps1') $h.current.operator
-  Assert-Phase7BWP2CFile (Join-Path $source 'phase7bWorkPackage2CHost.psm1') $h.current.hostModule
-  $hostDependencies=Get-Phase7BWP2CDependencyManifest $source @('phase7bWorkPackage2CPreparationOperator.ps1','phase7bRecordWorkPackage2CPreparation.ps1')
-  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $hostDependencies) -ceq (Get-Phase7BWP2CObjectHash $h.current.hostDependencies)) 'BASELINE_HANDOFF_HOST_DEPENDENCIES'
-  $manifest=Get-Phase7BWP2CDependencyManifest $source
-  Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $manifest) -ceq (Get-Phase7BWP2CObjectHash $h.current.toolingManifest) -and
-    $h.current.toolingManifestIdentity.sha256 -ceq (Get-Phase7BWP2CObjectHash $manifest)) 'BASELINE_HANDOFF_MANIFEST'
+  if($HistoricalOnly){
+    $manifest=$h.current.toolingManifest
+  }else{
+    Assert-Phase7BWP2CPublishedRepository $RepositoryRoot $h.current.toolingCommit
+    Assert-Phase7BWP2CFile (Join-Path $source 'phase7bWorkPackage2CPreparationOperator.ps1') $h.current.operator
+    Assert-Phase7BWP2CFile (Join-Path $source 'phase7bWorkPackage2CHost.psm1') $h.current.hostModule
+    $hostDependencies=Get-Phase7BWP2CDependencyManifest $source @('phase7bWorkPackage2CPreparationOperator.ps1','phase7bRecordWorkPackage2CPreparation.ps1')
+    Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $hostDependencies) -ceq (Get-Phase7BWP2CObjectHash $h.current.hostDependencies)) 'BASELINE_HANDOFF_HOST_DEPENDENCIES'
+    $manifest=Get-Phase7BWP2CDependencyManifest $source
+    Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $manifest) -ceq (Get-Phase7BWP2CObjectHash $h.current.toolingManifest)) 'BASELINE_HANDOFF_MANIFEST'
+  }
+  Assert-Phase7BWP2C ($h.current.toolingManifestIdentity.sha256 -ceq (Get-Phase7BWP2CObjectHash $manifest)) 'BASELINE_HANDOFF_MANIFEST'
   Assert-Phase7BWP2C ($h.current.toolingMediaPath -ceq (Join-Path $root 'tooling-baseline-current.iso')) 'BASELINE_HANDOFF_MEDIA_PATH'
   Assert-Phase7BWP2CFile $h.current.toolingMediaPath $h.current.toolingMedia
   $tool=Read-Phase7BWP2CBoundJson (Join-Path $root 'tooling-result.json') $h.current.toolingResult.sha256
@@ -363,17 +390,33 @@ function Read-Phase7BWP2CBaselineHandoffContinuation {
   $settings=ConvertTo-Phase7BCanonicalJson $parent.settings|ConvertFrom-Json
   $settings.toolingCommit=$h.current.toolingCommit;$settings.operator=$h.current.operator
   $effective=[pscustomobject][ordered]@{original=$parent.document.original;current=$h.current;vm=[pscustomobject][ordered]@{originalVmx=$parent.document.vm.originalVmx;vmsd=$h.vm.vmsd;configSha256=$h.vm.semanticSha256;guestIdentitySha256=$h.vm.guestIdentitySha256;snapshotName=$h.vm.snapshotName};vmBindingContinuation=$parent.identity;baselineHandoffContinuation=Get-Phase7BWP2CIdentity $Path}
-  [pscustomobject]@{document=$effective;baselineHandoff=$h;identity=Get-Phase7BWP2CIdentity $Path;root=$root;settings=$settings;tooling=$tool;parent=$parent}
+  if($null -ne $immediate){$effective|Add-Member NoteProperty immediateBaselineHandoffContinuation $immediate.identity}
+  [pscustomobject]@{document=$effective;baselineHandoff=$h;identity=Get-Phase7BWP2CIdentity $Path;root=$root;settings=$settings;tooling=$tool;parent=$parent;immediateParent=$immediate;historicalOnly=[bool]$HistoricalOnly}
 }
 
 function New-Phase7BWP2CBaselineHandoffContinuation {
-  param([string]$ParentPath,[string]$ParentSha256,[string]$StoppedVmxSha256,[string]$RepositoryRoot,[string]$ToolingCommit)
+  param([string]$ParentPath,[string]$ParentSha256,[string]$StoppedVmxSha256,[string]$RepositoryRoot,[string]$ToolingCommit,
+    [string]$ImmediateBaselineHandoffPath,[string]$ImmediateBaselineHandoffSha256)
+  Assert-Phase7BWP2C ([bool]$ImmediateBaselineHandoffPath -eq [bool]$ImmediateBaselineHandoffSha256) 'BASELINE_HANDOFF_IMMEDIATE_PARENT_INPUT'
   Assert-Phase7BWP2CPublishedRepository $RepositoryRoot $ToolingCommit
   $parent=Read-Phase7BWP2CVmBindingContinuation $ParentPath $ParentSha256 $RepositoryRoot -HistoricalOnly
+  $immediate=$null
+  if($ImmediateBaselineHandoffPath){
+    $immediate=Read-Phase7BWP2CBaselineHandoffContinuation $ImmediateBaselineHandoffPath $ImmediateBaselineHandoffSha256 $RepositoryRoot -HistoricalOnly
+    Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $immediate.baselineHandoff.parent.identity) -ceq (Get-Phase7BWP2CObjectHash $parent.identity) -and
+      $immediate.baselineHandoff.vm.semanticMode -ceq $parent.binding.vm.semanticMode -and
+      $immediate.baselineHandoff.vm.semanticSha256 -ceq $parent.binding.vm.semanticSha256 -and
+      $immediate.settings.preparedStateId -ceq $parent.settings.preparedStateId) 'BASELINE_HANDOFF_IMMEDIATE_PARENT'
+    $allowedImmediate=@('baseline-handoff.json','tooling-inputs.json','tooling-result.json','tooling-baseline-current.iso','tooling-baseline-current.iso.content')
+    Assert-Phase7BWP2C (@(Get-ChildItem -LiteralPath $immediate.root -Force|Where-Object {$_.Name -cnotin $allowedImmediate}).Count -eq 0) 'BASELINE_HANDOFF_IMMEDIATE_PARENT_PROGRESS'
+  }
   $s=$parent.settings;$root=Get-Phase7BWP2CBaselineHandoffRoot $s.preparedStateId $ToolingCommit;$path=Join-Path $root 'baseline-handoff.json'
   if(Test-Path -LiteralPath $root){
     $existing=Read-Phase7BWP2CBaselineHandoffContinuation $path (Get-Phase7BWP2CIdentity $path).sha256 $RepositoryRoot
     Assert-Phase7BWP2C ($existing.baselineHandoff.vm.stoppedVmx.sha256 -ceq $StoppedVmxSha256) 'BASELINE_HANDOFF_STOPPED_VMX'
+    Assert-Phase7BWP2C ((($null -eq $immediate) -and $existing.baselineHandoff.schemaVersion -eq 1) -or
+      (($null -ne $immediate) -and $existing.baselineHandoff.schemaVersion -eq 2 -and
+      (Get-Phase7BWP2CObjectHash $existing.baselineHandoff.immediateBaselineHandoffParent.identity) -ceq (Get-Phase7BWP2CObjectHash $immediate.identity))) 'BASELINE_HANDOFF_IMMEDIATE_PARENT'
     return [pscustomobject]@{classification='PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_EXISTS';path=$path;identity=$existing.identity;created=$false;wp2cExecuted=$false}
   }
   $allowed=@('vm-binding.json','tooling-inputs.json','tooling-result.json','tooling-semantic-current.iso','tooling-semantic-current.iso.content','semantic-tooling-step.txt')
@@ -385,7 +428,8 @@ function New-Phase7BWP2CBaselineHandoffContinuation {
     $cold.clipboardDisabled -ceq $true -and $cold.dragDropDisabled -ceq $true -and
     $cold.sharedFoldersDisabled -ceq $true -and $cold.hostIdentitySha256 -ceq $s.hostIdentitySha256) 'BASELINE_HANDOFF_COLD'
   $vmx=Read-Phase7BWP2COpticalVmx $s.vmxPath
-  Assert-Phase7BWP2CPreparationBootMedia $vmx $parent.document.current.toolingMediaPath
+  $expectedBootMedia=if($null -ne $immediate){$immediate.baselineHandoff.current.toolingMediaPath}else{$parent.document.current.toolingMediaPath}
+  Assert-Phase7BWP2CPreparationBootMedia $vmx $expectedBootMedia
   $semantic=Get-Phase7BWP2CVmxIdentity $vmx
   Assert-Phase7BWP2C ($semantic.mode -ceq 'wp2c-semantic-vmx-v2' -and
     $semantic.sha256 -ceq $parent.binding.vm.semanticSha256 -and
@@ -413,7 +457,14 @@ function New-Phase7BWP2CBaselineHandoffContinuation {
   $resultId=Write-Phase7BWP2CCreateNewJson (Join-Path $root 'tooling-result.json') $tool
   Assert-Phase7BWP2C ((Get-Phase7BWP2CIdentity $s.vmxPath).sha256 -ceq $StoppedVmxSha256) 'BASELINE_HANDOFF_STOPPED_VMX'
   $current=[pscustomobject][ordered]@{toolingCommit=$ToolingCommit;operator=Get-Phase7BWP2CIdentity (Join-Path $source 'phase7bWorkPackage2CPreparationOperator.ps1');hostModule=Get-Phase7BWP2CIdentity (Join-Path $source 'phase7bWorkPackage2CHost.psm1');hostDependencies=$hostDependencies;toolingManifest=$manifest;toolingManifestIdentity=$tool.content.manifestIdentity;toolingMediaPath=$mediaPath;toolingMedia=$tool.identity;toolingResult=$resultId;baselineBinding=$binding;baselineBindingIdentity=$tool.content.baselineBindingIdentity}
-  $h=[pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-preparation-baseline-handoff-continuation';classification='PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE';parent=[pscustomobject][ordered]@{path=$ParentPath;identity=$parent.identity;toolingCommit=$parent.document.current.toolingCommit;toolingMedia=$parent.document.current.toolingMedia;semanticVm=[pscustomobject][ordered]@{mode=$parent.binding.vm.semanticMode;sha256=$parent.binding.vm.semanticSha256}};current=$current;vm=[pscustomobject][ordered]@{semanticMode=$semantic.mode;semanticSha256=$semantic.sha256;stoppedVmx=Get-Phase7BWP2CIdentity $s.vmxPath;vmsd=Get-Phase7BWP2CIdentity $s.snapshotMetadataPath;guestIdentitySha256=$s.expectedGuestIdentitySha256;snapshotName='S1-physiqueos-bootstrap-inert'};createdAt=[datetime]::UtcNow.ToString('o');nonExecutable=$true;preparationOnly=$true;automaticRetryAllowed=$false;wp2cExecutionAuthorized=$false;laterMigrationAuthorized=$false}
+  $semanticParent=[pscustomobject][ordered]@{path=$ParentPath;identity=$parent.identity;toolingCommit=$parent.document.current.toolingCommit;toolingMedia=$parent.document.current.toolingMedia;semanticVm=[pscustomobject][ordered]@{mode=$parent.binding.vm.semanticMode;sha256=$parent.binding.vm.semanticSha256}}
+  $vm=[pscustomobject][ordered]@{semanticMode=$semantic.mode;semanticSha256=$semantic.sha256;stoppedVmx=Get-Phase7BWP2CIdentity $s.vmxPath;vmsd=Get-Phase7BWP2CIdentity $s.snapshotMetadataPath;guestIdentitySha256=$s.expectedGuestIdentitySha256;snapshotName='S1-physiqueos-bootstrap-inert'}
+  if($null -eq $immediate){
+    $h=[pscustomobject][ordered]@{schemaVersion=1;kind='wp2c-preparation-baseline-handoff-continuation';classification='PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE';parent=$semanticParent;current=$current;vm=$vm;createdAt=[datetime]::UtcNow.ToString('o');nonExecutable=$true;preparationOnly=$true;automaticRetryAllowed=$false;wp2cExecutionAuthorized=$false;laterMigrationAuthorized=$false}
+  }else{
+    $immediateParent=[pscustomobject][ordered]@{path=$ImmediateBaselineHandoffPath;identity=$immediate.identity;toolingCommit=$immediate.baselineHandoff.current.toolingCommit;toolingMediaPath=$immediate.baselineHandoff.current.toolingMediaPath;toolingMedia=$immediate.baselineHandoff.current.toolingMedia;baselineBindingIdentity=$immediate.baselineHandoff.current.baselineBindingIdentity;semanticVm=[pscustomobject][ordered]@{mode=$immediate.baselineHandoff.vm.semanticMode;sha256=$immediate.baselineHandoff.vm.semanticSha256}}
+    $h=[pscustomobject][ordered]@{schemaVersion=2;kind='wp2c-preparation-baseline-handoff-continuation';classification='PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE';parent=$semanticParent;immediateBaselineHandoffParent=$immediateParent;current=$current;vm=$vm;createdAt=[datetime]::UtcNow.ToString('o');nonExecutable=$true;preparationOnly=$true;automaticRetryAllowed=$false;wp2cExecutionAuthorized=$false;laterMigrationAuthorized=$false}
+  }
   $id=Write-Phase7BWP2CCreateNewJson $path $h;[void](Read-Phase7BWP2CBaselineHandoffContinuation $path $id.sha256 $RepositoryRoot)
   [pscustomobject]@{classification=$h.classification;path=$path;identity=$id;created=$true;wp2cExecuted=$false}
 }
@@ -424,7 +475,8 @@ function Add-Phase7BWP2CPreparationLineage {
   $hasVmBinding='binding' -in @($Continuation.PSObject.Properties.Name)
   $hasBaselineHandoff='baselineHandoff' -in @($Continuation.PSObject.Properties.Name)
   Assert-Phase7BWP2C ($b.toolingCommit -ceq $c.current.toolingCommit -and $b.preparedStateId -ceq $c.original.sessionId -and $b.snapshotSha256 -ceq $c.vm.vmsd.sha256 -and $b.vmConfigSha256 -ceq $c.vm.configSha256 -and $b.finalDescriptor.sha256 -ceq $c.original.descriptor.sha256 -and $b.toolingManifestSha256 -ceq $c.current.toolingManifestIdentity.sha256 -and (Get-Phase7BWP2CObjectHash $b.toolingMedia) -ceq (Get-Phase7BWP2CObjectHash $c.current.toolingMedia)) 'CONTINUATION_PLAN_BINDING'
-  $lineage=[pscustomobject][ordered]@{schemaVersion=if($hasBaselineHandoff){3}elseif($hasVmBinding){2}else{1};kind='wp2c-preparation-continuation-provenance';continuationPath=$Path;continuation=$Continuation.identity;originalSessionId=$c.original.sessionId;originalSession=$c.original.sessionMetadata;originalInitializationCommit=$c.original.initializationCommit;originalOperator=$c.original.operator;originalToolingMedia=$c.original.toolingMedia;originalToolingManifest=$c.original.toolingManifest;currentToolingCommit=$c.current.toolingCommit;currentOperator=$c.current.operator;currentHostModule=$c.current.hostModule;currentToolingMedia=$c.current.toolingMedia;currentToolingManifest=$c.current.toolingManifestIdentity;nonExecutable=$true}
+  $hasImmediateBaselineParent=$hasBaselineHandoff -and $Continuation.baselineHandoff.schemaVersion -eq 2
+  $lineage=[pscustomobject][ordered]@{schemaVersion=if($hasImmediateBaselineParent){4}elseif($hasBaselineHandoff){3}elseif($hasVmBinding){2}else{1};kind='wp2c-preparation-continuation-provenance';continuationPath=$Path;continuation=$Continuation.identity;originalSessionId=$c.original.sessionId;originalSession=$c.original.sessionMetadata;originalInitializationCommit=$c.original.initializationCommit;originalOperator=$c.original.operator;originalToolingMedia=$c.original.toolingMedia;originalToolingManifest=$c.original.toolingManifest;currentToolingCommit=$c.current.toolingCommit;currentOperator=$c.current.operator;currentHostModule=$c.current.hostModule;currentToolingMedia=$c.current.toolingMedia;currentToolingManifest=$c.current.toolingManifestIdentity;nonExecutable=$true}
   if($hasVmBinding){
     $lineage|Add-Member NoteProperty parentContinuationPath $Continuation.binding.parent.path
     $lineage|Add-Member NoteProperty parentContinuation $Continuation.binding.parent.identity
@@ -436,6 +488,11 @@ function Add-Phase7BWP2CPreparationLineage {
     $lineage|Add-Member NoteProperty parentVmBinding $Continuation.baselineHandoff.parent.identity
     $lineage|Add-Member NoteProperty semanticVmBinding ([pscustomobject][ordered]@{mode=$Continuation.baselineHandoff.vm.semanticMode;sha256=$Continuation.baselineHandoff.vm.semanticSha256;stoppedVmx=$Continuation.baselineHandoff.vm.stoppedVmx})
     $lineage|Add-Member NoteProperty baselineBinding $Continuation.baselineHandoff.current.baselineBindingIdentity
+    if($hasImmediateBaselineParent){
+      $lineage|Add-Member NoteProperty immediateBaselineHandoffPath $Continuation.baselineHandoff.immediateBaselineHandoffParent.path
+      $lineage|Add-Member NoteProperty immediateBaselineHandoff $Continuation.baselineHandoff.immediateBaselineHandoffParent.identity
+      $lineage|Add-Member NoteProperty immediateBaselineToolingMedia $Continuation.baselineHandoff.immediateBaselineHandoffParent.toolingMedia
+    }
   }
   $Preparation|Add-Member NoteProperty preparationLineage $lineage
 }

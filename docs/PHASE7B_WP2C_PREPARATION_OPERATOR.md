@@ -178,6 +178,14 @@ immutable parent provenance and creates
 then requires the exact `BaselineHandoffPath` and `BaselineHandoffSha256`.
 Historical media is never overwritten and no latest handoff is auto-selected.
 
+If another published host correction requires rebinding before Baseline, the
+same create mode additionally requires the exact accepted immediate
+`ImmediateBaselineHandoffPath` and `ImmediateBaselineHandoffSha256`. The new
+schema-v2 addendum retains the semantic bridge as earlier immutable provenance,
+but validates the powered-off optical projection only against that explicitly
+selected handoff's exact bound media. It never accepts arbitrary historical or
+latest media. Historical schema-v1 handoffs remain byte-immutable and readable.
+
 Create a temporary host 1Password Login item with ONLY the public invalid test
 value below in its password field, using that field's supported Type in window
 action (not whole-login Auto-Type). No TOTP/automatic submission. Do not assume a

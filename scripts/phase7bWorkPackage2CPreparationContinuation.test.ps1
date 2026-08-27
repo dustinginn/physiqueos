@@ -11,6 +11,7 @@ Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CHost.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CPreparationContinuation.psm1') -Force
 function Reject([scriptblock]$Action,[string]$Label){$failed=$false;try{& $Action|Out-Null}catch{$failed=$true};Assert-True $failed $Label}
+function Reject-Code([scriptblock]$Action,[string]$Code,[string]$Label){$actual=$null;try{& $Action|Out-Null}catch{$actual=$_.Exception.Message};Assert-True ($actual -ceq $Code) $Label}
 function Clone($Value){ConvertTo-Phase7BCanonicalJson $Value|ConvertFrom-Json}
 function Save-Vmx($Value){[IO.File]::WriteAllLines($vmxPath,@(foreach($key in @($Value.Keys|Sort-Object)){$key+' = "'+$Value[$key]+'"'}))}
 function Synthetic-Cim {
@@ -188,14 +189,56 @@ try {
   Assert-True ($handoffMade.created -and $handoffMade.classification -ceq 'PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE') 'actual create-new baseline-handoff operator'
   $selected=Read-Phase7BWP2CBaselineHandoffContinuation $handoffMade.path $handoffMade.identity.sha256 $repo;$c=$selected.document
   Assert-True ($selected.baselineHandoff.parent.identity.sha256 -ceq $bridgeMade.identity.sha256 -and $selected.baselineHandoff.current.toolingMediaPath -cne $selected.parent.document.current.toolingMediaPath) 'handoff preserves semantic bridge parent and distinct media'
+  Assert-True ($selected.baselineHandoff.schemaVersion -eq 1 -and $null -eq $selected.immediateParent) 'historical first handoff retains schema one semantics'
   Assert-True (@($selected.baselineHandoff.current.toolingManifest.files).Count -eq 14 -and @($selected.tooling.content.manifest.files).Count -eq 14 -and @(Get-ChildItem ($selected.baselineHandoff.current.toolingMediaPath+'.content')).Count -eq 18) 'handoff has thirteen-script plus b.cmd closure and exact eighteen-file media'
   Assert-True ($selected.baselineHandoff.current.baselineBinding.guestIdentitySha256 -ceq $original.settings.expectedGuestIdentitySha256 -and $selected.baselineHandoff.current.baselineBinding.toolingManifestSha256 -ceq $selected.baselineHandoff.current.toolingManifestIdentity.sha256) 'handoff binding uses source-owned guest and tooling pins'
   Assert-True (-not $selected.baselineHandoff.current.baselineBinding.restoreAuthorized -and -not $selected.baselineHandoff.current.baselineBinding.wp2cExecutionAuthorized -and -not $selected.baselineHandoff.current.baselineBinding.laterMigrationAuthorized) 'handoff binding grants no execution authority'
   $operatorText=Get-Content -LiteralPath $operatorPath -Raw
   Assert-True ($operatorText.Contains('type X:\b with X replaced') -and ($handoffRaw -join "`n") -notmatch '-ExpectedGuestIdentitySha256') 'generated guest instruction is four characters after visual drive selection and carries no transcribed pins'
-  $handoffAgain=New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 $selected.baselineHandoff.vm.stoppedVmx.sha256 $repo $handoffCommit
-  Assert-True (-not $handoffAgain.created -and $handoffAgain.identity.sha256 -ceq $handoffMade.identity.sha256) 'compatible handoff returned without another write'
-  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 ('0'*64) $repo $handoffCommit} 'existing handoff rejects wrong stopped VMX pin'
+  $firstHandoff=$selected;$firstHandoffMade=$handoffMade;$firstHandoffBytes=[IO.File]::ReadAllBytes($handoffMade.path)
+  $firstMediaPath=$selected.baselineHandoff.current.toolingMediaPath;$firstMediaIdentity=Get-Phase7BWP2CIdentity $firstMediaPath
+
+  # Exact live-defect reproduction: once the cold VM correctly retains the
+  # accepted first Baseline media, the legacy semantic-bridge-only selector
+  # still asks the unchanged strict validator for older semantic tooling.
+  $v['sata0:0.filename']=$firstMediaPath;$v['sata0:1.filename']=$firstMediaPath;Save-Vmx $v
+  $reboundCommit='f'*40;$publicationCommit=$reboundCommit;$global:phase7bContinuationTest.commit=$reboundCommit
+  Reject-Code {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit} 'PHASE7B_WP2C_PREPARATION_BOOT_MEDIA' 'published semantic-parent boot-media failure reproduced exactly before first write'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $null} 'immediate parent path and hash are an inseparable pair'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path ('0'*64) (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'wrong semantic bridge rejected for rebound'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path ('0'*64)} 'wrong immediate handoff identity rejected'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $bridgeMade.path $bridgeMade.identity.sha256} 'wrong immediate handoff path rejected'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo ('e'*40) $handoffMade.path $handoffMade.identity.sha256} 'wrong current publication commit rejected'
+  $firstMediaBytes=[IO.File]::ReadAllBytes($firstMediaPath);[IO.File]::AppendAllText($firstMediaPath,'changed')
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'modified immediate Baseline media rejected';[IO.File]::WriteAllBytes($firstMediaPath,$firstMediaBytes)
+  $badImmediate=Clone $selected.baselineHandoff;$badImmediate.current.toolingMedia.sha256='0'*64;Write-Json $handoffMade.path $badImmediate
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path (Get-Phase7BWP2CIdentity $handoffMade.path).sha256} 'parent handoff and media mismatch rejected';[IO.File]::WriteAllBytes($handoffMade.path,$firstHandoffBytes)
+  $badImmediate=Clone $selected.baselineHandoff;$badImmediate|Add-Member NoteProperty unexpectedParent 'x';Write-Json $handoffMade.path $badImmediate
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path (Get-Phase7BWP2CIdentity $handoffMade.path).sha256} 'malformed immediate parent provenance rejected';[IO.File]::WriteAllBytes($handoffMade.path,$firstHandoffBytes)
+  $bad=$v.Clone();$bad['ethernet0.startconnected']='TRUE';Save-Vmx $bad
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'connected NIC rejected for rebound';Save-Vmx $v
+  $bad=$v.Clone();$bad['sata0:0.filename']=$firstHandoff.parent.document.current.toolingMediaPath;$bad['sata0:1.filename']=$firstHandoff.parent.document.current.toolingMediaPath;Save-Vmx $bad
+  Reject-Code {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'PHASE7B_WP2C_PREPARATION_BOOT_MEDIA' 'older semantic tooling cannot replace exact immediate parent media';Save-Vmx $v
+  $bad=$v.Clone();$bad['sata0:0.filename']=Join-Path $testRoot 'unexpected-recovery.iso';Save-Vmx $bad
+  Reject-Code {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'PHASE7B_WP2C_PREPARATION_BOOT_MEDIA' 'unexpected recovery media rejected';Save-Vmx $v
+  $bad=$v.Clone();$bad['sata0:0.startconnected']='TRUE';Save-Vmx $bad
+  Reject-Code {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'PHASE7B_WP2C_PREPARATION_BOOT_MEDIA' 'wrong optical connection projection rejected';Save-Vmx $v
+  $bad=$v.Clone();$bad['sata0:2.present']='TRUE';$bad['sata0:2.devicetype']='cdrom-image';$bad['sata0:2.filename']=$firstMediaPath;Save-Vmx $bad
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'third optical device rejected';Save-Vmx $v
+  $bad=$v.Clone();$bad['sata0:1.present']='FALSE';Save-Vmx $bad
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 (Get-Phase7BWP2CIdentity $vmxPath).sha256 $repo $reboundCommit $handoffMade.path $handoffMade.identity.sha256} 'missing optical device rejected';Save-Vmx $v
+
+  $reboundRaw=Invoke-Operator @{Mode='CreateBaselineHandoffContinuation';SessionRoot=$firstHandoff.parent.root;VmBindingPath=$bridgeMade.path;VmBindingSha256=$bridgeMade.identity.sha256;ImmediateBaselineHandoffPath=$handoffMade.path;ImmediateBaselineHandoffSha256=$handoffMade.identity.sha256;StoppedVmxSha256=(Get-Phase7BWP2CIdentity $vmxPath).sha256;ToolingCommit=$reboundCommit}
+  $reboundJson=@($reboundRaw|Where-Object {$_ -notmatch '^[&$]'}|Where-Object {$_ -notmatch '^(Guest:|Set-ExecutionPolicy)'}) -join "`n";$reboundMade=$reboundJson|ConvertFrom-Json
+  Assert-True ($reboundMade.created -and $reboundMade.classification -ceq 'PHASE7B_WP2C_PREPARATION_BASELINE_HANDOFF_CONTINUATION_NONEXECUTABLE') 'actual rebound operator reaches creation with exact immediate parent'
+  $selected=Read-Phase7BWP2CBaselineHandoffContinuation $reboundMade.path $reboundMade.identity.sha256 $repo;$c=$selected.document
+  Assert-True ($selected.baselineHandoff.schemaVersion -eq 2 -and $selected.baselineHandoff.parent.identity.sha256 -ceq $bridgeMade.identity.sha256 -and $selected.baselineHandoff.immediateBaselineHandoffParent.identity.sha256 -ceq $handoffMade.identity.sha256) 'rebound binds semantic bridge and immediate handoff separately'
+  Assert-True ($selected.baselineHandoff.immediateBaselineHandoffParent.toolingMedia.sha256 -ceq $firstMediaIdentity.sha256 -and $selected.baselineHandoff.current.toolingMediaPath -cne $firstMediaPath) 'rebound validates exact immediate media and creates distinct current media'
+  Assert-True ((Get-Phase7BWP2CIdentity $handoffMade.path).sha256 -ceq $handoffMade.identity.sha256 -and (Get-Phase7BWP2CIdentity $firstMediaPath).sha256 -ceq $firstMediaIdentity.sha256) 'immediate handoff and media remain immutable after rebound creation'
+  $handoffRaw=$reboundRaw;$handoffMade=$reboundMade;$handoffCommit=$reboundCommit
+  $handoffAgain=New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 $selected.baselineHandoff.vm.stoppedVmx.sha256 $repo $handoffCommit $firstHandoffMade.path $firstHandoffMade.identity.sha256
+  Assert-True (-not $handoffAgain.created -and $handoffAgain.identity.sha256 -ceq $handoffMade.identity.sha256) 'compatible rebound handoff returned without another write'
+  Reject {New-Phase7BWP2CBaselineHandoffContinuation $bridgeMade.path $bridgeMade.identity.sha256 ('0'*64) $repo $handoffCommit $firstHandoffMade.path $firstHandoffMade.identity.sha256} 'existing rebound handoff rejects wrong stopped VMX pin'
   # Actual preboot must reject both stale original and stale parent media, then
   # consume only the exact selected handoff and bound media identity.
   $args=@{SessionRoot=$selected.root;BaselineHandoffPath=$handoffMade.path;BaselineHandoffSha256=$handoffMade.identity.sha256}
@@ -221,7 +264,7 @@ try {
   $plan=Get-Content (Join-Path $selected.root 'preparation-plan.json') -Raw|ConvertFrom-Json
   Assert-True ($plan.bindings.toolingCommit -ceq $handoffCommit -and $plan.bindings.toolingMedia.sha256 -ceq $c.current.toolingMedia.sha256 -and $plan.bindings.preparedStateId -ceq $original.settings.preparedStateId) 'plan carries handoff-current tooling and original lifecycle ID'
   $preparation=[pscustomobject]@{wp2cExecuted=$false};Add-Phase7BWP2CPreparationLineage $preparation $plan $selected $handoffMade.path
-  Assert-True ($preparation.preparationLineage.schemaVersion -eq 3 -and $preparation.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $preparation.preparationLineage.currentToolingCommit -ceq $handoffCommit -and $preparation.preparationLineage.continuation.sha256 -ceq $handoffMade.identity.sha256 -and $preparation.preparationLineage.parentVmBinding.sha256 -ceq $bridgeMade.identity.sha256) 'recorder lineage adapter binds original, semantic bridge and baseline-handoff lineages'
+  Assert-True ($preparation.preparationLineage.schemaVersion -eq 4 -and $preparation.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $preparation.preparationLineage.currentToolingCommit -ceq $handoffCommit -and $preparation.preparationLineage.continuation.sha256 -ceq $handoffMade.identity.sha256 -and $preparation.preparationLineage.parentVmBinding.sha256 -ceq $bridgeMade.identity.sha256 -and $preparation.preparationLineage.immediateBaselineHandoff.sha256 -ceq $firstHandoffMade.identity.sha256 -and $preparation.preparationLineage.immediateBaselineToolingMedia.sha256 -ceq $firstMediaIdentity.sha256) 'recorder lineage adapter binds original, semantic bridge, immediate and rebound lineages'
   $badPlan=Clone $plan;$badPlan.bindings.toolingMedia=$c.original.toolingMedia;Reject {Add-Phase7BWP2CPreparationLineage ([pscustomobject]@{}) $badPlan $selected $bridgeMade.path} 'recorder rejects stale tooling plan'
   $v['sata0:0.startconnected']='TRUE';$v['sata0:1.filename']=Join-Path $selected.root 'preparation.iso';Save-Vmx $v
   $secondBoot=Invoke-Operator (@{Mode='PreBoot'}+$args)
@@ -250,7 +293,7 @@ try {
   $recorded=Invoke-Operator (@{Mode='Record'}+$args)
   Assert-True (($recorded -join "`n") -match 'PHASE7B_WP2C_PREPARATION_RECORDED_NONEXECUTABLE') 'actual operator -> recorder -> accepted evidence'
   $accepted=Get-Content (Join-Path $selected.root 'accepted\preparation.json') -Raw|ConvertFrom-Json
-  Assert-True ($accepted.preparationLineage.continuation.sha256 -ceq $handoffMade.identity.sha256 -and $accepted.preparationLineage.parentVmBinding.sha256 -ceq $bridgeMade.identity.sha256 -and $accepted.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $accepted.preparationLineage.currentToolingCommit -ceq $handoffCommit -and -not $accepted.wp2cExecuted) 'durable final evidence preserves original, bridge and baseline-handoff lineages and nonexecution'
+  Assert-True ($accepted.preparationLineage.schemaVersion -eq 4 -and $accepted.preparationLineage.continuation.sha256 -ceq $handoffMade.identity.sha256 -and $accepted.preparationLineage.parentVmBinding.sha256 -ceq $bridgeMade.identity.sha256 -and $accepted.preparationLineage.immediateBaselineHandoff.sha256 -ceq $firstHandoffMade.identity.sha256 -and $accepted.preparationLineage.originalInitializationCommit -ceq $oldCommit -and $accepted.preparationLineage.currentToolingCommit -ceq $handoffCommit -and -not $accepted.wp2cExecuted) 'durable final evidence preserves original, bridge, immediate and rebound lineages and nonexecution'
   Assert-True (@(Get-ChildItem (Join-Path $selected.root 'accepted')).Count -eq 4) 'unchanged exact four-file closeout'
   Reject {Invoke-Operator (@{Mode='Record'}+$args)} 'accepted evidence cannot be overwritten'
   Assert-True ($inventoryPin -ceq (Get-Phase7BWP2CObjectHash (Get-Phase7BWP2COriginalPreparationInventory $originalRoot))) 'all original files unchanged after full synthetic continuation'

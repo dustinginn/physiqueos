@@ -327,6 +327,14 @@ preboot gate. Accepted lineage is schema 2 for a bridge and schema 3 for a hando
 retaining every prior provenance layer. Neither artifact boots the VM nor grants
 preparation resumption or WP2-C execution.
 
+A cross-commit rebound after an accepted Baseline handoff uses handoff schema 2.
+It binds the original semantic bridge and an exact, explicitly supplied immediate
+Baseline-handoff parent as separate provenance fields. Only the immediate
+parent's verified bound ISO may satisfy rebound-time optical validation. The
+resulting preparation lineage is schema 4 and retains the immediate handoff and
+media identities in addition to the original, semantic-bridge and current
+handoff layers. Schema-1 historical handoffs keep their original interpretation.
+
 After attachment and before boot, the host boot-permit entry independently checks
 the exact two local ISO paths, full ISO hashes, optical connection flags, projected
 VMX identity, S1 metadata, powered-off state, hardware and isolation. It then writes
