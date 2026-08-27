@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { readDatabaseConfig } from "../../database/config.js";
@@ -45,7 +44,9 @@ export async function executeSimplifiedProviderMigration({
   const ownsPool = suppliedPool == null;
   const ownsObjectProvider = suppliedObjectProvider == null;
   const packageRoot = required(args.packagePath, "packagePath");
-  const mediaRoot = required(args.mediaRoot, "mediaRoot");
+  const mediaSource = args.mediaSource?.visit
+    ? args.mediaSource
+    : createDirectoryMediaSource(required(args.mediaRoot, "mediaRoot"));
   const operationId = required(args.migrationOperationId, "migrationOperationId");
 
   try {
@@ -58,10 +59,10 @@ export async function executeSimplifiedProviderMigration({
     const ownerUserId = String(packageData.collections.user?.id ?? "");
     assertPackageIdentity(packageData.manifest, args, operationId);
     await observePhase("MEDIA_VALIDATION_STARTED", { mediaCount: packageData.manifest.files.length });
-    const mediaSource = await verifyMediaSnapshot({ packageData, mediaRoot });
+    const mediaSnapshot = await verifyMediaSnapshot({ packageData, mediaSource, observePhase });
     await observePhase("MEDIA_VALIDATION_COMPLETE", {
-      mediaCount: mediaSource.objectCount,
-      mediaBytes: mediaSource.byteLength,
+      mediaCount: mediaSnapshot.objectCount,
+      mediaBytes: mediaSnapshot.byteLength,
     });
     const databaseName = (await pool.query("SELECT current_database() AS database")).rows[0]?.database;
     const migrationNames = (await pool.query(
@@ -89,7 +90,7 @@ export async function executeSimplifiedProviderMigration({
         database: databaseName,
         schema: migrationNames,
         target: preImport,
-        mediaSource,
+        mediaSource: mediaSnapshot,
         firstPostgresWriteAt: null,
         authorityTransferred: false,
       });
@@ -110,7 +111,7 @@ export async function executeSimplifiedProviderMigration({
       });
       const media = await migrateCanonicalPackageMediaToSpaces({
         packageRoot,
-        snapshotMediaRoot: mediaRoot,
+        visitSourceEntries: mediaSource.visit,
         pool,
         objectProvider,
       });
@@ -164,30 +165,46 @@ async function inspectPreImportObserved(input) {
   return result;
 }
 
-async function verifyMediaSnapshot({ packageData, mediaRoot }) {
+async function verifyMediaSnapshot({ packageData, mediaSource, observePhase }) {
+  return mediaSource.visit(packageData.manifest.files, async () => undefined, {
+    onProgress: (details) => observePhase("MEDIA_ARCHIVE_PROGRESS", details),
+  });
+}
+
+function createDirectoryMediaSource(mediaRoot) {
   const root = path.resolve(mediaRoot);
-  const expected = new Set(packageData.manifest.files.map((entry) => entry.relativePath));
-  const actual = await listFiles(root);
-  if (actual.length !== expected.size || actual.some((relativePath) => !expected.has(relativePath))) {
-    throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "Transported media inventory differs from the canonical package.");
-  }
-  let byteLength = 0;
-  let maximumFileBytes = 0;
-  for (const entry of packageData.manifest.files) {
-    const file = confinedPath(root, entry.relativePath);
-    const stat = await fs.stat(file);
-    if (!stat.isFile() || stat.size !== entry.size || await hashFile(file) !== entry.sha256) {
-      throw coded("SIMPLIFIED_PROVIDER_MEDIA_IDENTITY_MISMATCH", "Transported media differs from the canonical package.");
-    }
-    byteLength += stat.size;
-    maximumFileBytes = Math.max(maximumFileBytes, stat.size);
-  }
   return Object.freeze({
-    verified: true,
-    objectCount: expected.size,
-    byteLength,
-    maximumFileBytes,
-    processing: "sequential-streaming-hash",
+    processing: "sequential-directory-files",
+    async visit(entries, visitor, { onProgress = async () => undefined } = {}) {
+      const expected = new Set(entries.map((entry) => entry.relativePath));
+      const actual = await listFiles(root);
+      if (actual.length !== expected.size || actual.some((relativePath) => !expected.has(relativePath))) {
+        throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "Transported media inventory differs from the canonical package.");
+      }
+      let byteLength = 0;
+      let maximumFileBytes = 0;
+      for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index];
+        const file = confinedPath(root, entry.relativePath);
+        const bytes = await fs.readFile(file);
+        if (bytes.length !== entry.size || createHash("sha256").update(bytes).digest("hex") !== entry.sha256) {
+          throw coded("SIMPLIFIED_PROVIDER_MEDIA_IDENTITY_MISMATCH", "Transported media differs from the canonical package.");
+        }
+        await visitor(entry, bytes);
+        byteLength += bytes.length;
+        maximumFileBytes = Math.max(maximumFileBytes, bytes.length);
+        if (index + 1 === entries.length || (index + 1) % 32 === 0) {
+          await onProgress(Object.freeze({ mediaCount: index + 1, mediaBytes: byteLength }));
+        }
+      }
+      return Object.freeze({
+        verified: true,
+        objectCount: expected.size,
+        byteLength,
+        maximumFileBytes,
+        processing: "sequential-directory-files",
+      });
+    },
   });
 }
 
@@ -402,16 +419,6 @@ function confinedPath(root, relative) {
     throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "Media path escaped the transported snapshot.");
   }
   return target;
-}
-
-function hashFile(file) {
-  return new Promise((resolve, reject) => {
-    const hash = createHash("sha256");
-    const stream = createReadStream(file);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(hash.digest("hex")));
-  });
 }
 
 function required(value, field) {

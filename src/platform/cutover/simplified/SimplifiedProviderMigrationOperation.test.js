@@ -20,11 +20,15 @@ describe("in-process simplified provider migration operation", () => {
     const executeMigration = vi.fn(async ({ observePhase }) => {
       await observePhase("PACKAGE_VALIDATION_STARTED");
       await observePhase("PACKAGE_VALIDATION_COMPLETE", { collectionCount: 39, mediaCount: 402 });
+      await observePhase("MEDIA_VALIDATION_STARTED", { mediaCount: 402 });
+      await observePhase("MEDIA_ARCHIVE_PROGRESS", { mediaCount: 402, mediaBytes: 288919315 });
+      await observePhase("MEDIA_VALIDATION_COMPLETE", { mediaCount: 402, mediaBytes: 288919315 });
       await observePhase("PREIMPORT_GATE_STARTED");
       await observePhase("PREIMPORT_GATE_COMPLETE", { ready: true });
       return { ready: true, phase: "pre-import", firstPostgresWriteAt: null, authorityTransferred: false };
     });
     const cleanup = vi.fn(async () => ({ deletedExactVersion: true, localRemoved: true }));
+    const mediaSource = { visit: vi.fn() };
     const store = operationStore();
     const handler = createSimplifiedProviderMigrationWorkerHandler({
       store,
@@ -37,7 +41,7 @@ describe("in-process simplified provider migration operation", () => {
           await observePhase("TRANSPORT_STREAM_HASH_COMPLETE", { byteLength: 321998848 });
           await observePhase("ARCHIVE_LIST_STARTED");
           await observePhase("ARCHIVE_LIST_COMPLETE", { entryCount: 412 });
-          return { packageRoot: "/tmp/package", mediaRoot: "/tmp/media", cleanup };
+          return { packageRoot: "/tmp/package", mediaSource, cleanup };
         }) },
         transportSummary: () => ({ privateVersionedSpace: true }),
         close: vi.fn(),
@@ -49,7 +53,7 @@ describe("in-process simplified provider migration operation", () => {
       phase: "pre-import", execute: false,
       args: {
         packagePath: "/tmp/package",
-        mediaRoot: "/tmp/media",
+        mediaSource,
         migrationOperationId: request.migrationOperationId,
         currentOutboxMessageId: `simplified-provider-migration:${request.commandId}`,
       },
@@ -67,6 +71,9 @@ describe("in-process simplified provider migration operation", () => {
       "RUNNER_ENTRY",
       "PACKAGE_VALIDATION_STARTED",
       "PACKAGE_VALIDATION_COMPLETE",
+      "MEDIA_VALIDATION_STARTED",
+      "MEDIA_ARCHIVE_PROGRESS",
+      "MEDIA_VALIDATION_COMPLETE",
       "PREIMPORT_GATE_STARTED",
       "PREIMPORT_GATE_COMPLETE",
       "RUNNER_EXIT",

@@ -21,12 +21,13 @@ export async function migrateCanonicalPackageMediaToSpaces({
   objectProvider,
   fetchImpl = globalThis.fetch,
   readSourceBytes = null,
+  visitSourceEntries = null,
 } = {}) {
   if (!pool?.query || !objectProvider?.beginMultipartUpload || typeof fetchImpl !== "function") {
     throw new Error("Production media migration requires PostgreSQL, Spaces, and fetch adapters.");
   }
-  if (typeof readSourceBytes !== "function" && !snapshotMediaRoot) {
-    throw new Error("Production media migration requires either snapshotMediaRoot or readSourceBytes.");
+  if (typeof visitSourceEntries !== "function" && typeof readSourceBytes !== "function" && !snapshotMediaRoot) {
+    throw new Error("Production media migration requires a bounded source visitor, snapshotMediaRoot, or readSourceBytes.");
   }
   const packageData = await readAndValidateCanonicalPackage(packageRoot);
   const mediaRoot = snapshotMediaRoot ? path.resolve(snapshotMediaRoot) : null;
@@ -35,12 +36,16 @@ export async function migrateCanonicalPackageMediaToSpaces({
     if (!isWithin(mediaRoot, absolutePath)) throw new Error("Migration media path escaped the immutable snapshot.");
     return fs.readFile(absolutePath);
   };
+  const visitEntries = typeof visitSourceEntries === "function"
+    ? visitSourceEntries
+    : async (entries, visitor) => {
+        for (const entry of entries) await visitor(entry, await readEntryBytes(entry));
+      };
   const uploaded = [];
   try {
-    for (const entry of packageData.manifest.files) {
-      // Re-checked here regardless of source, so an injected `readSourceBytes` can never skip
-      // this integrity gate merely by being a different code path.
-      const bytes = await readEntryBytes(entry);
+    await visitEntries(packageData.manifest.files, async (entry, bytes) => {
+      // Re-checked here regardless of source, so a bounded visitor cannot skip the
+      // production upload integrity gate merely by being a different code path.
       if (bytes.length !== entry.size || createHash("sha256").update(bytes).digest("hex") !== entry.sha256) {
         throw new Error(`Migration source media integrity failed: ${entry.relativePath}.`);
       }
@@ -85,7 +90,7 @@ export async function migrateCanonicalPackageMediaToSpaces({
           WHERE id=$1 AND owner_user_id=$2`,
         [objectId, entry.ownerUserId, begin.objectKey, completed.providerVersion, completed.etag],
       );
-    }
+    });
     return Object.freeze({
       status: "passed",
       objectCount: uploaded.length,

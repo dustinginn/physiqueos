@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -45,29 +46,32 @@ export function createSimplifiedProviderMigrationTransport({
         const entries = await tarEntries({ archive, spawnProcess });
         await observePhase("ARCHIVE_LIST_COMPLETE", {
           entryCount: entries.length,
-          listingBytes: Buffer.byteLength(entries.join("\n")),
+          listingBytes: Buffer.byteLength(entries.map(({ rawName }) => rawName).join("\n")),
         });
         await observePhase("ARCHIVE_LAYOUT_VALIDATION_STARTED");
-        const packageDirectory = validateArchiveEntries(entries);
+        const { packageDirectory, mediaMembers } = validateArchiveEntries(entries);
         await observePhase("ARCHIVE_LAYOUT_VALIDATION_COMPLETE", { entryCount: entries.length });
         await fs.mkdir(extracted);
         await observePhase("ARCHIVE_EXTRACT_STARTED", await temporaryStorage(root));
-        await runTar(spawnProcess, ["-xf", archive, "-C", extracted]);
+        await runTar(spawnProcess, [
+          "-xf", archive, "-C", extracted, "--",
+          `${packageDirectory}/manifest.json`,
+          `${packageDirectory}/canonical-runtime.json`,
+        ]);
         const extractedInventory = await assertNoLinksOrSpecialFiles(extracted);
         await observePhase("ARCHIVE_EXTRACT_COMPLETE", {
           ...extractedInventory,
           ...await temporaryStorage(root),
         });
         const packageRoot = path.join(extracted, packageDirectory);
-        const mediaRoot = path.join(extracted, "media");
         await Promise.all([
           requireFile(path.join(packageRoot, "manifest.json")),
           requireFile(path.join(packageRoot, "canonical-runtime.json")),
-          requireDirectory(mediaRoot),
         ]);
+        const mediaSource = createArchiveMediaSource({ archive, mediaMembers, spawnProcess });
         return Object.freeze({
           packageRoot,
-          mediaRoot,
+          mediaSource,
           transport: Object.freeze({ byteLength: downloaded.byteLength, sha256: downloaded.sha256, versioned: true }),
           cleanup: async () => {
             if (cleaned) return Object.freeze({ deletedExactVersion: true, localRemoved: true });
@@ -96,34 +100,164 @@ export function createSimplifiedProviderMigrationTransport({
 }
 
 async function tarEntries({ archive, spawnProcess }) {
-  const output = await runTar(spawnProcess, ["-tf", archive], { captureStdout: true });
-  return output.split(/\r?\n/).filter(Boolean).map((entry) => entry.replace(/\/$/, ""));
+  const plainOutput = await runTar(spawnProcess, ["-tf", archive], { captureStdout: true });
+  const verboseOutput = await runTar(spawnProcess, ["-tvf", archive], { captureStdout: true });
+  const plain = plainOutput.split(/\r?\n/).filter(Boolean);
+  const verbose = verboseOutput.split(/\r?\n/).filter(Boolean);
+  if (plain.length !== verbose.length) {
+    throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The archive inventory is ambiguous.");
+  }
+  return plain.map((rawName, index) => Object.freeze({
+    rawName,
+    name: rawName.replace(/\/$/, ""),
+    directory: rawName.endsWith("/"),
+    type: verbose[index]?.[0] ?? "?",
+  }));
 }
 
 function validateArchiveEntries(entries) {
   if (entries.length < 4) throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive is incomplete.");
+  const seen = new Set();
   for (const entry of entries) {
-    const normalized = entry.replaceAll("\\", "/");
+    const normalized = entry.name.replaceAll("\\", "/");
     if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)
       || normalized.split("/").includes("..")) {
       throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive contains an unsafe path.");
     }
+    if (seen.has(normalized)) {
+      throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive contains a duplicate path.");
+    }
+    seen.add(normalized);
+    if ((entry.directory && entry.type !== "d") || (!entry.directory && entry.type !== "-")) {
+      throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive contains a link or special entry.");
+    }
   }
-  const roots = [...new Set(entries.map((entry) => entry.split("/")[0]))].sort();
+  const roots = [...new Set(entries.map((entry) => entry.name.split("/")[0]))].sort();
   const packageDirectories = roots.filter((entry) => PACKAGE_DIRECTORY.test(entry));
   if (roots.length !== 2 || roots[0] !== "media" || packageDirectories.length !== 1) {
     throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The migration transport archive has an unexpected root layout.");
   }
   const packageDirectory = packageDirectories[0];
-  const packageEntries = entries.filter((entry) => entry.startsWith(`${packageDirectory}/`));
+  const packageEntries = entries.filter((entry) => entry.name.startsWith(`${packageDirectory}/`) && !entry.directory);
   const allowed = new Set([
     `${packageDirectory}/canonical-runtime.json`,
     `${packageDirectory}/manifest.json`,
   ]);
-  if (packageEntries.some((entry) => !allowed.has(entry))) {
+  if (packageEntries.length !== allowed.size || packageEntries.some((entry) => !allowed.has(entry.name))) {
     throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The canonical package directory contains unexpected files.");
   }
-  return packageDirectory;
+  const mediaMembers = entries.filter((entry) => entry.name.startsWith("media/") && !entry.directory);
+  if (!mediaMembers.length || entries.some((entry) => !entry.directory
+    && !allowed.has(entry.name) && !entry.name.startsWith("media/"))) {
+    throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The media package contains unexpected files.");
+  }
+  return Object.freeze({ packageDirectory, mediaMembers: Object.freeze(mediaMembers.map((entry) => entry.name)) });
+}
+
+function createArchiveMediaSource({ archive, mediaMembers, spawnProcess }) {
+  const archiveOrder = Object.freeze([...mediaMembers]);
+  return Object.freeze({
+    processing: "single-pass-tar-stream",
+    async visit(entries, visitor, { onProgress = async () => undefined } = {}) {
+      if (!Array.isArray(entries) || typeof visitor !== "function") {
+        throw new Error("Archive media processing requires manifest entries and a visitor.");
+      }
+      const expected = new Map();
+      for (const entry of entries) {
+        const relativePath = String(entry?.relativePath ?? "");
+        const member = `media/${relativePath}`;
+        if (!relativePath || expected.has(member)) {
+          throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "The canonical media inventory is ambiguous.");
+        }
+        expected.set(member, entry);
+      }
+      if (archiveOrder.length !== expected.size || archiveOrder.some((member) => !expected.has(member))) {
+        throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "Transported media inventory differs from the canonical package.");
+      }
+      const ordered = archiveOrder.map((member) => Object.freeze({ member, entry: expected.get(member) }));
+      return visitTarMedia({ archive, ordered, spawnProcess, visitor, onProgress });
+    },
+  });
+}
+
+async function visitTarMedia({ archive, ordered, spawnProcess, visitor, onProgress }) {
+  const child = spawnProcess("tar", ["-xOf", archive, "--", ...ordered.map(({ member }) => member)], {
+    shell: false,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr?.on("data", (chunk) => { if (stderr.length < 8192) stderr += chunk; });
+  const closed = new Promise((resolve, reject) => {
+    child.once("error", (cause) => reject(coded("SIMPLIFIED_TRANSPORT_MEDIA_STREAM_FAILED", "The bounded media reader could not start.", cause)));
+    child.once("close", (code) => resolve(code));
+  });
+  let index = 0;
+  let parts = [];
+  let currentBytes = 0;
+  let processedBytes = 0;
+  let maximumFileBytes = 0;
+  let nextProgressBytes = 32 * 1024 * 1024;
+  async function completeCurrent() {
+    const { entry } = ordered[index];
+    const bytes = Buffer.concat(parts, currentBytes);
+    parts = [];
+    currentBytes = 0;
+    if (bytes.length !== Number(entry.size)
+      || createHash("sha256").update(bytes).digest("hex") !== String(entry.sha256)) {
+      throw coded("SIMPLIFIED_PROVIDER_MEDIA_IDENTITY_MISMATCH", "Transported media differs from the canonical package.");
+    }
+    await visitor(entry, bytes);
+    index += 1;
+    processedBytes += bytes.length;
+    maximumFileBytes = Math.max(maximumFileBytes, bytes.length);
+    if (index === ordered.length || index % 32 === 0 || processedBytes >= nextProgressBytes) {
+      while (nextProgressBytes <= processedBytes) nextProgressBytes += 32 * 1024 * 1024;
+      await onProgress(Object.freeze({
+        mediaCount: index,
+        mediaBytes: processedBytes,
+        ...await temporaryStorage(path.dirname(archive)),
+      }));
+    }
+  }
+  try {
+    while (index < ordered.length && Number(ordered[index].entry.size) === 0) await completeCurrent();
+    for await (const chunk of child.stdout) {
+      let offset = 0;
+      while (offset < chunk.length) {
+        if (index >= ordered.length) {
+          throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "The media stream contains unexpected trailing bytes.");
+        }
+        const remaining = Number(ordered[index].entry.size) - currentBytes;
+        const take = Math.min(remaining, chunk.length - offset);
+        parts.push(chunk.subarray(offset, offset + take));
+        currentBytes += take;
+        offset += take;
+        if (currentBytes === Number(ordered[index].entry.size)) {
+          await completeCurrent();
+          while (index < ordered.length && Number(ordered[index].entry.size) === 0) await completeCurrent();
+        }
+      }
+    }
+    const code = await closed;
+    if (code !== 0) {
+      throw coded("SIMPLIFIED_TRANSPORT_MEDIA_STREAM_FAILED", `The bounded media reader failed with exit code ${code}: ${stderr.slice(0, 512)}`);
+    }
+    if (index !== ordered.length || currentBytes !== 0) {
+      throw coded("SIMPLIFIED_PROVIDER_MEDIA_INVENTORY_MISMATCH", "The media stream ended before the canonical inventory was complete.");
+    }
+    return Object.freeze({
+      verified: true,
+      objectCount: index,
+      byteLength: processedBytes,
+      maximumFileBytes,
+      processing: "single-pass-tar-stream",
+    });
+  } catch (error) {
+    if (child.exitCode == null && child.signalCode == null) child.kill("SIGTERM");
+    await closed.catch(() => undefined);
+    throw error;
+  }
 }
 
 function runTar(spawnProcess, args, { captureStdout = false } = {}) {
@@ -177,9 +311,6 @@ async function temporaryStorage(root) {
 
 async function requireFile(target) {
   if (!(await fs.stat(target)).isFile()) throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The canonical package is incomplete.");
-}
-async function requireDirectory(target) {
-  if (!(await fs.stat(target)).isDirectory()) throw coded("SIMPLIFIED_TRANSPORT_ARCHIVE_INVALID", "The media package is incomplete.");
 }
 function requireTransportKey(value) {
   const key = String(value ?? "");

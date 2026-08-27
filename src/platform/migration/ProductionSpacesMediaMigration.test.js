@@ -30,6 +30,28 @@ describe("production Spaces media migration", () => {
       expect(provider.deleteObject).toHaveBeenCalledWith({ objectKey: "private/owner/media/original", providerVersion: "version-one" });
     } finally { await fs.rm(fixture.root, { recursive: true, force: true }); }
   });
+
+  it("uses the same bounded source visitor that the provider proof validates", async () => {
+    const fixture = await packageFixture();
+    const provider = objectProvider(fixture);
+    const pool = { query: vi.fn(async () => ({ rows: [] })) };
+    const visitSourceEntries = vi.fn(async (entries, visitor) => {
+      expect(entries).toHaveLength(1);
+      await visitor(entries[0], fixture.bytes);
+      return { objectCount: 1, byteLength: fixture.bytes.length };
+    });
+    try {
+      await expect(migrateCanonicalPackageMediaToSpaces({
+        packageRoot: fixture.packageRoot,
+        visitSourceEntries,
+        pool,
+        objectProvider: provider,
+        fetchImpl: async () => ({ ok: true, status: 200, headers: { get: () => '"part-etag"' } }),
+      })).resolves.toMatchObject({ status: "passed", objectCount: 1, byteLength: fixture.bytes.length });
+      expect(visitSourceEntries).toHaveBeenCalledOnce();
+      expect(pool.query).toHaveBeenCalledOnce();
+    } finally { await fs.rm(fixture.root, { recursive: true, force: true }); }
+  });
 });
 
 function objectProvider(fixture) {

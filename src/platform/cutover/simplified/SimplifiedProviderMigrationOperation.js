@@ -21,6 +21,7 @@ export const SIMPLIFIED_PROVIDER_DIAGNOSTIC_PHASES = Object.freeze([
   "PACKAGE_VALIDATION_STARTED",
   "PACKAGE_VALIDATION_COMPLETE",
   "MEDIA_VALIDATION_STARTED",
+  "MEDIA_ARCHIVE_PROGRESS",
   "MEDIA_VALIDATION_COMPLETE",
   "PREIMPORT_GATE_STARTED",
   "PREIMPORT_GATE_COMPLETE",
@@ -285,7 +286,8 @@ export function createSimplifiedProviderMigrationWorkerHandler({
 function toExecutionArgs(request, materialized, currentOutboxMessageId) {
   return Object.freeze({
     packagePath: materialized.packageRoot,
-    mediaRoot: materialized.mediaRoot,
+    mediaRoot: materialized.mediaRoot ?? null,
+    mediaSource: materialized.mediaSource ?? null,
     migrationOperationId: request.migrationOperationId,
     migrationId: request.migrationId,
     runtimeRevision: request.runtimeRevision,
