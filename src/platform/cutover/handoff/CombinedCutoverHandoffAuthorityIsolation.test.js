@@ -40,7 +40,7 @@ const FORBIDDEN_WORKER_PATTERNS = [
 function codeOnly(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.replace(/\/\/.*$/, ""))
     .join("\n");
 }
@@ -88,7 +88,7 @@ describe("combined cutover handoff channel — authority write isolation", () =>
   it("no handoff module imports the canonical-write-boundary machinery or a worker module", () => {
     for (const moduleName of HANDOFF_MODULES) {
       const source = readModule("", moduleName);
-      const imports = source.split("\n").filter((line) => /^\s*import\b/.test(line)).join("\n");
+      const imports = source.split(/\r?\n/).filter((line) => /^\s*import\b/.test(line)).join("\n");
       expect(imports).not.toMatch(/Phase4CanonicalRecordStore/);
       expect(imports).not.toMatch(/AuthorityGatedWorker/);
     }

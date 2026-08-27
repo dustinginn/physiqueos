@@ -25,8 +25,20 @@ import {
   listFounderRepositoryMethodInventory,
 } from "./canonicalWriteSurfaceInventory.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import {
+  SIMPLIFIED_MIGRATION_MODE,
+  assertSimplifiedDisposableTarget,
+  assertSimplifiedFrozenSource,
+  assertSimplifiedSchema,
+} from "./simplified/SimplifiedMigrationEligibility.js";
 
 const EXPECTED_SCHEMA_MIGRATION = "000004_phase5_provider_readiness";
+const FOUNDER_SCOPED_TABLES = Object.freeze([
+  "canonical_user_records", "canonical_goal_records", "canonical_plan_records", "canonical_protocol_records",
+  "canonical_execution_records", "canonical_checkin_records", "canonical_evidence_records", "canonical_training_records",
+  "canonical_briefing_records", "canonical_confidence_records", "canonical_relationships", "canonical_media_objects",
+  "canonical_runtime_metadata", "canonical_application_context",
+]);
 const COUNTED_TABLES = Object.freeze([
   "canonical_user_records", "canonical_goal_records", "canonical_plan_records",
   "canonical_protocol_records", "canonical_execution_records", "canonical_checkin_records",
@@ -38,13 +50,14 @@ const COUNTED_TABLES = Object.freeze([
 export async function createProviderProductionMigrationDryRunEnvironment({ env = process.env, request } = {}) {
   assertProviderExecutionBoundary(env);
   if (request?.dryRun !== true) throw boundaryError("REMOTE_DRY_RUN_REQUIRED", "The provider execution environment accepts dry-run only.");
+  const simplified = request.migrationMode === SIMPLIFIED_MIGRATION_MODE;
   const providerIdentity = readBuildIdentity(env);
   if (!providerIdentity.gitSha) throw boundaryError("REMOTE_DRY_RUN_PROVIDER_IDENTITY_UNAVAILABLE", "The App Platform source identity is unavailable.");
 
   const databaseConfig = readDatabaseConfig({
     ...env,
     PHYSIQUEOS_DATABASE_ENABLED: "1",
-    PHYSIQUEOS_DATABASE_URL: required(env.PHYSIQUEOS_MIGRATION_DATABASE_URL, "PHYSIQUEOS_MIGRATION_DATABASE_URL"),
+    PHYSIQUEOS_DATABASE_URL: required(simplified ? env.PHYSIQUEOS_DATABASE_URL : env.PHYSIQUEOS_MIGRATION_DATABASE_URL, simplified ? "PHYSIQUEOS_DATABASE_URL" : "PHYSIQUEOS_MIGRATION_DATABASE_URL"),
     PHYSIQUEOS_DATABASE_APPLICATION_NAME: "physiqueos-provider-migration-dry-run",
   });
   const spacesConfig = readSpacesConfig(env);
@@ -52,28 +65,33 @@ export async function createProviderProductionMigrationDryRunEnvironment({ env =
   const pool = createPostgresPool(databaseConfig);
   const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
   const spacesInspector = createSpacesReadOnlyInspector(spacesConfig);
-  const clusterId = required(env.PHYSIQUEOS_DATABASE_CLUSTER_ID, "PHYSIQUEOS_DATABASE_CLUSTER_ID");
-  const backupFreshnessVerifier = createDigitalOceanManagedPostgresBackupFreshnessVerifier({
-    clusterId,
-    accessToken: required(env.DIGITALOCEAN_ACCESS_TOKEN, "DIGITALOCEAN_ACCESS_TOKEN"),
+  const clusterId = simplified ? null : required(env.PHYSIQUEOS_DATABASE_CLUSTER_ID, "PHYSIQUEOS_DATABASE_CLUSTER_ID");
+  const backupFreshnessVerifier = simplified ? null : createDigitalOceanManagedPostgresBackupFreshnessVerifier({
+    clusterId, accessToken: required(env.DIGITALOCEAN_ACCESS_TOKEN, "DIGITALOCEAN_ACCESS_TOKEN"),
   });
   const ownerUserId = required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
-  const configuredRecoverySha256 = sha256(required(env.PHYSIQUEOS_MIGRATION_RECOVERY_SHA256, "PHYSIQUEOS_MIGRATION_RECOVERY_SHA256"));
-  const configuredControlSha256 = sha256(required(env.PHYSIQUEOS_MIGRATION_CONTROL_SHA256, "PHYSIQUEOS_MIGRATION_CONTROL_SHA256"));
+  const configuredRecoverySha256 = simplified ? null : sha256(required(env.PHYSIQUEOS_MIGRATION_RECOVERY_SHA256, "PHYSIQUEOS_MIGRATION_RECOVERY_SHA256"));
+  const configuredControlSha256 = simplified ? request.expectedControlSha256 : sha256(required(env.PHYSIQUEOS_MIGRATION_CONTROL_SHA256, "PHYSIQUEOS_MIGRATION_CONTROL_SHA256"));
   const controlState = Object.freeze({
     schemaVersion: "production-migration-control-v1",
     version: request.expectedControlVersion,
     environment: "production",
-    fenceId: null,
-    migrationOperationId: null,
-    expectedMigrationId: null,
-    fenceState: "inactive",
+    fenceId: simplified ? request.previousFenceId : null,
+    migrationOperationId: simplified ? request.previousMigrationOperationId : null,
+    expectedMigrationId: simplified ? request.previousExpectedMigrationId : null,
+    fenceState: simplified ? request.expectedControlFenceState : "inactive",
     canonicalStoreEpoch: "legacy-json",
     compositionMode: "legacy-json",
     canonicalStoreTarget: "legacy-json",
     writesEnabled: true,
     readsEnabled: true,
     firstPostgresWriteAt: null,
+    ...(simplified ? {
+      currentStep: request.expectedControlCurrentStep,
+      lastTransition: request.expectedControlLastTransition,
+      abortedAt: request.previousAbortedAt,
+      releasedAt: request.previousReleasedAt,
+    } : {}),
   });
   const controlStore = Object.freeze({
     read: () => Object.freeze({ state: controlState, audit: Object.freeze([]) }),
@@ -104,6 +122,28 @@ export async function createProviderProductionMigrationDryRunEnvironment({ env =
       });
     },
     async verifyBackup() {
+      if (simplified) {
+        assertSimplifiedFrozenSource({
+          control: controlState,
+          operationId: request.operationId,
+          expectedRuntimeRevision: request.expectedFounderRevision,
+          actualRuntimeRevision: request.expectedFounderRevision,
+          expectedRuntimeSha256: request.expectedFounderSha256,
+          actualRuntimeSha256: request.expectedFounderSha256,
+          expectedControlSha256: request.expectedControlSha256,
+          actualControlSha256: configuredControlSha256,
+          expectedBackupInventorySha256: request.expectedBackupInventorySha256,
+          actualBackupInventorySha256: request.expectedBackupInventorySha256,
+          expectedSourceCommit: request.expectedProductionSourceCommit,
+          actualSourceCommit: request.expectedRollbackSourceCommit,
+        });
+        return pass({
+          finalRollbackBackup: { sha256: request.expectedBackupInventorySha256, source: "windows-control-plane-verified-and-drive-replicated" },
+          canonicalPackage: { migrationId: request.expectedMigrationId, packageDigest: request.expectedPackageDigest },
+          migrationControl: { sha256: configuredControlSha256, state: controlState.fenceState, epoch: "legacy-json", composition: "legacy-json" },
+          rollbackArtifact: { sourceCommit: request.expectedRollbackSourceCommit, buildId: request.expectedRollbackBuildId, source: "scratch-booted-frozen-backup" },
+        });
+      }
       if (request.expectedRecoverySha256 !== configuredRecoverySha256) {
         throw boundaryError("REMOTE_DRY_RUN_RECOVERY_IDENTITY_MISMATCH", "The recovery packet checksum does not match the provider configuration.");
       }
@@ -120,14 +160,15 @@ export async function createProviderProductionMigrationDryRunEnvironment({ env =
       const database = (await pool.query("SELECT current_database() AS name, current_setting('server_version') AS version")).rows[0];
       const migrations = await migrationNames(pool);
       targetIdentity = Object.freeze({
-        clusterId,
+        clusterId: clusterId ?? "attached-app-database",
         database: database?.name ?? null,
         host: new URL(databaseConfig.connectionString).hostname,
         postgresVersion: database?.version ?? null,
         latestSchemaMigration: migrations.at(-1) ?? null,
       });
       if (!String(database?.version ?? "").startsWith("17.")) throw boundaryError("REMOTE_DRY_RUN_POSTGRES_VERSION_MISMATCH", "The provider target is not PostgreSQL 17.");
-      if (targetIdentity.latestSchemaMigration !== EXPECTED_SCHEMA_MIGRATION) throw boundaryError("REMOTE_DRY_RUN_SCHEMA_MISMATCH", "The provider target schema is not at the accepted migration level.");
+      if (simplified) assertSimplifiedSchema(migrations);
+      else if (targetIdentity.latestSchemaMigration !== EXPECTED_SCHEMA_MIGRATION) throw boundaryError("REMOTE_DRY_RUN_SCHEMA_MISMATCH", "The provider target schema is not at the accepted migration level.");
       spacesStatus = await spacesInspector.verify();
       return pass({ database: targetIdentity, objectStorage: spacesStatus });
     },
@@ -172,7 +213,15 @@ export async function createProviderProductionMigrationDryRunEnvironment({ env =
     ...forbiddenExecutionAdapters(),
   };
 
-  const runner = createProductionMigrationRunner({ controlStore, adapters, backupFreshnessVerifier });
+  const rollbackSafetyVerifier = simplified ? {
+    async verify() {
+      const eligibility = await inspectSimplifiedTargetEligibility({
+        pool, spacesInspector, founderUserId: request.expectedFounderUserId, syntheticUserId: ownerUserId,
+      });
+      return Object.freeze({ ...assertSimplifiedDisposableTarget(eligibility), connectionHost: new URL(databaseConfig.connectionString).hostname, inspection: eligibility });
+    },
+  } : null;
+  const runner = createProductionMigrationRunner({ controlStore, adapters, backupFreshnessVerifier, rollbackSafetyVerifier });
   return Object.freeze({
     runner,
     providerIdentity,
@@ -213,7 +262,7 @@ function inspectWriteSurface() {
   });
 }
 
-function createSpacesReadOnlyInspector(config) {
+export function createSpacesReadOnlyInspector(config) {
   const client = new S3Client({
     region: config.region,
     endpoint: config.endpoint,
@@ -251,6 +300,16 @@ function createSpacesReadOnlyInspector(config) {
       objects.sort((left, right) => String(left.key).localeCompare(String(right.key)));
       return Object.freeze({ count: objects.length, bytes: objects.reduce((sum, item) => sum + item.bytes, 0), digest: digest(objects) });
     },
+    async countPrefix(prefix) {
+      let count = 0;
+      let continuationToken;
+      do {
+        const page = await client.send(new ListObjectsV2Command({ Bucket: config.bucket, Prefix: prefix, ContinuationToken: continuationToken }));
+        count += (page.Contents ?? []).length;
+        continuationToken = page.IsTruncated ? page.NextContinuationToken : null;
+      } while (continuationToken);
+      return count;
+    },
     close() { client.destroy(); },
   });
 }
@@ -266,6 +325,46 @@ function anonymousBucketUrl(config) {
 async function migrationNames(pool) {
   const result = await pool.query("SELECT name FROM physiqueos.physiqueos_schema_migrations ORDER BY run_on,id");
   return result.rows.map((row) => row.name);
+}
+
+export async function inspectSimplifiedTargetEligibility({ pool, spacesInspector, founderUserId, syntheticUserId }) {
+  if (!founderUserId || founderUserId === syntheticUserId) {
+    throw boundaryError("SIMPLIFIED_TARGET_SYNTHETIC_DATA_REJECTED", "Founder and rehearsal ownership are not distinguishable.");
+  }
+  const existing = new Set((await pool.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='physiqueos'")).rows.map((row) => row.tablename));
+  let founderScopedRowCount = 0;
+  for (const table of FOUNDER_SCOPED_TABLES) {
+    if (!existing.has(table)) continue;
+    const result = await pool.query(`SELECT count(*)::bigint AS count FROM physiqueos.${table} WHERE owner_user_id=$1`, [founderUserId]);
+    founderScopedRowCount += Number(result.rows[0]?.count ?? 0);
+  }
+  const users = await pool.query(
+    "SELECT count(*) FILTER (WHERE id=$1)::bigint AS synthetic_count, count(*) FILTER (WHERE id<>$1 AND id<>$2)::bigint AS other_count, count(*) FILTER (WHERE id=$2)::bigint AS founder_count FROM physiqueos.users",
+    [syntheticUserId, founderUserId],
+  );
+  founderScopedRowCount += Number(users.rows[0]?.founder_count ?? 0);
+  const authority = existing.has("combined_runtime_authority")
+    ? await pool.query("SELECT state->>'authority' AS authority,state->>'firstProviderCanonicalWriteAt' AS first_write FROM physiqueos.combined_runtime_authority ORDER BY environment")
+    : { rows: [] };
+  const outbox = existing.has("outbox_messages")
+    ? await pool.query("SELECT count(*) FILTER (WHERE status='failed')::bigint AS failed,count(*) FILTER (WHERE status='dead')::bigint AS dead,count(*) FILTER (WHERE status='processing' AND claim_expires_at<now())::bigint AS expired_leases FROM physiqueos.outbox_messages")
+    : { rows: [{}] };
+  const founderSpaceObjectCount = await spacesInspector.countPrefix(`private/${founderUserId}/`);
+  return Object.freeze({
+    authorityStates: authority.rows.map((row) => row.authority),
+    firstWriteMarkers: authority.rows.map((row) => row.first_write ?? null),
+    founderScopedRowCount,
+    founderSpaceObjectCount,
+    syntheticUserCount: Number(users.rows[0]?.synthetic_count ?? 0),
+    nonSyntheticUserCount: Number(users.rows[0]?.other_count ?? 0),
+    syntheticDataDistinguishable: true,
+    primaryKeyCollisionCount: founderScopedRowCount > 0 ? 1 : 0,
+    outbox: {
+      failed: Number(outbox.rows[0]?.failed ?? 0),
+      dead: Number(outbox.rows[0]?.dead ?? 0),
+      expiredLeases: Number(outbox.rows[0]?.expired_leases ?? 0),
+    },
+  });
 }
 
 async function captureDatabaseCounts(pool) {

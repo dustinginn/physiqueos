@@ -4,8 +4,10 @@ import {
   PROVIDER_MIGRATION_DRY_RUN_PAYLOAD_VERSION,
   PROVIDER_MIGRATION_DRY_RUN_TOPIC,
 } from "./ProviderMigrationDryRunContract.js";
+import { SIMPLIFIED_MIGRATION_MODE, SIMPLIFIED_REQUIRED_SCHEMA_MIGRATIONS } from "./simplified/SimplifiedMigrationEligibility.js";
 
 const TARGET_SCHEMA_VERSION = "000004_phase5_provider_readiness";
+const SIMPLIFIED_TARGET_SCHEMA_VERSION = SIMPLIFIED_REQUIRED_SCHEMA_MIGRATIONS.at(-1);
 
 export function createPostgresProviderMigrationDryRunStore({ pool, clock = () => new Date() } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Remote migration dry-run storage requires a PostgreSQL pool.");
@@ -32,7 +34,7 @@ export function createPostgresProviderMigrationDryRunStore({ pool, clock = () =>
             String(request.expectedFounderRevision),
             request.expectedFounderSha256,
             request.expectedProviderBuildId,
-            TARGET_SCHEMA_VERSION,
+            request.migrationMode === SIMPLIFIED_MIGRATION_MODE ? SIMPLIFIED_TARGET_SCHEMA_VERSION : TARGET_SCHEMA_VERSION,
             payloadFingerprint,
             { state: "queued", result, problem: null },
           ],

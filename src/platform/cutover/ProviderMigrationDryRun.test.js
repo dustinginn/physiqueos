@@ -29,6 +29,28 @@ describe("provider migration dry-run contract", () => {
     expect(() => assertProviderExecutionBoundary({ PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY: "digitalocean-app-platform", PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED: "1" })).not.toThrow();
   });
 
+  it("accepts the exact simplified backup/control/package binding and rejects backup drift", () => {
+    const request = {
+      ...validRequest(),
+      migrationMode: "single-user-cold-backup-v1",
+      expectedFounderUserId: "user_founder_001",
+      expectedRecoverySha256: undefined,
+      expectedBackupInventorySha256: "2".repeat(64),
+      expectedPackageDigest: "3".repeat(64),
+      expectedControlFenceState: "aborted",
+      previousMigrationOperationId: "old-operation",
+      previousFenceId: "old-fence",
+      previousExpectedMigrationId: "old-package",
+      previousAbortedAt: "2026-08-18T20:48:28.376Z",
+      previousReleasedAt: "2026-08-18T20:48:28.376Z",
+      expectedControlCurrentStep: "aborted-to-legacy",
+      expectedControlLastTransition: "abort-to-legacy",
+    };
+    const context = { ...validationContext, backupIdentity: { sha256: "2".repeat(64) } };
+    expect(validateProviderMigrationDryRunRequest(request, context)).toMatchObject({ migrationMode: "single-user-cold-backup-v1", expectedRecoverySha256: null, expectedPackageDigest: "3".repeat(64) });
+    expect(() => validateProviderMigrationDryRunRequest({ ...request, expectedBackupInventorySha256: "9".repeat(64) }, context)).toThrow(expect.objectContaining({ code: "REMOTE_DRY_RUN_BACKUP_IDENTITY_MISMATCH" }));
+  });
+
   it("redacts credential-shaped failures", () => {
     expect(safeMigrationFailure(new Error("postgresql://user:secret@example.invalid/db"))).toEqual({
       code: "REMOTE_DRY_RUN_FAILED",

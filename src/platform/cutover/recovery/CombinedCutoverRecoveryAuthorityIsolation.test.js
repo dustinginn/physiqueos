@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 function codeOnly(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.replace(/\/\/.*$/, ""))
     .join("\n");
 }
@@ -37,7 +37,7 @@ describe("combined cutover recovery trio — common isolation", () => {
 
     it(`${moduleName} never imports canonical-record write machinery`, () => {
       const source = readModule(moduleName);
-      const imports = source.split("\n").filter((line) => /^\s*import\b/.test(line)).join("\n");
+      const imports = source.split(/\r?\n/).filter((line) => /^\s*import\b/.test(line)).join("\n");
       expect(imports).not.toMatch(/Phase4CanonicalRecordStore/);
     });
   }
@@ -112,7 +112,7 @@ describe("enterProviderRecovery — post-boundary-only isolation", () => {
 describe("shared recovery decision helper — pure and side-effect free", () => {
   it("combinedCutoverRecoveryDecision.js has no store, network, or filesystem dependency", () => {
     const raw = readModule("../combinedCutoverRecoveryDecision.js");
-    const imports = raw.split("\n").filter((line) => /^\s*import\b/.test(line)).join("\n");
+    const imports = raw.split(/\r?\n/).filter((line) => /^\s*import\b/.test(line)).join("\n");
     expect(imports).not.toMatch(/PostgresCombinedRuntimeAuthorityStore|node:fs|node:http|node:net/);
   });
 });

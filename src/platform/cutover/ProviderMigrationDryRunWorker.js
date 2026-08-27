@@ -93,6 +93,8 @@ function toRunnerInput(request) {
       productionBuildId: request.expectedProductionBuildId,
       controlSha256: request.expectedControlSha256,
       recoverySha256: request.expectedRecoverySha256,
+      finalBackupInventorySha256: request.expectedBackupInventorySha256,
+      migrationMode: request.migrationMode,
     }),
   });
 }
@@ -111,7 +113,7 @@ function summarizePreflight(preflight, summaries) {
 }
 
 function assertClusterConnectionIdentity(preflight) {
-  const expected = String(preflight?.backup?.managedPostgres?.connectionHost ?? "").toLowerCase();
+  const expected = String(preflight?.backup?.managedPostgres?.connectionHost ?? preflight?.backup?.rollbackSafety?.connectionHost ?? "").toLowerCase();
   const actual = String(preflight?.target?.database?.host ?? "").toLowerCase();
   if (!expected || !actual || expected !== actual) {
     const error = new Error("The connected PostgreSQL host does not match the expected managed cluster.");

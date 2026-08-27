@@ -18,12 +18,14 @@ export function createProductionMigrationRunner({
   controlStore,
   adapters,
   backupFreshnessVerifier,
+  rollbackSafetyVerifier,
   now = () => new Date(),
   monotonicNow,
   maximumFenceDurationMs,
 } = {}) {
   if (!controlStore?.read || !controlStore?.transition) throw new Error("Production migration runner requires durable control.");
-  if (typeof backupFreshnessVerifier?.verify !== "function") throw new Error("Production migration runner requires independent backup verification.");
+  const targetRollbackVerifier = rollbackSafetyVerifier ?? backupFreshnessVerifier;
+  if (typeof targetRollbackVerifier?.verify !== "function") throw new Error("Production migration runner requires independent rollback-safety verification.");
   const wrappedAdapters = {
     ...adapters,
     inspectBuildIdentity: async (context) => {
@@ -42,12 +44,21 @@ export function createProductionMigrationRunner({
       return ready(result);
     },
     verifyBackup: async (context) => {
-      const [recovery, freshness] = await Promise.all([
-        adapters.verifyBackup(context),
-        backupFreshnessVerifier.verify(),
-      ]);
-      assertManagedPostgresBackupFreshness(freshness);
-      return ready(recovery, { managedPostgres: freshness });
+      const recoveryVerification = adapters.verifyBackup(context);
+      const targetVerification = rollbackSafetyVerifier
+        ? rollbackSafetyVerifier.verify()
+        : backupFreshnessVerifier.verify();
+      const [recovery, rollbackSafety] = await Promise.all([recoveryVerification, targetVerification]);
+      if (rollbackSafetyVerifier) {
+        if (rollbackSafety?.ready !== true || rollbackSafety?.status !== "PASS"
+          || rollbackSafety?.kind !== "simplified-empty-nonauthoritative-target"
+          || rollbackSafety?.managedTargetBackupRequired !== false) {
+          throw runnerError("SIMPLIFIED_TARGET_ROLLBACK_SAFETY_REJECTED", "The simplified target is not eligible for the managed-target-backup exemption.");
+        }
+        return ready(recovery, { rollbackSafety });
+      }
+      assertManagedPostgresBackupFreshness(rollbackSafety);
+      return ready(recovery, { managedPostgres: rollbackSafety });
     },
     verifyMigrationScripts: async (context) => {
       const result = await adapters.verifyMigrationScripts(context);

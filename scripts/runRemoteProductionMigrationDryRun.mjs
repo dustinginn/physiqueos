@@ -2,12 +2,18 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { register } from "node:module";
 import { inspectFoundationSourceInventory } from "../src/platform/migration/foundationSourceCollections.js";
+import { SIMPLIFIED_MIGRATION_MODE, assertSimplifiedRestartableControl } from "../src/platform/cutover/simplified/SimplifiedMigrationEligibility.js";
+
+register("./sourceModuleResolutionHook.mjs", import.meta.url);
+const { readAndValidateCanonicalPackage } = await import("../src/platform/migration/phase4CanonicalExport.js");
 
 const root = path.resolve(import.meta.dirname, "..");
 const args = parseArgs(process.argv.slice(2));
 if (args["dry-run"] !== "true") throw clientError("REMOTE_DRY_RUN_REQUIRED", "Specify --dry-run true; remote execution is not supported.");
 if (args.execute != null || args["final-go"] != null) throw clientError("REMOTE_DRY_RUN_EXECUTION_FLAG_REJECTED", "The remote control client refuses execution/final-GO flags.");
+if (args.mode !== SIMPLIFIED_MIGRATION_MODE) throw clientError("REMOTE_DRY_RUN_MIGRATION_MODE_REQUIRED", `Specify --mode ${SIMPLIFIED_MIGRATION_MODE}.`);
 
 const endpoint = new URL(required(args.endpoint ?? process.env.PHYSIQUEOS_REMOTE_DRY_RUN_ENDPOINT, "--endpoint"));
 if (endpoint.protocol !== "https:" && endpoint.hostname !== "127.0.0.1" && endpoint.hostname !== "localhost") {
@@ -21,29 +27,37 @@ const runtimePath = path.resolve(root, process.env.PHYSIQUEOS_RUNTIME_STORE_PATH
 const controlPath = path.resolve(root, process.env.PHYSIQUEOS_MIGRATION_CONTROL_PATH ?? path.join("private", "founder", "migration-control.json"));
 const mediaRoot = path.resolve(root, process.env.PHYSIQUEOS_FOUNDER_PRIVATE_ROOT ?? path.join("private", "founder"));
 const rollbackPath = path.resolve(required(args["rollback-path"], "--rollback-path"));
-const recoveryArchive = path.resolve(required(process.env.PHYSIQUEOS_MIGRATION_RECOVERY_ARCHIVE, "PHYSIQUEOS_MIGRATION_RECOVERY_ARCHIVE"));
+const backupInventoryPath = path.resolve(required(process.env.PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS, "PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS"));
+const packageRoot = path.resolve(required(args["package-path"], "--package-path"));
 
-const [runtimeBytes, controlBytes, productionSourceCommit, productionBuildId, rollbackSourceCommit, rollbackBuildId, recovery, media] = await Promise.all([
+const [runtimeBytes, controlBytes, productionSourceCommit, productionBuildId, rollbackSourceCommit, rollbackBuildId, backupInventory, media, packageData] = await Promise.all([
   fs.readFile(runtimePath),
   fs.readFile(controlPath),
   readIdentity(path.join(productionBuildRoot, ".next", "SOURCE_COMMIT")),
   readIdentity(path.join(productionBuildRoot, ".next", "BUILD_ID")),
   readIdentity(path.join(rollbackPath, "SOURCE_COMMIT")),
   readIdentity(path.join(rollbackPath, "BUILD_ID")),
-  hashFile(recoveryArchive),
+  hashFile(backupInventoryPath),
   inspectFounderMedia(mediaRoot),
+  readAndValidateCanonicalPackage(packageRoot),
 ]);
 const runtime = JSON.parse(runtimeBytes.toString("utf8").replace(/^\uFEFF/, ""));
 const controlEnvelope = JSON.parse(controlBytes.toString("utf8").replace(/^\uFEFF/, ""));
 const control = controlEnvelope.state;
-assertInactiveLegacyControl(control);
+assertSimplifiedRestartableControl(control, { operationId });
 const inventory = inspectFoundationSourceInventory(runtime);
 if (inventory.required.presentCount !== 39 || inventory.required.missing.length || inventory.unknown.length
   || inventory.excluded.length !== 3 || inventory.excluded.some((entry) => entry.sourcePresent)) {
   throw clientError("REMOTE_DRY_RUN_COLLECTION_INVENTORY_BLOCKED", "The local Founder collection inventory is not the accepted 39-required/3-excluded contract.");
 }
-const expectedRecoverySha256 = sha256(required(process.env.PHYSIQUEOS_MIGRATION_RECOVERY_SHA256, "PHYSIQUEOS_MIGRATION_RECOVERY_SHA256"));
-if (recovery.sha256 !== expectedRecoverySha256) throw clientError("REMOTE_DRY_RUN_RECOVERY_IDENTITY_MISMATCH", "The local encrypted recovery packet checksum does not match the accepted value.");
+const expectedBackupInventorySha256 = sha256(required(process.env.PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS_SHA256, "PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS_SHA256"));
+if (backupInventory.sha256 !== expectedBackupInventorySha256) throw clientError("REMOTE_DRY_RUN_BACKUP_IDENTITY_MISMATCH", "The final rollback backup inventory checksum does not match the accepted value.");
+if (packageData.manifest.source.runtime.sha256 !== digest(runtimeBytes)
+  || Number(packageData.manifest.source.runtime.revision) !== Number(runtime.revision)
+  || packageData.manifest.source.application.sourceCommit !== productionSourceCommit
+  || packageData.manifest.source.migration.operationId !== operationId) {
+  throw clientError("REMOTE_DRY_RUN_PACKAGE_IDENTITY_MISMATCH", "The canonical package does not match the frozen runtime, source commit, and operation.");
+}
 
 const request = Object.freeze({
   operationId,
@@ -51,19 +65,30 @@ const request = Object.freeze({
   operator: required(args.operator ?? "Founder", "--operator"),
   environment: "production",
   dryRun: true,
+  migrationMode: SIMPLIFIED_MIGRATION_MODE,
   expectedProductionSourceCommit: commit(productionSourceCommit, "live production source"),
   expectedProductionBuildId: productionBuildId,
   expectedProviderSourceCommit: commit(required(args["expected-provider-commit"], "--expected-provider-commit"), "provider source"),
   expectedProviderBuildId: required(args["expected-provider-build"], "--expected-provider-build"),
   expectedFounderRevision: Number(runtime.revision),
+  expectedFounderUserId: required(runtime.user?.id, "runtime.user.id"),
   expectedFounderSha256: digest(runtimeBytes),
   expectedMediaCount: media.count,
   expectedMediaBytes: media.bytes,
   expectedMediaInventorySha256: media.sha256,
   expectedControlVersion: Number(control.version),
   expectedControlSha256: digest(controlBytes),
-  expectedRecoverySha256,
-  expectedMigrationId: required(args["migration-id"], "--migration-id"),
+  expectedBackupInventorySha256,
+  expectedControlFenceState: control.fenceState,
+  previousMigrationOperationId: control.migrationOperationId,
+  previousFenceId: control.fenceId,
+  previousExpectedMigrationId: control.expectedMigrationId,
+  previousAbortedAt: control.abortedAt,
+  previousReleasedAt: control.releasedAt,
+  expectedControlCurrentStep: control.currentStep,
+  expectedControlLastTransition: control.lastTransition,
+  expectedMigrationId: packageData.manifest.migrationId,
+  expectedPackageDigest: packageData.manifest.semanticDigest,
   expectedRollbackSourceCommit: commit(rollbackSourceCommit, "rollback source"),
   expectedRollbackBuildId: rollbackBuildId,
 });
@@ -98,8 +123,8 @@ process.stdout.write(`${JSON.stringify({
     localControlSha256: request.expectedControlSha256,
     localMediaInventory: media,
     collectionInventory: { required: 39, excluded: 3, unknown: 0, missing: 0 },
-    recoveryBytes: recovery.size,
-    recoverySha256: recovery.sha256,
+    finalBackupInventoryBytes: backupInventory.size,
+    finalBackupInventorySha256: backupInventory.sha256,
   },
   providerDependentValidationExecutedIn: "DigitalOcean App Platform",
 })}\n`);
@@ -131,13 +156,6 @@ function assertRemoteIdentity(status, request) {
   const providerCommit = provider?.sourceCommit ?? provider?.gitSha;
   if (providerCommit !== request.expectedProviderSourceCommit || provider?.buildId !== request.expectedProviderBuildId) {
     throw clientError("REMOTE_DRY_RUN_PROVIDER_IDENTITY_MISMATCH", "Remote status reported a different provider source/build.");
-  }
-}
-
-function assertInactiveLegacyControl(state) {
-  const expected = { fenceState: "inactive", canonicalStoreEpoch: "legacy-json", compositionMode: "legacy-json", readsEnabled: true, writesEnabled: true, migrationOperationId: null, firstPostgresWriteAt: null };
-  for (const [field, value] of Object.entries(expected)) {
-    if (state?.[field] !== value) throw clientError("PRODUCTION_MIGRATION_EXPECTED_STATE_MISMATCH", `Migration control ${field} is not the accepted inactive legacy value.`);
   }
 }
 
@@ -194,7 +212,7 @@ function hashStream(file) {
   });
 }
 function digest(value) { return createHash("sha256").update(value).digest("hex"); }
-function sha256(value) { const candidate = value.toLowerCase(); if (!/^[a-f0-9]{64}$/.test(candidate)) throw clientError("REMOTE_DRY_RUN_ARGUMENT_INVALID", "Recovery SHA-256 is invalid."); return candidate; }
+function sha256(value) { const candidate = value.toLowerCase(); if (!/^[a-f0-9]{64}$/.test(candidate)) throw clientError("REMOTE_DRY_RUN_ARGUMENT_INVALID", "SHA-256 is invalid."); return candidate; }
 function commit(value, field) { const candidate = String(value ?? "").trim().toLowerCase(); if (!/^[a-f0-9]{40}$/.test(candidate)) throw clientError("REMOTE_DRY_RUN_ARGUMENT_INVALID", `${field} is invalid.`); return candidate; }
 function required(value, field) { const candidate = String(value ?? "").trim(); if (!candidate) throw clientError("REMOTE_DRY_RUN_ARGUMENT_INVALID", `${field} is required.`); return candidate; }
 function numberArg(value, fallback, minimum, maximum) { const result = value == null ? fallback : Number(value); if (!Number.isInteger(result) || result < minimum || result > maximum) throw clientError("REMOTE_DRY_RUN_ARGUMENT_INVALID", "Polling interval/timeout is invalid."); return result; }

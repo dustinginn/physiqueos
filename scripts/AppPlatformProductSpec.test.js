@@ -19,10 +19,13 @@ describe("full-product App Platform specification", () => {
     expect(template.match(/rule: RESTART_COUNT/g)).toHaveLength(2);
   });
 
-  it("keeps compatibility mode explicit and production migration execution disabled", () => {
+  it("keeps compatibility mode explicit and enables only the provider dry-run boundary through an explicit render input", () => {
     expect(template.match(/PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT/g)).toHaveLength(2);
-    expect(template.match(/PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED[^\n]*value: "0"/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED[^\n]*PROVIDER_MIGRATION_DRY_RUN_ENABLED/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_EXPECTED_FINAL_BACKUP_SHA256SUMS_SHA256/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED/g)).toHaveLength(2);
     expect(template).not.toContain("DIGITALOCEAN_ACCESS_TOKEN");
     expect(template).not.toContain("PHYSIQUEOS_MIGRATION_DATABASE_URL");
   });

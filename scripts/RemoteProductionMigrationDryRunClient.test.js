@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FOUNDATION_REQUIRED_SOURCE_COLLECTIONS } from "../src/platform/migration/foundationSourceCollections.js";
+import { PHASE4_PACKAGE_VERSION, exportCanonicalPackage } from "../src/platform/migration/phase4CanonicalExport.js";
+import { createFixedBuildIdentityProvider, deriveTrustedMigrationSourceIdentity } from "../src/platform/migration/MigrationSourceIdentity.js";
 
 const root = process.cwd();
 const cleanup = [];
@@ -73,14 +75,27 @@ async function createFixture() {
   Object.assign(runtime, { version: "fixture", revision: 122, updatedAt: "2026-08-13T00:00:00.000Z" });
   const runtimePath = path.join(directory, "runtime.json");
   const controlPath = path.join(directory, "control.json");
-  const recoveryPath = path.join(directory, "recovery.age");
+  const backupInventoryPath = path.join(directory, "SHA256SUMS.txt");
   const mediaRoot = path.join(directory, "media");
+  const packageRoot = path.join(directory, "package");
   for (const category of ["dexa", "evidence", "photos"]) await fs.mkdir(path.join(mediaRoot, category), { recursive: true });
   await fs.writeFile(path.join(mediaRoot, "photos", "synthetic.jpg"), "synthetic-media");
   await fs.writeFile(runtimePath, JSON.stringify(runtime));
-  await fs.writeFile(controlPath, JSON.stringify({ state: { version: 1, fenceState: "inactive", canonicalStoreEpoch: "legacy-json", compositionMode: "legacy-json", readsEnabled: true, writesEnabled: true, migrationOperationId: null, firstPostgresWriteAt: null } }));
-  await fs.writeFile(recoveryPath, "encrypted-fixture");
-  return { buildRoot, rollbackRoot, runtimePath, controlPath, recoveryPath, recoverySha256: digest("encrypted-fixture"), mediaRoot };
+  await fs.writeFile(controlPath, JSON.stringify({ state: {
+    schemaVersion: "production-migration-control-v1", environment: "production", version: 14, fenceState: "aborted", canonicalStoreEpoch: "legacy-json", compositionMode: "legacy-json", canonicalStoreTarget: "legacy-json",
+    readsEnabled: true, writesEnabled: true, fenceId: "old-fence", migrationOperationId: "old-operation", expectedMigrationId: "old-package",
+    currentStep: "aborted-to-legacy", lastTransition: "abort-to-legacy", abortedAt: "2026-08-18T20:48:28.376Z", releasedAt: "2026-08-18T20:48:28.376Z", firstPostgresWriteAt: null,
+  } }));
+  await fs.writeFile(backupInventoryPath, "verified-final-backup-inventory");
+  const sourceIdentity = await deriveTrustedMigrationSourceIdentity({
+    runtimePath,
+    packageVersion: PHASE4_PACKAGE_VERSION,
+    sourceSchemaVersion: "000003",
+    migrationOperationId: "remote-client-test-0001",
+    buildIdentityProvider: createFixedBuildIdentityProvider({ repositoryCommit: "b".repeat(40), applicationBuildId: "production-build", applicationSourceCommit: "b".repeat(40), migrationScriptCommit: "b".repeat(40) }),
+  });
+  await exportCanonicalPackage({ runtimePath, mediaRoot, outputRoot: packageRoot, sourceIdentity });
+  return { buildRoot, rollbackRoot, runtimePath, controlPath, backupInventoryPath, backupInventorySha256: digest("verified-final-backup-inventory"), mediaRoot, packageRoot };
 }
 
 function runClient(fixture, endpoint) {
@@ -88,12 +103,13 @@ function runClient(fixture, endpoint) {
     const child = spawn(process.execPath, [
       path.join(root, "scripts", "runRemoteProductionMigrationDryRun.mjs"),
       "--dry-run", "true",
+      "--mode", "single-user-cold-backup-v1",
       "--endpoint", endpoint,
       "--operation-id", "remote-client-test-0001",
       "--correlation-id", "remote-client-correlation-0001",
       "--expected-provider-commit", "a".repeat(40),
       "--expected-provider-build", "provider-build",
-      "--migration-id", "migration-id-0001",
+      "--package-path", fixture.packageRoot,
       "--rollback-path", fixture.rollbackRoot,
       "--poll-interval-ms", "250",
       "--poll-timeout-ms", "10000",
@@ -106,8 +122,8 @@ function runClient(fixture, endpoint) {
         PHYSIQUEOS_PRODUCTION_BUILD_ROOT: fixture.buildRoot,
         PHYSIQUEOS_RUNTIME_STORE_PATH: fixture.runtimePath,
         PHYSIQUEOS_MIGRATION_CONTROL_PATH: fixture.controlPath,
-        PHYSIQUEOS_MIGRATION_RECOVERY_ARCHIVE: fixture.recoveryPath,
-        PHYSIQUEOS_MIGRATION_RECOVERY_SHA256: fixture.recoverySha256,
+        PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS: fixture.backupInventoryPath,
+        PHYSIQUEOS_FINAL_BACKUP_SHA256SUMS_SHA256: fixture.backupInventorySha256,
         PHYSIQUEOS_FOUNDER_PRIVATE_ROOT: fixture.mediaRoot,
       },
       stdio: ["ignore", "pipe", "pipe"],

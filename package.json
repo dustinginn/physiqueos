@@ -29,6 +29,8 @@
     "test:migration-remediation": "vitest --config vitest.migration-safety.config.js run && vitest --config vitest.phase4.config.js run",
     "migration:production": "node scripts/runProductionMigration.mjs",
     "migration:production:remote-dry-run": "node scripts/runRemoteProductionMigrationDryRun.mjs",
+    "migration:simplified:package": "node scripts/prepareSimplifiedMigrationPackage.mjs",
+    "migration:simplified:provider": "node scripts/runSimplifiedProviderMigration.mjs",
     "provider:compatibility:initialize": "node scripts/initializeProviderCompatibility.mjs",
     "provider:artifact:scan": "node scripts/scanProviderArtifact.mjs",
     "provider:build:isolated": "node scripts/runIsolatedProviderBuild.mjs",

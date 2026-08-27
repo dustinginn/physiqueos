@@ -7,7 +7,7 @@ FROM dependencies AS artifact
 COPY src ./src
 COPY scripts/runFoundationWorker.mjs scripts/sourceModuleResolutionHook.mjs \
     scripts/scanProviderArtifact.mjs scripts/collectProviderWorkerArtifact.mjs \
-    scripts/collectProviderWorkerDependencies.mjs ./scripts/
+    scripts/collectProviderWorkerDependencies.mjs scripts/runSimplifiedProviderMigration.mjs ./scripts/
 RUN node scripts/collectProviderWorkerArtifact.mjs /worker
 RUN node scripts/collectProviderWorkerDependencies.mjs /worker
 RUN node scripts/scanProviderArtifact.mjs /worker

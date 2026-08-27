@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { SIMPLIFIED_MIGRATION_MODE } from "./simplified/SimplifiedMigrationEligibility.js";
 
 export const PROVIDER_MIGRATION_DRY_RUN_CONTRACT = "provider-production-migration-dry-run-v1";
 export const PROVIDER_MIGRATION_DRY_RUN_TOPIC = "operations.production-migration-dry-run";
@@ -12,11 +13,13 @@ const ALLOWED_FIELDS = Object.freeze([
   "operator",
   "environment",
   "dryRun",
+  "migrationMode",
   "expectedProductionSourceCommit",
   "expectedProductionBuildId",
   "expectedProviderSourceCommit",
   "expectedProviderBuildId",
   "expectedFounderRevision",
+  "expectedFounderUserId",
   "expectedFounderSha256",
   "expectedMediaCount",
   "expectedMediaBytes",
@@ -24,7 +27,17 @@ const ALLOWED_FIELDS = Object.freeze([
   "expectedControlVersion",
   "expectedControlSha256",
   "expectedRecoverySha256",
+  "expectedBackupInventorySha256",
+  "expectedControlFenceState",
+  "previousMigrationOperationId",
+  "previousFenceId",
+  "previousExpectedMigrationId",
+  "previousAbortedAt",
+  "previousReleasedAt",
+  "expectedControlCurrentStep",
+  "expectedControlLastTransition",
   "expectedMigrationId",
+  "expectedPackageDigest",
   "expectedRollbackSourceCommit",
   "expectedRollbackBuildId",
 ]);
@@ -37,6 +50,7 @@ export function validateProviderMigrationDryRunRequest(input = {}, {
   founderIdentity,
   mediaIdentity,
   rollbackIdentity,
+  backupIdentity,
 } = {}) {
   if (!isPlainObject(input)) throw contractError("REMOTE_DRY_RUN_PAYLOAD_INVALID", "The remote dry-run payload must be an object.");
   if (input.execute != null || input.finalMigrationAuthorization != null || input.finalGo != null) {
@@ -49,6 +63,10 @@ export function validateProviderMigrationDryRunRequest(input = {}, {
     throw contractError("REMOTE_DRY_RUN_CONTRACT_VERSION_UNSUPPORTED", "Remote dry-run contract version is unsupported.");
   }
 
+  const migrationMode = input.migrationMode == null ? null : required(input.migrationMode, "migrationMode");
+  if (migrationMode != null && migrationMode !== SIMPLIFIED_MIGRATION_MODE) {
+    throw contractError("REMOTE_DRY_RUN_MIGRATION_MODE_UNSUPPORTED", "Remote dry-run migration mode is unsupported.");
+  }
   const value = {
     contractVersion: PROVIDER_MIGRATION_DRY_RUN_CONTRACT,
     operationId: identifier(input.operationId, "operationId"),
@@ -56,19 +74,33 @@ export function validateProviderMigrationDryRunRequest(input = {}, {
     operator: required(input.operator, "operator"),
     environment: required(input.environment, "environment"),
     dryRun: true,
+    migrationMode,
     expectedProductionSourceCommit: commit(input.expectedProductionSourceCommit, "expectedProductionSourceCommit"),
     expectedProductionBuildId: identity(input.expectedProductionBuildId, "expectedProductionBuildId"),
     expectedProviderSourceCommit: commit(input.expectedProviderSourceCommit, "expectedProviderSourceCommit"),
     expectedProviderBuildId: identity(input.expectedProviderBuildId, "expectedProviderBuildId"),
     expectedFounderRevision: positiveInteger(input.expectedFounderRevision, "expectedFounderRevision"),
+    expectedFounderUserId: migrationMode === SIMPLIFIED_MIGRATION_MODE ? identity(input.expectedFounderUserId, "expectedFounderUserId") : null,
     expectedFounderSha256: sha256(input.expectedFounderSha256, "expectedFounderSha256"),
     expectedMediaCount: nonnegativeInteger(input.expectedMediaCount, "expectedMediaCount"),
     expectedMediaBytes: nonnegativeInteger(input.expectedMediaBytes, "expectedMediaBytes"),
     expectedMediaInventorySha256: sha256(input.expectedMediaInventorySha256, "expectedMediaInventorySha256"),
     expectedControlVersion: positiveInteger(input.expectedControlVersion, "expectedControlVersion"),
     expectedControlSha256: sha256(input.expectedControlSha256, "expectedControlSha256"),
-    expectedRecoverySha256: sha256(input.expectedRecoverySha256, "expectedRecoverySha256"),
+    expectedRecoverySha256: migrationMode === SIMPLIFIED_MIGRATION_MODE ? null : sha256(input.expectedRecoverySha256, "expectedRecoverySha256"),
+    expectedBackupInventorySha256: migrationMode === SIMPLIFIED_MIGRATION_MODE
+      ? sha256(input.expectedBackupInventorySha256, "expectedBackupInventorySha256")
+      : null,
+    expectedControlFenceState: migrationMode === SIMPLIFIED_MIGRATION_MODE ? identity(input.expectedControlFenceState, "expectedControlFenceState") : null,
+    previousMigrationOperationId: optionalIdentity(input.previousMigrationOperationId, "previousMigrationOperationId"),
+    previousFenceId: optionalIdentity(input.previousFenceId, "previousFenceId"),
+    previousExpectedMigrationId: optionalIdentity(input.previousExpectedMigrationId, "previousExpectedMigrationId"),
+    previousAbortedAt: optionalInstant(input.previousAbortedAt, "previousAbortedAt"),
+    previousReleasedAt: optionalInstant(input.previousReleasedAt, "previousReleasedAt"),
+    expectedControlCurrentStep: optionalIdentity(input.expectedControlCurrentStep, "expectedControlCurrentStep"),
+    expectedControlLastTransition: optionalIdentity(input.expectedControlLastTransition, "expectedControlLastTransition"),
     expectedMigrationId: identity(input.expectedMigrationId, "expectedMigrationId"),
+    expectedPackageDigest: migrationMode === SIMPLIFIED_MIGRATION_MODE ? sha256(input.expectedPackageDigest, "expectedPackageDigest") : null,
     expectedRollbackSourceCommit: commit(input.expectedRollbackSourceCommit, "expectedRollbackSourceCommit"),
     expectedRollbackBuildId: identity(input.expectedRollbackBuildId, "expectedRollbackBuildId"),
   };
@@ -108,6 +140,10 @@ export function validateProviderMigrationDryRunRequest(input = {}, {
       || value.expectedRollbackBuildId !== rollbackIdentity.buildId) {
       throw contractError("REMOTE_DRY_RUN_ROLLBACK_IDENTITY_MISMATCH", "The rollback artifact does not match the configured provider attestation.");
     }
+  }
+  if (backupIdentity && value.migrationMode === SIMPLIFIED_MIGRATION_MODE
+    && value.expectedBackupInventorySha256 !== String(backupIdentity.sha256 ?? "").toLowerCase()) {
+    throw contractError("REMOTE_DRY_RUN_BACKUP_IDENTITY_MISMATCH", "The final rollback backup inventory does not match the configured provider attestation.");
   }
   return Object.freeze(value);
 }
@@ -166,6 +202,14 @@ function identifier(value, field) {
 function identity(value, field) {
   const candidate = required(value, field);
   if (candidate.length > 200 || /[\r\n]/.test(candidate)) throw contractError("REMOTE_DRY_RUN_PAYLOAD_INVALID", `${field} is invalid.`);
+  return candidate;
+}
+
+function optionalIdentity(value, field) { return value == null ? null : identity(value, field); }
+function optionalInstant(value, field) {
+  if (value == null) return null;
+  const candidate = identity(value, field);
+  if (!Number.isFinite(Date.parse(candidate))) throw contractError("REMOTE_DRY_RUN_PAYLOAD_INVALID", `${field} is invalid.`);
   return candidate;
 }
 

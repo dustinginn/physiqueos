@@ -40,7 +40,7 @@ const FORBIDDEN_IMPORT_PATTERNS = [
 ];
 
 function importStatements(source) {
-  return source.split("\n").filter((line) => /^\s*import\b/.test(line));
+  return source.split(/\r?\n/).filter((line) => /^\s*import\b/.test(line));
 }
 
 // Strips // line comments and /* */ block comments so the write-pattern checks below match only
@@ -49,7 +49,7 @@ function importStatements(source) {
 function codeOnly(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.replace(/\/\/.*$/, ""))
     .join("\n");
 }
