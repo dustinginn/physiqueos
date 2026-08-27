@@ -5,6 +5,7 @@ import {
   COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX,
   COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX,
   COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX,
+  PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH,
 } from "./publicRoutes.js";
 
 describe("publicRoutes.isPublicPath", () => {
@@ -103,5 +104,21 @@ describe("publicRoutes.isPublicPath", () => {
 
   it("does NOT allow a sibling combined-cutover path to ride the handoff prefix", () => {
     expect(isPublicPath("/api/v1/operations/combined-cutover/handoff-evil/status")).toBe(false);
+  });
+
+  it("allows only the machine-authenticated production dry-run collection and one valid status segment", () => {
+    expect(isPublicPath(PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH)).toBe(true);
+    expect(isPublicPath(`${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/simplified-rev142-20260827`)).toBe(true);
+  });
+
+  it("does NOT broaden the dry-run exemption to siblings, invalid IDs, or nested descendants", () => {
+    for (const path of [
+      "/api/v1/operations/production-migration-dry-run",
+      "/api/v1/operations/production-migration-dry-runs-extra",
+      "/api/v1/operations/foo/production-migration-dry-runs",
+      `${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/short`,
+      `${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/invalid%20operation`,
+      `${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/simplified-rev142-20260827/extra`,
+    ]) expect(isPublicPath(path)).toBe(false);
   });
 });

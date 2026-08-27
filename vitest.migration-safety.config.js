@@ -33,6 +33,7 @@ export default defineConfig({
       "src/platform/cutover/ProductionMigrationRunner.test.js",
       "src/platform/cutover/ProviderMigrationDryRun.test.js",
       "src/platform/cutover/ProviderMigrationDryRunProductComposition.test.js",
+      "src/app/api/v1/operations/production-migration-dry-runs/ProviderMigrationDryRunProductRoutes.test.js",
       "src/platform/cutover/simplified/SimplifiedMigrationEligibility.test.js",
       "src/platform/cutover/simplified/SimplifiedAuthorityHandoffService.test.js",
       "src/platform/backup/DigitalOceanManagedPostgresBackupFreshness.test.js",

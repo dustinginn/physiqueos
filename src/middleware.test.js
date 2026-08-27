@@ -45,6 +45,31 @@ describe("middleware — public paths always pass, gate active", () => {
       expect(response.headers.get("x-middleware-next")).toBe("1");
     });
   }
+
+  it("passes only the machine-authenticated production dry-run collection and exact status path without a Founder cookie", async () => {
+    for (const [path, method] of [
+      ["/api/v1/operations/production-migration-dry-runs", "POST"],
+      ["/api/v1/operations/production-migration-dry-runs/simplified-rev142-20260827", "GET"],
+    ]) {
+      const response = await middleware(req(path, { method, headers: { accept: "application/json" } }));
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    }
+  });
+
+  it("keeps near-match and unrelated operations paths Founder-gated", async () => {
+    for (const path of [
+      "/api/v1/operations/production-migration-dry-run",
+      "/api/v1/operations/production-migration-dry-runs-extra",
+      "/api/v1/operations/foo/production-migration-dry-runs",
+      "/api/v1/operations/production-migration-dry-runs/short",
+      "/api/v1/operations/production-migration-dry-runs/simplified-rev142-20260827/extra",
+      "/api/v1/operations/unrelated",
+    ]) {
+      const response = await middleware(req(path, { headers: { accept: "application/json" } }));
+      expect(response.status).toBe(401);
+      expect(response.headers.get("x-middleware-next")).not.toBe("1");
+    }
+  });
 });
 
 describe("middleware — fail closed when secret is missing", () => {

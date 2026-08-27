@@ -27,6 +27,12 @@ export const COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX = "/api/v1/operation
 // its own separate, narrower machine credential (`combinedCutoverHandoffAuth.js`).
 export const COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX = "/api/v1/operations/combined-cutover/handoff/";
 
+// Production migration dry-runs are machine-to-provider operations authenticated by the existing
+// operations bearer token inside their routes. Exempt only the collection POST and one status GET
+// segment with the controller's exact operation-ID grammar; arbitrary descendants stay Founder-gated.
+export const PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH = "/api/v1/operations/production-migration-dry-runs";
+const PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID = /^[A-Za-z0-9._:-]{8,160}$/;
+
 const PUBLIC_EXACT_PATHS = new Set([
   "/api/v1/health/live",
   "/api/v1/health/ready",
@@ -50,5 +56,9 @@ export function isPublicPath(pathname) {
   if (pathname.startsWith(COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX)) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX)) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX)) return true;
+  if (pathname === PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH) return true;
+  if (pathname.startsWith(`${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/`)) {
+    return PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID.test(pathname.slice(PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH.length + 1));
+  }
   return false;
 }
