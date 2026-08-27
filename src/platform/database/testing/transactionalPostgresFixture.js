@@ -143,7 +143,7 @@ export function createTransactionalPostgresFixture({
       if (normalized.startsWith(`UPDATE ${AUTHORITY_TABLE} SET`)) {
         if (!inTransaction) throw fixtureError("FIXTURE_WRITE_OUTSIDE_TRANSACTION", "Authority update requires a transaction.");
         const environment = values[0];
-        const expectedVersion = values[18];
+        const expectedVersion = values[17];
         const index = view.authority.findIndex((entry) => entry.environment === environment && entry.state.version === expectedVersion);
         if (index === -1) return result([], 0); // drives RUNTIME_AUTHORITY_VERSION_CONFLICT
         view.authority[index] = { environment, state: JSON.parse(values[15]) };

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCompatibilityRuntimeAuthorityState } from "./CombinedRuntimeAuthorityState.js";
+import {
+  createCompatibilityRuntimeAuthorityState,
+  createInitialCombinedRuntimeAuthorityState,
+  RuntimeAuthorityAction,
+} from "./CombinedRuntimeAuthorityState.js";
 import { createPostgresCombinedRuntimeAuthorityStore } from "./PostgresCombinedRuntimeAuthorityStore.js";
+import { createTransactionalPostgresFixture } from "../database/testing/transactionalPostgresFixture.js";
 
 const environment = "compatibility-nonproduction";
 const state = createCompatibilityRuntimeAuthorityState({
@@ -40,6 +45,59 @@ describe("PostgreSQL combined runtime-authority store initialization", () => {
       query_timeout: 1200,
     }));
     expect(query.mock.calls[0][0].text).toMatch(/^SELECT state FROM/);
+  });
+});
+
+describe("PostgreSQL combined runtime-authority store updates", () => {
+  it("binds every update parameter contiguously while preserving immutable created_at", async () => {
+    const productionEnvironment = "combined-cutover-production";
+    const fixture = createTransactionalPostgresFixture();
+    const store = createPostgresCombinedRuntimeAuthorityStore({ pool: fixture.pool, environment: productionEnvironment });
+    const initial = createInitialCombinedRuntimeAuthorityState({
+      environment: productionEnvironment,
+      windowsSource: { commit: "f".repeat(40), buildId: "windows-build" },
+      now: "2026-08-27T23:19:17.815Z",
+    });
+    await store.initialize(initial);
+
+    const transition = await store.transition({
+      action: RuntimeAuthorityAction.BEGIN_CUTOVER,
+      expectedVersion: 1,
+      migrationOperationId: "simplified-rev142-20260827",
+      authorizationFingerprint: "a".repeat(64),
+      fenceId: "windows-cold-rev142-a2993575",
+      finalSnapshot: {
+        runtimeSha256: "b".repeat(64), runtimeRevision: 142, mediaInventorySha256: "c".repeat(64),
+        migrationControlSha256: "d".repeat(64), packageDigest: "e".repeat(64),
+      },
+      providerSource: { commit: "1".repeat(40), buildId: "provider-build" },
+      target: { databaseClusterId: "attached-app-database", databaseName: "provider-db", spacesBucket: "private-space" },
+      routingTarget: "https://provider.example",
+      commandId: "simplified-rev142-final-20260827:begin",
+      reason: "Begin the accepted single-user cold-backup migration with Windows cold.",
+    });
+
+    const update = fixture.statements().find((entry) => entry.sql.startsWith("UPDATE physiqueos.combined_runtime_authority SET"));
+    const placeholders = [...update.sql.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]));
+    expect([...new Set(placeholders)].sort((left, right) => left - right)).toEqual(Array.from({ length: 18 }, (_, index) => index + 1));
+    expect(update.values).toHaveLength(18);
+    expect(update.values[0]).toBe(productionEnvironment);
+    expect(update.values[1]).toBe(2);
+    expect(update.values[2]).toBe("combined-cutover-in-progress");
+    expect(update.values[3]).toBe("simplified-rev142-20260827");
+    expect(update.values[13]).toBeNull();
+    expect(update.values[14]).toBeNull();
+    expect(JSON.parse(update.values[15])).toEqual(transition.state);
+    expect(update.values[16]).toBe(transition.state.updatedAt);
+    expect(update.values[17]).toBe(1);
+    expect(transition.state).toMatchObject({
+      environment: productionEnvironment,
+      version: 2,
+      authority: "combined-cutover-in-progress",
+      firstProviderCanonicalWriteAt: null,
+      publicRuntimeAuthority: "windows",
+    });
+    expect(transition.state.createdAt).toBe(initial.createdAt);
   });
 });
 

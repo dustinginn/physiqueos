@@ -151,11 +151,11 @@ describe("transactional fixture — staging and visibility", () => {
          version=$2,authority=$3,migration_operation_id=$4,authorization_fingerprint=$5,fence_id=$6,
          canonical_store_epoch=$7,composition_mode=$8,public_runtime_authority=$9,migration_control_authority=$10,
          worker_authority=$11,writes_enabled=$12,reads_enabled=$13,first_provider_canonical_write_at=$14,
-         first_provider_command_id=$15,state=$16::jsonb,updated_at=$18
-       WHERE environment=$1 AND version=$19`,
+         first_provider_command_id=$15,state=$16::jsonb,updated_at=$17
+       WHERE environment=$1 AND version=$18`,
       [environment, 2, next.authority, null, null, null, "postgres-canonical", "postgres", "provider",
         "provider", "provider", true, true, next.firstProviderCanonicalWriteAt, null,
-        JSON.stringify(next), "2026-08-18T00:00:00.000Z", "2026-08-18T01:00:00.000Z", 1],
+        JSON.stringify(next), "2026-08-18T01:00:00.000Z", 1],
     );
     expect(updated.rowCount).toBe(1);
     await client.query("ROLLBACK");
