@@ -22,6 +22,7 @@ describe("full-product App Platform specification", () => {
   it("keeps compatibility mode explicit and enables only the provider dry-run boundary through an explicit render input", () => {
     expect(template.match(/PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_CANONICAL_OWNER_USER_ID/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED[^\n]*PROVIDER_MIGRATION_DRY_RUN_ENABLED/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_EXPECTED_FINAL_BACKUP_SHA256SUMS_SHA256/g)).toHaveLength(2);
