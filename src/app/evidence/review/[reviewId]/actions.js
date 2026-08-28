@@ -29,7 +29,8 @@ import {
   createFounderPhotoEventNarrativeService,
   createPhotoEventNarrativeService,
 } from "../../../../domain/services/PhotoEventNarrativeService";
-import { filterEligibleEventBriefingTypes, resolveEventBriefingPreferencesFromStore } from "../../../../domain/services/CoachingUpdatesReadService";
+import { filterEligibleEventBriefingTypes } from "../../../../domain/services/CoachingUpdatesReadService";
+import { createEvidenceConfirmationReadService } from "../../../../application/read-models/EvidenceConfirmationReadService";
 import {
   createPhotoInterpreterGoalContext,
   resolvePhotoEventContext,
@@ -510,6 +511,7 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
 }
 
 function createHandlers({ evidencePackage, reviewId, user }) {
+  const confirmationReads = createEvidenceConfirmationReadService({ repositories: FounderRepositories });
   let canonical = null;
   let analyses = [];
   let trainingAnalysis = null;
@@ -767,14 +769,14 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           : [],
       };
     },
-    goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user }),
+    goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user, confirmationReads }),
     event_eligibility: async () => {
       const eventObjects = (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed && ["photo_session", "dexa", "dexa_scan", "body_composition"].includes(item.evidence_type));
       return { status: "completed", eligible: eventObjects.filter((item) => item.evidence_type !== "photo_session" || isCompletePhotoSession(item)).map((item) => item.evidence_type) };
     },
     briefing: async ({ results }) => {
       const eligible = results.event_eligibility?.eligible ?? [];
-      const eventPreferences = resolveEventBriefingPreferencesFromStore(await loadApplicationCanonicalRuntime());
+      const eventPreferences = await confirmationReads.readEventBriefingPreferences(user.id);
       const briefable = filterEligibleEventBriefingTypes(eligible, eventPreferences);
       const artifacts = [];
       const photoSessionIds = [];
@@ -1088,10 +1090,9 @@ function getStableCanonicalId(object, userId) {
   return object?.evidence_type === "photo_session" ? `photo_session_${userId}_${date}` : object?.id ?? `dexa_${userId}_${date}`;
 }
 
-async function refreshGoalEvaluations({ evidencePackage, user }) {
-  const [goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext] = await Promise.all([
-    FounderRepositories.goals.listGoals(user.id), FounderRepositories.dexaScans.listDEXAScans(user.id), FounderRepositories.weights.listWeightEntries(user.id), FounderRepositories.progressPhotos.listPhotos(user.id), FounderRepositories.protocols.listProtocols(user.id), FounderRepositories.nutritionContext.getNutritionContext?.(user.id),
-  ]);
+async function refreshGoalEvaluations({ evidencePackage, user, confirmationReads }) {
+  const { goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext } =
+    await confirmationReads.readGoalEvaluationInputs(user.id);
   const evaluations = GoalEvaluationService.getGoalEvaluations({ goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext });
   const versionId = `goal_evaluation_${evidencePackage.package_id}`;
   const record = createAnalysis({ id: versionId, createdAt: new Date().toISOString(), title: "Goal Evaluation Refreshed", summary: "Goal Evaluation recomputed from confirmed canonical-compatible evidence.", evidenceIds: (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed).map((item) => item.id), evidenceTypes: [...new Set((evidencePackage.evidence_objects ?? []).map((item) => item.evidence_type))], metadata: { evaluationVersion: versionId, evaluations, source: "GoalEvaluationService" } });
