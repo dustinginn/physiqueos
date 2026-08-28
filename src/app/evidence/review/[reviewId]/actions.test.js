@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { canonicalJson } from "../../../../contracts/v1/canonicalJson";
+import { prepareCanonicalExerciseIdentitiesForConfirmation } from "../../../../domain/services/CanonicalExerciseLibraryService";
 
 const runtimeStore = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "private/founder/runtime-store.json"), "utf8")
@@ -12,7 +13,19 @@ const revalidatePath = vi.fn();
 const mockState = vi.hoisted(() => ({ value: null }));
 
 vi.mock("next/cache", () => ({ revalidatePath }));
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", async () => {
+  const { getRedirectError } = await vi.importActual(
+    "next/dist/client/components/redirect"
+  );
+  return {
+    redirect(destination) {
+      redirect(destination);
+      if (mockState.value?.useNextRedirectSemantics) {
+        throw getRedirectError(destination, "replace");
+      }
+    },
+  };
+});
 
 vi.mock("../../../../data/repositories/founderRepositories", async () => {
   const { reconcileConfirmedEvidencePackage } = await vi.importActual(
@@ -42,6 +55,101 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
             updatedAt: "2026-07-27T17:00:00.000Z",
           };
           return state.evidenceReviews[index];
+        },
+        get claimEvidenceReviewCommit() {
+          if (!getState().durableCommitClaims) return undefined;
+          return async (reviewId, lifecycle) => {
+            const review = getState().evidenceReviews.find((item) => item.id === reviewId);
+            if (!review) return null;
+            const activeExpiry = Date.parse(review.commitClaim?.leaseExpiresAt ?? "");
+            if (
+              review.commitClaim?.status === "in_progress" &&
+              review.commitClaim.operationId !== lifecycle.operationId &&
+              Number.isFinite(activeExpiry) &&
+              activeExpiry > Date.parse(lifecycle.claimedAt)
+            ) {
+              throw Object.assign(new Error("This evidence review confirmation is already running."), {
+                code: "COMMIT_IN_PROGRESS",
+              });
+            }
+            review.status = "committing";
+            review.commitError = null;
+            review.commitClaim = structuredClone({
+              operationId: lifecycle.operationId,
+              status: "in_progress",
+              claimedAt: lifecycle.claimedAt,
+              leaseExpiresAt: lifecycle.leaseExpiresAt,
+              packageId: lifecycle.packageId,
+            });
+            getState().claimCalls = (getState().claimCalls ?? 0) + 1;
+            return structuredClone(review);
+          };
+        },
+        get recordEvidenceReviewCommitProgress() {
+          if (!getState().durableCommitClaims) return undefined;
+          return async (reviewId, { operationId, key, value, leaseExpiresAt }) => {
+            const review = requireActiveTestClaim(getState(), reviewId, operationId);
+            if (getState().recordProgressError) {
+              const error = getState().recordProgressError;
+              getState().recordProgressError = null;
+              throw error;
+            }
+            review.commitProgress = {
+              ...(review.commitProgress ?? {}),
+              [key]: structuredClone(value),
+            };
+            review.commitClaim = { ...review.commitClaim, leaseExpiresAt };
+            return structuredClone(review);
+          };
+        },
+        get releaseEvidenceReviewCommit() {
+          if (!getState().durableCommitClaims) return undefined;
+          return async (reviewId, { operationId, releasedAt }) => {
+            const review = requireActiveTestClaim(getState(), reviewId, operationId);
+            review.commitClaim = {
+              ...review.commitClaim,
+              status: "available",
+              releasedAt,
+              leaseExpiresAt: releasedAt,
+            };
+            getState().pauseCommitCalls = (getState().pauseCommitCalls ?? 0) + 1;
+            return structuredClone(review);
+          };
+        },
+        get completeEvidenceReviewCommit() {
+          if (!getState().durableCommitClaims) return undefined;
+          return async (reviewId, { operationId, confirmation, interpretedEvidence }) => {
+            const review = requireActiveTestClaim(getState(), reviewId, operationId);
+            review.status = "confirmed";
+            review.interpretedEvidence = structuredClone(interpretedEvidence);
+            review.confirmation = structuredClone(confirmation);
+            review.commitClaim = {
+              ...review.commitClaim,
+              status: "completed",
+              completedAt: confirmation.confirmedAt,
+              leaseExpiresAt: confirmation.confirmedAt,
+            };
+            getState().completeCommitCalls = (getState().completeCommitCalls ?? 0) + 1;
+            return structuredClone(review);
+          };
+        },
+        get failEvidenceReviewCommit() {
+          if (!getState().durableCommitClaims) return undefined;
+          return async (reviewId, { operationId, error, failedAt }) => {
+            const review = requireActiveTestClaim(getState(), reviewId, operationId);
+            review.status = Object.values(review.commitProgress ?? {}).some(
+              (step) => step?.status === "completed"
+            ) ? "partially_committed" : "commit_failed";
+            review.commitError = String(error);
+            review.commitClaim = {
+              ...review.commitClaim,
+              status: "failed",
+              failedAt,
+              leaseExpiresAt: failedAt,
+            };
+            getState().failCommitCalls = (getState().failCommitCalls ?? 0) + 1;
+            return structuredClone(review);
+          };
         },
       },
       canonicalEvidence: {
@@ -231,6 +339,21 @@ vi.mock("../../../../domain/services/TrainingPerformanceIntelligenceService", ()
 
 const { confirmEvidenceReview, reprocessEvidenceReview } = await import("./actions.js");
 
+function requireActiveTestClaim(state, reviewId, operationId) {
+  const review = state.evidenceReviews.find((item) => item.id === reviewId);
+  if (
+    !review ||
+    review.status !== "committing" ||
+    review.commitClaim?.status !== "in_progress" ||
+    review.commitClaim.operationId !== operationId
+  ) {
+    throw Object.assign(new Error("The evidence review confirmation claim is no longer active."), {
+      code: "COMMIT_CLAIM_LOST",
+    });
+  }
+  return review;
+}
+
 function createIsolatedReviewState(store) {
   const review = structuredClone(
     store.evidenceReviews.find((item) => item.id === "evidence_review_20260727161133407")
@@ -390,6 +513,64 @@ function createBriefingFailedPhotoReviewState(store) {
     canonicalCommitCalls: 0,
     photoNarrativeCalls: 0,
   };
+}
+
+function createDurableContinuationState(store) {
+  const state = createIsolatedReviewState(store);
+  const review = state.evidenceReviews[0];
+  review.interpretedEvidence = prepareCanonicalExerciseIdentitiesForConfirmation(
+    review.interpretedEvidence
+  );
+  review.status = "committing";
+  review.confirmation = null;
+  review.commitError = null;
+  review.commitClaim = {
+    operationId: "previous-recovery",
+    status: "available",
+    claimedAt: "2026-08-28T23:21:12.467Z",
+    leaseExpiresAt: "2026-08-28T23:21:30.016Z",
+    releasedAt: "2026-08-28T23:21:30.016Z",
+    packageId: review.interpretedEvidence.package_id,
+  };
+  review.commitProgress = Object.fromEntries([
+    "canonical_commit",
+    "compatibility_writes",
+    "scheduled_completion",
+    "analysis",
+    "training_performance_events",
+    "goal_evaluation",
+  ].map((step) => [step, {
+    status: "completed",
+    attempts: step === "goal_evaluation" ? 2 : 1,
+    completedAt: "2026-08-28T23:21:29.000Z",
+    result: step === "canonical_commit"
+      ? {
+          status: "completed",
+          canonicalEvidenceIds: state.canonicalEvidenceObjects.map(
+            (item) => item.canonicalId
+          ),
+        }
+      : step === "analysis"
+        ? { status: "completed", analysisIds: [] }
+        : step === "training_performance_events"
+          ? { status: "completed", newlyCreatedEvents: [], existingEvents: [] }
+          : { status: "completed" },
+  }]));
+  state.durableCommitClaims = true;
+  state.useNextRedirectSemantics = true;
+  state.canonicalCommitCalls = 0;
+  state.claimCalls = 0;
+  state.pauseCommitCalls = 0;
+  state.completeCommitCalls = 0;
+  state.failCommitCalls = 0;
+  return state;
+}
+
+async function expectNextRedirect(promise, destinationPart) {
+  await expect(promise).rejects.toMatchObject({
+    message: "NEXT_REDIRECT",
+    digest: expect.stringContaining(destinationPart),
+  });
 }
 
 describe("confirmEvidenceReview", () => {
@@ -580,6 +761,93 @@ describe("confirmEvidenceReview", () => {
         evaluations: [expect.objectContaining({ metricKey: null })],
       }),
     }));
+  });
+
+  it("releases a one-step recovery claim before an actual Next redirect without falsely failing the commit", async () => {
+    mockState.value = createDurableContinuationState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      `/evidence/review/${review.id}?resume=continuing`
+    );
+
+    const continued = mockState.value.evidenceReviews[0];
+    expect(continued.commitProgress.event_eligibility).toMatchObject({
+      status: "completed",
+      attempts: 1,
+    });
+    expect(continued.commitClaim.status).toBe("available");
+    expect(mockState.value.pauseCommitCalls).toBe(1);
+    expect(mockState.value.failCommitCalls).toBe(0);
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+  });
+
+  it("continues the exact six-step-complete incident state to final confirmation one step per request", async () => {
+    mockState.value = createDurableContinuationState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+    const initialAttempts = Object.fromEntries(
+      Object.entries(review.commitProgress).map(([step, progress]) => [step, progress.attempts])
+    );
+    const canonicalBefore = structuredClone(mockState.value.canonicalEvidenceObjects);
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      "resume=continuing"
+    );
+    expect(mockState.value.evidenceReviews[0].commitProgress.event_eligibility.status)
+      .toBe("completed");
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      "resume=continuing"
+    );
+    expect(mockState.value.evidenceReviews[0].commitProgress.briefing.status)
+      .toBe("completed");
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      `confirmed=1`
+    );
+
+    const confirmed = mockState.value.evidenceReviews[0];
+    expect(confirmed.status).toBe("confirmed");
+    expect(confirmed.confirmation?.confirmedAt).toBeTruthy();
+    expect(confirmed.commitProgress.home_refresh).toMatchObject({
+      status: "completed",
+      attempts: 1,
+    });
+    for (const [step, attempts] of Object.entries(initialAttempts)) {
+      expect(confirmed.commitProgress[step].attempts).toBe(attempts);
+    }
+    expect(mockState.value.claimCalls).toBe(3);
+    expect(mockState.value.pauseCommitCalls).toBe(2);
+    expect(mockState.value.completeCommitCalls).toBe(1);
+    expect(mockState.value.failCommitCalls).toBe(0);
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+  });
+
+  it("still records and fails a genuine progress-persistence error before redirecting to retry", async () => {
+    mockState.value = createDurableContinuationState(runtimeStore);
+    mockState.value.recordProgressError = new Error("durable progress unavailable");
+    const review = mockState.value.evidenceReviews[0];
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      `/evidence/review/${review.id}?resume=paused`
+    );
+
+    const failed = mockState.value.evidenceReviews[0];
+    expect(failed.status).toBe("partially_committed");
+    expect(failed.commitProgress.event_eligibility).toMatchObject({
+      status: "failed",
+      attempts: 1,
+      retryable: true,
+    });
+    expect(failed.commitClaim.status).toBe("failed");
+    expect(mockState.value.failCommitCalls).toBe(1);
+    expect(mockState.value.pauseCommitCalls).toBe(0);
   });
 
   it("publishes the Photo Event without Confidence when the goal contract is ineligible", async () => {

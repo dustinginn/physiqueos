@@ -163,6 +163,7 @@ export async function confirmEvidenceReview(formData) {
   const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
     .claimEvidenceReviewCommit === "function";
   let orchestrationResult;
+  let continuationPath = null;
   try {
     const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, reviewId, user }) });
     orchestrationResult = await orchestrator.run(
@@ -172,12 +173,13 @@ export async function confirmEvidenceReview(formData) {
     if (!orchestrationResult.complete) {
       await service.pauseCommit(reviewId, { operationId });
       revalidatePath(`/evidence/review/${reviewId}`);
-      return redirect(appendEvidenceRecoveryContext(
+      continuationPath = appendEvidenceRecoveryContext(
         `/evidence/review/${reviewId}?resume=continuing`,
         recoveryContext
-      ));
+      );
+    } else {
+      await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id, operationId });
     }
-    await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id, operationId });
   } catch (error) {
     await service.failCommit(reviewId, error, { operationId });
     if (error?.retryableFailures?.length) {
@@ -197,6 +199,7 @@ export async function confirmEvidenceReview(formData) {
     }
     throw error;
   }
+  if (continuationPath) redirect(continuationPath);
   const publication = publishPostConfirmationRefreshes(orchestrationResult);
   if (recoveryContext) {
     revalidatePath(recoveryContext.returnTo);
