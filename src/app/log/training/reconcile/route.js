@@ -1,7 +1,14 @@
+import path from "node:path";
 import { NextResponse } from "next/server";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
-import { assertProductionLegacyCanonicalWriteAllowed } from "../../../../platform/cutover/canonicalWriteFence";
-import { processEvidenceIntakeSubmission } from "../../../../domain/services/EvidenceIntakeService";
+import {
+  assertApplicationUploadEntryAllowed,
+  storeApplicationUpload,
+} from "../../../../application/media/ApplicationUploadService";
+import {
+  createStoredEvidenceArtifactDescriptor,
+  processEvidenceIntakeSubmission,
+} from "../../../../domain/services/EvidenceIntakeService";
 import { createEvidenceReviewService } from "../../../../domain/services/EvidenceReviewService";
 import {
   buildTrainingLoggerEvidencePackage,
@@ -12,7 +19,7 @@ export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
-    assertProductionLegacyCanonicalWriteAllowed({ operation: "training-reconciliation:create" });
+    assertApplicationUploadEntryAllowed({ operation: "training-reconciliation:create" });
     const formData = await request.formData();
     const draft = parseJson(formData.get("draftJson"), "Training Logger draft");
     assertDraftForReconciliation(draft);
@@ -25,11 +32,13 @@ export async function POST(request) {
 
     if (files.length > 0) {
       const intake = await processEvidenceIntakeSubmission({
+        artifactStorageFailureMode: "preserve-recoverable-package",
         evidenceDate: draft.workoutDate,
         expectedEvidenceType: "training",
         files,
         typedEvidence: null,
         userId: user.id,
+        storeArtifact: createTrainingLoggerArtifactStore({ userId: user.id }),
       });
       evidencePackage = intake.evidencePackage;
       await FounderRepositories.evidencePackages.saveEvidencePackage(evidencePackage);
@@ -64,7 +73,7 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    assertProductionLegacyCanonicalWriteAllowed({ operation: "training-reconciliation:update" });
+    assertApplicationUploadEntryAllowed({ operation: "training-reconciliation:update" });
     const requested = await request.json();
     const draft = requested?.draft;
     assertDraftForReview(draft);
@@ -117,6 +126,34 @@ export async function PUT(request) {
       error: error?.message ?? "Training Logger Evidence Review could not be prepared.",
     }, { status: error?.status ?? (error?.code === "APPLE_WORKOUT_ALREADY_CONSUMED" ? 409 : 400) });
   }
+}
+
+function createTrainingLoggerArtifactStore({ userId }) {
+  return async ({ capturedAt, observedDate, file, index, submissionId }) => {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const artifactId = `artifact_${submissionId}_${index + 1}`;
+    const stored = await storeApplicationUpload({
+      ownerUserId: userId,
+      bytes: buffer,
+      contentType: file.type || "application/octet-stream",
+      originalFilename: file.name || `apple-health-${index + 1}.bin`,
+      legacyDirectory: path.join("private", "founder", "evidence", "uploads"),
+      legacyPrefix: `${submissionId}-${index + 1}`,
+      category: "evidencePackages",
+      relationshipId: submissionId,
+      artifactId,
+    });
+    return createStoredEvidenceArtifactDescriptor({
+      artifactId,
+      buffer,
+      capturedAt,
+      file,
+      id: artifactId,
+      observedDate,
+      relativePath: stored.reference,
+      safeName: file.name || `apple-health-${index + 1}.bin`,
+    });
+  };
 }
 
 function assertDraftForReconciliation(draft) {

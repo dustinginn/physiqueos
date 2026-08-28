@@ -25,6 +25,7 @@ const CANONICAL_PROGRESS_PHOTO_CATEGORIES = CanonicalProgressPhotoCategories;
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export async function processEvidenceIntakeSubmission({
+  artifactStorageFailureMode = "throw",
   evidenceDate = null,
   expectedEvidenceType = null,
   files = [],
@@ -39,18 +40,31 @@ export async function processEvidenceIntakeSubmission({
   const uploadFiles = files.filter(
     (file) => typeof file?.arrayBuffer === "function" && file.size > 0
   );
-  const storedArtifacts = await Promise.all(
-    uploadFiles.map((file, index) =>
-      storeArtifact({
-        capturedAt,
-        observedDate,
-        file,
-        index,
-        submissionId,
-        userId,
-      })
-    )
-  );
+  const storage = await storeEvidenceArtifacts({
+    artifactStorageFailureMode,
+    capturedAt,
+    observedDate,
+    storeArtifact,
+    submissionId,
+    uploadFiles,
+    userId,
+  });
+  const storedArtifacts = storage.storedArtifacts;
+  if (storage.error) {
+    const evidencePackage = createFailedIngestionEvidencePackage({
+      capturedAt,
+      error: storage.error,
+      evidenceDate: observedDate,
+      storedArtifacts,
+      submissionId,
+      userId,
+    });
+    return {
+      evidencePackage,
+      provider: getPackageProvider(evidencePackage),
+      storedArtifacts,
+    };
+  }
 
   try {
     const evidencePackage = await createEvidencePackageFromStoredArtifacts({
@@ -85,6 +99,41 @@ export async function processEvidenceIntakeSubmission({
       storedArtifacts,
     };
   }
+}
+
+async function storeEvidenceArtifacts({
+  artifactStorageFailureMode,
+  capturedAt,
+  observedDate,
+  storeArtifact,
+  submissionId,
+  uploadFiles,
+  userId,
+}) {
+  const storeOne = (file, index) => storeArtifact({
+    capturedAt,
+    observedDate,
+    file,
+    index,
+    submissionId,
+    userId,
+  });
+  if (artifactStorageFailureMode !== "preserve-recoverable-package") {
+    return {
+      error: null,
+      storedArtifacts: await Promise.all(uploadFiles.map(storeOne)),
+    };
+  }
+
+  const storedArtifacts = [];
+  for (let index = 0; index < uploadFiles.length; index += 1) {
+    try {
+      storedArtifacts.push(await storeOne(uploadFiles[index], index));
+    } catch (error) {
+      return { error, storedArtifacts };
+    }
+  }
+  return { error: null, storedArtifacts };
 }
 
 export async function recoverEvidenceIntakeSubmissionFromArtifacts({

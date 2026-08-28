@@ -36,6 +36,10 @@ describe("Training Logger production mutation boundary", () => {
     expect(intakeSource).toContain("storeEvidenceArtifact");
     expect(intakeSource).toContain("await fs.writeFile(absolutePath, buffer)");
     const postSource = routeSource.split("export async function PUT")[0];
+    expect(postSource).toContain("assertApplicationUploadEntryAllowed");
+    expect(postSource).toContain("storeApplicationUpload");
+    expect(postSource).toContain('artifactStorageFailureMode: "preserve-recoverable-package"');
+    expect(postSource).not.toContain("assertProductionLegacyCanonicalWriteAllowed");
     expect(postSource).toContain("saveEvidencePackage(evidencePackage)");
   });
 
@@ -44,6 +48,8 @@ describe("Training Logger production mutation boundary", () => {
     expect(putSource).toContain("saveEvidencePackage(evidencePackage)");
     expect(putSource).toContain("createEvidenceReviewService");
     expect(putSource).toContain(".stage({");
+    expect(putSource).toContain("assertApplicationUploadEntryAllowed");
+    expect(putSource).not.toContain("assertProductionLegacyCanonicalWriteAllowed");
     expect(putSource).not.toContain("commitConfirmedEvidencePackage");
   });
 
