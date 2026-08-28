@@ -36,6 +36,7 @@ export default defineConfig({
       "src/app/api/v1/operations/production-migration-dry-runs/ProviderMigrationDryRunProductRoutes.test.js",
       "src/platform/cutover/simplified/SimplifiedMigrationEligibility.test.js",
       "src/platform/cutover/simplified/SimplifiedAuthorityHandoffService.test.js",
+      "src/platform/cutover/simplified/SimplifiedProviderMigrationProductComposition.test.js",
       "src/platform/cutover/simplified/SimplifiedProviderMigrationOperation.test.js",
       "src/platform/cutover/simplified/SimplifiedProviderMigrationTransport.test.js",
       "src/app/api/v1/operations/simplified-provider-migrations/SimplifiedProviderMigrationRoutes.test.js",

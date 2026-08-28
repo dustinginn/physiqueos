@@ -1,7 +1,7 @@
 import { readDatabaseConfig } from "../../database/config.js";
 import { createPostgresPool } from "../../database/pool.js";
 import { readBuildIdentity } from "../../observability/buildIdentity.js";
-import { assertProviderExecutionBoundary } from "../ProviderMigrationDryRunContract.js";
+import { assertSimplifiedProviderExecutionBoundary } from "./SimplifiedMigrationEligibility.js";
 import {
   createPostgresSimplifiedProviderMigrationOperationStore,
   createSimplifiedProviderMigrationController,
@@ -11,7 +11,7 @@ let resolved;
 
 export function getSimplifiedProviderMigrationProductController(env = process.env) {
   if (env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED !== "1") return null;
-  assertProviderExecutionBoundary(env);
+  assertSimplifiedProviderExecutionBoundary(env);
   if (resolved) return resolved.controller;
   const databaseConfig = readDatabaseConfig(env);
   if (!databaseConfig.enabled) throw new Error("Simplified provider operation storage requires PostgreSQL.");
