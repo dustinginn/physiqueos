@@ -25,17 +25,26 @@ import { GET } from "./route.js";
 
 const canonicalId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
 const legacyUuid = "550e8400-e29b-41d4-a716-446655440000";
-const request = new Request("https://compatibility.invalid/api/private-evidence/media/object");
+const publicOrigin = "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app";
+const request = new Request("http://0.0.0.0:8080/api/private-evidence/media/object", {
+  headers: {
+    host: "evil.example",
+    "x-forwarded-host": "evil-forwarded.example",
+    "x-forwarded-proto": "http",
+  },
+});
 
 describe("private evidence route provider media boundary", () => {
   beforeEach(() => {
     process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME = "1";
+    process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN = publicOrigin;
     mocks.authorizeRead.mockReset();
     mocks.createAuthenticationPrincipal.mockClear();
   });
 
   afterEach(() => {
     delete process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME;
+    delete process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN;
   });
 
   it.each([canonicalId, legacyUuid])("resolves an authorized opaque media identifier %s", async (objectId) => {
@@ -44,9 +53,42 @@ describe("private evidence route provider media boundary", () => {
     const response = await GET(request, { params: Promise.resolve({ path: ["media", objectId] }) });
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://compatibility.invalid/api/v1/media/read?grant=opaque-grant");
+    expect(response.headers.get("location")).toBe(`${publicOrigin}/api/v1/media/read?grant=opaque-grant`);
+    expect(response.headers.get("location")).not.toMatch(/0\.0\.0\.0|localhost|127\.0\.0\.1|:8080/);
+    expect(response.headers.get("location")).not.toContain("evil");
     expect(response.headers.get("location")).not.toMatch(/private\/|object-key|spaces|bucket/i);
     expect(mocks.authorizeRead).toHaveBeenCalledWith(expect.objectContaining({ objectId, lifetimeSeconds: 60 }));
+  });
+
+  it("fails closed when the trusted public origin is missing", async () => {
+    delete process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN;
+    mocks.authorizeRead.mockResolvedValue({ accessHandle: "/api/v1/media/read?grant=opaque-grant" });
+    const response = await GET(request, { params: Promise.resolve({ path: ["media", canonicalId] }) });
+    expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("fails closed when the trusted public origin is malformed or internal", async () => {
+    mocks.authorizeRead.mockResolvedValue({ accessHandle: "/api/v1/media/read?grant=opaque-grant" });
+    for (const origin of ["not-a-url", "http://provider.example", "https://0.0.0.0:8080"]) {
+      process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN = origin;
+      const response = await GET(request, { params: Promise.resolve({ path: ["media", canonicalId] }) });
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  it("does not permit an authorized-media adapter to redirect outside the exact media reader", async () => {
+    for (const accessHandle of [
+      "https://evil.example/api/v1/media/read?grant=x",
+      "//evil.example/api/v1/media/read?grant=x",
+      "/api/v1/media/read/extra?grant=x",
+    ]) {
+      mocks.authorizeRead.mockResolvedValue({ accessHandle });
+      const response = await GET(request, { params: Promise.resolve({ path: ["media", canonicalId] }) });
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+    }
   });
 
   it("returns not found for an unknown valid-format identifier", async () => {

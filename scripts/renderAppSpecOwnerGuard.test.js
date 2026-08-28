@@ -33,6 +33,7 @@ function productTemplateEnv(overrides = {}) {
     MIGRATION_OPERATION_ID: "test-operation",
     OPERATIONS_TOKEN: "test-token",
     PROVIDER_MIGRATION_DRY_RUN_ENABLED: "1",
+    PUBLIC_APP_ORIGIN: "https://provider.example",
     SIMPLIFIED_MIGRATION_ENABLED: "1",
     MIGRATION_OPERATOR_ID: "Founder",
     EXPECTED_PRODUCTION_SOURCE_COMMIT: "f8e63bd023d611c008d1bf8a04fbf6f34424cbde",

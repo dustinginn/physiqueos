@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { isPrivateMediaObjectId } from "../../../../contracts/v1/mediaIdentifiers.js";
+import { resolveTrustedMediaRedirect } from "../../../../platform/http/trustedApplicationOrigin.js";
 
 const MIME_TYPES = {
   ".jpeg": "image/jpeg",
@@ -14,7 +15,7 @@ const MIME_TYPES = {
 export async function GET(_request, { params }) {
   const { path: pathParts = [] } = await params;
   if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {
-    return providerMediaResponse(pathParts, _request);
+    return providerMediaResponse(pathParts);
   }
   const privateRoot = path.join(process.cwd(), "private");
   const requestedPath = path.join(privateRoot, ...pathParts);
@@ -39,7 +40,7 @@ export async function GET(_request, { params }) {
   }
 }
 
-async function providerMediaResponse(pathParts, request) {
+async function providerMediaResponse(pathParts) {
   const objectId = pathParts.length === 2 && pathParts[0] === "media" ? String(pathParts[1]) : null;
   if (!isPrivateMediaObjectId(objectId)) {
     return new NextResponse("Not found", { status: 404 });
@@ -59,7 +60,7 @@ async function providerMediaResponse(pathParts, request) {
       transport: "server-only",
     });
     const descriptor = await composition.media.authorizeRead({ principal, objectId, lifetimeSeconds: 60 });
-    return NextResponse.redirect(new URL(descriptor.accessHandle, request.url), 307);
+    return NextResponse.redirect(resolveTrustedMediaRedirect(descriptor.accessHandle), 307);
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }

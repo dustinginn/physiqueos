@@ -27,6 +27,8 @@ describe("full-product App Platform specification", () => {
     expect(template.match(/PHYSIQUEOS_PROVIDER_EXECUTION_BOUNDARY/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_EXPECTED_FINAL_BACKUP_SHA256SUMS_SHA256/g)).toHaveLength(2);
     expect(template.match(/PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED/g)).toHaveLength(2);
+    expect(template.match(/PHYSIQUEOS_PUBLIC_APP_ORIGIN/g)).toHaveLength(1);
+    expect(template).toContain("PHYSIQUEOS_PUBLIC_APP_ORIGIN, scope: RUN_TIME, value: ${PUBLIC_APP_ORIGIN}");
     expect(template).not.toContain("DIGITALOCEAN_ACCESS_TOKEN");
     expect(template).not.toContain("PHYSIQUEOS_MIGRATION_DATABASE_URL");
   });
