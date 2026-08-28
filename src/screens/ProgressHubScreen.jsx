@@ -11,6 +11,7 @@ export default function ProgressHubScreen({ from, report }) {
         <Link
           className="mb-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-500"
           href={fromYou ? "/profile" : "/"}
+          prefetch={false}
         >
           <ArrowLeft size={18} />
           {fromYou ? "You" : "Home"}

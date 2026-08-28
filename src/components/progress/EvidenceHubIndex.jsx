@@ -100,6 +100,7 @@ function EvidenceStreamCard({ from, onVisit, stream }) {
       className="flex min-h-[68px] w-full items-center gap-3 rounded-[14px] border border-[var(--divider)] bg-[var(--surface-elevated)] px-3.5 py-3 shadow-[var(--shadow-card)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
       href={href}
       onClick={() => onVisit(stream.id)}
+      prefetch={false}
     >
       <IconBadge
         appearanceClassName={getEvidenceIconAppearanceClassName(stream.id)}

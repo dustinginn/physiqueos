@@ -50,6 +50,13 @@ describe("Evidence Hub V2", () => {
     expect(index).toContain("getEvidenceIconPresentation(stream.id)");
   });
 
+  it("disables automatic prefetch for heavy evidence and adjacent composite destinations", () => {
+    expect(index).toContain('prefetch={false}');
+    expect(screen).toContain('prefetch={false}');
+    expect(index.match(/prefetch=\{false\}/g)).toHaveLength(1);
+    expect(screen.match(/prefetch=\{false\}/g)).toHaveLength(1);
+  });
+
   it("keeps the centered mobile column overflow-safe above the bottom navigation", () => {
     expect(screen).toContain("max-w-[393px]");
     expect(screen).toContain("overflow-x-hidden");
