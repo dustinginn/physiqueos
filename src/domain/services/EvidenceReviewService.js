@@ -16,6 +16,9 @@ import {
 } from "../models/trainingExerciseRelationship";
 import { normalizeReviewedPhotoSessionMetadata } from "./PhotoSessionMetadataService";
 import { applyDexaReviewMeasurements } from "./DexaPdfIntakeService";
+import { POST_CONFIRMATION_STEP_ORDER } from "./PostConfirmationOrchestrator";
+
+const COMMIT_LEASE_MS = 10 * 60 * 1000;
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
@@ -51,27 +54,47 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       };
       return repositories.evidenceReviews.createReview(review);
     },
-    async confirm(id, { evidencePackage, confirmedBy } = {}) {
+    async confirm(id, { evidencePackage, confirmedBy, operationId } = {}) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review is no longer pending.");
       assertNoUnresolvedProvisionalExercises(evidencePackage ?? review.interpretedEvidence);
       assertNoTrainingStructureReviewIssues(evidencePackage ?? review.interpretedEvidence);
       const timestamp = now().toISOString();
+      if (typeof repositories.evidenceReviews.completeEvidenceReviewCommit === "function") {
+        assertCommitProgressComplete(review.commitProgress);
+        return repositories.evidenceReviews.completeEvidenceReviewCommit(id, {
+          operationId,
+          interpretedEvidence: evidencePackage ?? review.interpretedEvidence,
+          confirmation: { confirmedAt: timestamp, confirmedBy },
+        });
+      }
       return repositories.evidenceReviews.updateReview(id, {
         status: "confirmed",
         interpretedEvidence: evidencePackage ?? review.interpretedEvidence,
         confirmation: { confirmedAt: timestamp, confirmedBy },
       });
     },
-    async beginCommit(id, { evidencePackage } = {}) {
+    async beginCommit(id, { evidencePackage, operationId } = {}) {
       const review = await repositories.evidenceReviews.getReviewById(id);
-      if (!review || !["pending", "commit_failed", "partially_committed"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
+      if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
+      if (review.status === "committing") assertResumableCommitProgress(review.commitProgress);
       assertNoUnresolvedProvisionalExercises(
         evidencePackage ?? review.interpretedEvidence
       );
       assertNoTrainingStructureReviewIssues(
         evidencePackage ?? review.interpretedEvidence
       );
+      const claimedAt = now().toISOString();
+      const resolvedOperationId = operationId || `evidence-confirmation:${id}:${claimedAt}`;
+      if (typeof repositories.evidenceReviews.claimEvidenceReviewCommit === "function") {
+        return repositories.evidenceReviews.claimEvidenceReviewCommit(id, {
+          operationId: resolvedOperationId,
+          claimedAt,
+          leaseExpiresAt: new Date(Date.parse(claimedAt) + COMMIT_LEASE_MS).toISOString(),
+          packageId: packageIdentity(evidencePackage ?? review.interpretedEvidence),
+          evidencePackage: review.status === "committing" ? null : evidencePackage,
+        });
+      }
       return repositories.evidenceReviews.updateReview(id, {
         status: "committing",
         commitError: null,
@@ -264,14 +287,39 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
         },
       });
     },
-    async failCommit(id, error) {
+    async failCommit(id, error, { operationId } = {}) {
       const review = await repositories.evidenceReviews.getReviewById(id);
       const completed = Object.values(review?.commitProgress ?? {}).some((item) => item?.status === "completed");
+      if (typeof repositories.evidenceReviews.failEvidenceReviewCommit === "function") {
+        return repositories.evidenceReviews.failEvidenceReviewCommit(id, {
+          operationId,
+          error: String(error?.message ?? error),
+          failedAt: now().toISOString(),
+        });
+      }
       return repositories.evidenceReviews.updateReview(id, { status: completed ? "partially_committed" : "commit_failed", commitError: String(error?.message ?? error) });
     },
-    async recordCommitProgress(id, key, value) {
+    async recordCommitProgress(id, key, value, { operationId } = {}) {
+      if (!POST_CONFIRMATION_STEP_ORDER.includes(key)) {
+        throw reviewError("COMMIT_PROGRESS_INVALID", `Unknown evidence confirmation step: ${key}.`);
+      }
+      if (typeof repositories.evidenceReviews.recordEvidenceReviewCommitProgress === "function") {
+        return repositories.evidenceReviews.recordEvidenceReviewCommitProgress(id, {
+          operationId,
+          key,
+          value,
+          leaseExpiresAt: new Date(now().getTime() + COMMIT_LEASE_MS).toISOString(),
+        });
+      }
       const review = await repositories.evidenceReviews.getReviewById(id);
       return repositories.evidenceReviews.updateReview(id, { commitProgress: { ...(review?.commitProgress ?? {}), [key]: value } });
+    },
+    async pauseCommit(id, { operationId } = {}) {
+      if (typeof repositories.evidenceReviews.releaseEvidenceReviewCommit !== "function") return null;
+      return repositories.evidenceReviews.releaseEvidenceReviewCommit(id, {
+        operationId,
+        releasedAt: now().toISOString(),
+      });
     },
     async setItemDecision(id, { itemId, included, decidedBy }) {
       const review = await repositories.evidenceReviews.getReviewById(id);
@@ -426,6 +474,45 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
 
 function unique(values) { return [...new Set(values.filter(Boolean))]; }
 function reviewError(code, message) { const error = new Error(message); error.code = code; return error; }
+
+function packageIdentity(evidencePackage) {
+  return String(evidencePackage?.package_id ?? evidencePackage?.id ?? "").trim();
+}
+
+export function assertResumableCommitProgress(progress) {
+  if (!progress || typeof progress !== "object") {
+    throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no durable progress.");
+  }
+  const keys = Object.keys(progress);
+  if (keys.length === 0 || keys.some((key) => !POST_CONFIRMATION_STEP_ORDER.includes(key))) {
+    throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation progress is invalid.");
+  }
+  let incompleteSeen = false;
+  for (const step of POST_CONFIRMATION_STEP_ORDER) {
+    const status = progress[step]?.status;
+    if (status === "completed") {
+      if (incompleteSeen) {
+        throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation progress is not contiguous.");
+      }
+      continue;
+    }
+    incompleteSeen = true;
+    if (status && status !== "failed") {
+      throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation progress has an unknown status.");
+    }
+  }
+  if (progress.canonical_commit?.status !== "completed") {
+    throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no durable canonical commit.");
+  }
+  return true;
+}
+
+function assertCommitProgressComplete(progress) {
+  assertResumableCommitProgress(progress);
+  if (!POST_CONFIRMATION_STEP_ORDER.every((step) => progress[step]?.status === "completed")) {
+    throw reviewError("COMMIT_PROGRESS_INCOMPLETE", "Evidence confirmation still has unfinished steps.");
+  }
+}
 
 function assertNoTrainingStructureReviewIssues(evidencePackage = {}) {
   const issueCount = (evidencePackage.evidence_objects ?? [])

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import { createEvidenceReviewRepository } from "../../data/repositories/EvidenceReviewRepository.js";
 import {
   CanonicalWriteDisposition,
   classifyFounderRepositoryMethod,
@@ -11,6 +12,13 @@ import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { assertKnownPhase4Collection } from "../migration/phase4DomainCollections.js";
 
 const GUARDED_COMPATIBILITY_DATABASE = /^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/;
+const TARGETED_EVIDENCE_REVIEW_METHODS = new Set([
+  "claimEvidenceReviewCommit",
+  "recordEvidenceReviewCommitProgress",
+  "releaseEvidenceReviewCommit",
+  "completeEvidenceReviewCommit",
+  "failEvidenceReviewCommit",
+]);
 
 export function createPostgresFounderRepositoryFacade({
   pool,
@@ -64,6 +72,16 @@ export function createPostgresFounderRepositoryFacade({
       return repositories[repositoryName][methodName](...args);
     }
 
+    if (repositoryName === "evidenceReviews" && TARGETED_EVIDENCE_REVIEW_METHODS.has(methodName)) {
+      return executePostgresEvidenceReviewMutation({
+        pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode,
+        requireCompatibilityAuthority, now,
+        commandId: createCommandId({ repositoryName, methodName, args }),
+        methodName,
+        args,
+      });
+    }
+
     return executePostgresFounderRuntimeMutation({
       pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority, now,
       commandId: createCommandId({ repositoryName, methodName, args }),
@@ -73,6 +91,80 @@ export function createPostgresFounderRepositoryFacade({
         return repositories[repositoryName][methodName](...args);
       },
     });
+  }
+}
+
+export async function executePostgresEvidenceReviewMutation({
+  pool,
+  ownerUserId,
+  authorityStore = null,
+  migrationOperationId = null,
+  compatibilityMode = false,
+  requireCompatibilityAuthority = false,
+  now = () => new Date(),
+  commandId = randomUUID(),
+  methodName,
+  args = [],
+} = {}) {
+  if (!pool?.connect || !TARGETED_EVIDENCE_REVIEW_METHODS.has(methodName)) {
+    throw new Error("Targeted PostgreSQL evidence review mutation is not configured.");
+  }
+  const reviewId = String(args[0] ?? "");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${ownerUserId}`]);
+    if (compatibilityMode) {
+      const databaseName = await assertCompatibilityTarget(client);
+      if (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess) {
+        await authorityStore.assertCompatibilityAccess({ client, databaseName });
+      }
+    } else if (authorityStore) {
+      await authorityStore.claimCanonicalWriteBoundary({ client, migrationOperationId, commandId });
+    } else {
+      throw Object.assign(new Error("Canonical runtime authority is required."), {
+        code: "CANONICAL_RUNTIME_AUTHORITY_REQUIRED",
+      });
+    }
+    const current = await client.query(
+      `SELECT version,payload FROM physiqueos.canonical_evidence_records
+        WHERE owner_user_id=$1 AND collection_name='evidenceReviews' AND record_id=$2
+        FOR UPDATE`,
+      [ownerUserId, reviewId],
+    );
+    if (current.rowCount !== 1) {
+      await client.query("COMMIT");
+      return null;
+    }
+    const reviews = [structuredClone(current.rows[0].payload)];
+    const repository = createEvidenceReviewRepository(reviews);
+    const result = await repository[methodName](...args);
+    const review = reviews[0];
+    const version = Number(current.rows[0].version) + 1;
+    const payload = { ...structuredClone(review), version };
+    const metadata = extractMetadata(payload);
+    const updated = await client.query(
+      `UPDATE physiqueos.canonical_evidence_records SET
+         version=$3,status=$4,occurrence_date=$5::date,observed_at=$6::timestamptz,
+         source_identity=$7,provenance=$8::jsonb,payload=$9::jsonb,updated_at=now()
+       WHERE owner_user_id=$1 AND collection_name='evidenceReviews' AND record_id=$2`,
+      [ownerUserId, reviewId, version, metadata.status, metadata.occurrenceDate,
+        metadata.observedAt, metadata.sourceIdentity, JSON.stringify(metadata.provenance),
+        JSON.stringify(payload)],
+    );
+    if (updated.rowCount !== 1) {
+      throw Object.assign(new Error("Evidence review changed during confirmation."), {
+        code: "EVIDENCE_REVIEW_CONCURRENCY_CONFLICT",
+      });
+    }
+    await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
+    await client.query("COMMIT");
+    return structuredClone(result);
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 

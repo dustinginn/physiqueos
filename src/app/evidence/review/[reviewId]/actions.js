@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
@@ -102,8 +103,15 @@ export async function reprocessEvidenceReview(formData) {
 
 export async function confirmEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
-  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
-  const user = await FounderRepositories.users.getCurrentUser();
+  const runInReadScope = FounderRepositories.runInReadScope ?? ((callback) => callback());
+  const { review, user } = await runInReadScope(async () => {
+    const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+    const currentUser = await FounderRepositories.users.getCurrentUser();
+    if (currentReview?.status === "committing") {
+      await assertDurableResumeState(currentReview, currentUser);
+    }
+    return { review: currentReview, user: currentUser };
+  }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
   if (review.status === "confirmed") {
@@ -113,48 +121,64 @@ export async function confirmEvidenceReview(formData) {
     }
     return redirect(`/evidence/review/${reviewId}?confirmed=1`);
   }
-  let evidencePackage;
-  try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
-  catch { throw new Error("The reviewed evidence contains invalid JSON."); }
-  let submittedItemDecisions;
-  try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
-  catch { throw new Error("The evidence selection is invalid."); }
-  evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
-  evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
-  evidencePackage = mergeAuthoritativeDexaScans(evidencePackage, review.interpretedEvidence);
-  evidencePackage = mergeAuthoritativeNutritionDays(
-    evidencePackage,
-    review.interpretedEvidence,
-    reviewId
-  );
-  evidencePackage = {
-    ...evidencePackage,
-    review_metadata: {
-      ...(evidencePackage.review_metadata ?? {}),
-      confirmedAt:
-        evidencePackage.review_metadata?.confirmedAt ??
-        review.interpretedEvidence?.review_metadata?.confirmedAt ??
-        review.confirmation?.confirmedAt ??
-        new Date().toISOString(),
-      sourceReviewId: reviewId,
-    },
-  };
-  evidencePackage = prepareCanonicalExerciseIdentitiesForConfirmation(evidencePackage);
-  evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
-  assertNoUnresolvedProvisionalExercises(evidencePackage);
-  assertIncludedPhotoSessionsReady(evidencePackage);
-  validateDexaObjectsBeforeCommit(evidencePackage);
+  const resuming = review.status === "committing";
+  let evidencePackage = structuredClone(review.interpretedEvidence);
+  if (!resuming) {
+    try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
+    catch { throw new Error("The reviewed evidence contains invalid JSON."); }
+    let submittedItemDecisions;
+    try { submittedItemDecisions = JSON.parse(String(formData.get("itemDecisionsJson") ?? "{}")); }
+    catch { throw new Error("The evidence selection is invalid."); }
+    evidencePackage = mergeAuthoritativePhotoSessions(evidencePackage, review.interpretedEvidence);
+    evidencePackage = mergeAuthoritativeTrainingSessions(evidencePackage, review.interpretedEvidence);
+    evidencePackage = mergeAuthoritativeDexaScans(evidencePackage, review.interpretedEvidence);
+    evidencePackage = mergeAuthoritativeNutritionDays(
+      evidencePackage,
+      review.interpretedEvidence,
+      reviewId
+    );
+    evidencePackage = {
+      ...evidencePackage,
+      review_metadata: {
+        ...(evidencePackage.review_metadata ?? {}),
+        confirmedAt:
+          evidencePackage.review_metadata?.confirmedAt ??
+          review.interpretedEvidence?.review_metadata?.confirmedAt ??
+          review.confirmation?.confirmedAt ??
+          new Date().toISOString(),
+        sourceReviewId: reviewId,
+      },
+    };
+    evidencePackage = prepareCanonicalExerciseIdentitiesForConfirmation(evidencePackage);
+    evidencePackage = applyPersistedItemDecisions(evidencePackage, submittedItemDecisions);
+    assertNoUnresolvedProvisionalExercises(evidencePackage);
+    assertIncludedPhotoSessionsReady(evidencePackage);
+    validateDexaObjectsBeforeCommit(evidencePackage);
+  }
 
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
-  await service.beginCommit(reviewId, { evidencePackage });
+  const operationId = randomUUID();
+  const claimedReview = await service.beginCommit(reviewId, { evidencePackage, operationId });
+  const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
+    .claimEvidenceReviewCommit === "function";
   let orchestrationResult;
   try {
-    const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
     const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, reviewId, user }) });
-    orchestrationResult = await orchestrator.run({ reviewId, evidencePackage, userId: user.id, commitProgress: currentReview.commitProgress ?? {} });
-    await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id });
+    orchestrationResult = await orchestrator.run(
+      { reviewId, evidencePackage, userId: user.id, commitProgress: claimedReview.commitProgress ?? {} },
+      { maxSteps: supportsDurableCommitClaims ? 1 : Number.POSITIVE_INFINITY, operationId }
+    );
+    if (!orchestrationResult.complete) {
+      await service.pauseCommit(reviewId, { operationId });
+      revalidatePath(`/evidence/review/${reviewId}`);
+      return redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?resume=continuing`,
+        recoveryContext
+      ));
+    }
+    await service.confirm(reviewId, { evidencePackage, confirmedBy: user.id, operationId });
   } catch (error) {
-    await service.failCommit(reviewId, error);
+    await service.failCommit(reviewId, error, { operationId });
     if (error?.retryableFailures?.length) {
       try {
         revalidatePath(`/evidence/review/${reviewId}`);
@@ -184,6 +208,33 @@ export async function confirmEvidenceReview(formData) {
   }
   const confirmedPath = `/evidence/review/${reviewId}?confirmed=1${publication?.warning ? `&refresh=${encodeURIComponent(publication.warning)}` : ""}`;
   redirect(confirmedPath);
+}
+
+async function assertDurableResumeState(review, user) {
+  if (!user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const packageId = String(review.interpretedEvidence?.package_id ?? review.interpretedEvidence?.id ?? "");
+  if (!packageId) throw Object.assign(new Error("Interrupted evidence confirmation package is unavailable."), { code: "COMMIT_PACKAGE_MISMATCH" });
+  const progress = review.commitProgress ?? {};
+  const canonicalIds = progress.canonical_commit?.result?.canonicalEvidenceIds ?? [];
+  if (progress.canonical_commit?.status === "completed") {
+    const canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+    const existingIds = new Set(canonical.map((item) => item.canonicalId ?? item.id));
+    if (!canonicalIds.length || canonicalIds.some((id) => !existingIds.has(id))) {
+      throw Object.assign(new Error("Interrupted evidence confirmation canonical side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
+    }
+  }
+  for (const analysisId of progress.analysis?.result?.analysisIds ?? []) {
+    if (!await FounderRepositories.analyses.getAnalysisById(analysisId)) {
+      throw Object.assign(new Error("Interrupted evidence confirmation analysis side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
+    }
+  }
+  const eventResult = progress.training_performance_events?.result ?? {};
+  for (const event of [...(eventResult.newlyCreatedEvents ?? []), ...(eventResult.existingEvents ?? [])]) {
+    const eventId = event?.id ?? event;
+    if (eventId && !await FounderRepositories.trainingPerformanceEvents.getTrainingPerformanceEventById(eventId)) {
+      throw Object.assign(new Error("Interrupted evidence confirmation Training side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
+    }
+  }
 }
 
 export async function resolveEvidenceReviewExercise(formData) {

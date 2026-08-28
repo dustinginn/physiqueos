@@ -174,15 +174,19 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
           {blockedNutritionInvariant.length > 0 && <p className="text-sm font-semibold text-[var(--text-secondary)]">This date has conflicting active Nutrition records and needs repair before another update can be saved.</p>}
         </Card>
 
-        <form action={confirmAction} className="mt-6">
-          <input name="reviewId" type="hidden" value={review.id} />
-          <EvidenceRecoveryContextFields context={recoveryContext}/>
-          <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
-          <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
-          {canEdit || canContinue ? (
-            <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingDexaIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue || blockingPhotoSessionMetadata))} retry={canContinue} savingLabel={experience.savingLabel} />
-          ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
-        </form>
+        {status === "committing" ? (
+          <EvidenceCommitRecoveryForm action={confirmAction} recoveryContext={recoveryContext} review={review} />
+        ) : (
+          <form action={confirmAction} className="mt-6">
+            <input name="reviewId" type="hidden" value={review.id} />
+            <EvidenceRecoveryContextFields context={recoveryContext}/>
+            <textarea className="hidden" name="evidenceJson" readOnly value={JSON.stringify(submittedEvidencePackage)} />
+            <textarea className="hidden" name="itemDecisionsJson" readOnly value={JSON.stringify(itemDecisions)} />
+            {canEdit || canContinue ? (
+              <ConfirmButton blockingCount={blockingExercises.length + blockingStructuralIssues.length} disabled={blockingExercises.length > 0 || blockingStructuralIssues.length > 0 || blockingDexaIssues.length > 0 || blockingNutrition.length > 0 || blockedNutritionInvariant.length > 0 || (!canContinue && (!presentation.summary.included || blockingPhotoIssue || blockingPhotoSessionMetadata))} retry={canContinue} savingLabel={experience.savingLabel} />
+            ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
+          </form>
+        )}
         {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
         {reprocessOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">Review updated from the original evidence.</p></Card>}
         {reprocessOutcome === "current" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">No newer interpretation is available.</p></Card>}
@@ -732,6 +736,30 @@ function ConfirmButton({ blockingCount = 0, disabled, retry, savingLabel }) {
   const { pending } = useFormStatus();
   const label = blockingCount > 0 ? `Resolve ${blockingCount} exercise ${blockingCount === 1 ? "identity" : "identities"} to save` : retry ? "Continue" : "Save included evidence";
   return <button aria-live="polite" className="min-h-14 w-full cursor-pointer rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? (retry ? "Continuing\u2026" : savingLabel) : label}</button>;
+}
+
+function EvidenceCommitRecoveryForm({ action, recoveryContext, review }) {
+  const formRef = useRef(null);
+  const submittedRef = useRef(false);
+  useEffect(() => {
+    if (!submittedRef.current) {
+      submittedRef.current = true;
+      formRef.current?.requestSubmit();
+    }
+  }, []);
+  return (
+    <form action={action} className="mt-6" ref={formRef}>
+      <input name="reviewId" type="hidden" value={review.id} />
+      <EvidenceRecoveryContextFields context={recoveryContext}/>
+      <Card variant="warning">
+        <p className="font-extrabold text-[var(--text-primary)]">Finishing your saved evidence</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Completed work is preserved. PhysiqueOS will continue from the next unfinished step.</p>
+        <button className="mt-4 min-h-12 w-full rounded-xl bg-[var(--primary)] px-3 text-sm font-extrabold text-white" type="submit">
+          Continue saving
+        </button>
+      </Card>
+    </form>
+  );
 }
 
 function ReprocessButton() {

@@ -12,26 +12,35 @@ const STEP_ORDER = [
 
 export function createPostConfirmationOrchestrator({ reviewService, handlers = {}, now = () => new Date() } = {}) {
   return {
-    async run(context) {
+    async run(context, { maxSteps = Number.POSITIVE_INFINITY, operationId = null } = {}) {
       const results = {};
       const retryableFailures = [];
+      const skippedSteps = [];
+      const executedSteps = [];
+      const progress = { ...(context.commitProgress ?? {}) };
       for (const step of STEP_ORDER) {
-        const prior = context.commitProgress?.[step];
+        const prior = progress[step];
         if (prior?.status === "completed") {
           results[step] = prior.result;
+          skippedSteps.push(step);
           continue;
         }
+        if (executedSteps.length >= maxSteps) break;
         try {
           const result = handlers[step] ? await handlers[step]({ ...context, results }) : { status: "not_required" };
           results[step] = result;
-          await reviewService?.recordCommitProgress(context.reviewId, step, { status: "completed", attempts: (prior?.attempts ?? 0) + 1, completedAt: now().toISOString(), result });
+          const completed = { status: "completed", attempts: (prior?.attempts ?? 0) + 1, completedAt: now().toISOString(), result };
+          await reviewService?.recordCommitProgress(context.reviewId, step, completed, { operationId });
+          progress[step] = completed;
+          executedSteps.push(step);
         } catch (error) {
           const failure = { step, message: String(error?.message ?? error), retryable: true };
           retryableFailures.push(failure);
-          await reviewService?.recordCommitProgress(context.reviewId, step, { status: "failed", attempts: (prior?.attempts ?? 0) + 1, failedAt: now().toISOString(), error: failure.message, retryable: true });
+          await reviewService?.recordCommitProgress(context.reviewId, step, { status: "failed", attempts: (prior?.attempts ?? 0) + 1, failedAt: now().toISOString(), error: failure.message, retryable: true }, { operationId });
           throw Object.assign(new Error(`Post-confirmation step ${step} failed: ${failure.message}`), { results, retryableFailures });
         }
       }
+      const complete = STEP_ORDER.every((step) => progress[step]?.status === "completed");
       return {
         canonicalCommitStatus: statusOf(results.canonical_commit),
         compatibilityWriteStatus: statusOf(results.compatibility_writes),
@@ -43,6 +52,9 @@ export function createPostConfirmationOrchestrator({ reviewService, handlers = {
         homeRefreshResult: results.home_refresh,
         retryableFailures,
         results,
+        complete,
+        executedSteps,
+        skippedSteps,
       };
     },
   };

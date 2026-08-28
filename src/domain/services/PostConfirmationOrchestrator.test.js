@@ -54,4 +54,68 @@ describe("PostConfirmationOrchestrator", () => {
       existingEvents,
     });
   });
+
+  it("resumes the incident after five durable steps without invoking them again", async () => {
+    const progress = Object.fromEntries(
+      POST_CONFIRMATION_STEP_ORDER.slice(0, 5).map((step) => [
+        step,
+        { status: "completed", attempts: 1, result: { status: "completed", step } },
+      ])
+    );
+    const handlers = Object.fromEntries(
+      POST_CONFIRMATION_STEP_ORDER.map((step) => [
+        step,
+        vi.fn(async () => ({ status: "completed", step })),
+      ])
+    );
+    const reviewService = {
+      recordCommitProgress: vi.fn(async (_id, step, value, options) => {
+        progress[step] = value;
+        expect(options).toEqual({ operationId: "recovery-operation" });
+      }),
+    };
+    const orchestrator = createPostConfirmationOrchestrator({ handlers, reviewService });
+
+    for (let request = 0; request < 4; request += 1) {
+      const result = await orchestrator.run(
+        { reviewId: "incident-review", commitProgress: structuredClone(progress) },
+        { maxSteps: 1, operationId: "recovery-operation" }
+      );
+      expect(result.executedSteps).toHaveLength(1);
+    }
+
+    for (const step of POST_CONFIRMATION_STEP_ORDER.slice(0, 5)) {
+      expect(handlers[step]).not.toHaveBeenCalled();
+    }
+    for (const step of POST_CONFIRMATION_STEP_ORDER.slice(5)) {
+      expect(handlers[step]).toHaveBeenCalledOnce();
+    }
+    expect(POST_CONFIRMATION_STEP_ORDER.every((step) => progress[step]?.status === "completed"))
+      .toBe(true);
+  });
+
+  it.each(POST_CONFIRMATION_STEP_ORDER.slice(0, -1).map((_step, index) => index + 1))(
+    "continues after a process restart following %i durable steps",
+    async (completedCount) => {
+      const progress = Object.fromEntries(
+        POST_CONFIRMATION_STEP_ORDER.slice(0, completedCount).map((step) => [
+          step,
+          { status: "completed", result: { status: "completed" } },
+        ])
+      );
+      const handlers = Object.fromEntries(
+        POST_CONFIRMATION_STEP_ORDER.map((step) => [step, vi.fn(async () => ({ status: "completed" }))])
+      );
+      await createPostConfirmationOrchestrator({
+        handlers,
+        reviewService: { recordCommitProgress: vi.fn() },
+      }).run(
+        { reviewId: "restart-review", commitProgress: progress },
+        { maxSteps: 1, operationId: "restart-operation" }
+      );
+      POST_CONFIRMATION_STEP_ORDER.slice(0, completedCount)
+        .forEach((step) => expect(handlers[step]).not.toHaveBeenCalled());
+      expect(handlers[POST_CONFIRMATION_STEP_ORDER[completedCount]]).toHaveBeenCalledOnce();
+    }
+  );
 });

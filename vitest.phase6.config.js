@@ -39,6 +39,8 @@ export default defineConfig({
       "src/screens/PhotoEventBriefingScreen.test.js",
       "src/screens/PhotosEvidenceContextProduction.test.js",
       "src/domain/services/EvidenceReviewService.test.js",
+      "src/domain/services/EvidenceReviewCommitRecovery.test.js",
+      "src/domain/services/PostConfirmationOrchestrator.test.js",
       "src/domain/services/EvidenceReviewPresentationService.test.js",
       "src/domain/services/MorningCheckInPersistenceService.test.js",
       "src/domain/services/ExecutionPriorityProjectionService.test.js",

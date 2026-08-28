@@ -73,6 +73,50 @@ describe("PostgreSQL Founder repository facade", () => {
     }));
   });
 
+  it("persists confirmation claims and progress without reconstructing the full Founder runtime", async () => {
+    const database = fakeDatabase();
+    const review = database.runtime.evidenceReviews[0];
+    review.status = "pending";
+    review.interpretedEvidence = { package_id: "package-one", evidence_objects: [] };
+    review.commitProgress = {};
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess: vi.fn(async () => ({ authority: "provider-compatibility-nonauthoritative" })) },
+      createCommandId: ({ methodName }) => `review-${methodName}`,
+    });
+
+    await repositories.evidenceReviews.claimEvidenceReviewCommit(review.id, {
+      operationId: "operation-one",
+      claimedAt: "2026-08-28T21:30:00.000Z",
+      leaseExpiresAt: "2026-08-28T21:32:00.000Z",
+      packageId: "package-one",
+      evidencePackage: review.interpretedEvidence,
+    });
+    await repositories.evidenceReviews.recordEvidenceReviewCommitProgress(review.id, {
+      operationId: "operation-one",
+      key: "canonical_commit",
+      value: { status: "completed", result: { canonicalEvidenceIds: ["canonical-one"] } },
+      leaseExpiresAt: "2026-08-28T21:32:30.000Z",
+    });
+    await repositories.evidenceReviews.releaseEvidenceReviewCommit(review.id, {
+      operationId: "operation-one",
+      releasedAt: "2026-08-28T21:31:00.000Z",
+    });
+
+    const fullRuntimeReads = database.client.query.mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("SELECT record_id,payload FROM physiqueos."));
+    expect(fullRuntimeReads).toHaveLength(0);
+    expect(database.runtime.evidenceReviews[0]).toMatchObject({
+      status: "committing",
+      commitClaim: { operationId: "operation-one", status: "available" },
+      commitProgress: { canonical_commit: { status: "completed" } },
+    });
+    expect(database.metadata.revision).toBe(5004);
+  });
+
   it("shares one canonical repository snapshot across the complete Home fan-out and refreshes the next request", async () => {
     let source = structuredClone(createPhase5SyntheticRuntime());
     let loads = 0;
@@ -325,6 +369,16 @@ function fakeDatabase() {
     }
     if (normalized.includes("pg_advisory_xact_lock")) return { rows: [{}], rowCount: 1 };
     if (normalized === "SELECT current_database() AS database") return { rows: [{ database: "physiqueos_phase5_test_provider_unit" }], rowCount: 1 };
+    if (normalized.startsWith("SELECT version,payload FROM physiqueos.canonical_evidence_records")) {
+      const review = runtime.evidenceReviews.find((item) => id(item) === values[1]);
+      return { rows: review ? [{ version: review.version ?? 1, payload: structuredClone(review) }] : [], rowCount: review ? 1 : 0 };
+    }
+    if (normalized.startsWith("UPDATE physiqueos.canonical_evidence_records SET") && normalized.includes("collection_name='evidenceReviews'")) {
+      const position = runtime.evidenceReviews.findIndex((item) => id(item) === values[1]);
+      if (position < 0) return { rows: [], rowCount: 0 };
+      runtime.evidenceReviews[position] = JSON.parse(values[8]);
+      return { rows: [], rowCount: 1 };
+    }
     if (normalized.includes("SELECT record_id,payload FROM physiqueos.")) {
       const collection = values[1];
       const source = runtime[collection];
