@@ -42,6 +42,7 @@ export default defineConfig({
       "src/domain/services/EvidenceReviewCommitRecovery.test.js",
       "src/domain/services/PostConfirmationOrchestrator.test.js",
       "src/domain/services/EvidenceReviewPresentationService.test.js",
+      "src/domain/services/GoalEvaluationJsonSafety.test.js",
       "src/application/read-models/EvidenceConfirmationReadService.test.js",
       "src/app/evidence/review/[reviewId]/actions.test.js",
       "src/domain/services/MorningCheckInPersistenceService.test.js",

@@ -533,7 +533,7 @@ function createEvaluation({
   return {
     id: `goal_evaluation_${goal.id}`,
     goalId: goal.id,
-    metricKey: goal.metricKey,
+    metricKey: goal.metricKey ?? null,
     title,
     primary: Boolean(goal.primary),
     current,

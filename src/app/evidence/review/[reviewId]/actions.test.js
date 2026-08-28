@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { canonicalJson } from "../../../../contracts/v1/canonicalJson";
 
 const runtimeStore = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "private/founder/runtime-store.json"), "utf8")
@@ -83,7 +84,10 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
       },
       analyses: {
         async createAnalysis(analysis) {
-          getState().analyses.push(structuredClone(analysis));
+          const stored = getState().enforceCanonicalJson
+            ? JSON.parse(canonicalJson(analysis))
+            : structuredClone(analysis);
+          getState().analyses.push(stored);
           return analysis;
         },
         async getAnalysisById(analysisId) {
@@ -106,7 +110,7 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
         async upsertPhoto() { return null; },
       },
       dexaScans: { async listDEXAScans() { return []; }, async upsertDEXAScan() { return null; }, async addDEXAScan() { return null; } },
-      goals: { async listGoals() { return []; } },
+      goals: { async listGoals() { return structuredClone(getState().goals ?? []); } },
       protocols: { async listProtocols() { return []; } },
       nutritionContext: { async getNutritionContext() { return null; } },
       reminders: { async completeReminderFromEvidence() { return null; } },
@@ -166,12 +170,6 @@ vi.mock("../../../../domain/services/PendingEvidenceReviewReprocessingService", 
       return mockState.value.reprocessResult ?? { changed: false, idempotent: true };
     },
   }),
-}));
-
-vi.mock("../../../../domain/services/GoalEvaluationService", () => ({
-  GoalEvaluationService: {
-    getGoalEvaluations: () => [],
-  },
 }));
 
 vi.mock("../../../../domain/services/DEXAEventNarrativeService", () => ({
@@ -520,6 +518,68 @@ describe("confirmEvidenceReview", () => {
       expect.stringContaining(`/evidence/review/${review.id}?resume=paused`)
     );
     expect(redirect).not.toHaveBeenCalledWith("/check-in/morning");
+  });
+
+  it("resumes goal evaluation with an optional metric key without replaying completed steps", async () => {
+    const state = createIsolatedReviewState(runtimeStore);
+    const review = state.evidenceReviews[0];
+    const completedBefore = [
+      "canonical_commit",
+      "compatibility_writes",
+      "scheduled_completion",
+      "analysis",
+      "training_performance_events",
+    ];
+    review.status = "partially_committed";
+    review.confirmation = null;
+    review.commitError = "goal_evaluation: metricKey was not JSON serializable";
+    review.commitProgress = Object.fromEntries([
+      ...completedBefore.map((step) => [step, {
+        status: "completed",
+        attempts: 1,
+        result: { status: "completed" },
+      }]),
+      ["goal_evaluation", {
+        status: "failed",
+        attempts: 1,
+        retryable: true,
+      }],
+    ]);
+    state.goals = [{
+      id: "goal_optional_metric",
+      title: "Optional metric goal",
+      type: "habit",
+      primary: false,
+      status: "active",
+    }];
+    state.enforceCanonicalJson = true;
+    state.canonicalCommitCalls = 0;
+    const canonicalBefore = structuredClone(state.canonicalEvidenceObjects);
+    mockState.value = state;
+
+    await expect(confirmEvidenceReview(confirmationForm(review)))
+      .resolves.toBeUndefined();
+
+    const confirmed = mockState.value.evidenceReviews[0];
+    expect(confirmed.status).toBe("confirmed");
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+    for (const step of completedBefore) {
+      expect(confirmed.commitProgress[step].attempts).toBe(1);
+    }
+    expect(confirmed.commitProgress.goal_evaluation).toMatchObject({
+      status: "completed",
+      attempts: 2,
+    });
+    expect(confirmed.commitProgress.event_eligibility.status).toBe("completed");
+    expect(confirmed.commitProgress.briefing.status).toBe("completed");
+    expect(confirmed.commitProgress.home_refresh.status).toBe("completed");
+    expect(mockState.value.analyses).toContainEqual(expect.objectContaining({
+      id: `goal_evaluation_${review.interpretedEvidence.package_id}`,
+      metadata: expect.objectContaining({
+        evaluations: [expect.objectContaining({ metricKey: null })],
+      }),
+    }));
   });
 
   it("publishes the Photo Event without Confidence when the goal contract is ineligible", async () => {
