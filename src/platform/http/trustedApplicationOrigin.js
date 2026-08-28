@@ -29,6 +29,24 @@ export function readTrustedApplicationOrigin(env = process.env) {
   return origin.origin;
 }
 
+export function isTrustedApplicationRequestOrigin(value, env = process.env) {
+  const candidate = String(value ?? "");
+  if (!candidate || candidate.trim() !== candidate) return false;
+
+  let origin;
+  try {
+    origin = new URL(candidate);
+  } catch {
+    return false;
+  }
+
+  // Browser Origin headers are serialized origins, never arbitrary URLs.
+  // Requiring the canonical serialization rejects credentials, paths,
+  // queries, fragments, explicit default ports, and other ambiguous forms.
+  if (origin.origin !== candidate) return false;
+  return origin.origin === readTrustedApplicationOrigin(env);
+}
+
 export function resolveTrustedMediaRedirect(accessHandle, env = process.env) {
   const candidate = String(accessHandle ?? "");
   if (!candidate.startsWith("/") || candidate.startsWith("//") || candidate.includes("\\")) {

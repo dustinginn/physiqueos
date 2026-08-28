@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { isAccessGateExpected, readAccessGateSecret } from "./platform/accessGate/accessGateConfig.js";
 import { isPublicPath, FOUNDER_GATE_LOGIN_PATH } from "./platform/accessGate/publicRoutes.js";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "./platform/accessGate/sessionToken.js";
+import { isTrustedApplicationRequestOrigin } from "./platform/http/trustedApplicationOrigin.js";
 
 // Excludes only /_next/static (framework JS/CSS/font chunks - never product
 // data) and favicon.ico from even reaching this function, for performance.
@@ -32,22 +33,20 @@ export async function middleware(request) {
   const secret = readAccessGateSecret(process.env);
   if (!secret) return denyResponse(request, 503, "ACCESS_GATE_NOT_CONFIGURED");
 
-  // CSRF defense-in-depth for state-changing requests (Server Actions and
-  // any mutation route): Next.js Server Actions already enforce their own
-  // Origin/Host check, and the session cookie is SameSite=Lax, but an
-  // explicit check here costs nothing and does not depend on that staying
-  // true across framework versions.
+  // CSRF defense-in-depth for state-changing Founder requests (Server Actions
+  // and mutation routes). The browser-visible public origin is the trust
+  // anchor; the upstream Host can legitimately differ when a trusted proxy
+  // rewrites it for provider TLS/virtual-host routing. Host and forwarded-host
+  // values are therefore transport metadata, never authorization inputs.
   if (request.method !== "GET" && request.method !== "HEAD") {
     const origin = request.headers.get("origin");
-    if (origin) {
-      let originHost = null;
-      try {
-        originHost = new URL(origin).host;
-      } catch {
-        originHost = null;
-      }
-      if (originHost !== request.headers.get("host")) return denyResponse(request, 403, "ORIGIN_MISMATCH");
+    let trusted = false;
+    try {
+      trusted = isTrustedApplicationRequestOrigin(origin, process.env);
+    } catch {
+      return denyResponse(request, 503, "PUBLIC_APP_ORIGIN_NOT_CONFIGURED");
     }
+    if (!trusted) return denyResponse(request, 403, "ORIGIN_MISMATCH");
   }
 
   const cookieValue = request.cookies.get(SESSION_COOKIE_NAME)?.value;

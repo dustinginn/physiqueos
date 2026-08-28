@@ -5,12 +5,14 @@ import { createSessionToken, SESSION_COOKIE_NAME } from "./platform/accessGate/s
 
 const SECRET = "s".repeat(40);
 const ORIGIN = "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app";
+const PUBLIC_ORIGIN = "https://float-departed-symphony.ngrok-free.dev";
 
 let originalEnv;
 beforeEach(() => {
   originalEnv = { ...process.env };
   process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME = "1";
   process.env.PHYSIQUEOS_ACCESS_GATE_SECRET = SECRET;
+  process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN = PUBLIC_ORIGIN;
 });
 afterEach(() => {
   process.env = originalEnv;
@@ -127,7 +129,7 @@ describe("middleware — unauthenticated denial across every protected surface",
   it("does NOT redirect a Server Action POST (Next-Action header present) — returns 401 JSON instead", async () => {
     const response = await middleware(req("/profile/operating-plan/tracking/morning-weigh-in", {
       method: "POST",
-      headers: { "next-action": "abcdef1234567890", accept: "text/x-component" },
+      headers: { origin: PUBLIC_ORIGIN, "next-action": "abcdef1234567890", accept: "text/x-component" },
     }));
     expect(response.status).toBe(401);
     expect(response.headers.get("location")).toBeNull();
@@ -184,7 +186,7 @@ describe("middleware — cookie validation", () => {
 });
 
 describe("middleware — CSRF / cross-origin write protection", () => {
-  it("rejects a state-changing request whose Origin does not match Host, even with a valid cookie", async () => {
+  it("rejects a state-changing request whose Origin is not the trusted public origin, even with a valid cookie", async () => {
     const cookie = await validCookie();
     const response = await middleware(req("/profile/operating-plan/tracking/morning-weigh-in", {
       method: "POST",
@@ -194,14 +196,70 @@ describe("middleware — CSRF / cross-origin write protection", () => {
     expect(response.status).toBe(403);
   });
 
-  it("allows a state-changing request whose Origin matches Host with a valid cookie", async () => {
+  it("allows the trusted public Origin behind the provider Host rewrite with a valid cookie", async () => {
     const cookie = await validCookie();
     const response = await middleware(req("/profile/operating-plan/tracking/morning-weigh-in", {
       method: "POST",
-      headers: { origin: ORIGIN, accept: "text/x-component" },
+      headers: {
+        origin: PUBLIC_ORIGIN,
+        host: new URL(ORIGIN).host,
+        "x-forwarded-host": new URL(PUBLIC_ORIGIN).host,
+        "x-forwarded-proto": "https",
+        "next-action": "abcdef1234567890",
+        accept: "text/x-component",
+      },
       cookie,
     }));
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it.each([
+    ["missing", null],
+    ["malformed", "not a URL"],
+    ["wrong scheme", "http://float-departed-symphony.ngrok-free.dev"],
+    ["wrong port", "https://float-departed-symphony.ngrok-free.dev:8443"],
+    ["different host", "https://evil.example"],
+    ["lookalike subdomain", "https://float-departed-symphony.ngrok-free.dev.evil.example"],
+    ["credentials", "https://user:pass@float-departed-symphony.ngrok-free.dev"],
+    ["path", "https://float-departed-symphony.ngrok-free.dev/path"],
+    ["query", "https://float-departed-symphony.ngrok-free.dev?x=1"],
+    ["fragment", "https://float-departed-symphony.ngrok-free.dev#x"],
+  ])("rejects a %s state-changing Origin", async (_label, origin) => {
+    const cookie = await validCookie();
+    const headers = { host: new URL(ORIGIN).host, accept: "text/x-component" };
+    if (origin !== null) headers.origin = origin;
+    const response = await middleware(req("/check-in/morning", { method: "POST", headers, cookie }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ code: "ORIGIN_MISMATCH" });
+  });
+
+  it("does not let Host or forwarded-host spoofing authorize an attacker Origin", async () => {
+    const cookie = await validCookie();
+    for (const headers of [
+      { origin: "https://evil.example", host: "evil.example" },
+      { origin: "https://evil.example", "x-forwarded-host": new URL(PUBLIC_ORIGIN).host, "x-forwarded-proto": "https" },
+      { origin: "https://evil.example", "x-forwarded-host": `${new URL(PUBLIC_ORIGIN).host}, evil.example`, "x-forwarded-proto": "https" },
+    ]) {
+      const response = await middleware(req("/check-in/morning", { method: "POST", headers, cookie }));
+      expect(response.status).toBe(403);
+    }
+  });
+
+  it("denies provider-native browser writes while the reserved public origin is configured", async () => {
+    const cookie = await validCookie();
+    const response = await middleware(req("/check-in/morning", { method: "POST", headers: { origin: ORIGIN }, cookie }));
+    expect(response.status).toBe(403);
+  });
+
+  it("fails closed when the trusted public origin is absent or invalid", async () => {
+    const cookie = await validCookie();
+    for (const configured of [null, "not a URL", "http://float-departed-symphony.ngrok-free.dev"]) {
+      if (configured === null) delete process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN;
+      else process.env.PHYSIQUEOS_PUBLIC_APP_ORIGIN = configured;
+      const response = await middleware(req("/check-in/morning", { method: "POST", headers: { origin: PUBLIC_ORIGIN }, cookie }));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ code: "PUBLIC_APP_ORIGIN_NOT_CONFIGURED" });
+    }
   });
 
   it("does not apply the Origin check to GET requests", async () => {
