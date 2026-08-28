@@ -186,6 +186,8 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("exercise.variantLabel");
     expect(screen).toContain("Superset with {exercise.supersetWith.join(\" + \")}");
     expect(screen).toContain("New exercise");
+    expect(screen).toContain("formatRecordedExerciseSets(exercise.sets)");
+    expect(screen).not.toContain('exercise.sets.join(" Â· ")');
     const recordedSetDetails = screen.match(
       /function RecordedStrengthSetDetails[\s\S]*?\n}\n\nfunction GroupedExerciseReviewRow/
     )?.[0] ?? "";

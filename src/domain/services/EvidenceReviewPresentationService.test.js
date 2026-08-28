@@ -4,6 +4,7 @@ import { createEvidenceReviewService } from "./EvidenceReviewService";
 import {
   createEvidenceReviewPresentation,
   formatExerciseSet,
+  formatRecordedExerciseSets,
   presentEvidenceObject,
   repairPendingReviewExerciseIdentities,
   toggleEvidenceReviewItemDecision,
@@ -210,6 +211,24 @@ describe("Evidence Review presentation", () => {
     expect(formatExerciseSet({ reps: 8 })).toBe("8 reps");
     expect(formatExerciseSet({ duration_seconds: null })).toBeNull();
     expect(formatExerciseSet({ duration_seconds: 0 })).toBeNull();
+  });
+
+  it("formats recorded sets with a UTF-8-safe middle-dot separator", () => {
+    expect(formatRecordedExerciseSets(["12 reps @ 45 lb"]))
+      .toBe("12 reps @ 45 lb");
+
+    const rendered = formatRecordedExerciseSets([
+      "12 reps @ 45 lb",
+      "10 reps @ 45 lb",
+      "10 reps @ 45 lb",
+      "10 reps @ 45 lb",
+    ]);
+
+    expect(rendered).toBe(
+      "12 reps @ 45 lb · 10 reps @ 45 lb · 10 reps @ 45 lb · 10 reps @ 45 lb"
+    );
+    expect(rendered).not.toContain("Â·");
+    expect(JSON.parse(JSON.stringify({ rendered })).rendered).toBe(rendered);
   });
 
   it("persists a stable item decision through repeated exclude and include transitions", async () => {

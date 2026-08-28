@@ -9,6 +9,7 @@ import EvidenceImage from "../components/progress/EvidenceImage";
 import {
   createEvidenceReviewPresentation,
   formatExerciseSet,
+  formatRecordedExerciseSets,
   toggleEvidenceReviewItemDecision,
 } from "../domain/services/EvidenceReviewPresentationService";
 import {
@@ -400,7 +401,7 @@ function RecordedStrengthSetDetails({ exercises }) {
             </div>
             {exercise.sets.length > 0 ? (
               <p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
-                {exercise.sets.join(" Â· ")}
+                {formatRecordedExerciseSets(exercise.sets)}
               </p>
             ) : (
               <p className="mt-2 text-sm text-[var(--text-muted)]">Set details unavailable</p>

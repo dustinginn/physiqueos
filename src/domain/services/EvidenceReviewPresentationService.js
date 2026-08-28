@@ -98,6 +98,10 @@ export function formatExerciseSet(set = {}) {
   return null;
 }
 
+export function formatRecordedExerciseSets(sets = []) {
+  return sets.join(" \u00b7 ");
+}
+
 export function formatReviewDate(value) {
   if (!value) return null;
   const dateKey = String(value).slice(0, 10);
