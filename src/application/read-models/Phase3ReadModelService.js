@@ -8,21 +8,23 @@ export const Phase3ReadModel = Object.freeze({
   TRAINING: "training.v1", PROFILE: "profile.v1",
 });
 
-export function createPhase3ReadModelService({ loaders, now = () => new Date(), readResourceVersion = () => "1" } = {}) {
+export function createPhase3ReadModelService({ loaders, now = () => new Date(), readResourceVersion = () => "1", runInReadScope = (callback) => callback() } = {}) {
   async function read(model, principal, input = {}) {
     const actor = requireAuthenticationPrincipal(principal);
     const loader = loaders?.[model];
     if (typeof loader !== "function") throw new Error(`No application loader is registered for ${model}.`);
-    const generatedAt = now().toISOString();
-    const data = await loader({ ...input, principal: actor });
-    return createApplicationReadModel({
-      model,
-      data,
-      resourceVersion: await readResourceVersion({ model, principal: actor, data }),
-      generatedAt,
-      freshThrough: generatedAt,
-      intentionalDifferences: ["Raw web href fields are represented as typed destinations.", "Persistence and filesystem implementation fields are omitted."],
-    });
+    return runInReadScope(async () => {
+      const generatedAt = now().toISOString();
+      const data = await loader({ ...input, principal: actor });
+      return createApplicationReadModel({
+        model,
+        data,
+        resourceVersion: await readResourceVersion({ model, principal: actor, data }),
+        generatedAt,
+        freshThrough: generatedAt,
+        intentionalDifferences: ["Raw web href fields are represented as typed destinations.", "Persistence and filesystem implementation fields are omitted."],
+      });
+    }, { readModel: model });
   }
   return Object.freeze({
     home: (principal, input) => read(Phase3ReadModel.HOME, principal, input),

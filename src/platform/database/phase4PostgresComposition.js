@@ -15,6 +15,7 @@ import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.j
 import { createPostgresTransactionRunner } from "./transaction.js";
 import {
   createPostgresFounderRepositoryFacade,
+  createPostgresFounderReadScope,
   executePostgresFounderRuntimeMutation,
 } from "./PostgresFounderRepositoryFacade.js";
 
@@ -29,12 +30,18 @@ export async function createPhase4PostgresApplicationComposition({
   migrationOperationId = null,
   compatibilityMode = true,
   requireCompatibilityAuthority = false,
+  readDiagnostics = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
   const query = (text, values) => pool.query(text, values);
   const canonicalRuntime = await loadCanonicalRuntime({ query, ownerUserId });
   const runtime = addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId);
   registerRuntimeTrainingExercises(runtime.canonicalExerciseLibrary ?? []);
+  const readScope = createPostgresFounderReadScope({
+    loadRuntime: () => loadCanonicalRuntime({ query, ownerUserId }),
+    readPoolState: () => ({ totalCount: pool.totalCount, idleCount: pool.idleCount, waitingCount: pool.waitingCount }),
+    onComplete: readDiagnostics,
+  });
   const repositories = createPostgresFounderRepositoryFacade({
     pool,
     ownerUserId,
@@ -43,12 +50,14 @@ export async function createPhase4PostgresApplicationComposition({
     compatibilityMode,
     requireCompatibilityAuthority,
     now,
+    readRepositories: () => readScope.readRepositories(),
   });
-  const loaders = createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => runtime, now });
+  const loaders = createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => readScope.currentRuntime() ?? runtime, now });
   const readModels = createPhase3ReadModelService({
     loaders,
     now,
-    readResourceVersion: ({ data }) => String(data?.version ?? runtime.revision ?? "1"),
+    readResourceVersion: ({ data }) => String(data?.version ?? readScope.currentRuntime()?.revision ?? runtime.revision ?? "1"),
+    runInReadScope: (callback, metadata) => readScope.run(callback, metadata),
   });
   const transactionRunner = createPhase4TransactionRunner({ pool });
   const ports = createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority });

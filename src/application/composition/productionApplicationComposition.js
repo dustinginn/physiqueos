@@ -145,6 +145,9 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     migrationOperationId: compatibilityMode ? null : env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
     compatibilityMode,
     requireCompatibilityAuthority: compatibilityMode,
+    readDiagnostics: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.canonical_read_scope.complete", event)
+      : null,
   });
   return Object.freeze({
     ...composition,

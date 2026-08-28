@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import {
@@ -20,6 +21,7 @@ export function createPostgresFounderRepositoryFacade({
   requireCompatibilityAuthority = false,
   now = () => new Date(),
   createCommandId = () => randomUUID(),
+  readRepositories = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("PostgreSQL Founder repositories require a pool.");
   if (!String(ownerUserId ?? "").trim()) throw new Error("PostgreSQL Founder repositories require an owner.");
@@ -31,6 +33,10 @@ export function createPostgresFounderRepositoryFacade({
   }
 
   const template = createSeedRepositories(emptyRuntime(), { allowStagedMutations: true });
+  const loadReadRepositories = readRepositories ?? (async () => createReadRepositories(
+    await loadCanonicalRuntime({ query: (text, values) => pool.query(text, values), ownerUserId }),
+  ));
+  if (typeof loadReadRepositories !== "function") throw new Error("PostgreSQL Founder repository reads require a snapshot loader.");
   return Object.freeze(Object.fromEntries(Object.entries(template).map(([repositoryName, repository]) => [
     repositoryName,
     Object.freeze(Object.fromEntries(Object.entries(repository).map(([methodName, value]) => [
@@ -44,8 +50,7 @@ export function createPostgresFounderRepositoryFacade({
   async function invoke({ repositoryName, methodName, args }) {
     const disposition = classifyFounderRepositoryMethod(repositoryName, methodName);
     if (disposition === CanonicalWriteDisposition.READ_ONLY) {
-      const runtime = await loadCanonicalRuntime({ query: (text, values) => pool.query(text, values), ownerUserId });
-      const repositories = createSeedRepositories(mutableRuntime(runtime), { allowStagedMutations: false });
+      const repositories = await loadReadRepositories();
       return repositories[repositoryName][methodName](...args);
     }
 
@@ -59,6 +64,74 @@ export function createPostgresFounderRepositoryFacade({
       },
     });
   }
+}
+
+export function createPostgresFounderReadScope({ loadRuntime, readPoolState = () => null, onComplete = null, now = () => Date.now() } = {}) {
+  if (typeof loadRuntime !== "function") throw new Error("PostgreSQL Founder read scope requires a canonical runtime loader.");
+  const storage = new AsyncLocalStorage();
+  return Object.freeze({
+    async run(callback, metadata = {}) {
+      if (typeof callback !== "function") throw new Error("PostgreSQL Founder read scope requires a callback.");
+      if (storage.getStore()) return callback();
+      const scope = { runtime: null, runtimePromise: null, repositoriesPromise: null, loadCount: 0 };
+      const startedAt = now();
+      const poolBefore = safePoolState(readPoolState);
+      try {
+        return await storage.run(scope, callback);
+      } finally {
+        safelyObserve(onComplete, Object.freeze({
+          readModel: String(metadata.readModel ?? "unknown"),
+          runtimeLoadCount: scope.loadCount,
+          elapsedMs: Math.max(0, now() - startedAt),
+          poolBefore,
+          poolAfter: safePoolState(readPoolState),
+        }));
+      }
+    },
+    async readRepositories() {
+      const scope = storage.getStore();
+      if (!scope) return createReadRepositories(await loadRuntime());
+      if (!scope.repositoriesPromise) {
+        scope.repositoriesPromise = loadScopedRuntime(scope, loadRuntime).then(createReadRepositories);
+      }
+      return scope.repositoriesPromise;
+    },
+    currentRuntime() {
+      return storage.getStore()?.runtime ?? null;
+    },
+  });
+}
+
+function loadScopedRuntime(scope, loadRuntime) {
+  if (!scope.runtimePromise) {
+    scope.loadCount += 1;
+    scope.runtimePromise = Promise.resolve().then(loadRuntime).then((runtime) => {
+      scope.runtime = runtime;
+      return runtime;
+    });
+  }
+  return scope.runtimePromise;
+}
+
+function createReadRepositories(runtime) {
+  return createSeedRepositories(mutableRuntime(runtime), { allowStagedMutations: false });
+}
+
+function safePoolState(readPoolState) {
+  try {
+    const state = readPoolState?.();
+    if (!state || typeof state !== "object") return null;
+    return Object.freeze({
+      totalCount: Number(state.totalCount ?? 0),
+      idleCount: Number(state.idleCount ?? 0),
+      waitingCount: Number(state.waitingCount ?? 0),
+    });
+  } catch { return null; }
+}
+
+function safelyObserve(observer, event) {
+  if (typeof observer !== "function") return;
+  try { observer(event); } catch { /* Diagnostics must never change canonical read behavior. */ }
 }
 
 export async function executePostgresFounderRuntimeMutation({

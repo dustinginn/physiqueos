@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
+import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { createPhase5SyntheticRuntime, PHASE5_SYNTHETIC_OWNER_ID } from "../migration/phase5SyntheticPackage.js";
-import { createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
+import { createPostgresFounderReadScope, createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
 
 describe("PostgreSQL Founder repository facade", () => {
   it("hydrates reads from PostgreSQL and commits a repository mutation with metadata, enqueueing no durable outbox work", async () => {
@@ -62,7 +64,121 @@ describe("PostgreSQL Founder repository facade", () => {
       commandId: "first-provider-command",
     }));
   });
+
+  it("shares one canonical repository snapshot across the complete Home fan-out and refreshes the next request", async () => {
+    let source = structuredClone(createPhase5SyntheticRuntime());
+    let loads = 0;
+    const diagnostics = [];
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: async () => { loads += 1; return structuredClone(source); },
+      readPoolState: () => ({ totalCount: 1, idleCount: 1, waitingCount: 0 }),
+      onComplete: (event) => diagnostics.push(event),
+    });
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: { query: vi.fn(), connect: vi.fn() },
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      readRepositories: () => scope.readRepositories(),
+    });
+    const home = createHomeBriefingService({
+      repositories,
+      readRuntimeStore: () => scope.currentRuntime(),
+      now: () => new Date("2026-08-12T12:00:00.000Z"),
+    });
+
+    const first = await scope.run(() => home.getHomeBriefing(PHASE5_SYNTHETIC_OWNER_ID), { readModel: "home.v1" });
+    expect(first.header.name).toBe("Synthetic");
+    expect(loads).toBe(1);
+    expect(scope.currentRuntime()).toBeNull();
+
+    source.user.firstName = "Refreshed";
+    const second = await scope.run(() => home.getHomeBriefing(PHASE5_SYNTHETIC_OWNER_ID), { readModel: "home.v1" });
+    expect(second.header.name).toBe("Refreshed");
+    expect(loads).toBe(2);
+    expect(diagnostics).toEqual([
+      expect.objectContaining({ readModel: "home.v1", runtimeLoadCount: 1, poolAfter: { totalCount: 1, idleCount: 1, waitingCount: 0 } }),
+      expect.objectContaining({ readModel: "home.v1", runtimeLoadCount: 1, poolAfter: { totalCount: 1, idleCount: 1, waitingCount: 0 } }),
+    ]);
+  });
+
+  it("reduces a provider-equivalent 20-way read fan-out from 840 queries and 15 waiters to one 42-query load", async () => {
+    const runtime = structuredClone(createPhase5SyntheticRuntime());
+    const baseline = limitedCanonicalQuery(runtime, 5);
+    await Promise.all(Array.from({ length: 20 }, () => loadCanonicalRuntime({ query: baseline.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID })));
+    expect(baseline.telemetry()).toEqual({ queryCount: 840, maxActive: 5, maxWaiting: 15, active: 0, waiting: 0 });
+
+    const repaired = limitedCanonicalQuery(runtime, 5);
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: () => loadCanonicalRuntime({ query: repaired.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID }),
+    });
+    await scope.run(() => Promise.all(Array.from({ length: 20 }, () => scope.readRepositories())));
+    expect(repaired.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+  });
+
+  it("isolates concurrent requests, releases rejected scopes, and never serves a stale cross-request snapshot", async () => {
+    let revision = 1;
+    let loads = 0;
+    let fail = true;
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: async () => {
+        loads += 1;
+        if (fail) throw new Error("provider read failed");
+        return { ...structuredClone(createPhase5SyntheticRuntime()), revision };
+      },
+    });
+    await expect(scope.run(() => scope.readRepositories())).rejects.toThrow("provider read failed");
+    expect(scope.currentRuntime()).toBeNull();
+    fail = false;
+    const [left, right] = await Promise.all([
+      scope.run(async () => (await scope.readRepositories()).users.getCurrentUser()),
+      scope.run(async () => (await scope.readRepositories()).users.getCurrentUser()),
+    ]);
+    expect(left.id).toBe(PHASE5_SYNTHETIC_OWNER_ID);
+    expect(right.id).toBe(PHASE5_SYNTHETIC_OWNER_ID);
+    expect(loads).toBe(3);
+    revision = 2;
+    await scope.run(() => scope.readRepositories());
+    expect(loads).toBe(4);
+    expect(scope.currentRuntime()).toBeNull();
+  });
 });
+
+function limitedCanonicalQuery(runtime, limit) {
+  let active = 0, waiting = 0, maxActive = 0, maxWaiting = 0, queryCount = 0;
+  const queue = [];
+  async function query(sql, values = []) {
+    queryCount += 1;
+    if (active >= limit) {
+      waiting += 1;
+      maxWaiting = Math.max(maxWaiting, waiting);
+      await new Promise((resolve) => queue.push(resolve));
+      waiting -= 1;
+    }
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return canonicalRows(runtime, sql, values);
+    } finally {
+      active -= 1;
+      queue.shift()?.();
+    }
+  }
+  return { query, telemetry: () => ({ queryCount, maxActive, maxWaiting, active, waiting }) };
+}
+
+function canonicalRows(runtime, sql, values) {
+  const normalized = String(sql).replace(/\s+/g, " ").trim();
+  if (normalized.includes("SELECT record_id,payload FROM physiqueos.")) {
+    const source = runtime[values[1]];
+    const records = source == null ? [] : Array.isArray(source) ? source : [source];
+    return { rows: records.map((payload, index) => ({ record_id: id(payload, index), payload: structuredClone(payload) })), rowCount: records.length };
+  }
+  if (normalized.includes("FROM physiqueos.phase4_import_runs")) return { rows: [{ report: { runtimeVersion: runtime.version, runtimeRevision: runtime.revision, sourceUpdatedAt: runtime.updatedAt }, source_sha256: "a".repeat(64) }], rowCount: 1 };
+  if (normalized.includes("FROM physiqueos.canonical_application_context")) return { rows: [{ operating_rhythm: runtime.operatingRhythm ?? null, adaptive_trust_profile: runtime.adaptiveTrustProfile ?? null, retired_milestones: runtime.milestones ?? [] }], rowCount: 1 };
+  if (normalized.startsWith("SELECT runtime_version,revision,last_command_id,updated_at,imported_at")) return { rows: [{ runtime_version: runtime.version, revision: runtime.revision, last_command_id: runtime.lastCommitId, updated_at: runtime.updatedAt, imported_at: runtime.importedAt }], rowCount: 1 };
+  throw new Error(`Unexpected canonical read SQL: ${normalized}`);
+}
 
 function fakeDatabase() {
   const runtime = structuredClone(createPhase5SyntheticRuntime());

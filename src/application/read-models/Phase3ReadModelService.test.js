@@ -30,4 +30,21 @@ describe("Phase 3 bounded read models", () => {
     const right = createPhase3ReadModelService({ loaders: { [Phase3ReadModel.HOME]: async () => ({ nested: { beta: 2, alpha: 1 }, id: "one" }) }, now: () => new Date("2026-08-11T12:00:00Z") });
     expect((await left.home(principal)).etag).toBe((await right.home(principal)).etag);
   });
+
+  it("keeps the loader and resource-version read inside one bounded request scope", async () => {
+    const events = [];
+    let active = false;
+    const service = createPhase3ReadModelService({
+      loaders: { [Phase3ReadModel.HOME]: async () => { expect(active).toBe(true); events.push("loader"); return { id: "home" }; } },
+      readResourceVersion: async () => { expect(active).toBe(true); events.push("version"); return "9"; },
+      runInReadScope: async (callback, metadata) => {
+        expect(metadata).toEqual({ readModel: Phase3ReadModel.HOME });
+        active = true;
+        try { return await callback(); } finally { active = false; events.push("cleanup"); }
+      },
+    });
+    expect((await service.home(principal)).resourceVersion).toBe("9");
+    expect(events).toEqual(["loader", "version", "cleanup"]);
+    expect(active).toBe(false);
+  });
 });
