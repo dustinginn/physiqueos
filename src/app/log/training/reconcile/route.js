@@ -1,6 +1,10 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { createAuthenticationPrincipal } from "../../../../application/auth/principal.js";
+import { getProductionApplicationComposition } from "../../../../application/composition/productionApplicationComposition.js";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
+import { parsePrivateMediaReference } from "../../../../contracts/v1/mediaIdentifiers.js";
 import {
   assertApplicationUploadEntryAllowed,
   storeApplicationUpload,
@@ -8,6 +12,7 @@ import {
 import {
   createStoredEvidenceArtifactDescriptor,
   processEvidenceIntakeSubmission,
+  reinterpretEvidenceIntakeSubmissionFromStoredArtifacts,
 } from "../../../../domain/services/EvidenceIntakeService";
 import { createEvidenceReviewService } from "../../../../domain/services/EvidenceReviewService";
 import {
@@ -30,7 +35,25 @@ export async function POST(request) {
       .listCanonicalEvidenceObjects(user.id);
     let evidencePackage = null;
 
-    if (files.length > 0) {
+    if (formData.get("reprocessExisting") === "1") {
+      const packageId = String(formData.get("evidencePackageId") ?? "");
+      const persistedPackage = packageId
+        ? await FounderRepositories.evidencePackages.getEvidencePackageById(packageId)
+        : null;
+      if (!persistedPackage || persistedPackage.userId !== user.id) {
+        throw new Error("Apple Health evidence is unavailable.");
+      }
+      const intake = await reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
+        evidencePackage: persistedPackage,
+        expectedEvidenceType: "training",
+        loadArtifact: createTrainingLoggerStoredArtifactLoader({ userId: user.id }),
+        userId: user.id,
+      });
+      evidencePackage = intake.evidencePackage;
+      await FounderRepositories.evidencePackages.saveEvidencePackage(evidencePackage);
+    }
+
+    if (!evidencePackage && files.length > 0) {
       const intake = await processEvidenceIntakeSubmission({
         artifactStorageFailureMode: "preserve-recoverable-package",
         evidenceDate: draft.workoutDate,
@@ -126,6 +149,41 @@ export async function PUT(request) {
       error: error?.message ?? "Training Logger Evidence Review could not be prepared.",
     }, { status: error?.status ?? (error?.code === "APPLE_WORKOUT_ALREADY_CONSUMED" ? 409 : 400) });
   }
+}
+
+function createTrainingLoggerStoredArtifactLoader({ userId, fetchImpl = fetch }) {
+  return async ({ artifact }) => {
+    if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
+      throw new Error("Stored provider evidence reinterpretation requires provider full runtime.");
+    }
+    const objectId = parsePrivateMediaReference(artifact.storage_path);
+    if (!objectId) throw new Error("Stored Apple Health evidence has an invalid private media reference.");
+    const composition = await getProductionApplicationComposition();
+    const principal = createAuthenticationPrincipal({
+      userId,
+      deviceId: "training-logger-reinterpretation",
+      sessionId: "training-logger-reinterpretation",
+      scopes: ["media:read"],
+      authenticationMethod: "founder-session",
+      transport: "server-only",
+    });
+    const descriptor = await composition.media.authorizeRead({ principal, objectId });
+    const access = await composition.mediaGateway.redeemRead({
+      accessHandle: descriptor.accessHandle,
+      principal,
+    });
+    const response = await fetchImpl(access.url, { cache: "no-store", redirect: "error" });
+    if (!response.ok) throw new Error("Stored Apple Health evidence is unavailable.");
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
+    if (buffer.length !== descriptor.size || sha256 !== descriptor.sha256) {
+      throw new Error("Stored Apple Health evidence failed integrity verification.");
+    }
+    if (artifact.mime_type && descriptor.contentType !== artifact.mime_type) {
+      throw new Error("Stored Apple Health evidence content type does not match.");
+    }
+    return { buffer, contentType: descriptor.contentType };
+  };
 }
 
 function createTrainingLoggerArtifactStore({ userId }) {

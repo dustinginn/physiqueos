@@ -25,7 +25,7 @@ describe("Training Logger production mutation boundary", () => {
 
   it("uses transient reconciliation when no screenshots are submitted", () => {
     const postSource = routeSource.split("export async function PUT")[0];
-    expect(postSource).toContain("if (files.length > 0)");
+    expect(postSource).toContain("if (!evidencePackage && files.length > 0)");
     expect(postSource).toContain("processEvidenceIntakeSubmission");
     expect(postSource).not.toContain(".stage({");
     expect(postSource).not.toContain("commitConfirmedEvidencePackage");

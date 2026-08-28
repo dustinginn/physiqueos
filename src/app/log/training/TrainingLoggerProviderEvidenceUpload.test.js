@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({
   assertApplicationUploadEntryAllowed: vi.fn(),
@@ -14,10 +15,21 @@ const mocks = vi.hoisted(() => ({
     uploadedAt: value.capturedAt,
   })),
   listCanonicalEvidenceObjects: vi.fn(),
+  getEvidencePackageById: vi.fn(),
+  reinterpretEvidenceIntakeSubmissionFromStoredArtifacts: vi.fn(),
   processEvidenceIntakeSubmission: vi.fn(),
   saveEvidencePackage: vi.fn(),
   stage: vi.fn(),
   storeApplicationUpload: vi.fn(),
+  authorizeRead: vi.fn(),
+  redeemRead: vi.fn(),
+}));
+
+vi.mock("../../../application/composition/productionApplicationComposition.js", () => ({
+  getProductionApplicationComposition: vi.fn(async () => ({
+    media: { authorizeRead: mocks.authorizeRead },
+    mediaGateway: { redeemRead: mocks.redeemRead },
+  })),
 }));
 
 vi.mock("../../../application/media/ApplicationUploadService", () => ({
@@ -29,7 +41,7 @@ vi.mock("../../../data/repositories/founderRepositories", () => ({
     users: { getCurrentUser: vi.fn(async () => ({ id: "founder" })) },
     canonicalEvidence: { listCanonicalEvidenceObjects: mocks.listCanonicalEvidenceObjects },
     evidencePackages: {
-      getEvidencePackageById: vi.fn(async () => null),
+      getEvidencePackageById: mocks.getEvidencePackageById,
       saveEvidencePackage: mocks.saveEvidencePackage,
     },
     evidenceReviews: { listReviews: vi.fn(async () => []) },
@@ -38,6 +50,8 @@ vi.mock("../../../data/repositories/founderRepositories", () => ({
 vi.mock("../../../domain/services/EvidenceIntakeService", () => ({
   createStoredEvidenceArtifactDescriptor: mocks.createStoredEvidenceArtifactDescriptor,
   processEvidenceIntakeSubmission: mocks.processEvidenceIntakeSubmission,
+  reinterpretEvidenceIntakeSubmissionFromStoredArtifacts:
+    mocks.reinterpretEvidenceIntakeSubmissionFromStoredArtifacts,
 }));
 vi.mock("../../../domain/services/EvidenceReviewService", () => ({
   createEvidenceReviewService: mocks.createEvidenceReviewService,
@@ -53,6 +67,7 @@ describe("Training Logger provider Apple Health evidence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listCanonicalEvidenceObjects.mockResolvedValue([]);
+    mocks.getEvidencePackageById.mockResolvedValue(null);
     mocks.createEvidenceReviewService.mockReturnValue({ stage: mocks.stage });
     mocks.storeApplicationUpload.mockImplementation(async ({ artifactId }) => ({
       reference: `media://${artifactId}`,
@@ -64,6 +79,7 @@ describe("Training Logger provider Apple Health evidence", () => {
       selectedStrengthSourceId: null,
       strengthCandidateIds: [],
     });
+    process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME = "1";
     mocks.processEvidenceIntakeSubmission.mockImplementation(async (options) => {
       const storedArtifacts = [];
       for (let index = 0; index < options.files.length; index += 1) {
@@ -85,6 +101,83 @@ describe("Training Logger provider Apple Health evidence", () => {
         storedArtifacts,
       };
     });
+  });
+
+  it("reinterprets the existing three-image provider package without another upload", async () => {
+    const bytes = Uint8Array.from([1, 2, 3]);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const sourceArtifacts = [1, 2, 3].map((index) => ({
+      id: `artifact-${index}`,
+      file_name: `apple-${index}.png`,
+      mime_type: "image/png",
+      observed_date: "2026-08-20",
+      storage_path: `media://01a049eb-ea13-75e8-948d-6b82752ae10${index}`,
+      uploaded_at: "2026-08-28T19:49:51.048Z",
+    }));
+    const persisted = {
+      package_id: "evidence_submission_20260828194951048_images",
+      userId: "founder",
+      provenance: { source_artifacts: sourceArtifacts },
+    };
+    mocks.getEvidencePackageById.mockResolvedValue(persisted);
+    mocks.authorizeRead.mockResolvedValue({
+      accessHandle: "/api/v1/media/read?grant=opaque",
+      contentType: "image/png",
+      size: bytes.length,
+      sha256,
+    });
+    mocks.redeemRead.mockResolvedValue({ url: "https://private-storage.invalid/object" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(bytes, {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    );
+    mocks.reinterpretEvidenceIntakeSubmissionFromStoredArtifacts.mockImplementation(
+      async (options) => {
+        for (const artifact of sourceArtifacts) {
+          const loaded = await options.loadArtifact({ artifact });
+          expect(loaded).toMatchObject({ contentType: "image/png" });
+          expect([...loaded.buffer]).toEqual([...bytes]);
+        }
+        return {
+          evidencePackage: {
+            ...persisted,
+            evidence_objects: [{ id: "strength", evidence_type: "training" }],
+          },
+        };
+      }
+    );
+    mocks.createProductionAppleHealthReconciliation.mockReturnValue({
+      batchId: persisted.package_id,
+      finalized: false,
+      matchState: "strong_match",
+      normalizedEvidence: [{ sourceWorkoutId: "strength" }],
+      selectedStrengthSourceId: "strength",
+      strengthCandidateIds: ["strength"],
+    });
+    const form = new FormData();
+    form.set("draftJson", JSON.stringify(draft({ mode: "retrospective", workoutDate: "2026-08-20" })));
+    form.set("evidencePackageId", persisted.package_id);
+    form.set("reprocessExisting", "1");
+
+    try {
+      const response = await POST(new Request("http://localhost/log/training/reconcile", {
+        method: "POST",
+        body: form,
+      }));
+      expect(response.status).toBe(200);
+      expect(mocks.reinterpretEvidenceIntakeSubmissionFromStoredArtifacts).toHaveBeenCalledWith(
+        expect.objectContaining({ evidencePackage: persisted, userId: "founder" })
+      );
+      expect(mocks.authorizeRead).toHaveBeenCalledTimes(3);
+      expect(mocks.redeemRead).toHaveBeenCalledTimes(3);
+      expect(mocks.storeApplicationUpload).not.toHaveBeenCalled();
+      expect(mocks.saveEvidencePackage).toHaveBeenCalledTimes(1);
+      expect(mocks.stage).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("stores all three screenshots through private provider uploads without canonical confirmation", async () => {

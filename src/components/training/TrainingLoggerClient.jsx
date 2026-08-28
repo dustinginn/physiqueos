@@ -232,6 +232,41 @@ export default function TrainingLoggerClient({
     }
   }
 
+  async function retryAppleEvidenceInterpretation() {
+    if (submitting) return;
+    const packageId = evidencePackageId ?? draft.reconciliation?.batchId ?? null;
+    if (!packageId) {
+      setSubmissionError("The preserved Apple Health evidence package is unavailable.");
+      return;
+    }
+    setSubmitting(true);
+    setSubmissionError(null);
+    try {
+      const formData = new FormData();
+      formData.set("draftJson", JSON.stringify(serializeTrainingLoggerRecoveryDraft(draft)));
+      formData.set("evidencePackageId", packageId);
+      formData.set("reprocessExisting", "1");
+      const response = await fetch("/log/training/reconcile", {
+        method: "POST",
+        body: formData,
+        headers: { Accept: "application/json" },
+      });
+      const result = await response.json();
+      if (!response.ok || !result.reconciliation) {
+        throw new Error(result.error ?? "Apple Health evidence could not be reinterpreted.");
+      }
+      setEvidencePackageId(result.evidencePackageId ?? packageId);
+      setDraft((current) => attachProductionAppleHealthReconciliation(
+        current,
+        result.reconciliation
+      ));
+    } catch (error) {
+      setSubmissionError(error?.message ?? "Apple Health evidence could not be reinterpreted.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function stageEvidenceReview() {
     if (submitting) return;
     setSubmitting(true);
@@ -467,6 +502,7 @@ export default function TrainingLoggerClient({
             onSelectMatch={(matchId) => setDraft((current) =>
               selectAppleHealthMatch(current, matchId)
             )}
+            onRetryInterpretation={production ? retryAppleEvidenceInterpretation : null}
             onToggleAdditionalEvidence={(sourceWorkoutId) => setDraft((current) =>
               toggleAppleHealthAdditionalEvidence(current, sourceWorkoutId)
             )}
@@ -1407,6 +1443,7 @@ function ReconciliationScreen({
   onContinue,
   onContinueWithoutMatch,
   onSelectMatch,
+  onRetryInterpretation = null,
   onToggleAdditionalEvidence,
   submitting = false,
 }) {
@@ -1472,8 +1509,18 @@ function ReconciliationScreen({
           <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text-secondary)]">
             Your detailed workout can still continue to Evidence Review.
           </p>
+          {onRetryInterpretation && (
+            <button
+              className="mt-4 min-h-12 w-full rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-50"
+              disabled={submitting}
+              onClick={onRetryInterpretation}
+              type="button"
+            >
+              {submitting ? "Reinterpreting screenshots…" : "Retry Apple Health interpretation"}
+            </button>
+          )}
           <button
-            className={`mt-4 min-h-12 w-full rounded-xl border text-sm font-extrabold ${reconciliation.continueWithoutStrength
+            className={`${onRetryInterpretation ? "mt-2" : "mt-4"} min-h-12 w-full rounded-xl border text-sm font-extrabold ${reconciliation.continueWithoutStrength
               ? "border-emerald-500 bg-[var(--surface-success)] text-emerald-700"
               : "border-[var(--divider)] bg-[var(--surface-elevated)]"}`}
             onClick={onContinueWithoutMatch}

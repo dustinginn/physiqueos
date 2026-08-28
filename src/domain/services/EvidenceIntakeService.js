@@ -101,6 +101,84 @@ export async function processEvidenceIntakeSubmission({
   }
 }
 
+export async function reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
+  evidencePackage,
+  expectedEvidenceType = "training",
+  loadArtifact,
+  userId = "founder",
+} = {}) {
+  if (!evidencePackage?.package_id || typeof loadArtifact !== "function") {
+    throw new Error("A persisted EvidencePackage and artifact loader are required.");
+  }
+  if (evidencePackage.userId && evidencePackage.userId !== userId) {
+    throw new Error("Apple Health evidence is unavailable.");
+  }
+
+  const sourceArtifacts = (evidencePackage.provenance?.source_artifacts ?? [])
+    .filter((artifact) => artifact?.storage_path && artifact?.id);
+  if (sourceArtifacts.length === 0) {
+    throw new Error("The EvidencePackage has no reusable screenshot artifacts.");
+  }
+
+  const packageSubmissionId = String(
+    evidencePackage.provenance?.submission_id ?? evidencePackage.package_id
+  );
+  const submissionId = packageSubmissionId.endsWith("_images")
+    ? packageSubmissionId.slice(0, -"_images".length)
+    : packageSubmissionId;
+  const capturedAt = evidencePackage.captured_at ?? new Date().toISOString();
+  const evidenceDate = normalizeDateKey(
+    evidencePackage.observed_date ??
+    evidencePackage.provenance?.evidence_date ??
+    sourceArtifacts[0]?.observed_date
+  );
+  if (!evidenceDate) {
+    throw new Error("The EvidencePackage has no reusable observation date.");
+  }
+
+  const storedArtifacts = [];
+  for (const artifact of sourceArtifacts) {
+    const loaded = await loadArtifact({ artifact, userId });
+    const buffer = Buffer.from(loaded?.buffer ?? []);
+    if (buffer.length === 0) {
+      throw new Error(`Stored artifact ${artifact.id} is unavailable.`);
+    }
+    const mimeType = loaded.contentType ?? artifact.mime_type;
+    storedArtifacts.push(createStoredEvidenceArtifactDescriptor({
+      buffer,
+      capturedAt: artifact.uploaded_at ?? capturedAt,
+      file: {
+        name: artifact.file_name ?? `${artifact.id}.bin`,
+        type: mimeType,
+      },
+      id: artifact.id,
+      mimeType,
+      observedDate: artifact.observed_date ?? evidenceDate,
+      relativePath: artifact.storage_path,
+      safeName: artifact.file_name ?? `${artifact.id}.bin`,
+    }));
+  }
+
+  const reinterpreted = await createEvidencePackageFromStoredArtifacts({
+    capturedAt,
+    evidenceDate,
+    expectedEvidenceType,
+    storedArtifacts,
+    submissionId,
+    typedEvidence: null,
+    userId,
+  });
+  if (reinterpreted.package_id !== evidencePackage.package_id) {
+    throw new Error("Stored evidence reinterpretation changed package identity.");
+  }
+
+  return {
+    evidencePackage: reinterpreted,
+    provider: getPackageProvider(reinterpreted),
+    storedArtifacts,
+  };
+}
+
 async function storeEvidenceArtifacts({
   artifactStorageFailureMode,
   capturedAt,

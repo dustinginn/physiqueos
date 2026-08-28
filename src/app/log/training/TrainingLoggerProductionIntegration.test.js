@@ -10,7 +10,7 @@ const routeSource = fs.readFileSync(new URL("./reconcile/route.js", import.meta.
 const clientSource = fs.readFileSync(
   new URL("../../../components/training/TrainingLoggerClient.jsx", import.meta.url),
   "utf8"
-);
+).replaceAll("\r\n", "\n");
 const stateSource = fs.readFileSync(
   new URL("../../preview/training-logger/TrainingLoggerPreviewState.js", import.meta.url),
   "utf8"
