@@ -7,8 +7,13 @@ import { loadApplicationCanonicalRuntime } from "../../application/runtime/Appli
 import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
 import { describeWeightAndEnergyInterpretation } from "../presentation/evidenceInterpretationPresentation";
 import { buildMilestoneStory } from "../presentation/milestoneStoryPresentation";
+import { runRepositoryReadScope } from "../../application/read-models/RepositoryReadScope";
 
 export async function getPhaseAwareActiveGoalPreview({ repositories = FounderRepositories, currentDate = new Date() } = {}) {
+  return runRepositoryReadScope({ repositories, readModel: "goals.phase-aware-preview", callback: () => getPhaseAwareActiveGoalPreviewWithinScope({ repositories, currentDate }) });
+}
+
+async function getPhaseAwareActiveGoalPreviewWithinScope({ repositories, currentDate }) {
   const user = await repositories.users.getCurrentUser();
   if (!user) throw new Error("The current user is unavailable.");
   const [goal, dexaScans, protocols, canonicalEvidence, checkIns, nutritionContext, progressPhotos] = await Promise.all([

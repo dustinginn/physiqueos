@@ -31,17 +31,18 @@ export async function createPhase4PostgresApplicationComposition({
   compatibilityMode = true,
   requireCompatibilityAuthority = false,
   readDiagnostics = null,
+  providerReadScope = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
   const query = (text, values) => pool.query(text, values);
-  const canonicalRuntime = await loadCanonicalRuntime({ query, ownerUserId });
-  const runtime = addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId);
-  registerRuntimeTrainingExercises(runtime.canonicalExerciseLibrary ?? []);
-  const readScope = createPostgresFounderReadScope({
+  const readScope = providerReadScope ?? createPostgresFounderReadScope({
     loadRuntime: () => loadCanonicalRuntime({ query, ownerUserId }),
     readPoolState: () => ({ totalCount: pool.totalCount, idleCount: pool.idleCount, waitingCount: pool.waitingCount }),
     onComplete: readDiagnostics,
   });
+  const canonicalRuntime = await readScope.readRuntime();
+  const runtime = addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId);
+  registerRuntimeTrainingExercises(runtime.canonicalExerciseLibrary ?? []);
   const repositories = createPostgresFounderRepositoryFacade({
     pool,
     ownerUserId,
@@ -51,6 +52,7 @@ export async function createPhase4PostgresApplicationComposition({
     requireCompatibilityAuthority,
     now,
     readRepositories: () => readScope.readRepositories(),
+    runInReadScope: (callback, metadata) => readScope.run(callback, metadata),
   });
   const loaders = createLegacyFounderReadLoaders({ repositories, readRuntimeStore: () => readScope.currentRuntime() ?? runtime, now });
   const readModels = createPhase3ReadModelService({
@@ -78,6 +80,8 @@ export async function createPhase4PostgresApplicationComposition({
     commands,
     media,
     runtime,
+    readRuntimeStore: () => readScope.currentRuntime() ?? runtime,
+    runInReadScope: (callback, metadata) => readScope.run(callback, metadata),
     loadRuntime: () => loadCanonicalRuntime({ query, ownerUserId }),
     mutateRuntime: ({ commandId, operation, expectedRuntime, mutate }) =>
       executePostgresFounderRuntimeMutation({

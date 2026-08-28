@@ -20,6 +20,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function MorningCheckInPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const now = new Date();
   const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
@@ -64,6 +65,7 @@ export default async function MorningCheckInPage() {
       reconciliationItems={reconciliationSelection.items}
     />
   );
+  }, { readModel: "route.morning-check-in" });
 }
 
 function formatDate(value){const [year,month,day]=value.split("-").map(Number);return new Date(year,month-1,day).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});}

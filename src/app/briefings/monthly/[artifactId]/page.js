@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MonthlyBriefingArtifactPage({ params }) {
   const { artifactId } = await params;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [artifacts, workItems] = user?.id
     ? await Promise.all([
@@ -30,6 +31,7 @@ export default async function MonthlyBriefingArtifactPage({ params }) {
     presentation={presentation}
     reconciliation={reconciliation}
   />;
+  }, { readModel: "route.monthly-briefing" });
 }
 
 function isReadableMonthlyArtifact(artifact, userId) {

@@ -16,6 +16,10 @@ import { orderWeeklyAveragesNewestFirst } from "../domain/utils/weeklyAverageOrd
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
 export async function getVisibleAbsDossier() {
+  return FounderRepositories.runInReadScope(getVisibleAbsDossierWithinScope, { readModel: "goals.visible-abs-dossier" });
+}
+
+async function getVisibleAbsDossierWithinScope() {
   const user = await FounderRepositories.users.getCurrentUser();
   const userId = user?.id;
   const [

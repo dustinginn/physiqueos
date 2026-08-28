@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
+import { createProgressReportingService } from "../../domain/services/ProgressReportingService.js";
+import { getWeightTimelineReport } from "../../domain/services/WeightEvidenceContextService.js";
+import { getTrainingTimelineReport } from "../../domain/services/TrainingEvidenceContextService.js";
+import { getPhotosTimelineReport } from "../../domain/services/PhotosEvidenceContextService.js";
+import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContextService.js";
+import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import { createProductionRepositoryFacade } from "../../data/repositories/founderRepositories.js";
 import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { createPhase5SyntheticRuntime, PHASE5_SYNTHETIC_OWNER_ID } from "../migration/phase5SyntheticPackage.js";
 import { createPostgresFounderReadScope, createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
@@ -139,6 +146,94 @@ describe("PostgreSQL Founder repository facade", () => {
     revision = 2;
     await scope.run(() => scope.readRepositories());
     expect(loads).toBe(4);
+    expect(scope.currentRuntime()).toBeNull();
+  });
+
+  it("shares one runtime across the direct Progress facade even when every repository call resolves a fresh composition", async () => {
+    const runtime = structuredClone(createPhase5SyntheticRuntime());
+    const database = limitedCanonicalQuery(runtime, 5);
+    const diagnostics = [];
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: () => loadCanonicalRuntime({ query: database.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID }),
+      readPoolState: database.telemetry,
+      onComplete: (event) => diagnostics.push(event),
+    });
+    const direct = createProductionRepositoryFacade({
+      legacyRepositories: createSeedRepositories(structuredClone(runtime)),
+      runInReadScope: (callback, metadata) => scope.run(callback, metadata),
+      resolveComposition: async () => ({
+        repositories: createPostgresFounderRepositoryFacade({
+          pool: { query: database.query, connect: vi.fn() },
+          ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+          compatibilityMode: true,
+          readRepositories: () => scope.readRepositories(),
+        }),
+      }),
+    });
+
+    const report = await createProgressReportingService({ repositories: direct }).getProgressHub();
+
+    expect(report.streams).toHaveLength(9);
+    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(diagnostics).toEqual([expect.objectContaining({
+      readModel: "progress.getProgressHub",
+      runtimeLoadCount: 1,
+      poolAfter: expect.objectContaining({ waitingCount: 0 }),
+    })]);
+    expect(scope.currentRuntime()).toBeNull();
+  });
+
+  it("reuses an active direct-composite scope when a nested Phase 3 scope is entered", async () => {
+    let loads = 0;
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: async () => { loads += 1; return structuredClone(createPhase5SyntheticRuntime()); },
+    });
+
+    await scope.run(async () => {
+      await scope.readRepositories();
+      await scope.run(async () => {
+        await scope.readRepositories();
+      }, { readModel: "home.v1" });
+    }, { readModel: "direct-composite" });
+
+    expect(loads).toBe(1);
+    expect(scope.currentRuntime()).toBeNull();
+  });
+
+  it.each([
+    ["weight", (repositories) => getWeightTimelineReport({ repositories, context: "all" })],
+    ["training", (repositories) => getTrainingTimelineReport({ repositories, context: "all" })],
+    ["photos", (repositories) => getPhotosTimelineReport({ repositories, context: "all" })],
+    ["dexa", (repositories) => getDEXATimelineReport({ repositories, context: "all" })],
+  ])("shares one runtime across the nested %s Progress composite", async (_stream, read) => {
+    const runtime = structuredClone(createPhase5SyntheticRuntime());
+    const database = limitedCanonicalQuery(runtime, 5);
+    const diagnostics = [];
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: () => loadCanonicalRuntime({ query: database.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID }),
+      readPoolState: database.telemetry,
+      onComplete: (event) => diagnostics.push(event),
+    });
+    const direct = createProductionRepositoryFacade({
+      legacyRepositories: createSeedRepositories(structuredClone(runtime)),
+      runInReadScope: (callback, metadata) => scope.run(callback, metadata),
+      resolveComposition: async () => ({
+        repositories: createPostgresFounderRepositoryFacade({
+          pool: { query: database.query, connect: vi.fn() },
+          ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+          compatibilityMode: true,
+          readRepositories: () => scope.readRepositories(),
+        }),
+      }),
+    });
+
+    await read(direct);
+
+    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(diagnostics).toEqual([expect.objectContaining({
+      runtimeLoadCount: 1,
+      poolAfter: expect.objectContaining({ waitingCount: 0 }),
+    })]);
     expect(scope.currentRuntime()).toBeNull();
   });
 });

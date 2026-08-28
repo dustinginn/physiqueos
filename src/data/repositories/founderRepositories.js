@@ -46,13 +46,19 @@ export const FounderRepositories = createProductionRepositoryFacade({
     );
     return getProductionApplicationComposition();
   },
+  async runInReadScope(callback, metadata) {
+    const { runProductionApplicationReadScope } = await import(
+      "../../application/composition/productionApplicationComposition.js"
+    );
+    return runProductionApplicationReadScope(callback, metadata);
+  },
 });
 
-export function createProductionRepositoryFacade({ legacyRepositories, resolveComposition }) {
+export function createProductionRepositoryFacade({ legacyRepositories, resolveComposition, runInReadScope = null }) {
   if (typeof resolveComposition !== "function") {
     throw new Error("Production repository facade requires a composition resolver.");
   }
-  return Object.freeze(Object.fromEntries(
+  const facade = Object.fromEntries(
     Object.entries(legacyRepositories).map(([repositoryName, repository]) => [
       repositoryName,
       Object.freeze(Object.fromEntries(
@@ -84,7 +90,16 @@ export function createProductionRepositoryFacade({ legacyRepositories, resolveCo
         ]),
       )),
     ]),
-  ));
+  );
+  if (typeof runInReadScope === "function") {
+    Object.defineProperty(facade, "runInReadScope", {
+      configurable: false,
+      enumerable: false,
+      value: runInReadScope,
+      writable: false,
+    });
+  }
+  return Object.freeze(facade);
 }
 
 function wrapRepositoriesWithRuntimeRefresh(repositories) {

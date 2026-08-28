@@ -43,6 +43,19 @@ describe("Progress query safety", () => {
     expect(repositories.dailyBriefings.createDailyBriefing).not.toHaveBeenCalled();
   });
 
+  it("opens one direct-composite request scope around the actual Progress fan-out", async () => {
+    const repositories = createRepositories();
+    repositories.runInReadScope = vi.fn(async (callback) => callback());
+    const service = createProgressReportingService({ repositories });
+
+    await service.getProgressHub();
+
+    expect(repositories.runInReadScope).toHaveBeenCalledTimes(1);
+    expect(repositories.users.getCurrentUser).toHaveBeenCalledTimes(1);
+    expect(repositories.goals.listGoals).toHaveBeenCalledTimes(1);
+    expect(repositories.canonicalEvidence.listCanonicalEvidenceObjects).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["weight", "getWeightReport"],
     ["dexa", "getDEXAReport"],

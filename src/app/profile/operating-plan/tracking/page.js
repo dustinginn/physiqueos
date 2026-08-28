@@ -6,6 +6,7 @@ import TrackingScreen from "../../../../screens/TrackingScreen";
 export const dynamic = "force-dynamic";
 
 export default async function TrackingPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) notFound();
   const [executionItems, protocols, reminders] = await Promise.all([
@@ -15,4 +16,5 @@ export default async function TrackingPage() {
   ]);
   const morningWeighIn = resolveMorningWeighInSupport({ executionItems, protocols, reminders, userId: user.id });
   return <TrackingScreen morningWeighIn={morningWeighIn} />;
+  }, { readModel: "route.tracking" });
 }

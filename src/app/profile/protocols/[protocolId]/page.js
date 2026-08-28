@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ProtocolDetailPage({ params, searchParams }) {
   const { protocolId } = await params;
   const query = await searchParams;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [protocol, goals, version, activeProtocols, executionItems] = await Promise.all([
     FounderRepositories.protocols.getProtocolById(protocolId),
@@ -52,4 +53,5 @@ export default async function ProtocolDetailPage({ params, searchParams }) {
     protocol={protocol}
     version={authoritativeVersion}
   />;
+  }, { readModel: "route.protocol-detail" });
 }

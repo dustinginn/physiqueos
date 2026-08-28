@@ -56,7 +56,7 @@ export default async function GoalsHubScreen({ from } = {}) {
 export async function getGoalsHub() {
   const composition = await getProductionApplicationComposition();
   const { principal } = await createInactiveLegacyWebContext({ repositories: composition.repositories });
-  const hub = await createGoalsHubReadService({ repositories: composition.repositories, readRuntimeStore: () => composition.runtime }).getGoalsHub({ principal });
+  const hub = await createGoalsHubReadService({ repositories: composition.repositories, readRuntimeStore: composition.readRuntimeStore ?? (() => composition.runtime) }).getGoalsHub({ principal });
   for (const goal of hub.activeGoals.filter((item) => !item.navigation.available)) {
     console.warn("[GoalNavigation] Goal detail route unavailable.", { goalId: goal.id ?? null, goalType: goal.goalType ?? null, lifecycle: goal.lifecycleState ?? goal.status ?? null, resolverCode: goal.navigation.code });
   }

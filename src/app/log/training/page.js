@@ -5,6 +5,7 @@ import { listCanonicalTrainingExerciseIdentities } from "../../../domain/models/
 export const dynamic = "force-dynamic";
 
 export default async function TrainingLoggerPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [canonicalObjects, activeGoal] = await Promise.all([
     FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id),
@@ -39,6 +40,7 @@ export default async function TrainingLoggerPage() {
       production
     />
   );
+  }, { readModel: "training-logger.page" });
 }
 
 function projectTrainingHistorySession(record) {

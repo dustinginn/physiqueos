@@ -1,5 +1,7 @@
+import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+
 export function createYouProfileService({ repositories }) {
-  return {
+  return scopeRepositoryReadService({ repositories, namespace: "profile", service: {
     async getYouProfile(userId) {
       const user = userId
         ? await repositories.users.getUserById(userId)
@@ -75,7 +77,7 @@ export function createYouProfileService({ repositories }) {
         reminders: activeReminders,
       };
     },
-  };
+  } });
 }
 
 export function formatActiveGoalCount(count) {

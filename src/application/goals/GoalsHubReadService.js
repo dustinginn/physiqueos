@@ -7,11 +7,12 @@ import { composeCompletedGoalPreview } from "../../domain/services/CompletedGoal
 import { resolveActiveGoalConfidencePresentation } from "../../domain/services/ActiveGoalConfidencePresentationReadService.js";
 import { resolveCommittedPhaseContext } from "../../domain/services/FounderPhaseCorrectionService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
+import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
 
 const COMPLETED_GOAL_ID = "goal_visible_abs_at_rest";
 
 export function createGoalsHubReadService({ repositories, readRuntimeStore } = {}) {
-  return Object.freeze({
+  return scopeRepositoryReadService({ repositories, namespace: "goals", service: Object.freeze({
     async getGoalsHub({ principal } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const [goals, activeGoal, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext, analyses, canonicalEvidence, briefings] = await Promise.all([
@@ -56,7 +57,7 @@ export function createGoalsHubReadService({ repositories, readRuntimeStore } = {
         transitionEntry: safelyGetProductionGoalTransitionEntryPointState(structuredClone(runtimeStore)),
       });
     },
-  });
+  }) });
 }
 
 export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfidence) {

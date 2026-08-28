@@ -52,6 +52,10 @@ const configs = {
 };
 
 export async function getSupportingGoalDossier(goalKey) {
+  return FounderRepositories.runInReadScope(() => getSupportingGoalDossierWithinScope(goalKey), { readModel: "goals.supporting-dossier" });
+}
+
+async function getSupportingGoalDossierWithinScope(goalKey) {
   const resolvedGoalKey = configs[goalKey] ? goalKey : "maintenance";
   const config = configs[resolvedGoalKey];
   const data = await getSupportingGoalData(config, resolvedGoalKey);

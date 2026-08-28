@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function GoalEditPage({ params }) {
   const { goalId } = await params;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const goal = await FounderRepositories.goals.getGoalById(goalId);
   if (!goal || goal.userId !== user?.id || goal.status !== "active" || goal.primary !== true) notFound();
@@ -18,4 +19,5 @@ export default async function GoalEditPage({ params }) {
   const capability = await ProductionGoalPhasePersistenceService.getCapability({ founderUserId: user.id, sourceGoalId: goal.id });
   const initialDraft = extendGoalEditDraftWithPhases(buildGoalEditDraft(goal), { goal, capability });
   return <GoalEditWizardScreen goalHref={goalHref} initialDraft={initialDraft} prepareReview={prepareGoalEditReview} preparePhaseReview={prepareGoalPhaseReview} saveChanges={saveGoalEditChanges} savePhaseChanges={saveGoalPhaseChanges} />;
+  }, { readModel: "route.goal-edit" });
 }

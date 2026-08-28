@@ -5,6 +5,8 @@ import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeSt
 import { createDurableMigrationControlStore, resolveMigrationControlPath } from "../../platform/cutover/DurableMigrationControlStore.js";
 import { createProductionApplicationCompositionRuntime } from "../../platform/cutover/ProductionApplicationCompositionRuntime.js";
 import { createPhase5ProviderApplicationComposition } from "../../platform/database/phase5ProviderComposition.js";
+import { createPostgresFounderReadScope } from "../../platform/database/PostgresFounderRepositoryFacade.js";
+import { loadCanonicalRuntime } from "../../platform/migration/phase4CanonicalImport.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
 import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
@@ -39,6 +41,12 @@ export async function getProductionApplicationComposition(env = process.env) {
     return createPostgresComposition({ controlStore: null, env, providerFullRuntime: true });
   }
   return getProductionApplicationCompositionRuntime(env).resolve();
+}
+
+export async function runProductionApplicationReadScope(callback, metadata = {}, env = process.env) {
+  if (typeof callback !== "function") throw new Error("Production application read scope requires a callback.");
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") return callback();
+  return getOrCreateProviderRuntime(env).readScope.run(callback, metadata);
 }
 
 export function getProductionProviderReadinessComposition(env = process.env) {
@@ -148,6 +156,7 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     readDiagnostics: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.canonical_read_scope.complete", event)
       : null,
+    providerReadScope: runtime.readScope,
   });
   return Object.freeze({
     ...composition,
@@ -173,9 +182,17 @@ function getOrCreateProviderRuntime(env) {
   const ownerUserId = required(env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID");
   const pool = createPostgresPool(databaseConfig);
   const objectProvider = createSpacesPrivateObjectProvider(spacesConfig);
+  const readScope = createPostgresFounderReadScope({
+    loadRuntime: () => loadCanonicalRuntime({ query: (text, values) => pool.query(text, values), ownerUserId }),
+    readPoolState: () => ({ totalCount: pool.totalCount, idleCount: pool.idleCount, waitingCount: pool.waitingCount }),
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.canonical_read_scope.complete", event)
+      : null,
+  });
   providerRuntime = Object.freeze({
     pool,
     objectProvider,
+    readScope,
     ownerUserId,
     databaseName: databaseConfig.databaseName,
   });

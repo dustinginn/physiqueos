@@ -42,11 +42,12 @@ import {
   selectNutritionDayPayloads,
 } from "./CanonicalNutritionDayService";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
+import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export function createProgressReportingService({ repositories }) {
-  return {
+  return scopeRepositoryReadService({ repositories, namespace: "progress", service: {
     async getProgressHub(userId) {
       const context = await getProgressContext({ repositories, userId });
       const report = buildProgressHub(context);
@@ -153,7 +154,7 @@ export function createProgressReportingService({ repositories }) {
         evidenceWindow: options.dateWindow ?? null,
       };
     },
-  };
+  } });
 }
 
 export function scopeWeightReportContext(context, dateWindow) {

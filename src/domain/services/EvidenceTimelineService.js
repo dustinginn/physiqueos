@@ -1,8 +1,9 @@
 import { getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabulary";
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
+import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 
 export function createEvidenceTimelineService({ repositories }) {
-  return {
+  return scopeRepositoryReadService({ repositories, namespace: "timeline", service: {
     async getTimeline(userId) {
       const user = userId
         ? await repositories.users.getUserById(userId)
@@ -113,7 +114,7 @@ export function createEvidenceTimelineService({ repositories }) {
         .filter((item) => item.date)
         .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     },
-  };
+  } });
 }
 
 export function formatTimelineDetail(value) {

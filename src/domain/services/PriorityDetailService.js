@@ -23,11 +23,12 @@ import {
   MORNING_WEIGH_IN_REMINDER_ID,
   resolveMorningWeighInSupport,
 } from "./TrackingSupportService";
+import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
 export function createPriorityDetailService({ repositories, now = () => new Date() }) {
-  return {
+  return scopeRepositoryReadService({ repositories, namespace: "priority-detail", service: {
     async getPriorityDetail(priorityId, userId) {
       const user = userId
         ? await repositories.users.getUserById(userId)
@@ -159,7 +160,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
 
       return createFallbackPriorityDetail(priorityId, goals);
     },
-  };
+  }});
 }
 
 function createExecutionPriorityDetail({

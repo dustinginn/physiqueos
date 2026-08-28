@@ -5,9 +5,10 @@ import { getOperatingPlanStrategyHref } from "../../domain/services/OperatingPla
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { describeEnergyStrategyIdentity } from "../../domain/presentation/strategyIdentityPresentation.js";
+import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
 
 export function createOperatingPlanReadService({ repositories } = {}) {
-  return Object.freeze({
+  return scopeRepositoryReadService({ repositories, namespace: "operating-plan", service: Object.freeze({
     async getOperatingPlan({ principal } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const activity = createActivityProtocolBuilderService({ repositories });
@@ -31,7 +32,7 @@ export function createOperatingPlanReadService({ repositories } = {}) {
         }),
       });
     },
-  });
+  }) });
 }
 
 export function buildOperatingPlan({ energyStrategy, executionItems = [], nutritionContext, protocols = [], reminders = [], trainingProtocol }) {

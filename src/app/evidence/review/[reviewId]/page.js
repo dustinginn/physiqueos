@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function EvidenceReviewPage({ params, searchParams }) {
   const { reviewId } = await params;
   const query = await searchParams;
+  return FounderRepositories.runInReadScope(async () => {
   const review = process.env.NODE_ENV !== "production" && reviewId === "fixture-mobile-review"
     ? createMobileEvidenceReviewFixture({
         newExercise: query?.state === "new-exercise",
@@ -49,4 +50,5 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   const presentedReview = { ...review, interpretedEvidence };
   const dexaEditOutcome = ["updated", "stale"].includes(query?.dexa) ? query.dexa : null;
   return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
+  }, { readModel: "route.evidence-review" });
 }

@@ -1,3 +1,5 @@
+import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+
 export const COACHING_UPDATES_SCHEMA_VERSION = "coaching_updates_schedule_v1";
 export const COACHING_NOTIFICATION_PREFERENCES = Object.freeze([
   "notify_when_ready",
@@ -11,7 +13,7 @@ const LEGACY_TIME = "00:00";
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 export function createCoachingUpdatesReadService({ repositories }) {
-  return {
+  return scopeRepositoryReadService({ repositories, namespace: "coaching-updates", service: {
     async getCurrent({ protocolId = null, userId } = {}) {
       const [protocols, goal, user] = await Promise.all([
         repositories.protocols?.listActiveProtocols?.(userId) ??
@@ -30,7 +32,7 @@ export function createCoachingUpdatesReadService({ repositories }) {
         protocol, version, goal, timeZone: user?.timeZone ?? DEFAULT_TIME_ZONE,
       });
     },
-  };
+  }});
 }
 
 export function resolveCoachingUpdatesReadModel({

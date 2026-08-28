@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function BriefingReviewPage({ params, searchParams }) {
   const { artifactId } = await params;
   const query = await searchParams;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const artifacts = await FounderRepositories.dailyBriefings.listDailyBriefings(user?.id);
   const artifact = resolveBriefingReviewArtifact(artifacts, { artifactId, version: query.version ?? null });
@@ -59,4 +60,5 @@ export default async function BriefingReviewPage({ params, searchParams }) {
     return <MonthlyBriefingScreen presentation={artifact.briefing.monthlyPresentation}/>;
   }
   return <BriefingReviewScreen artifact={artifact} preview={preview}/>;
+  }, { readModel: "route.briefing-review" });
 }

@@ -22,6 +22,7 @@ export function createPostgresFounderRepositoryFacade({
   now = () => new Date(),
   createCommandId = () => randomUUID(),
   readRepositories = null,
+  runInReadScope = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("PostgreSQL Founder repositories require a pool.");
   if (!String(ownerUserId ?? "").trim()) throw new Error("PostgreSQL Founder repositories require an owner.");
@@ -37,7 +38,7 @@ export function createPostgresFounderRepositoryFacade({
     await loadCanonicalRuntime({ query: (text, values) => pool.query(text, values), ownerUserId }),
   ));
   if (typeof loadReadRepositories !== "function") throw new Error("PostgreSQL Founder repository reads require a snapshot loader.");
-  return Object.freeze(Object.fromEntries(Object.entries(template).map(([repositoryName, repository]) => [
+  const facade = Object.fromEntries(Object.entries(template).map(([repositoryName, repository]) => [
     repositoryName,
     Object.freeze(Object.fromEntries(Object.entries(repository).map(([methodName, value]) => [
       methodName,
@@ -45,7 +46,16 @@ export function createPostgresFounderRepositoryFacade({
         ? async (...args) => invoke({ repositoryName, methodName, args })
         : value,
     ]))),
-  ])));
+  ]));
+  if (typeof runInReadScope === "function") {
+    Object.defineProperty(facade, "runInReadScope", {
+      configurable: false,
+      enumerable: false,
+      value: runInReadScope,
+      writable: false,
+    });
+  }
+  return Object.freeze(facade);
 
   async function invoke({ repositoryName, methodName, args }) {
     const disposition = classifyFounderRepositoryMethod(repositoryName, methodName);
@@ -95,6 +105,10 @@ export function createPostgresFounderReadScope({ loadRuntime, readPoolState = ()
         scope.repositoriesPromise = loadScopedRuntime(scope, loadRuntime).then(createReadRepositories);
       }
       return scope.repositoriesPromise;
+    },
+    async readRuntime() {
+      const scope = storage.getStore();
+      return scope ? loadScopedRuntime(scope, loadRuntime) : loadRuntime();
     },
     currentRuntime() {
       return storage.getStore()?.runtime ?? null;

@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function StrategyEditPage({ params }) {
   const { strategyId, strategyType } = await params;
   if (!["briefings", "nutrition", "training"].includes(strategyType)) notFound();
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const protocol = await FounderRepositories.protocols.getProtocolById(strategyId);
   if (!protocol || protocol.userId !== user.id || protocol.status !== "active" ||
@@ -72,4 +73,5 @@ export default async function StrategyEditPage({ params }) {
     coachingContext,
   });
   return <StrategyEditorScreen action={action} model={model}/>;
+  }, { readModel: "route.strategy-edit" });
 }

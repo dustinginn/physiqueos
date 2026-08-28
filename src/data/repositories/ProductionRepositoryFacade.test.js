@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
 import { createProductionRepositoryFacade } from "./founderRepositories.js";
 
 describe("production repository facade", () => {
@@ -43,5 +44,44 @@ describe("production repository facade", () => {
 
     await expect(facade.weights.addWeightEntry({ id: "one" })).rejects.toThrow(/does not provide weights\.addWeightEntry/);
     expect(legacyWrite).not.toHaveBeenCalled();
+  });
+
+  it("exposes the source-owned request scope without adding it to repository enumeration", async () => {
+    const runInReadScope = vi.fn(async (callback, metadata) => callback(metadata));
+    const facade = createProductionRepositoryFacade({
+      legacyRepositories: { weights: { listWeightEntries: vi.fn() } },
+      resolveComposition: vi.fn(),
+      runInReadScope,
+    });
+
+    await expect(facade.runInReadScope((metadata) => metadata.readModel, { readModel: "progress.getProgressHub" }))
+      .resolves.toBe("progress.getProgressHub");
+    expect(Object.keys(facade)).toEqual(["weights"]);
+    expect(runInReadScope).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    "../../app/briefings/monthly/[artifactId]/page.js",
+    "../../app/briefings/photo/[sessionId]/page.js",
+    "../../app/briefings/review/[artifactId]/page.js",
+    "../../app/briefings/review/page.js",
+    "../../app/briefings/weekly/page.js",
+    "../../app/check-in/morning/page.js",
+    "../../app/evidence/review/[reviewId]/page.js",
+    "../../app/goals/[goalId]/edit/page.js",
+    "../../app/log/training/page.js",
+    "../../app/profile/operating-plan/execution/[executionId]/page.js",
+    "../../app/profile/operating-plan/execution/dexa/page.js",
+    "../../app/profile/operating-plan/execution/peptides/[protocolId]/page.js",
+    "../../app/profile/operating-plan/execution/supplements/[protocolId]/page.js",
+    "../../app/profile/operating-plan/strategy/[strategyType]/[strategyId]/edit/page.js",
+    "../../app/profile/operating-plan/supplements/[protocolId]/edit/page.js",
+    "../../app/profile/operating-plan/supplements/new/page.js",
+    "../../app/profile/operating-plan/tracking/morning-weigh-in/page.js",
+    "../../app/profile/operating-plan/tracking/page.js",
+    "../../app/profile/protocols/[protocolId]/page.js",
+  ])("enters the common read scope for audited direct composite page %s", (relativePath) => {
+    const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
+    expect(source).toContain("FounderRepositories.runInReadScope");
   });
 });

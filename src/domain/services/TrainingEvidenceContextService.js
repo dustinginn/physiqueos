@@ -2,13 +2,15 @@ import { FounderRepositories } from "../../data/repositories/founderRepositories
 import { normalizeTrainingContextId } from "../../navigation/trainingTimelineNavigation";
 import { EVIDENCE_CONTEXT_WINDOWS } from "./EvidenceContextWindows";
 import { createProgressReportingService } from "./ProgressReportingService";
+import { runRepositoryReadScope } from "../../application/read-models/RepositoryReadScope";
 
 export async function getTrainingEvidenceContext({
   context,
   currentDate = new Date(),
   repositories = FounderRepositories,
 } = {}) {
-  const user = await repositories.users.getCurrentUser();
+  return runRepositoryReadScope({ repositories, readModel: "progress.training-context", callback: async () => {
+    const user = await repositories.users.getCurrentUser();
   const goals = await repositories.goals.listGoals(user?.id);
   const activeGoal = goals.find(
     (goal) => goal.status === "active" && goal.type === "build_lean_mass"
@@ -46,7 +48,7 @@ export async function getTrainingEvidenceContext({
     throw new Error(`The ${labels[selected]} lifecycle window is unavailable.`);
   }
 
-  return Object.freeze({
+    return Object.freeze({
     contextId: selected,
     selectedLabel: labels[selected],
     goalId: goal?.id ?? null,
@@ -72,25 +74,27 @@ export async function getTrainingEvidenceContext({
       selected: id === selected,
     })),
     source: selected === "all" ? "canonical_training_history" : "goal_lifecycle",
-  });
+    });
+  }});
 }
 
 export async function getTrainingTimelineReport({
   context,
   repositories = FounderRepositories,
 } = {}) {
-  const timeline = await getTrainingEvidenceContext({ context, repositories });
-  const reporting = createProgressReportingService({ repositories });
-  const [globalReport, scopedReport] = await Promise.all([
-    reporting.getPlaceholderReport("training"),
-    reporting.getPlaceholderReport("training", undefined, {
-      dateWindow: timeline.goalScoped
-        ? { startDate: timeline.startDate, endDate: timeline.endDate }
-        : null,
-    }),
-  ]);
+  return runRepositoryReadScope({ repositories, readModel: "progress.training-timeline", callback: async () => {
+    const timeline = await getTrainingEvidenceContext({ context, repositories });
+    const reporting = createProgressReportingService({ repositories });
+    const [globalReport, scopedReport] = await Promise.all([
+      reporting.getPlaceholderReport("training"),
+      reporting.getPlaceholderReport("training", undefined, {
+        dateWindow: timeline.goalScoped
+          ? { startDate: timeline.startDate, endDate: timeline.endDate }
+          : null,
+      }),
+    ]);
 
-  return {
+    return {
     timeline,
     report: timeline.goalScoped
       ? {
@@ -102,7 +106,8 @@ export async function getTrainingTimelineReport({
           trainingLibrary: globalReport.trainingLibrary,
         }
       : globalReport,
-  };
+    };
+  }});
 }
 
 export function mergeTrainingBreakdowns({

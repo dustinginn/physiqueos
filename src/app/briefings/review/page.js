@@ -5,6 +5,7 @@ import { createBriefingReconciliationPresentation } from "../../../domain/servic
 export const dynamic = "force-dynamic";
 
 export default async function BriefingHistoryPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [briefings, workItems] = await Promise.all([
     FounderRepositories.dailyBriefings.listDailyBriefings(user?.id),
@@ -37,6 +38,7 @@ export default async function BriefingHistoryPage() {
       </Link>;
     })}</div>
   </div></main>;
+  }, { readModel: "route.briefing-history" });
 }
 
 function artifactHref(item) {

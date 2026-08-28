@@ -8,6 +8,7 @@ import { saveMorningWeighInSupport } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function MorningWeighInSupportPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [executionItems, protocols, reminders] = await Promise.all([
     FounderRepositories.executionItems.listExecutionItems(user.id),
@@ -32,4 +33,5 @@ export default async function MorningWeighInSupportPage() {
       protocol={support.protocol}
     />
   );
+  }, { readModel: "route.morning-weigh-in-support" });
 }

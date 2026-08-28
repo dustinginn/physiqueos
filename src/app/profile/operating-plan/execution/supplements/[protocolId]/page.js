@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Page({ params, searchParams }) {
   const { protocolId } = await params;
   const query = await searchParams;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [protocol, version, executions, reminders] = await Promise.all([
     FounderRepositories.protocols.getProtocolById(protocolId),
@@ -24,4 +25,5 @@ export default async function Page({ params, searchParams }) {
     protocolId, expectedRevision: item?.executionRevision ?? null,
   })} hydration={hydration} key={`${item?.id ?? "unconfigured"}:${item?.executionRevision ?? 0}`} protocol={protocol}/>;
   return <SupplementExecutionDetailScreen item={item} protocol={protocol} reminder={reminder}/>;
+  }, { readModel: "route.supplement-execution" });
 }

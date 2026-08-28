@@ -1,9 +1,10 @@
 import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService.js";
 import { createLoggedTodayService } from "../../domain/services/LoggedTodayService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
+import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
 
 export function createLogReadService({ repositories, now = () => new Date() } = {}) {
-  return Object.freeze({
+  return scopeRepositoryReadService({ repositories, namespace: "log", service: Object.freeze({
     async getLog({ principal, timeZone } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const user = await repositories.users.getUserById(actor.userId);
@@ -20,7 +21,7 @@ export function createLogReadService({ repositories, now = () => new Date() } = 
         pendingEvidenceReviews: Object.freeze(projectPendingReviews(reviews)),
       });
     },
-  });
+  }) });
 }
 
 export function projectPendingReviews(reviews = []) {

@@ -2,6 +2,7 @@ import { FounderRepositories } from "../../data/repositories/founderRepositories
 import { getTrainingEvidenceContext } from "./TrainingEvidenceContextService";
 import { EVIDENCE_CONTEXT_WINDOWS } from "./EvidenceContextWindows";
 import { createProgressReportingService } from "./ProgressReportingService";
+import { runRepositoryReadScope } from "../../application/read-models/RepositoryReadScope";
 
 const PHOTO_CONTEXT_IDS = new Set(["build-lean-mass", "visible-abs", "all"]);
 
@@ -10,41 +11,47 @@ export async function getPhotosTimelineReport({
   currentDate = new Date(),
   repositories = FounderRepositories,
 } = {}) {
-  const timeline = await getTrainingEvidenceContext({
-    context: PHOTO_CONTEXT_IDS.has(context) ? context : "all",
-    currentDate,
+  return runRepositoryReadScope({
     repositories,
-  });
-  const photoSessionWindow = getPhotoSessionWindow(timeline);
-  const report = await createProgressReportingService({
-    repositories,
-  }).getPlaceholderReport("photos", undefined, { photoSessionWindow });
-  const user = await repositories.users.getCurrentUser();
-  const artifacts = user && repositories.dailyBriefings?.listDailyBriefings
-    ? await repositories.dailyBriefings.listDailyBriefings(user.id)
-    : [];
-  const publicationAwareReport = attachPhotoBriefingPublication({
-    report,
-    artifacts,
-  });
+    readModel: "progress.photos-timeline",
+    callback: async () => {
+      const timeline = await getTrainingEvidenceContext({
+        context: PHOTO_CONTEXT_IDS.has(context) ? context : "all",
+        currentDate,
+        repositories,
+      });
+      const photoSessionWindow = getPhotoSessionWindow(timeline);
+      const report = await createProgressReportingService({
+        repositories,
+      }).getPlaceholderReport("photos", undefined, { photoSessionWindow });
+      const user = await repositories.users.getCurrentUser();
+      const artifacts = user && repositories.dailyBriefings?.listDailyBriefings
+        ? await repositories.dailyBriefings.listDailyBriefings(user.id)
+        : [];
+      const publicationAwareReport = attachPhotoBriefingPublication({
+        report,
+        artifacts,
+      });
 
-  return {
-    timeline: Object.freeze({
-      ...timeline,
-      selectedLabel:
-        timeline.contextId === "all" ? "All Photos" : timeline.selectedLabel,
-      options: timeline.options.map((option) => ({
-        ...option,
-        label: option.id === "all" ? "All Photos" : option.label,
-      })),
-      photoSessionWindow,
-      source:
-        timeline.contextId === "all"
-          ? "canonical_photo_history"
-          : "goal_lifecycle_with_photo_baseline",
-    }),
-    report: publicationAwareReport,
-  };
+      return {
+        timeline: Object.freeze({
+          ...timeline,
+          selectedLabel:
+            timeline.contextId === "all" ? "All Photos" : timeline.selectedLabel,
+          options: timeline.options.map((option) => ({
+            ...option,
+            label: option.id === "all" ? "All Photos" : option.label,
+          })),
+          photoSessionWindow,
+          source:
+            timeline.contextId === "all"
+              ? "canonical_photo_history"
+              : "goal_lifecycle_with_photo_baseline",
+        }),
+        report: publicationAwareReport,
+      };
+    },
+  });
 }
 
 export function attachPhotoBriefingPublication({ report, artifacts = [] }) {

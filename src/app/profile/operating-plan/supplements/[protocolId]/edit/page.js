@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSupplementPage({ params }) {
   const { protocolId } = await params;
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   const [protocol, version, allGoals] = await Promise.all([
     FounderRepositories.protocols.getProtocolById(protocolId),
@@ -28,4 +29,5 @@ export default async function EditSupplementPage({ params }) {
       goalId: version.goalLinks?.[0]?.goalId ?? goals[0]?.id ?? "",
     }}
   />;
+  }, { readModel: "route.supplement-strategy-edit" });
 }
