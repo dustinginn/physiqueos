@@ -1,4 +1,8 @@
 import { createAuthenticationPrincipal } from "./principal.js";
+import {
+  getProductionApplicationComposition,
+  runProductionApplicationReadScope,
+} from "../composition/productionApplicationComposition.js";
 
 const LEGACY_WEB_SCOPE = "legacy.runtime.application-boundary";
 
@@ -19,6 +23,23 @@ export async function createInactiveLegacyWebContext({ repositories, requestId =
     requestId,
     user: structuredClone(user),
   });
+}
+
+export async function runInactiveLegacyWebReadScope({
+  callback,
+  readModel,
+  requestId = null,
+  resolveComposition = getProductionApplicationComposition,
+  runInReadScope = runProductionApplicationReadScope,
+} = {}) {
+  if (typeof callback !== "function") throw new Error("Inactive legacy web read scope requires a callback.");
+  if (typeof resolveComposition !== "function") throw new Error("Inactive legacy web read scope requires a composition resolver.");
+  if (typeof runInReadScope !== "function") throw new Error("Inactive legacy web read scope requires a scope runner.");
+  return runInReadScope(async () => {
+    const composition = await resolveComposition();
+    const context = await createInactiveLegacyWebContext({ repositories: composition.repositories, requestId });
+    return callback({ composition, context });
+  }, { readModel });
 }
 
 export function assertLegacyContextCannotCrossApi(principal) {

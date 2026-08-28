@@ -7,6 +7,7 @@ import { getPhotosTimelineReport } from "../../domain/services/PhotosEvidenceCon
 import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContextService.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createProductionRepositoryFacade } from "../../data/repositories/founderRepositories.js";
+import { runInactiveLegacyWebReadScope } from "../../application/auth/legacyWebContext.js";
 import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { createPhase5SyntheticRuntime, PHASE5_SYNTHETIC_OWNER_ID } from "../migration/phase5SyntheticPackage.js";
 import { createPostgresFounderReadScope, createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
@@ -120,6 +121,42 @@ describe("PostgreSQL Founder repository facade", () => {
     });
     await scope.run(() => Promise.all(Array.from({ length: 20 }, () => scope.readRepositories())));
     expect(repaired.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+  });
+
+  it("shares one 42-query provider runtime across composition, principal, and a nested page read", async () => {
+    const runtime = structuredClone(createPhase5SyntheticRuntime());
+    const database = limitedCanonicalQuery(runtime, 5);
+    const scope = createPostgresFounderReadScope({
+      loadRuntime: () => loadCanonicalRuntime({ query: database.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID }),
+      readPoolState: database.telemetry,
+    });
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: { query: database.query, connect: vi.fn() },
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      readRepositories: () => scope.readRepositories(),
+      runInReadScope: (callback, metadata) => scope.run(callback, metadata),
+    });
+    const runRequest = () => runInactiveLegacyWebReadScope({
+      readModel: "home.page",
+      runInReadScope: (callback, metadata) => scope.run(callback, metadata),
+      resolveComposition: async () => {
+        await scope.readRuntime();
+        return Object.freeze({ repositories });
+      },
+      callback: ({ context }) => repositories.runInReadScope(async () => ({
+        user: await repositories.users.getUserById(context.principal.userId),
+        goals: await repositories.goals.listGoals(context.principal.userId),
+      }), { readModel: "home.v1" }),
+    });
+
+    const first = await runRequest();
+    expect(first.user.id).toBe(PHASE5_SYNTHETIC_OWNER_ID);
+    expect(first.goals.length).toBeGreaterThan(0);
+    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+
+    await runRequest();
+    expect(database.telemetry()).toEqual({ queryCount: 84, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
   });
 
   it("isolates concurrent requests, releases rejected scopes, and never serves a stale cross-request snapshot", async () => {

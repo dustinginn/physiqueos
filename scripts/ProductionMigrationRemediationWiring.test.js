@@ -16,9 +16,12 @@ describe("production migration remediation wiring", () => {
   });
 
   it("wires the accepted live Phase 3 web surfaces through server-owned composition", () => {
-    for (const file of ["src/app/log/page.js", "src/app/profile/operating-plan/page.js", "src/screens/GoalsHubScreen.jsx"]) {
+    const boundary = read("src/application/auth/legacyWebContext.js");
+    expect(boundary).toContain("getProductionApplicationComposition");
+    expect(boundary).toContain("runProductionApplicationReadScope");
+    for (const file of ["src/screens/HomeScreen.jsx", "src/app/log/page.js", "src/app/profile/operating-plan/page.js", "src/screens/GoalsHubScreen.jsx"]) {
       const source = read(file);
-      expect(source).toContain("getProductionApplicationComposition");
+      expect(source).toContain("runInactiveLegacyWebReadScope");
       expect(source).not.toContain("import { FounderRepositories }");
     }
   });
