@@ -2,12 +2,14 @@ import { firstRow } from "./postgresRows.js";
 
 export function createPostgresOutboxStore({ query }) {
   return Object.freeze({
-    async claimNext({ workerId, leaseExpiresAt, now }) {
+    async claimNext({ workerId, leaseExpiresAt, now, allowedTopics = null }) {
+      const topicFilter = normalizeAllowedTopics(allowedTopics);
       return firstRow(await query(
         `WITH candidate AS (
            SELECT id FROM physiqueos.outbox_messages
             WHERE due_at <= $3
               AND (status = 'pending' OR (status = 'processing' AND claim_expires_at <= $3))
+              AND ($4::text[] IS NULL OR topic = ANY($4::text[]))
             ORDER BY due_at, created_at
             FOR UPDATE SKIP LOCKED LIMIT 1
          )
@@ -15,7 +17,7 @@ export function createPostgresOutboxStore({ query }) {
             SET status = 'processing', claimed_by = $1, claim_expires_at = $2,
                 attempt_count = attempt_count + 1, updated_at = $3
            FROM candidate WHERE message.id = candidate.id RETURNING message.*`,
-        [workerId, leaseExpiresAt, now],
+        [workerId, leaseExpiresAt, now, topicFilter],
       ));
     },
     async acknowledge({ id, workerId, at }) {
@@ -51,4 +53,14 @@ export function createPostgresOutboxStore({ query }) {
       return firstRow(await query("SELECT * FROM physiqueos.worker_heartbeats ORDER BY observed_at DESC LIMIT 1"));
     },
   });
+}
+
+function normalizeAllowedTopics(allowedTopics) {
+  if (allowedTopics == null) return null;
+  if (!Array.isArray(allowedTopics) || allowedTopics.length === 0) throw new Error("An allowed outbox topic filter must be a non-empty array.");
+  const normalized = allowedTopics.map((topic) => String(topic ?? ""));
+  if (normalized.some((topic) => !topic || topic.trim() !== topic) || new Set(normalized).size !== normalized.length) {
+    throw new Error("Allowed outbox topics must be unique non-empty exact identities.");
+  }
+  return normalized;
 }

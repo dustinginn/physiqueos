@@ -45,15 +45,41 @@ describe("durable outbox worker", () => {
       expect(store.state[0]).toMatchObject({ status: "dead", last_error_code: "OUTBOX_TOPIC_UNSUPPORTED" });
     }
   });
+
+  it("claims only an exact allowed topic while retaining paused-authority heartbeat semantics", async () => {
+    const canonical = message({ id: "canonical", topic: "canonical.read-model.invalidate" });
+    const nearMatch = message({ id: "near-match", topic: "operations.simplified-provider-migration-extra" });
+    const controlPlane = message({ id: "control-plane", topic: "operations.simplified-provider-migration" });
+    const store = durableStore([canonical, nearMatch, controlPlane]);
+    const handler = vi.fn();
+    const worker = createDurableOutboxWorker({
+      store,
+      handlers: { "operations.simplified-provider-migration": handler },
+      workerId: "worker",
+      buildId: "build",
+      clock: () => at(0),
+    });
+    await expect(worker.runOnce({
+      allowedTopics: ["operations.simplified-provider-migration"],
+      heartbeatStatus: "paused_authority",
+      heartbeatDetails: { controlPlaneOnly: true },
+    })).resolves.toMatchObject({ outcome: "succeeded", messageId: "control-plane" });
+    expect(handler).toHaveBeenCalledOnce();
+    expect(store.state.find((entry) => entry.id === "canonical")).toMatchObject({ status: "pending", attempt_count: 0 });
+    expect(store.state.find((entry) => entry.id === "near-match")).toMatchObject({ status: "pending", attempt_count: 0 });
+    expect(store.heartbeats).toEqual([expect.objectContaining({ status: "paused_authority", details: { controlPlaneOnly: true } })]);
+  });
 });
 
 function durableStore(seed) {
   const state = structuredClone(seed);
+  const heartbeats = [];
   return {
     state,
-    async heartbeat() {},
-    async claimNext({ workerId, now, leaseExpiresAt }) {
-      const item = state.find((entry) => entry.due_at <= now && (entry.status === "pending" || (entry.status === "processing" && entry.claim_expires_at <= now)));
+    heartbeats,
+    async heartbeat(value) { heartbeats.push(structuredClone(value)); },
+    async claimNext({ workerId, now, leaseExpiresAt, allowedTopics = null }) {
+      const item = state.find((entry) => (allowedTopics == null || allowedTopics.includes(entry.topic)) && entry.due_at <= now && (entry.status === "pending" || (entry.status === "processing" && entry.claim_expires_at <= now)));
       if (!item) return null;
       Object.assign(item, { status: "processing", claimed_by: workerId, claim_expires_at: leaseExpiresAt, attempt_count: item.attempt_count + 1 });
       return structuredClone(item);

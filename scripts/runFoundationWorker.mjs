@@ -131,6 +131,7 @@ const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
       heartbeat: adapters.outbox.heartbeat,
       workerId: worker.workerId,
       buildId: buildIdentity.buildId,
+      preAuthorityTopics: simplifiedMigration ? [simplifiedMigration.SIMPLIFIED_PROVIDER_OPERATION_TOPIC] : [],
       compatibilityMode,
       compatibilityEnvironment: authorityEnvironment,
       compatibilityDatabaseName,

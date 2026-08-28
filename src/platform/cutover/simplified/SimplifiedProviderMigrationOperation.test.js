@@ -150,6 +150,14 @@ describe("in-process simplified provider migration operation", () => {
     expect(cli).toContain("executeSimplifiedProviderMigration");
     expect(cli).not.toContain("process.exit");
   });
+
+  it("wires the exact simplified control-plane topic through the existing authority-gated worker", () => {
+    const worker = fs.readFileSync("scripts/runFoundationWorker.mjs", "utf8");
+    expect(worker).toContain("preAuthorityTopics: simplifiedMigration ? [simplifiedMigration.SIMPLIFIED_PROVIDER_OPERATION_TOPIC] : []");
+    expect(worker).not.toMatch(/preAuthorityTopics:[^\n]*(?:includes|startsWith)/);
+    expect(worker).toContain("createDurableOutboxWorker");
+    expect(worker).toContain("createAuthorityGatedWorker");
+  });
 });
 
 function payload(request) {

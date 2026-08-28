@@ -3,6 +3,64 @@ import { createAuthorityGatedWorker } from "./AuthorityGatedWorker.js";
 import { createCompatibilityRuntimeAuthorityState } from "../cutover/CombinedRuntimeAuthorityState.js";
 
 describe("authority-gated worker", () => {
+  it("runs only the exact allowlisted migration control-plane topic before provider authority", async () => {
+    const runOnce = vi.fn(async () => ({ outcome: "succeeded", messageId: "control-plane-message" }));
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: windowsState() }) },
+      preAuthorityTopics: ["operations.simplified-provider-migration"],
+    });
+    await expect(gated.runOnce()).resolves.toMatchObject({ outcome: "succeeded" });
+    expect(runOnce).toHaveBeenCalledOnce();
+    expect(runOnce).toHaveBeenCalledWith({
+      allowedTopics: ["operations.simplified-provider-migration"],
+      heartbeatStatus: "paused_authority",
+      heartbeatDetails: expect.objectContaining({
+        authority: "windows-legacy-authoritative",
+        firstProviderWriteBoundaryRecorded: false,
+        controlPlaneOnly: true,
+      }),
+    });
+  });
+
+  it("does not broaden the pre-authority allowlist to near-match, unknown, or canonical topics", async () => {
+    const messages = [
+      "canonical.read-model.invalidate",
+      "foundation.synthetic",
+      "operations.simplified-provider-migration-extra",
+      "operations.other",
+      "unknown",
+      "operations.simplified-provider-migration",
+    ];
+    const handled = [];
+    const worker = {
+      async runOnce({ allowedTopics }) {
+        const match = messages.find((topic) => allowedTopics.includes(topic));
+        if (match) handled.push(match);
+        return { outcome: match ? "succeeded" : "idle" };
+      },
+      markStopping: vi.fn(),
+      isStopping: () => false,
+    };
+    const gated = createAuthorityGatedWorker({
+      worker,
+      authorityStore: { read: async () => ({ state: windowsState() }) },
+      preAuthorityTopics: ["operations.simplified-provider-migration"],
+    });
+    await expect(gated.runOnce()).resolves.toMatchObject({ outcome: "succeeded" });
+    expect(handled).toEqual(["operations.simplified-provider-migration"]);
+  });
+
+  it("rejects ambiguous pre-authority topic configuration", () => {
+    const base = {
+      worker: { runOnce: vi.fn(), markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: vi.fn() },
+    };
+    expect(() => createAuthorityGatedWorker({ ...base, preAuthorityTopics: [""] })).toThrow(/unique non-empty exact identities/);
+    expect(() => createAuthorityGatedWorker({ ...base, preAuthorityTopics: ["same", "same"] })).toThrow(/unique non-empty exact identities/);
+    expect(() => createAuthorityGatedWorker({ ...base, preAuthorityTopics: "operations.simplified-provider-migration" })).toThrow(/must be an array/);
+  });
+
   it("does not poll while provider worker authority is paused", async () => {
     const runOnce = vi.fn();
     const heartbeat = vi.fn();
@@ -123,6 +181,19 @@ function providerState(overrides = {}) {
     firstProviderCanonicalWriteAt: "2026-08-21T00:00:00.000Z",
     firstProviderCommandId: "command:first-provider-write",
     version: 5,
+    ...overrides,
+  };
+}
+
+function windowsState(overrides = {}) {
+  return {
+    authority: "windows-legacy-authoritative",
+    workerAuthority: "windows",
+    publicRuntimeAuthority: "windows",
+    canonicalStoreEpoch: "legacy-json",
+    firstProviderCanonicalWriteAt: null,
+    firstProviderCommandId: null,
+    version: 13,
     ...overrides,
   };
 }

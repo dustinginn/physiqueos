@@ -8,11 +8,11 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
   if (!buildId) throw new Error("A worker build identity is required.");
   let stopping = false;
 
-  async function runOnce() {
+  async function runOnce({ allowedTopics = null, heartbeatStatus = "healthy", heartbeatDetails = null } = {}) {
     if (stopping) return Object.freeze({ outcome: "stopping" });
     const now = clock();
-    await store.heartbeat({ workerId, buildId, status: "healthy", observedAt: now, details: null });
-    const message = await store.claimNext({ workerId, now, leaseExpiresAt: new Date(now.getTime() + leaseMs) });
+    await store.heartbeat({ workerId, buildId, status: heartbeatStatus, observedAt: now, details: heartbeatDetails });
+    const message = await store.claimNext({ workerId, now, leaseExpiresAt: new Date(now.getTime() + leaseMs), allowedTopics });
     if (!message) return Object.freeze({ outcome: "idle" });
     const handler = handlers[message.topic];
     if (typeof handler !== "function") return failMessage(message, new WorkerMessageError("OUTBOX_TOPIC_UNSUPPORTED", "No handler is registered for this outbox topic."), true);

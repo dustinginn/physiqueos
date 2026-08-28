@@ -2,9 +2,10 @@ import { RuntimeAuthority, assertCompatibilityRuntimeAuthorityState } from "../c
 
 export function createAuthorityGatedWorker({
   worker, authorityStore, heartbeat, workerId, buildId, compatibilityMode = false,
-  compatibilityEnvironment = null, compatibilityDatabaseName = null, now = () => new Date(),
+  compatibilityEnvironment = null, compatibilityDatabaseName = null, preAuthorityTopics = [], now = () => new Date(),
 } = {}) {
   if (!worker?.runOnce || !authorityStore?.read) throw new Error("Authority-gated worker requires a worker and runtime-authority store.");
+  const allowedControlPlaneTopics = normalizePreAuthorityTopics(preAuthorityTopics);
   return Object.freeze({
     async runOnce() {
       const { state } = await authorityStore.read();
@@ -19,12 +20,21 @@ export function createAuthorityGatedWorker({
       if (state.authority !== RuntimeAuthority.PROVIDER || state.workerAuthority !== "provider" ||
           state.publicRuntimeAuthority !== "provider" || state.canonicalStoreEpoch !== "postgres-canonical" ||
           !firstProviderWriteBoundaryRecorded) {
-        await heartbeat?.({ workerId, buildId, status: "paused_authority", observedAt: now(), details: {
+        const details = Object.freeze({
           authority: state.authority,
           workerAuthority: state.workerAuthority,
           stateVersion: state.version,
           firstProviderWriteBoundaryRecorded,
-        } });
+          controlPlaneOnly: allowedControlPlaneTopics.length > 0,
+        });
+        if (allowedControlPlaneTopics.length > 0) {
+          return worker.runOnce({
+            allowedTopics: allowedControlPlaneTopics,
+            heartbeatStatus: "paused_authority",
+            heartbeatDetails: details,
+          });
+        }
+        await heartbeat?.({ workerId, buildId, status: "paused_authority", observedAt: now(), details });
         return Object.freeze({ outcome: "idle", authority: state.authority });
       }
       return worker.runOnce();
@@ -32,6 +42,15 @@ export function createAuthorityGatedWorker({
     markStopping: () => worker.markStopping(),
     isStopping: () => worker.isStopping(),
   });
+}
+
+function normalizePreAuthorityTopics(topics) {
+  if (!Array.isArray(topics)) throw new Error("Pre-authority topics must be an array.");
+  const normalized = topics.map((topic) => String(topic ?? ""));
+  if (normalized.some((topic) => !topic || topic.trim() !== topic) || new Set(normalized).size !== normalized.length) {
+    throw new Error("Pre-authority topics must be unique non-empty exact identities.");
+  }
+  return Object.freeze(normalized);
 }
 
 function hasRecordedFirstProviderWriteBoundary(state) {
