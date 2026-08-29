@@ -1,5 +1,9 @@
 import { createEvidenceReviewPresentation } from "../../domain/services/EvidenceReviewPresentationService.js";
 import { createLoggedTodayService } from "../../domain/services/LoggedTodayService.js";
+import {
+  getLocalDateKey,
+  resolveLocalTimeZone,
+} from "../../domain/utils/localDate.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
 
@@ -9,14 +13,18 @@ export function createLogReadService({ repositories, now = () => new Date() } = 
       const actor = requireAuthenticationPrincipal(principal);
       const user = await repositories.users.getUserById(actor.userId);
       if (!user) return null;
+      const resolvedTimeZone = resolveLocalTimeZone(
+        timeZone ?? user.timeZone ?? user.timezone
+      );
       const [reviews, loggedToday] = await Promise.all([
         repositories.evidenceReviews.listReviews(actor.userId),
         createLoggedTodayService({ repositories, now }).getSummary({
           userId: actor.userId,
-          timeZone: timeZone ?? user.timeZone ?? user.timezone,
+          timeZone: resolvedTimeZone,
         }),
       ]);
       return Object.freeze({
+        localDate: getLocalDateKey(now(), resolvedTimeZone),
         loggedToday,
         pendingEvidenceReviews: Object.freeze(projectPendingReviews(reviews)),
       });

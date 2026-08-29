@@ -2,8 +2,87 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { loadApplicationRuntimeBindings } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { createDailyCheckIn } from "../../domain/models/dailyCheckIn";
+import { createMorningCheckInPersistenceService } from "../../domain/services/MorningCheckInPersistenceService";
+import {
+  getLocalDateKey,
+  getLocalDayWindow,
+  resolveLocalTimeZone,
+} from "../../domain/utils/localDate";
+
+export async function saveDirectWeighIn(formData) {
+  const user = await FounderRepositories.users.getCurrentUser();
+  if (!user) throw new Error("Founder user is not available.");
+
+  const rawWeight = String(formData.get("weight") ?? "").trim();
+  const parsedWeight = Number(rawWeight);
+  if (!rawWeight || !Number.isFinite(parsedWeight)) {
+    return directWeighInFailure("Enter a valid weight.");
+  }
+  const weightValue = Math.round(parsedWeight * 10) / 10;
+  if (weightValue < 50 || weightValue > 1000) {
+    return directWeighInFailure("Weight must be between 50 and 1,000 lb.");
+  }
+
+  const now = new Date();
+  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
+  const today = getLocalDateKey(now, timeZone);
+  let measurementDate;
+  try {
+    measurementDate = getLocalDayWindow({
+      dateKey: String(formData.get("evidenceDate") ?? "").trim(),
+      timeZone,
+    }).dateKey;
+  } catch {
+    return directWeighInFailure("Choose a valid weigh-in date.");
+  }
+  if (measurementDate > today) {
+    return directWeighInFailure("A weigh-in cannot be logged for a future date.");
+  }
+
+  const bindings = await loadApplicationRuntimeBindings();
+  const result = await createMorningCheckInPersistenceService({
+    ...bindings,
+    now: () => now,
+  }).save({
+    user,
+    weightValue,
+    today: measurementDate,
+    createdAt: now.toISOString(),
+    at: now,
+    timeZone,
+    notes: null,
+    protocolChangeNote: null,
+    estimatedCalories: null,
+    estimatedCaloriesBurned: null,
+    proteinTarget: null,
+    proteinAchieved: null,
+    weighInContext: resolveDefaultWeighInContext(
+      user.preferences?.defaultWeighInContext
+    ),
+    reconciliationSubmissions: [],
+  });
+
+  if (result.status !== "unchanged") {
+    revalidatePath("/");
+    revalidatePath("/log");
+    revalidatePath("/progress");
+    revalidatePath("/progress/weight");
+    if (result.analysisId) revalidatePath(`/analysis/${result.analysisId}`);
+  }
+
+  const dateLabel = formatWeighInDate(measurementDate, today);
+  return Object.freeze({
+    ok: true,
+    status: result.status,
+    date: measurementDate,
+    message: result.status === "unchanged"
+      ? `That weigh-in is already logged for ${dateLabel}.`
+      : `Weigh-in logged for ${dateLabel}.`,
+  });
+}
 
 export async function completeLogReminder(formData) {
   const reminderId = String(formData.get("reminderId") ?? "");
@@ -134,4 +213,30 @@ function normalizeOptionalText(value) {
   const text = String(value ?? "").trim();
 
   return text.length > 0 ? text : null;
+}
+
+function directWeighInFailure(error) {
+  return Object.freeze({ ok: false, error });
+}
+
+function formatWeighInDate(date, today) {
+  if (date === today) return "today";
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function resolveDefaultWeighInContext(defaultContext = {}) {
+  return {
+    timing: defaultContext?.timing ?? "morning",
+    nutritionState: defaultContext?.nutritionState ?? "fasted",
+    intakeState: defaultContext?.intakeState ?? "before_food_water",
+    scale: defaultContext?.scale ?? "normal_home_scale",
+    confidence: defaultContext?.confidence ?? "high",
+    conditions: [],
+    notes: null,
+    isDefault: true,
+  };
 }

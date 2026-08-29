@@ -24,4 +24,22 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain('role="alert"');
     expect(source).not.toMatch(/Evidence Saved|Workout Saved|Nutrition Saved|Does this look right/);
   });
+
+  it("shares one Founder-local date across Upload and direct weigh-in", () => {
+    expect(source).toContain('name="evidenceDate"');
+    expect(source).toContain("value={selectedDate}");
+    expect(source).toContain("max={defaultDate}");
+    expect(source).toContain('formData.set("evidenceDate", selectedDate)');
+    expect(source).toContain("Date: {formatFriendlyDate(selectedDate)}");
+  });
+
+  it("keeps direct weigh-in isolated from the multipart upload submission", () => {
+    expect(source).toContain("Log weigh-in");
+    expect(source).toContain("Save weigh-in");
+    expect(source).toContain('formData.set("weight", weight)');
+    expect(source).toContain("directWeighInAction(formData)");
+    expect(source).toContain("No upload or review required.");
+    expect(source.match(/type="button"/g).length).toBeGreaterThanOrEqual(2);
+    expect(source.match(/fetch\(action/g)).toHaveLength(1);
+  });
 });

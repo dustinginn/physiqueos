@@ -5,6 +5,8 @@ import IconBadge from "../components/ui/IconBadge";
 import UploadAnythingForm from "../components/evidence/UploadAnythingForm";
 
 export default function LogHubScreen({
+  defaultLogDate,
+  directWeighInAction,
   error = null,
   loggedToday = { rows: [] },
   pendingEvidenceReviews = [],
@@ -34,7 +36,12 @@ export default function LogHubScreen({
           <LoggedTodayCard summary={loggedToday} />
           {pendingEvidenceReviews.length > 0 && <PendingEvidenceReviews reviews={pendingEvidenceReviews} />}
           <TrainingLoggerCard />
-          <UploadAnythingCard action={uploadAnythingAction} recoveryContext={recoveryContext} />
+          <UploadAnythingCard
+            action={uploadAnythingAction}
+            defaultDate={defaultLogDate}
+            directWeighInAction={directWeighInAction}
+            recoveryContext={recoveryContext}
+          />
         </div>
       </div>
     </main>
@@ -112,7 +119,7 @@ function LoggedTodayRow({ row }) {
   );
 }
 
-function UploadAnythingCard({ action, recoveryContext }) {
+function UploadAnythingCard({ action, defaultDate, directWeighInAction, recoveryContext }) {
   return (
     <Card className="space-y-4">
       <div className="flex items-start gap-3">
@@ -123,7 +130,11 @@ function UploadAnythingCard({ action, recoveryContext }) {
         </div>
       </div>
 
-      <UploadAnythingForm action={action}>
+      <UploadAnythingForm
+        action={action}
+        defaultDate={recoveryContext?.date ?? defaultDate}
+        directWeighInAction={directWeighInAction}
+      >
         {recoveryContext && <>
           <input name="expectedEvidenceType" type="hidden" value={recoveryContext.expectedEvidenceType}/>
           <input name="recoveryDate" type="hidden" value={recoveryContext.date}/>
@@ -146,11 +157,6 @@ function UploadAnythingCard({ action, recoveryContext }) {
           <textarea className="min-h-24 w-full resize-none rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm leading-6 text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" name="evidenceNote" placeholder="Example: Did spider curls 4 x 13 @ 30 lb and EZ bar curls 2 x 12 @ 65 lb..." />
         </label>
 
-        <label className="block space-y-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-          <span className="text-sm font-extrabold text-slate-950">When did this happen?</span>
-          <span className="block text-xs font-medium leading-5 text-slate-500">Use the date the workout, meal, scan, or activity happened.</span>
-          <input className="w-full rounded-[12px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" defaultValue={recoveryContext?.date ?? getTodayKey()} name="evidenceDate" type="date" />
-        </label>
       </UploadAnythingForm>
     </Card>
   );
@@ -179,9 +185,4 @@ function formatLogError(error) {
   if (error === "intake-failed") return "Your upload was saved, but PhysiqueOS could not finish reading it. Please try again.";
   if (error === "writes-paused") return "Writes are temporarily paused for maintenance. Nothing was applied; try again after maintenance completes.";
   return "Something went wrong while saving your upload.";
-}
-
-function getTodayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }

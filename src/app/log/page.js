@@ -1,6 +1,7 @@
 import { runInactiveLegacyWebReadScope } from "../../application/auth/legacyWebContext";
 import { createLogReadService } from "../../application/log/LogReadService";
 import LogHubScreen from "../../screens/LogHubScreen";
+import { saveDirectWeighIn } from "./actions";
 import {
   parseEvidenceRecoverySearchParams,
 } from "../../domain/services/EvidenceRecoveryContext";
@@ -21,6 +22,8 @@ export default async function LogPage({ searchParams }) {
   return (
     <LogHubScreen
       error={params?.error ?? null}
+      defaultLogDate={log.localDate}
+      directWeighInAction={saveDirectWeighIn}
       loggedToday={log.loggedToday}
       saved={params?.saved ?? null}
       uploadAnythingAction="/log/upload"
