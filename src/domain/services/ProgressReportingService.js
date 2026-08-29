@@ -613,6 +613,24 @@ function buildWeightReport(
   };
 }
 
+export function createProviderWeightEvidenceReport({
+  dateWindow = null,
+  dexaScans = [],
+  goals = [],
+  summaryContextId = "all",
+  weights = [],
+} = {}) {
+  const context = scopeWeightReportContext({
+    dexaScans: sortByDate(dexaScans, "measuredAt"),
+    goals,
+    weights: sortByDate(weights, "measuredAt"),
+  }, dateWindow);
+  return Object.freeze({
+    ...buildWeightReport(context, { summaryContextId }),
+    evidenceWindow: dateWindow,
+  });
+}
+
 export function buildWeightSummary({
   allWeights = [],
   contextId = "all",
@@ -850,6 +868,36 @@ function buildActivityReport(context) {
     reportPattern:
       "Latest activity day -> current activity protocol -> activity areas -> recent activity history.",
   };
+}
+
+export function createProviderActivityEvidenceReport({
+  canonicalEvidenceObjects = [],
+  dateWindow = null,
+  evidencePackages = [],
+  goals = [],
+} = {}) {
+  const canonicalPayloads = getCanonicalPayloads({
+    canonicalEvidenceObjects,
+    evidencePackages,
+  });
+  const trainingSessions = sortByDate(
+    canonicalPayloads.filter(isTrainingSession),
+    "observed_at"
+  );
+  const allActivityDays = getActivityDaysWithTrainingAggregates({
+    explicitActivityDays: sortByDate(
+      canonicalPayloads.filter(isActivityDay),
+      "observed_at"
+    ),
+    trainingSessions,
+  });
+  const activityDays = dateWindow
+    ? allActivityDays.filter((day) => isInsideDateWindow(day.observed_at, dateWindow))
+    : allActivityDays;
+  return Object.freeze({
+    ...buildActivityReport({ activityDays, goals, trainingSessions }),
+    evidenceWindow: dateWindow,
+  });
 }
 
 export function getPlaceholderEntries(streamId, context) {
@@ -1160,6 +1208,49 @@ export function getNutritionReportExtras({
     nutritionReportingLinks: getNutritionReportingLinks(),
     reportPattern: "Latest nutrition day -> current protocol -> reporting -> nutrition areas -> recent nutrition history.",
   };
+}
+
+export function createProviderNutritionEvidenceReports({
+  canonicalEvidenceObjects = [],
+  dateWindow = null,
+  evidencePackages = [],
+  goals = [],
+  nutritionContext = null,
+} = {}) {
+  const canonicalPayloads = getCanonicalPayloads({
+    canonicalEvidenceObjects,
+    evidencePackages,
+  });
+  const context = {
+    activityDays: [],
+    dexaScans: [],
+    goals,
+    nutritionContext,
+    nutritionDays: sortByDate(
+      canonicalPayloads.filter(isNutritionDay),
+      "observed_at"
+    ),
+    photoSessions: [],
+    progressPhotos: [],
+    protocols: [],
+    trainingSessions: [],
+    weights: [],
+  };
+  const globalReport = buildPlaceholderReportFromContext({
+    context,
+    streamId: "nutrition",
+  });
+  const scopedReport = dateWindow
+    ? buildPlaceholderReportFromContext({
+        context,
+        options: { dateWindow },
+        streamId: "nutrition",
+      })
+    : globalReport;
+  return Object.freeze({
+    globalReport: Object.freeze(globalReport),
+    scopedReport: Object.freeze(scopedReport),
+  });
 }
 
 export function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages = [] } = {}) {

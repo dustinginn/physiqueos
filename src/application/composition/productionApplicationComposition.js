@@ -27,6 +27,11 @@ import {
   createRepositoryProgressHubReadStore,
 } from "../../platform/database/PostgresProgressHubReadStore.js";
 import { createProgressHubReadService } from "../progress/ProgressHubReadService.js";
+import {
+  createPostgresProgressEvidenceReadStore,
+  createRepositoryProgressEvidenceReadStore,
+} from "../../platform/database/PostgresProgressEvidenceReadStore.js";
+import { createProgressEvidenceReadService } from "../progress/ProgressEvidenceReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -71,6 +76,13 @@ export function getProductionProgressHubReadService(env = process.env) {
     ? createProviderProgressHubReadStore(env)
     : createRepositoryProgressHubReadStore({ repositories: LegacyFounderRepositories });
   return createProgressHubReadService({ store });
+}
+
+export function getProductionProgressEvidenceReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderProgressEvidenceReadStore(env)
+    : createRepositoryProgressEvidenceReadStore({ repositories: LegacyFounderRepositories });
+  return createProgressEvidenceReadService({ store });
 }
 
 export function getProductionProviderReadinessComposition(env = process.env) {
@@ -241,6 +253,17 @@ function createProviderProgressHubReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.progress_hub_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderProgressEvidenceReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresProgressEvidenceReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.progress_evidence_read.complete", event)
       : null,
   });
 }

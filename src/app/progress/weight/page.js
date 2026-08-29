@@ -1,11 +1,11 @@
-import { getWeightTimelineReport } from "../../../domain/services/WeightEvidenceContextService";
+import { getProductionProgressEvidenceReadService } from "../../../application/composition/productionApplicationComposition";
 import WeightReportScreen from "../../../screens/WeightReportScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function WeightProgressPage({ searchParams }) {
   const params = await searchParams;
-  const { report, timeline } = await getWeightTimelineReport({
+  const { report, timeline } = await getProductionProgressEvidenceReadService().getWeight({
     context: params?.context,
   });
 
