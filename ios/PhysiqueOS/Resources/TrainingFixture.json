@@ -1,0 +1,257 @@
+{
+  "history": {
+    "trainingDays": [
+      {
+        "date": "2026-08-26",
+        "label": "Wednesday, August 26",
+        "summary": "2 sessions",
+        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-26" } }
+      },
+      {
+        "date": "2026-08-24",
+        "label": "Monday, August 24",
+        "summary": "1 session",
+        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-24" } }
+      },
+      {
+        "date": "2026-08-22",
+        "label": "Saturday, August 22",
+        "summary": "1 session",
+        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-22" } }
+      }
+    ],
+    "trainingOverview": [
+      { "label": "Sessions", "value": "4" },
+      { "label": "Active Calories", "value": "1390" },
+      { "label": "Exercise Minutes", "value": "176" }
+    ],
+    "trainingUnderstanding": [
+      { "label": "Resistance training", "value": "2 workouts" },
+      { "label": "Cardio", "value": "2 sessions" }
+    ]
+  },
+  "days": [
+    {
+      "date": "2026-08-26",
+      "label": "Wednesday, August 26",
+      "summary": {
+        "bodyAreas": ["Chest", "Triceps"],
+        "sessionCount": 2,
+        "strengthSessions": 1,
+        "exerciseCount": 4,
+        "hasWalking": true,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-001",
+          "activityType": "Traditional Strength Training",
+          "title": "Traditional Strength Training",
+          "kind": "strength",
+          "exerciseCount": 4,
+          "bodyAreas": ["Chest", "Triceps"],
+          "durationSeconds": 3120,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 420,
+          "detail": "Chest, Triceps · 4 exercises",
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-001" } }
+        },
+        {
+          "id": "session-fixture-004",
+          "activityType": "Walking",
+          "title": "Walking",
+          "kind": "walking",
+          "exerciseCount": 0,
+          "bodyAreas": [],
+          "durationSeconds": 2520,
+          "distance": 2.1,
+          "distanceUnit": "mi",
+          "activeCalories": 180,
+          "detail": "42 min · 2.1 mi · 180 active cal",
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-004" } }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-24",
+      "label": "Monday, August 24",
+      "summary": {
+        "bodyAreas": ["Back", "Shoulders"],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-002",
+          "activityType": "Functional Strength Training",
+          "title": "Functional Strength Training",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": ["Back", "Shoulders"],
+          "durationSeconds": 2880,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 380,
+          "detail": "Back, Shoulders · 3 exercises",
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-002" } }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-22",
+      "label": "Saturday, August 22",
+      "summary": {
+        "bodyAreas": [],
+        "sessionCount": 1,
+        "strengthSessions": 0,
+        "exerciseCount": 0,
+        "hasWalking": false,
+        "hasCardio": true
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-003",
+          "activityType": "Run",
+          "title": "Run",
+          "kind": "cardio",
+          "exerciseCount": 0,
+          "bodyAreas": [],
+          "durationSeconds": 2040,
+          "distance": 3.4,
+          "distanceUnit": "mi",
+          "activeCalories": 410,
+          "detail": "34 min · 3.4 mi · 410 active cal",
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-003" } }
+        }
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session-fixture-001",
+      "label": "Traditional Strength Training",
+      "value": "420 active cal",
+      "detail": "6:02 AM–6:54 AM · 52 min · 420 active cal · Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
+      "date": "2026-08-26T06:02:00-07:00",
+      "sourceEvidence": ["Typed evidence"],
+      "exercises": [
+        {
+          "id": "press",
+          "name": "Bench Press",
+          "canonicalExerciseId": "barbell_bench_press",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 8, "weight": 135, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 8, "weight": 145, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 6, "weight": 155, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "fly",
+          "name": "Cable Fly",
+          "canonicalExerciseId": "cable_fly",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 30, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 30, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "triceps",
+          "name": "Overhead Triceps Extension",
+          "canonicalExerciseId": "overhead_triceps_extension",
+          "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" },
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 40, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 10, "weight": 40, "weight_unit": "lb" },
+            { "set_number": 3, "reps": null, "weight": null, "duration_seconds": 30 }
+          ]
+        },
+        {
+          "id": "pushups",
+          "name": "Push-ups",
+          "canonicalExerciseId": "pushup",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 20, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" },
+            { "set_number": 2, "reps": 18, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": [
+        {
+          "id": "session-fixture-001_superset",
+          "relationshipType": "superset",
+          "memberExerciseIds": ["press", "fly"]
+        }
+      ]
+    },
+    {
+      "id": "session-fixture-004",
+      "label": "Walking",
+      "value": "2.1 mi",
+      "detail": "6:10 PM–6:52 PM · 42 min · 2.1 mi · 180 active cal",
+      "date": "2026-08-26T18:10:00-07:00",
+      "sourceEvidence": ["Apple Health"],
+      "exercises": [],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-002",
+      "label": "Functional Strength Training",
+      "value": "380 active cal",
+      "detail": "5:45 AM–6:33 AM · 48 min · 380 active cal · Lat Pulldown, Seated Cable Row, Face Pull",
+      "date": "2026-08-24T05:45:00-07:00",
+      "sourceEvidence": ["Screenshot"],
+      "exercises": [
+        {
+          "id": "pulldown",
+          "name": "Lat Pulldown",
+          "canonicalExerciseId": "lat_pulldown",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 110, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 10, "weight": 120, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 8, "weight": 130, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "row",
+          "name": "Seated Cable Row",
+          "canonicalExerciseId": "seated_cable_row",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 100, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 100, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "facepull",
+          "name": "Face Pull",
+          "canonicalExerciseId": "face_pull",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 15, "weight": 40, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 15, "weight": 40, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 15, "weight": 40, "weight_unit": "lb" }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-003",
+      "label": "Run",
+      "value": "3.4 mi",
+      "detail": "7:00 AM–7:34 AM · 34 min · 3.4 mi · 410 active cal",
+      "date": "2026-08-22T07:00:00-07:00",
+      "sourceEvidence": ["Apple Health"],
+      "exercises": [],
+      "exerciseRelationshipGroups": []
+    }
+  ]
+}

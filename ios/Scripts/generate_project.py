@@ -35,8 +35,13 @@ app_files = [
     ("Contracts", "LogReadModel.swift"),
     ("Contracts", "DirectWeighInValidation.swift"),
     ("Contracts", "EvidenceDateParsing.swift"),
+    ("Contracts", "EvidenceReadModel.swift"),
+    ("Contracts", "TrainingReadModel.swift"),
+    ("Contracts", "TrainingSessionRenderItems.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "LogAPI.swift"),
+    ("Networking", "EvidenceAPI.swift"),
+    ("Networking", "TrainingAPI.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "IconBadge.swift"),
     ("SharedUI", "CardContainer.swift"),
@@ -51,8 +56,12 @@ app_files = [
     ("SharedUI", "ScrollScreenLayout.swift"),
     ("SharedUI", "DateField.swift"),
     ("SharedUI", "TabPlaceholderView.swift"),
+    ("SharedUI", "EvidenceAttachment.swift"),
+    ("SharedUI", "EvidenceSourcePicker.swift"),
+    ("SharedUI", "EvidenceStreamPresentation.swift"),
     ("Presentation/Root", "RootTabView.swift"),
     ("Presentation/Root", "DestinationPlaceholderView.swift"),
+    ("Presentation/Root", "AppDestinationRouterView.swift"),
     ("Presentation/Home", "HomeView.swift"),
     ("Presentation/Home", "HomeViewModel.swift"),
     ("Presentation/Home", "HomeHeaderView.swift"),
@@ -70,9 +79,18 @@ app_files = [
     ("Presentation/Log", "TrainingLoggerCardView.swift"),
     ("Presentation/Log", "PendingEvidenceReviewsCardView.swift"),
     ("Presentation/Log", "UploadCardView.swift"),
-    ("Presentation/Progress", "ProgressPlaceholderView.swift"),
-    ("Presentation/Coach", "CoachPlaceholderView.swift"),
-    ("Presentation/Profile", "ProfilePlaceholderView.swift"),
+    ("Presentation/Goals", "GoalsPlaceholderView.swift"),
+    ("Presentation/You", "YouPlaceholderView.swift"),
+    ("Presentation/Evidence", "EvidenceView.swift"),
+    ("Presentation/Evidence", "EvidenceViewModel.swift"),
+    ("Presentation/Evidence", "EvidenceHeaderView.swift"),
+    ("Presentation/Evidence", "EvidenceStreamRowView.swift"),
+    ("Presentation/Training", "TrainingHistoryView.swift"),
+    ("Presentation/Training", "TrainingHistoryViewModel.swift"),
+    ("Presentation/Training", "TrainingDayView.swift"),
+    ("Presentation/Training", "TrainingDayViewModel.swift"),
+    ("Presentation/Training", "TrainingSessionDetailView.swift"),
+    ("Presentation/Training", "TrainingSessionDetailViewModel.swift"),
 ]
 
 # Non-Swift app-target resources (group path -> filename) — copied into the
@@ -80,6 +98,8 @@ app_files = [
 resource_files = [
     ("Resources", "HomeFixture.json"),
     ("Resources", "LogFixture.json"),
+    ("Resources", "EvidenceFixture.json"),
+    ("Resources", "TrainingFixture.json"),
     ("Resources/Fonts", "PlusJakartaSans[wght].ttf"),
     ("Resources/Fonts", "OFL.txt"),
 ]
@@ -96,6 +116,8 @@ test_files = [
     ("PhysiqueOSTests", "HomeReadModelTests.swift"),
     ("PhysiqueOSTests", "LogReadModelTests.swift"),
     ("PhysiqueOSTests", "SharedUITests.swift"),
+    ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
+    ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
 ]
 
 BUNDLE_ID_APP = "com.physiqueos.native.dev"

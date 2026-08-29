@@ -10,9 +10,18 @@ import Foundation
 final class AppEnvironment {
     let homeAPI: HomeAPI
     let logAPI: LogAPI
+    let evidenceAPI: EvidenceAPI
+    let trainingAPI: TrainingAPI
 
-    init(homeAPI: HomeAPI = FixtureHomeAPI(), logAPI: LogAPI = FixtureLogAPI()) {
+    init(
+        homeAPI: HomeAPI = FixtureHomeAPI(),
+        logAPI: LogAPI = FixtureLogAPI(),
+        evidenceAPI: EvidenceAPI = FixtureEvidenceAPI(),
+        trainingAPI: TrainingAPI = FixtureTrainingAPI()
+    ) {
         self.homeAPI = homeAPI
         self.logAPI = logAPI
+        self.evidenceAPI = evidenceAPI
+        self.trainingAPI = trainingAPI
     }
 }

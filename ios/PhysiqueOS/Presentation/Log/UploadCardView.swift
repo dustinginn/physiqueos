@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
 
 /// Mirrors `UploadAnythingCard`/`UploadAnythingForm.jsx`: a general
 /// evidence-upload card (files + a note) with a nested, collapsible direct
@@ -16,8 +17,11 @@ struct UploadCardView: View {
 
     @State private var selectedDate = Date()
     @State private var noteText = ""
-    @State private var selectedFileNames: [String] = []
+    @State private var selectedAttachments: [EvidenceAttachment] = []
+    @State private var isSourcePickerPresented = false
     @State private var isFilePickerPresented = false
+    @State private var isPhotosPickerPresented = false
+    @State private var photosSelection: [PhotosPickerItem] = []
     @State private var uploadStatusMessage: String?
 
     @State private var isWeighInExpanded = false
@@ -35,7 +39,7 @@ struct UploadCardView: View {
     /// server contacted, no canonical write implied — that still lets both
     /// the enabled and disabled treatments be verified visually.
     private var hasContentToSubmit: Bool {
-        !selectedFileNames.isEmpty || !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !selectedAttachments.isEmpty || !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -73,13 +77,30 @@ struct UploadCardView: View {
             }
         }
         .onAppear { selectedDate = maxSelectableDate }
+        .evidenceSourcePicker(isPresented: $isSourcePickerPresented) { option in
+            switch option {
+            case .photos: isPhotosPickerPresented = true
+            case .files: isFilePickerPresented = true
+            }
+        }
+        .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photosSelection, matching: .images)
+        .onChange(of: photosSelection) {
+            let startIndex = selectedAttachments.filter { $0.source == .photoLibrary }.count
+            let newPhotos = photosSelection.indices.map { offset in
+                EvidenceAttachment(displayName: "Photo \(startIndex + offset + 1)", source: .photoLibrary)
+            }
+            selectedAttachments.append(contentsOf: newPhotos)
+            photosSelection = []
+        }
         .fileImporter(
             isPresented: $isFilePickerPresented,
             allowedContentTypes: [.image, .pdf],
             allowsMultipleSelection: true
         ) { result in
             if case .success(let urls) = result {
-                selectedFileNames = urls.map(\.lastPathComponent)
+                selectedAttachments.append(contentsOf: urls.map {
+                    EvidenceAttachment(displayName: $0.lastPathComponent, source: .files)
+                })
             }
         }
     }
@@ -176,17 +197,21 @@ struct UploadCardView: View {
         )
     }
 
+    /// Mirrors the web's "Upload files" drop zone, retitled "Add evidence"
+    /// now that native supports both a Photos source and a Files source —
+    /// "Upload files" is the web's literal wording for its single merged
+    /// file input and undersells what this control now offers.
     private var filePickerField: some View {
-        Button { isFilePickerPresented = true } label: {
+        Button { isSourcePickerPresented = true } label: {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Upload files", systemImage: "doc.badge.plus")
+                Label("Add evidence", systemImage: "doc.badge.plus")
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("Choose screenshots, photos, or PDFs. You can select more than one.")
+                Text("Choose photos or files. You can select more than one.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if !selectedFileNames.isEmpty {
-                    Text(selectedFileNames.joined(separator: ", "))
+                if !selectedAttachments.isEmpty {
+                    Text(selectedAttachments.map(\.displayName).joined(separator: ", "))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                         .lineLimit(2)

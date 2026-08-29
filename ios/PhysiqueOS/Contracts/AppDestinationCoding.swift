@@ -42,7 +42,12 @@ extension AppDestination {
             self = .trainingSession(sessionId: try parameters.decode(String.self, forKey: .sessionId))
         case "progress.stream":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
-            self = .progressStream(streamId: try parameters.decode(String.self, forKey: .streamId))
+            let streamId = try parameters.decode(String.self, forKey: .streamId)
+            if streamId.hasPrefix(Self.trainingDayStreamIdPrefix) {
+                self = .trainingDay(date: String(streamId.dropFirst(Self.trainingDayStreamIdPrefix.count)))
+            } else {
+                self = .progressStream(streamId: streamId)
+            }
         case "log":
             self = .trainingLogger
         default:
@@ -65,7 +70,14 @@ extension AppDestination {
         case .evidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
         case .trainingSession(let sessionId): try parameters.encode(sessionId, forKey: .sessionId)
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
+        case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger: break
         }
     }
+
+    /// `progress.stream`'s compound streamId prefix for a Training Day
+    /// href (`/progress/training/day/<date>` → streamId
+    /// `"training/day/<date>"`), matching `destinationFromWebHref`'s
+    /// catch-all capture exactly.
+    fileprivate static let trainingDayStreamIdPrefix = "training/day/"
 }

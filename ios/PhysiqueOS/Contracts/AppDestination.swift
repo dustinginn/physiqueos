@@ -25,6 +25,16 @@ enum AppDestination: Hashable, Codable {
     /// directly against `destinationFromWebHref`'s pattern list, not
     /// assumed.
     case progressStream(streamId: String)
+    /// `/progress/training/day/:date` — verified against
+    /// `destinationFromWebHref`'s pattern list (`src/contracts/v1/destination.js`):
+    /// there is no dedicated Training Day destination id yet, so this href
+    /// falls through the same catch-all `progress.stream` pattern as
+    /// `progressStream` above, with a compound `streamId` of
+    /// `"training/day/<date>"`. This preserves that exact, if unusual,
+    /// current contract fact — the same kind of quirk already recorded for
+    /// `trainingLogger` — rather than inventing a dedicated destination id
+    /// the server does not have.
+    case trainingDay(date: String)
     /// The web's own typed-destination registry currently maps
     /// `/log/training` (the Training Logger entry point) to the same
     /// `log` destination id as `/log` itself — Training Logger has no
@@ -47,6 +57,7 @@ enum AppDestination: Hashable, Codable {
         case .evidenceReview: "evidence.review"
         case .trainingSession: "training.session"
         case .progressStream: "progress.stream"
+        case .trainingDay: "progress.stream"
         case .trainingLogger: "log"
         }
     }

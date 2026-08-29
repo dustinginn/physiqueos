@@ -118,20 +118,21 @@ final class SharedUITests: XCTestCase {
         XCTAssertNil(EvidenceDateParsing.date(fromLocalDateString: "not-a-date"))
     }
 
-    // MARK: - Tab order and icons remain the accepted five, with a
-    // faithful (not miscommunicating) Coach icon.
+    // MARK: - Tab order and icons — see `AppTabTests` for the full,
+    // corrected Home/Goals/Log/Evidence/You coverage (this file's own tab
+    // assertions were superseded by that correction and removed here to
+    // avoid asserting the same contract twice from two different files).
 
-    func testTabOrderRemainsHomeLogProgressCoachProfile() {
-        XCTAssertEqual(AppTab.allCases.map(\.title), ["Home", "Log", "Progress", "Coach", "Profile"])
-    }
+    // MARK: - Evidence-source selection never claims canonical success
 
-    /// Guards specifically against the reported regression: an earlier
-    /// placeholder used a meditation/wellness pose for Coach, which
-    /// miscommunicates what "Coach" means in this product. The web's own
-    /// icon vocabulary (`BottomNavItem.jsx`'s `iconMap.coach`) is a
-    /// message bubble.
-    func testCoachIconIsAConversationBubbleNotAWellnessPose() {
-        XCTAssertEqual(AppTab.coach.systemImageName, "message.fill")
-        XCTAssertFalse(AppTab.coach.systemImageName.contains("figure"))
+    /// `EvidenceAttachment` only describes what is staged locally in this
+    /// session — it must never carry any field implying the item has been
+    /// uploaded, reviewed, or confirmed (see
+    /// `docs/PHYSIQUEOS_NATIVE_V1.md`, section 8).
+    func testEvidenceAttachmentDistinguishesPhotoAndFileSources() {
+        let photo = EvidenceAttachment(displayName: "Photo 1", source: .photoLibrary)
+        let file = EvidenceAttachment(displayName: "scan.pdf", source: .files)
+        XCTAssertNotEqual(photo.source, file.source)
+        XCTAssertNotEqual(photo.id, file.id)
     }
 }
