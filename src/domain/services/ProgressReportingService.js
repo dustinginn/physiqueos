@@ -1319,6 +1319,39 @@ export function createTrainingNavigationReport({
   });
 }
 
+export function createTrainingLibraryReports({
+  canonicalEvidenceObjects = [],
+  evidencePackages = [],
+  dateWindow = null,
+  activitySlug = null,
+} = {}) {
+  const payloads = getCanonicalPayloads({ canonicalEvidenceObjects, evidencePackages });
+  const trainingSessions = sortByDate(
+    payloads.filter(isTrainingSession),
+    "observed_at"
+  );
+  const scopedSessions = dateWindow
+    ? trainingSessions.filter((session) =>
+        isInsideDateWindow(session.observed_at, dateWindow)
+      )
+    : trainingSessions;
+  const activitySessions = activitySlug
+    ? scopedSessions.filter(
+        (session) =>
+          !isResistanceTrainingSession(session) &&
+          slugify(session.metadata?.activity_type) === slugify(activitySlug)
+      )
+    : [];
+  const activityEntries = getTrainingRecords({ trainingSessions: activitySessions });
+
+  return Object.freeze({
+    globalBreakdowns: getTrainingBreakdowns(trainingSessions),
+    scopedBreakdowns: getTrainingBreakdowns(scopedSessions),
+    activityEntries: Object.freeze(activityEntries),
+    activityTrainingDays: Object.freeze(getTrainingDays(activityEntries)),
+  });
+}
+
 function getActivityDayRecords(context = {}) {
   return (context.activityDays ?? [])
     .map(createActivityDayRecord)

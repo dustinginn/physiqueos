@@ -13,12 +13,14 @@ describe("production Training timeline port", () => {
     const library = read("src/app/progress/training/library/[[...path]]/page.js");
     const reporting = read("src/app/progress/training/reporting/[reportId]/page.js");
 
-    [library, reporting].forEach((source) => {
-      expect(source).toContain("getTrainingTimelineReport");
-    });
+    expect(reporting).toContain("getTrainingTimelineReport");
     expect(landing).toContain("getProductionTrainingNavigationReadService().getLanding");
     expect(landing).not.toContain("getTrainingTimelineReport");
     expect(landing).not.toContain("loadCanonicalRuntime");
+    expect(library).toContain("getProductionTrainingNavigationReadService");
+    expect(library).toContain("getLibrary({ context, path })");
+    expect(library).not.toContain("getTrainingTimelineReport");
+    expect(library).not.toContain("loadCanonicalRuntime");
     expect(library).toContain("<TrainingTimelineSelector");
     expect(reporting).toContain("<TrainingTimelineSelector");
     expect(library).toContain("showSourceWorkouts: false");

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { getTrainingTimelineReport } from "../../../../../domain/services/TrainingEvidenceContextService";
 import { buildTrainingLibraryNavigation } from "../../../../../navigation/navigationRegistry";
 import { withTrainingTimelineContext } from "../../../../../navigation/trainingTimelineNavigation";
 import TrainingTimelineSelector from "../../../../../components/training/TrainingTimelineSelector";
@@ -41,16 +40,14 @@ export default async function TrainingLibraryPage({ params, searchParams }) {
     path.length >= 2 && path[0] !== "cardio"
       ? resolveTrainingExerciseIdentity(path.at(-1))
       : null;
-  const narrowExercise = exerciseIdentity?.canonicalExerciseId
-    ? await getProductionTrainingNavigationReadService().getExercise({
+  const trainingNavigation = getProductionTrainingNavigationReadService();
+  const narrowRead = exerciseIdentity?.canonicalExerciseId
+    ? await trainingNavigation.getExercise({
         context,
         exerciseSlug: path.at(-1),
       })
-    : null;
-  const { report, timeline, exerciseRecords } = narrowExercise ?? {
-    ...(await getTrainingTimelineReport({ context })),
-    exerciseRecords: null,
-  };
+    : await trainingNavigation.getLibrary({ context, path });
+  const { report, timeline, exerciseRecords = null } = narrowRead;
   const baseNavigation = buildTrainingLibraryNavigation(path);
   const currentPath = baseNavigation.route;
   const returnTo = withTrainingTimelineContext(currentPath, timeline.contextId);

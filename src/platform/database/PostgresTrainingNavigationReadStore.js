@@ -104,7 +104,8 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
     listCanonicalTrainingAndActivityEvidenceObjects: async () => (await repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id))
       .filter((record) => ["training", "activity_day"].includes((record.payload ?? record).evidence_type)),
     getCanonicalEvidenceObject: async (recordId) => repositories.canonicalEvidence.getCanonicalEvidenceObjectById?.(recordId) ?? null,
-    listCanonicalTrainingEvidenceObjects: async () => repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id),
+    listCanonicalTrainingEvidenceObjects: async () => (await repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id))
+      .filter((record) => (record.payload ?? record).evidence_type === "training"),
     listCanonicalTrainingEvidenceByExercise: async (canonicalExerciseId) => (await repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id))
       .filter((record) => ((record.payload ?? record).exercises ?? []).some((exercise) =>
         [exercise.canonicalExerciseId, exercise.exerciseId, exercise.id].includes(canonicalExerciseId))),

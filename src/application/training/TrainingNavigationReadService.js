@@ -1,6 +1,7 @@
 import { createTrainingDayReadModel } from "./TrainingReadService.js";
 import {
   createTrainingLandingReports,
+  createTrainingLibraryReports,
   createTrainingNavigationReport,
 } from "../../domain/services/ProgressReportingService.js";
 import {
@@ -67,6 +68,57 @@ export function createTrainingNavigationReadService({ store } = {}) {
           canonicalEvidenceObjects,
           date,
           timeZone: timeZone ?? user?.timezone,
+        });
+      });
+    },
+    getLibrary({ context, currentDate = new Date(), path = [] } = {}) {
+      return store.run("training.navigation.library", async () => {
+        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+          store.getUser(),
+          store.listGoals(),
+          store.listCanonicalTrainingEvidenceObjects(),
+        ]);
+        const timeline = createTrainingEvidenceContext({
+          context,
+          currentDate,
+          goals,
+          user,
+        });
+        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+          (record.payload ?? record).evidence_type === "training"
+        );
+        const evidencePackages = hasCanonicalTraining
+          ? []
+          : await store.listEvidencePackages();
+        const activitySlug = path[0] === "cardio" && path.length >= 2
+          ? path[1]
+          : null;
+        const {
+          activityEntries,
+          activityTrainingDays,
+          globalBreakdowns,
+          scopedBreakdowns,
+        } = createTrainingLibraryReports({
+          canonicalEvidenceObjects,
+          dateWindow: timeline.goalScoped
+            ? { startDate: timeline.startDate, endDate: timeline.endDate }
+            : null,
+          evidencePackages,
+          activitySlug,
+        });
+
+        return Object.freeze({
+          timeline,
+          report: Object.freeze({
+            entries: activityEntries,
+            trainingDays: activityTrainingDays,
+            trainingBreakdowns: timeline.goalScoped
+              ? mergeTrainingBreakdowns({
+                  globalBreakdowns,
+                  scopedBreakdowns,
+                })
+              : globalBreakdowns,
+          }),
         });
       });
     },

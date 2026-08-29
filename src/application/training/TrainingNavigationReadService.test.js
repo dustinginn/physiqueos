@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { createAuthenticationPrincipal } from "../auth/principal.js";
 import { createTrainingPerformanceEvent } from "../../domain/models/trainingPerformanceEvent.js";
@@ -8,6 +10,8 @@ import { createSeedRepositories } from "../../data/repositories/createSeedReposi
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
 import { getTrainingTimelineReport } from "../../domain/services/TrainingEvidenceContextService.js";
 import { createRepositoryTrainingNavigationReadStore } from "../../platform/database/PostgresTrainingNavigationReadStore.js";
+import { buildTrainingLibraryNavigation } from "../../navigation/navigationRegistry.js";
+import TrainingKnowledgeScreen from "../../screens/TrainingKnowledgeScreen.jsx";
 
 const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId: "device-one", sessionId: "session-one" });
 
@@ -101,7 +105,62 @@ describe("provider-native Training navigation", () => {
     const route = fs.readFileSync("src/app/progress/training/library/[[...path]]/page.js", "utf8");
     const metadata = route.slice(route.indexOf("export async function generateMetadata"), route.indexOf("export default async function"));
     expect(metadata).not.toContain("getTrainingTimelineReport");
-    expect(route).toContain("getProductionTrainingNavigationReadService().getExercise");
+    expect(route).toContain("trainingNavigation.getExercise");
+  });
+
+  it.each(["all", "build-lean-mass"])(
+    "keeps Training Library category output equivalent for %s without a broad timeline",
+    async (context) => {
+      const runtime = createPhase5SyntheticRuntime();
+      const narrowRepositories = createSeedRepositories(structuredClone(runtime), {
+        allowStagedMutations: false,
+      });
+      const legacyRepositories = createSeedRepositories(structuredClone(runtime), {
+        allowStagedMutations: false,
+      });
+      const narrow = await createTrainingNavigationReadService({
+        store: createRepositoryTrainingNavigationReadStore({
+          repositories: narrowRepositories,
+        }),
+      }).getLibrary({ context, path: ["biceps"] });
+      const legacy = await getTrainingTimelineReport({
+        context,
+        repositories: legacyRepositories,
+      });
+
+      expect(narrow.timeline).toEqual(legacy.timeline);
+      expect(narrow.report.trainingBreakdowns).toEqual(
+        legacy.report.trainingBreakdowns
+      );
+      expect(renderLibrary(narrow, ["biceps"])).toEqual(
+        renderLibrary(legacy, ["biceps"])
+      );
+      expect(narrow.report).not.toHaveProperty("latestTrainingDay");
+      expect(narrow.report).not.toHaveProperty("trainingLibrary");
+      expect(narrow.report).not.toHaveProperty("resistancePerformance");
+    }
+  );
+
+  it("keeps library reads request-local and preserves cardio history only when requested", async () => {
+    const cardio = training("walk", "2026-08-26");
+    cardio.payload.metadata.activity_type = "Outdoor Walk";
+    cardio.payload.exercises = [];
+    const store = navigationStore([
+      training("strength", "2026-08-27"),
+      cardio,
+    ]);
+    const service = createTrainingNavigationReadService({ store });
+    const root = await service.getLibrary({ context: "all", path: [] });
+    const activity = await service.getLibrary({
+      context: "all",
+      path: ["cardio", "outdoor-walk"],
+    });
+
+    expect(root.report.trainingDays).toEqual([]);
+    expect(activity.report.trainingDays).toHaveLength(1);
+    expect(activity.report.trainingDays[0].sessions[0].label).toBe("Outdoor Walk");
+    expect(store.run).toHaveBeenCalledTimes(2);
+    expect(store.listCanonicalTrainingEvidenceObjects).toHaveBeenCalledTimes(2);
   });
 
   it("removes compatibility-runtime/report construction from Day and Session routes", () => {
@@ -128,6 +187,24 @@ function navigationStore(records, events = []) {
     listEvidencePackages: vi.fn(async () => []),
     listTrainingPerformanceEventsByExercise: vi.fn(async (id) => events.filter((event) => event.canonicalExerciseId === id)),
   };
+}
+
+function renderLibrary(result, path) {
+  const baseNavigation = buildTrainingLibraryNavigation(path);
+  const adaptHref = (href) => `${href}?context=${result.timeline.contextId}`;
+  return renderToStaticMarkup(React.createElement(TrainingKnowledgeScreen, {
+    mode: "library",
+    navigation: {
+      ...baseNavigation,
+      breadcrumbs: baseNavigation.breadcrumbs.map((item) => ({
+        ...item,
+        href: adaptHref(item.href),
+      })),
+    },
+    report: result.report,
+    slug: path,
+    trainingEvidenceContext: { adaptHref, showSourceWorkouts: false },
+  }));
 }
 
 function projectLanding(report) {
