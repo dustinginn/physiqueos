@@ -1,5 +1,4 @@
-import { runInactiveLegacyWebReadScope } from "../../application/auth/legacyWebContext";
-import { createLogReadService } from "../../application/log/LogReadService";
+import { getProductionCoreNavigationReadService } from "../../application/composition/productionApplicationComposition";
 import LogHubScreen from "../../screens/LogHubScreen";
 import { saveDirectWeighIn } from "./actions";
 import {
@@ -11,13 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LogPage({ searchParams }) {
   const params = await searchParams;
   const recoveryContext = parseEvidenceRecoverySearchParams(params);
-  const log = await runInactiveLegacyWebReadScope({
-    readModel: "log.page",
-    callback: async ({ composition, context }) => createLogReadService({ repositories: composition.repositories }).getLog({
-      principal: context.principal,
-      timeZone: context.user.timeZone ?? context.user.timezone,
-    }),
-  });
+  const log = await getProductionCoreNavigationReadService().getLog();
 
   return (
     <LogHubScreen

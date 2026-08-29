@@ -1,15 +1,11 @@
-import { runInactiveLegacyWebReadScope } from "../../../application/auth/legacyWebContext";
-import { createOperatingPlanReadService } from "../../../application/plan/OperatingPlanReadService";
+import { getProductionCoreNavigationReadService } from "../../../application/composition/productionApplicationComposition";
 import OperatingPlanScreen from "../../../screens/OperatingPlanScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function OperatingPlanPage({ searchParams }) {
   const params = await searchParams;
-  const plan = await runInactiveLegacyWebReadScope({
-    readModel: "operating-plan.page",
-    callback: async ({ composition, context: { principal } }) => createOperatingPlanReadService({ repositories: composition.repositories }).getOperatingPlan({ principal }),
-  });
+  const plan = await getProductionCoreNavigationReadService().getOperatingPlan();
 
   return (
     <OperatingPlanScreen

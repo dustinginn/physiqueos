@@ -15,6 +15,7 @@ export default defineConfig({
       "src/platform/database/phase4PersistenceSecurity.test.js",
       "src/platform/database/PostgresTrainingNavigationReadStore.test.js",
       "src/platform/database/PostgresProgressHubReadStore.test.js",
+      "src/platform/database/PostgresCoreNavigationReadStore.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

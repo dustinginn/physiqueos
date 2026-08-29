@@ -21,9 +21,13 @@ describe("production migration remediation wiring", () => {
     expect(boundary).toContain("runProductionApplicationReadScope");
     for (const file of ["src/screens/HomeScreen.jsx", "src/app/log/page.js", "src/app/profile/operating-plan/page.js", "src/screens/GoalsHubScreen.jsx"]) {
       const source = read(file);
-      expect(source).toContain("runInactiveLegacyWebReadScope");
+      expect(source).toContain("getProductionCoreNavigationReadService");
+      expect(source).not.toContain("runInactiveLegacyWebReadScope");
       expect(source).not.toContain("import { FounderRepositories }");
     }
+    const composition = read("src/application/composition/productionApplicationComposition.js");
+    expect(composition).toContain("createPostgresCoreNavigationReadStore");
+    expect(composition).toContain("provider.core_navigation_read.complete");
   });
 
   it("routes the shared production repository facade through composition with no raw legacy import bypass", () => {

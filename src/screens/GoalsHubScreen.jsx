@@ -9,9 +9,8 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
-import { runInactiveLegacyWebReadScope } from "../application/auth/legacyWebContext";
+import { getProductionCoreNavigationReadService } from "../application/composition/productionApplicationComposition";
 import {
-  createGoalsHubReadService,
   mapGoalSummary as mapApplicationGoalSummary,
 } from "../application/goals/GoalsHubReadService";
 
@@ -53,16 +52,11 @@ export default async function GoalsHubScreen({ from } = {}) {
 }
 
 export async function getGoalsHub() {
-  return runInactiveLegacyWebReadScope({
-    readModel: "goals.page",
-    callback: async ({ composition, context: { principal } }) => {
-      const hub = await createGoalsHubReadService({ repositories: composition.repositories, readRuntimeStore: composition.readRuntimeStore ?? (() => composition.runtime) }).getGoalsHub({ principal });
-      for (const goal of hub.activeGoals.filter((item) => !item.navigation.available)) {
-        console.warn("[GoalNavigation] Goal detail route unavailable.", { goalId: goal.id ?? null, goalType: goal.goalType ?? null, lifecycle: goal.lifecycleState ?? goal.status ?? null, resolverCode: goal.navigation.code });
-      }
-      return { ...hub, activeGoals: hub.activeGoals.map(withWebGoalVisual) };
-    },
-  });
+  const hub = await getProductionCoreNavigationReadService().getGoals();
+  for (const goal of hub.activeGoals.filter((item) => !item.navigation.available)) {
+    console.warn("[GoalNavigation] Goal detail route unavailable.", { goalId: goal.id ?? null, goalType: goal.goalType ?? null, lifecycle: goal.lifecycleState ?? goal.status ?? null, resolverCode: goal.navigation.code });
+  }
+  return { ...hub, activeGoals: hub.activeGoals.map(withWebGoalVisual) };
 }
 
 function ActiveGoals({ from, goals }) {
