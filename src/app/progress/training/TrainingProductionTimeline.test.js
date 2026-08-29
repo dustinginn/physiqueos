@@ -8,15 +8,17 @@ const storePath = path.resolve(process.cwd(), "private/founder/runtime-store.jso
 const read = (relativePath) => fs.readFileSync(relativePath, "utf8");
 
 describe("production Training timeline port", () => {
-  it("uses the production timeline contract across landing, library, and reporting", () => {
+  it("uses a provider-native landing read while retaining the timeline contract elsewhere", () => {
     const landing = read("src/app/progress/training/page.js");
     const library = read("src/app/progress/training/library/[[...path]]/page.js");
     const reporting = read("src/app/progress/training/reporting/[reportId]/page.js");
 
-    [landing, library, reporting].forEach((source) => {
+    [library, reporting].forEach((source) => {
       expect(source).toContain("getTrainingTimelineReport");
     });
-    expect(landing).toContain("evidenceContext");
+    expect(landing).toContain("getProductionTrainingNavigationReadService().getLanding");
+    expect(landing).not.toContain("getTrainingTimelineReport");
+    expect(landing).not.toContain("loadCanonicalRuntime");
     expect(library).toContain("<TrainingTimelineSelector");
     expect(reporting).toContain("<TrainingTimelineSelector");
     expect(library).toContain("showSourceWorkouts: false");

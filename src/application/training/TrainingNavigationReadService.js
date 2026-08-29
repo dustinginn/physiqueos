@@ -1,6 +1,12 @@
 import { createTrainingDayReadModel } from "./TrainingReadService.js";
-import { createTrainingNavigationReport } from "../../domain/services/ProgressReportingService.js";
-import { createTrainingEvidenceContext } from "../../domain/services/TrainingEvidenceContextService.js";
+import {
+  createTrainingLandingReports,
+  createTrainingNavigationReport,
+} from "../../domain/services/ProgressReportingService.js";
+import {
+  createTrainingEvidenceContext,
+  mergeTrainingBreakdowns,
+} from "../../domain/services/TrainingEvidenceContextService.js";
 import { createTrainingLibraryExerciseRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExerciseIdentity.js";
 
@@ -8,6 +14,48 @@ export function createTrainingNavigationReadService({ store } = {}) {
   if (!store?.run) throw new Error("Training navigation requires a read store.");
 
   return Object.freeze({
+    getLanding({ context, currentDate = new Date() } = {}) {
+      return store.run("training.landing", async () => {
+        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+          store.getUser(),
+          store.listGoals(),
+          store.listCanonicalTrainingAndActivityEvidenceObjects(),
+        ]);
+        const timeline = createTrainingEvidenceContext({
+          context,
+          currentDate,
+          goals,
+          user,
+        });
+        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+          (record.payload ?? record).evidence_type === "training"
+        );
+        const evidencePackages = hasCanonicalTraining
+          ? []
+          : await store.listEvidencePackages();
+        const { globalReport, scopedReport } = createTrainingLandingReports({
+          canonicalEvidenceObjects,
+          dateWindow: timeline.goalScoped
+            ? { startDate: timeline.startDate, endDate: timeline.endDate }
+            : null,
+          evidencePackages,
+          goals,
+        });
+        return Object.freeze({
+          timeline,
+          report: timeline.goalScoped
+            ? Object.freeze({
+                ...scopedReport,
+                trainingBreakdowns: mergeTrainingBreakdowns({
+                  globalBreakdowns: globalReport.trainingBreakdowns,
+                  scopedBreakdowns: scopedReport.trainingBreakdowns,
+                }),
+                trainingLibrary: globalReport.trainingLibrary,
+              })
+            : globalReport,
+        });
+      });
+    },
     getDay({ date, timeZone = null } = {}) {
       return store.run("training.navigation.day", async () => {
         const user = await store.getUser();

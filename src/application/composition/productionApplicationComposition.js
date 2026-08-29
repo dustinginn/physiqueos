@@ -22,6 +22,11 @@ import {
   createRepositoryTrainingNavigationReadStore,
 } from "../../platform/database/PostgresTrainingNavigationReadStore.js";
 import { createTrainingNavigationReadService } from "../training/TrainingNavigationReadService.js";
+import {
+  createPostgresProgressHubReadStore,
+  createRepositoryProgressHubReadStore,
+} from "../../platform/database/PostgresProgressHubReadStore.js";
+import { createProgressHubReadService } from "../progress/ProgressHubReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -59,6 +64,13 @@ export function getProductionTrainingNavigationReadService(env = process.env) {
     ? createProviderTrainingNavigationReadStore(env)
     : createRepositoryTrainingNavigationReadStore({ repositories: LegacyFounderRepositories });
   return createTrainingNavigationReadService({ store });
+}
+
+export function getProductionProgressHubReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderProgressHubReadStore(env)
+    : createRepositoryProgressHubReadStore({ repositories: LegacyFounderRepositories });
+  return createProgressHubReadService({ store });
 }
 
 export function getProductionProviderReadinessComposition(env = process.env) {
@@ -218,6 +230,17 @@ function createProviderTrainingNavigationReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.training_navigation_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderProgressHubReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresProgressHubReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.progress_hub_read.complete", event)
       : null,
   });
 }

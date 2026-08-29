@@ -4,10 +4,41 @@ import { createAuthenticationPrincipal } from "../auth/principal.js";
 import { createTrainingPerformanceEvent } from "../../domain/models/trainingPerformanceEvent.js";
 import { createTrainingReadService } from "./TrainingReadService.js";
 import { createTrainingNavigationReadService } from "./TrainingNavigationReadService.js";
+import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
+import { getTrainingTimelineReport } from "../../domain/services/TrainingEvidenceContextService.js";
+import { createRepositoryTrainingNavigationReadStore } from "../../platform/database/PostgresTrainingNavigationReadStore.js";
 
 const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId: "device-one", sessionId: "session-one" });
 
 describe("provider-native Training navigation", () => {
+  it.each(["all", "build-lean-mass"])(
+    "keeps the Training landing output equivalent for %s without broad report fields",
+    async (context) => {
+      const runtime = createPhase5SyntheticRuntime();
+      const narrowRepositories = createSeedRepositories(structuredClone(runtime), {
+        allowStagedMutations: false,
+      });
+      const legacyRepositories = createSeedRepositories(structuredClone(runtime), {
+        allowStagedMutations: false,
+      });
+      const narrow = await createTrainingNavigationReadService({
+        store: createRepositoryTrainingNavigationReadStore({
+          repositories: narrowRepositories,
+        }),
+      }).getLanding({ context });
+      const legacy = await getTrainingTimelineReport({
+        context,
+        repositories: legacyRepositories,
+      });
+
+      expect(narrow.timeline).toEqual(legacy.timeline);
+      expect(projectLanding(narrow.report)).toEqual(projectLanding(legacy.report));
+      expect(narrow.report).not.toHaveProperty("resistancePerformance");
+      expect(narrow.report).not.toHaveProperty("trainingPatterns");
+    }
+  );
+
   it("keeps Training Day output equivalent while using the date-scoped read", async () => {
     const records = [training("session-a", "2026-08-26", "2026-08-26T08:00:00-07:00"), training("session-b", "2026-08-27")];
     const legacy = createTrainingReadService({ repositories: repositories(records) });
@@ -89,6 +120,7 @@ function navigationStore(records, events = []) {
     run: vi.fn((_name, callback) => callback()),
     getUser: vi.fn(async () => user),
     listGoals: vi.fn(async () => [{ id: "goal-build", type: "build_lean_mass", status: "active", updatedAt: "2026-08-15" }]),
+    listCanonicalTrainingAndActivityEvidenceObjects: vi.fn(async () => records),
     getCanonicalEvidenceObject: vi.fn(async (id) => records.find((record) => record.canonicalId === id) ?? null),
     listCanonicalTrainingEvidenceObjects: vi.fn(async () => records),
     listCanonicalTrainingEvidenceForDate: vi.fn(async (date) => records.filter((record) => record.payload.observed_at.slice(0, 10) === date)),
@@ -96,6 +128,30 @@ function navigationStore(records, events = []) {
     listEvidencePackages: vi.fn(async () => []),
     listTrainingPerformanceEventsByExercise: vi.fn(async (id) => events.filter((event) => event.canonicalExerciseId === id)),
   };
+}
+
+function projectLanding(report) {
+  const fields = [
+    "id",
+    "title",
+    "description",
+    "tone",
+    "status",
+    "summary",
+    "dataSources",
+    "entries",
+    "relatedGoals",
+    "latestTrainingDay",
+    "currentProtocol",
+    "reportingLinks",
+    "trainingLibrary",
+    "trainingDays",
+    "trainingBreakdowns",
+    "sourceEvidence",
+    "reportPattern",
+    "evidenceWindow",
+  ];
+  return Object.fromEntries(fields.map((field) => [field, report[field]]));
 }
 
 function repositories(records) {

@@ -14,6 +14,7 @@ export default defineConfig({
       "src/application/commands/CanonicalPersistenceCommandPorts.test.js",
       "src/platform/database/phase4PersistenceSecurity.test.js",
       "src/platform/database/PostgresTrainingNavigationReadStore.test.js",
+      "src/platform/database/PostgresProgressHubReadStore.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

@@ -47,6 +47,13 @@ export function createPostgresTrainingNavigationReadStore({
       return users.find((user) => user?.id === ownerUserId) ?? users[0] ?? null;
     },
     listGoals: () => list("goals"),
+    listCanonicalTrainingAndActivityEvidenceObjects: () => queryRecords(
+      `SELECT payload,version FROM physiqueos.canonical_evidence_records
+       WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+         AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type') IN ('training','activity_day')
+       ORDER BY record_id`,
+      [ownerUserId]
+    ),
     getCanonicalEvidenceObject: (recordId) => records.get({ ownerUserId, collection: "canonicalEvidenceObjects", recordId }),
     listCanonicalTrainingEvidenceObjects: () => queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
@@ -94,6 +101,8 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
     run: (_readModel, callback) => callback(),
     getUser: () => repositories.users.getCurrentUser(),
     listGoals: async () => repositories.goals.listGoals((await repositories.users.getCurrentUser())?.id),
+    listCanonicalTrainingAndActivityEvidenceObjects: async () => (await repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id))
+      .filter((record) => ["training", "activity_day"].includes((record.payload ?? record).evidence_type)),
     getCanonicalEvidenceObject: async (recordId) => repositories.canonicalEvidence.getCanonicalEvidenceObjectById?.(recordId) ?? null,
     listCanonicalTrainingEvidenceObjects: async () => repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id),
     listCanonicalTrainingEvidenceByExercise: async (canonicalExerciseId) => (await repositories.canonicalEvidence.listCanonicalEvidenceObjects((await repositories.users.getCurrentUser())?.id))

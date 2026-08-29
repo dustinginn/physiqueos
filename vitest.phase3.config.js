@@ -13,6 +13,7 @@ export default defineConfig({
       "src/application/briefings/BriefingReadService.test.js",
       "src/application/training/TrainingReadService.test.js",
       "src/application/training/TrainingNavigationReadService.test.js",
+      "src/application/progress/ProgressHubReadService.test.js",
       "src/application/platform/openApiConsistency.test.js",
       "src/domain/services/EvidenceHubUsageService.test.js",
       "src/domain/services/ProgressReadSafety.test.js",

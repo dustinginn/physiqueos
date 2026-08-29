@@ -46,4 +46,31 @@ describe("PostgreSQL Training navigation read store", () => {
     await store.run("session", () => store.getCanonicalEvidenceObject("canonical-session"));
     expect(query).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the Training landing to three narrow reads and zero runtime loads", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const complete = vi.fn();
+    const store = createPostgresTrainingNavigationReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+      ownerUserId: "owner-one",
+      onComplete: complete,
+    });
+
+    await store.run("training.landing", async () => {
+      await Promise.all([
+        store.getUser(),
+        store.listGoals(),
+        store.listCanonicalTrainingAndActivityEvidenceObjects(),
+      ]);
+    });
+
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      readModel: "training.landing",
+      queryCount: 3,
+      compatibilityRuntimeLoadCount: 0,
+    }));
+    expect(query.mock.calls.map(([sql]) => sql).join("\n"))
+      .not.toContain("loadCanonicalRuntime");
+  });
 });

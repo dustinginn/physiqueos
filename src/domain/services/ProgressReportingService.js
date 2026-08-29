@@ -511,6 +511,67 @@ function buildProgressHub(context) {
   };
 }
 
+export function createProviderProgressHubReport({
+  analyses = [],
+  canonicalEvidenceObjects = [],
+  dexaScans = [],
+  evidencePackages = [],
+  nutritionContext = null,
+  progressPhotos = [],
+  protocols = [],
+  userId = null,
+  weights = [],
+} = {}) {
+  const canonicalPayloads = getCanonicalPayloads({
+    canonicalEvidenceObjects,
+    evidencePackages,
+  });
+  const trainingSessions = sortByDate(
+    canonicalPayloads.filter(isTrainingSession),
+    "observed_at"
+  );
+  const activityDays = getActivityDaysWithTrainingAggregates({
+    explicitActivityDays: sortByDate(
+      canonicalPayloads.filter(isActivityDay),
+      "observed_at"
+    ),
+    trainingSessions,
+  });
+  const derivedProgressPhotos = deriveProgressPhotosFromEvidencePackages({
+    evidencePackages,
+    existingProgressPhotos: progressPhotos,
+    userId,
+  });
+  const usableProgressPhotos = [...progressPhotos, ...derivedProgressPhotos]
+    .filter(isUsableProgressPhoto);
+  const orderedWeights = sortByDate(weights, "measuredAt");
+  const orderedDEXA = sortByDate(dexaScans, "measuredAt");
+  const photoSessions = createPhotoSessionReadModels({
+    analyses,
+    canonicalObjects: canonicalEvidenceObjects,
+    legacyPhotos: usableProgressPhotos,
+    weights: orderedWeights,
+  });
+  const report = buildProgressHub({
+    activityDays,
+    dexaScans: orderedDEXA,
+    nutritionContext,
+    nutritionDays: sortByDate(
+      canonicalPayloads.filter(isNutritionDay),
+      "observed_at"
+    ),
+    photoSessions,
+    progressPhotos: sortByDate(usableProgressPhotos, "date"),
+    protocols: sortByDate(protocols, "startDate"),
+    trainingSessions,
+    weights: orderedWeights,
+  });
+  return Object.freeze({
+    ...report,
+    streams: Object.freeze(orderEvidenceStreams(report.streams)),
+  });
+}
+
 function buildWeightReport(
   { weights, dexaScans, goals },
   { summaryContextId = "all" } = {}
@@ -905,12 +966,10 @@ function toGalleryEvidenceRecord(view) {
 }
 
 function getTrainingReportExtras(context) {
+  const landing = getTrainingLandingExtras(context);
   const { nutritionContext, trainingSessions = [], activityDays = [] } = context;
   const burn = nutritionContext?.estimatedDailyActiveCalorieBurn;
-  const records = getTrainingRecords(context);
-  const activityRecords = getActivityDayRecords(context);
   const latestActivityDay = activityDays.at(-1);
-  const trainingDays = getTrainingDays(records);
   const understanding = getTrainingUnderstanding({
     activityDays,
     trainingSessions,
@@ -921,24 +980,11 @@ function getTrainingReportExtras(context) {
   });
 
   return {
-    entries: records.length > 0 ? records : activityRecords,
-    latestTrainingDay: trainingDays[0] ?? null,
-    currentProtocol: {
-      sourceOfTruth: "User-defined",
-      dailyActivityTarget: "~1000 active calories/day",
-      resistanceTraining: "Maintain lean mass while cutting",
-      goal: "Visible abs while preserving lean mass",
-    },
-    reportingLinks: getTrainingReportingLinks(),
-    trainingLibrary: getTrainingLibrary({
-      breakdowns: trainingBreakdowns,
-      understanding,
-    }),
+    ...landing,
     trainingPatterns: getTrainingPatterns({
       breakdowns: trainingBreakdowns,
       understanding,
     }),
-    trainingDays,
     trainingOverview: [
       {
         label: "Sessions",
@@ -971,9 +1017,7 @@ function getTrainingReportExtras(context) {
         }`,
       },
     ],
-    trainingBreakdowns,
     resistancePerformance,
-    sourceEvidence: getTrainingSourceEvidence(trainingSessions),
     educationalContext: burn
       ? `Estimated from Apple Watch context at ${burn.value} ${burn.unit}/day with an expected wearable margin of error near ${burn.marginOfErrorPercent}%.`
       : trainingSessions.length > 0
@@ -987,6 +1031,96 @@ function getTrainingReportExtras(context) {
       : null,
     reportPattern: "Latest training day -> current protocol -> reporting -> training areas -> recent training history.",
   };
+}
+
+function getTrainingLandingExtras(context) {
+  const { trainingSessions = [], activityDays = [] } = context;
+  const records = getTrainingRecords(context);
+  const activityRecords = getActivityDayRecords(context);
+  const trainingDays = getTrainingDays(records);
+  const understanding = getTrainingUnderstanding({
+    activityDays,
+    trainingSessions,
+  });
+  const trainingBreakdowns = getTrainingBreakdowns(trainingSessions);
+
+  return {
+    entries: records.length > 0 ? records : activityRecords,
+    latestTrainingDay: trainingDays[0] ?? null,
+    currentProtocol: {
+      sourceOfTruth: "User-defined",
+      dailyActivityTarget: "~1000 active calories/day",
+      resistanceTraining: "Maintain lean mass while cutting",
+      goal: "Visible abs while preserving lean mass",
+    },
+    reportingLinks: getTrainingReportingLinks(),
+    trainingLibrary: getTrainingLibrary({
+      breakdowns: trainingBreakdowns,
+      understanding,
+    }),
+    trainingDays,
+    trainingBreakdowns,
+    sourceEvidence: getTrainingSourceEvidence(trainingSessions),
+    reportPattern: "Latest training day -> current protocol -> reporting -> training areas -> recent training history.",
+  };
+}
+
+export function createTrainingLandingReports({
+  canonicalEvidenceObjects = [],
+  dateWindow = null,
+  evidencePackages = [],
+  goals = [],
+} = {}) {
+  const canonicalPayloads = getCanonicalPayloads({
+    canonicalEvidenceObjects,
+    evidencePackages,
+  });
+  const trainingSessions = sortByDate(
+    canonicalPayloads.filter(isTrainingSession),
+    "observed_at"
+  );
+  const activityDays = getActivityDaysWithTrainingAggregates({
+    explicitActivityDays: sortByDate(
+      canonicalPayloads.filter(isActivityDay),
+      "observed_at"
+    ),
+    trainingSessions,
+  });
+  const context = {
+    activityDays,
+    dexaScans: [],
+    goals,
+    nutritionContext: null,
+    nutritionDays: [],
+    photoSessions: [],
+    progressPhotos: [],
+    protocols: [],
+    trainingSessions,
+    weights: [],
+  };
+  const globalReport = buildTrainingLandingReport(context, null);
+  const scopedReport = dateWindow
+    ? buildTrainingLandingReport({
+        ...context,
+        trainingSessions: trainingSessions.filter((session) =>
+          isInsideDateWindow(session.observed_at, dateWindow)
+        ),
+      }, dateWindow)
+    : globalReport;
+  return Object.freeze({ globalReport, scopedReport });
+}
+
+function buildTrainingLandingReport(context, evidenceWindow) {
+  const stream = buildProgressHub(context).streams.find(
+    (item) => item.id === "training"
+  );
+  return Object.freeze({
+    ...stream,
+    dataSources: getDataSources("training"),
+    relatedGoals: getStreamRelatedGoals("training", context.goals),
+    ...getTrainingLandingExtras(context),
+    evidenceWindow,
+  });
 }
 
 function getProtocolReportExtras({ protocols }) {
