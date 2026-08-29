@@ -32,22 +32,23 @@ describe("provider-native Progress hub", () => {
       userId: "owner-one",
       weights: [],
       dexaScans: [],
-      progressPhotos: [{ id: "photo", userId: "owner-one", date: "2026-08-01", status: "available", fileReference: "private/photo.jpg" }],
+      photoInputs: {
+        canonicalPhotoSessionObjects: [],
+        progressPhotos: [{ id: "photo", userId: "owner-one", date: "2026-08-01", status: "available", fileReference: "private/photo.jpg" }],
+      },
       protocols: [],
       nutritionContext: null,
       canonicalEvidenceObjects: [],
-      analyses: [],
     };
     const store = {
       run: vi.fn((_name, callback) => callback()),
       getOwnerUserId: vi.fn(async () => values.userId),
       listWeightEntries: vi.fn(async () => values.weights),
       listDEXAScans: vi.fn(async () => values.dexaScans),
-      listProgressPhotos: vi.fn(async () => values.progressPhotos),
+      getProgressHubPhotoInputs: vi.fn(async () => values.photoInputs),
       listProtocols: vi.fn(async () => values.protocols),
       getNutritionContext: vi.fn(async () => values.nutritionContext),
       listProgressHubCanonicalEvidenceObjects: vi.fn(async () => values.canonicalEvidenceObjects),
-      listAnalyses: vi.fn(async () => values.analyses),
       listEvidencePackages: vi.fn(async () => []),
     };
 
@@ -55,7 +56,21 @@ describe("provider-native Progress hub", () => {
 
     expect(store.run).toHaveBeenCalledWith("progress.hub", expect.any(Function));
     expect(store.listProgressHubCanonicalEvidenceObjects).toHaveBeenCalledOnce();
+    expect(store.getProgressHubPhotoInputs).toHaveBeenCalledOnce();
     expect(store.listEvidencePackages).not.toHaveBeenCalled();
+  });
+
+  it("does not hydrate analyses or detailed photo comparisons for the landing screen", () => {
+    const service = fs.readFileSync("src/application/progress/ProgressHubReadService.js", "utf8");
+    const reporting = fs.readFileSync("src/domain/services/ProgressReportingService.js", "utf8");
+    const providerHub = reporting.slice(
+      reporting.indexOf("export function createProviderProgressHubReport"),
+      reporting.indexOf("function buildWeightReport")
+    );
+
+    expect(service).not.toMatch(/listAnalyses|createPhotoSessionReadModels/);
+    expect(providerHub).toContain("createPhotoSessionLandingSummary");
+    expect(providerHub).not.toContain("createPhotoSessionReadModels");
   });
 
   it("removes compatibility runtime composition from the Progress route", () => {

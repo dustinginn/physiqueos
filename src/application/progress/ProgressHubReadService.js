@@ -10,38 +10,32 @@ export function createProgressHubReadService({ store } = {}) {
           userId,
           weights,
           dexaScans,
-          progressPhotos,
+          photoInputs,
           protocols,
           nutritionContext,
           canonicalEvidenceObjects,
-          analyses,
         ] = await Promise.all([
           store.getOwnerUserId(),
           store.listWeightEntries(),
           store.listDEXAScans(),
-          store.listProgressPhotos(),
+          store.getProgressHubPhotoInputs(),
           store.listProtocols(),
           store.getNutritionContext(),
           store.listProgressHubCanonicalEvidenceObjects(),
-          store.listAnalyses(),
         ]);
-        const hasPhotoEvidence = progressPhotos.length > 0 ||
-          canonicalEvidenceObjects.some((record) =>
-            ["photo_session", "progress_photo"].includes(
-              (record.payload ?? record).evidence_type
-            )
-          );
+        const hasPhotoEvidence = photoInputs.progressPhotos.length > 0 ||
+          photoInputs.canonicalPhotoSessionObjects.length > 0;
         const evidencePackages = hasPhotoEvidence
           ? []
           : await store.listEvidencePackages();
 
         return createProviderProgressHubReport({
-          analyses,
+          canonicalPhotoSessionObjects: photoInputs.canonicalPhotoSessionObjects,
           canonicalEvidenceObjects,
           dexaScans,
           evidencePackages,
           nutritionContext,
-          progressPhotos,
+          progressPhotos: photoInputs.progressPhotos,
           protocols,
           userId,
           weights,

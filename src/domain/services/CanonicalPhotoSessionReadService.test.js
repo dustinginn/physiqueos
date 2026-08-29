@@ -1,13 +1,35 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService";
+import {
+  createPhotoSessionLandingSummary,
+  createPhotoSessionReadModels,
+} from "./CanonicalPhotoSessionReadService";
 
 function canonicalSession(date = "2026-07-11") {
   return { canonicalId: `session_${date}`, evidence_type: "photo_session", lastObservedAt: date, quality: { status: "active" }, provenance: { source_artifact_refs: ["front", "rear", "flex", "retry"] }, payload: { captureDate: date, completionState: "complete", synthesisStatus: "complete", sessionConditions: { morning: { value: false }, fasted: { value: false }, postWorkout: { value: true }, pump: { value: "unknown" } }, photos: [{ canonicalPhotoId: "front", view: "front", pose: "relaxed", status: "active", storage_path: "front.jpg" }, { canonicalPhotoId: "rear", view: "back", pose: "relaxed", status: "active", storage_path: "rear.jpg" }, { canonicalPhotoId: "flex", view: "back", pose: "flexed", status: "active", storage_path: "flex.jpg" }, { canonicalPhotoId: "retry", view: "back", pose: "flexed", status: "duplicate", storage_path: "retry.jpg", sourceIds: ["retry-source"] }] } };
 }
 
 describe("CanonicalPhotoSessionReadService", () => {
+  it("derives the compact landing date and count without detailed comparison hydration", () => {
+    const current = canonicalSession("2026-07-11");
+    const prior = canonicalSession("2026-07-03");
+    prior.payload.photos = prior.payload.photos.map((photo, index) => ({
+      ...photo,
+      canonicalPhotoId: `prior-${index}`,
+      storage_path: `prior-${index}.jpg`,
+    }));
+    const canonicalObjects = [current, prior];
+    const detailed = createPhotoSessionReadModels({ canonicalObjects });
+    const summary = createPhotoSessionLandingSummary({ canonicalObjects });
+
+    expect(summary).toEqual({
+      count: detailed.length,
+      latestDate: detailed[0].captureDate,
+    });
+    expect(Object.isFrozen(summary)).toBe(true);
+  });
+
   it("routes migrated canonical media references through the private evidence boundary", () => {
     const canonical = canonicalSession("2026-08-14");
     const objectId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";

@@ -23,6 +23,7 @@ import {
 } from "./CanonicalReadModel";
 import { orderWeeklyAveragesNewestFirst } from "../utils/weeklyAverageOrdering";
 import {
+  createPhotoSessionLandingSummary,
   createPhotoSessionReadModels,
   reconcilePhotoSessionComparisons,
 } from "./CanonicalPhotoSessionReadService";
@@ -314,10 +315,10 @@ function buildProgressHub(context) {
   const latestWeight = weights.at(-1);
   const firstWeight = weights.at(0);
   const latestDEXA = dexaScans.at(-1);
-  const latestPhoto = context.photoSessions?.[0] ?? progressPhotos.at(-1);
-  const reportPhotos = context.photoSessions ?? [];
+  const latestPhoto = context.photoSummary?.latestDate
+    ? { captureDate: context.photoSummary.latestDate }
+    : context.photoSessions?.[0] ?? progressPhotos.at(-1);
   const activeProtocols = protocols.filter((item) => item.status === "active");
-  const photoSetCount = reportPhotos.length;
   const latestTrainingSession = trainingSessions.at(-1);
   const latestActivityDay = activityDays.at(-1);
   const trainingUnderstanding = getTrainingUnderstanding({
@@ -512,7 +513,7 @@ function buildProgressHub(context) {
 }
 
 export function createProviderProgressHubReport({
-  analyses = [],
+  canonicalPhotoSessionObjects = [],
   canonicalEvidenceObjects = [],
   dexaScans = [],
   evidencePackages = [],
@@ -546,11 +547,9 @@ export function createProviderProgressHubReport({
     .filter(isUsableProgressPhoto);
   const orderedWeights = sortByDate(weights, "measuredAt");
   const orderedDEXA = sortByDate(dexaScans, "measuredAt");
-  const photoSessions = createPhotoSessionReadModels({
-    analyses,
-    canonicalObjects: canonicalEvidenceObjects,
+  const photoSummary = createPhotoSessionLandingSummary({
+    canonicalObjects: canonicalPhotoSessionObjects,
     legacyPhotos: usableProgressPhotos,
-    weights: orderedWeights,
   });
   const report = buildProgressHub({
     activityDays,
@@ -560,7 +559,7 @@ export function createProviderProgressHubReport({
       canonicalPayloads.filter(isNutritionDay),
       "observed_at"
     ),
-    photoSessions,
+    photoSummary,
     progressPhotos: sortByDate(usableProgressPhotos, "date"),
     protocols: sortByDate(protocols, "startDate"),
     trainingSessions,

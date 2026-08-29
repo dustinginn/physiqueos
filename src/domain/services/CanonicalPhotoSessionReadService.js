@@ -35,6 +35,74 @@ export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhot
   return finalizeComparisons([...canonicalSessions, ...legacySessions].sort((left, right) => right.captureDate.localeCompare(left.captureDate)));
 }
 
+export function createPhotoSessionLandingSummary({ canonicalObjects = [], legacyPhotos = [] } = {}) {
+  const canonicalCandidates = canonicalObjects
+    .filter((item) => item.evidence_type === "photo_session" && item.quality?.status !== "superseded")
+    .map((item) => buildCanonicalLandingSession(item, legacyPhotos));
+  const canonicalByFingerprint = new Map();
+  canonicalCandidates.forEach((session) => {
+    const existing = canonicalByFingerprint.get(session.sessionFingerprint);
+    canonicalByFingerprint.set(
+      session.sessionFingerprint,
+      existing ? selectCanonicalSessionOwner(existing, session) : session
+    );
+  });
+  const canonicalSessions = [...canonicalByFingerprint.values()];
+  const ownedSourceIds = new Set(canonicalSessions.flatMap((session) => [
+    ...session.activeSourceIds,
+    ...session.inactiveSourceReferences,
+  ]));
+  const canonicalAssetKeys = new Set([
+    ...canonicalSessions.flatMap((session) => session.assetKeys),
+    ...legacyPhotos
+      .filter((photo) => ownedSourceIds.has(photo.id))
+      .map((photo) => stableAssetKey(photo.imagePath, [])),
+  ]);
+  const legacyDates = new Set(legacyPhotos
+    .filter((photo) =>
+      !canonicalAssetKeys.has(stableAssetKey(photo.imagePath, [])) &&
+      isUsableLegacyPhoto(photo)
+    )
+    .map((photo) => dateKey(photo.date ?? photo.capturedAt))
+    .filter(Boolean));
+  const dates = [
+    ...canonicalSessions.map((session) => session.captureDate).filter(Boolean),
+    ...legacyDates,
+  ].sort((left, right) => right.localeCompare(left));
+
+  return Object.freeze({ count: dates.length, latestDate: dates[0] ?? null });
+}
+
+function buildCanonicalLandingSession(object, legacyPhotos) {
+  const payload = object.payload ?? {};
+  const activePhotos = uniqueActivePhotos(payload.photos ?? [], legacyPhotos).sort(comparePoses);
+  const inactivePhotos = (payload.photos ?? [])
+    .filter((photo) => INACTIVE.has(photo.status) || photo.active === false);
+
+  return {
+    id: object.canonicalId,
+    activeViewCount: activePhotos.length,
+    hasStableSessionIdentity: payload.sessionId === object.canonicalId,
+    captureDate: resolveVisibleEvidenceDate({
+      payload,
+      object,
+      activePhotos,
+      legacyPhotos,
+    }),
+    sessionFingerprint: createSessionFingerprint(
+      activePhotos.map((photo) => resolveCanonicalAsset(photo, legacyPhotos))
+    ),
+    activeSourceIds: unique(activePhotos.flatMap((photo) => photo.sourceIds ?? [])),
+    inactiveSourceReferences: unique([
+      ...(payload.duplicateRetrySourceReferences ?? []),
+      ...inactivePhotos.flatMap((photo) => photo.sourceIds ?? []),
+    ]),
+    assetKeys: activePhotos.map((photo) =>
+      stableAssetKey(resolveCanonicalAsset(photo, legacyPhotos)?.path, [])
+    ),
+  };
+}
+
 export function reconcilePhotoSessionComparisons(sessions = []) {
   return finalizeComparisons(
     sessions.map((session) => ({

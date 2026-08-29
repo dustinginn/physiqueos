@@ -3,8 +3,6 @@ import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.j
 const HUB_EVIDENCE_TYPES = Object.freeze([
   "activity_day",
   "nutrition",
-  "photo_session",
-  "progress_photo",
   "training",
 ]);
 
@@ -56,13 +54,36 @@ export function createPostgresProgressHubReadStore({
     getOwnerUserId: async () => ownerUserId,
     listWeightEntries: () => list("weightEntries"),
     listDEXAScans: () => list("dexaScans"),
-    listProgressPhotos: () => list("progressPhotos"),
+    async getProgressHubPhotoInputs() {
+      queryCount += 1;
+      const result = await pool.query(
+        `SELECT record_kind,payload,version FROM (
+           SELECT 'canonical'::text AS record_kind,record_id,payload,version
+             FROM physiqueos.canonical_evidence_records
+            WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+              AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='photo_session'
+           UNION ALL
+           SELECT 'legacy'::text AS record_kind,record_id,payload,version
+             FROM physiqueos.canonical_evidence_records
+            WHERE owner_user_id=$1 AND collection_name='progressPhotos'
+         ) AS progress_photo_inputs
+         ORDER BY record_kind,record_id`,
+        [ownerUserId]
+      );
+      return Object.freeze({
+        canonicalPhotoSessionObjects: Object.freeze(result.rows
+          .filter((row) => row.record_kind === "canonical")
+          .map((row) => Object.freeze({ ...row.payload, version: Number(row.version) }))),
+        progressPhotos: Object.freeze(result.rows
+          .filter((row) => row.record_kind === "legacy")
+          .map((row) => Object.freeze({ ...row.payload, version: Number(row.version) }))),
+      });
+    },
     listProtocols: () => list("protocols"),
     async getNutritionContext() {
       const contexts = await list("nutritionContext");
       return contexts.at(-1) ?? null;
     },
-    listAnalyses: () => list("analyses"),
     listEvidencePackages: () => list("evidencePackages"),
     listProgressHubCanonicalEvidenceObjects: () => queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_evidence_records
@@ -86,10 +107,20 @@ export function createRepositoryProgressHubReadStore({ repositories } = {}) {
     getOwnerUserId: userId,
     listWeightEntries: async () => repositories.weights.listWeightEntries(await userId()),
     listDEXAScans: async () => repositories.dexaScans.listDEXAScans(await userId()),
-    listProgressPhotos: async () => repositories.progressPhotos?.listPhotos(await userId()) ?? [],
+    async getProgressHubPhotoInputs() {
+      const ownerUserId = await userId();
+      const [canonicalEvidenceObjects, progressPhotos] = await Promise.all([
+        repositories.canonicalEvidence?.listCanonicalEvidenceObjects(ownerUserId) ?? [],
+        repositories.progressPhotos?.listPhotos(ownerUserId) ?? [],
+      ]);
+      return Object.freeze({
+        canonicalPhotoSessionObjects: Object.freeze(canonicalEvidenceObjects
+          .filter((record) => (record.payload ?? record).evidence_type === "photo_session")),
+        progressPhotos: Object.freeze(progressPhotos),
+      });
+    },
     listProtocols: async () => repositories.protocols.listProtocols(await userId()),
     getNutritionContext: async () => repositories.nutritionContext.getNutritionContext(await userId()),
-    listAnalyses: async () => repositories.analyses?.listAnalyses(await userId()) ?? [],
     listEvidencePackages: async () => repositories.evidencePackages?.listEvidencePackages(await userId()) ?? [],
     listProgressHubCanonicalEvidenceObjects: async () =>
       (await repositories.canonicalEvidence?.listCanonicalEvidenceObjects(await userId()) ?? [])
