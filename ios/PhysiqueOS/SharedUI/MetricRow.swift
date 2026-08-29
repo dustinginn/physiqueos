@@ -13,10 +13,10 @@ struct MetricRow: View {
             IconBadge(systemImage: systemImage, color: .evidence, size: .sm)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.system(size: 10, weight: .medium))
+                    .physiqueOSFont(PhysiqueOSTypography.metricLabel)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 Text(value)
-                    .font(.system(size: 14, weight: .heavy))
+                    .physiqueOSFont(PhysiqueOSTypography.metricValue)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     .lineLimit(1)
             }

@@ -22,18 +22,17 @@ struct GoalRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 if isPrimary {
-                    Text("PRIMARY GOAL")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(0.8)
+                    Text("Primary Goal")
+                        .physiqueOSFont(PhysiqueOSTypography.primaryGoalEyebrow)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                 }
                 Text(goal.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .physiqueOSFont(PhysiqueOSTypography.goalTitle)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     .lineLimit(1)
                 if isPrimary {
                     Text("\(goal.current)\(goal.unit) → \(goal.target)\(goal.unit)")
-                        .font(.system(size: 12, weight: .medium))
+                        .physiqueOSFont(PhysiqueOSTypography.goalRange)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
@@ -68,22 +67,20 @@ struct GoalRowView: View {
                     .frame(width: 64)
                 VStack(alignment: .trailing, spacing: 1) {
                     Text("\(progress)%")
-                        .font(.system(size: 18, weight: .bold))
+                        .physiqueOSFont(PhysiqueOSTypography.goalProgressValue)
                         .foregroundStyle(goal.color.foreground)
-                    Text("COMPLETE")
-                        .font(.system(size: 7, weight: .bold))
-                        .tracking(0.6)
+                    Text("Complete")
+                        .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
         case .supporting(let status, let detail):
             VStack(alignment: .trailing, spacing: 2) {
                 Text(status)
-                    .font(.system(size: 13, weight: .bold))
+                    .physiqueOSFont(PhysiqueOSTypography.goalStatusValue)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(detail)
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.4)
+                    .physiqueOSFont(PhysiqueOSTypography.goalStatusDetail)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)

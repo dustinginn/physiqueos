@@ -10,13 +10,13 @@ struct HomeHeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(header.greeting)
-                .font(.system(size: 17, weight: .medium))
+                .physiqueOSFont(PhysiqueOSTypography.greeting)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
             (
                 Text(header.name).foregroundStyle(PhysiqueOSTheme.textPrimary)
                     + Text(".").foregroundStyle(PhysiqueOSTheme.accent)
             )
-            .font(.system(size: 34, weight: .bold))
+            .physiqueOSFont(PhysiqueOSTypography.displayName)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

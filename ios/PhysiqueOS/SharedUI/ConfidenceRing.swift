@@ -16,6 +16,7 @@ struct ConfidenceRing: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var fraction: Double { Double(min(max(value, 0), 100)) / 100 }
+    private var labelFontSize: CGFloat { PhysiqueOSTypography.confidenceLabelFontSize(ringDiameter: size) }
 
     var body: some View {
         ZStack {
@@ -26,12 +27,16 @@ struct ConfidenceRing: View {
                 .stroke(PhysiqueOSTheme.confidence, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
+                // Intentionally not Dynamic-Type-scaled: sized purely from
+                // the ring's own diameter, matching both the web source
+                // and common native fixed-badge convention. See
+                // `PhysiqueOSTypography.confidenceValueFontSize`.
                 Text("\(value)%")
-                    .font(.system(size: max(18, size * 0.24), weight: .bold))
+                    .font(.system(size: PhysiqueOSTypography.confidenceValueFontSize(ringDiameter: size), weight: .bold))
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(label.uppercased())
-                    .font(.system(size: max(8, size * 0.07), weight: .bold))
-                    .tracking(0.6)
+                    .font(.system(size: labelFontSize, weight: .bold))
+                    .tracking(labelFontSize * 0.035)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                     .multilineTextAlignment(.center)
             }

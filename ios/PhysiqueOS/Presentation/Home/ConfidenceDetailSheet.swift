@@ -12,12 +12,17 @@ struct ConfidenceDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Why confidence is \(confidence)%")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Why confidence is \(confidence)%")
+                        .physiqueOSFont(PhysiqueOSTypography.sheetTitle)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text("The evidence currently supporting and limiting the overall trajectory.")
+                        .physiqueOSFont(PhysiqueOSTypography.sheetDescription)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
 
                 Text("Current confidence: \(detail.qualitativeLevel)")
-                    .font(.system(size: 14, weight: .heavy))
+                    .physiqueOSFont(PhysiqueOSTypography.sheetSectionHeading)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
 
                 factorGroup(systemImage: "checkmark.circle.fill", title: "What supports confidence", items: detail.supportingFactors)
@@ -26,7 +31,7 @@ struct ConfidenceDetailSheet: View {
 
                 if !detail.uncertaintyStatement.isEmpty {
                     Text(detail.uncertaintyStatement)
-                        .font(.system(size: 12, weight: .semibold))
+                        .physiqueOSFont(PhysiqueOSTypography.sheetBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -46,7 +51,7 @@ struct ConfidenceDetailSheet: View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Label(title, systemImage: systemImage)
-                    .font(.system(size: 14, weight: .heavy))
+                    .physiqueOSFont(PhysiqueOSTypography.sheetSectionHeading)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     .labelStyle(.titleAndIcon)
                     .tint(PhysiqueOSTheme.accent)
@@ -55,7 +60,7 @@ struct ConfidenceDetailSheet: View {
                         Text("•")
                         Text(item)
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .physiqueOSFont(PhysiqueOSTypography.sheetBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }

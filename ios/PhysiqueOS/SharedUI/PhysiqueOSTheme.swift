@@ -9,6 +9,9 @@ enum PhysiqueOSTheme {
     static let background = Color(hex: 0x080D18)
     static let surfaceElevated = Color(hex: 0x141F31)
     static let surfaceMuted = Color(hex: 0x172235)
+    /// `--surface-accent` in the web dark theme — a distinct tinted
+    /// surface for promotional/entry-point cards (e.g. Training Logger).
+    static let surfaceAccent = Color(hex: 0x20264A)
 
     static let textPrimary = Color(hex: 0xF3F6FB)
     static let textSecondary = Color(hex: 0xCBD5E1)

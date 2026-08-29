@@ -13,43 +13,55 @@
 		000000000000000000001008 /* AppDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001007 /* AppDestination.swift */; };
 		00000000000000000000100A /* AppDestinationCoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001009 /* AppDestinationCoding.swift */; };
 		00000000000000000000100C /* HomeReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100B /* HomeReadModel.swift */; };
-		00000000000000000000100E /* HomeAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100D /* HomeAPI.swift */; };
-		000000000000000000001010 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100F /* PhysiqueOSTheme.swift */; };
-		000000000000000000001012 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* IconBadge.swift */; };
-		000000000000000000001014 /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* CardContainer.swift */; };
-		000000000000000000001016 /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001015 /* SectionHeading.swift */; };
-		000000000000000000001018 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001017 /* StatusChip.swift */; };
-		00000000000000000000101A /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001019 /* ConfidenceRing.swift */; };
-		00000000000000000000101C /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101B /* AnimatedProgressBar.swift */; };
-		00000000000000000000101E /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101D /* MetricRow.swift */; };
-		000000000000000000001020 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101F /* TabPlaceholderView.swift */; };
-		000000000000000000001022 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001021 /* RootTabView.swift */; };
-		000000000000000000001024 /* DestinationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001023 /* DestinationPlaceholderView.swift */; };
-		000000000000000000001026 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001025 /* HomeView.swift */; };
-		000000000000000000001028 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001027 /* HomeViewModel.swift */; };
-		00000000000000000000102A /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001029 /* HomeHeaderView.swift */; };
-		00000000000000000000102C /* HomeHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102B /* HomeHeroCardView.swift */; };
-		00000000000000000000102E /* ConfidenceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102D /* ConfidenceDetailSheet.swift */; };
-		000000000000000000001030 /* NextBestActionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102F /* NextBestActionView.swift */; };
-		000000000000000000001032 /* BriefingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001031 /* BriefingCardView.swift */; };
-		000000000000000000001034 /* GoalRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001033 /* GoalRowView.swift */; };
-		000000000000000000001036 /* FocusTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001035 /* FocusTileView.swift */; };
-		000000000000000000001038 /* TodaysFocusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001037 /* TodaysFocusCardView.swift */; };
-		00000000000000000000103A /* LogPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001039 /* LogPlaceholderView.swift */; };
-		00000000000000000000103C /* ProgressPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103B /* ProgressPlaceholderView.swift */; };
-		00000000000000000000103E /* CoachPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103D /* CoachPlaceholderView.swift */; };
-		000000000000000000001040 /* ProfilePlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103F /* ProfilePlaceholderView.swift */; };
-		000000000000000000001042 /* HomeFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001041 /* HomeFixture.json */; };
-		000000000000000000001044 /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001043 /* AppTabTests.swift */; };
-		000000000000000000001046 /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001045 /* HomeReadModelTests.swift */; };
+		00000000000000000000100E /* LogReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100D /* LogReadModel.swift */; };
+		000000000000000000001010 /* DirectWeighInValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100F /* DirectWeighInValidation.swift */; };
+		000000000000000000001012 /* HomeAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* HomeAPI.swift */; };
+		000000000000000000001014 /* LogAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* LogAPI.swift */; };
+		000000000000000000001016 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001015 /* PhysiqueOSTheme.swift */; };
+		000000000000000000001018 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001017 /* IconBadge.swift */; };
+		00000000000000000000101A /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001019 /* CardContainer.swift */; };
+		00000000000000000000101C /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101B /* SectionHeading.swift */; };
+		00000000000000000000101E /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101D /* StatusChip.swift */; };
+		000000000000000000001020 /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000101F /* ConfidenceRing.swift */; };
+		000000000000000000001022 /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001021 /* AnimatedProgressBar.swift */; };
+		000000000000000000001024 /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001023 /* MetricRow.swift */; };
+		000000000000000000001026 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001025 /* Typography.swift */; };
+		000000000000000000001028 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001027 /* TabPlaceholderView.swift */; };
+		00000000000000000000102A /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001029 /* RootTabView.swift */; };
+		00000000000000000000102C /* DestinationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102B /* DestinationPlaceholderView.swift */; };
+		00000000000000000000102E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102D /* HomeView.swift */; };
+		000000000000000000001030 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000102F /* HomeViewModel.swift */; };
+		000000000000000000001032 /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001031 /* HomeHeaderView.swift */; };
+		000000000000000000001034 /* HomeHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001033 /* HomeHeroCardView.swift */; };
+		000000000000000000001036 /* ConfidenceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001035 /* ConfidenceDetailSheet.swift */; };
+		000000000000000000001038 /* NextBestActionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001037 /* NextBestActionView.swift */; };
+		00000000000000000000103A /* BriefingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001039 /* BriefingCardView.swift */; };
+		00000000000000000000103C /* GoalRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103B /* GoalRowView.swift */; };
+		00000000000000000000103E /* FocusTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103D /* FocusTileView.swift */; };
+		000000000000000000001040 /* TodaysFocusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103F /* TodaysFocusCardView.swift */; };
+		000000000000000000001042 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001041 /* LogView.swift */; };
+		000000000000000000001044 /* LogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001043 /* LogViewModel.swift */; };
+		000000000000000000001046 /* LogHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001045 /* LogHeaderView.swift */; };
+		000000000000000000001048 /* LoggedTodayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001047 /* LoggedTodayCardView.swift */; };
+		00000000000000000000104A /* TrainingLoggerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001049 /* TrainingLoggerCardView.swift */; };
+		00000000000000000000104C /* PendingEvidenceReviewsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000104B /* PendingEvidenceReviewsCardView.swift */; };
+		00000000000000000000104E /* UploadCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000104D /* UploadCardView.swift */; };
+		000000000000000000001050 /* ProgressPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000104F /* ProgressPlaceholderView.swift */; };
+		000000000000000000001052 /* CoachPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001051 /* CoachPlaceholderView.swift */; };
+		000000000000000000001054 /* ProfilePlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001053 /* ProfilePlaceholderView.swift */; };
+		000000000000000000001056 /* HomeFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001055 /* HomeFixture.json */; };
+		000000000000000000001058 /* LogFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001057 /* LogFixture.json */; };
+		00000000000000000000105A /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001059 /* AppTabTests.swift */; };
+		00000000000000000000105C /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000105B /* HomeReadModelTests.swift */; };
+		00000000000000000000105E /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000105D /* LogReadModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		00000000000000000000106C /* PBXContainerItemProxy */ = {
+		000000000000000000001084 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000001059 /* Project object */;
+			containerPortal = 000000000000000000001071 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000105D;
+			remoteGlobalIDString = 000000000000000000001075;
 			remoteInfo = PhysiqueOS;
 		};
 /* End PBXContainerItemProxy section */
@@ -61,48 +73,60 @@
 		000000000000000000001007 /* AppDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDestination.swift"; sourceTree = "<group>"; };
 		000000000000000000001009 /* AppDestinationCoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDestinationCoding.swift"; sourceTree = "<group>"; };
 		00000000000000000000100B /* HomeReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000100D /* HomeAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeAPI.swift"; sourceTree = "<group>"; };
-		00000000000000000000100F /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
-		000000000000000000001011 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
-		000000000000000000001013 /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
-		000000000000000000001015 /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
-		000000000000000000001017 /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
-		000000000000000000001019 /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
-		00000000000000000000101B /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
-		00000000000000000000101D /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
-		00000000000000000000101F /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
-		000000000000000000001021 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootTabView.swift"; sourceTree = "<group>"; };
-		000000000000000000001023 /* DestinationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DestinationPlaceholderView.swift"; sourceTree = "<group>"; };
-		000000000000000000001025 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeView.swift"; sourceTree = "<group>"; };
-		000000000000000000001027 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001029 /* HomeHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeaderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000102B /* HomeHeroCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeroCardView.swift"; sourceTree = "<group>"; };
-		00000000000000000000102D /* ConfidenceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceDetailSheet.swift"; sourceTree = "<group>"; };
-		00000000000000000000102F /* NextBestActionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NextBestActionView.swift"; sourceTree = "<group>"; };
-		000000000000000000001031 /* BriefingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingCardView.swift"; sourceTree = "<group>"; };
-		000000000000000000001033 /* GoalRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalRowView.swift"; sourceTree = "<group>"; };
-		000000000000000000001035 /* FocusTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FocusTileView.swift"; sourceTree = "<group>"; };
-		000000000000000000001037 /* TodaysFocusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TodaysFocusCardView.swift"; sourceTree = "<group>"; };
-		000000000000000000001039 /* LogPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogPlaceholderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000103B /* ProgressPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPlaceholderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000103D /* CoachPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoachPlaceholderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000103F /* ProfilePlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProfilePlaceholderView.swift"; sourceTree = "<group>"; };
-		000000000000000000001041 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001043 /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001045 /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001057 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001058 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000100D /* LogReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000100F /* DirectWeighInValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectWeighInValidation.swift"; sourceTree = "<group>"; };
+		000000000000000000001011 /* HomeAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001013 /* LogAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001015 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
+		000000000000000000001017 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
+		000000000000000000001019 /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
+		00000000000000000000101B /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
+		00000000000000000000101D /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
+		00000000000000000000101F /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
+		000000000000000000001021 /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
+		000000000000000000001023 /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
+		000000000000000000001025 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography.swift"; sourceTree = "<group>"; };
+		000000000000000000001027 /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001029 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootTabView.swift"; sourceTree = "<group>"; };
+		00000000000000000000102B /* DestinationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DestinationPlaceholderView.swift"; sourceTree = "<group>"; };
+		00000000000000000000102D /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeView.swift"; sourceTree = "<group>"; };
+		00000000000000000000102F /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001031 /* HomeHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeaderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001033 /* HomeHeroCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeroCardView.swift"; sourceTree = "<group>"; };
+		000000000000000000001035 /* ConfidenceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceDetailSheet.swift"; sourceTree = "<group>"; };
+		000000000000000000001037 /* NextBestActionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NextBestActionView.swift"; sourceTree = "<group>"; };
+		000000000000000000001039 /* BriefingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingCardView.swift"; sourceTree = "<group>"; };
+		00000000000000000000103B /* GoalRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalRowView.swift"; sourceTree = "<group>"; };
+		00000000000000000000103D /* FocusTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FocusTileView.swift"; sourceTree = "<group>"; };
+		00000000000000000000103F /* TodaysFocusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TodaysFocusCardView.swift"; sourceTree = "<group>"; };
+		000000000000000000001041 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogView.swift"; sourceTree = "<group>"; };
+		000000000000000000001043 /* LogViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001045 /* LogHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogHeaderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001047 /* LoggedTodayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggedTodayCardView.swift"; sourceTree = "<group>"; };
+		000000000000000000001049 /* TrainingLoggerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerCardView.swift"; sourceTree = "<group>"; };
+		00000000000000000000104B /* PendingEvidenceReviewsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PendingEvidenceReviewsCardView.swift"; sourceTree = "<group>"; };
+		00000000000000000000104D /* UploadCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UploadCardView.swift"; sourceTree = "<group>"; };
+		00000000000000000000104F /* ProgressPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPlaceholderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001051 /* CoachPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoachPlaceholderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001053 /* ProfilePlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProfilePlaceholderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001055 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001057 /* LogFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "LogFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001059 /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000105B /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000105D /* LogReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModelTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000106F /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001070 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		000000000000000000001062 /* Frameworks */ = {
+		00000000000000000000107A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001069 /* Frameworks */ = {
+		000000000000000000001081 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -112,20 +136,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		000000000000000000001049 /* PhysiqueOS */ = {
+		000000000000000000001061 /* PhysiqueOS */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000104B /* App */,
-				00000000000000000000104C /* Contracts */,
-				00000000000000000000104D /* Networking */,
-				000000000000000000001050 /* SharedUI */,
-				00000000000000000000104E /* Presentation */,
-				00000000000000000000104F /* Resources */,
+				000000000000000000001063 /* App */,
+				000000000000000000001064 /* Contracts */,
+				000000000000000000001065 /* Networking */,
+				000000000000000000001068 /* SharedUI */,
+				000000000000000000001066 /* Presentation */,
+				000000000000000000001067 /* Resources */,
 			);
 			path = PhysiqueOS;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104B /* App */ = {
+		000000000000000000001063 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001001 /* PhysiqueOSApp.swift */,
@@ -134,157 +158,169 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104C /* Contracts */ = {
+		000000000000000000001064 /* Contracts */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001005 /* AppTab.swift */,
 				000000000000000000001007 /* AppDestination.swift */,
 				000000000000000000001009 /* AppDestinationCoding.swift */,
 				00000000000000000000100B /* HomeReadModel.swift */,
+				00000000000000000000100D /* LogReadModel.swift */,
+				00000000000000000000100F /* DirectWeighInValidation.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104D /* Networking */ = {
+		000000000000000000001065 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000100D /* HomeAPI.swift */,
+				000000000000000000001011 /* HomeAPI.swift */,
+				000000000000000000001013 /* LogAPI.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104E /* Presentation */ = {
+		000000000000000000001066 /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001051 /* Coach */,
-				000000000000000000001052 /* Home */,
-				000000000000000000001053 /* Log */,
-				000000000000000000001054 /* Profile */,
-				000000000000000000001055 /* Progress */,
-				000000000000000000001056 /* Root */,
+				000000000000000000001069 /* Coach */,
+				00000000000000000000106A /* Home */,
+				00000000000000000000106B /* Log */,
+				00000000000000000000106C /* Profile */,
+				00000000000000000000106D /* Progress */,
+				00000000000000000000106E /* Root */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104F /* Resources */ = {
+		000000000000000000001067 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001041 /* HomeFixture.json */,
+				000000000000000000001055 /* HomeFixture.json */,
+				000000000000000000001057 /* LogFixture.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		000000000000000000001050 /* SharedUI */ = {
+		000000000000000000001068 /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000100F /* PhysiqueOSTheme.swift */,
-				000000000000000000001011 /* IconBadge.swift */,
-				000000000000000000001013 /* CardContainer.swift */,
-				000000000000000000001015 /* SectionHeading.swift */,
-				000000000000000000001017 /* StatusChip.swift */,
-				000000000000000000001019 /* ConfidenceRing.swift */,
-				00000000000000000000101B /* AnimatedProgressBar.swift */,
-				00000000000000000000101D /* MetricRow.swift */,
-				00000000000000000000101F /* TabPlaceholderView.swift */,
+				000000000000000000001015 /* PhysiqueOSTheme.swift */,
+				000000000000000000001017 /* IconBadge.swift */,
+				000000000000000000001019 /* CardContainer.swift */,
+				00000000000000000000101B /* SectionHeading.swift */,
+				00000000000000000000101D /* StatusChip.swift */,
+				00000000000000000000101F /* ConfidenceRing.swift */,
+				000000000000000000001021 /* AnimatedProgressBar.swift */,
+				000000000000000000001023 /* MetricRow.swift */,
+				000000000000000000001025 /* Typography.swift */,
+				000000000000000000001027 /* TabPlaceholderView.swift */,
 			);
 			path = SharedUI;
 			sourceTree = "<group>";
 		};
-		000000000000000000001051 /* Coach */ = {
+		000000000000000000001069 /* Coach */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000103D /* CoachPlaceholderView.swift */,
+				000000000000000000001051 /* CoachPlaceholderView.swift */,
 			);
 			path = Coach;
 			sourceTree = "<group>";
 		};
-		000000000000000000001052 /* Home */ = {
+		00000000000000000000106A /* Home */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001025 /* HomeView.swift */,
-				000000000000000000001027 /* HomeViewModel.swift */,
-				000000000000000000001029 /* HomeHeaderView.swift */,
-				00000000000000000000102B /* HomeHeroCardView.swift */,
-				00000000000000000000102D /* ConfidenceDetailSheet.swift */,
-				00000000000000000000102F /* NextBestActionView.swift */,
-				000000000000000000001031 /* BriefingCardView.swift */,
-				000000000000000000001033 /* GoalRowView.swift */,
-				000000000000000000001035 /* FocusTileView.swift */,
-				000000000000000000001037 /* TodaysFocusCardView.swift */,
+				00000000000000000000102D /* HomeView.swift */,
+				00000000000000000000102F /* HomeViewModel.swift */,
+				000000000000000000001031 /* HomeHeaderView.swift */,
+				000000000000000000001033 /* HomeHeroCardView.swift */,
+				000000000000000000001035 /* ConfidenceDetailSheet.swift */,
+				000000000000000000001037 /* NextBestActionView.swift */,
+				000000000000000000001039 /* BriefingCardView.swift */,
+				00000000000000000000103B /* GoalRowView.swift */,
+				00000000000000000000103D /* FocusTileView.swift */,
+				00000000000000000000103F /* TodaysFocusCardView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
 		};
-		000000000000000000001053 /* Log */ = {
+		00000000000000000000106B /* Log */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001039 /* LogPlaceholderView.swift */,
+				000000000000000000001041 /* LogView.swift */,
+				000000000000000000001043 /* LogViewModel.swift */,
+				000000000000000000001045 /* LogHeaderView.swift */,
+				000000000000000000001047 /* LoggedTodayCardView.swift */,
+				000000000000000000001049 /* TrainingLoggerCardView.swift */,
+				00000000000000000000104B /* PendingEvidenceReviewsCardView.swift */,
+				00000000000000000000104D /* UploadCardView.swift */,
 			);
 			path = Log;
 			sourceTree = "<group>";
 		};
-		000000000000000000001054 /* Profile */ = {
+		00000000000000000000106C /* Profile */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000103F /* ProfilePlaceholderView.swift */,
+				000000000000000000001053 /* ProfilePlaceholderView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
 		};
-		000000000000000000001055 /* Progress */ = {
+		00000000000000000000106D /* Progress */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000103B /* ProgressPlaceholderView.swift */,
+				00000000000000000000104F /* ProgressPlaceholderView.swift */,
 			);
 			path = Progress;
 			sourceTree = "<group>";
 		};
-		000000000000000000001056 /* Root */ = {
+		00000000000000000000106E /* Root */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001021 /* RootTabView.swift */,
-				000000000000000000001023 /* DestinationPlaceholderView.swift */,
+				000000000000000000001029 /* RootTabView.swift */,
+				00000000000000000000102B /* DestinationPlaceholderView.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
 		};
-		00000000000000000000104A /* PhysiqueOSTests */ = {
+		000000000000000000001062 /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001043 /* AppTabTests.swift */,
-				000000000000000000001045 /* HomeReadModelTests.swift */,
+				000000000000000000001059 /* AppTabTests.swift */,
+				00000000000000000000105B /* HomeReadModelTests.swift */,
+				00000000000000000000105D /* LogReadModelTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
 		};
-		000000000000000000001048 /* Products */ = {
+		000000000000000000001060 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001057 /* PhysiqueOS.app */,
-				000000000000000000001058 /* PhysiqueOSTests.xctest */,
+				00000000000000000000106F /* PhysiqueOS.app */,
+				000000000000000000001070 /* PhysiqueOSTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		000000000000000000001047 /* Main */ = {
+		00000000000000000000105F /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001049 /* PhysiqueOS */,
-				00000000000000000000104A /* PhysiqueOSTests */,
-				000000000000000000001048 /* Products */,
+				000000000000000000001061 /* PhysiqueOS */,
+				000000000000000000001062 /* PhysiqueOSTests */,
+				000000000000000000001060 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00000000000000000000105D /* PhysiqueOS */ = {
+		000000000000000000001075 /* PhysiqueOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00000000000000000000105E /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
+			buildConfigurationList = 000000000000000000001076 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
 			buildPhases = (
-				000000000000000000001061 /* Sources */,
-				000000000000000000001062 /* Frameworks */,
-				000000000000000000001063 /* Resources */,
+				000000000000000000001079 /* Sources */,
+				00000000000000000000107A /* Frameworks */,
+				00000000000000000000107B /* Resources */,
 			);
 			buildRules = (
 			);
@@ -292,47 +328,47 @@
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
-			productReference = 000000000000000000001057 /* PhysiqueOS.app */;
+			productReference = 00000000000000000000106F /* PhysiqueOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001064 /* PhysiqueOSTests */ = {
+		00000000000000000000107C /* PhysiqueOSTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001065 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
+			buildConfigurationList = 00000000000000000000107D /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
 			buildPhases = (
-				000000000000000000001068 /* Sources */,
-				000000000000000000001069 /* Frameworks */,
-				00000000000000000000106A /* Resources */,
+				000000000000000000001080 /* Sources */,
+				000000000000000000001081 /* Frameworks */,
+				000000000000000000001082 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				00000000000000000000106B /* PBXTargetDependency */,
+				000000000000000000001083 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSTests;
 			productName = PhysiqueOSTests;
-			productReference = 000000000000000000001058 /* PhysiqueOSTests.xctest */;
+			productReference = 000000000000000000001070 /* PhysiqueOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		000000000000000000001059 /* Project object */ = {
+		000000000000000000001071 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					00000000000000000000105D = {
+					000000000000000000001075 = {
 						CreatedOnToolsVersion = 26.0;
 					};
-					000000000000000000001064 = {
+					00000000000000000000107C = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 00000000000000000000105D;
+						TestTargetID = 000000000000000000001075;
 					};
 				};
 			};
-			buildConfigurationList = 00000000000000000000105A /* Build configuration list for PBXProject "PhysiqueOS" */;
+			buildConfigurationList = 000000000000000000001072 /* Build configuration list for PBXProject "PhysiqueOS" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -340,27 +376,28 @@
 				en,
 				Base,
 			);
-			mainGroup = 000000000000000000001047;
-			productRefGroup = 000000000000000000001048 /* Products */;
+			mainGroup = 00000000000000000000105F;
+			productRefGroup = 000000000000000000001060 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				00000000000000000000105D /* PhysiqueOS */,
-				000000000000000000001064 /* PhysiqueOSTests */,
+				000000000000000000001075 /* PhysiqueOS */,
+				00000000000000000000107C /* PhysiqueOSTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		000000000000000000001063 /* Resources */ = {
+		00000000000000000000107B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001042 /* HomeFixture.json in Resources */,
+				000000000000000000001056 /* HomeFixture.json in Resources */,
+				000000000000000000001058 /* LogFixture.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000106A /* Resources */ = {
+		000000000000000000001082 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -370,7 +407,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		000000000000000000001061 /* Sources */ = {
+		000000000000000000001079 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -380,56 +417,67 @@
 				000000000000000000001008 /* AppDestination.swift in Sources */,
 				00000000000000000000100A /* AppDestinationCoding.swift in Sources */,
 				00000000000000000000100C /* HomeReadModel.swift in Sources */,
-				00000000000000000000100E /* HomeAPI.swift in Sources */,
-				000000000000000000001010 /* PhysiqueOSTheme.swift in Sources */,
-				000000000000000000001012 /* IconBadge.swift in Sources */,
-				000000000000000000001014 /* CardContainer.swift in Sources */,
-				000000000000000000001016 /* SectionHeading.swift in Sources */,
-				000000000000000000001018 /* StatusChip.swift in Sources */,
-				00000000000000000000101A /* ConfidenceRing.swift in Sources */,
-				00000000000000000000101C /* AnimatedProgressBar.swift in Sources */,
-				00000000000000000000101E /* MetricRow.swift in Sources */,
-				000000000000000000001020 /* TabPlaceholderView.swift in Sources */,
-				000000000000000000001022 /* RootTabView.swift in Sources */,
-				000000000000000000001024 /* DestinationPlaceholderView.swift in Sources */,
-				000000000000000000001026 /* HomeView.swift in Sources */,
-				000000000000000000001028 /* HomeViewModel.swift in Sources */,
-				00000000000000000000102A /* HomeHeaderView.swift in Sources */,
-				00000000000000000000102C /* HomeHeroCardView.swift in Sources */,
-				00000000000000000000102E /* ConfidenceDetailSheet.swift in Sources */,
-				000000000000000000001030 /* NextBestActionView.swift in Sources */,
-				000000000000000000001032 /* BriefingCardView.swift in Sources */,
-				000000000000000000001034 /* GoalRowView.swift in Sources */,
-				000000000000000000001036 /* FocusTileView.swift in Sources */,
-				000000000000000000001038 /* TodaysFocusCardView.swift in Sources */,
-				00000000000000000000103A /* LogPlaceholderView.swift in Sources */,
-				00000000000000000000103C /* ProgressPlaceholderView.swift in Sources */,
-				00000000000000000000103E /* CoachPlaceholderView.swift in Sources */,
-				000000000000000000001040 /* ProfilePlaceholderView.swift in Sources */,
+				00000000000000000000100E /* LogReadModel.swift in Sources */,
+				000000000000000000001010 /* DirectWeighInValidation.swift in Sources */,
+				000000000000000000001012 /* HomeAPI.swift in Sources */,
+				000000000000000000001014 /* LogAPI.swift in Sources */,
+				000000000000000000001016 /* PhysiqueOSTheme.swift in Sources */,
+				000000000000000000001018 /* IconBadge.swift in Sources */,
+				00000000000000000000101A /* CardContainer.swift in Sources */,
+				00000000000000000000101C /* SectionHeading.swift in Sources */,
+				00000000000000000000101E /* StatusChip.swift in Sources */,
+				000000000000000000001020 /* ConfidenceRing.swift in Sources */,
+				000000000000000000001022 /* AnimatedProgressBar.swift in Sources */,
+				000000000000000000001024 /* MetricRow.swift in Sources */,
+				000000000000000000001026 /* Typography.swift in Sources */,
+				000000000000000000001028 /* TabPlaceholderView.swift in Sources */,
+				00000000000000000000102A /* RootTabView.swift in Sources */,
+				00000000000000000000102C /* DestinationPlaceholderView.swift in Sources */,
+				00000000000000000000102E /* HomeView.swift in Sources */,
+				000000000000000000001030 /* HomeViewModel.swift in Sources */,
+				000000000000000000001032 /* HomeHeaderView.swift in Sources */,
+				000000000000000000001034 /* HomeHeroCardView.swift in Sources */,
+				000000000000000000001036 /* ConfidenceDetailSheet.swift in Sources */,
+				000000000000000000001038 /* NextBestActionView.swift in Sources */,
+				00000000000000000000103A /* BriefingCardView.swift in Sources */,
+				00000000000000000000103C /* GoalRowView.swift in Sources */,
+				00000000000000000000103E /* FocusTileView.swift in Sources */,
+				000000000000000000001040 /* TodaysFocusCardView.swift in Sources */,
+				000000000000000000001042 /* LogView.swift in Sources */,
+				000000000000000000001044 /* LogViewModel.swift in Sources */,
+				000000000000000000001046 /* LogHeaderView.swift in Sources */,
+				000000000000000000001048 /* LoggedTodayCardView.swift in Sources */,
+				00000000000000000000104A /* TrainingLoggerCardView.swift in Sources */,
+				00000000000000000000104C /* PendingEvidenceReviewsCardView.swift in Sources */,
+				00000000000000000000104E /* UploadCardView.swift in Sources */,
+				000000000000000000001050 /* ProgressPlaceholderView.swift in Sources */,
+				000000000000000000001052 /* CoachPlaceholderView.swift in Sources */,
+				000000000000000000001054 /* ProfilePlaceholderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001068 /* Sources */ = {
+		000000000000000000001080 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001044 /* AppTabTests.swift in Sources */,
-				000000000000000000001046 /* HomeReadModelTests.swift in Sources */,
+				00000000000000000000105A /* AppTabTests.swift in Sources */,
+				00000000000000000000105C /* HomeReadModelTests.swift in Sources */,
+				00000000000000000000105E /* LogReadModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		00000000000000000000106B /* PBXTargetDependency */ = {
+		000000000000000000001083 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000105D /* PhysiqueOS */;
-			targetProxy = 00000000000000000000106C /* PBXContainerItemProxy */;
+			target = 000000000000000000001075 /* PhysiqueOS */;
+			targetProxy = 000000000000000000001084 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		00000000000000000000105B /* Debug */ = {
+		000000000000000000001073 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -493,7 +541,7 @@
 			};
 			name = Debug;
 		};
-		00000000000000000000105C /* Release */ = {
+		000000000000000000001074 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -551,7 +599,7 @@
 			};
 			name = Release;
 		};
-		00000000000000000000105F /* Debug */ = {
+		000000000000000000001077 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -575,7 +623,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001060 /* Release */ = {
+		000000000000000000001078 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -599,7 +647,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001066 /* Debug */ = {
+		00000000000000000000107E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -615,7 +663,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001067 /* Release */ = {
+		00000000000000000000107F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -634,34 +682,34 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		00000000000000000000105A /* Build configuration list for PBXProject "PhysiqueOS" */ = {
+		000000000000000000001072 /* Build configuration list for PBXProject "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				00000000000000000000105B /* Debug */,
-				00000000000000000000105C /* Release */,
+				000000000000000000001073 /* Debug */,
+				000000000000000000001074 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		00000000000000000000105E /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
+		000000000000000000001076 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				00000000000000000000105F /* Debug */,
-				000000000000000000001060 /* Release */,
+				000000000000000000001077 /* Debug */,
+				000000000000000000001078 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001065 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
+		00000000000000000000107D /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001066 /* Debug */,
-				000000000000000000001067 /* Release */,
+				00000000000000000000107E /* Debug */,
+				00000000000000000000107F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 000000000000000000001059 /* Project object */;
+	rootObject = 000000000000000000001071 /* Project object */;
 }

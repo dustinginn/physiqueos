@@ -14,6 +14,15 @@ struct PhysiqueOSApp: App {
         WindowGroup {
             RootTabView()
                 .environment(environment)
+                // PhysiqueOS's accepted native visual baseline is the web
+                // app's dark theme (`.dark` in globals.css) — not merely
+                // this app's own dark colors, but the OS-level appearance
+                // system controls (DatePicker, keyboards, share sheets,
+                // alerts) also render against. Without this, those
+                // system-provided controls follow the simulator/device's
+                // own light/dark setting instead, mismatching every
+                // custom-drawn view.
+                .preferredColorScheme(.dark)
         }
     }
 }

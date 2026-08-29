@@ -24,11 +24,11 @@ struct FocusTileView: View {
             IconBadge(systemImage: iconMap[item.icon] ?? "target", color: item.color, size: .xs, isCircular: true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .physiqueOSFont(PhysiqueOSTypography.focusLabel)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 if let subtitle = item.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 10, weight: .medium))
+                        .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }

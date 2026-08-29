@@ -1,0 +1,272 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Mirrors `UploadAnythingCard`/`UploadAnythingForm.jsx`: a general
+/// evidence-upload card (files + a note) with a nested, collapsible direct
+/// weigh-in entry. File/note selection and the weigh-in disclosure are
+/// real local UI — no server mutation is required to represent them
+/// faithfully. Submitting either one is a genuine canonical-write path on
+/// the web (`saveDirectWeighIn` calls `MorningCheckInPersistenceService`
+/// directly; the general upload creates a pending Evidence Review) that
+/// this fixture-only slice has no live command boundary for, so neither
+/// button fakes success — both surface an honest status message in the
+/// exact slot the web itself uses for `weighInResult`/`weighInError`/`error`.
+struct UploadCardView: View {
+    let localDate: String
+
+    @State private var selectedDate = Date()
+    @State private var noteText = ""
+    @State private var selectedFileNames: [String] = []
+    @State private var isFilePickerPresented = false
+    @State private var uploadStatusMessage: String?
+
+    @State private var isWeighInExpanded = false
+    @State private var weightText = ""
+    @State private var weighInStatusMessage: String?
+
+    private var maxSelectableDate: Date {
+        Self.dateFormatter.date(from: localDate) ?? Date()
+    }
+
+    var body: some View {
+        CardContainer(padding: .sm) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    IconBadge(systemImage: "square.and.arrow.up", color: .primary, size: .md)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Upload")
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text("Add one file, several files, or just a note.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+
+                whenDidThisHappenField
+                weighInDisclosure
+
+                filePickerField
+                noteField
+
+                if let uploadStatusMessage {
+                    StatusBanner(text: uploadStatusMessage, tone: .neutral)
+                }
+
+                Button {
+                    uploadStatusMessage = "Uploading isn't connected to a server in this build yet."
+                } label: {
+                    Text("Submit evidence")
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(PhysiqueOSTheme.textPrimary.opacity(0.9))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(.isButton)
+            }
+        }
+        .onAppear { selectedDate = maxSelectableDate }
+        .fileImporter(
+            isPresented: $isFilePickerPresented,
+            allowedContentTypes: [.image, .pdf],
+            allowsMultipleSelection: true
+        ) { result in
+            if case .success(let urls) = result {
+                selectedFileNames = urls.map(\.lastPathComponent)
+            }
+        }
+    }
+
+    private var whenDidThisHappenField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("When did this happen?")
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text("Use the date the weigh-in, workout, meal, scan, or activity happened.")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            DatePicker(
+                "Evidence date", selection: $selectedDate,
+                in: ...maxSelectableDate, displayedComponents: .date
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .tint(PhysiqueOSTheme.accent)
+            .onChange(of: selectedDate) {
+                weighInStatusMessage = nil
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var weighInDisclosure: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isWeighInExpanded.toggle() }
+            } label: {
+                HStack(spacing: 12) {
+                    IconBadge(systemImage: "scalemass.fill", color: .primary, size: .sm)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Log weigh-in")
+                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text("Record your weight for the selected date.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: isWeighInExpanded ? "minus" : "plus")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                }
+                .padding(12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityValue(isWeighInExpanded ? "Expanded" : "Collapsed")
+
+            if isWeighInExpanded {
+                VStack(alignment: .leading, spacing: 12) {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Weight")
+                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        HStack(spacing: 10) {
+                            TextField("165.2", text: $weightText)
+                                .keyboardType(.decimalPad)
+                                .physiqueOSFont(PhysiqueOSTypography.weighInValue18)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(PhysiqueOSTheme.surfaceElevated)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .onChange(of: weightText) { weighInStatusMessage = nil }
+                            Text("lb")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                    Text(Self.friendlyDateFormatter.string(from: selectedDate))
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+
+                    if let weighInStatusMessage {
+                        StatusBanner(text: weighInStatusMessage, tone: .neutral)
+                    }
+
+                    Button {
+                        weighInStatusMessage = DirectWeighInValidation.validationError(forWeightText: weightText)
+                            ?? "Saving a weigh-in isn't connected to a server in this build yet."
+                    } label: {
+                        Text("Save weigh-in")
+                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(PhysiqueOSTheme.accent)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isButton)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(PhysiqueOSTheme.accent.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(PhysiqueOSTheme.accent.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private var filePickerField: some View {
+        Button { isFilePickerPresented = true } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Upload files", systemImage: "doc.badge.plus")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("Choose screenshots, photos, or PDFs. You can select more than one.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !selectedFileNames.isEmpty {
+                    Text(selectedFileNames.joined(separator: ", "))
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                        .lineLimit(2)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(PhysiqueOSTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
+        )
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var noteField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Add details", systemImage: "note.text")
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text("Add any details that help PhysiqueOS understand what you're logging.")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            TextEditor(text: $noteText)
+                .physiqueOSFont(PhysiqueOSTypography.body14Regular)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 90)
+                .padding(8)
+                .background(PhysiqueOSTheme.surfaceElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(16)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    private static let friendlyDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .full
+        return formatter
+    }()
+}
+
+/// A small honesty-first status line — used wherever this fixture-only
+/// slice needs to say "this isn't connected yet" instead of pretending an
+/// action succeeded.
+private struct StatusBanner: View {
+    enum Tone { case neutral }
+    let text: String
+    var tone: Tone = .neutral
+
+    var body: some View {
+        Text(text)
+            .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
+            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PhysiqueOSTheme.surfaceMuted)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .accessibilityAddTraits(.isStaticText)
+    }
+}

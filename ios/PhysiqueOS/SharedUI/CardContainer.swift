@@ -17,12 +17,16 @@ struct CardContainer<Content: View>: View {
     }
 
     var padding: Padding = .md
+    /// `Card.jsx`'s `variant` prop — defaults to the elevated surface;
+    /// pass `PhysiqueOSTheme.surfaceAccent` for a promotional card like
+    /// Log's Training Logger entry (`variant="accent"`).
+    var background: Color = PhysiqueOSTheme.surfaceElevated
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(padding.value)
-            .background(PhysiqueOSTheme.surfaceElevated)
+            .background(background)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)

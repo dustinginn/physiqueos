@@ -8,7 +8,9 @@ import Foundation
 /// into this type without changing Home.
 extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
-    private enum ParameterKeys: String, CodingKey { case goalId, checkInType, briefingId, priorityId }
+    private enum ParameterKeys: String, CodingKey {
+        case goalId, checkInType, briefingId, priorityId, reviewId, sessionId, streamId
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -32,6 +34,17 @@ extension AppDestination {
         case "priority.detail":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .priorityDetail(priorityId: try parameters.decode(String.self, forKey: .priorityId))
+        case "evidence.review":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .evidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
+        case "training.session":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .trainingSession(sessionId: try parameters.decode(String.self, forKey: .sessionId))
+        case "progress.stream":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .progressStream(streamId: try parameters.decode(String.self, forKey: .streamId))
+        case "log":
+            self = .trainingLogger
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .id, in: container,
@@ -49,7 +62,10 @@ extension AppDestination {
         case .checkIn(let checkInType): try parameters.encode(checkInType, forKey: .checkInType)
         case .briefingDetail(let briefingId): try parameters.encode(briefingId, forKey: .briefingId)
         case .priorityDetail(let priorityId): try parameters.encode(priorityId, forKey: .priorityId)
-        case .photoUpload, .dexaUpload, .briefingList: break
+        case .evidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
+        case .trainingSession(let sessionId): try parameters.encode(sessionId, forKey: .sessionId)
+        case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
+        case .photoUpload, .dexaUpload, .briefingList, .trainingLogger: break
         }
     }
 }

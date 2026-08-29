@@ -14,7 +14,7 @@ struct BriefingCardView: View {
                             Text("View")
                             Image(systemName: "arrow.right")
                         }
-                        .font(.system(size: 11, weight: .bold))
+                        .physiqueOSFont(PhysiqueOSTypography.briefingViewLink)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                     }
                 }
@@ -23,17 +23,17 @@ struct BriefingCardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .top) {
                             Text(card.title)
-                                .font(.system(size: 16, weight: .bold))
+                                .physiqueOSFont(PhysiqueOSTypography.briefingTitle)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             Spacer(minLength: 8)
                             if let relative = card.createdAt.flatMap({ Self.relativeDateLabel(from: $0) }) {
                                 Text(relative)
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingTimestamp)
                                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                             }
                         }
                         Text(card.prompt)
-                            .font(.system(size: 13, weight: .medium))
+                            .physiqueOSFont(PhysiqueOSTypography.briefingPrompt)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                 }

@@ -18,17 +18,16 @@ struct HomeHeroCardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             IconBadge(systemImage: "target", color: .primary, size: .xs, isCircular: true)
-                            Text(hero.goalLabel.uppercased())
-                                .font(.system(size: 10, weight: .heavy))
-                                .tracking(0.8)
+                            Text(hero.goalLabel)
+                                .physiqueOSFont(PhysiqueOSTypography.heroEyebrow)
                                 .foregroundStyle(PhysiqueOSTheme.accent)
                                 .lineLimit(1)
                         }
                         Text(hero.headline)
-                            .font(.system(size: 18, weight: .heavy))
+                            .physiqueOSFont(PhysiqueOSTypography.heroHeadline)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         Text(hero.supportLine)
-                            .font(.system(size: 12, weight: .medium))
+                            .physiqueOSFont(PhysiqueOSTypography.heroSupportLine)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     Spacer(minLength: 8)
@@ -67,10 +66,13 @@ struct HomeHeroCardView: View {
             ZStack {
                 Circle().stroke(PhysiqueOSTheme.divider, lineWidth: 6)
                 VStack(spacing: 2) {
-                    Text("—").font(.system(size: 18, weight: .heavy))
-                    Text("CONFIDENCE").font(.system(size: 9, weight: .bold)).tracking(0.5)
+                    Text("—")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text("Confidence")
+                        .physiqueOSFont(.init(size: 9, weight: .bold))
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             .frame(width: 82, height: 82)
         }
@@ -85,7 +87,7 @@ struct HomeHeroCardView: View {
                 Image(systemName: "arrow.right")
                 Spacer()
             }
-            .font(.system(size: 15, weight: .heavy))
+            .physiqueOSFont(.init(size: 14, weight: .heavy))
             .foregroundStyle(.white)
             .padding(.vertical, 12)
             .background(PhysiqueOSTheme.accent)

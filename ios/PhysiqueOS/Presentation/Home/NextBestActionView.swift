@@ -26,7 +26,7 @@ struct NextBestActionView: View {
                     .background(.white.opacity(0.16))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 Text(action.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
                     .foregroundStyle(.white)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")

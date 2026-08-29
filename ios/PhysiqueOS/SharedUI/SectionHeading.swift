@@ -13,9 +13,8 @@ struct SectionHeading<Trailing: View>: View {
 
     var body: some View {
         HStack {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.1)
+            Text(title)
+                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
                 .foregroundStyle(PhysiqueOSTheme.accent)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
