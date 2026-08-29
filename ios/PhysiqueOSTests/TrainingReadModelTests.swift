@@ -395,27 +395,139 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(chestRow.destination, .trainingExercise(exerciseId: "chest"))
     }
 
-    /// Every other Training Area row keeps a correctly-typed
-    /// `training.exercise` destination (real navigation intent) but must
-    /// not resolve to a fixture-backed area screen this slice — only Chest
-    /// does. Guards against silently "implementing" the other nine by
-    /// forgetting to scope `fetchTrainingArea`.
-    func testNonChestAreasHaveTypedDestinationsButNoFixtureBackedArea() async throws {
+    /// All 10 canonical Training Areas are now fixture-backed (extends the
+    /// prior slice, which only backed Chest) — every landing row resolves
+    /// to a real `TrainingAreaReadModel`, and each area's own resolved
+    /// `exercises.count` agrees exactly with the landing row's
+    /// `exerciseCount`, so the grid and the area page can never disagree.
+    func testEveryTrainingAreaIsFixtureBackedAndItsExerciseCountAgreesWithLanding() async throws {
         let landing = try await api.fetchTrainingLanding()
-        let nonChestAreas = landing.trainingAreas.filter { $0.id != "chest" }
-        XCTAssertFalse(nonChestAreas.isEmpty)
-        for area in nonChestAreas {
-            guard case .trainingExercise(let exerciseId) = area.destination else {
-                return XCTFail("Expected a trainingExercise destination for \(area.label).")
-            }
-            XCTAssertEqual(exerciseId, area.id)
+        for area in landing.trainingAreas {
             let fixtureBacked = try await api.fetchTrainingArea(areaId: area.id)
-            XCTAssertNil(fixtureBacked, "\(area.id) must not be fixture-backed yet — only Chest is this slice.")
+            let unwrapped = try XCTUnwrap(fixtureBacked, "\(area.id) must be fixture-backed.")
+            XCTAssertEqual(unwrapped.title, area.label)
+            XCTAssertEqual(
+                unwrapped.exercises.count, area.exerciseCount,
+                "\(area.id)'s Browse list must have exactly as many rows as the landing grid claims."
+            )
+        }
+    }
+
+    /// The six areas with no logged exercises today (Biceps, Core, Quads,
+    /// Hamstrings, Glutes, Calves) still render a real, honest area page —
+    /// an empty "Browse" section, not a placeholder or an error — matching
+    /// `InformationList`'s real behavior for zero exercises (verified
+    /// directly from source: no "come back later" copy exists there).
+    func testAreasWithNoLoggedExercisesRenderAnEmptyBrowseListNotAPlaceholder() async throws {
+        for areaId in ["biceps", "core", "quads", "hamstrings", "glutes", "calves"] {
+            let area = try await api.fetchTrainingArea(areaId: areaId)
+            let unwrapped = try XCTUnwrap(area, "\(areaId) must be fixture-backed.")
+            XCTAssertTrue(unwrapped.exercises.isEmpty)
+            XCTAssertEqual(unwrapped.breadcrumbs.map(\.label), ["Training", "Training Library"])
+        }
+    }
+
+    /// Back/Shoulders/Triceps' exercises are drawn from the same
+    /// `session-fixture-001`/`session-fixture-002` exercises those areas'
+    /// landing counts were computed from (`testTrainingAreaExerciseCountsMatchTheFixturedSessions`)
+    /// — not invented area-specific duplicates of exercises that already
+    /// have a canonical identity elsewhere in the fixture.
+    func testBackShouldersAndTricepsExercisesMatchTheirFixturedSessionExercises() async throws {
+        let back = try await api.fetchTrainingArea(areaId: "back")
+        XCTAssertEqual(try XCTUnwrap(back).exercises.map(\.label), ["Lat Pulldown", "Seated Cable Row"])
+
+        let shoulders = try await api.fetchTrainingArea(areaId: "shoulders")
+        XCTAssertEqual(try XCTUnwrap(shoulders).exercises.map(\.label), ["Face Pull"])
+
+        let triceps = try await api.fetchTrainingArea(areaId: "triceps")
+        XCTAssertEqual(try XCTUnwrap(triceps).exercises.map(\.label), ["Overhead Triceps Extension"])
+    }
+
+    /// Every area's exercise rows keep the same identity/destination/no-
+    /// detail-text integrity Chest's own tests already establish — not
+    /// just Chest's.
+    func testEveryAreaExerciseRowHasConsistentIdentityAndNoDetailText() async throws {
+        for areaId in ["chest", "back", "shoulders", "triceps"] {
+            let area = try await api.fetchTrainingArea(areaId: areaId)
+            let unwrapped = try XCTUnwrap(area)
+            XCTAssertEqual(Set(unwrapped.exercises.map(\.id)).count, unwrapped.exercises.count)
+            for exercise in unwrapped.exercises {
+                guard case .trainingExercise(let exerciseId) = exercise.destination else {
+                    return XCTFail("Expected a trainingExercise destination for \(exercise.label).")
+                }
+                XCTAssertEqual(exerciseId, exercise.id)
+                XCTAssertNil(exercise.detail)
+            }
         }
     }
 
     func testUnknownAreaResolvesToNilRatherThanCrashing() async throws {
         let area = try await api.fetchTrainingArea(areaId: "not-a-real-area")
         XCTAssertNil(area)
+    }
+
+    // MARK: - Training Day fidelity (Stage 2)
+
+    func testCompactDateFormattingMatchesTheFounderSpecifiedForm() {
+        XCTAssertEqual(TrainingDayView.formatCompactDate("2026-08-26"), "Aug 26, 2026")
+        XCTAssertEqual(TrainingDayView.formatCompactDate("2026-01-05"), "Jan 5, 2026")
+    }
+
+    func testTrainingDaySessionsDistinguishStrengthFromCardioByKind() async throws {
+        let day = try await api.fetchTrainingDay(date: "2026-08-26")
+        let unwrapped = try XCTUnwrap(day)
+        let strength = try XCTUnwrap(unwrapped.sessions.first { $0.id == "session-fixture-001" })
+        let walking = try XCTUnwrap(unwrapped.sessions.first { $0.id == "session-fixture-004" })
+        XCTAssertEqual(strength.kind, .strength)
+        XCTAssertEqual(walking.kind, .walking)
+    }
+
+    func testEveryTrainingDaySessionCarriesATrainingSessionDestination() async throws {
+        let day = try await api.fetchTrainingDay(date: "2026-08-26")
+        let unwrapped = try XCTUnwrap(day)
+        for session in unwrapped.sessions {
+            guard case .trainingSession(let sessionId) = session.destination else {
+                return XCTFail("Expected a trainingSession destination for \(session.id).")
+            }
+            XCTAssertEqual(sessionId, session.id)
+        }
+    }
+
+    // MARK: - Workout Detail fidelity (Stage 3)
+
+    /// A prior revision joined source labels with `", "` — the real web
+    /// (`getSessionContent`, `TrainingKnowledgeScreen.jsx:782-786`) and
+    /// every other Training source line in this app already use `" + "`.
+    func testSourceLineJoinsMultipleSourcesWithPlusNotComma() {
+        XCTAssertEqual(TrainingSessionDetailView.formatSourceLine(["Typed evidence"]), "Source: Typed evidence")
+        XCTAssertEqual(
+            TrainingSessionDetailView.formatSourceLine(["Screenshot", "Typed evidence"]),
+            "Source: Screenshot + Typed evidence"
+        )
+    }
+
+    /// `formatDurationSet` (`TrainingKnowledgeScreen.jsx:1746-1753`): under
+    /// 60s is `"Ns"`; 60s and over is `"M:SS"` — a prior revision rendered
+    /// the latter as `"1m 15s"`, which the fixture's original single 30s
+    /// timed set never exercised.
+    func testTimedSetsSixtySecondsOrLongerUseColonNotationNotMinutesSeconds() async throws {
+        let session = try await api.fetchTrainingSession(sessionId: "session-fixture-001")
+        let unwrapped = try XCTUnwrap(session)
+        let triceps = try XCTUnwrap(unwrapped.exercises.first { $0.id == "triceps" })
+        let longTimedSet = try XCTUnwrap(triceps.sets.first { $0.durationSeconds == 75 })
+        XCTAssertEqual(longTimedSet.formattedDetail, "1:15")
+        let shortTimedSet = try XCTUnwrap(triceps.sets.first { $0.durationSeconds == 30 })
+        XCTAssertEqual(shortTimedSet.formattedDetail, "30s")
+    }
+
+    // MARK: - Add / Correct Workout Details (Stage 4)
+
+    /// Mirrors the real web's `"missing-details"` client validation
+    /// message exactly — this is honest client-side input validation, not
+    /// a claim about server state.
+    func testCorrectionValidationRequiresNonEmptyText() {
+        XCTAssertEqual(TrainingSessionCorrectionValidation.validationError(forText: ""), "Add workout details before saving.")
+        XCTAssertEqual(TrainingSessionCorrectionValidation.validationError(forText: "   \n  "), "Add workout details before saving.")
+        XCTAssertNil(TrainingSessionCorrectionValidation.validationError(forText: "15 x #120"))
     }
 }

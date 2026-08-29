@@ -372,12 +372,17 @@ extension TrainingSet {
         value.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(value)) : String(value)
     }
 
+    /// Mirrors `formatDurationSet` (`TrainingKnowledgeScreen.jsx:1746-1753`)
+    /// exactly: under 60s is a plain `"Ns"`, 60s and over is `"M:SS"` — not
+    /// the `"Xm Ys"` form used elsewhere in the app for durations (e.g.
+    /// Walking's `"42 min"`). This is the Workout Detail page's own
+    /// specific per-set formatter, verified directly from source.
     private static func formatDuration(_ seconds: Double) -> String {
         let total = Int(seconds)
         let minutes = total / 60
         let remaining = total % 60
-        if minutes > 0 { return remaining > 0 ? "\(minutes)m \(remaining)s" : "\(minutes)m" }
-        return "\(remaining)s"
+        if minutes <= 0 { return "\(total)s" }
+        return "\(minutes):\(String(format: "%02d", remaining))"
     }
 }
 

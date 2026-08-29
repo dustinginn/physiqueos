@@ -15,6 +15,7 @@
 		00000000000000000000100C /* HomeReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100B /* HomeReadModel.swift */; };
 		00000000000000000000100E /* LogReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100D /* LogReadModel.swift */; };
 		000000000000000000001010 /* DirectWeighInValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100F /* DirectWeighInValidation.swift */; };
+		0000000000000000000010CE /* TrainingSessionCorrectionValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */; };
 		000000000000000000001012 /* EvidenceDateParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* EvidenceDateParsing.swift */; };
 		000000000000000000001014 /* EvidenceReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* EvidenceReadModel.swift */; };
 		000000000000000000001016 /* EvidenceHubUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001015 /* EvidenceHubUsage.swift */; };
@@ -109,6 +110,7 @@
 		00000000000000000000100B /* HomeReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModel.swift"; sourceTree = "<group>"; };
 		00000000000000000000100D /* LogReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModel.swift"; sourceTree = "<group>"; };
 		00000000000000000000100F /* DirectWeighInValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectWeighInValidation.swift"; sourceTree = "<group>"; };
+		0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionCorrectionValidation.swift"; sourceTree = "<group>"; };
 		000000000000000000001011 /* EvidenceDateParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceDateParsing.swift"; sourceTree = "<group>"; };
 		000000000000000000001013 /* EvidenceReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModel.swift"; sourceTree = "<group>"; };
 		000000000000000000001015 /* EvidenceHubUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsage.swift"; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				000000000000000000001015 /* EvidenceHubUsage.swift */,
 				000000000000000000001017 /* TrainingReadModel.swift */,
 				000000000000000000001019 /* TrainingSessionRenderItems.swift */,
+				0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -556,6 +559,7 @@
 				000000000000000000001016 /* EvidenceHubUsage.swift in Sources */,
 				000000000000000000001018 /* TrainingReadModel.swift in Sources */,
 				00000000000000000000101A /* TrainingSessionRenderItems.swift in Sources */,
+				0000000000000000000010CE /* TrainingSessionCorrectionValidation.swift in Sources */,
 				00000000000000000000101C /* HomeAPI.swift in Sources */,
 				00000000000000000000101E /* LogAPI.swift in Sources */,
 				000000000000000000001020 /* EvidenceAPI.swift in Sources */,

@@ -18,12 +18,16 @@ struct AppDestinationRouterView: View {
             TrainingDayView(date: date)
         case .progressStream(let streamId) where streamId == "training":
             TrainingHistoryView()
-        // Chest is the only Training Area with a real screen this slice —
-        // establishing the pattern, not every area (task-bounded scope).
-        // Every other `.trainingExercise` id (other areas, or an
-        // individual exercise leaf) still honestly falls to
-        // `DestinationPlaceholderView` below.
-        case .trainingExercise(let exerciseId) where exerciseId == "chest":
+        // All 10 canonical Training Areas are fixture-backed (see
+        // TrainingFixture.json's `areas` array) — `TrainingAreaView` is
+        // fully generic over `areaId` and already renders an honest empty
+        // "Browse" section for an area with zero exercises (matching real
+        // web behavior). An individual exercise leaf (drilling into one
+        // exercise from inside an area, e.g. "bench-press") uses this exact
+        // same `.trainingExercise` case with a non-area id, and still
+        // honestly falls to `DestinationPlaceholderView` below — no
+        // Exercise Detail screen exists yet.
+        case .trainingExercise(let exerciseId) where TrainingAreaIcon.canonicalAreaIds.contains(exerciseId):
             TrainingAreaView(areaId: exerciseId)
         default:
             DestinationPlaceholderView(destination: destination)

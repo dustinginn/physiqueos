@@ -39,6 +39,7 @@ app_files = [
     ("Contracts", "EvidenceHubUsage.swift"),
     ("Contracts", "TrainingReadModel.swift"),
     ("Contracts", "TrainingSessionRenderItems.swift"),
+    ("Contracts", "TrainingSessionCorrectionValidation.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "LogAPI.swift"),
     ("Networking", "EvidenceAPI.swift"),

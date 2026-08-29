@@ -231,7 +231,8 @@
           "sets": [
             { "set_number": 1, "reps": 10, "weight": 40, "weight_unit": "lb" },
             { "set_number": 2, "reps": 10, "weight": 40, "weight_unit": "lb" },
-            { "set_number": 3, "reps": null, "weight": null, "duration_seconds": 30 }
+            { "set_number": 3, "reps": null, "weight": null, "duration_seconds": 30 },
+            { "set_number": 4, "reps": null, "weight": null, "duration_seconds": 75 }
           ]
         },
         {
@@ -353,6 +354,186 @@
           "destination": { "id": "training.exercise", "parameters": { "exerciseId": "push-ups" } }
         }
       ]
+    },
+    {
+      "id": "back",
+      "title": "Back",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": [
+        {
+          "id": "lat-pulldown",
+          "label": "Lat Pulldown",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "lat-pulldown" } }
+        },
+        {
+          "id": "seated-cable-row",
+          "label": "Seated Cable Row",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "seated-cable-row" } }
+        }
+      ]
+    },
+    {
+      "id": "shoulders",
+      "title": "Shoulders",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": [
+        {
+          "id": "face-pull",
+          "label": "Face Pull",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "face-pull" } }
+        }
+      ]
+    },
+    {
+      "id": "biceps",
+      "title": "Biceps",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
+    },
+    {
+      "id": "triceps",
+      "title": "Triceps",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": [
+        {
+          "id": "overhead-triceps-extension",
+          "label": "Overhead Triceps Extension",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "overhead-triceps-extension" } }
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "title": "Core",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
+    },
+    {
+      "id": "quads",
+      "title": "Quads",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
+    },
+    {
+      "id": "hamstrings",
+      "title": "Hamstrings",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
+    },
+    {
+      "id": "glutes",
+      "title": "Glutes",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
+    },
+    {
+      "id": "calves",
+      "title": "Calves",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": []
     }
   ]
 }

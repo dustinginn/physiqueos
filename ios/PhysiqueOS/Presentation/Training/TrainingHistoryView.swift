@@ -565,6 +565,19 @@ private struct TrainingAreaRow: View {
 /// `circle.circle.fill` (concentric filled circles) was a mismatch,
 /// corrected here.
 enum TrainingAreaIcon {
+    /// The 10 canonical muscle-group Training Area ids, in
+    /// `TRAINING_AREA_NAV_GROUPS` order. Also doubles as the set
+    /// `AppDestinationRouterView` uses to tell an area-grid row's
+    /// `.trainingExercise(exerciseId:)` destination (e.g. `"chest"`) apart
+    /// from an individual exercise leaf's destination using the exact same
+    /// case (e.g. `"bench-press"`) — both are real, typed
+    /// `training.exercise` destinations, so only the id value disambiguates
+    /// them.
+    static let canonicalAreaIds: Set<String> = [
+        "chest", "back", "shoulders", "biceps", "triceps",
+        "core", "quads", "hamstrings", "glutes", "calves",
+    ]
+
     static func systemImage(for areaId: String) -> String {
         switch areaId {
         case "chest": "smallcircle.filled.circle" // CircleDot

@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// A single Training Area (`/progress/training/library/:areaId`) — the
-/// first Training Area page, establishing the pattern for the other nine
-/// (Back, Shoulders, Biceps, Triceps, Core, Quads, Hamstrings, Glutes,
-/// Calves) in later work. Fixture-backed for `"chest"` only this slice;
-/// the view itself is fully generic over `areaId` so a future slice adds
-/// areas by extending the fixture, not by writing new screens.
+/// A single Training Area (`/progress/training/library/:areaId`) — fully
+/// generic over `areaId`, fixture-backed for all 10 canonical areas
+/// (Chest, Back, Shoulders, Biceps, Triceps, Core, Quads, Hamstrings,
+/// Glutes, Calves; see `TrainingFixture.json`'s `areas` array). Areas with
+/// zero exercises today (Biceps, Core, Quads, Hamstrings, Glutes, Calves)
+/// render this exact screen with an honest empty "Browse" section — no
+/// exercises and no placeholder copy — matching real web behavior for an
+/// area with no logged exercises (`InformationList` renders nothing, not a
+/// "come back later" message; verified directly from source).
 ///
 /// Reproduces `TrainingKnowledgeScreen.jsx`'s `mode="library"` render path
 /// for a bare area path exactly: `TrainingLibraryHeader` (eyebrow, title,
