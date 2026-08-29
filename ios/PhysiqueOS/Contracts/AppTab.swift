@@ -29,13 +29,22 @@ enum AppTab: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The foundation slice's icons were unreviewed placeholders. These
+    /// are chosen to match the web's own established icon vocabulary —
+    /// `src/components/navigation/BottomNavItem.jsx`'s `iconMap`
+    /// (`Home`, `PlusCircle`, `BarChart3`, `MessageCircle`, `User` from
+    /// lucide-react) — rather than an independently invented native set.
+    /// Most notably, Coach's icon is a message bubble, not a meditation
+    /// pose: the web's own `iconMap.coach` is `MessageCircle`, matching
+    /// what "Coach" means in this product (a coaching conversation), not
+    /// wellness/mindfulness.
     var systemImageName: String {
         switch self {
-        case .home: "house"
-        case .log: "plus.circle"
-        case .progress: "chart.line.uptrend.xyaxis"
-        case .coach: "figure.mind.and.body"
-        case .profile: "person.crop.circle"
+        case .home: "house.fill"
+        case .log: "plus.circle.fill"
+        case .progress: "chart.bar.fill"
+        case .coach: "message.fill"
+        case .profile: "person.crop.circle.fill"
         }
     }
 }

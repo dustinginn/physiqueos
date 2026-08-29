@@ -10,29 +10,23 @@ import SwiftUI
 /// and no Arial-fallback-only build). It materially contributes to
 /// PhysiqueOS's identity: a rounded, geometric sans distinct from SF Pro.
 ///
-/// Native renders with the **San Francisco system font** instead of
-/// embedding Plus Jakarta Sans, because the actual font binary is not
-/// obtainable inside this task's bounds: it ships only via the
-/// `@fontsource-variable/plus-jakarta-sans` npm package, and this
-/// environment has neither `node` nor `npm` installed to fetch/extract it,
-/// nor any vendored copy already committed to the repository (`node_modules`
-/// is gitignored and absent; no font binary is tracked in git; `public/`
-/// contains no font asset). Downloading the font from the network was not
-/// attempted — that requires the user's explicit permission this task did
-/// not request, and the source-of-truth instruction for this slice is
-/// repository inspection, not external fetches. See
-/// docs/PHYSIQUEOS_NATIVE_V1.md for the resulting Founder decision this
-/// creates: whether to supply the actual `.ttf`/`.otf` font files for a
-/// later slice to embed via `UIFontDescriptor`/`Font.custom`, which would
-/// need no new dependency (Plus Jakarta Sans is SIL Open Font License,
-/// free) and no paid service.
+/// Native now renders with the **real Plus Jakarta Sans**, Founder-approved
+/// as the Native V1 brand font. The variable font file is vendored at
+/// `Resources/Fonts/PlusJakartaSans[wght].ttf` (SIL Open Font License,
+/// retrieved from the official `google/fonts` repository — see
+/// `ATTRIBUTION.md` beside it) and registered via `Info.plist`'s
+/// `UIAppFonts`. `PlusJakartaSans.swift` resolves specific weights through
+/// the font's own `wght` variation axis rather than separate font files.
+/// A prior slice used San Francisco here because no `node`/`npm` was
+/// available to extract the font from its npm package; this slice sourced
+/// the identical upstream release directly instead.
 ///
 /// Every value below is copied from an actual Tailwind arbitrary class in
 /// the current web source (`text-[Npx]`, `font-*`, `tracking-[Nem]`,
 /// `uppercase`) — not estimated. Screens must use `PhysiqueOSTypography`
 /// tokens through `.physiqueOSFont(_:)` rather than picking raw
-/// `.system(size:weight:)` values, so a future correction (or the eventual
-/// switch to the real brand font) happens in one place.
+/// `.system(size:weight:)` values, so both the font and every size/weight
+/// correction happen in one place.
 enum PhysiqueOSTypography {
     /// One named point in the hierarchy: a base point size, a weight, and
     /// optional em-relative tracking/case — CSS's `em` unit is a fraction
@@ -205,7 +199,7 @@ private struct PhysiqueOSFontModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .font(.system(size: scaledSize, weight: weight))
+            .font(PlusJakartaSans.font(size: scaledSize, weight: weight.numericValue))
             .tracking(scaledSize * trackingEm)
             .textCase(uppercase ? .uppercase : nil)
     }

@@ -16,8 +16,8 @@ struct LogView: View {
             content
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .padding(.bottom, 32)
         }
+        .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task {

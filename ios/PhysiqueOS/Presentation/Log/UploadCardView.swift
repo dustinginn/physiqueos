@@ -25,7 +25,17 @@ struct UploadCardView: View {
     @State private var weighInStatusMessage: String?
 
     private var maxSelectableDate: Date {
-        Self.dateFormatter.date(from: localDate) ?? Date()
+        EvidenceDateParsing.date(fromLocalDateString: localDate) ?? Date()
+    }
+
+    /// The web's "Submit evidence" is disabled only while a real upload is
+    /// in flight (`disabled={submitting}`), a state this fixture-only
+    /// slice cannot honestly reach. Requiring *something* to submit before
+    /// enabling the button is an honest, purely local precondition — no
+    /// server contacted, no canonical write implied — that still lets both
+    /// the enabled and disabled treatments be verified visually.
+    private var hasContentToSubmit: Bool {
+        !selectedFileNames.isEmpty || !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -53,19 +63,13 @@ struct UploadCardView: View {
                     StatusBanner(text: uploadStatusMessage, tone: .neutral)
                 }
 
-                Button {
+                PrimaryActionButton(
+                    title: "Submit evidence",
+                    tone: .dark,
+                    isEnabled: hasContentToSubmit
+                ) {
                     uploadStatusMessage = "Uploading isn't connected to a server in this build yet."
-                } label: {
-                    Text("Submit evidence")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(PhysiqueOSTheme.textPrimary.opacity(0.9))
-                        .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(.isButton)
             }
         }
         .onAppear { selectedDate = maxSelectableDate }
@@ -88,16 +92,10 @@ struct UploadCardView: View {
             Text("Use the date the weigh-in, workout, meal, scan, or activity happened.")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            DatePicker(
-                "Evidence date", selection: $selectedDate,
-                in: ...maxSelectableDate, displayedComponents: .date
-            )
-            .labelsHidden()
-            .datePickerStyle(.compact)
-            .tint(PhysiqueOSTheme.accent)
-            .onChange(of: selectedDate) {
-                weighInStatusMessage = nil
-            }
+            DateField(date: $selectedDate, maximumDate: maxSelectableDate, label: "Evidence date")
+                .onChange(of: selectedDate) {
+                    weighInStatusMessage = nil
+                }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -161,20 +159,10 @@ struct UploadCardView: View {
                         StatusBanner(text: weighInStatusMessage, tone: .neutral)
                     }
 
-                    Button {
+                    PrimaryActionButton(title: "Save weigh-in", tone: .accent) {
                         weighInStatusMessage = DirectWeighInValidation.validationError(forWeightText: weightText)
                             ?? "Saving a weigh-in isn't connected to a server in this build yet."
-                    } label: {
-                        Text("Save weigh-in")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(PhysiqueOSTheme.accent)
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(.isButton)
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
@@ -236,13 +224,6 @@ struct UploadCardView: View {
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
 
     private static let friendlyDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
