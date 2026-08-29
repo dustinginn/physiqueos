@@ -17,26 +17,37 @@ import {
 import {
   createFounderMorningBriefingFinalizationService,
 } from "../../../domain/services/MorningBriefingFinalizationService";
+import {
+  createProviderBriefingReconciliationService,
+} from "../../../application/composition/providerBriefingReconciliationComposition";
 
 export async function finalizeMorningBriefingReconciliation() {
-  const user = await FounderRepositories.users.getCurrentUser();
-  if (!user) throw new Error("Founder user is not available.");
-  const now = new Date();
-  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
-  const result = await createFounderMorningBriefingFinalizationService({
-    repositories: FounderRepositories,
-    now: () => now,
-  }).finalize({ userId: user.id, timeZone, at: now });
-  if (result.status === "waiting") {
-    redirect("/check-in/morning?briefingUpdate=waiting");
-  }
-  revalidatePath("/");
-  revalidatePath("/check-in/morning");
-  revalidatePath("/briefings/weekly");
-  revalidatePath("/briefings/review");
-  redirect(result.status === "failed"
-    ? "/check-in/morning?briefingUpdate=failed"
-    : "/briefings/weekly?briefingUpdate=current");
+  return FounderRepositories.runInReadScope(async () => {
+    const user = await FounderRepositories.users.getCurrentUser();
+    if (!user) throw new Error("Founder user is not available.");
+    const now = new Date();
+    const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
+    const result = await createFounderMorningBriefingFinalizationService({
+      repositories: FounderRepositories,
+      now: () => now,
+      briefingServiceFactory: async () =>
+        createProviderBriefingReconciliationService({
+          repositories: FounderRepositories,
+          runtimeBindings: await loadApplicationRuntimeBindings(),
+          now: () => now,
+        }),
+    }).finalize({ userId: user.id, timeZone, at: now });
+    if (result.status === "waiting") {
+      redirect("/check-in/morning?briefingUpdate=waiting");
+    }
+    revalidatePath("/");
+    revalidatePath("/check-in/morning");
+    revalidatePath("/briefings/weekly");
+    revalidatePath("/briefings/review");
+    redirect(result.status === "failed"
+      ? "/check-in/morning?briefingUpdate=failed"
+      : "/briefings/weekly?briefingUpdate=current");
+  }, { readModel: "action.morning-briefing-reconciliation" });
 }
 
 export async function saveStructuredRecoveryCheckIn(formData) {

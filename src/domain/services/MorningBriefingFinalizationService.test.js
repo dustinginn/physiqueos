@@ -86,6 +86,24 @@ describe("MorningBriefingFinalizationService", () => {
     });
     expect(createBriefingService).not.toHaveBeenCalled();
   });
+
+  it("does not select a current publication claim until its lease expires", async () => {
+    const createBriefingService = vi.fn();
+    const service = createService({
+      createBriefingService,
+      workItems: [{
+        ...workItem,
+        status: "revising",
+        attempts: 1,
+        startedAt: "2026-08-09T15:59:30.000Z",
+        updatedAt: "2026-08-09T15:59:30.000Z",
+      }],
+    });
+    await expect(service.finalize(command)).resolves.toMatchObject({
+      status: "current", attempted: 0,
+    });
+    expect(createBriefingService).not.toHaveBeenCalled();
+  });
 });
 
 function createService({

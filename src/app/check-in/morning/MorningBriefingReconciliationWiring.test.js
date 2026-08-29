@@ -16,6 +16,9 @@ describe("Morning Check-In briefing reconciliation wiring", () => {
 
   it("keeps bounded finalization available only as an explicit retry", () => {
     expect(actions).toContain("finalizeMorningBriefingReconciliation");
+    expect(actions).toContain("createProviderBriefingReconciliationService");
+    expect(actions).toContain("runtimeBindings: await loadApplicationRuntimeBindings()");
+    expect(actions).toContain("FounderRepositories.runInReadScope");
     expect(actions.match(/\.finalize\(\{ userId: user\.id, timeZone, at: now \}\)/g))
       .toHaveLength(1);
     expect(page).toContain(

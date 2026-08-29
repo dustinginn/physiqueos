@@ -203,6 +203,89 @@ describe("late-evidence confirmation and recovery finalization integration", () 
     expect(items[0].result.noOp).toBe(true);
   });
 
+  it("repairs an expired post-publication claim without publishing a duplicate revision", async () => {
+    const workItem = {
+      ...pendingWorkItem(),
+      status: "revising",
+      attempts: 1,
+      startedAt: "2026-08-09T22:00:00.000Z",
+      updatedAt: "2026-08-09T22:00:00.000Z",
+    };
+    const current = {
+      ...weeklyPublication(),
+      dependencyManifest: {
+        fingerprint: "sha256_already_revised",
+        canonicalDependencies: workItem.affectedDependencies,
+      },
+      revisionProvenance: {
+        workItemId: workItem.id,
+        inputFingerprint: workItem.inputFingerprint,
+      },
+    };
+    const items = [workItem];
+    const cadence = {
+      prepareRegeneration: vi.fn(),
+      executePreparedRegeneration: vi.fn(),
+    };
+    const service = createFounderBriefingReconciliationService({
+      repositories: {
+        briefingReconciliationWorkItems: {
+          listWorkItems: async () => structuredClone(items),
+        },
+        dailyBriefings: { listDailyBriefings: async () => [current] },
+      },
+      persistence: {
+        saveWorkItem: async (item) => items.splice(0, 1, structuredClone(item)),
+      },
+      cadenceServices: { weekly: cadence },
+      now: sequenceClock("2026-08-09T22:20:00.000Z"),
+    });
+
+    await expect(service.finalizePending({
+      userId: USER,
+      workItemIds: [workItem.id],
+    })).resolves.toMatchObject({ completed: 1, failed: 0 });
+    expect(items[0]).toMatchObject({
+      status: "current_after_revision",
+      result: { noOp: true, publicationArtifactId: ROOT },
+    });
+    expect(cadence.prepareRegeneration).not.toHaveBeenCalled();
+    expect(cadence.executePreparedRegeneration).not.toHaveBeenCalled();
+  });
+
+  it("does not steal an unexpired reconciliation claim", async () => {
+    const item = {
+      ...pendingWorkItem(),
+      status: "revising",
+      attempts: 1,
+      startedAt: "2026-08-09T22:19:30.000Z",
+      updatedAt: "2026-08-09T22:19:30.000Z",
+    };
+    const persistence = { saveWorkItem: vi.fn() };
+    const cadence = {
+      prepareRegeneration: vi.fn(),
+      executePreparedRegeneration: vi.fn(),
+    };
+    const service = createFounderBriefingReconciliationService({
+      repositories: {
+        briefingReconciliationWorkItems: {
+          listWorkItems: async () => [structuredClone(item)],
+        },
+        dailyBriefings: { listDailyBriefings: async () => [weeklyPublication()] },
+      },
+      persistence,
+      cadenceServices: { weekly: cadence },
+      now: () => new Date("2026-08-09T22:20:00.000Z"),
+    });
+
+    await expect(service.finalizePending({
+      userId: USER,
+      workItemIds: [item.id],
+    })).resolves.toMatchObject({ attempted: 0, completed: 0, failed: 0 });
+    expect(persistence.saveWorkItem).not.toHaveBeenCalled();
+    expect(cadence.prepareRegeneration).not.toHaveBeenCalled();
+  });
+
   it("keeps failure retryable and succeeds on the next bounded finalization", async () => {
     const current = weeklyPublication();
     const items = [pendingWorkItem()];

@@ -80,6 +80,21 @@ describe("current-briefing late-evidence eligibility", () => {
       .toMatchObject({ changed: false, workItemIds: [] });
   });
 
+  it("does not duplicate work when the same qualifying evidence is reconciled again", () => {
+    const current = publication("weekly-current", "weekly",
+      "2026-08-23", "2026-08-29", "2026-08-30T15:00:00.000Z");
+    const candidate = store([current]);
+    const evidence = training("2026-08-29", "2026-08-30T20:00:00.000Z");
+
+    const first = enqueue(candidate, evidence, evidence.updatedAt);
+    const firstItem = structuredClone(candidate.briefingReconciliationWorkItems[0]);
+    const second = enqueue(candidate, evidence, evidence.updatedAt);
+
+    expect(first.workItemIds).toHaveLength(1);
+    expect(second).toMatchObject({ changed: false, workItemIds: [] });
+    expect(candidate.briefingReconciliationWorkItems).toEqual([firstItem]);
+  });
+
   it("ignores evidence types outside the briefing dependency contract", () => {
     const current = publication("weekly-current", "weekly",
       "2026-08-23", "2026-08-29", "2026-08-30T15:00:00.000Z");

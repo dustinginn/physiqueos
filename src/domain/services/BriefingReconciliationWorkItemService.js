@@ -4,6 +4,7 @@ import { stableSerialize } from
 
 export const BRIEFING_RECONCILIATION_WORK_ITEM_VERSION =
   "briefing_reconciliation_work_item_v1";
+export const BRIEFING_RECONCILIATION_CLAIM_LEASE_MS = 15 * 60 * 1000;
 
 export const BriefingReconciliationState = Object.freeze({
   CURRENT: "current",
@@ -86,6 +87,45 @@ export function beginBriefingReconciliation(item, startedAt) {
     updatedAt: startedAt,
     failure: null,
   });
+}
+
+export function resumeBriefingReconciliation(item, resumedAt, {
+  claimLeaseMs = BRIEFING_RECONCILIATION_CLAIM_LEASE_MS,
+} = {}) {
+  assertWorkItem(item);
+  if (item.status !== BriefingReconciliationState.REVISING ||
+      !isBriefingReconciliationClaimAvailable(item, {
+        at: resumedAt,
+        claimLeaseMs,
+      })) {
+    const error = new Error(
+      "Only an expired briefing reconciliation claim can resume."
+    );
+    error.code = "briefing_reconciliation_claim_active";
+    throw error;
+  }
+  return freeze({
+    ...structuredClone(item),
+    updatedAt: resumedAt,
+    failure: null,
+  });
+}
+
+export function isBriefingReconciliationClaimAvailable(item, {
+  at = new Date(),
+  claimLeaseMs = BRIEFING_RECONCILIATION_CLAIM_LEASE_MS,
+  maxAttempts = 3,
+} = {}) {
+  if (!item || (item.attempts ?? 0) >= maxAttempts) return false;
+  if (item.status === BriefingReconciliationState.REVISION_PENDING) return true;
+  if (item.status === BriefingReconciliationState.FAILED) {
+    return item.failure?.retryable !== false;
+  }
+  if (item.status !== BriefingReconciliationState.REVISING) return false;
+  const claimedAt = Date.parse(item.updatedAt ?? item.startedAt);
+  const evaluatedAt = Date.parse(at);
+  return Number.isFinite(claimedAt) && Number.isFinite(evaluatedAt) &&
+    evaluatedAt - claimedAt >= claimLeaseMs;
 }
 
 export function completeBriefingReconciliation(item, {

@@ -16,19 +16,31 @@ import {
 import {
   createFounderWeeklyNarrativeService,
 } from "./WeeklyNarrativeService";
+import {
+  isBriefingReconciliationClaimAvailable,
+} from "./BriefingReconciliationWorkItemService";
 
-const EXECUTABLE = new Set(["revision_pending", "failed"]);
 const MAX_AUTOMATIC_ATTEMPTS = 3;
 
 export function createFounderBriefingReconciliationService({
   repositories,
   now = () => new Date(),
-  persistence = createFounderBriefingReconciliationPersistenceService({ now }),
+  persistence = null,
   cadenceServices = null,
 } = {}) {
   if (!repositories) {
     throw new Error("Founder briefing reconciliation repositories are required.");
   }
+  if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" &&
+      (!persistence || !cadenceServices)) {
+    const error = new Error(
+      "Provider briefing reconciliation requires provider-native persistence composition."
+    );
+    error.code = "PROVIDER_BRIEFING_PERSISTENCE_REQUIRED";
+    throw error;
+  }
+  const workItemPersistence = persistence ??
+    createFounderBriefingReconciliationPersistenceService({ now });
   const services = cadenceServices ?? {
     weekly: createFounderWeeklyNarrativeService({ repositories, now }),
     midweek: createFounderMidweekBriefingService({ repositories, now }),
@@ -40,7 +52,7 @@ export function createFounderBriefingReconciliationService({
       (await repositories.dailyBriefings.listDailyBriefings(userId))
         .find((item) => item.id === publicationRootId) ?? null,
     validateEligibility: validateCurrentEligibility,
-    saveWorkItem: (workItem) => persistence.saveWorkItem(workItem),
+    saveWorkItem: (workItem) => workItemPersistence.saveWorkItem(workItem),
     now,
   });
 
@@ -50,8 +62,9 @@ export function createFounderBriefingReconciliationService({
       if (!requestedIds.size) return emptyFinalization();
       const workItems = await repositories.briefingReconciliationWorkItems
         .listWorkItems(userId);
+      const evaluatedAt = now();
       const selected = workItems
-        .filter(isExecutable)
+        .filter((item) => isExecutable(item, evaluatedAt))
         .filter((item) => requestedIds.has(item.id))
         .sort((left, right) =>
           String(left.enqueuedAt).localeCompare(String(right.enqueuedAt))
@@ -126,8 +139,9 @@ function manifestContainsChanges(manifest, dependencies = []) {
   });
 }
 
-function isExecutable(item) {
-  if (!EXECUTABLE.has(item.status)) return false;
-  if ((item.attempts ?? 0) >= MAX_AUTOMATIC_ATTEMPTS) return false;
-  return item.status !== "failed" || item.failure?.retryable !== false;
+function isExecutable(item, at) {
+  return isBriefingReconciliationClaimAvailable(item, {
+    at,
+    maxAttempts: MAX_AUTOMATIC_ATTEMPTS,
+  });
 }

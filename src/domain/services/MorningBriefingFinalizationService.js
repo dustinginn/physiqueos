@@ -13,6 +13,9 @@ import {
 import {
   createCoachingUpdatesReadService,
 } from "./CoachingUpdatesReadService";
+import {
+  isBriefingReconciliationClaimAvailable,
+} from "./BriefingReconciliationWorkItemService";
 
 export function createMorningBriefingFinalizationService({
   priorityService,
@@ -65,6 +68,7 @@ export function createMorningBriefingFinalizationService({
             evidenceDate: selection.window.previousLocalDate,
             publicationRootId: currentPublication.id,
             workItems,
+            at,
           })
         : [];
       if (!workItemIds.length) {
@@ -77,7 +81,8 @@ export function createMorningBriefingFinalizationService({
           results: Object.freeze([]),
         });
       }
-      const result = await createBriefingService().finalizePending({
+      const briefingService = await createBriefingService();
+      const result = await briefingService.finalizePending({
         userId,
         workItemIds,
       });
@@ -98,6 +103,9 @@ export function createMorningBriefingFinalizationService({
 export function createFounderMorningBriefingFinalizationService({
   repositories,
   now = () => new Date(),
+  briefingServiceFactory = () => createFounderBriefingReconciliationService({
+    repositories, now,
+  }),
 } = {}) {
   return createMorningBriefingFinalizationService({
     priorityService: createMorningPriorityReconciliationService({
@@ -110,9 +118,7 @@ export function createFounderMorningBriefingFinalizationService({
       repositories.briefingReconciliationWorkItems.listWorkItems(userId),
     getCoachingUpdates: (userId) =>
       createCoachingUpdatesReadService({ repositories }).getCurrent({ userId }),
-    createBriefingService: () => createFounderBriefingReconciliationService({
-      repositories, now,
-    }),
+    createBriefingService: briefingServiceFactory,
   });
 }
 
@@ -120,12 +126,11 @@ function selectCurrentWorkItemIds({
   evidenceDate,
   publicationRootId,
   workItems = [],
+  at,
 }) {
   return workItems
     .filter((item) => item.publicationRootId === publicationRootId)
-    .filter((item) => ["revision_pending", "failed"].includes(item.status))
-    .filter((item) => item.status !== "failed" ||
-      item.failure?.retryable !== false)
+    .filter((item) => isBriefingReconciliationClaimAvailable(item, { at }))
     .filter((item) => item.affectedDependencies?.some((dependency) =>
       dependency.observedDate === evidenceDate
     ))

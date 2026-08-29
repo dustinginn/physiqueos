@@ -2,6 +2,7 @@ import {
   beginBriefingReconciliation,
   completeBriefingReconciliation,
   failBriefingReconciliation,
+  resumeBriefingReconciliation,
 } from "./BriefingReconciliationWorkItemService";
 
 export const BRIEFING_REVISION_EXECUTION_VERSION =
@@ -22,7 +23,10 @@ export function createBriefingRevisionExecutionService({
   }
   return Object.freeze({
     async execute({ workItem, userId } = {}) {
-      let active = beginBriefingReconciliation(workItem, now().toISOString());
+      const startedAt = now().toISOString();
+      let active = workItem?.status === "revising"
+        ? resumeBriefingReconciliation(workItem, startedAt)
+        : beginBriefingReconciliation(workItem, startedAt);
       await saveWorkItem(active);
       try {
         const publication = await getCurrentPublication({
