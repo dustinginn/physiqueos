@@ -1,0 +1,127 @@
+{
+  "header": {
+    "greeting": "Good morning,",
+    "name": "Alex"
+  },
+  "hero": {
+    "mode": "active",
+    "goalLabel": "Lean Definition Goal",
+    "headline": "On track.",
+    "supportLine": "Keep executing the plan.",
+    "confidence": 68,
+    "confidenceDetail": {
+      "qualitativeLevel": "Moderate",
+      "supportingFactors": [
+        "Weight trends have continued to hold up, which supports confidence that the plan is working."
+      ],
+      "limitingFactors": [
+        "There hasn't yet been enough direct body-composition evidence to confirm the desired outcome."
+      ],
+      "clarifyingFactors": [
+        "The next DEXA measurement can directly confirm how this is progressing."
+      ],
+      "uncertaintyStatement": ""
+    },
+    "projectedFinish": "Nov 14",
+    "daysRemaining": "62 days",
+    "actionLabel": null,
+    "actionDestination": null
+  },
+  "nextBestAction": {
+    "title": "Log Morning Weight",
+    "icon": "scale",
+    "destination": { "id": "check-in", "parameters": { "checkInType": "morning" } }
+  },
+  "briefingCards": [
+    {
+      "id": "briefing-daily-fixture-001",
+      "sectionLabel": "Daily Briefing",
+      "title": "Daily Briefing Ready",
+      "prompt": "See what's changed.",
+      "createdAt": "2026-08-28T13:00:00.000Z",
+      "destination": { "id": "briefing.detail", "parameters": { "briefingId": "briefing-daily-fixture-001" } }
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal_fixture_lean_definition",
+      "title": "Lean Definition Goal",
+      "current": "16.2",
+      "target": "12.0",
+      "unit": "%",
+      "icon": "target",
+      "color": "success",
+      "presentationMode": "primary",
+      "progress": 61,
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_lean_definition" } }
+    },
+    {
+      "id": "goal_fixture_maintain_strength",
+      "title": "Maintain Strength Baseline",
+      "current": "",
+      "target": "",
+      "unit": "",
+      "icon": "dumbbell",
+      "color": "evidence",
+      "presentationMode": "supporting",
+      "status": "Maintaining",
+      "detail": "Strength holding steady",
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_maintain_strength" } }
+    },
+    {
+      "id": "goal_fixture_preserve_lean_mass",
+      "title": "Preserve Lean Mass",
+      "current": "",
+      "target": "",
+      "unit": "",
+      "icon": "shield",
+      "color": "primary",
+      "presentationMode": "supporting",
+      "status": "On track",
+      "detail": "Lean mass stable across recent DEXA scans",
+      "destination": null
+    }
+  ],
+  "todaysFocus": [
+    {
+      "id": "focus-fixture-weight",
+      "label": "Morning Weight",
+      "subtitle": null,
+      "icon": "scale",
+      "color": "primary",
+      "completed": true,
+      "actionLabel": null,
+      "destination": null
+    },
+    {
+      "id": "focus-fixture-foam-roll",
+      "label": "Foam Roll",
+      "subtitle": "10 minutes",
+      "icon": "activity",
+      "color": "evidence",
+      "completed": false,
+      "actionLabel": null,
+      "destination": null
+    },
+    {
+      "id": "focus-fixture-photo",
+      "label": "Front Progress Photo",
+      "subtitle": "Weekly photo set",
+      "icon": "camera",
+      "color": "warning",
+      "completed": false,
+      "actionLabel": "Needs Setup",
+      "destination": { "id": "photo.upload", "parameters": {} }
+    },
+    {
+      "id": "focus-fixture-peptide",
+      "label": "Evening Peptide",
+      "subtitle": "Retatrutide",
+      "icon": "syringe",
+      "color": "effort",
+      "completed": false,
+      "actionLabel": null,
+      "destination": null
+    }
+  ]
+}

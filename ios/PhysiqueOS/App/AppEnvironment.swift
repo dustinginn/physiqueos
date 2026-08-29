@@ -2,13 +2,16 @@ import Foundation
 
 /// The app's composition root.
 ///
-/// Stage 1 introduces no networking, authentication, or persistence, so this
-/// type is intentionally empty. It exists now so later slices can attach a
-/// fixture-backed (and eventually live) API client, session state, and
-/// device-local settings here without restructuring how screens obtain their
-/// dependencies. Screens must keep depending on this type by injection
-/// rather than reaching for globals as real dependencies are added.
+/// Screens depend on this type by injection rather than reaching for
+/// globals. `homeAPI` is the first dependency attached here — a
+/// fixture-backed `HomeAPI` today, replaced with a live, authenticated
+/// implementation once one exists, with no change required to `HomeView`
+/// or `HomeViewModel`.
 @Observable
 final class AppEnvironment {
-    init() {}
+    let homeAPI: HomeAPI
+
+    init(homeAPI: HomeAPI = FixtureHomeAPI()) {
+        self.homeAPI = homeAPI
+    }
 }
