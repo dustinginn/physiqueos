@@ -30,13 +30,14 @@ export const PILowerLevelSourceCommitOutcome = Object.freeze({
 export function createPILowerLevelCanonicalEvidenceCommitService({
   runtimeStorePath,
   liveStore,
+  mutateCanonicalRuntime = null,
   now = () => new Date(),
   createUnitOfWork = createFounderStoreUnitOfWork,
   enqueueCoordinator = createPILowerLevelConfidenceWorkEnqueueService({ now }),
   briefingCoordinator = createBriefingReconciliationEnqueueService({ now }),
   enableEnergyConfidenceEnqueue = true,
 } = {}) {
-  if (!runtimeStorePath || !liveStore) {
+  if ((!runtimeStorePath || !liveStore) && typeof mutateCanonicalRuntime !== "function") {
     throw new Error("Lower-level canonical commit requires a bound Founder store.");
   }
   return Object.freeze({
@@ -45,123 +46,232 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
       userId,
       { canonicalExerciseDefinitions = [] } = {}
     ) {
-      const transaction = createUnitOfWork({
-        filePath: runtimeStorePath,
-        liveStore,
-        stageFrom: liveStore,
-        now,
-      }).begin();
       let reconciliation;
       const enqueueResults = [];
       let briefingReconciliation = null;
       let evidencePackageAdded = false;
-      try {
-        await transaction.mutate((candidate) => {
-          evidencePackageAdded = ensureEvidencePackage(candidate, evidencePackage);
-          candidate.canonicalExerciseLibrary ??= [];
-          for (const definition of canonicalExerciseDefinitions) {
-            const conflict = findCanonicalExerciseConflict(
-              definition,
-              candidate.canonicalExerciseLibrary
-            );
-            if (conflict) {
-              throw new Error(
-                `"${definition.name}" matches the existing exercise "${conflict.name}".`
-              );
-            }
-            candidate.canonicalExerciseLibrary.push({
-              ...definition,
-              created_at: definition.created_at ?? now().toISOString(),
-              created_by: userId,
-            });
-          }
-          reconciliation = reconcileConfirmedEvidencePackage({
-            evidencePackage,
-            existingCanonicalObjects: candidate.canonicalEvidenceObjects ?? [],
-            userId,
-          });
-          if (reconciliation.changedObjects.length === 0) return;
-          candidate.canonicalEvidenceObjects = applyChanges(
-            candidate.canonicalEvidenceObjects,
-            reconciliation.changedObjects
+      const stageCandidate = (candidate) => {
+        evidencePackageAdded = ensureEvidencePackage(candidate, evidencePackage);
+        candidate.canonicalExerciseLibrary ??= [];
+        for (const definition of canonicalExerciseDefinitions) {
+          const conflict = findCanonicalExerciseConflict(
+            definition,
+            candidate.canonicalExerciseLibrary
           );
-          for (const record of enableEnergyConfidenceEnqueue
-            ? reconciliation.changedObjects.filter(isEnergySource)
-            : []) {
-            const date = sourceDate(record);
-            const counterpart = findCounterpart(
-              candidate.canonicalEvidenceObjects,
-              record,
-              date
+          if (conflict) {
+            throw new Error(
+              `"${definition.name}" matches the existing exercise "${conflict.name}".`
             );
+          }
+          candidate.canonicalExerciseLibrary.push({
+            ...definition,
+            created_at: definition.created_at ?? now().toISOString(),
+            created_by: userId,
+          });
+        }
+        reconciliation = reconcileConfirmedEvidencePackage({
+          evidencePackage,
+          existingCanonicalObjects: candidate.canonicalEvidenceObjects ?? [],
+          userId,
+        });
+        if (reconciliation.changedObjects.length === 0) return;
+        candidate.canonicalEvidenceObjects = applyChanges(
+          candidate.canonicalEvidenceObjects,
+          reconciliation.changedObjects
+        );
+        for (const record of enableEnergyConfidenceEnqueue
+          ? reconciliation.changedObjects.filter(isEnergySource)
+          : []) {
+          const date = sourceDate(record);
+          const counterpart = findCounterpart(
+            candidate.canonicalEvidenceObjects,
+            record,
+            date
+          );
+          enqueueResults.push(
+            enqueueCoordinator.stageEnergySourceChange(candidate, {
+              domain: energyDomain(record),
+              canonicalEvidenceId: record.canonicalId,
+              changedLocalDate: date,
+              sourceChangeType: sourceChangeType(record),
+              sourceSemanticFingerprint: sourceSemanticFingerprint(record),
+              linkedCounterpartId: counterpart?.canonicalId ?? null,
+              evidenceCutoff: `${date}T23:59:59.999Z`,
+              createdAt: now().toISOString(),
+            })
+          );
+        }
+        for (const rmr of enableEnergyConfidenceEnqueue
+          ? reconciliation.changedObjects.filter(isRmrSource)
+          : []) {
+          for (const date of boundedRmrAffectedDates(
+            candidate.canonicalEvidenceObjects,
+            sourceDate(rmr)
+          )) {
+            const sources = candidate.canonicalEvidenceObjects.filter(
+              (item) =>
+                isEnergySource(item) &&
+                item.quality?.status !== "superseded" &&
+                sourceDate(item) === date
+            );
+            const nutrition = sources.find(
+              (item) => energyDomain(item) === "nutrition"
+            );
+            const activity = sources.find(
+              (item) => energyDomain(item) === "activity"
+            );
+            const primary = nutrition ?? activity;
+            if (!primary) continue;
             enqueueResults.push(
               enqueueCoordinator.stageEnergySourceChange(candidate, {
-                domain: energyDomain(record),
-                canonicalEvidenceId: record.canonicalId,
+                domain: energyDomain(primary),
+                canonicalEvidenceId: primary.canonicalId,
+                linkedCounterpartId:
+                  (nutrition === primary ? activity : nutrition)
+                    ?.canonicalId ?? null,
                 changedLocalDate: date,
-                sourceChangeType: sourceChangeType(record),
-                sourceSemanticFingerprint: sourceSemanticFingerprint(record),
-                linkedCounterpartId: counterpart?.canonicalId ?? null,
+                sourceChangeType: "rmr_correction",
+                sourceSemanticFingerprint:
+                  createPISemanticFingerprint(semanticRecord(rmr)),
+                rmrSourceId: rmr.canonicalId,
+                reason: "rmr_correction_committed",
                 evidenceCutoff: `${date}T23:59:59.999Z`,
                 createdAt: now().toISOString(),
               })
             );
           }
-          for (const rmr of enableEnergyConfidenceEnqueue
-            ? reconciliation.changedObjects.filter(isRmrSource)
-            : []) {
-            for (const date of boundedRmrAffectedDates(
-              candidate.canonicalEvidenceObjects,
-              sourceDate(rmr)
-            )) {
-              const sources = candidate.canonicalEvidenceObjects.filter(
-                (item) =>
-                  isEnergySource(item) &&
-                  item.quality?.status !== "superseded" &&
-                  sourceDate(item) === date
-              );
-              const nutrition = sources.find(
-                (item) => energyDomain(item) === "nutrition"
-              );
-              const activity = sources.find(
-                (item) => energyDomain(item) === "activity"
-              );
-              const primary = nutrition ?? activity;
-              if (!primary) continue;
-              enqueueResults.push(
-                enqueueCoordinator.stageEnergySourceChange(candidate, {
-                  domain: energyDomain(primary),
-                  canonicalEvidenceId: primary.canonicalId,
-                  linkedCounterpartId:
-                    (nutrition === primary ? activity : nutrition)
-                      ?.canonicalId ?? null,
-                  changedLocalDate: date,
-                  sourceChangeType: "rmr_correction",
-                  sourceSemanticFingerprint:
-                    createPISemanticFingerprint(semanticRecord(rmr)),
-                  rmrSourceId: rmr.canonicalId,
-                  reason: "rmr_correction_committed",
-                  evidenceCutoff: `${date}T23:59:59.999Z`,
-                  createdAt: now().toISOString(),
-                })
-              );
-            }
+        }
+        briefingReconciliation = briefingCoordinator
+          .stageCanonicalEvidenceChanges(candidate, {
+            canonicalChanges: reconciliation.changedObjects,
+            confirmedAt: evidencePackage.review_metadata?.confirmedAt ??
+              now().toISOString(),
+            sourceEvidencePackageId: evidencePackage.package_id ?? null,
+            sourceReviewId: evidencePackage.review_metadata?.sourceReviewId ?? null,
+            userId,
+          });
+      };
+      const noMutationRequired = () =>
+        (!reconciliation || reconciliation.changedObjects.length === 0) &&
+        canonicalExerciseDefinitions.length === 0 &&
+        !evidencePackageAdded;
+      const finalizeCandidate = (candidate, commitId) => {
+        stampPendingSourceCommits(candidate, commitId);
+        briefingCoordinator.stampSourceCommit(candidate, commitId);
+      };
+      const validateFinalizedCandidate = (candidate) =>
+        reconciliation.changedObjects.every((record) =>
+          candidate.canonicalEvidenceObjects?.some(
+            (item) => item.canonicalId === record.canonicalId
+          )
+        ) && canonicalExerciseDefinitions.every((definition) =>
+          candidate.canonicalExerciseLibrary?.some(
+            (item) => item.id === definition.id
+          )
+        ) && (!evidencePackageAdded || candidate.evidencePackages?.some(
+          (item) => item.package_id === evidencePackage.package_id
+        )) && enqueueResults.every((item) =>
+          candidate.piEnergyConfidenceWorkItems?.some(
+            (work) => work.id === item.workId &&
+              work.sourceCommitLinks?.every(
+                (link) => link.commitId !== "pending_source_commit"
+              )
+          )
+        ) && (briefingReconciliation?.workItemIds ?? []).every((workId) =>
+          candidate.briefingReconciliationWorkItems?.some((work) =>
+            work.id === workId &&
+            !work.sourceCommitLinks?.includes("pending_source_commit")
+          )
+        );
+      try {
+        if (typeof mutateCanonicalRuntime === "function") {
+          let committedExerciseLibrary = [];
+          const committed = await mutateCanonicalRuntime({
+            operation: "evidence-review-canonical-commit",
+            allowedCollections: [
+              "evidencePackages",
+              "canonicalExerciseLibrary",
+              "canonicalEvidenceObjects",
+              "piEnergyConfidenceWorkItems",
+              "piTrainingConfidenceWorkItems",
+              "briefingReconciliationWorkItems",
+            ],
+            allowApplicationContextMutation: false,
+            mutate(candidate, { commandId }) {
+              stageCandidate(candidate);
+              if (noMutationRequired()) {
+                return {
+                  sourceMatched: true,
+                  canonicalEvidenceObjects: selectSourceCanonicalObjects(
+                    candidate,
+                    evidencePackage
+                  ),
+                };
+              }
+              finalizeCandidate(candidate, commandId);
+              if (!validateFinalizedCandidate(candidate)) {
+                throw Object.assign(
+                  new Error("Finalized provider canonical evidence candidate was rejected."),
+                  { code: FounderStoreUnitOfWorkErrorCode.VALIDATION_FAILED }
+                );
+              }
+              committedExerciseLibrary = candidate.canonicalExerciseLibrary ?? [];
+              return {
+                sourceMatched: false,
+                canonicalEvidenceObjects: selectSourceCanonicalObjects(
+                  candidate,
+                  evidencePackage
+                ),
+              };
+            },
+          });
+          if (committed.result?.sourceMatched) {
+            return sourceResult(
+              PILowerLevelSourceCommitOutcome.SOURCE_MATCHED,
+              reconciliation,
+              enqueueResults,
+              {
+                canonicalEvidenceObjects:
+                  committed.result?.canonicalEvidenceObjects ?? [],
+                memoryProfile: committed.memoryProfile,
+              }
+            );
           }
-          briefingReconciliation = briefingCoordinator
-            .stageCanonicalEvidenceChanges(candidate, {
-              canonicalChanges: reconciliation.changedObjects,
-              confirmedAt: evidencePackage.review_metadata?.confirmedAt ??
-                now().toISOString(),
-              sourceEvidencePackageId: evidencePackage.package_id ?? null,
-              sourceReviewId: evidencePackage.review_metadata?.sourceReviewId ?? null,
-              userId,
-            });
-        });
-        if (
-          (!reconciliation || reconciliation.changedObjects.length === 0) &&
-          canonicalExerciseDefinitions.length === 0 &&
-          !evidencePackageAdded
-        ) {
+          registerRuntimeTrainingExercises(committedExerciseLibrary);
+          return sourceResult(
+            enqueueResults.every((item) => item.outcome === "matched") &&
+              !briefingReconciliation?.changed
+              ? PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED
+              : PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_ENQUEUED,
+            reconciliation,
+            enqueueResults,
+            {
+              committed: true,
+              revision: committed.revision,
+              commitId: committed.commitId,
+              report: {
+                ...(reconciliation?.report ?? {}),
+                newCanonicalExercises: canonicalExerciseDefinitions.map(
+                  ({ id, name }) => ({ id, name })
+                ),
+              },
+              briefingReconciliation,
+              canonicalEvidenceObjects:
+                committed.result?.canonicalEvidenceObjects ?? [],
+              changedCollections: committed.changedCollections,
+              memoryProfile: committed.memoryProfile,
+            }
+          );
+        }
+
+        const transaction = createUnitOfWork({
+          filePath: runtimeStorePath,
+          liveStore,
+          stageFrom: liveStore,
+          now,
+        }).begin();
+        await transaction.mutate(stageCandidate);
+        if (noMutationRequired()) {
           transaction.abort();
           return sourceResult(
             PILowerLevelSourceCommitOutcome.SOURCE_MATCHED,
@@ -171,33 +281,10 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         }
         const committed = await transaction.commit({
           finalizeCandidate({ stagedState, commitId }) {
-            stampPendingSourceCommits(stagedState, commitId);
-            briefingCoordinator.stampSourceCommit(stagedState, commitId);
+            finalizeCandidate(stagedState, commitId);
           },
           validateFinalized(candidate) {
-            return reconciliation.changedObjects.every((record) =>
-              candidate.canonicalEvidenceObjects?.some(
-                (item) => item.canonicalId === record.canonicalId
-              )
-            ) && canonicalExerciseDefinitions.every((definition) =>
-              candidate.canonicalExerciseLibrary?.some(
-                (item) => item.id === definition.id
-              )
-            ) && (!evidencePackageAdded || candidate.evidencePackages?.some(
-              (item) => item.package_id === evidencePackage.package_id
-            )) && enqueueResults.every((item) =>
-              candidate.piEnergyConfidenceWorkItems?.some(
-                (work) => work.id === item.workId &&
-                  work.sourceCommitLinks?.every(
-                    (link) => link.commitId !== "pending_source_commit"
-                  )
-              )
-            ) && (briefingReconciliation?.workItemIds ?? []).every((workId) =>
-              candidate.briefingReconciliationWorkItems?.some((work) =>
-                work.id === workId &&
-                !work.sourceCommitLinks?.includes("pending_source_commit")
-              )
-            );
+            return validateFinalizedCandidate(candidate);
           },
         });
         registerRuntimeTrainingExercises(liveStore.canonicalExerciseLibrary ?? []);
@@ -246,6 +333,9 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
       }
     },
     captureBaseline() {
+      if (!liveStore) {
+        throw new Error("A transaction-local provider commit has no reusable runtime baseline.");
+      }
       return {
         revision: liveStore.revision ?? 0,
         semanticDigest: createFounderRuntimeSemanticDigest(liveStore),
@@ -269,6 +359,20 @@ function ensureEvidencePackage(candidate, evidencePackage) {
     return true;
   }
   return false;
+}
+function selectSourceCanonicalObjects(candidate, evidencePackage) {
+  const packageId = evidencePackage?.package_id ?? evidencePackage?.id ?? null;
+  const objectIds = new Set(
+    (evidencePackage?.evidence_objects ?? [])
+      .filter((item) => item?.removed !== true)
+      .map((item) => item?.id)
+      .filter(Boolean)
+  );
+  return (candidate.canonicalEvidenceObjects ?? []).filter((item) =>
+    (packageId && item.provenance?.evidence_package_ids?.includes(packageId)) ||
+    (item.provenance?.contributing_evidence_object_ids ?? [])
+      .some((id) => objectIds.has(id))
+  );
 }
 function isEnergySource(record) {
   return ["nutrition", "activity_day", "activity"].includes(

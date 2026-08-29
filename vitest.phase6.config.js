@@ -40,6 +40,8 @@ export default defineConfig({
       "src/screens/PhotosEvidenceContextProduction.test.js",
       "src/domain/services/EvidenceReviewService.test.js",
       "src/domain/services/EvidenceReviewCommitRecovery.test.js",
+      "src/domain/services/EvidenceCanonicalCommitRecoveryService.test.js",
+      "src/domain/services/PILowerLevelCanonicalEvidenceBoundedCommit.test.js",
       "src/domain/services/PostConfirmationOrchestrator.test.js",
       "src/domain/services/EvidenceReviewPresentationService.test.js",
       "src/domain/services/GoalEvaluationJsonSafety.test.js",

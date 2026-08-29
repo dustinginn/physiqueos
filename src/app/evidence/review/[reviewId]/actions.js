@@ -43,6 +43,7 @@ import {
 } from "../../../../domain/services/TrainingPerformanceEventPersistenceService";
 import {
   loadApplicationCanonicalRuntime,
+  loadApplicationCanonicalCommitBindings,
   loadApplicationRuntimeBindings,
 } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import {
@@ -73,6 +74,9 @@ import {
   evidenceReviewMatchesRecoveryContext,
   parseEvidenceRecoveryFormData,
 } from "../../../../domain/services/EvidenceRecoveryContext";
+import {
+  CanonicalCommitRecoveryDisposition,
+} from "../../../../domain/services/EvidenceCanonicalCommitRecoveryService";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -104,14 +108,24 @@ export async function reprocessEvidenceReview(formData) {
 
 export async function confirmEvidenceReview(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
+  const service = createEvidenceReviewService({ repositories: FounderRepositories });
   const runInReadScope = FounderRepositories.runInReadScope ?? ((callback) => callback());
-  const { review, user } = await runInReadScope(async () => {
+  const { review, user, canonicalCommitRecovery } = await runInReadScope(async () => {
     const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
     const currentUser = await FounderRepositories.users.getCurrentUser();
+    let currentCanonicalCommitRecovery = null;
     if (currentReview?.status === "committing") {
-      await assertDurableResumeState(currentReview, currentUser);
+      currentCanonicalCommitRecovery = await assertDurableResumeState(
+        currentReview,
+        currentUser,
+        service
+      );
     }
-    return { review: currentReview, user: currentUser };
+    return {
+      review: currentReview,
+      user: currentUser,
+      canonicalCommitRecovery: currentCanonicalCommitRecovery,
+    };
   }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
@@ -157,15 +171,27 @@ export async function confirmEvidenceReview(formData) {
     validateDexaObjectsBeforeCommit(evidencePackage);
   }
 
-  const service = createEvidenceReviewService({ repositories: FounderRepositories });
   const operationId = randomUUID();
-  const claimedReview = await service.beginCommit(reviewId, { evidencePackage, operationId });
+  const claimedReview = await service.beginCommit(reviewId, {
+    evidencePackage,
+    operationId,
+    recoveryProof: canonicalCommitRecovery,
+    reviewSnapshot: review,
+  });
   const supportsDurableCommitClaims = typeof FounderRepositories.evidenceReviews
     .claimEvidenceReviewCommit === "function";
   let orchestrationResult;
   let continuationPath = null;
   try {
-    const orchestrator = createPostConfirmationOrchestrator({ reviewService: service, handlers: createHandlers({ evidencePackage, reviewId, user }) });
+    const orchestrator = createPostConfirmationOrchestrator({
+      reviewService: service,
+      handlers: createHandlers({
+        evidencePackage,
+        reviewId,
+        user,
+        canonicalCommitRecovery,
+      }),
+    });
     orchestrationResult = await orchestrator.run(
       { reviewId, evidencePackage, userId: user.id, commitProgress: claimedReview.commitProgress ?? {} },
       { maxSteps: supportsDurableCommitClaims ? 1 : Number.POSITIVE_INFINITY, operationId }
@@ -214,17 +240,29 @@ export async function confirmEvidenceReview(formData) {
   redirect(confirmedPath);
 }
 
-async function assertDurableResumeState(review, user) {
+async function assertDurableResumeState(review, user, reviewService) {
   if (!user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const packageId = String(review.interpretedEvidence?.package_id ?? review.interpretedEvidence?.id ?? "");
   if (!packageId) throw Object.assign(new Error("Interrupted evidence confirmation package is unavailable."), { code: "COMMIT_PACKAGE_MISMATCH" });
   const progress = review.commitProgress ?? {};
   const canonicalIds = progress.canonical_commit?.result?.canonicalEvidenceIds ?? [];
+  let recoveryProof = null;
   if (progress.canonical_commit?.status === "completed") {
     const canonical = await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
     const existingIds = new Set(canonical.map((item) => item.canonicalId ?? item.id));
     if (!canonicalIds.length || canonicalIds.some((id) => !existingIds.has(id))) {
       throw Object.assign(new Error("Interrupted evidence confirmation canonical side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
+    }
+  } else {
+    recoveryProof = await reviewService.inspectCommitRecovery(review);
+    if (
+      recoveryProof.disposition === CanonicalCommitRecoveryDisposition.AMBIGUOUS ||
+      recoveryProof.disposition === CanonicalCommitRecoveryDisposition.DURABLE_PROGRESS
+    ) {
+      throw Object.assign(
+        new Error("Interrupted evidence confirmation first-step state is not safely recoverable."),
+        { code: recoveryProof.reason ?? "COMMIT_RECOVERY_PROOF_INVALID" }
+      );
     }
   }
   for (const analysisId of progress.analysis?.result?.analysisIds ?? []) {
@@ -239,6 +277,7 @@ async function assertDurableResumeState(review, user) {
       throw Object.assign(new Error("Interrupted evidence confirmation Training side effects are incomplete."), { code: "COMMIT_SIDE_EFFECT_MISMATCH" });
     }
   }
+  return recoveryProof;
 }
 
 export async function resolveEvidenceReviewExercise(formData) {
@@ -513,7 +552,8 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
   }
 }
 
-function createHandlers({ evidencePackage, reviewId, user }) {
+function createHandlers({ evidencePackage, reviewId, user,
+  canonicalCommitRecovery = null }) {
   const confirmationReads = createEvidenceConfirmationReadService({ repositories: FounderRepositories });
   let canonical = null;
   let analyses = [];
@@ -529,28 +569,43 @@ function createHandlers({ evidencePackage, reviewId, user }) {
           .includes(item.evidence_type)
       );
       const newExerciseDefinitions = canonicalDefinitionsPendingCreation(committedPackage);
-      const canonicalBeforeCommit = await FounderRepositories.canonicalEvidence
-        .listCanonicalEvidenceObjects(user.id);
+      const recoveringCommittedCanonical =
+        canonicalCommitRecovery?.disposition ===
+          CanonicalCommitRecoveryDisposition.COMMITTED_WITHOUT_PROGRESS;
+      const containsPhotoSession = committedPackage.evidence_objects.some(
+        (item) => item.evidence_type === "photo_session"
+      );
+      const canonicalBeforeCommit =
+        recoveringCommittedCanonical || containsPhotoSession
+          ? await FounderRepositories.canonicalEvidence
+              .listCanonicalEvidenceObjects(user.id)
+          : null;
       const atomicPhotoCommitAlreadyPersisted =
+        containsPhotoSession &&
         isPersistedAtomicPhotoCommit(canonicalBeforeCommit, committedPackage);
-      const scopedResult = atomicPhotoCommitAlreadyPersisted
-        ? createPersistedPhotoCommitResult(committedPackage)
-        : await createCanonicalEvidenceConfirmationCommitService({
-          ...(await loadApplicationRuntimeBindings()),
-          enableEnergyConfidenceEnqueue:
-            energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
-        }).commitConfirmedEvidencePackage(committedPackage, user.id, {
-          canonicalExerciseDefinitions: newExerciseDefinitions,
-        });
+      const scopedResult = recoveringCommittedCanonical
+        ? createRecoveredCanonicalCommitResult(
+            committedPackage,
+            canonicalCommitRecovery
+          )
+        : atomicPhotoCommitAlreadyPersisted
+          ? createPersistedPhotoCommitResult(committedPackage)
+          : await createCanonicalEvidenceConfirmationCommitService({
+              ...(await loadApplicationCanonicalCommitBindings()),
+              enableEnergyConfidenceEnqueue:
+                energySourceCommit && isPIEnergyConfidenceEnqueueEnabled(),
+            }).commitConfirmedEvidencePackage(committedPackage, user.id, {
+              canonicalExerciseDefinitions: newExerciseDefinitions,
+            });
       if (
         scopedResult.committed !== true &&
         scopedResult.outcome !== "source_matched"
       ) {
         throw new Error(`Canonical evidence commit failed: ${scopedResult.outcome}`);
       }
-      canonical = atomicPhotoCommitAlreadyPersisted
+      canonical = atomicPhotoCommitAlreadyPersisted || recoveringCommittedCanonical
         ? canonicalBeforeCommit
-        : await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+        : scopedResult.canonicalEvidenceObjects ?? scopedResult.changedObjects ?? [];
       if (committedPackage.evidence_objects.some((item) => item.evidence_type === "photo_session")) {
         const expanded = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
         const projectionChanges = selectChangedPhotoProjectionObjects(
@@ -576,6 +631,10 @@ function createHandlers({ evidencePackage, reviewId, user }) {
         reconciliationScope: scopedResult.scope ?? scopedResult.reconciliationScope,
         lowerLevelWork: scopedResult.lowerLevelWork ?? [],
         briefingReconciliation: scopedResult.briefingReconciliation ?? null,
+        canonicalCommitOutcome: scopedResult.outcome,
+        canonicalCommitMemoryProfile: scopedResult.memoryProfile ?? null,
+        recoveredFromDurableSource:
+          scopedResult.recoveredFromDurableSource === true,
         ...scopedResult.report,
       };
     },
@@ -868,6 +927,30 @@ function createPersistedPhotoCommitResult(evidencePackage) {
       supersededCanonicalIds: [],
       updatedCanonicalIds: [],
     },
+  };
+}
+
+function createRecoveredCanonicalCommitResult(evidencePackage, recoveryProof) {
+  const packageId = evidencePackage.package_id ?? evidencePackage.id;
+  return {
+    committed: true,
+    outcome: "source_matched",
+    recoveredFromDurableSource: true,
+    report: {
+      addedCanonicalIds: [],
+      changedCanonicalIds: [],
+      sourceEvidencePackageIds: packageId ? [packageId] : [],
+      supersededCanonicalIds: [],
+      updatedCanonicalIds: [],
+    },
+    memoryProfile: {
+      runtimeLoadCount: 0,
+      runtimeCloneCount: 0,
+      fullRuntimeSerializationCount: 0,
+      collectionSnapshotMode: "source_proof",
+    },
+    recoveredCanonicalEvidenceIds:
+      recoveryProof?.canonicalEvidenceIds ?? [],
   };
 }
 

@@ -17,6 +17,10 @@ import {
 import { normalizeReviewedPhotoSessionMetadata } from "./PhotoSessionMetadataService";
 import { applyDexaReviewMeasurements } from "./DexaPdfIntakeService";
 import { POST_CONFIRMATION_STEP_ORDER } from "./PostConfirmationOrchestrator";
+import {
+  assertCanonicalCommitRecoveryProof,
+  inspectEvidenceCanonicalCommitRecovery,
+} from "./EvidenceCanonicalCommitRecoveryService";
 
 const COMMIT_LEASE_MS = 10 * 60 * 1000;
 
@@ -74,10 +78,32 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
         confirmation: { confirmedAt: timestamp, confirmedBy },
       });
     },
-    async beginCommit(id, { evidencePackage, operationId } = {}) {
-      const review = await repositories.evidenceReviews.getReviewById(id);
+    async inspectCommitRecovery(review, { canonicalEvidenceObjects = null,
+      briefingReconciliationWorkItems = null } = {}) {
+      return inspectEvidenceCanonicalCommitRecovery({
+        review,
+        canonicalEvidenceObjects: canonicalEvidenceObjects ??
+          await repositories.canonicalEvidence.listCanonicalEvidenceObjects(review.userId),
+        briefingReconciliationWorkItems: briefingReconciliationWorkItems ??
+          await repositories.briefingReconciliationWorkItems.listWorkItems(review.userId),
+        now: now(),
+      });
+    },
+    async beginCommit(id, { evidencePackage, operationId, recoveryProof = null,
+      reviewSnapshot = null } = {}) {
+      const review = reviewSnapshot ??
+        await repositories.evidenceReviews.getReviewById(id);
       if (!review || !["pending", "commit_failed", "partially_committed", "committing"].includes(review.status)) throw new Error("This evidence review cannot be committed.");
-      if (review.status === "committing") assertResumableCommitProgress(review.commitProgress);
+      if (review.status === "committing") {
+        const requiresFirstStepRecovery =
+          review.commitProgress?.canonical_commit?.status !== "completed";
+        if (requiresFirstStepRecovery) {
+          assertCanonicalCommitRecoveryProof(recoveryProof, review);
+        }
+        assertResumableCommitProgress(review.commitProgress, {
+          allowFirstStepRecovery: requiresFirstStepRecovery,
+        });
+      }
       assertNoUnresolvedProvisionalExercises(
         evidencePackage ?? review.interpretedEvidence
       );
@@ -93,6 +119,7 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
           leaseExpiresAt: new Date(Date.parse(claimedAt) + COMMIT_LEASE_MS).toISOString(),
           packageId: packageIdentity(evidencePackage ?? review.interpretedEvidence),
           evidencePackage: review.status === "committing" ? null : evidencePackage,
+          recoveryProof,
         });
       }
       return repositories.evidenceReviews.updateReview(id, {
@@ -479,12 +506,17 @@ function packageIdentity(evidencePackage) {
   return String(evidencePackage?.package_id ?? evidencePackage?.id ?? "").trim();
 }
 
-export function assertResumableCommitProgress(progress) {
+export function assertResumableCommitProgress(progress, {
+  allowFirstStepRecovery = false,
+} = {}) {
   if (!progress || typeof progress !== "object") {
     throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no durable progress.");
   }
   const keys = Object.keys(progress);
-  if (keys.length === 0 || keys.some((key) => !POST_CONFIRMATION_STEP_ORDER.includes(key))) {
+  if (
+    (!allowFirstStepRecovery && keys.length === 0) ||
+    keys.some((key) => !POST_CONFIRMATION_STEP_ORDER.includes(key))
+  ) {
     throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation progress is invalid.");
   }
   let incompleteSeen = false;
@@ -497,11 +529,18 @@ export function assertResumableCommitProgress(progress) {
       continue;
     }
     incompleteSeen = true;
-    if (status && status !== "failed") {
+    if (status && !["failed", "started"].includes(status)) {
       throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation progress has an unknown status.");
     }
   }
-  if (progress.canonical_commit?.status !== "completed") {
+  if (
+    progress.canonical_commit?.status !== "completed" &&
+    !(
+      allowFirstStepRecovery &&
+      keys.every((key) => key === "canonical_commit") &&
+      [undefined, "started", "failed"].includes(progress.canonical_commit?.status)
+    )
+  ) {
     throw reviewError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no durable canonical commit.");
   }
   return true;

@@ -51,7 +51,13 @@ export function createEvidenceReviewRepository(reviews = [], options = {}) {
         throw repositoryError("COMMIT_PACKAGE_MISMATCH", "The evidence review package changed before confirmation.");
       }
       const resuming = review.status === "committing";
-      if (resuming) assertResumableProgress(review.commitProgress);
+      if (resuming) {
+        assertResumableProgress(
+          review.commitProgress,
+          lifecycle?.recoveryProof,
+          review
+        );
+      }
       review.status = "committing";
       review.commitError = null;
       if (!resuming && lifecycle?.evidencePackage) {
@@ -170,9 +176,25 @@ function assertActiveCommit(review, operationId) {
   }
 }
 
-function assertResumableProgress(progress) {
-  if (!progress || typeof progress !== "object" || Object.keys(progress).length === 0) {
+function assertResumableProgress(progress, recoveryProof = null, review = null) {
+  if (!progress || typeof progress !== "object") {
     throw repositoryError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no durable progress.");
+  }
+  const canonicalComplete = progress.canonical_commit?.status === "completed";
+  if (canonicalComplete) return;
+  const validFirstStepState =
+    Object.keys(progress).every((key) => key === "canonical_commit") &&
+    [undefined, "started", "failed"].includes(progress.canonical_commit?.status);
+  const proofMatches =
+    ["zero_side_effects", "committed_without_progress"].includes(
+      recoveryProof?.disposition
+    ) &&
+    recoveryProof.reviewId === review?.id &&
+    recoveryProof.packageId === packageIdentity(review?.interpretedEvidence) &&
+    recoveryProof.priorClaim?.operationId === review?.commitClaim?.operationId &&
+    recoveryProof.priorClaim?.leaseExpiresAt === review?.commitClaim?.leaseExpiresAt;
+  if (!validFirstStepState || !proofMatches) {
+    throw repositoryError("COMMIT_PROGRESS_INVALID", "Interrupted evidence confirmation has no safe first-step recovery proof.");
   }
 }
 

@@ -51,6 +51,19 @@ export async function loadApplicationRuntimeBindings() {
   return bindings;
 }
 
+export async function loadApplicationCanonicalCommitBindings() {
+  if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
+    return loadApplicationRuntimeBindings();
+  }
+  const composition = await providerComposition();
+  if (typeof composition.mutateRuntimeBounded !== "function") {
+    throw unavailable("bounded canonical mutation");
+  }
+  return Object.freeze({
+    mutateCanonicalRuntime: (input) => composition.mutateRuntimeBounded(input),
+  });
+}
+
 export function createProviderFounderStoreUnitOfWork({
   liveStore,
   stageFrom = liveStore,

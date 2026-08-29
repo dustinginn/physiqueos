@@ -26,17 +26,29 @@ export function createPostConfirmationOrchestrator({ reviewService, handlers = {
           continue;
         }
         if (executedSteps.length >= maxSteps) break;
+        const started = {
+          status: "started",
+          attempts: (prior?.attempts ?? 0) + 1,
+          startedAt: now().toISOString(),
+        };
         try {
+          await reviewService?.recordCommitProgress(
+            context.reviewId,
+            step,
+            started,
+            { operationId }
+          );
+          progress[step] = started;
           const result = handlers[step] ? await handlers[step]({ ...context, results }) : { status: "not_required" };
           results[step] = result;
-          const completed = { status: "completed", attempts: (prior?.attempts ?? 0) + 1, completedAt: now().toISOString(), result };
+          const completed = { ...started, status: "completed", completedAt: now().toISOString(), result };
           await reviewService?.recordCommitProgress(context.reviewId, step, completed, { operationId });
           progress[step] = completed;
           executedSteps.push(step);
         } catch (error) {
           const failure = { step, message: String(error?.message ?? error), retryable: true };
           retryableFailures.push(failure);
-          await reviewService?.recordCommitProgress(context.reviewId, step, { status: "failed", attempts: (prior?.attempts ?? 0) + 1, failedAt: now().toISOString(), error: failure.message, retryable: true }, { operationId });
+          await reviewService?.recordCommitProgress(context.reviewId, step, { ...started, status: "failed", failedAt: now().toISOString(), error: failure.message, retryable: true }, { operationId });
           throw Object.assign(new Error(`Post-confirmation step ${step} failed: ${failure.message}`), { results, retryableFailures });
         }
       }

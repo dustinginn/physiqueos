@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { canonicalJson } from "../../contracts/v1/canonicalJson.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
@@ -252,6 +252,10 @@ export async function executePostgresFounderRuntimeMutation({
   operation = "application-runtime-mutation",
   expectedRuntime = null,
   mutate,
+  bounded = false,
+  allowedCollections = null,
+  allowApplicationContextMutation = true,
+  returnReceipt = false,
 } = {}) {
   if (!pool?.connect || typeof mutate !== "function") throw new Error("PostgreSQL runtime mutation is not configured.");
   const client = await pool.connect();
@@ -267,24 +271,60 @@ export async function executePostgresFounderRuntimeMutation({
     else if (authorityStore) await authorityStore.claimCanonicalWriteBoundary({ client, migrationOperationId, commandId });
     else throw Object.assign(new Error("Canonical runtime authority is required."), { code: "CANONICAL_RUNTIME_AUTHORITY_REQUIRED" });
 
-    const runtime = mutableRuntime(await loadCanonicalRuntime({ query: (text, values) => client.query(text, values), ownerUserId }));
+    const loadedRuntime = await loadCanonicalRuntime({
+      query: (text, values) => client.query(text, values),
+      ownerUserId,
+    });
+    const runtime = bounded ? loadedRuntime : mutableRuntime(loadedRuntime);
     if (expectedRuntime && canonicalJson(runtime) !== canonicalJson(expectedRuntime)) {
       throw Object.assign(new Error("Canonical runtime changed before the command acquired its transaction lock."), {
         code: "FOUNDER_STORE_REVISION_CONFLICT",
       });
     }
-    const before = snapshotCollections(runtime);
-    const beforeContext = snapshotApplicationContext(runtime);
+    const before = bounded
+      ? snapshotCollectionDigests(runtime)
+      : snapshotCollections(runtime);
+    const beforeContext = bounded
+      ? snapshotApplicationContextDigest(runtime)
+      : snapshotApplicationContext(runtime);
     const result = await mutate(runtime, { client, commandId });
-    const changed = changedCollections(before, runtime);
+    const changed = bounded
+      ? changedCollectionDigests(before, runtime)
+      : changedCollections(before, runtime);
+    assertBoundedMutationScope({
+      changed,
+      allowedCollections,
+      contextChanged: beforeContext !== (bounded
+        ? snapshotApplicationContextDigest(runtime)
+        : snapshotApplicationContext(runtime)),
+      allowApplicationContextMutation,
+    });
     for (const collection of changed) await replaceCollection(client, { ownerUserId, collection, source: runtime[collection] });
-    const contextChanged = beforeContext !== snapshotApplicationContext(runtime);
+    const contextChanged = beforeContext !== (bounded
+      ? snapshotApplicationContextDigest(runtime)
+      : snapshotApplicationContext(runtime));
     if (contextChanged) await replaceApplicationContext(client, { ownerUserId, runtime });
+    let revision = Number(runtime.revision ?? 0);
     if (changed.length || contextChanged) {
-      await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
+      revision = await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
     }
     await client.query("COMMIT");
-    return structuredClone(result);
+    const clonedResult = structuredClone(result);
+    return returnReceipt
+      ? Object.freeze({
+          committed: true,
+          commitId: commandId,
+          revision,
+          result: clonedResult,
+          changedCollections: Object.freeze([...changed]),
+          memoryProfile: Object.freeze({
+            runtimeLoadCount: 1,
+            runtimeCloneCount: bounded ? 0 : 1,
+            fullRuntimeSerializationCount: expectedRuntime ? 2 : 0,
+            collectionSnapshotMode: bounded ? "digest" : "canonical_json",
+          }),
+        })
+      : clonedResult;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -345,7 +385,7 @@ async function bumpRuntimeMetadata(client, { ownerUserId, commandId, now }) {
   const result = await client.query(
     `UPDATE physiqueos.canonical_runtime_metadata
         SET revision=revision+1,last_command_id=$2,version=version+1,updated_at=$3
-      WHERE owner_user_id=$1`,
+      WHERE owner_user_id=$1 RETURNING revision`,
     [ownerUserId, commandId, updatedAt],
   );
   if (result.rowCount !== 1) {
@@ -353,6 +393,7 @@ async function bumpRuntimeMetadata(client, { ownerUserId, commandId, now }) {
     error.code = "CANONICAL_RUNTIME_METADATA_UNAVAILABLE";
     throw error;
   }
+  return Number(result.rows[0]?.revision ?? 0);
 }
 
 function snapshotCollections(runtime) {
@@ -363,12 +404,66 @@ function changedCollections(before, runtime) {
   return FOUNDATION_SOURCE_COLLECTIONS.filter((name) => before[name] !== canonicalJson(runtime[name] ?? null));
 }
 
+function snapshotCollectionDigests(runtime) {
+  return Object.fromEntries(
+    FOUNDATION_SOURCE_COLLECTIONS.map((name) => [
+      name,
+      canonicalDigest(runtime[name] ?? null),
+    ])
+  );
+}
+
+function changedCollectionDigests(before, runtime) {
+  return FOUNDATION_SOURCE_COLLECTIONS.filter(
+    (name) => before[name] !== canonicalDigest(runtime[name] ?? null)
+  );
+}
+
 function snapshotApplicationContext(runtime) {
   return canonicalJson({
     operatingRhythm: runtime.operatingRhythm ?? null,
     adaptiveTrustProfile: runtime.adaptiveTrustProfile ?? null,
     milestones: runtime.milestones ?? [],
   });
+}
+
+function snapshotApplicationContextDigest(runtime) {
+  return canonicalDigest({
+    operatingRhythm: runtime.operatingRhythm ?? null,
+    adaptiveTrustProfile: runtime.adaptiveTrustProfile ?? null,
+    milestones: runtime.milestones ?? [],
+  });
+}
+
+function canonicalDigest(value) {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function assertBoundedMutationScope({
+  changed,
+  allowedCollections,
+  contextChanged,
+  allowApplicationContextMutation,
+}) {
+  if (allowedCollections) {
+    const allowed = new Set(allowedCollections.map((collection) => {
+      assertKnownPhase4Collection(collection);
+      return collection;
+    }));
+    const unexpected = changed.filter((collection) => !allowed.has(collection));
+    if (unexpected.length) {
+      throw Object.assign(
+        new Error(`Bounded Founder mutation changed unauthorized collections: ${unexpected.join(", ")}.`),
+        { code: "FOUNDER_RUNTIME_MUTATION_SCOPE_VIOLATION" }
+      );
+    }
+  }
+  if (contextChanged && !allowApplicationContextMutation) {
+    throw Object.assign(
+      new Error("Bounded Founder mutation changed unauthorized application context."),
+      { code: "FOUNDER_RUNTIME_MUTATION_SCOPE_VIOLATION" }
+    );
+  }
 }
 
 async function replaceApplicationContext(client, { ownerUserId, runtime }) {

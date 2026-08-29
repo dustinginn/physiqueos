@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { canonicalJson } from "../../../../contracts/v1/canonicalJson";
 import { prepareCanonicalExerciseIdentitiesForConfirmation } from "../../../../domain/services/CanonicalExerciseLibraryService";
+import { reconcileConfirmedEvidencePackage } from "../../../../domain/services/CanonicalEvidenceService";
 
 const runtimeStore = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "private/founder/runtime-store.json"), "utf8")
@@ -223,6 +224,11 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
       nutritionContext: { async getNutritionContext() { return null; } },
       reminders: { async completeReminderFromEvidence() { return null; } },
       executionItems: { async getExecutionItemById() { return null; }, async saveExecutionItem() { return null; } },
+      briefingReconciliationWorkItems: {
+        async listWorkItems() {
+          return structuredClone(getState().briefingReconciliationWorkItems ?? []);
+        },
+      },
     },
   };
 });
@@ -263,6 +269,14 @@ vi.mock("../../../../domain/services/CanonicalEvidenceConfirmationCommitService"
           outcome: reconciliation.changedObjects.length > 0
             ? "source_committed_work_matched"
             : "source_matched",
+          canonicalEvidenceObjects: structuredClone(
+            state.canonicalEvidenceObjects.filter((item) =>
+              item.provenance?.evidence_package_ids?.includes(
+                evidencePackage.package_id
+              )
+            )
+          ),
+          changedObjects: structuredClone(reconciliation.changedObjects),
           report: reconciliation.report,
           scope: reconciliation.scope,
         };
@@ -566,6 +580,48 @@ function createDurableContinuationState(store) {
   return state;
 }
 
+function createExpiredFirstStepRecoveryState(store, { canonicalCommitPersisted = false } = {}) {
+  const state = createIsolatedReviewState(store);
+  const review = state.evidenceReviews[0];
+  review.interpretedEvidence = prepareCanonicalExerciseIdentitiesForConfirmation(
+    review.interpretedEvidence
+  );
+  review.status = "committing";
+  review.confirmation = null;
+  review.commitError = null;
+  review.commitProgress = {};
+  review.commitClaim = {
+    operationId: "expired-first-step-claim",
+    status: "in_progress",
+    claimedAt: "2026-08-29T06:23:20.343Z",
+    leaseExpiresAt: "2026-08-29T06:33:20.343Z",
+    packageId: review.interpretedEvidence.package_id,
+  };
+  state.canonicalEvidenceObjects = [];
+  if (canonicalCommitPersisted) {
+    const reconciliation = reconcileConfirmedEvidencePackage({
+      evidencePackage: review.interpretedEvidence,
+      existingCanonicalObjects: [],
+      userId: state.user.id,
+    });
+    state.canonicalEvidenceObjects = structuredClone(reconciliation.changedObjects);
+    review.commitProgress.canonical_commit = {
+      status: "started",
+      attempts: 1,
+      startedAt: "2026-08-29T06:23:21.000Z",
+    };
+  }
+  state.briefingReconciliationWorkItems = [];
+  state.durableCommitClaims = true;
+  state.useNextRedirectSemantics = true;
+  state.canonicalCommitCalls = 0;
+  state.claimCalls = 0;
+  state.pauseCommitCalls = 0;
+  state.completeCommitCalls = 0;
+  state.failCommitCalls = 0;
+  return state;
+}
+
 async function expectNextRedirect(promise, destinationPart) {
   await expect(promise).rejects.toMatchObject({
     message: "NEXT_REDIRECT",
@@ -826,6 +882,68 @@ describe("confirmEvidenceReview", () => {
     expect(mockState.value.failCommitCalls).toBe(0);
     expect(mockState.value.canonicalCommitCalls).toBe(0);
     expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+  });
+
+  it("recovers an expired pre-first-step claim only after zero-side-effect proof and completes once", async () => {
+    mockState.value = createExpiredFirstStepRecoveryState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+
+    for (let request = 0; request < 12 && review.status !== "confirmed"; request += 1) {
+      const expectedRedirect = request < 8 ? "resume=continuing" : "confirmed=1";
+      await expectNextRedirect(
+        confirmEvidenceReview(confirmationForm(review)),
+        expectedRedirect
+      );
+    }
+
+    expect(review.status).toBe("confirmed");
+    expect(mockState.value.canonicalCommitCalls).toBe(1);
+    expect(mockState.value.claimCalls).toBe(9);
+    expect(mockState.value.pauseCommitCalls).toBe(8);
+    expect(mockState.value.completeCommitCalls).toBe(1);
+    expect(mockState.value.failCommitCalls).toBe(0);
+    expect(review.commitProgress.canonical_commit).toMatchObject({
+      status: "completed",
+      attempts: 1,
+    });
+    expect(Object.values(review.commitProgress).every(
+      (progress) => progress.status === "completed"
+    )).toBe(true);
+    const packageId = review.interpretedEvidence.package_id;
+    const packageRecords = mockState.value.canonicalEvidenceObjects.filter((item) =>
+      item.provenance?.evidence_package_ids?.includes(packageId)
+    );
+    expect(packageRecords).toHaveLength(
+      review.interpretedEvidence.evidence_objects.filter((item) => item.removed !== true).length
+    );
+    expect(new Set(packageRecords.map((item) => item.canonicalId)).size)
+      .toBe(packageRecords.length);
+  });
+
+  it("reconciles a committed first step whose progress marker was lost without replaying canonical mutation", async () => {
+    mockState.value = createExpiredFirstStepRecoveryState(runtimeStore, {
+      canonicalCommitPersisted: true,
+    });
+    const review = mockState.value.evidenceReviews[0];
+    const canonicalBefore = structuredClone(mockState.value.canonicalEvidenceObjects);
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      "resume=continuing"
+    );
+
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+    expect(review.commitProgress.canonical_commit).toMatchObject({
+      status: "completed",
+      attempts: 2,
+      result: expect.objectContaining({
+        recoveredFromDurableSource: true,
+      }),
+    });
+    expect(review.commitClaim.status).toBe("available");
+    expect(mockState.value.pauseCommitCalls).toBe(1);
+    expect(mockState.value.failCommitCalls).toBe(0);
   });
 
   it("still records and fails a genuine progress-persistence error before redirecting to retry", async () => {

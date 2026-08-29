@@ -9,6 +9,7 @@ vi.mock("../composition/productionApplicationComposition.js", () => ({
 import {
   createApplicationRuntimeBindings,
   createProviderFounderStoreUnitOfWork,
+  loadApplicationCanonicalCommitBindings,
   loadApplicationCanonicalRuntime,
 } from "./ApplicationCanonicalRuntime.js";
 
@@ -77,6 +78,41 @@ describe("provider application canonical runtime", () => {
     await expect(transaction.commit()).rejects.toMatchObject({ code: "RUNTIME_AUTHORITY_MISMATCH" });
     expect(transaction.status).toBe("aborted");
     expect(liveStore).toEqual(baseline);
+  });
+
+  it("binds canonical commit directly to the bounded provider mutation without hydrating a live runtime", async () => {
+    const loadRuntime = vi.fn(async () => runtime());
+    const mutateRuntimeBounded = vi.fn(async (input) => ({
+      committed: true,
+      result: input.mutate(runtime(), { commandId: "bounded-commit" }),
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+      },
+    }));
+    composition.current = { loadRuntime, mutateRuntimeBounded };
+
+    const bindings = await loadApplicationCanonicalCommitBindings();
+    const receipt = await bindings.mutateCanonicalRuntime({
+      operation: "evidence-review-canonical-commit",
+      mutate(candidate) {
+        candidate.weightEntries.push({ id: "weight-2", value: 180 });
+        return { accepted: true };
+      },
+    });
+
+    expect(loadRuntime).not.toHaveBeenCalled();
+    expect(mutateRuntimeBounded).toHaveBeenCalledTimes(1);
+    expect(receipt).toMatchObject({
+      committed: true,
+      result: { accepted: true },
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+      },
+    });
   });
 });
 

@@ -9,7 +9,13 @@ describe("PostConfirmationOrchestrator", () => {
     const result = await createPostConfirmationOrchestrator({ handlers, reviewService }).run({ reviewId: "review_1", commitProgress: {} });
     expect(calls).toEqual(POST_CONFIRMATION_STEP_ORDER);
     expect(result.retryableFailures).toEqual([]);
-    expect(reviewService.recordCommitProgress).toHaveBeenCalledTimes(POST_CONFIRMATION_STEP_ORDER.length);
+    expect(reviewService.recordCommitProgress).toHaveBeenCalledTimes(
+      POST_CONFIRMATION_STEP_ORDER.length * 2
+    );
+    expect(reviewService.recordCommitProgress.mock.calls[0][2]).toMatchObject({
+      status: "started",
+      attempts: 1,
+    });
   });
 
   it("stops on failure and resumes without repeating completed steps", async () => {

@@ -10,7 +10,11 @@ import { createProductionRepositoryFacade } from "../../data/repositories/founde
 import { runInactiveLegacyWebReadScope } from "../../application/auth/legacyWebContext.js";
 import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { createPhase5SyntheticRuntime, PHASE5_SYNTHETIC_OWNER_ID } from "../migration/phase5SyntheticPackage.js";
-import { createPostgresFounderReadScope, createPostgresFounderRepositoryFacade } from "./PostgresFounderRepositoryFacade.js";
+import {
+  createPostgresFounderReadScope,
+  createPostgresFounderRepositoryFacade,
+  executePostgresFounderRuntimeMutation,
+} from "./PostgresFounderRepositoryFacade.js";
 
 describe("PostgreSQL Founder repository facade", () => {
   it("hydrates reads from PostgreSQL and commits a repository mutation with metadata, enqueueing no durable outbox work", async () => {
@@ -115,6 +119,78 @@ describe("PostgreSQL Founder repository facade", () => {
       commitProgress: { canonical_commit: { status: "completed" } },
     });
     expect(database.metadata.revision).toBe(5004);
+  });
+
+  it("executes a bounded canonical commit with one runtime load and digest-only snapshots", async () => {
+    const database = fakeDatabase();
+    const receipt = await executePostgresFounderRuntimeMutation({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: {
+        assertCompatibilityAccess: vi.fn(async () => ({
+          authority: "provider-compatibility-nonauthoritative",
+        })),
+      },
+      commandId: "bounded-canonical-command",
+      operation: "evidence-review-canonical-commit",
+      bounded: true,
+      returnReceipt: true,
+      allowedCollections: ["canonicalEvidenceObjects"],
+      allowApplicationContextMutation: false,
+      mutate(runtime) {
+        runtime.canonicalEvidenceObjects.push({
+          canonicalId: "training|2026-08-26|bounded",
+          evidence_type: "training",
+          quality: { status: "active" },
+          userId: PHASE5_SYNTHETIC_OWNER_ID,
+        });
+        return { accepted: true };
+      },
+    });
+
+    expect(receipt).toMatchObject({
+      committed: true,
+      commitId: "bounded-canonical-command",
+      result: { accepted: true },
+      changedCollections: ["canonicalEvidenceObjects"],
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        collectionSnapshotMode: "digest",
+      },
+    });
+    expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
+    expect(database.runtime.canonicalEvidenceObjects.some(
+      (item) => item.canonicalId === "training|2026-08-26|bounded"
+    )).toBe(true);
+  });
+
+  it("rolls back a bounded mutation that escapes its declared collection scope", async () => {
+    const database = fakeDatabase();
+    await expect(executePostgresFounderRuntimeMutation({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: {
+        assertCompatibilityAccess: vi.fn(async () => ({
+          authority: "provider-compatibility-nonauthoritative",
+        })),
+      },
+      bounded: true,
+      returnReceipt: true,
+      allowedCollections: ["canonicalEvidenceObjects"],
+      allowApplicationContextMutation: false,
+      mutate(runtime) {
+        runtime.goals[0].title = "Unauthorized";
+      },
+    })).rejects.toMatchObject({
+      code: "FOUNDER_RUNTIME_MUTATION_SCOPE_VIOLATION",
+    });
+    expect(database.transactions).toEqual(["BEGIN", "ROLLBACK"]);
   });
 
   it("shares one canonical repository snapshot across the complete Home fan-out and refreshes the next request", async () => {
@@ -420,7 +496,7 @@ function fakeDatabase() {
     }
     if (normalized.startsWith("UPDATE physiqueos.canonical_runtime_metadata")) {
       metadata.revision += 1;
-      return { rows: [], rowCount: 1 };
+      return { rows: [{ revision: metadata.revision }], rowCount: 1 };
     }
     if (normalized.startsWith("SELECT runtime_version,revision,last_command_id,updated_at,imported_at")) {
       return { rows: [{ runtime_version: "founder-seed-v2", revision: metadata.revision,

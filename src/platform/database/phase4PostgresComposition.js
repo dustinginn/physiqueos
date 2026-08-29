@@ -88,6 +88,28 @@ export async function createPhase4PostgresApplicationComposition({
         pool, ownerUserId, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority,
         now, commandId, operation, expectedRuntime, mutate,
       }),
+    mutateRuntimeBounded: ({
+      commandId,
+      operation,
+      allowedCollections,
+      allowApplicationContextMutation = false,
+      mutate,
+    }) => executePostgresFounderRuntimeMutation({
+      pool,
+      ownerUserId,
+      authorityStore,
+      migrationOperationId,
+      compatibilityMode,
+      requireCompatibilityAuthority,
+      now,
+      commandId,
+      operation,
+      mutate,
+      bounded: true,
+      allowedCollections,
+      allowApplicationContextMutation,
+      returnReceipt: true,
+    }),
   });
 }
 
