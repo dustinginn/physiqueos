@@ -92,22 +92,22 @@ export default function UploadAnythingForm({
         />
       </label>
 
-      <section className="rounded-[16px] border border-[#C7D2FE] bg-indigo-50/50 p-4">
+      <section className="rounded-[16px] border border-indigo-200 bg-indigo-50/50 p-4 dark:border-[color-mix(in_srgb,var(--primary)_32%,var(--divider))] dark:bg-[color-mix(in_srgb,var(--primary)_10%,var(--surface-elevated))]">
         <button
           aria-expanded={showWeighIn}
           className="flex min-h-11 w-full items-center gap-3 text-left"
           onClick={() => setShowWeighIn((value) => !value)}
           type="button"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600"><Scale aria-hidden="true" size={18} /></span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-indigo-600 dark:text-[var(--primary)]"><Scale aria-hidden="true" size={18} /></span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-extrabold text-slate-950">Log weigh-in</span>
-            <span className="mt-0.5 block text-xs font-medium leading-5 text-slate-500">Save a structured weight directly. No upload or review required.</span>
+            <span className="block text-sm font-extrabold text-slate-950 dark:text-[var(--text-primary)]">Log weigh-in</span>
+            <span className="mt-0.5 block text-xs font-medium leading-5 text-slate-500 dark:text-[var(--text-secondary)]">Save a structured weight directly. No upload or review required.</span>
           </span>
-          <span aria-hidden="true" className="text-lg font-black text-indigo-600">{showWeighIn ? "−" : "+"}</span>
+          <span aria-hidden="true" className="text-lg font-black text-indigo-600 dark:text-[var(--primary)]">{showWeighIn ? "−" : "+"}</span>
         </button>
         {showWeighIn && (
-          <div className="mt-4 space-y-3 border-t border-indigo-100 pt-4">
+          <div className="mt-4 space-y-3 border-t border-indigo-100 pt-4 dark:border-[color-mix(in_srgb,var(--primary)_20%,var(--divider))]">
             <label className="block space-y-2">
               <span className="text-sm font-extrabold text-slate-950">Weight</span>
               <span className="flex items-center gap-3">

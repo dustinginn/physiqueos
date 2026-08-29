@@ -42,4 +42,14 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source.match(/type="button"/g).length).toBeGreaterThanOrEqual(2);
     expect(source.match(/fetch\(action/g)).toHaveLength(1);
   });
+
+  it("preserves the approved light surface and uses PhysiqueOS tokens in dark mode", () => {
+    expect(source).toContain("border-indigo-200 bg-indigo-50/50");
+    expect(source).toContain("dark:bg-[color-mix(in_srgb,var(--primary)_10%,var(--surface-elevated))]");
+    expect(source).toContain("dark:border-[color-mix(in_srgb,var(--primary)_32%,var(--divider))]");
+    expect(source).toContain("bg-[var(--surface-elevated)] text-indigo-600 dark:text-[var(--primary)]");
+    expect(source).toContain("dark:text-[var(--text-primary)]");
+    expect(source).toContain("dark:text-[var(--text-secondary)]");
+    expect(source).not.toMatch(/Log weigh-in[\s\S]{0,400}(opacity-|disabled:)/);
+  });
 });
