@@ -73,4 +73,24 @@ describe("EvidenceConfirmationReadService", () => {
     }));
     expect(preferences).toEqual(expect.objectContaining({ photo: expect.any(Boolean), dexa: expect.any(Boolean) }));
   });
+
+  it("shares one runtime for canonical Training history and its persisted analysis", async () => {
+    const fixture = harness();
+    const service = createEvidenceConfirmationReadService({ repositories: fixture.repositories });
+
+    const inputs = await service.readTrainingPerformanceEventInputs(
+      PHASE5_SYNTHETIC_OWNER_ID,
+      "phase5-analyses-001"
+    );
+
+    expect(inputs.canonicalEvidenceObjects).toEqual(expect.any(Array));
+    expect(inputs.trainingAnalysis).toEqual(expect.objectContaining({
+      id: "phase5-analyses-001",
+    }));
+    expect(fixture.loads).toBe(1);
+    expect(fixture.diagnostics).toEqual([expect.objectContaining({
+      readModel: "action.evidence-review-training-performance-events",
+      runtimeLoadCount: 1,
+    })]);
+  });
 });

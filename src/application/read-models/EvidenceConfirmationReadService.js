@@ -40,5 +40,20 @@ export function createEvidenceConfirmationReadService({ repositories } = {}) {
         },
       });
     },
+    async readTrainingPerformanceEventInputs(userId, analysisId) {
+      return runRepositoryReadScope({
+        repositories,
+        readModel: "action.evidence-review-training-performance-events",
+        callback: async () => {
+          const [canonicalEvidenceObjects, trainingAnalysis] = await Promise.all([
+            repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
+            analysisId
+              ? repositories.analyses.getAnalysisById(analysisId)
+              : Promise.resolve(null),
+          ]);
+          return { canonicalEvidenceObjects, trainingAnalysis };
+        },
+      });
+    },
   });
 }

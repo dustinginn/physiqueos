@@ -11,6 +11,10 @@ import {
   createTrainingPerformanceEventPersistenceService,
   TrainingPerformanceEventPersistenceOutcome as Outcome,
 } from "./TrainingPerformanceEventPersistenceService";
+import {
+  createShallowWritableFounderRuntime,
+  detachBoundedFounderCollections,
+} from "../../platform/database/BoundedFounderRuntimeMutation.js";
 
 const directories = [];
 
@@ -106,6 +110,145 @@ describe("TrainingPerformanceEventPersistenceService", () => {
       committed: false,
     });
   });
+
+  it("commits through one bounded runtime load without cloning unrelated Founder state", async () => {
+    const fixture = createBoundedFixture();
+    const events = [volumeEvent(), repsEvent()];
+    const batch = eventBatch(events);
+
+    const persisted = await fixture.service.persistEventBatch(events, {
+      batchId: batch.id,
+      batch,
+      mutateCandidate(candidate) {
+        candidate.piTrainingConfidenceWorkItems = [
+          ...(candidate.piTrainingConfidenceWorkItems ?? []),
+          { id: "work-current", performanceEventBatchId: batch.id },
+        ];
+      },
+      finalizeCandidate({ stagedState, commitId }) {
+        stagedState.trainingPerformanceEventBatches =
+          stagedState.trainingPerformanceEventBatches.map((item) =>
+            item.id === batch.id ? { ...item, sourceCommitId: commitId } : item
+          );
+      },
+      validateFinalized(candidate) {
+        return candidate.piTrainingConfidenceWorkItems.some(
+          (item) => item.performanceEventBatchId === batch.id
+        );
+      },
+      selectFinalized(candidate) {
+        return {
+          workIds: candidate.piTrainingConfidenceWorkItems
+            .filter((item) => item.performanceEventBatchId === batch.id)
+            .map((item) => item.id),
+        };
+      },
+    });
+
+    expect(persisted).toMatchObject({
+      outcome: Outcome.CREATED,
+      committed: true,
+      newEvents: events,
+      selected: { workIds: ["work-current"] },
+      changedCollections: [
+        "trainingPerformanceEvents",
+        "trainingPerformanceEventBatches",
+        "piTrainingConfidenceWorkItems",
+      ],
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        boundedCollectionCloneCount: 3,
+      },
+    });
+    expect(fixture.mutationCalls).toBe(1);
+    expect(fixture.originalTopLevelFrozen).toBe(true);
+    expect(fixture.originalUnrelatedReferencePreserved).toBe(true);
+    expect(fixture.original.trainingPerformanceEvents).toEqual([]);
+    expect(fixture.runtime.trainingPerformanceEvents).toHaveLength(2);
+  });
+
+  it("recognizes an exact post-event pre-progress replay without duplicating events or work", async () => {
+    const fixture = createBoundedFixture();
+    const events = [volumeEvent(), repsEvent()];
+    const batch = eventBatch(events);
+    const options = {
+      batchId: batch.id,
+      batch,
+      mutateCandidate(candidate) {
+        candidate.piTrainingConfidenceWorkItems = [
+          ...(candidate.piTrainingConfidenceWorkItems ?? []),
+          { id: "work-current", performanceEventBatchId: batch.id },
+        ];
+      },
+      finalizeCandidate({ stagedState, commitId }) {
+        stagedState.trainingPerformanceEventBatches =
+          stagedState.trainingPerformanceEventBatches.map((item) =>
+            item.id === batch.id ? { ...item, sourceCommitId: commitId } : item
+          );
+      },
+      validateFinalized(candidate) {
+        return candidate.piTrainingConfidenceWorkItems.filter(
+          (item) => item.performanceEventBatchId === batch.id
+        ).length === 1;
+      },
+    };
+
+    await fixture.service.persistEventBatch(events, options);
+    const afterCommit = structuredClone(fixture.runtime);
+    const replay = await fixture.service.persistEventBatch(events, options);
+
+    expect(replay).toMatchObject({
+      outcome: Outcome.MATCHED,
+      committed: false,
+      newEvents: [],
+    });
+    expect(replay.existingEvents).toHaveLength(2);
+    expect(fixture.runtime).toEqual(afterCommit);
+    expect(fixture.runtime.trainingPerformanceEvents).toHaveLength(2);
+    expect(fixture.runtime.trainingPerformanceEventBatches).toHaveLength(1);
+    expect(fixture.runtime.piTrainingConfidenceWorkItems).toHaveLength(1);
+  });
+
+  it("fails closed on a partial persisted batch and leaves the baseline unchanged", async () => {
+    const events = [volumeEvent(), repsEvent()];
+    const batch = eventBatch(events);
+    const fixture = createBoundedFixture({
+      trainingPerformanceEvents: [events[0]],
+      trainingPerformanceEventBatches: [{ ...batch, sourceCommitId: "prior" }],
+    });
+    const before = structuredClone(fixture.runtime);
+
+    const persisted = await fixture.service.persistEventBatch(events, {
+      batchId: batch.id,
+      batch,
+    });
+
+    expect(persisted).toMatchObject({
+      outcome: Outcome.COLLISION,
+      committed: false,
+      collisionEventId: batch.id,
+    });
+    expect(fixture.runtime).toEqual(before);
+  });
+
+  it("rolls back a bounded persistence failure without mutating aliased baseline collections", async () => {
+    const fixture = createBoundedFixture({ failBeforePublish: true });
+    const before = structuredClone(fixture.runtime);
+
+    const persisted = await fixture.service.persistEventBatch([
+      volumeEvent(),
+      repsEvent(),
+    ]);
+
+    expect(persisted).toMatchObject({
+      outcome: Outcome.PERSISTENCE_FAILURE,
+      committed: false,
+    });
+    expect(fixture.runtime).toEqual(before);
+    expect(fixture.original.trainingPerformanceEvents).toEqual([]);
+  });
 });
 
 function createFixture({ events = [], createUnitOfWork } = {}) {
@@ -128,6 +271,77 @@ function createFixture({ events = [], createUnitOfWork } = {}) {
       createUnitOfWork,
       now: () => new Date("2026-07-26T02:31:01.000Z"),
     }),
+  };
+}
+
+function createBoundedFixture({
+  trainingPerformanceEvents = [],
+  trainingPerformanceEventBatches = [],
+  failBeforePublish = false,
+} = {}) {
+  let runtime = {
+    revision: 17,
+    trainingPerformanceEvents: structuredClone(trainingPerformanceEvents),
+    trainingPerformanceEventBatches: structuredClone(trainingPerformanceEventBatches),
+    piTrainingConfidenceWorkItems: [],
+    unrelatedFounderState: { payload: "x".repeat(2_000_000) },
+  };
+  const original = Object.freeze({ ...runtime });
+  let mutationCalls = 0;
+  let originalUnrelatedReferencePreserved = false;
+  const mutateCanonicalRuntime = async ({ allowedCollections, mutate }) => {
+    mutationCalls += 1;
+    const loaded = Object.freeze({ ...runtime });
+    const candidate = createShallowWritableFounderRuntime(loaded);
+    originalUnrelatedReferencePreserved =
+      candidate.unrelatedFounderState === loaded.unrelatedFounderState;
+    const detachedCollectionCount = detachBoundedFounderCollections(
+      candidate,
+      allowedCollections
+    );
+    const result = await mutate(candidate, { commandId: `commit-${mutationCalls}` });
+    if (failBeforePublish) throw new Error("injected bounded persistence failure");
+    const changedCollections = allowedCollections.filter((collection) =>
+      JSON.stringify(candidate[collection]) !== JSON.stringify(runtime[collection])
+    );
+    runtime = { ...runtime };
+    for (const collection of changedCollections) {
+      runtime[collection] = structuredClone(candidate[collection]);
+    }
+    return {
+      committed: true,
+      commitId: `commit-${mutationCalls}`,
+      revision: runtime.revision + (changedCollections.length ? 1 : 0),
+      result: structuredClone(result),
+      changedCollections,
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        collectionSnapshotMode: "digest",
+        boundedCollectionCloneCount: detachedCollectionCount,
+      },
+    };
+  };
+  return {
+    original,
+    get runtime() { return runtime; },
+    get mutationCalls() { return mutationCalls; },
+    get originalTopLevelFrozen() { return Object.isFrozen(original); },
+    get originalUnrelatedReferencePreserved() {
+      return originalUnrelatedReferencePreserved;
+    },
+    service: createTrainingPerformanceEventPersistenceService({
+      mutateCanonicalRuntime,
+    }),
+  };
+}
+
+function eventBatch(events) {
+  return {
+    id: "training-event-batch-current",
+    sourceCommitId: "pending_source_commit",
+    performanceEventIds: events.map((event) => event.id).sort(),
   };
 }
 

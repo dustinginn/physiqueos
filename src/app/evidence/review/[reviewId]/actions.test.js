@@ -884,6 +884,70 @@ describe("confirmEvidenceReview", () => {
     expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
   });
 
+  it("reclaims an expired started Training-event step and skips every completed predecessor", async () => {
+    mockState.value = createDurableContinuationState(runtimeStore);
+    const review = mockState.value.evidenceReviews[0];
+    const completedSteps = [
+      "canonical_commit",
+      "compatibility_writes",
+      "scheduled_completion",
+      "analysis",
+    ];
+    review.commitProgress = Object.fromEntries([
+      ...completedSteps.map((step) => [step, review.commitProgress[step]]),
+      ["training_performance_events", {
+        status: "started",
+        attempts: 1,
+        startedAt: "2026-08-29T15:41:23.954Z",
+      }],
+    ]);
+    review.commitClaim = {
+      operationId: "c024a5ab-cc61-41ac-98f7-584efc6eef3f",
+      status: "in_progress",
+      claimedAt: "2026-08-29T15:41:23.954Z",
+      leaseExpiresAt: "2026-08-29T15:51:23.954Z",
+      packageId: review.interpretedEvidence.package_id,
+    };
+    const analysisId = `analysis_training_${review.interpretedEvidence.package_id}`;
+    review.commitProgress.analysis.result = {
+      status: "completed",
+      analysisIds: [analysisId],
+    };
+    mockState.value.analyses = [{
+      id: analysisId,
+      createdAt: "2026-08-29T15:40:04.886Z",
+      metadata: { trainingPerformance: { exerciseObservations: [] } },
+    }];
+    const canonicalBefore = structuredClone(mockState.value.canonicalEvidenceObjects);
+    const predecessorAttempts = Object.fromEntries(completedSteps.map((step) => [
+      step,
+      review.commitProgress[step].attempts,
+    ]));
+
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      "resume=continuing"
+    );
+
+    expect(review.commitProgress.training_performance_events).toMatchObject({
+      status: "completed",
+      attempts: 2,
+      result: {
+        status: "completed",
+        newlyCreatedEvents: [],
+        existingEvents: [],
+      },
+    });
+    for (const [step, attempts] of Object.entries(predecessorAttempts)) {
+      expect(review.commitProgress[step].attempts).toBe(attempts);
+    }
+    expect(mockState.value.canonicalCommitCalls).toBe(0);
+    expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+    expect(review.commitClaim.status).toBe("available");
+    expect(mockState.value.pauseCommitCalls).toBe(1);
+    expect(mockState.value.failCommitCalls).toBe(0);
+  });
+
   it("recovers an expired pre-first-step claim only after zero-side-effect proof and completes once", async () => {
     mockState.value = createExpiredFirstStepRecoveryState(runtimeStore);
     const review = mockState.value.evidenceReviews[0];

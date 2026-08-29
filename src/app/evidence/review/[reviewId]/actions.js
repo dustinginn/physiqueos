@@ -42,9 +42,7 @@ import {
   TrainingPerformanceEventPersistenceOutcome,
 } from "../../../../domain/services/TrainingPerformanceEventPersistenceService";
 import {
-  loadApplicationCanonicalRuntime,
   loadApplicationCanonicalCommitBindings,
-  loadApplicationRuntimeBindings,
 } from "../../../../application/runtime/ApplicationCanonicalRuntime";
 import {
   createCanonicalEvidenceConfirmationCommitService,
@@ -695,21 +693,28 @@ function createHandlers({ evidencePackage, reviewId, user,
           existingEvents: [],
         };
       }
-      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       const analysisId =
         trainingAnalysis?.id ??
         results.analysis?.analysisIds?.find((id) => id === `analysis_training_${evidencePackage.package_id}`);
-      trainingAnalysis ??=
+      const persistedInputs = canonical && trainingAnalysis
+        ? null
+        : await confirmationReads.readTrainingPerformanceEventInputs(
+            user.id,
+            analysisId
+          );
+      const canonicalForEvents = canonical ??
+        persistedInputs?.canonicalEvidenceObjects ?? [];
+      const analysisForEvents = trainingAnalysis ??
         analyses.find((analysis) => analysis.id === analysisId) ??
-        (analysisId ? await FounderRepositories.analyses.getAnalysisById(analysisId) : null);
-      if (!trainingAnalysis) {
+        persistedInputs?.trainingAnalysis ?? null;
+      if (!analysisForEvents) {
         throw new Error("Persisted Training analysis is unavailable for performance-event generation.");
       }
       const canonicalCommitResults = results.canonical_commit?.canonicalCommitResults ?? [];
       const resolvedTrainingSessions = trainingObjects.map((session) => {
         const resolution = resolveConfirmedCanonicalTrainingSession({
           reviewItem: session,
-          canonicalEvidenceObjects: canonical,
+          canonicalEvidenceObjects: canonicalForEvents,
           canonicalCommitResults,
         });
         if (resolution.status !== "resolved" || !resolution.canonicalSession) {
@@ -720,7 +725,7 @@ function createHandlers({ evidencePackage, reviewId, user,
       const events = resolvedTrainingSessions.flatMap(({ canonicalSession }) =>
         produceTrainingPerformanceEvents({
           canonicalTrainingSession: canonicalSession,
-          trainingAnalysis,
+          trainingAnalysis: analysisForEvents,
           sourceReviewId: reviewId,
           sourceEvidencePackageId: evidencePackage.package_id,
         })
@@ -731,7 +736,7 @@ function createHandlers({ evidencePackage, reviewId, user,
       const eventIds = events.map((event) => event.id).sort();
       const batchId = `training_event_batch|${createPISemanticFingerprint({
         packageId: evidencePackage.package_id,
-        analysisId: trainingAnalysis.id,
+        analysisId: analysisForEvents.id,
         sessionIds: resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
         eventIds,
       }).slice(7)}`;
@@ -741,15 +746,15 @@ function createHandlers({ evidencePackage, reviewId, user,
         sourceCommitId: "pending_source_commit",
         sourceEvidencePackageId: evidencePackage.package_id,
         sourceReviewId: reviewId,
-        finalizedReportId: trainingAnalysis.id,
+        finalizedReportId: analysisForEvents.id,
         canonicalTrainingSessionIds:
           resolvedTrainingSessions.map((item) => item.canonicalSession.canonicalId).sort(),
         performanceEventIds: eventIds,
         zeroEventCompletion: eventIds.length === 0,
-        finalizedAt: trainingAnalysis.createdAt,
+        finalizedAt: analysisForEvents.createdAt,
       };
       const persistence = await createTrainingPerformanceEventPersistenceService({
-        ...(await loadApplicationRuntimeBindings()),
+        ...(await loadApplicationCanonicalCommitBindings()),
       }).persistEventBatch(events, lowerLevelEnabled ? {
         batchId,
         batch,
@@ -758,7 +763,7 @@ function createHandlers({ evidencePackage, reviewId, user,
             const sessionEvents = events.filter((event) => event.sourceSessionId === session.id);
             coordinator.stageTrainingFinalization(candidate, {
               canonicalTrainingSessionId: canonicalSession.canonicalId,
-              finalizedTrainingReportId: trainingAnalysis.id,
+              finalizedTrainingReportId: analysisForEvents.id,
               sourceTrainingEvidenceIds: [
                 canonicalSession.canonicalId,
               ],
@@ -766,12 +771,12 @@ function createHandlers({ evidencePackage, reviewId, user,
               performanceEventIds: sessionEvents.map((event) => event.id),
               zeroEventCompletion: sessionEvents.length === 0,
               categoryRollupFingerprint: createPISemanticFingerprint(
-                trainingAnalysis.metadata?.trainingPerformance
+                analysisForEvents.metadata?.trainingPerformance
                   ?.categoryObservations ?? []
               ),
               sourceSemanticFingerprint: createPISemanticFingerprint({
                 canonicalSession,
-                finalizedReportId: trainingAnalysis.id,
+                finalizedReportId: analysisForEvents.id,
                 performanceEventIds:
                   sessionEvents.map((event) => event.id).sort(),
               }),
@@ -780,16 +785,21 @@ function createHandlers({ evidencePackage, reviewId, user,
           }
         },
         finalizeCandidate: ({ stagedState, commitId }) => {
-          const persistedBatch = stagedState.trainingPerformanceEventBatches
-            ?.find((item) => item.id === batchId);
-          if (persistedBatch) persistedBatch.sourceCommitId = commitId;
-          for (const work of stagedState.piTrainingConfidenceWorkItems ?? []) {
-            work.sourceCommitLinks = (work.sourceCommitLinks ?? []).map(
-              (link) => link.commitId === "pending_source_commit"
-                ? { ...link, commitId }
-                : link
+          stagedState.trainingPerformanceEventBatches =
+            (stagedState.trainingPerformanceEventBatches ?? []).map((item) =>
+              item.id === batchId ? { ...item, sourceCommitId: commitId } : item
             );
-          }
+          stagedState.piTrainingConfidenceWorkItems =
+            (stagedState.piTrainingConfidenceWorkItems ?? []).map((work) => {
+              const sourceCommitLinks = (work.sourceCommitLinks ?? []).map(
+                (link) => link.commitId === "pending_source_commit"
+                  ? { ...link, commitId }
+                  : link
+              );
+              return sourceCommitLinks.some(
+                (link, index) => link !== work.sourceCommitLinks?.[index]
+              ) ? { ...work, sourceCommitLinks } : work;
+            });
         },
         validateFinalized: (candidate) =>
           resolvedTrainingSessions.every(({ canonicalSession }) =>
@@ -797,8 +807,17 @@ function createHandlers({ evidencePackage, reviewId, user,
               (work) =>
                 work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
                 work.performanceEventBatchId === batchId
-            )
+              )
           ),
+        selectFinalized: (candidate) => ({
+          lowerLevelWorkIds: resolvedTrainingSessions.map(
+            ({ canonicalSession }) => candidate.piTrainingConfidenceWorkItems
+              ?.find((work) =>
+                work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
+                work.performanceEventBatchId === batchId
+              )?.id
+          ).filter(Boolean),
+        }),
       } : {});
       if (
         [
@@ -811,9 +830,9 @@ function createHandlers({ evidencePackage, reviewId, user,
       ) {
         throw new Error(`Training performance-event persistence failed: ${persistence.outcome}`);
       }
-      const confidenceRuntime = lowerLevelEnabled
-        ? await loadApplicationCanonicalRuntime()
-        : null;
+      canonical = null;
+      analyses = [];
+      trainingAnalysis = null;
       return {
         status: "completed",
         outcome: persistence.outcome,
@@ -821,14 +840,9 @@ function createHandlers({ evidencePackage, reviewId, user,
         existingEvents: persistence.existingEvents,
         performanceEventBatchId: persistence.batch?.id ?? null,
         lowerLevelWorkIds: lowerLevelEnabled
-          ? resolvedTrainingSessions.map(({ canonicalSession }) =>
-              confidenceRuntime.piTrainingConfidenceWorkItems
-                ?.find((work) =>
-                  work.canonicalTrainingSessionId === canonicalSession.canonicalId &&
-                  work.performanceEventBatchId === batchId
-                )?.id
-            ).filter(Boolean)
+          ? persistence.selected?.lowerLevelWorkIds ?? []
           : [],
+        memoryProfile: persistence.memoryProfile ?? null,
       };
     },
     goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user, confirmationReads }),
