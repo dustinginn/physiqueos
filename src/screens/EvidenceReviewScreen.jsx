@@ -32,6 +32,10 @@ import {
 } from "../domain/models/trainingMuscleGroupIdentity";
 import { parsePrivateMediaReference } from "../contracts/v1/mediaIdentifiers";
 import { validateDexaScan } from "../domain/services/DEXAContract";
+import {
+  createEvidenceReviewContinuationKey,
+  submitEvidenceReviewContinuation,
+} from "./evidenceReviewContinuation";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
@@ -744,13 +748,15 @@ function ConfirmButton({ blockingCount = 0, disabled, retry, savingLabel }) {
 
 function EvidenceCommitRecoveryForm({ action, recoveryContext, review }) {
   const formRef = useRef(null);
-  const submittedRef = useRef(false);
+  const submittedCheckpointRef = useRef(null);
+  const continuationKey = createEvidenceReviewContinuationKey(review);
   useEffect(() => {
-    if (!submittedRef.current) {
-      submittedRef.current = true;
-      formRef.current?.requestSubmit();
-    }
-  }, []);
+    submitEvidenceReviewContinuation({
+      continuationKey,
+      form: formRef.current,
+      submittedCheckpointRef,
+    });
+  }, [continuationKey]);
   return (
     <form action={action} className="mt-6" ref={formRef}>
       <input name="reviewId" type="hidden" value={review.id} />
@@ -758,12 +764,15 @@ function EvidenceCommitRecoveryForm({ action, recoveryContext, review }) {
       <Card variant="warning">
         <p className="font-extrabold text-[var(--text-primary)]">Finishing your saved evidence</p>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">Completed work is preserved. PhysiqueOS will continue from the next unfinished step.</p>
-        <button className="mt-4 min-h-12 w-full rounded-xl bg-[var(--primary)] px-3 text-sm font-extrabold text-white" type="submit">
-          Continue saving
-        </button>
+        <EvidenceContinuationButton />
       </Card>
     </form>
   );
+}
+
+function EvidenceContinuationButton() {
+  const { pending } = useFormStatus();
+  return <button aria-live="polite" className="mt-4 min-h-12 w-full rounded-xl bg-[var(--primary)] px-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={pending} type="submit">{pending ? "Continuing\u2026" : "Continue saving"}</button>;
 }
 
 function ReprocessButton() {

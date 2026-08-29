@@ -109,6 +109,16 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("without re-uploading or repeating completed work");
   });
 
+  it("auto-continues once per durable checkpoint and shows pending feedback", () => {
+    expect(screen).toContain("createEvidenceReviewContinuationKey(review)");
+    expect(screen).toContain("submitEvidenceReviewContinuation({");
+    expect(screen).toContain("[continuationKey]");
+    expect(screen).not.toContain("const submittedRef = useRef(false)");
+    expect(screen).toContain("function EvidenceContinuationButton()");
+    expect(screen).toContain('disabled={pending}');
+    expect(screen).toContain('pending ? "Continuing\\u2026" : "Continue saving"');
+  });
+
   it("submits local decisions only with final confirmation", () => {
     expect(screen).toContain('name="itemDecisionsJson"');
     expect(actions).toContain('formData.get("itemDecisionsJson")');
