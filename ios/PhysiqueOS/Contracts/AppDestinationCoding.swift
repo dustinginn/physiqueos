@@ -9,7 +9,7 @@ import Foundation
 extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
-        case goalId, checkInType, briefingId, priorityId, reviewId, sessionId, streamId
+        case goalId, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
     }
 
     init(from decoder: Decoder) throws {
@@ -40,6 +40,9 @@ extension AppDestination {
         case "training.session":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .trainingSession(sessionId: try parameters.decode(String.self, forKey: .sessionId))
+        case "training.exercise":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .trainingExercise(exerciseId: try parameters.decode(String.self, forKey: .exerciseId))
         case "progress.stream":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             let streamId = try parameters.decode(String.self, forKey: .streamId)
@@ -69,6 +72,7 @@ extension AppDestination {
         case .priorityDetail(let priorityId): try parameters.encode(priorityId, forKey: .priorityId)
         case .evidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
         case .trainingSession(let sessionId): try parameters.encode(sessionId, forKey: .sessionId)
+        case .trainingExercise(let exerciseId): try parameters.encode(exerciseId, forKey: .exerciseId)
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
         case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger: break

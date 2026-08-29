@@ -6,7 +6,7 @@ import Foundation
 /// client — the three-projection shape lives in the read models themselves
 /// (see `TrainingReadModel.swift`), not in the transport boundary.
 protocol TrainingAPI: Sendable {
-    func fetchTrainingHistory() async throws -> TrainingHistoryReadModel
+    func fetchTrainingLanding() async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
 }
@@ -24,7 +24,7 @@ struct FixtureTrainingAPI: TrainingAPI {
     }
 
     private struct TrainingFixtureFile: Codable {
-        var history: TrainingHistoryReadModel
+        var landing: TrainingLandingReadModel
         var days: [TrainingDayReadModel]
         var sessions: [TrainingSessionDetailReadModel]
     }
@@ -51,8 +51,8 @@ struct FixtureTrainingAPI: TrainingAPI {
         return try Self.decoder.decode(TrainingFixtureFile.self, from: data)
     }
 
-    func fetchTrainingHistory() async throws -> TrainingHistoryReadModel {
-        try loadFixture().history
+    func fetchTrainingLanding() async throws -> TrainingLandingReadModel {
+        try loadFixture().landing
     }
 
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel? {

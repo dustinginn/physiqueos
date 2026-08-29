@@ -61,6 +61,15 @@ enum PhysiqueOSTypography {
     static let heroSupportLine = Style(size: 12, weight: .medium)
     /// `text-[10px] font-medium` — "Projected Finish" / "Days Remaining".
     static let metricLabel = Style(size: 10, weight: .medium)
+    /// `text-[10px] font-extrabold uppercase tracking-[0.08em]` (and the
+    /// near-identical `tracking-[0.1em]` variant used by
+    /// `TrainingTimelineSelector`'s "Viewing" eyebrow — the 0.02em
+    /// difference is visually negligible at 10px and consolidated to one
+    /// token here) — a small uppercase eyebrow repeated across many deep
+    /// pages: `ProtocolRow`, `ActivityMetricGrid`, `PerformanceMetric`,
+    /// `TrainingSourceMetadataFooter`'s "DATA SOURCES" label. Distinct from
+    /// `metricLabel` above, which is `font-medium`, not `font-extrabold`.
+    static let deepPageEyebrow10 = Style(size: 10, weight: .heavy, trackingEm: 0.08, uppercase: true)
     /// `text-[14px] font-extrabold leading-none` — the metric's value.
     static let metricValue = Style(size: 14, weight: .heavy)
 

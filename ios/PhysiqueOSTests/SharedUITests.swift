@@ -135,4 +135,13 @@ final class SharedUITests: XCTestCase {
         XCTAssertNotEqual(photo.source, file.source)
         XCTAssertNotEqual(photo.id, file.id)
     }
+
+    /// `EvidenceSourceMenu` is a native `Menu` (not directly unit-testable
+    /// without UI automation), so this guards the one thing that can
+    /// regress silently: the option set itself must stay exactly Photos +
+    /// Files, in that order — no source silently added, removed, or
+    /// reordered.
+    func testEvidenceSourceOptionsRemainExactlyPhotosThenFiles() {
+        XCTAssertEqual(EvidenceSourceOption.allCases, [.photos, .files])
+    }
 }

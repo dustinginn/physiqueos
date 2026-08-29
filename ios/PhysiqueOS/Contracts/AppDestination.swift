@@ -18,6 +18,15 @@ enum AppDestination: Hashable, Codable {
     case priorityDetail(priorityId: String)
     case evidenceReview(reviewId: String)
     case trainingSession(sessionId: String)
+    /// `training.exercise` — a Training Area row's own destination
+    /// (`/progress/training/library/:exerciseSlug`,
+    /// `TRAINING_EXERCISE`/`getTrainingAreaNavigationGroups`,
+    /// `src/screens/ProgressPlaceholderScreen.jsx:986-996`). No Training
+    /// Library screen exists yet, so this falls to
+    /// `DestinationPlaceholderView` like `photoUpload`/`dexaUpload` already
+    /// do — the destination id is real and carried faithfully even before
+    /// its screen exists.
+    case trainingExercise(exerciseId: String)
     /// `progress.stream` — the server's catch-all `/progress/*` pattern.
     /// Log's Nutrition and (multi-session/no-id) Training rows resolve
     /// here today because the server destination registry has no
@@ -56,6 +65,7 @@ enum AppDestination: Hashable, Codable {
         case .priorityDetail: "priority.detail"
         case .evidenceReview: "evidence.review"
         case .trainingSession: "training.session"
+        case .trainingExercise: "training.exercise"
         case .progressStream: "progress.stream"
         case .trainingDay: "progress.stream"
         case .trainingLogger: "log"

@@ -10,37 +10,50 @@ import SwiftUI
 /// library-access prompt) for photos, or the document picker for PDFs and
 /// other files, instead of a document picker opening immediately and never
 /// offering Photos at all (the bug this replaces).
-enum EvidenceSourceOption {
+enum EvidenceSourceOption: CaseIterable, Equatable {
     case photos
     case files
 }
 
-/// A shared confirmation-dialog trigger for choosing an evidence source.
-/// Reusable wherever a screen needs to ask "Choose Photos or Choose Files"
-/// before opening the platform-appropriate picker — not one-off to Log's
-/// Upload card, so Nutrition, Photos, and DEXA intake can adopt it later
-/// without rebuilding the choice.
-struct EvidenceSourcePicker: ViewModifier {
-    @Binding var isPresented: Bool
+/// A shared, contextually-anchored evidence-source chooser. Reusable
+/// wherever a screen needs to ask "Choose Photos or Choose Files" — not
+/// one-off to Log's Upload card, so Nutrition, Photos, and DEXA intake can
+/// adopt it later without rebuilding the choice.
+///
+/// Built on `Menu` rather than `.confirmationDialog`: a `confirmationDialog`
+/// is always OS-anchored to the bottom of the screen regardless of where
+/// its trigger sits, which is exactly the reported bug — on a screen where
+/// the "Add evidence" card isn't near the bottom, the choice appears to
+/// float over unrelated content. `Menu` presents its options anchored at
+/// the triggering control itself (the standard iOS contextual-menu
+/// placement, not the iPad-style global popover `.popover(...)` would
+/// default to on a compact size class without explicit compact
+/// adaptation), so the choice now appears at/over the "Add evidence"
+/// surface that triggered it.
+struct EvidenceSourceMenu<TriggerLabel: View>: View {
     let onSelect: (EvidenceSourceOption) -> Void
+    var triggerLabel: TriggerLabel
 
-    func body(content: Content) -> some View {
-        content.confirmationDialog("Add evidence", isPresented: $isPresented, titleVisibility: .visible) {
-            Button("Choose Photos") { onSelect(.photos) }
-            Button("Choose Files") { onSelect(.files) }
-            Button("Cancel", role: .cancel) {}
-        }
+    init(onSelect: @escaping (EvidenceSourceOption) -> Void, @ViewBuilder label: () -> TriggerLabel) {
+        self.onSelect = onSelect
+        self.triggerLabel = label()
     }
-}
 
-extension View {
-    /// Presents the shared "Choose Photos" / "Choose Files" evidence-source
-    /// choice. The caller is responsible for presenting the corresponding
-    /// picker (`PhotosPicker` or `.fileImporter`) from `onSelect`.
-    func evidenceSourcePicker(
-        isPresented: Binding<Bool>,
-        onSelect: @escaping (EvidenceSourceOption) -> Void
-    ) -> some View {
-        modifier(EvidenceSourcePicker(isPresented: isPresented, onSelect: onSelect))
+    var body: some View {
+        Menu {
+            Button {
+                onSelect(.photos)
+            } label: {
+                Label("Choose Photos", systemImage: "photo.on.rectangle")
+            }
+            Button {
+                onSelect(.files)
+            } label: {
+                Label("Choose Files", systemImage: "folder")
+            }
+        } label: {
+            triggerLabel
+        }
+        .menuOrder(.fixed)
     }
 }

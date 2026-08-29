@@ -1,33 +1,96 @@
 {
-  "history": {
+  "landing": {
+    "title": "Training",
+    "subtitle": null,
+    "tone": "primary",
+    "scope": {
+      "options": [
+        { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+        { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+        { "id": "all", "label": "All Training", "selected": true }
+      ],
+      "dateRangeLabel": "Complete history"
+    },
+    "latestTrainingDay": {
+      "date": "2026-08-26",
+      "label": "Wednesday, August 26",
+      "daySummary": "Chest · Triceps · Walking",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-26" } },
+      "sessions": [
+        {
+          "id": "session-fixture-004",
+          "label": "Walking",
+          "value": "2.1 mi",
+          "detail": "6:10 PM–6:52 PM · 42 min · 2.1 mi · 180 active cal",
+          "date": "2026-08-26T18:10:00-07:00",
+          "sourceEvidence": ["Apple Health"],
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-004" } }
+        },
+        {
+          "id": "session-fixture-001",
+          "label": "Traditional Strength Training",
+          "value": "420 active cal",
+          "detail": "6:02 AM–6:54 AM · 52 min · 420 active cal · Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
+          "date": "2026-08-26T06:02:00-07:00",
+          "sourceEvidence": ["Typed evidence"],
+          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-001" } }
+        }
+      ]
+    },
+    "trainingAreas": [
+      { "id": "chest", "label": "Chest", "exerciseCount": 3, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "chest" } } },
+      { "id": "back", "label": "Back", "exerciseCount": 2, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "back" } } },
+      { "id": "shoulders", "label": "Shoulders", "exerciseCount": 1, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "shoulders" } } },
+      { "id": "biceps", "label": "Biceps", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "biceps" } } },
+      { "id": "triceps", "label": "Triceps", "exerciseCount": 1, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "triceps" } } },
+      { "id": "core", "label": "Core", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "core" } } },
+      { "id": "quads", "label": "Quads", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "quads" } } },
+      { "id": "hamstrings", "label": "Hamstrings", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "hamstrings" } } },
+      { "id": "glutes", "label": "Glutes", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "glutes" } } },
+      { "id": "calves", "label": "Calves", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "calves" } } }
+    ],
+    "reportingLinks": [
+      { "id": "resistance", "label": "Resistance Training", "detail": "Strength progression, body-part distribution, and lean mass support.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/resistance" } } },
+      { "id": "cardio", "label": "Cardio", "detail": "Calories, exercise minutes, distance, pace, and heart-rate trends.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/cardio" } } },
+      { "id": "volume", "label": "Volume", "detail": "Sets, reps, loads, and weekly work by exercise or muscle group.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/volume" } } },
+      { "id": "frequency", "label": "Frequency", "detail": "How often each area, modality, and exercise appears.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/frequency" } } },
+      { "id": "consistency", "label": "Consistency", "detail": "Logging cadence and evidence coverage over time.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/consistency" } } }
+    ],
     "trainingDays": [
       {
         "date": "2026-08-26",
         "label": "Wednesday, August 26",
-        "summary": "2 sessions",
+        "summary": "Chest · Triceps · Walking",
         "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-26" } }
       },
       {
         "date": "2026-08-24",
         "label": "Monday, August 24",
-        "summary": "1 session",
+        "summary": "Back · Shoulders",
         "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-24" } }
       },
       {
         "date": "2026-08-22",
         "label": "Saturday, August 22",
-        "summary": "1 session",
+        "summary": "Cardio",
         "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-22" } }
       }
     ],
-    "trainingOverview": [
-      { "label": "Sessions", "value": "4" },
-      { "label": "Active Calories", "value": "1390" },
-      { "label": "Exercise Minutes", "value": "176" }
+    "currentProtocol": {
+      "sourceOfTruth": "User-defined",
+      "dailyActivityTarget": "~1000 active calories/day",
+      "trainingObjective": "Maintain lean mass while cutting",
+      "goal": "Visible abs while preserving lean mass"
+    },
+    "relatedGoals": [
+      { "id": "goal_visible_abs_at_rest", "title": "Visible Abs At Rest", "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_visible_abs_at_rest" } } },
+      { "id": "goal_preserve_lean_mass", "title": "Preserve Lean Mass", "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_preserve_lean_mass" } } }
     ],
-    "trainingUnderstanding": [
-      { "label": "Resistance training", "value": "2 workouts" },
-      { "label": "Cardio", "value": "2 sessions" }
+    "sourceEvidence": [
+      { "id": "session-fixture-003", "label": "Run", "date": "2026-08-22T07:00:00-07:00", "sources": ["Apple Health"] },
+      { "id": "session-fixture-002", "label": "Functional Strength Training", "date": "2026-08-24T05:45:00-07:00", "sources": ["Screenshot"] },
+      { "id": "session-fixture-001", "label": "Traditional Strength Training", "date": "2026-08-26T06:02:00-07:00", "sources": ["Typed evidence"] },
+      { "id": "session-fixture-004", "label": "Walking", "date": "2026-08-26T18:10:00-07:00", "sources": ["Apple Health"] }
     ]
   },
   "days": [

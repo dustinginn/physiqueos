@@ -36,6 +36,7 @@ app_files = [
     ("Contracts", "DirectWeighInValidation.swift"),
     ("Contracts", "EvidenceDateParsing.swift"),
     ("Contracts", "EvidenceReadModel.swift"),
+    ("Contracts", "EvidenceHubUsage.swift"),
     ("Contracts", "TrainingReadModel.swift"),
     ("Contracts", "TrainingSessionRenderItems.swift"),
     ("Networking", "HomeAPI.swift"),
@@ -117,6 +118,7 @@ test_files = [
     ("PhysiqueOSTests", "LogReadModelTests.swift"),
     ("PhysiqueOSTests", "SharedUITests.swift"),
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
+    ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
 ]
 

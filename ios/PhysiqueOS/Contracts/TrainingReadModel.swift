@@ -21,32 +21,168 @@ import Foundation
 /// and the Training Logger's write-path/draft state are out of scope (see
 /// `AppDestination.trainingLogger`).
 
-// MARK: - Training list/hub (`/progress/training`)
+// MARK: - Training landing page (`/progress/training`)
+//
+// Mirrors `ProgressPlaceholderScreen.jsx`'s `report.id === "training"`
+// render path field-for-field: `TrainingEvidenceContext` (the scope
+// selector) + `TrainingEvidenceReport` (the section list — Latest Training
+// Day, Training Areas, Reporting, Recent Training History, Current
+// Protocol, Related Goals, Data Sources). `report.trainingOverview` and
+// `report.trainingUnderstanding` are real fields on the server's object
+// but are never rendered by this screen — confirmed by reading
+// `TrainingEvidenceReport` directly — so they are intentionally absent
+// here rather than carried forward as a native-only "Overview" dashboard.
 
-struct TrainingHistoryReadModel: Codable, Equatable {
+struct TrainingLandingReadModel: Codable, Equatable {
+    /// `report.title` — "Training".
+    var title: String
+    /// `report.subtitle` — genuinely absent on the server's stream object
+    /// for every stream (`buildProgressHub` never sets it); the header
+    /// falls back to `"What PhysiqueOS currently understands."`
+    /// (`ProgressPlaceholderScreen.jsx:73`), which the view applies when
+    /// this is `nil` rather than the fixture repeating server behavior.
+    var subtitle: String?
+    /// `report.tone` — drives the header `IconBadge`'s color.
+    var tone: HomeColorToken
+    /// `evidenceContext` — `TrainingEvidenceContextService`'s scope
+    /// selector ("Build Lean Mass" / "Visible Abs" / "All Training").
+    var scope: TrainingScopeContext
+    /// `report.latestTrainingDay` — `nil` when no training evidence exists
+    /// yet (`LatestTrainingDayCard`'s own empty state).
+    var latestTrainingDay: TrainingLandingDay?
+    /// `report.trainingBreakdowns` projected through
+    /// `getTrainingAreaNavigationGroups` — always the 10 canonical
+    /// muscle-group categories, each with its own exercise count.
+    var trainingAreas: [TrainingAreaSummary]
+    /// `report.reportingLinks` — `getTrainingReportingLinks()`.
+    var reportingLinks: [TrainingReportingLink]
+    /// `report.trainingDays` — used for the "Recent Training History"
+    /// preview (`trainingDays[0]`) and its "Show All" sheet.
     var trainingDays: [TrainingDaySummary]
-    var trainingOverview: [TrainingStat]
-    var trainingUnderstanding: [TrainingStat]
+    /// `report.currentProtocol`.
+    var currentProtocol: TrainingProtocolSummary
+    /// `report.relatedGoals`.
+    var relatedGoals: [TrainingRelatedGoal]
+    /// `report.sourceEvidence` — capped to 5 server-side
+    /// (`TrainingSourceMetadataFooter`'s `items.slice(0, 5)`).
+    var sourceEvidence: [TrainingSourceEvidenceItem]
+}
+
+/// `TrainingTimelineSelector`'s own props: `timeline.options` and
+/// `timeline.dateRangeLabel` are the only fields it renders — the richer
+/// `TrainingEvidenceContextService` object (`goalId`, `startDate`, `type`,
+/// …) exists server-side but is not part of what this screen displays.
+struct TrainingScopeContext: Codable, Equatable {
+    var options: [TrainingScopeOption]
+    var dateRangeLabel: String
+}
+
+struct TrainingScopeOption: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var selected: Bool
+}
+
+/// The "Latest Training Day" card's data — distinct from `TrainingDaySummary`
+/// below (which only needs a row's worth of fields for the history
+/// list/sheet): this card renders every session's own label/value/detail/
+/// date/sourceEvidence, matching `RecordPreview`'s per-entry fields.
+struct TrainingLandingDay: Codable, Equatable {
+    var date: String
+    var label: String
+    /// Mirrors `getTrainingDaySummary(sessions)` — the exercise-navigation-
+    /// category + activity-classification summary ("Chest · Triceps ·
+    /// Walking"), precomputed the same way every other native read model
+    /// carries server-formatted display strings rather than recomputing
+    /// them client-side. `nil` when no exercises/activities resolve to a
+    /// label, matching the web's own `daySummary && (...)` conditional.
+    var daySummary: String?
+    /// "View Training Day →" action.
+    var destination: AppDestination
+    var sessions: [TrainingSessionPreview]
+}
+
+/// A `RecordPreviewItem`-shaped session row — the same fields
+/// `getTrainingRecords` produces, minus `exercises`/
+/// `exerciseRelationshipGroups` (unused by this card; see
+/// `TrainingSessionDetailReadModel` for the full session-detail shape).
+struct TrainingSessionPreview: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var value: String
+    var detail: String
+    var date: String
+    var sourceEvidence: [String]
+    var destination: AppDestination
+}
+
+/// `getTrainingAreaNavigationGroups`'s per-category row
+/// (`ProgressPlaceholderScreen.jsx:983-1010`) — always the 10 canonical
+/// `TRAINING_AREA_NAV_GROUPS`, each carrying its own resolved exercise
+/// count (`nil` detail when the count is zero, matching
+/// `count ? "{count} exercises" : null`).
+struct TrainingAreaSummary: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var exerciseCount: Int
+    var destination: AppDestination
+}
+
+/// `getTrainingReportingLinks()` — always these exact 5 links today.
+struct TrainingReportingLink: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var detail: String
+    var destination: AppDestination
+}
+
+/// `report.currentProtocol` — static, server-authored copy
+/// (`getTrainingReportExtras`), not derived from Founder data.
+struct TrainingProtocolSummary: Codable, Equatable {
+    var sourceOfTruth: String
+    var dailyActivityTarget: String
+    /// `CurrentProtocolCard`'s "Training objective" row —
+    /// `protocol.resistanceTraining` server-side.
+    var trainingObjective: String
+    var goal: String
+}
+
+/// `getRelatedGoals`'s `{id, title, href}` shape — `href` always resolves
+/// to `goal.detail`, so this reuses `AppDestination.goalDetail` rather
+/// than inventing a new destination case.
+struct TrainingRelatedGoal: Codable, Equatable, Identifiable {
+    var id: String
+    var title: String
+    var destination: AppDestination
+}
+
+/// `getTrainingSourceEvidence`'s `{id, label, date, sources}` shape.
+/// `date` is a genuine field on the server object but is not rendered by
+/// `TrainingSourceMetadataFooter` (verified directly from source) — kept
+/// here for field-for-field fidelity, unused by the view.
+struct TrainingSourceEvidenceItem: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var date: String
+    var sources: [String]
 }
 
 /// The list page's per-day row (`getTrainingDays`,
-/// `ProgressReportingService.js:1143-1169`).
+/// `ProgressReportingService.js:1143-1169`) — used for
+/// `report.trainingDays` (the "Recent Training History" preview + its
+/// "Show All" sheet). `summary` holds the same `getTrainingDaySummary`
+/// text `TrainingLandingDay.daySummary` does — confirmed by reading
+/// `TrainingDayHistoryPreview` and `TrainingHistorySheet` directly, both
+/// call `getTrainingDaySummary(day.sessions)` rather than the server
+/// object's separate (and, on this screen, never-rendered) `"N session(s)"`
+/// `summary` field.
 struct TrainingDaySummary: Codable, Equatable, Identifiable {
     var date: String
     var label: String
-    var summary: String
+    var summary: String?
     var destination: AppDestination
 
     var id: String { date }
-}
-
-/// `report.trainingOverview` / `report.trainingUnderstanding` — both are
-/// flat `{label, value}` pairs on the server too.
-struct TrainingStat: Codable, Equatable, Identifiable {
-    var label: String
-    var value: String
-
-    var id: String { label }
 }
 
 // MARK: - Training Day (`/progress/training/day/:date`)

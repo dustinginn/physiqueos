@@ -18,7 +18,6 @@ struct UploadCardView: View {
     @State private var selectedDate = Date()
     @State private var noteText = ""
     @State private var selectedAttachments: [EvidenceAttachment] = []
-    @State private var isSourcePickerPresented = false
     @State private var isFilePickerPresented = false
     @State private var isPhotosPickerPresented = false
     @State private var photosSelection: [PhotosPickerItem] = []
@@ -77,12 +76,6 @@ struct UploadCardView: View {
             }
         }
         .onAppear { selectedDate = maxSelectableDate }
-        .evidenceSourcePicker(isPresented: $isSourcePickerPresented) { option in
-            switch option {
-            case .photos: isPhotosPickerPresented = true
-            case .files: isFilePickerPresented = true
-            }
-        }
         .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photosSelection, matching: .images)
         .onChange(of: photosSelection) {
             let startIndex = selectedAttachments.filter { $0.source == .photoLibrary }.count
@@ -200,9 +193,16 @@ struct UploadCardView: View {
     /// Mirrors the web's "Upload files" drop zone, retitled "Add evidence"
     /// now that native supports both a Photos source and a Files source —
     /// "Upload files" is the web's literal wording for its single merged
-    /// file input and undersells what this control now offers.
+    /// file input and undersells what this control now offers. The choice
+    /// itself is an `EvidenceSourceMenu`, anchored directly at this card
+    /// rather than floating at the bottom of the screen.
     private var filePickerField: some View {
-        Button { isSourcePickerPresented = true } label: {
+        EvidenceSourceMenu { option in
+            switch option {
+            case .photos: isPhotosPickerPresented = true
+            case .files: isFilePickerPresented = true
+            }
+        } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Add evidence", systemImage: "doc.badge.plus")
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
@@ -219,12 +219,12 @@ struct UploadCardView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(PhysiqueOSTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
+            )
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(PhysiqueOSTheme.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
-        )
         .accessibilityAddTraits(.isButton)
     }
 

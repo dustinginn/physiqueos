@@ -5,7 +5,7 @@ import Foundation
 final class TrainingHistoryViewModel {
     enum LoadState: Equatable {
         case loading
-        case loaded(TrainingHistoryReadModel)
+        case loaded(TrainingLandingReadModel)
         case failed(String)
     }
 
@@ -18,9 +18,9 @@ final class TrainingHistoryViewModel {
 
     func load() async {
         do {
-            state = .loaded(try await api.fetchTrainingHistory())
+            state = .loaded(try await api.fetchTrainingLanding())
         } catch {
-            state = .failed("Training history could not be loaded.")
+            state = .failed("Training could not be loaded.")
         }
     }
 }

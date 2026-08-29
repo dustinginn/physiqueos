@@ -5,13 +5,14 @@ import SwiftUI
 /// card icon), so it belongs in shared UI rather than any one screen.
 struct IconBadge: View {
     enum Size {
-        case xs, sm, md
+        case xs, sm, md, lg
 
         var dimension: CGFloat {
             switch self {
             case .xs: 28
             case .sm: 32
             case .md: 40
+            case .lg: 48
             }
         }
 
@@ -20,6 +21,7 @@ struct IconBadge: View {
             case .xs: 14
             case .sm: 16
             case .md: 18
+            case .lg: 22
             }
         }
     }

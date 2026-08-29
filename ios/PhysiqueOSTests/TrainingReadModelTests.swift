@@ -11,34 +11,120 @@ final class TrainingReadModelTests: XCTestCase {
 
     // MARK: - Fixture decoding integrity
 
-    func testHistoryDecodesWithoutError() async throws {
-        let history = try await api.fetchTrainingHistory()
-        XCTAssertFalse(history.trainingDays.isEmpty)
-        XCTAssertFalse(history.trainingOverview.isEmpty)
-        XCTAssertFalse(history.trainingUnderstanding.isEmpty)
+    func testLandingDecodesWithoutError() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertEqual(landing.title, "Training")
+        XCTAssertFalse(landing.trainingDays.isEmpty)
+        XCTAssertFalse(landing.trainingAreas.isEmpty)
+        XCTAssertFalse(landing.reportingLinks.isEmpty)
     }
 
-    // MARK: - Training history ordering/grouping
+    /// `report.trainingOverview`/`report.trainingUnderstanding` are real
+    /// server fields but are never rendered by `TrainingEvidenceReport`
+    /// (confirmed directly from `ProgressPlaceholderScreen.jsx`) — this
+    /// guards against that native-only "Overview" dashboard silently
+    /// reappearing in the read model.
+    func testLandingModelHasNoOverviewOrUnderstandingFields() {
+        let mirror = Mirror(reflecting: TrainingLandingReadModel(
+            title: "", subtitle: nil, tone: .primary,
+            scope: TrainingScopeContext(options: [], dateRangeLabel: ""),
+            latestTrainingDay: nil, trainingAreas: [], reportingLinks: [],
+            trainingDays: [], currentProtocol: TrainingProtocolSummary(sourceOfTruth: "", dailyActivityTarget: "", trainingObjective: "", goal: ""),
+            relatedGoals: [], sourceEvidence: []
+        ))
+        let fieldNames = Set(mirror.children.compactMap(\.label))
+        XCTAssertFalse(fieldNames.contains("trainingOverview"))
+        XCTAssertFalse(fieldNames.contains("trainingUnderstanding"))
+    }
+
+    // MARK: - Scope-control (`TrainingTimelineSelector`) model/state
+
+    /// The default scope is "All Training" / "Complete history" — matching
+    /// `normalizeTrainingContextId`'s own default when no `context` query
+    /// param is present.
+    func testScopeDefaultsToAllTrainingWithCompleteHistoryLabel() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertEqual(landing.scope.options.map(\.id), ["build-lean-mass", "visible-abs", "all"])
+        XCTAssertEqual(landing.scope.options.map(\.label), ["Build Lean Mass", "Visible Abs", "All Training"])
+        let selected = landing.scope.options.filter(\.selected)
+        XCTAssertEqual(selected.map(\.id), ["all"])
+        XCTAssertEqual(landing.scope.dateRangeLabel, "Complete history")
+    }
+
+    // MARK: - Latest Training Day content
+
+    func testLatestTrainingDayShowsBothOfThatDaysSessionsNewestFirst() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let latest = try XCTUnwrap(landing.latestTrainingDay)
+        XCTAssertEqual(latest.date, "2026-08-26")
+        XCTAssertEqual(latest.sessions.map(\.id), ["session-fixture-004", "session-fixture-001"])
+        XCTAssertEqual(latest.daySummary, "Chest · Triceps · Walking")
+    }
+
+    func testEveryLatestDaySessionCarriesATrainingSessionDestination() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let latest = try XCTUnwrap(landing.latestTrainingDay)
+        for session in latest.sessions {
+            guard case .trainingSession(let sessionId) = session.destination else {
+                return XCTFail("Expected a trainingSession destination.")
+            }
+            XCTAssertEqual(sessionId, session.id)
+        }
+    }
+
+    // MARK: - Training Areas / exercise counts
+
+    /// Always the 10 canonical muscle-group categories, in
+    /// `TRAINING_AREA_NAV_GROUPS` order, each with its own resolved count.
+    func testTrainingAreasCoverAllTenCanonicalCategoriesInOrder() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertEqual(
+            landing.trainingAreas.map(\.label),
+            ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Quads", "Hamstrings", "Glutes", "Calves"]
+        )
+    }
+
+    func testTrainingAreaExerciseCountsMatchTheFixturedSessions() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let countsByLabel = Dictionary(uniqueKeysWithValues: landing.trainingAreas.map { ($0.label, $0.exerciseCount) })
+        XCTAssertEqual(countsByLabel["Chest"], 3)
+        XCTAssertEqual(countsByLabel["Back"], 2)
+        XCTAssertEqual(countsByLabel["Shoulders"], 1)
+        XCTAssertEqual(countsByLabel["Triceps"], 1)
+        XCTAssertEqual(countsByLabel["Biceps"], 0)
+    }
+
+    func testEveryTrainingAreaCarriesATrainingExerciseDestination() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        for area in landing.trainingAreas {
+            guard case .trainingExercise(let exerciseId) = area.destination else {
+                return XCTFail("Expected a trainingExercise destination for \(area.label).")
+            }
+            XCTAssertEqual(exerciseId, area.id)
+        }
+    }
+
+    // MARK: - Recent Training History day grouping (list-page shape, unchanged from prior slice)
 
     /// The list page always shows the most recent Training Day first
     /// (`trainingDays[0]` == `latestTrainingDay`,
     /// `ProgressReportingService.js:1162-1169`).
     func testTrainingDaysAreOrderedNewestFirst() async throws {
-        let history = try await api.fetchTrainingHistory()
-        let dates = history.trainingDays.map(\.date)
+        let landing = try await api.fetchTrainingLanding()
+        let dates = landing.trainingDays.map(\.date)
         XCTAssertEqual(dates, dates.sorted(by: >))
     }
 
-    /// A day's own `summary.sessionCount` must agree with the actual
-    /// number of sessions returned for that day — grouping must not silently
-    /// drift between the list-page count and the day-page detail.
-    func testDaySessionCountMatchesActualSessionsForEveryDay() async throws {
-        let history = try await api.fetchTrainingHistory()
-        for daySummary in history.trainingDays {
-            let day = try await api.fetchTrainingDay(date: daySummary.date)
-            let unwrapped = try XCTUnwrap(day, "Every listed training day must resolve.")
-            XCTAssertEqual(unwrapped.summary.sessionCount, unwrapped.sessions.count)
-        }
+    /// `TrainingDayHistoryPreview`/`TrainingHistorySheet` both render
+    /// `getTrainingDaySummary(day.sessions)`, not the day's own (differently
+    /// shaped) `"N session(s)"` summary — every listed day must carry that
+    /// precomputed text, and it must agree with the Latest Training Day
+    /// card's own summary for the same date.
+    func testTrainingDaysSummaryAgreesWithLatestTrainingDayForTheSameDate() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let latest = try XCTUnwrap(landing.latestTrainingDay)
+        let matchingRow = try XCTUnwrap(landing.trainingDays.first { $0.date == latest.date })
+        XCTAssertEqual(matchingRow.summary, latest.daySummary)
     }
 
     /// Exercises both real presentation states this fixture was built to
