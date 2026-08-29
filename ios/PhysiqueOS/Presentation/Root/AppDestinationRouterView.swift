@@ -18,6 +18,13 @@ struct AppDestinationRouterView: View {
             TrainingDayView(date: date)
         case .progressStream(let streamId) where streamId == "training":
             TrainingHistoryView()
+        // Chest is the only Training Area with a real screen this slice —
+        // establishing the pattern, not every area (task-bounded scope).
+        // Every other `.trainingExercise` id (other areas, or an
+        // individual exercise leaf) still honestly falls to
+        // `DestinationPlaceholderView` below.
+        case .trainingExercise(let exerciseId) where exerciseId == "chest":
+            TrainingAreaView(areaId: exerciseId)
         default:
             DestinationPlaceholderView(destination: destination)
         }

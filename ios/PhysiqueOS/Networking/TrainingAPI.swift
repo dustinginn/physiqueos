@@ -9,6 +9,9 @@ protocol TrainingAPI: Sendable {
     func fetchTrainingLanding() async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
+    /// Fixture-backed for `"chest"` only this slice — establishing the
+    /// pattern, not every area (see `TrainingAreaReadModel`).
+    func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel?
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file mirroring the
@@ -27,6 +30,7 @@ struct FixtureTrainingAPI: TrainingAPI {
         var landing: TrainingLandingReadModel
         var days: [TrainingDayReadModel]
         var sessions: [TrainingSessionDetailReadModel]
+        var areas: [TrainingAreaReadModel]
     }
 
     /// Several canonical Training field names are genuinely snake_case in
@@ -61,5 +65,9 @@ struct FixtureTrainingAPI: TrainingAPI {
 
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel? {
         try loadFixture().sessions.first { $0.id == sessionId }
+    }
+
+    func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel? {
+        try loadFixture().areas.first { $0.id == areaId }
     }
 }

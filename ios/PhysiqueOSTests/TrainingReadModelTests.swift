@@ -290,4 +290,132 @@ final class TrainingReadModelTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AppDestination.self, from: json)
         XCTAssertEqual(decoded, .progressStream(streamId: "nutrition"))
     }
+
+    // MARK: - View Training Day CTA resolves to the correct day (Objective 1)
+
+    /// `AppDestinationRouterView` special-cases `.trainingDay(date:)` to the
+    /// real `TrainingDayView` — this guards that "View Training Day →"
+    /// (`latestTrainingDayCard`'s `NavigationLink`) carries a destination
+    /// for the *same date* the card is displaying, not a stale or
+    /// mismatched one.
+    func testViewTrainingDayDestinationResolvesToTheDisplayedDate() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let day = try XCTUnwrap(landing.latestTrainingDay)
+        XCTAssertEqual(day.destination, .trainingDay(date: day.date))
+    }
+
+    func testViewTrainingDayDestinationRoundTripsAndResolvesTheCorrectFixtureDay() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let day = try XCTUnwrap(landing.latestTrainingDay)
+        guard case .trainingDay(let date) = day.destination else {
+            return XCTFail("Expected a trainingDay destination.")
+        }
+        let resolved = try await api.fetchTrainingDay(date: date)
+        XCTAssertEqual(resolved?.date, day.date)
+    }
+
+    // MARK: - Training icon mappings are centrally stable (Objective 2)
+
+    func testTrainingAreaIconMappingMatchesTheVerifiedWebIconVocabulary() {
+        // CircleDot (Chest) is a ring with a small filled center dot;
+        // smallcircle.filled.circle is SF Symbols' literal match — guards
+        // against the previous circle.circle.fill mismatch silently
+        // returning.
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "chest"), "smallcircle.filled.circle")
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "back"), "dumbbell.fill")
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "core"), "shield.fill")
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "glutes"), "flame.fill")
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "quads"), "bolt.fill")
+    }
+
+    func testTrainingAreaIconMappingFailsSafeToDumbbellForAnUnknownArea() {
+        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "not-a-real-area"), "dumbbell.fill")
+    }
+
+    // MARK: - Chest Training Area (Objective 3)
+
+    func testChestAreaDecodesWithoutError() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        XCTAssertEqual(unwrapped.title, "Chest")
+        XCTAssertFalse(unwrapped.exercises.isEmpty)
+    }
+
+    /// `getTrainingLibraryHeaderItems` always resolves to exactly
+    /// `["Training", "Training Library"]` for a bare area path — the
+    /// area's own breadcrumb entry is filtered out because its href equals
+    /// the current route (verified from source, not assumed).
+    func testChestBreadcrumbsAreTrainingThenTrainingLibraryOnly() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        XCTAssertEqual(unwrapped.breadcrumbs.map(\.label), ["Training", "Training Library"])
+    }
+
+    func testChestBreadcrumbsResolveToRealDestinations() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        let training = try XCTUnwrap(unwrapped.breadcrumbs.first { $0.label == "Training" })
+        XCTAssertEqual(training.destination, .progressStream(streamId: "training"))
+    }
+
+    /// Exercise identity/count integrity: every exercise has a unique id,
+    /// a non-empty label, and a `training.exercise` destination carrying
+    /// that same id.
+    func testChestExerciseIdentityAndDestinationsAreConsistent() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        XCTAssertEqual(unwrapped.exercises.map(\.label), ["Bench Press", "Cable Fly", "Push-ups"])
+        XCTAssertEqual(Set(unwrapped.exercises.map(\.id)).count, unwrapped.exercises.count)
+        for exercise in unwrapped.exercises {
+            guard case .trainingExercise(let exerciseId) = exercise.destination else {
+                return XCTFail("Expected a trainingExercise destination for \(exercise.label).")
+            }
+            XCTAssertEqual(exerciseId, exercise.id)
+        }
+    }
+
+    /// Verified, source-confirmed current-web behavior (not a native
+    /// simplification): `formatExerciseSetSummary` reads `set.summary` off
+    /// plain formatted strings, which is always `undefined`, so no detail
+    /// line renders for any exercise on the production Training Library
+    /// page today. Reproduced exactly.
+    func testChestExerciseRowsHaveNoDetailTextMatchingTheCurrentWebBehavior() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        for exercise in unwrapped.exercises {
+            XCTAssertNil(exercise.detail)
+        }
+    }
+
+    // MARK: - Chest navigation from the Training landing page
+
+    func testChestAreaRowOnLandingNavigatesToTheRealChestDestination() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let chestRow = try XCTUnwrap(landing.trainingAreas.first { $0.id == "chest" })
+        XCTAssertEqual(chestRow.destination, .trainingExercise(exerciseId: "chest"))
+    }
+
+    /// Every other Training Area row keeps a correctly-typed
+    /// `training.exercise` destination (real navigation intent) but must
+    /// not resolve to a fixture-backed area screen this slice — only Chest
+    /// does. Guards against silently "implementing" the other nine by
+    /// forgetting to scope `fetchTrainingArea`.
+    func testNonChestAreasHaveTypedDestinationsButNoFixtureBackedArea() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let nonChestAreas = landing.trainingAreas.filter { $0.id != "chest" }
+        XCTAssertFalse(nonChestAreas.isEmpty)
+        for area in nonChestAreas {
+            guard case .trainingExercise(let exerciseId) = area.destination else {
+                return XCTFail("Expected a trainingExercise destination for \(area.label).")
+            }
+            XCTAssertEqual(exerciseId, area.id)
+            let fixtureBacked = try await api.fetchTrainingArea(areaId: area.id)
+            XCTAssertNil(fixtureBacked, "\(area.id) must not be fixture-backed yet — only Chest is this slice.")
+        }
+    }
+
+    func testUnknownAreaResolvesToNilRatherThanCrashing() async throws {
+        let area = try await api.fetchTrainingArea(areaId: "not-a-real-area")
+        XCTAssertNil(area)
+    }
 }

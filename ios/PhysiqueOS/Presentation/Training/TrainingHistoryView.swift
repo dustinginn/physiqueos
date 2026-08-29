@@ -43,8 +43,13 @@ struct TrainingHistoryView: View {
                 Button {
                     dismiss()
                 } label: {
+                    // `ArrowLeft` (lucide) — a straight arrow, not a chevron
+                    // — is the literal icon `ProgressPlaceholderScreen.jsx`'s
+                    // own back link uses; `arrow.left` is the faithful SF
+                    // Symbol match (verified against source, corrected from
+                    // a prior `chevron.left` mismatch).
                     HStack(spacing: 6) {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: "arrow.left")
                             .font(.system(size: 13, weight: .semibold))
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
@@ -108,42 +113,75 @@ struct TrainingHistoryView: View {
 
     // MARK: - Latest Training Day
 
+    /// The web's card is a single inert `&lt;details&gt;`/`&lt;summary&gt;`
+    /// disclosure — "View Training Day →" is static affordance text with no
+    /// `href` anywhere in `LatestTrainingDayCard`
+    /// (`ProgressPlaceholderScreen.jsx:724-758`), confirmed by reading the
+    /// JSX directly. This is an explicitly approved Native V1 deviation
+    /// (Founder decision, this slice): the inline expand/collapse — which
+    /// the Founder likes and this preserves unchanged — and "View Training
+    /// Day →" are split into two independent controls. The label/day-summary
+    /// text stays the disclosure toggle; "View Training Day →" becomes its
+    /// own `NavigationLink` to the same `day.destination` every other
+    /// Training Day link already uses (`.trainingDay(date:)`) — no second
+    /// route model, no duplicated day data.
     private func latestTrainingDayCard(_ day: TrainingLandingDay?) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Latest Training Day")
                 if let day {
-                    TrainingDisclosureRow(isExpanded: $isLatestDayExpanded) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(day.label)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            if let daySummary = day.daySummary {
-                                Text(daySummary)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { isLatestDayExpanded.toggle() }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(day.label)
+                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                if let daySummary = day.daySummary {
+                                    Text(daySummary)
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityValue(isLatestDayExpanded ? "Expanded" : "Collapsed")
+
+                        NavigationLink(value: day.destination) {
                             Text("View Training Day →")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.accent)
-                                .padding(.top, 2)
+                                .padding(.top, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
-                    } expanded: {
-                        VStack(spacing: 8) {
-                            ForEach(day.sessions) { session in
-                                NavigationLink(value: session.destination) {
-                                    TrainingRecordPreviewRow(
-                                        label: session.label,
-                                        detail: session.detail,
-                                        value: session.value,
-                                        date: session.date,
-                                        sourceEvidence: session.sourceEvidence
-                                    )
+                        .buttonStyle(.plain)
+
+                        if isLatestDayExpanded {
+                            VStack(spacing: 8) {
+                                ForEach(day.sessions) { session in
+                                    NavigationLink(value: session.destination) {
+                                        TrainingRecordPreviewRow(
+                                            label: session.label,
+                                            detail: session.detail,
+                                            value: session.value,
+                                            date: session.date,
+                                            sourceEvidence: session.sourceEvidence
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(.top, 12)
                         }
                     }
+                    .padding(12)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Text("Upload or enter a workout to begin building your training history.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -182,13 +220,22 @@ struct TrainingHistoryView: View {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Reporting")
                 TrainingDisclosureRow(isExpanded: $isReportingExpanded) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Review trends and summaries")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text("Resistance, cardio, volume, frequency, and consistency.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Review trends and summaries")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text("Resistance, cardio, volume, frequency, and consistency.")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                        Spacer(minLength: 8)
+                        // `ReportingLinks`'s compact `&lt;summary&gt;` carries
+                        // its own trailing "&gt;" (`ProgressPlaceholderScreen.jsx`'s
+                        // `ReportingLinks` compact mode) — previously missing here.
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(PhysiqueOSTheme.accent)
                     }
                 } expanded: {
                     VStack(spacing: 8) {
@@ -343,7 +390,8 @@ private struct TrainingHistorySheet: View {
 /// Mirrors `SectionHeader` (`DeepPagePrimitives.jsx`): a bold title with an
 /// optional trailing action link — visually distinct from the small
 /// uppercase `SectionHeading` eyebrow style used on Home/Log cards.
-private struct TrainingSectionHeaderView<Action: View>: View {
+/// Internal (not `private`): also reused by `TrainingAreaView`.
+struct TrainingSectionHeaderView<Action: View>: View {
     let title: String
     @ViewBuilder var action: Action
 
@@ -363,13 +411,25 @@ private struct TrainingSectionHeaderView<Action: View>: View {
     }
 }
 
+/// Mirrors `CompactAction` (`DeepPagePrimitives.jsx:7-18`) and
+/// `TrainingHistorySheet.jsx`'s own "Show All &gt;" trigger literally: both
+/// render `{label} &gt;`, a plain greater-than character — not an arrow.
+/// "View Training Day →" (`latestTrainingDayCard`) is a different, genuine
+/// web string that really does use "→" and is left as-is; this label was
+/// previously (incorrectly) unified with that one.
 private struct TrainingCompactActionLabel: View {
     let label: String
 
     var body: some View {
-        Text("\(label) →")
+        Text("\(label) >")
             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             .foregroundStyle(PhysiqueOSTheme.accent)
+            // A plain `Text` with no opaque background only hit-tests its
+            // rendered glyphs by default — `contentShape` makes the whole
+            // frame (including inter-glyph gaps) tappable, matching the
+            // real touch target every other row-styled control gets for
+            // free from its `.background(...)` fill.
+            .contentShape(Rectangle())
     }
 }
 
@@ -396,6 +456,7 @@ private struct TrainingDisclosureRow<Summary: View, Expanded: View>: View {
             } label: {
                 summary
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(.isButton)
@@ -494,12 +555,19 @@ private struct TrainingAreaRow: View {
 }
 
 /// `getTrainingAreaIcon` (`ProgressPlaceholderScreen.jsx:1041-1056`) —
-/// documented best SF Symbol equivalents of the web's lucide icons per
-/// area, not pixel-exact ports.
-private enum TrainingAreaIcon {
+/// verified against the exact lucide icon per area, then mapped to the
+/// closest faithful SF Symbol equivalent (not a generic fitness-icon
+/// guess). `Dumbbell`→`dumbbell.fill`, `Activity`→`waveform.path.ecg`,
+/// `Shield`→`shield.fill`, `Flame`→`flame.fill`, and `Zap`→`bolt.fill` are
+/// all direct concept matches. `CircleDot` (Chest) is a ring with a small
+/// filled center dot — `smallcircle.filled.circle` is SF Symbols' own
+/// literal equivalent of that exact shape; the previously-shipped
+/// `circle.circle.fill` (concentric filled circles) was a mismatch,
+/// corrected here.
+enum TrainingAreaIcon {
     static func systemImage(for areaId: String) -> String {
         switch areaId {
-        case "chest": "circle.circle.fill" // CircleDot
+        case "chest": "smallcircle.filled.circle" // CircleDot
         case "back", "biceps", "triceps": "dumbbell.fill" // Dumbbell
         case "shoulders", "hamstrings": "waveform.path.ecg" // Activity
         case "core": "shield.fill" // Shield
@@ -563,8 +631,9 @@ private struct TrainingProtocolRow: View {
 /// accurate but inert snapshot of the current scope: switching pills on
 /// the web re-fetches a differently date-windowed report, which this
 /// fixture-only slice has no second scoped dataset to honestly back yet —
-/// see the final report's noted deviation.
-private struct TrainingScopeSelectorView: View {
+/// see the final report's noted deviation. Internal (not `private`): every
+/// Training Library page (Chest included) shows this same selector.
+struct TrainingScopeSelectorView: View {
     let scope: TrainingScopeContext
 
     var body: some View {

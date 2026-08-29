@@ -185,6 +185,57 @@ struct TrainingDaySummary: Codable, Equatable, Identifiable {
     var id: String { date }
 }
 
+// MARK: - Training Area (`/progress/training/library/:areaId`)
+//
+// Mirrors `TrainingKnowledgeScreen.jsx`'s `mode="library"` render path for
+// a single muscle-group area (`getLibraryContent` → `getFlatTrainingNavigationChildren`,
+// verified directly from source, not inferred from the landing page's
+// Training Areas card): a breadcrumb-headed page titled with the area name,
+// the same scope selector every Training page shows, and one "Browse" card
+// listing every canonical exercise resolved to that area. Establishing the
+// pattern for Chest here is meant to generalize to the other nine areas —
+// this struct is not Chest-specific.
+
+struct TrainingAreaReadModel: Codable, Equatable {
+    var id: String
+    var title: String
+    /// `getTrainingLibraryHeaderItems` (`TrainingKnowledgeScreen.jsx:222-254`)
+    /// — for a bare area path this is always exactly `["Training", "Training
+    /// Library"]`; the area's own breadcrumb entry is filtered out because
+    /// its `href` equals the current route (verified from source).
+    var breadcrumbs: [TrainingBreadcrumb]
+    var scope: TrainingScopeContext
+    var exercises: [TrainingAreaExerciseRow]
+}
+
+struct TrainingBreadcrumb: Codable, Equatable, Identifiable {
+    var label: String
+    var destination: AppDestination
+
+    var id: String { label }
+}
+
+/// `getFlatTrainingNavigationChildren`'s per-exercise row
+/// (`TrainingKnowledgeScreen.jsx:1030-1048`). `detail` is modeled as
+/// optional and, in this fixture, always absent — verified against
+/// source: `formatExerciseSetSummary` (`TrainingKnowledgeScreen.jsx:1743-1747`)
+/// reads `set.summary` off each grouped-set entry, but `groupExerciseSets`
+/// (`ProgressReportingService.js:2253-2295`) actually produces plain
+/// formatted strings ("3 x 8 @ 135 lb"), not objects with a `.summary`
+/// property — so `set.summary` is `undefined` for every set today,
+/// `.filter(Boolean)` drops all of them, and the resulting `""` is falsy in
+/// `InformationListItem`'s `{detail && (...)}` guard
+/// (`DeepPagePrimitives.jsx:124-141`), so no detail line renders on the
+/// current production Training Library page for any exercise, in any area.
+/// Reproduced exactly here rather than "fixed" — see this slice's Native
+/// V1 doc entry and final report.
+struct TrainingAreaExerciseRow: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var detail: String?
+    var destination: AppDestination
+}
+
 // MARK: - Training Day (`/progress/training/day/:date`)
 
 /// `TrainingReadService.getDay`'s projection — distinct field names from

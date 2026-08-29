@@ -316,5 +316,43 @@
       "exercises": [],
       "exerciseRelationshipGroups": []
     }
+  ],
+  "areas": [
+    {
+      "id": "chest",
+      "title": "Chest",
+      "breadcrumbs": [
+        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
+        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+      ],
+      "scope": {
+        "options": [
+          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
+          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+          { "id": "all", "label": "All Training", "selected": true }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": [
+        {
+          "id": "bench-press",
+          "label": "Bench Press",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "bench-press" } }
+        },
+        {
+          "id": "cable-fly",
+          "label": "Cable Fly",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "cable-fly" } }
+        },
+        {
+          "id": "push-ups",
+          "label": "Push-ups",
+          "detail": null,
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "push-ups" } }
+        }
+      ]
+    }
   ]
 }

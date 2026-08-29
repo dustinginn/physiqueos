@@ -92,6 +92,8 @@ app_files = [
     ("Presentation/Training", "TrainingDayViewModel.swift"),
     ("Presentation/Training", "TrainingSessionDetailView.swift"),
     ("Presentation/Training", "TrainingSessionDetailViewModel.swift"),
+    ("Presentation/Training", "TrainingAreaView.swift"),
+    ("Presentation/Training", "TrainingAreaViewModel.swift"),
 ]
 
 # Non-Swift app-target resources (group path -> filename) — copied into the
