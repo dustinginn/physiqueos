@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import { getProductionTrainingNavigationReadService } from "../../../../../application/composition/productionApplicationComposition";
 import { buildTrainingSessionNavigation } from "../../../../../navigation/navigationRegistry";
 import {
   getTrainingRootHref,
@@ -16,11 +15,8 @@ export default async function TrainingSessionPage({ params, searchParams }) {
   const { sessionId } = await params;
   const query = await searchParams;
   const requestedSessionId = decodeRouteParam(sessionId);
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
-  });
-  const report = await service.getPlaceholderReport("training");
-  const session = findTrainingSessionByRouteId(report, requestedSessionId);
+  const service = getProductionTrainingNavigationReadService();
+  const session = await service.getSession({ sessionId: requestedSessionId });
 
   if (!session) notFound();
 
@@ -47,25 +43,9 @@ export default async function TrainingSessionPage({ params, searchParams }) {
         ),
         parentRoute: returnHref,
       }}
-      report={report}
       session={session}
       trainingHref={getTrainingRootHref(query?.context)}
     />
-  );
-}
-
-function findTrainingSessionByRouteId(report = {}, routeId) {
-  const sessions = [
-    ...(report.entries ?? []),
-    ...(report.trainingDays ?? []).flatMap((day) => day.sessions ?? []),
-  ];
-
-  return sessions.find((session) =>
-    [
-      session.id,
-      session.canonicalId,
-      ...(session.aliases ?? []),
-    ].some((candidate) => String(candidate) === String(routeId))
   );
 }
 

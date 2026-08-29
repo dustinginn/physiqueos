@@ -6,26 +6,23 @@ import TrainingTimelineSelector from "../../../../../components/training/Trainin
 import TrainingKnowledgeScreen, {
   getTrainingLibraryExercisePresentation,
 } from "../../../../../screens/TrainingKnowledgeScreen";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
 import { resolveTrainingExerciseIdentity } from "../../../../../domain/models/trainingExerciseIdentity";
-import { createTrainingLibraryExerciseRecordsReadModel } from "../../../../../domain/services/TrainingLibraryExerciseRecordsService";
 import { createTrainingLibraryMetadata } from "../../../../../presentation/trainingExercisePresentation";
+import { getProductionTrainingNavigationReadService } from "../../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params, searchParams }) {
+export async function generateMetadata({ params }) {
   const { path = [] } = await params;
-  const { context } = await searchParams;
   const exerciseSlug = path.length >= 2 && path[0] !== "cardio"
     ? path.at(-1)
     : null;
 
   if (!exerciseSlug) return { title: "Training Library | PhysiqueOS" };
 
-  const { report } = await getTrainingTimelineReport({ context });
   const presentation = getTrainingLibraryExercisePresentation({
     exerciseSlug,
-    report,
+    report: { trainingDays: [] },
   });
 
   return createTrainingLibraryMetadata(presentation);
@@ -40,19 +37,20 @@ export default async function TrainingLibraryPage({ params, searchParams }) {
     redirect(withTrainingTimelineContext(legacyRedirect, context));
   }
 
-  const { report, timeline } = await getTrainingTimelineReport({ context });
   const exerciseIdentity =
     path.length >= 2 && path[0] !== "cardio"
       ? resolveTrainingExerciseIdentity(path.at(-1))
       : null;
-  const trainingPerformanceEvents = exerciseIdentity?.canonicalExerciseId
-    ? await FounderRepositories.trainingPerformanceEvents
-      .listTrainingPerformanceEvents()
-    : [];
-  const exerciseRecords = createTrainingLibraryExerciseRecordsReadModel({
-    canonicalExerciseId: exerciseIdentity?.canonicalExerciseId,
-    events: trainingPerformanceEvents,
-  });
+  const narrowExercise = exerciseIdentity?.canonicalExerciseId
+    ? await getProductionTrainingNavigationReadService().getExercise({
+        context,
+        exerciseSlug: path.at(-1),
+      })
+    : null;
+  const { report, timeline, exerciseRecords } = narrowExercise ?? {
+    ...(await getTrainingTimelineReport({ context })),
+    exerciseRecords: null,
+  };
   const baseNavigation = buildTrainingLibraryNavigation(path);
   const currentPath = baseNavigation.route;
   const returnTo = withTrainingTimelineContext(currentPath, timeline.contextId);

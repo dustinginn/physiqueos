@@ -27,11 +27,11 @@ export function createTrainingReadService({ repositories } = {}) {
       if (!isValidDateKey(date)) return null;
       const user = await repositories.users?.getUserById?.(actor.userId);
       const resolvedTimeZone = resolveLocalTimeZone(timeZone ?? user?.timezone);
-      const sessions = (await listSessions(repositories, actor.userId))
-        .filter((record) => sessionLocalDate(record, resolvedTimeZone) === date)
-        .sort(compareDaySessions)
-        .map(projectSessionSummary);
-      return projectTrainingDay({ date, sessions, timeZone: resolvedTimeZone });
+      return createTrainingDayReadModel({
+        canonicalEvidenceObjects: await repositories.canonicalEvidence.listCanonicalEvidenceObjects(actor.userId),
+        date,
+        timeZone: resolvedTimeZone,
+      });
     },
     async getExerciseLibrary({ principal, query = "", limit = 50 } = {}) {
       requireAuthenticationPrincipal(principal);
@@ -74,6 +74,21 @@ export function createTrainingReadService({ repositories } = {}) {
       });
     },
   });
+}
+
+export function createTrainingDayReadModel({
+  canonicalEvidenceObjects = [],
+  date,
+  timeZone = null,
+} = {}) {
+  if (!isValidDateKey(date)) return null;
+  const resolvedTimeZone = resolveLocalTimeZone(timeZone);
+  const sessions = canonicalEvidenceObjects
+    .filter(isActiveCanonicalTrainingSession)
+    .filter((record) => sessionLocalDate(record, resolvedTimeZone) === date)
+    .sort(compareDaySessions)
+    .map(projectSessionSummary);
+  return projectTrainingDay({ date, sessions, timeZone: resolvedTimeZone });
 }
 
 async function listSessions(repositories, userId) {

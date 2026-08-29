@@ -13,6 +13,7 @@ export default defineConfig({
       "src/contracts/v1/mediaIdentifiers.test.js",
       "src/application/commands/CanonicalPersistenceCommandPorts.test.js",
       "src/platform/database/phase4PersistenceSecurity.test.js",
+      "src/platform/database/PostgresTrainingNavigationReadStore.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

@@ -1,6 +1,4 @@
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createInactiveLegacyWebContext } from "../../../../../application/auth/legacyWebContext";
-import { createTrainingReadService } from "../../../../../application/training/TrainingReadService";
+import { getProductionTrainingNavigationReadService } from "../../../../../application/composition/productionApplicationComposition";
 import {
   getTrainingRootHref,
   normalizeTrainingContextId,
@@ -14,12 +12,9 @@ export default async function TrainingDayPage({ params, searchParams }) {
   const { date } = await params;
   const query = await searchParams;
   const contextId = normalizeTrainingContextId(query?.context);
-  const webContext = await createInactiveLegacyWebContext({ repositories: FounderRepositories });
-  const service = createTrainingReadService({ repositories: FounderRepositories });
+  const service = getProductionTrainingNavigationReadService();
   const day = await service.getDay({
-    principal: webContext.principal,
     date: String(date ?? ""),
-    timeZone: webContext.user.timezone,
   });
 
   if (!day) {

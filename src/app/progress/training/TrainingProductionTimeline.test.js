@@ -29,7 +29,8 @@ describe("production Training timeline port", () => {
     expect(session).toContain("correctionNavigation");
     expect(session).toContain("getTrainingRootHref(query?.context)");
     expect(session).not.toContain("TrainingTimelineSelector");
-    expect(session).toContain('getPlaceholderReport("training")');
+    expect(session).toContain("getProductionTrainingNavigationReadService");
+    expect(session).not.toContain("getPlaceholderReport");
   });
 
   it(

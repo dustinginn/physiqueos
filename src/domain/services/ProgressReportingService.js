@@ -1168,6 +1168,24 @@ function getTrainingDays(records = []) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export function createTrainingNavigationReport({
+  canonicalEvidenceObjects = [],
+  evidencePackages = [],
+  dateWindow = null,
+} = {}) {
+  const payloads = getCanonicalPayloads({ canonicalEvidenceObjects, evidencePackages });
+  const trainingSessions = payloads
+    .filter(isTrainingSession)
+    .filter((session) => !dateWindow || isInsideDateWindow(session.observed_at, dateWindow));
+  const entries = getTrainingRecords({
+    trainingSessions: sortByDate(trainingSessions, "observed_at"),
+  });
+  return Object.freeze({
+    entries: Object.freeze(entries),
+    trainingDays: Object.freeze(getTrainingDays(entries)),
+  });
+}
+
 function getActivityDayRecords(context = {}) {
   return (context.activityDays ?? [])
     .map(createActivityDayRecord)
