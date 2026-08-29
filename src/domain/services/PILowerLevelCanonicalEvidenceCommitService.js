@@ -447,13 +447,16 @@ function stampPendingSourceCommits(store, commitId) {
     "piEnergyConfidenceWorkItems",
     "piTrainingConfidenceWorkItems",
   ]) {
-    for (const work of store[collection] ?? []) {
-      work.sourceCommitLinks = (work.sourceCommitLinks ?? []).map((link) =>
+    store[collection] = (store[collection] ?? []).map((work) => {
+      const sourceCommitLinks = (work.sourceCommitLinks ?? []).map((link) =>
         link.commitId === "pending_source_commit"
           ? { ...link, commitId }
           : link
       );
-    }
+      return sourceCommitLinks.some((link, index) =>
+        link !== work.sourceCommitLinks?.[index]
+      ) ? { ...work, sourceCommitLinks } : work;
+    });
   }
 }
 function sourceResult(outcome, reconciliation, enqueueResults, values = {}) {

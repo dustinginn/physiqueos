@@ -10,6 +10,10 @@ import {
 import { FOUNDATION_SOURCE_COLLECTIONS } from "../migration/foundationSourceCollections.js";
 import { loadCanonicalRuntime } from "../migration/phase4CanonicalImport.js";
 import { assertKnownPhase4Collection } from "../migration/phase4DomainCollections.js";
+import {
+  createShallowWritableFounderRuntime,
+  detachBoundedFounderCollections,
+} from "./BoundedFounderRuntimeMutation.js";
 
 const GUARDED_COMPATIBILITY_DATABASE = /^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/;
 const TARGETED_EVIDENCE_REVIEW_METHODS = new Set([
@@ -275,7 +279,9 @@ export async function executePostgresFounderRuntimeMutation({
       query: (text, values) => client.query(text, values),
       ownerUserId,
     });
-    const runtime = bounded ? loadedRuntime : mutableRuntime(loadedRuntime);
+    const runtime = bounded
+      ? createShallowWritableFounderRuntime(loadedRuntime)
+      : mutableRuntime(loadedRuntime);
     if (expectedRuntime && canonicalJson(runtime) !== canonicalJson(expectedRuntime)) {
       throw Object.assign(new Error("Canonical runtime changed before the command acquired its transaction lock."), {
         code: "FOUNDER_STORE_REVISION_CONFLICT",
@@ -287,6 +293,9 @@ export async function executePostgresFounderRuntimeMutation({
     const beforeContext = bounded
       ? snapshotApplicationContextDigest(runtime)
       : snapshotApplicationContext(runtime);
+    const detachedCollectionCount = bounded
+      ? detachBoundedFounderCollections(runtime, allowedCollections)
+      : 0;
     const result = await mutate(runtime, { client, commandId });
     const changed = bounded
       ? changedCollectionDigests(before, runtime)
@@ -322,6 +331,7 @@ export async function executePostgresFounderRuntimeMutation({
             runtimeCloneCount: bounded ? 0 : 1,
             fullRuntimeSerializationCount: expectedRuntime ? 2 : 0,
             collectionSnapshotMode: bounded ? "digest" : "canonical_json",
+            boundedCollectionCloneCount: detachedCollectionCount,
           }),
         })
       : clonedResult;

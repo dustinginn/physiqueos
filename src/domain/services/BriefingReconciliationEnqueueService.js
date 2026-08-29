@@ -111,18 +111,28 @@ export function createBriefingReconciliationEnqueueService({
 
     stampSourceCommit(candidate, commitId) {
       if (!commitId) return;
-      for (const item of candidate.briefingReconciliationWorkItems ?? []) {
-        item.sourceCommitLinks = (item.sourceCommitLinks ?? []).map((link) =>
+      candidate.briefingReconciliationWorkItems =
+        (candidate.briefingReconciliationWorkItems ?? []).map((item) => {
+        const sourceCommitLinks = (item.sourceCommitLinks ?? []).map((link) =>
           link === PENDING_COMMIT_ID ? commitId : link
         );
-        item.affectedDependencies = (item.affectedDependencies ?? [])
+        const affectedDependencies = (item.affectedDependencies ?? [])
           .map((dependency) => ({
             ...dependency,
             sourceLinkage: dependency.sourceLinkage?.commitId === PENDING_COMMIT_ID
               ? { ...dependency.sourceLinkage, commitId }
               : dependency.sourceLinkage,
           }));
-      }
+        const changed = sourceCommitLinks.some((link, index) =>
+          link !== item.sourceCommitLinks?.[index]
+        ) || affectedDependencies.some((dependency, index) =>
+          dependency.sourceLinkage !== item.affectedDependencies?.[index]
+            ?.sourceLinkage
+        );
+        return changed
+          ? { ...item, sourceCommitLinks, affectedDependencies }
+          : item;
+      });
     },
   });
 }

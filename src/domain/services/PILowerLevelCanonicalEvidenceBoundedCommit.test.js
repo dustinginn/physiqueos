@@ -3,6 +3,10 @@ import {
   createPILowerLevelCanonicalEvidenceCommitService,
   PILowerLevelSourceCommitOutcome,
 } from "./PILowerLevelCanonicalEvidenceCommitService";
+import {
+  createShallowWritableFounderRuntime,
+  detachBoundedFounderCollections,
+} from "../../platform/database/BoundedFounderRuntimeMutation.js";
 
 describe("provider-bounded lower-level canonical evidence commit", () => {
   it.each([
@@ -71,6 +75,35 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
     expect(fixture.store).toEqual(before);
   });
 
+  it("does not mutate aliased baseline collections or nested work items", async () => {
+    const fixture = boundedFixture({
+      seedPendingWork: true,
+      preserveLoadedRuntime: true,
+    });
+    const service = createPILowerLevelCanonicalEvidenceCommitService({
+      mutateCanonicalRuntime: fixture.mutateCanonicalRuntime,
+      enableEnergyConfidenceEnqueue: false,
+    });
+
+    const result = await service.commitConfirmedEvidencePackage(
+      evidencePackage(evidence("training", { exercises: [] })),
+      "user_founder_001"
+    );
+
+    expect(result.committed).toBe(true);
+    expect(Object.isFrozen(fixture.loadedRuntime)).toBe(true);
+    expect(fixture.loadedRuntime.evidencePackages).toHaveLength(0);
+    expect(fixture.loadedRuntime.canonicalEvidenceObjects).toHaveLength(0);
+    expect(fixture.loadedRuntime.piTrainingConfidenceWorkItems[0]
+      .sourceCommitLinks[0].commitId).toBe("pending_source_commit");
+    expect(fixture.loadedRuntime.briefingReconciliationWorkItems[0]
+      .sourceCommitLinks[0]).toBe("pending_source_commit");
+    expect(fixture.store.piTrainingConfidenceWorkItems[0]
+      .sourceCommitLinks[0].commitId).toBe("bounded-commit-1");
+    expect(fixture.store.briefingReconciliationWorkItems[0]
+      .sourceCommitLinks[0]).toBe("bounded-commit-1");
+  });
+
   it("keeps a Founder-scale unrelated payload outside the canonical commit result graph", async () => {
     const fixture = boundedFixture();
     fixture.store.unrelatedLargeReadProjection = Array.from(
@@ -94,6 +127,7 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
       runtimeCloneCount: 0,
       fullRuntimeSerializationCount: 0,
       collectionSnapshotMode: "digest",
+      boundedCollectionCloneCount: 6,
     });
     expect(result).not.toHaveProperty("runtime");
     expect(result).not.toHaveProperty("candidate");
@@ -101,7 +135,11 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
   });
 });
 
-function boundedFixture({ failBeforePublish = false } = {}) {
+function boundedFixture({
+  failBeforePublish = false,
+  preserveLoadedRuntime = false,
+  seedPendingWork = false,
+} = {}) {
   const fixture = {
     calls: 0,
     store: {
@@ -110,14 +148,29 @@ function boundedFixture({ failBeforePublish = false } = {}) {
       canonicalExerciseLibrary: [],
       canonicalEvidenceObjects: [],
       piEnergyConfidenceWorkItems: [],
-      piTrainingConfidenceWorkItems: [],
-      briefingReconciliationWorkItems: [],
+      piTrainingConfidenceWorkItems: seedPendingWork ? [{
+        id: "training-work-existing",
+        sourceCommitLinks: [{ commitId: "pending_source_commit" }],
+      }] : [],
+      briefingReconciliationWorkItems: seedPendingWork ? [{
+        id: "briefing-work-existing",
+        sourceCommitLinks: ["pending_source_commit"],
+        affectedDependencies: [{
+          sourceLinkage: { commitId: "pending_source_commit" },
+        }],
+      }] : [],
       dailyBriefings: [],
     },
   };
   fixture.mutateCanonicalRuntime = async (input) => {
     fixture.calls += 1;
-    const candidate = structuredClone(fixture.store);
+    const loadedRuntime = Object.freeze({ ...fixture.store });
+    if (preserveLoadedRuntime) fixture.loadedRuntime = loadedRuntime;
+    const candidate = createShallowWritableFounderRuntime(loadedRuntime);
+    const boundedCollectionCloneCount = detachBoundedFounderCollections(
+      candidate,
+      input.allowedCollections
+    );
     const commitId = `bounded-commit-${fixture.calls}`;
     const result = await input.mutate(candidate, { commandId: commitId });
     if (failBeforePublish) throw new Error("injected transaction rollback");
@@ -135,6 +188,7 @@ function boundedFixture({ failBeforePublish = false } = {}) {
         runtimeCloneCount: 0,
         fullRuntimeSerializationCount: 0,
         collectionSnapshotMode: "digest",
+        boundedCollectionCloneCount,
       },
     };
   };

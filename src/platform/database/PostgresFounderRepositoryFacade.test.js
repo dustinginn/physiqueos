@@ -121,7 +121,7 @@ describe("PostgreSQL Founder repository facade", () => {
     expect(database.metadata.revision).toBe(5004);
   });
 
-  it("executes a bounded canonical commit with one runtime load and digest-only snapshots", async () => {
+  it("executes a bounded canonical commit through a writable shell over the frozen loaded runtime", async () => {
     const database = fakeDatabase();
     const receipt = await executePostgresFounderRuntimeMutation({
       pool: database.pool,
@@ -140,12 +140,13 @@ describe("PostgreSQL Founder repository facade", () => {
       allowedCollections: ["canonicalEvidenceObjects"],
       allowApplicationContextMutation: false,
       mutate(runtime) {
-        runtime.canonicalEvidenceObjects.push({
+        expect(Object.isFrozen(runtime)).toBe(false);
+        runtime.canonicalEvidenceObjects = [...runtime.canonicalEvidenceObjects, {
           canonicalId: "training|2026-08-26|bounded",
           evidence_type: "training",
           quality: { status: "active" },
           userId: PHASE5_SYNTHETIC_OWNER_ID,
-        });
+        }];
         return { accepted: true };
       },
     });
@@ -160,6 +161,7 @@ describe("PostgreSQL Founder repository facade", () => {
         runtimeCloneCount: 0,
         fullRuntimeSerializationCount: 0,
         collectionSnapshotMode: "digest",
+        boundedCollectionCloneCount: 1,
       },
     });
     expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
