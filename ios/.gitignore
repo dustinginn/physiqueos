@@ -1,0 +1,12 @@
+# Xcode user/local state - never shared project configuration.
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Build products and local tooling caches.
+build/
+DerivedData/
+*.dSYM/
+*.ipa
+
+.DS_Store
