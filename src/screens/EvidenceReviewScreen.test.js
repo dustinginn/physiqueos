@@ -134,6 +134,14 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).not.toContain(">Daily total:");
   });
 
+  it("reserves Nutrition conflict copy for the true duplicate-active invariant", () => {
+    expect(screen).toContain('dispositionStatus !== "already_committed"');
+    expect(screen).toContain('status === "blocked_duplicate_active_days"');
+    expect(screen).toContain("Saving is paused because this date has conflicting active Nutrition records.");
+    expect(screen).toContain("This Nutrition Day is ready to save with the selected update.");
+    expect(screen).not.toMatch(/status === "already_committed"[\s\S]{0,400}conflicting active Nutrition records/);
+  });
+
   it("preserves save-for-later, discard, and reprocessing controls", () => {
     expect(screen).toContain("Save and return later");
     expect(screen).toContain("Discard review");

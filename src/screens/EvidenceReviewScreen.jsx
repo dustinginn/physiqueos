@@ -224,7 +224,9 @@ function EvidenceCard({ canEdit, dexaMeasurementsAction, exerciseRelationshipAct
         <RecordedStrengthSetDetails exercises={item.strengthSetDetails} />
       )}
 
-      {item.type === "nutrition" && item.object.reconciliation?.nutrition?.targetCanonicalId && (
+      {item.type === "nutrition" &&
+        item.object.reconciliation?.nutrition?.targetCanonicalId &&
+        item.object.reconciliation?.nutrition?.dispositionStatus !== "already_committed" && (
         <NutritionReplacementControl
           canEdit={canEdit && item.included}
           disposition={nutritionDisposition}
@@ -517,8 +519,10 @@ function NutritionReplacementControl({ canEdit, disposition, onChange, relations
           <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 text-sm font-bold text-[var(--text-primary)]"><input checked={disposition === "replace"} name={`nutrition-${relationship.logicalDayKey}`} onChange={() => onChange("replace")} type="radio"/>Replace existing</label>
           <label className="flex min-h-11 items-center gap-3 rounded-xl bg-white px-3 text-sm font-bold text-[var(--text-primary)]"><input checked={disposition === "additive"} name={`nutrition-${relationship.logicalDayKey}`} onChange={() => onChange("additive")} type="radio"/>Add as a distinct meal</label>
         </fieldset>
-      ) : (
+      ) : status === "blocked_duplicate_active_days" ? (
         <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">Saving is paused because this date has conflicting active Nutrition records.</p>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-[var(--primary)]">This Nutrition Day is ready to save with the selected update.</p>
       )}
     </section>
   );

@@ -128,6 +128,26 @@ export function prepareNutritionEvidencePackageForReview({
           targetCanonicalId: existing.canonicalId,
         });
       }
+      if (isExactAcceptedSourceReplay({
+        evidenceObject: object,
+        evidencePackage,
+        existingObject: existing,
+        reviewId,
+      })) {
+        return withNutritionReconciliation(object, {
+          disposition: null,
+          dispositionStatus: "already_committed",
+          existingPreview: null,
+          expectedPriorSemanticFingerprint:
+            getCanonicalNutritionSemanticFingerprint(existing),
+          logicalDayKey: getNutritionDayLogicalKey(object),
+          newPreview: null,
+          projectedPreview: null,
+          replacementScope: null,
+          sourceReviewId: reviewId,
+          targetCanonicalId: existing.canonicalId,
+        });
+      }
       const assessment = assessNutritionDisposition({
         existingPayload: existing.payload,
         incomingPayload: object,
@@ -351,12 +371,24 @@ export function createCanonicalNutritionDayRecord({
   };
 }
 
-function isExactAcceptedSourceReplay({ evidenceObject, evidencePackage, existingObject }) {
+export function isExactAcceptedSourceReplay({
+  evidenceObject,
+  evidencePackage,
+  existingObject,
+  reviewId = null,
+}) {
   const packageId = evidencePackage?.package_id ?? evidencePackage?.id;
   if (!packageId || !(existingObject.provenance?.evidence_package_ids ?? [])
     .includes(packageId)) return false;
   if (!(existingObject.provenance?.contributing_evidence_object_ids ?? [])
     .includes(evidenceObject.id)) return false;
+  const expectedReviewId = reviewId ??
+    evidenceObject.reconciliation?.nutrition?.sourceReviewId ??
+    evidencePackage?.review_metadata?.sourceReviewId ?? null;
+  if (expectedReviewId &&
+    existingObject.nutritionRevision?.sourceReviewId !== expectedReviewId &&
+    !(existingObject.provenance?.evidence_review_ids ?? [])
+      .includes(expectedReviewId)) return false;
   return createNutritionSemanticFingerprint(evidenceObject, {
     replacementScope:
       existingObject.nutritionRevision?.replacementScope ?? "legacy_active_day",

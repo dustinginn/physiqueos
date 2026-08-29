@@ -233,6 +233,84 @@ describe("canonical NutritionDay revision semantics", () => {
       .diagnostics[0].code).toBe("NUTRITION_ACTIVE_DAY_DUPLICATE");
   });
 
+  it("recognizes the exact committed review source on post-commit reentry", () => {
+    const packageId = "evidence_submission_20260829050904908_images";
+    const reviewId = "evidence_review_20260829051041150";
+    const objectId = "nutrition_2026-08-28_0";
+    const incidentDate = "2026-08-28";
+    const incoming = fullDayPackage(packageId, objectId, 703, 2350);
+    incoming.evidence_objects[0].observed_at = incidentDate;
+    incoming.evidence_objects[0].metadata.date = incidentDate;
+    incoming.evidence_objects[0].meals = [
+      meal("Breakfast", 440),
+      meal("Lunch", 620),
+      meal("Dinner", 588),
+      meal("Snacks", 703),
+    ];
+    incoming.evidence_objects.push({
+      id: "activity_day_2026-08-28_applefitness_IMG_2059",
+      evidence_type: "activity_day",
+      observed_at: incidentDate,
+      metrics: { active_calories: 500 },
+    });
+    const initiallyPrepared = prepare([], incoming, reviewId);
+    expect(initiallyPrepared.evidence_objects[0].reconciliation.nutrition)
+      .toEqual(expect.objectContaining({
+        disposition: "additive",
+        dispositionStatus: "automatic",
+        replacementScope: "initial_day",
+      }));
+
+    const firstResult = reconcileConfirmedEvidencePackage({
+      evidencePackage: initiallyPrepared,
+      existingCanonicalObjects: [],
+      userId,
+    });
+    const canonical = apply([], firstResult.changedObjects);
+    const nutritionBefore = canonical.find((item) => item.evidence_type === "nutrition");
+    const activityBefore = canonical.find((item) => item.evidence_type === "activity_day");
+    const reentered = prepare(canonical, initiallyPrepared, reviewId);
+    const relationship = reentered.evidence_objects[0].reconciliation.nutrition;
+
+    expect(relationship).toEqual(expect.objectContaining({
+      disposition: null,
+      dispositionStatus: "already_committed",
+      sourceReviewId: reviewId,
+      targetCanonicalId: nutritionBefore.canonicalId,
+    }));
+    expect(relationship.existingPreview).toBeNull();
+    expect(relationship.newPreview).toBeNull();
+    expect(relationship.projectedPreview).toBeNull();
+
+    const replay = reconcileConfirmedEvidencePackage({
+      evidencePackage: {
+        ...reentered,
+        evidence_objects: [reentered.evidence_objects[0]],
+      },
+      existingCanonicalObjects: canonical,
+      userId,
+    });
+    expect(replay.changedObjects).toEqual([]);
+    expect(nutritionBefore.nutritionRevisionHistory).toEqual([]);
+    expect(canonical.filter((item) => item.evidence_type === "nutrition")).toHaveLength(1);
+    expect(canonical.filter((item) => item.evidence_type === "activity_day")).toHaveLength(1);
+    expect(canonical.find((item) => item.evidence_type === "activity_day"))
+      .toEqual(activityBefore);
+    expect(reentered.evidence_objects[1]).toEqual(initiallyPrepared.evidence_objects[1]);
+  });
+
+  it("does not source-match a different review with identical Nutrition values", () => {
+    const first = confirm([], fullDayPackage("package-a", "nutrition-a", 400, 2200), "review-a");
+    const incoming = fullDayPackage("package-b", "nutrition-b", 400, 2200);
+    const prepared = prepare(first, incoming, "review-b");
+    const relationship = prepared.evidence_objects[0].reconciliation.nutrition;
+
+    expect(relationship.dispositionStatus).toBe("automatic");
+    expect(relationship.dispositionStatus).not.toBe("already_committed");
+    expect(relationship.targetCanonicalId).toBe(first[0].canonicalId);
+    expect(relationship.projectedPreview).not.toBeNull();
+  });
+
   it("fingerprints canonical meaning rather than upload-derived IDs", () => {
     const first = nutrition("upload-a");
     const second = {
