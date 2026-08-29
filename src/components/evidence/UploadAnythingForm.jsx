@@ -102,7 +102,7 @@ export default function UploadAnythingForm({
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-indigo-600 dark:text-[var(--primary)]"><Scale aria-hidden="true" size={18} /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-extrabold text-slate-950 dark:text-[var(--text-primary)]">Log weigh-in</span>
-            <span className="mt-0.5 block text-xs font-medium leading-5 text-slate-500 dark:text-[var(--text-secondary)]">Save a structured weight directly. No upload or review required.</span>
+            <span className="mt-0.5 block text-xs font-medium leading-5 text-slate-500 dark:text-[var(--text-secondary)]">Record your weight for the selected date.</span>
           </span>
           <span aria-hidden="true" className="text-lg font-black text-indigo-600 dark:text-[var(--primary)]">{showWeighIn ? "−" : "+"}</span>
         </button>
@@ -130,7 +130,7 @@ export default function UploadAnythingForm({
                 <span className="text-sm font-extrabold text-slate-500">lb</span>
               </span>
             </label>
-            <p className="text-xs font-semibold text-slate-600">Date: {formatFriendlyDate(selectedDate)}</p>
+            <p className="text-xs font-semibold text-slate-600">{formatFriendlyDate(selectedDate)}</p>
             {weighInError && <p aria-live="assertive" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700" role="alert">{weighInError}</p>}
             {weighInResult && <p aria-live="polite" className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700" role="status">{weighInResult.message}</p>}
             <button

@@ -30,7 +30,7 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain("value={selectedDate}");
     expect(source).toContain("max={defaultDate}");
     expect(source).toContain('formData.set("evidenceDate", selectedDate)');
-    expect(source).toContain("Date: {formatFriendlyDate(selectedDate)}");
+    expect(source).toContain(">{formatFriendlyDate(selectedDate)}</p>");
   });
 
   it("keeps direct weigh-in isolated from the multipart upload submission", () => {
@@ -38,7 +38,7 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain("Save weigh-in");
     expect(source).toContain('formData.set("weight", weight)');
     expect(source).toContain("directWeighInAction(formData)");
-    expect(source).toContain("No upload or review required.");
+    expect(source).toContain("Record your weight for the selected date.");
     expect(source.match(/type="button"/g).length).toBeGreaterThanOrEqual(2);
     expect(source.match(/fetch\(action/g)).toHaveLength(1);
   });
@@ -51,5 +51,17 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain("dark:text-[var(--text-primary)]");
     expect(source).toContain("dark:text-[var(--text-secondary)]");
     expect(source).not.toMatch(/Log weigh-in[\s\S]{0,400}(opacity-|disabled:)/);
+  });
+
+  it("uses Founder-facing copy in both collapsed and expanded states", () => {
+    const supportingCopy = "Record your weight for the selected date.";
+    expect(source).toContain("Log weigh-in");
+    expect(source).toContain(supportingCopy);
+    expect(source.indexOf(supportingCopy)).toBeLessThan(source.indexOf("{showWeighIn && ("));
+    expect(source).toContain("Weight");
+    expect(source).toContain(">{formatFriendlyDate(selectedDate)}</p>");
+    expect(source).toContain("Save weigh-in");
+    expect(source).not.toContain("Save a structured weight directly. No upload or review required.");
+    expect(source).not.toContain("Date: {formatFriendlyDate(selectedDate)}");
   });
 });
