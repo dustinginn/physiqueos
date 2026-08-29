@@ -127,38 +127,6 @@ export async function saveMorningCheckIn(formData) {
       parseMorningPriorityReconciliationFormData(formData),
   });
 
-  let briefingFinalization;
-  try {
-    briefingFinalization =
-      await createFounderMorningBriefingFinalizationService({
-        repositories: FounderRepositories,
-        now: () => now,
-      }).finalize({ userId: user.id, timeZone, at: now });
-  } catch (error) {
-    console.warn("[MorningCheckIn] Briefing finalization remains retryable.", {
-      code: error?.code ?? "BRIEFING_FINALIZATION_FAILED",
-      message: String(error?.message ?? error),
-    });
-    briefingFinalization = { status: "failed", attempted: 0 };
-  }
-
-  if (briefingFinalization.status === "waiting") {
-    revalidatePath("/check-in/morning");
-    redirect("/check-in/morning?weight=saved&briefingUpdate=waiting");
-  }
-  if (briefingFinalization.status === "failed") {
-    revalidatePath("/");
-    revalidatePath("/check-in/morning");
-    redirect("/check-in/morning?weight=saved&briefingUpdate=failed");
-  }
-  if (briefingFinalization.attempted > 0) {
-    revalidatePath("/");
-    revalidatePath("/check-in/morning");
-    revalidatePath("/briefings/weekly");
-    revalidatePath("/briefings/review");
-    redirect("/briefings/weekly?weight=saved&briefingUpdate=current");
-  }
-
   if (result.status === "unchanged") {
     redirect("/?weight=unchanged");
   }

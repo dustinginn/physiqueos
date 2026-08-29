@@ -288,6 +288,7 @@ export function createMorningCheckInPersistenceService({
             analysisId: analysis.id,
             analysis,
             canonicalObject,
+            briefingReconciliation,
             dailyCheckIn,
             reconciliation: reconciliationDescriptor(
               reconciliation,
@@ -321,6 +322,9 @@ export function createMorningCheckInPersistenceService({
           status: stagedResult.status,
           committed: true,
           analysisId: stagedResult.analysisId,
+          briefingReconciliation: freezeBriefingReconciliation(
+            stagedResult.briefingReconciliation
+          ),
           revision: committed.revision,
           commitId: committed.commitId,
         });
@@ -334,6 +338,21 @@ export function createMorningCheckInPersistenceService({
       }
     },
   };
+}
+
+function freezeBriefingReconciliation(value) {
+  if (!value) return Object.freeze({
+    affectedPublicationIds: Object.freeze([]),
+    changed: false,
+    workItemIds: Object.freeze([]),
+  });
+  return Object.freeze({
+    affectedPublicationIds: Object.freeze([
+      ...(value.affectedPublicationIds ?? []),
+    ]),
+    changed: value.changed === true,
+    workItemIds: Object.freeze([...(value.workItemIds ?? [])]),
+  });
 }
 
 function validateCandidate(candidate, result, command) {

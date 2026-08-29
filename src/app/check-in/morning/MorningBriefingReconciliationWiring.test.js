@@ -14,10 +14,10 @@ describe("Morning Check-In briefing reconciliation wiring", () => {
     expect(actions).toContain("createFounderMorningBriefingFinalizationService");
   });
 
-  it("uses one bounded finalization path after persistence and for explicit retry", () => {
+  it("keeps bounded finalization available only as an explicit retry", () => {
     expect(actions).toContain("finalizeMorningBriefingReconciliation");
     expect(actions.match(/\.finalize\(\{ userId: user\.id, timeZone, at: now \}\)/g))
-      .toHaveLength(2);
+      .toHaveLength(1);
     expect(page).toContain(
       "briefingFinalizationAction={finalizeMorningBriefingReconciliation}"
     );

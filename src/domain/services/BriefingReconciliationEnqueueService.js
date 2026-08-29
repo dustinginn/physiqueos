@@ -7,6 +7,12 @@ import {
 import {
   enqueueBriefingReconciliationWorkItems,
 } from "./BriefingReconciliationWorkItemService";
+import {
+  resolveCurrentPublishedBriefing,
+} from "./CurrentPublishedBriefingService";
+import {
+  resolveCoachingUpdatesReadModel,
+} from "./CoachingUpdatesReadService";
 
 const CADENCE_REVISIONS = new Set(["weekly", "midweek", "monthly"]);
 const PENDING_COMMIT_ID = "pending_source_commit";
@@ -36,8 +42,19 @@ export function createBriefingReconciliationEnqueueService({
         return emptyResult(candidate.briefingReconciliationWorkItems);
       }
 
-      const directPlans = cadencePlans(planAffectedBriefingPublications({
+      const currentPublication = resolveCurrentPublishedBriefing({
         publications,
+        at: new Date(confirmedAt),
+        timeZone: resolveTimeZone(candidate, userId, publications),
+        coachingUpdates: resolveCoachingUpdates(candidate, userId),
+      });
+      if (!currentPublication) {
+        return emptyResult(candidate.briefingReconciliationWorkItems);
+      }
+      const currentPublications = [currentPublication];
+
+      const directPlans = cadencePlans(planAffectedBriefingPublications({
+        publications: currentPublications,
         evidenceChanges: directChanges,
         confirmedAt,
       }));
@@ -58,7 +75,7 @@ export function createBriefingReconciliationEnqueueService({
             candidate,
             directChanges,
             legacyRoots,
-            publications,
+            publications: currentPublications,
           })
         : [];
       const evidenceChanges = coalesceDescriptors([
@@ -66,7 +83,7 @@ export function createBriefingReconciliationEnqueueService({
         ...compatibilityChanges,
       ]);
       const plans = cadencePlans(planAffectedBriefingPublications({
-        publications,
+        publications: currentPublications,
         evidenceChanges,
         confirmedAt,
       })).filter((plan) => directPlans.some((direct) =>
@@ -108,6 +125,38 @@ export function createBriefingReconciliationEnqueueService({
       }
     },
   });
+}
+
+function resolveCoachingUpdates(candidate, userId) {
+  const protocol = (candidate.protocols ?? []).find((item) =>
+    item.status === "active" &&
+    (item.protocolType ?? item.category) === "briefings" &&
+    (!userId || !item.userId || item.userId === userId)
+  );
+  const version = (candidate.protocolVersions ?? []).find((item) =>
+    item.id === protocol?.currentVersionId
+  );
+  const goal = (candidate.goals ?? []).find((item) =>
+    item.status === "active" && (!userId || !item.userId || item.userId === userId)
+  );
+  const user = candidate.user?.id === userId
+    ? candidate.user
+    : (candidate.users ?? []).find((item) => item.id === userId);
+  return resolveCoachingUpdatesReadModel({
+    protocol,
+    version,
+    goal,
+    timeZone: user?.timeZone ?? user?.timezone,
+  });
+}
+
+function resolveTimeZone(candidate, userId, publications) {
+  const user = candidate.user?.id === userId
+    ? candidate.user
+    : (candidate.users ?? []).find((item) => item.id === userId);
+  return user?.timeZone ?? user?.timezone ??
+    publications.find((item) => item.userId === userId)?.evidenceWindow?.timeZone ??
+    "America/Los_Angeles";
 }
 
 function collectLegacyCompatibilityChanges({

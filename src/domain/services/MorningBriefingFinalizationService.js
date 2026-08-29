@@ -7,12 +7,22 @@ import {
 import {
   MORNING_EVIDENCE_RECOVERY_STATUSES,
 } from "./MorningEvidenceRecoveryService";
+import {
+  resolveCurrentPublishedBriefing,
+} from "./CurrentPublishedBriefingService";
+import {
+  createCoachingUpdatesReadService,
+} from "./CoachingUpdatesReadService";
 
 export function createMorningBriefingFinalizationService({
   priorityService,
-  briefingService,
+  createBriefingService,
+  listPublications,
+  listWorkItems,
+  getCoachingUpdates = async () => null,
 } = {}) {
-  if (!priorityService || !briefingService) {
+  if (!priorityService || !createBriefingService || !listPublications ||
+      !listWorkItems) {
     throw new Error("Morning briefing finalization services are required.");
   }
 
@@ -39,9 +49,37 @@ export function createMorningBriefingFinalizationService({
         });
       }
 
-      const result = await briefingService.finalizePending({
+      const [publications, workItems, coachingUpdates] = await Promise.all([
+        listPublications(userId),
+        listWorkItems(userId),
+        getCoachingUpdates(userId),
+      ]);
+      const currentPublication = resolveCurrentPublishedBriefing({
+        publications,
+        at,
+        timeZone,
+        coachingUpdates,
+      });
+      const workItemIds = currentPublication
+        ? selectCurrentWorkItemIds({
+            evidenceDate: selection.window.previousLocalDate,
+            publicationRootId: currentPublication.id,
+            workItems,
+          })
+        : [];
+      if (!workItemIds.length) {
+        return Object.freeze({
+          status: "current",
+          evidenceDate: selection.window.previousLocalDate,
+          attempted: 0,
+          completed: 0,
+          failed: 0,
+          results: Object.freeze([]),
+        });
+      }
+      const result = await createBriefingService().finalizePending({
         userId,
-        evidenceDate: selection.window.previousLocalDate,
+        workItemIds,
       });
 
       return Object.freeze({
@@ -66,9 +104,34 @@ export function createFounderMorningBriefingFinalizationService({
       repositories,
       now,
     }),
-    briefingService: createFounderBriefingReconciliationService({
-      repositories,
-      now,
+    listPublications: (userId) =>
+      repositories.dailyBriefings.listDailyBriefings(userId),
+    listWorkItems: (userId) =>
+      repositories.briefingReconciliationWorkItems.listWorkItems(userId),
+    getCoachingUpdates: (userId) =>
+      createCoachingUpdatesReadService({ repositories }).getCurrent({ userId }),
+    createBriefingService: () => createFounderBriefingReconciliationService({
+      repositories, now,
     }),
   });
+}
+
+function selectCurrentWorkItemIds({
+  evidenceDate,
+  publicationRootId,
+  workItems = [],
+}) {
+  return workItems
+    .filter((item) => item.publicationRootId === publicationRootId)
+    .filter((item) => ["revision_pending", "failed"].includes(item.status))
+    .filter((item) => item.status !== "failed" ||
+      item.failure?.retryable !== false)
+    .filter((item) => item.affectedDependencies?.some((dependency) =>
+      dependency.observedDate === evidenceDate
+    ))
+    .sort((left, right) =>
+      String(left.enqueuedAt).localeCompare(String(right.enqueuedAt))
+    )
+    .slice(0, 3)
+    .map((item) => item.id);
 }

@@ -45,18 +45,18 @@ export function createFounderBriefingReconciliationService({
   });
 
   return Object.freeze({
-    async finalizePending({ userId, evidenceDate = null, limit = 3 } = {}) {
+    async finalizePending({ userId, workItemIds = [] } = {}) {
+      const requestedIds = new Set(workItemIds);
+      if (!requestedIds.size) return emptyFinalization();
       const workItems = await repositories.briefingReconciliationWorkItems
         .listWorkItems(userId);
       const selected = workItems
         .filter(isExecutable)
-        .filter((item) => !evidenceDate || item.affectedDependencies?.some(
-          (dependency) => dependency.observedDate === evidenceDate
-        ))
+        .filter((item) => requestedIds.has(item.id))
         .sort((left, right) =>
           String(left.enqueuedAt).localeCompare(String(right.enqueuedAt))
         )
-        .slice(0, Math.max(1, Math.min(Number(limit) || 3, 3)));
+        .slice(0, 3);
       const results = [];
       for (const workItem of selected) {
         results.push(await execution.execute({ workItem, userId }));
@@ -73,6 +73,16 @@ export function createFounderBriefingReconciliationService({
           : results.length ? "completed" : "current",
       });
     },
+  });
+}
+
+function emptyFinalization() {
+  return Object.freeze({
+    attempted: 0,
+    completed: 0,
+    failed: 0,
+    results: Object.freeze([]),
+    status: "current",
   });
 }
 

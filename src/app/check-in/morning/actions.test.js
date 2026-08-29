@@ -45,16 +45,13 @@ describe("Morning Check-In reconciliation action wiring", () => {
     );
   });
 
-  it("runs retryable briefing finalization only after the atomic Morning save resolves", () => {
-    const persistenceSave = source.indexOf("const result = await service.save");
-    const briefingFinalization = source.indexOf(
+  it("does not turn a successful Morning write into a generic briefing retry", () => {
+    const saveAction = source.slice(source.indexOf("export async function saveMorningCheckIn"));
+    expect(saveAction).toContain("const result = await service.save");
+    expect(saveAction).not.toContain(
       "await createFounderMorningBriefingFinalizationService",
-      persistenceSave
     );
-
-    expect(persistenceSave).toBeGreaterThan(-1);
-    expect(briefingFinalization).toBeGreaterThan(persistenceSave);
-    expect(source).toContain("Briefing finalization remains retryable");
-    expect(source).toContain("briefingFinalization.attempted > 0");
+    expect(saveAction).not.toContain("Briefing finalization remains retryable");
+    expect(saveAction).not.toContain("briefingUpdate=failed");
   });
 });

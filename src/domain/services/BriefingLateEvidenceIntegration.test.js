@@ -157,7 +157,7 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       persistence,
       cadenceServices: { weekly: cadence },
       now: sequenceClock("2026-08-09T23:00:00.000Z"),
-    }).finalizePending({ userId: USER, evidenceDate: "2026-08-08" });
+    }).finalizePending({ userId: USER, workItemIds: [workItem.id] });
 
     expect(result).toMatchObject({ attempted: 1, completed: 1, failed: 0 });
     expect(cadence.prepareRegeneration).toHaveBeenCalledOnce();
@@ -196,7 +196,7 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       },
       cadenceServices: { weekly: cadence },
       now: sequenceClock("2026-08-09T23:00:00.000Z"),
-    }).finalizePending({ userId: USER, evidenceDate: "2026-08-08" });
+    }).finalizePending({ userId: USER, workItemIds: [workItem.id] });
 
     expect(result).toMatchObject({ completed: 1, failed: 0 });
     expect(cadence.prepareRegeneration).not.toHaveBeenCalled();
@@ -237,13 +237,13 @@ describe("late-evidence confirmation and recovery finalization integration", () 
     });
 
     expect(await service.finalizePending({ userId: USER,
-      evidenceDate: "2026-08-08" }))
+      workItemIds: [items[0].id] }))
       .toMatchObject({ completed: 0, failed: 1 });
     expect(items[0]).toMatchObject({ status: "failed",
       failure: { retryable: true } });
     expect(current.replacedBriefingHistory).toBeUndefined();
     expect(await service.finalizePending({ userId: USER,
-      evidenceDate: "2026-08-08" }))
+      workItemIds: [items[0].id] }))
       .toMatchObject({ completed: 1, failed: 0 });
     expect(items[0].status).toBe("current_after_revision");
     expect(cadence.executePreparedRegeneration).toHaveBeenCalledTimes(2);
@@ -340,7 +340,9 @@ describe("late-evidence confirmation and recovery finalization integration", () 
           evidenceRecoveryItems: [],
         }),
       },
-      briefingService,
+      createBriefingService: () => briefingService,
+      listPublications: async () => state.dailyBriefings,
+      listWorkItems: async () => workItems,
     });
     const photoRecovery = createConfirmedPhotoEventRecoveryService({
       repositories,
@@ -538,8 +540,9 @@ function weeklyPublication() {
       startDate: "2026-08-02",
       endDate: "2026-08-08",
       timeZone: "America/Los_Angeles",
+      closed: true,
     },
-    briefing: { version: "legacy" },
+    briefing: { version: "legacy", weeklyNarrative: {} },
   };
 }
 
@@ -556,8 +559,22 @@ function cadencePublication({ cadence, startDate, endDate, generatedAt }) {
       startDate,
       endDate,
       timeZone: "America/Los_Angeles",
+      closed: true,
+      briefingDate: new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(new Date(generatedAt)),
+      deliveryDate: cadence === "monthly" ? new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(new Date(generatedAt)) : undefined,
     },
-    briefing: { version: "fixture" },
+    briefing: {
+      version: "fixture",
+      ...(cadence === "weekly" ? { weeklyNarrative: {} } : {}),
+      ...(cadence === "midweek" ? { hero: {} } : {}),
+      ...(cadence === "monthly" ? { monthlyPresentation: {} } : {}),
+    },
   };
 }
 
