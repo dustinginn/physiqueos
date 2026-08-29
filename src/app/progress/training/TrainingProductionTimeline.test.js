@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { getTrainingTimelineReport } from "../../../domain/services/TrainingEvidenceContextService";
 
@@ -34,46 +35,56 @@ describe("production Training timeline port", () => {
   it(
     "scopes temporal evidence while retaining global movement availability without writes",
     async () => {
-      const before = fs.readFileSync(storePath);
-      const [build, visible, all] = await Promise.all(
-        ["build-lean-mass", "visible-abs", "all"].map((context) =>
-          getTrainingTimelineReport({ context })
-        )
-      );
+      const before = hash(fs.readFileSync(storePath));
+      let build = await getTrainingTimelineReport({ context: "build-lean-mass" });
 
       expect(build.timeline.contextId).toBe("build-lean-mass");
       expect(
         build.report.trainingDays.every((day) => day.date >= "2026-07-19")
       ).toBe(true);
+      const buildTrainingDayCount = build.report.trainingDays.length;
+      expect(Array.isArray(build.report.trainingBreakdowns.resistance)).toBe(true);
+      const buildExerciseLabelHash = hashExerciseLabels(
+        build.report.trainingBreakdowns
+      );
+      build = null;
+
+      let visible = await getTrainingTimelineReport({ context: "visible-abs" });
       expect(
         visible.report.trainingDays.every(
           (day) => day.date >= "2026-05-24" && day.date <= "2026-07-18"
         )
       ).toBe(true);
+      const visibleLibraryHash = hash(visible.report.trainingLibrary);
+      visible = null;
+
+      const all = await getTrainingTimelineReport({ context: "all" });
       expect(all.report.trainingDays.length).toBeGreaterThanOrEqual(
-        build.report.trainingDays.length
+        buildTrainingDayCount
       );
-    expect(build.report.trainingBreakdowns).toEqual(
-      expect.objectContaining({
-        resistance: expect.any(Array),
-      })
-    );
-    expect(
-      build.report.trainingBreakdowns.resistance.flatMap((region) =>
-        (region.movementFamilies ?? region.muscleGroups ?? []).flatMap(
-          (family) => family.exercises ?? []
-        )
-      ).map((exercise) => exercise.label)
-    ).toEqual(
-      all.report.trainingBreakdowns.resistance.flatMap((region) =>
-        (region.movementFamilies ?? region.muscleGroups ?? []).flatMap(
-          (family) => family.exercises ?? []
-        )
-      ).map((exercise) => exercise.label)
-    );
-      expect(visible.report.trainingLibrary).toEqual(all.report.trainingLibrary);
-      expect(fs.readFileSync(storePath)).toEqual(before);
+      expect(buildExerciseLabelHash).toBe(
+        hashExerciseLabels(all.report.trainingBreakdowns)
+      );
+      expect(visibleLibraryHash).toBe(hash(all.report.trainingLibrary));
+      expect(hash(fs.readFileSync(storePath))).toBe(before);
     },
     30000
   );
 });
+
+function hash(value) {
+  const input = Buffer.isBuffer(value) ? value : JSON.stringify(value);
+  return createHash("sha256").update(input).digest("hex");
+}
+
+function hashExerciseLabels(breakdowns) {
+  const digest = createHash("sha256");
+  for (const region of breakdowns.resistance ?? []) {
+    for (const family of region.movementFamilies ?? region.muscleGroups ?? []) {
+      for (const exercise of family.exercises ?? []) {
+        digest.update(`${exercise.label}\n`);
+      }
+    }
+  }
+  return digest.digest("hex");
+}

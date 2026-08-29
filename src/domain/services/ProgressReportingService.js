@@ -105,56 +105,74 @@ export function createProgressReportingService({ repositories }) {
 
     async getPlaceholderReport(streamId, userId, options = {}) {
       const context = await getProgressContext({ repositories, userId });
-      let scopedContext =
-        (streamId === "training" || streamId === "nutrition") && options.dateWindow
-          ? {
-              ...context,
-              ...(streamId === "training"
-                ? {
-                    trainingSessions: context.trainingSessions.filter((session) =>
-                      isInsideDateWindow(session.observed_at, options.dateWindow)
-                    ),
-                  }
-                : {
-                    nutritionDays: context.nutritionDays.filter((day) =>
-                      isInsideDateWindow(day.observed_at, options.dateWindow)
-                    ),
-                    nutritionEvidenceScoped: true,
-                  }),
-            }
-          : context;
-      if (streamId === "photos" && options.photoSessionWindow) {
-        scopedContext = {
-          ...context,
-          photoSessions: reconcilePhotoSessionComparisons(
-            context.photoSessions.filter((session) =>
-              isInsideDateWindow(
-                session.captureDate,
-                options.photoSessionWindow
-              )
-            )
-          ),
-        };
-      }
-      const stream = buildProgressHub(scopedContext).streams.find(
-        (item) => item.id === streamId
-      );
+      return buildPlaceholderReportFromContext({ context, options, streamId });
+    },
 
-      if (!stream) return null;
+    async getTrainingReports(userId, options = {}) {
+      const context = await getProgressContext({ repositories, userId });
+      const globalReport = buildPlaceholderReportFromContext({
+        context,
+        streamId: "training",
+      });
+      const scopedReport = options.dateWindow
+        ? buildPlaceholderReportFromContext({
+            context,
+            options,
+            streamId: "training",
+          })
+        : globalReport;
 
-      return {
-        ...stream,
-        dataSources: getDataSources(streamId),
-        entries: getPlaceholderEntries(streamId, scopedContext),
-        relatedGoals: getStreamRelatedGoals(streamId, context.goals),
-        ...getStreamReportExtras(streamId, scopedContext),
-        ...(streamId === "training" && options.dateWindow
-          ? { trainingLibrary: getTrainingReportExtras(context).trainingLibrary }
-          : {}),
-        evidenceWindow: options.dateWindow ?? null,
-      };
+      return { globalReport, scopedReport };
     },
   } });
+}
+
+function buildPlaceholderReportFromContext({ context, options = {}, streamId }) {
+  let scopedContext =
+    (streamId === "training" || streamId === "nutrition") && options.dateWindow
+      ? {
+          ...context,
+          ...(streamId === "training"
+            ? {
+                trainingSessions: context.trainingSessions.filter((session) =>
+                  isInsideDateWindow(session.observed_at, options.dateWindow)
+                ),
+              }
+            : {
+                nutritionDays: context.nutritionDays.filter((day) =>
+                  isInsideDateWindow(day.observed_at, options.dateWindow)
+                ),
+                nutritionEvidenceScoped: true,
+              }),
+        }
+      : context;
+  if (streamId === "photos" && options.photoSessionWindow) {
+    scopedContext = {
+      ...context,
+      photoSessions: reconcilePhotoSessionComparisons(
+        context.photoSessions.filter((session) =>
+          isInsideDateWindow(session.captureDate, options.photoSessionWindow)
+        )
+      ),
+    };
+  }
+  const stream = buildProgressHub(scopedContext).streams.find(
+    (item) => item.id === streamId
+  );
+
+  if (!stream) return null;
+
+  return {
+    ...stream,
+    dataSources: getDataSources(streamId),
+    entries: getPlaceholderEntries(streamId, scopedContext),
+    relatedGoals: getStreamRelatedGoals(streamId, context.goals),
+    ...getStreamReportExtras(streamId, scopedContext),
+    ...(streamId === "training" && options.dateWindow
+      ? { trainingLibrary: getTrainingReportExtras(context).trainingLibrary }
+      : {}),
+    evidenceWindow: options.dateWindow ?? null,
+  };
 }
 
 export function scopeWeightReportContext(context, dateWindow) {

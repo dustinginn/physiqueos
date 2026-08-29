@@ -85,14 +85,14 @@ export async function getTrainingTimelineReport({
   return runRepositoryReadScope({ repositories, readModel: "progress.training-timeline", callback: async () => {
     const timeline = await getTrainingEvidenceContext({ context, repositories });
     const reporting = createProgressReportingService({ repositories });
-    const [globalReport, scopedReport] = await Promise.all([
-      reporting.getPlaceholderReport("training"),
-      reporting.getPlaceholderReport("training", undefined, {
+    const { globalReport, scopedReport } = await reporting.getTrainingReports(
+      undefined,
+      {
         dateWindow: timeline.goalScoped
           ? { startDate: timeline.startDate, endDate: timeline.endDate }
           : null,
-      }),
-    ]);
+      }
+    );
 
     return {
     timeline,
