@@ -24,11 +24,13 @@ struct AppDestinationRouterView: View {
         // "Browse" section for an area with zero exercises (matching real
         // web behavior). An individual exercise leaf (drilling into one
         // exercise from inside an area, e.g. "bench-press") uses this exact
-        // same `.trainingExercise` case with a non-area id, and still
-        // honestly falls to `DestinationPlaceholderView` below — no
-        // Exercise Detail screen exists yet.
+        // same `.trainingExercise` case with a non-area id, and now routes
+        // to the real Exercise Detail/history screen instead of a
+        // placeholder.
         case .trainingExercise(let exerciseId) where TrainingAreaIcon.canonicalAreaIds.contains(exerciseId):
             TrainingAreaView(areaId: exerciseId)
+        case .trainingExercise(let exerciseId):
+            TrainingExerciseDetailView(exerciseId: exerciseId)
         default:
             DestinationPlaceholderView(destination: destination)
         }

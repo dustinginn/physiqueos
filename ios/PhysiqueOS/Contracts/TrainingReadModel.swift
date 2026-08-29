@@ -234,6 +234,15 @@ struct TrainingAreaExerciseRow: Codable, Equatable, Identifiable {
     var label: String
     var detail: String?
     var destination: AppDestination
+    /// Links this Browse row to the same canonical exercise identity used
+    /// by `TrainingSessionDetailReadModel`'s occurrences
+    /// (`exercise.canonicalExerciseId`, `resolveTrainingExerciseIdentity`
+    /// on the web) — how `TrainingAPI.fetchTrainingExercise(exerciseId:)`
+    /// finds every historical occurrence of this exercise across every
+    /// session, not just this area. `nil` for a row with no resolvable
+    /// canonical identity yet (mirrors the web's `historicalOnly` exercise
+    /// presentation state), in which case there is no queryable history.
+    var canonicalExerciseId: String?
 }
 
 // MARK: - Training Day (`/progress/training/day/:date`)
@@ -384,6 +393,25 @@ extension TrainingSet {
         if minutes <= 0 { return "\(total)s" }
         return "\(minutes):\(String(format: "%02d", remaining))"
     }
+
+    /// Mirrors `formatTrainingSetGlance`
+    /// (`src/presentation/trainingPresentation.js:10-13`) — the Training
+    /// Library exercise-history page's compact "{reps} x {load}" form,
+    /// distinct from `formattedDetail`'s "{reps} reps @ {load}" sentence
+    /// used on the Workout Detail page. The web keeps these as two
+    /// separate formatters for two different screens; so does this port.
+    var glance: String {
+        if let durationSeconds { return Self.formatDuration(durationSeconds) }
+        return "\(repsColumnText) x \(formattedLoad)"
+    }
+
+    /// `ExerciseSetList`'s "Reps" column value
+    /// (`TrainingKnowledgeScreen.jsx:1476-1502`): the formatted duration
+    /// for a timed set, otherwise the raw rep count (or `"?"`).
+    var repsColumnText: String {
+        if let durationSeconds { return Self.formatDuration(durationSeconds) }
+        return reps.map(Self.formatNumber) ?? "?"
+    }
 }
 
 extension TrainingExerciseOccurrence {
@@ -394,5 +422,96 @@ extension TrainingExerciseOccurrence {
     var occurrenceLabel: String {
         guard let executionVariant else { return name }
         return "\(name) · \(executionVariant.label)"
+    }
+}
+
+// MARK: - Exercise Detail / History (`/progress/training/library/:area/:exercise`)
+//
+// Mirrors `getExerciseDetailContent` (`TrainingKnowledgeScreen.jsx:1154-1199`)
+// and its data source `getExerciseOccurrences` (`:1569-1590`): a flat,
+// area-agnostic scan of every session for every historical occurrence of
+// one canonical exercise, newest first. The web keeps exactly four
+// sections for this route (`showSourceWorkouts: false` on the real
+// `/progress/training/library/...` page — `page.js:84` — suppresses the
+// fifth, "Source workouts"): Current Benchmark, an optional Performance
+// Records card (not yet ported — see this slice's final report), Last
+// Session, and Recent History. This is the same read/transport boundary
+// Workout Logger prepopulation should consume later — the benchmark/
+// history computation lives here, not duplicated per-screen.
+
+struct TrainingExerciseDetailReadModel: Identifiable, Equatable {
+    var id: String
+    var title: String
+    var breadcrumbs: [TrainingBreadcrumb]
+    var scope: TrainingScopeContext
+    /// `getCurrentExerciseBenchmark` — `nil` when there is no comparable
+    /// history at all (`lifetimeStats.bestSet` falsy on the web), matching
+    /// `CurrentExerciseBenchmarkCard`'s own "No matching history yet."
+    /// empty state.
+    var benchmark: TrainingExerciseBenchmark?
+    /// `occurrences[0]` — `nil` when the exercise has never been logged.
+    var lastSession: TrainingExerciseHistoryOccurrence?
+    /// `occurrences.slice(0, 10)` (`ExerciseHistoryCard`, `:1421`), newest
+    /// first.
+    var history: [TrainingExerciseHistoryOccurrence]
+}
+
+/// One historical occurrence of a canonical exercise, carrying enough
+/// context (session id/date, the occurrence's own sets/variant, and its
+/// superset relationship if any) to render both `LastExerciseSessionCard`
+/// and each `ExerciseHistoryCard` row without a second query.
+struct TrainingExerciseHistoryOccurrence: Identifiable, Equatable {
+    var sessionId: String
+    var sessionDate: String
+    var exercise: TrainingExerciseOccurrence
+    /// `deriveTrainingExerciseRelationshipContext` — `nil` for a standalone
+    /// occurrence.
+    var relationship: TrainingExerciseRelationshipContext?
+
+    var id: String { "\(sessionId)-\(exercise.id)" }
+}
+
+/// `formatRelationshipContext` (`TrainingKnowledgeScreen.jsx:1592-1598`)
+/// reads two fields: the relationship type (only `"superset"` exists
+/// today) and the *other* members' display names, in their original
+/// group order.
+struct TrainingExerciseRelationshipContext: Equatable {
+    var relationshipType: String
+    var partnerNames: [String]
+
+    /// Mirrors `formatRelationshipContext` exactly: `"Superset with A + B"`
+    /// when there are partner names, else the bare relationship type.
+    var label: String {
+        guard relationshipType == "superset" else { return relationshipType.capitalized }
+        return partnerNames.isEmpty ? "Superset" : "Superset with \(partnerNames.joined(separator: " + "))"
+    }
+}
+
+/// `CurrentExerciseBenchmarkCard`'s three metric tiles plus its single
+/// comparison sentence — `getCurrentExerciseBenchmark`
+/// (`TrainingKnowledgeScreen.jsx:1639-1692`), ported field-for-field.
+struct TrainingExerciseBenchmark: Equatable {
+    /// Best set across every occurrence sharing the latest occurrence's
+    /// variant/relationship context (lifetime, not just the latest visit).
+    var bestSet: String
+    /// One of four fixed English sentences, or `nil` when there isn't
+    /// enough comparable history yet to say anything. Never a numeric
+    /// score — the web has none here.
+    var comparison: String?
+    var lastSessionDate: String
+    /// Best set from the latest occurrence only.
+    var workingWeight: String
+
+    /// `getBenchmarkComparisonTone` (`TrainingKnowledgeScreen.jsx:1363-1372`):
+    /// tone is derived from the comparison sentence's own text, not a
+    /// separately stored value — ported the same way rather than inventing
+    /// a parallel enum that could drift from the sentence.
+    enum Tone { case newBest, matched, belowOrUnknown }
+
+    var tone: Tone {
+        guard let comparison else { return .belowOrUnknown }
+        if comparison.contains("established a new best") { return .newBest }
+        if comparison.contains("matched") { return .matched }
+        return .belowOrUnknown
     }
 }

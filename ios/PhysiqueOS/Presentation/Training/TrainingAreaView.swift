@@ -16,11 +16,11 @@ import SwiftUI
 /// `summary: null` for every area) → the shared scope selector → one
 /// "Browse" card listing every exercise resolved to this area
 /// (`BrowseCard`/`InformationList`/`InformationListItem`,
-/// `DeepPagePrimitives.jsx`). Exercise rows are read-only this slice —
-/// tapping one pushes the same `AppDestination.trainingExercise` case the
-/// Training landing's area rows already use, honestly falling to
-/// `DestinationPlaceholderView` (no Exercise Detail screen exists yet; see
-/// this slice's final report).
+/// `DeepPagePrimitives.jsx`). Exercise rows push the same
+/// `AppDestination.trainingExercise` case the Training landing's area rows
+/// already use — `AppDestinationRouterView` tells the two apart by id
+/// membership in `TrainingAreaIcon.canonicalAreaIds` and routes a real
+/// exercise id to `TrainingExerciseDetailView`.
 struct TrainingAreaView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingAreaViewModel?
@@ -61,43 +61,11 @@ struct TrainingAreaView: View {
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let area)):
             VStack(alignment: .leading, spacing: 16) {
-                header(for: area)
+                TrainingLibraryHeaderView(title: area.title, breadcrumbs: area.breadcrumbs)
                 TrainingScopeSelectorView(scope: area.scope)
                 browseCard(area.exercises)
             }
         }
-    }
-
-    private func header(for area: TrainingAreaReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Training Library")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(area.title)
-                    .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            }
-            HStack(spacing: 8) {
-                ForEach(area.breadcrumbs) { crumb in
-                    NavigationLink(value: crumb.destination) {
-                        Text(crumb.label)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// `BrowseCard` (`DeepPagePrimitives.jsx:53-69`): `SectionHeader`

@@ -530,4 +530,169 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(TrainingSessionCorrectionValidation.validationError(forText: "   \n  "), "Add workout details before saving.")
         XCTAssertNil(TrainingSessionCorrectionValidation.validationError(forText: "15 x #120"))
     }
+
+    // MARK: - Exercise Detail / History routing (Training Library slice)
+
+    /// Every Browse row that carries a canonical exercise id is a real
+    /// exercise, never one of the 10 area ids `AppDestinationRouterView`
+    /// special-cases to `TrainingAreaView` — proving these rows route to
+    /// the new exercise-history screen instead of accidentally re-entering
+    /// the area page.
+    func testExerciseRowIdsAreNeverConfusedWithCanonicalAreaIds() async throws {
+        for areaId in ["chest", "back", "shoulders", "triceps"] {
+            let area = try await api.fetchTrainingArea(areaId: areaId)
+            let unwrapped = try XCTUnwrap(area)
+            for exercise in unwrapped.exercises {
+                XCTAssertFalse(TrainingAreaIcon.canonicalAreaIds.contains(exercise.id))
+            }
+        }
+    }
+
+    func testChestExerciseRowsCarryTheSameCanonicalIdsUsedBySessionOccurrences() async throws {
+        let chest = try await api.fetchTrainingArea(areaId: "chest")
+        let unwrapped = try XCTUnwrap(chest)
+        let byLabel = Dictionary(uniqueKeysWithValues: unwrapped.exercises.map { ($0.label, $0.canonicalExerciseId) })
+        XCTAssertEqual(byLabel["Bench Press"], "barbell_bench_press")
+        XCTAssertEqual(byLabel["Cable Fly"], "cable_fly")
+        XCTAssertEqual(byLabel["Push-ups"], "pushup")
+    }
+
+    // MARK: - Exercise Detail / History fetch integrity
+
+    func testUnknownExerciseResolvesToNilRatherThanCrashing() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "not-a-real-exercise")
+        XCTAssertNil(exercise)
+    }
+
+    func testExerciseDetailBreadcrumbsAreTrainingThenTrainingLibraryThenTheOwningArea() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
+        let unwrapped = try XCTUnwrap(exercise)
+        XCTAssertEqual(unwrapped.breadcrumbs.map(\.label), ["Training", "Training Library", "Chest"])
+        let areaCrumb = try XCTUnwrap(unwrapped.breadcrumbs.first { $0.label == "Chest" })
+        XCTAssertEqual(areaCrumb.destination, .trainingExercise(exerciseId: "chest"))
+    }
+
+    /// Bench Press has exactly one historical occurrence, and it's inside
+    /// a superset — `getCurrentExerciseBenchmark` must isolate it from any
+    /// (nonexistent) standalone comparison rather than silently comparing
+    /// across relationship contexts.
+    func testBenchPressBenchmarkIsolatesTheSupersetOccurrence() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
+        let unwrapped = try XCTUnwrap(exercise)
+        XCTAssertEqual(unwrapped.history.count, 1)
+        let benchmark = try XCTUnwrap(unwrapped.benchmark)
+        XCTAssertEqual(benchmark.comparison, "No comparable prior superset session.")
+        XCTAssertEqual(benchmark.workingWeight, "155 lb")
+    }
+
+    /// Overhead Triceps Extension's one occurrence carries a "Static Hold"
+    /// variant — isolated the same way, by variant key this time.
+    func testOverheadTricepsExtensionBenchmarkIsolatesTheVariantOccurrence() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "overhead-triceps-extension")
+        let unwrapped = try XCTUnwrap(exercise)
+        let benchmark = try XCTUnwrap(unwrapped.benchmark)
+        XCTAssertEqual(benchmark.comparison, "No comparable prior variant session.")
+    }
+
+    /// Lat Pulldown has two standalone occurrences at different loads
+    /// (100/110/120 lb on 2026-08-17, then 110/120/130 lb on 2026-08-24) —
+    /// this is the multi-session "new best" path, and history must show
+    /// both, newest first.
+    func testLatPulldownShowsTwoOccurrencesNewestFirstWithANewBest() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "lat-pulldown")
+        let unwrapped = try XCTUnwrap(exercise)
+        XCTAssertEqual(unwrapped.history.map(\.sessionDate), unwrapped.history.map(\.sessionDate).sorted(by: >))
+        XCTAssertEqual(unwrapped.history.count, 2)
+        XCTAssertEqual(unwrapped.history.first?.sessionId, "session-fixture-002")
+        XCTAssertEqual(unwrapped.history.last?.sessionId, "session-fixture-005")
+        let benchmark = try XCTUnwrap(unwrapped.benchmark)
+        XCTAssertEqual(benchmark.comparison, "Last session established a new best.")
+        XCTAssertEqual(benchmark.workingWeight, "130 lb")
+        XCTAssertEqual(benchmark.bestSet, "8 x 130 lb")
+    }
+
+    /// Push-ups is bodyweight across both its occurrences (20/18 reps on
+    /// 2026-08-26, 16/15 reps on 2026-08-17) — the benchmark comparator
+    /// must rank by reps when weight is absent on both sides, not treat a
+    /// bodyweight exercise as unranked.
+    func testPushUpsBodyweightHistoryComparesByRepsAndFormatsAsBW() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "push-ups")
+        let unwrapped = try XCTUnwrap(exercise)
+        XCTAssertEqual(unwrapped.history.count, 2)
+        for occurrence in unwrapped.history {
+            for set in occurrence.exercise.sets {
+                XCTAssertTrue(set.isBodyweight)
+                XCTAssertEqual(set.formattedLoad, "BW")
+            }
+        }
+        let benchmark = try XCTUnwrap(unwrapped.benchmark)
+        XCTAssertEqual(benchmark.comparison, "Last session established a new best.")
+        XCTAssertEqual(benchmark.workingWeight, "BW")
+        XCTAssertEqual(benchmark.bestSet, "20 x BW")
+    }
+
+    func testExerciseHistoryPreservesRawSetsAcrossSessions() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "lat-pulldown")
+        let unwrapped = try XCTUnwrap(exercise)
+        let earlier = try XCTUnwrap(unwrapped.history.first { $0.sessionId == "session-fixture-005" })
+        XCTAssertEqual(earlier.exercise.sets.map(\.reps), [10, 10, 8])
+        XCTAssertEqual(earlier.exercise.sets.map(\.weight), [100, 110, 120])
+        XCTAssertEqual(earlier.exercise.sets.map(\.weightUnit), ["lb", "lb", "lb"])
+    }
+
+    func testExerciseHistoryCarriesVariantSemantics() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "overhead-triceps-extension")
+        let unwrapped = try XCTUnwrap(exercise)
+        let occurrence = try XCTUnwrap(unwrapped.lastSession)
+        XCTAssertEqual(occurrence.exercise.executionVariant?.label, "Static Hold")
+        XCTAssertEqual(occurrence.exercise.occurrenceLabel, "Overhead Triceps Extension · Static Hold")
+        XCTAssertNil(occurrence.relationship)
+    }
+
+    func testExerciseHistoryCarriesSupersetSemantics() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
+        let unwrapped = try XCTUnwrap(exercise)
+        let occurrence = try XCTUnwrap(unwrapped.lastSession)
+        let relationship = try XCTUnwrap(occurrence.relationship)
+        XCTAssertEqual(relationship.relationshipType, "superset")
+        XCTAssertEqual(relationship.partnerNames, ["Cable Fly"])
+        XCTAssertEqual(relationship.label, "Superset with Cable Fly")
+    }
+
+    // MARK: - Pure benchmark/formatting helpers
+
+    func testCompareExerciseSetsRanksByWeightThenRepsThenTreatsMissingAsWorst() {
+        let heavier = TrainingSet(setNumber: 1, reps: 8, weight: 150, weightUnit: "lb", durationSeconds: nil, loadType: nil, setType: nil)
+        let lighter = TrainingSet(setNumber: 1, reps: 8, weight: 140, weightUnit: "lb", durationSeconds: nil, loadType: nil, setType: nil)
+        let moreReps = TrainingSet(setNumber: 1, reps: 10, weight: 140, weightUnit: "lb", durationSeconds: nil, loadType: nil, setType: nil)
+        let timed = TrainingSet(setNumber: 1, reps: nil, weight: nil, weightUnit: nil, durationSeconds: 30, loadType: nil, setType: nil)
+
+        XCTAssertLessThan(TrainingExerciseHistoryCalculator.compare(heavier, lighter), 0)
+        XCTAssertLessThan(TrainingExerciseHistoryCalculator.compare(moreReps, lighter), 0)
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.compare(lighter, lighter), 0)
+        XCTAssertLessThan(TrainingExerciseHistoryCalculator.compare(lighter, timed), 0)
+    }
+
+    func testTrainingSetGlanceFormatsWeightedBodyweightAndTimedSets() {
+        let weighted = TrainingSet(setNumber: 1, reps: 8, weight: 150, weightUnit: "lb", durationSeconds: nil, loadType: nil, setType: nil)
+        XCTAssertEqual(weighted.glance, "8 x 150 lb")
+
+        let bodyweight = TrainingSet(setNumber: 1, reps: 20, weight: nil, weightUnit: "bodyweight", durationSeconds: nil, loadType: "bodyweight", setType: "bodyweight_reps")
+        XCTAssertEqual(bodyweight.glance, "20 x BW")
+
+        let shortTimed = TrainingSet(setNumber: 1, reps: nil, weight: nil, weightUnit: nil, durationSeconds: 30, loadType: nil, setType: nil)
+        XCTAssertEqual(shortTimed.glance, "30s")
+
+        let longTimed = TrainingSet(setNumber: 1, reps: nil, weight: nil, weightUnit: nil, durationSeconds: 75, loadType: nil, setType: nil)
+        XCTAssertEqual(longTimed.glance, "1:15")
+    }
+
+    /// `referenceDate` is injectable specifically so this doesn't depend
+    /// on the device clock — deterministic against fixed fixture dates.
+    func testSessionBadgeShowsTodayYesterdayOrAShortDate() throws {
+        let reference = try XCTUnwrap(TrainingDateFormatting.date(from: "2026-08-26T12:00:00-07:00"))
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-26T06:02:00-07:00", referenceDate: reference), "Today")
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-25T06:02:00-07:00", referenceDate: reference), "Yesterday")
+        XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-17T06:05:00-07:00", referenceDate: reference), "Aug 17")
+    }
 }

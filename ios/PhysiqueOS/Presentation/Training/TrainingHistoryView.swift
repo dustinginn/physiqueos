@@ -784,10 +784,15 @@ private struct FlowLayout: Layout {
     }
 }
 
-private enum TrainingDateFormatting {
+/// Not `private`: also used by `TrainingExerciseHistoryCalculator` for
+/// benchmark/history-row date formatting.
+enum TrainingDateFormatting {
+    static func date(from value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
+
     static func short(_ value: String) -> String {
-        let isoWithTime = ISO8601DateFormatter()
-        if let date = isoWithTime.date(from: value) {
+        if let date = date(from: value) {
             let display = DateFormatter()
             display.dateFormat = "MMM d"
             return display.string(from: date)

@@ -316,6 +316,38 @@
       "sourceEvidence": ["Apple Health"],
       "exercises": [],
       "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-005",
+      "label": "Traditional Strength Training",
+      "value": "360 active cal",
+      "detail": "6:05 AM–6:48 AM · 43 min · 360 active cal · Lat Pulldown, Push-ups",
+      "date": "2026-08-17T06:05:00-07:00",
+      "sourceEvidence": ["Typed evidence"],
+      "exercises": [
+        {
+          "id": "pulldown-earlier",
+          "name": "Lat Pulldown",
+          "canonicalExerciseId": "lat_pulldown",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 100, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 10, "weight": 110, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 8, "weight": 120, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "pushups-earlier",
+          "name": "Push-ups",
+          "canonicalExerciseId": "pushup",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 16, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" },
+            { "set_number": 2, "reps": 15, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
     }
   ],
   "areas": [
@@ -339,19 +371,22 @@
           "id": "bench-press",
           "label": "Bench Press",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "bench-press" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "bench-press" } },
+          "canonicalExerciseId": "barbell_bench_press"
         },
         {
           "id": "cable-fly",
           "label": "Cable Fly",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "cable-fly" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "cable-fly" } },
+          "canonicalExerciseId": "cable_fly"
         },
         {
           "id": "push-ups",
           "label": "Push-ups",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "push-ups" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "push-ups" } },
+          "canonicalExerciseId": "pushup"
         }
       ]
     },
@@ -375,13 +410,15 @@
           "id": "lat-pulldown",
           "label": "Lat Pulldown",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "lat-pulldown" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "lat-pulldown" } },
+          "canonicalExerciseId": "lat_pulldown"
         },
         {
           "id": "seated-cable-row",
           "label": "Seated Cable Row",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "seated-cable-row" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "seated-cable-row" } },
+          "canonicalExerciseId": "seated_cable_row"
         }
       ]
     },
@@ -405,7 +442,8 @@
           "id": "face-pull",
           "label": "Face Pull",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "face-pull" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "face-pull" } },
+          "canonicalExerciseId": "face_pull"
         }
       ]
     },
@@ -446,7 +484,8 @@
           "id": "overhead-triceps-extension",
           "label": "Overhead Triceps Extension",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "overhead-triceps-extension" } }
+          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "overhead-triceps-extension" } },
+          "canonicalExerciseId": "overhead_triceps_extension"
         }
       ]
     },

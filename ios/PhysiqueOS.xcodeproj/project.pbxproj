@@ -16,6 +16,10 @@
 		00000000000000000000100E /* LogReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100D /* LogReadModel.swift */; };
 		000000000000000000001010 /* DirectWeighInValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000100F /* DirectWeighInValidation.swift */; };
 		0000000000000000000010CE /* TrainingSessionCorrectionValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */; };
+		0000000000000000000010D0 /* TrainingExerciseHistoryCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CF /* TrainingExerciseHistoryCalculator.swift */; };
+		0000000000000000000010D2 /* TrainingLibraryHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D1 /* TrainingLibraryHeaderView.swift */; };
+		0000000000000000000010D4 /* TrainingExerciseDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D3 /* TrainingExerciseDetailViewModel.swift */; };
+		0000000000000000000010D6 /* TrainingExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D5 /* TrainingExerciseDetailView.swift */; };
 		000000000000000000001012 /* EvidenceDateParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* EvidenceDateParsing.swift */; };
 		000000000000000000001014 /* EvidenceReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* EvidenceReadModel.swift */; };
 		000000000000000000001016 /* EvidenceHubUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001015 /* EvidenceHubUsage.swift */; };
@@ -111,6 +115,10 @@
 		00000000000000000000100D /* LogReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModel.swift"; sourceTree = "<group>"; };
 		00000000000000000000100F /* DirectWeighInValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectWeighInValidation.swift"; sourceTree = "<group>"; };
 		0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionCorrectionValidation.swift"; sourceTree = "<group>"; };
+		0000000000000000000010CF /* TrainingExerciseHistoryCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseHistoryCalculator.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D1 /* TrainingLibraryHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryHeaderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D3 /* TrainingExerciseDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D5 /* TrainingExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailView.swift"; sourceTree = "<group>"; };
 		000000000000000000001011 /* EvidenceDateParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceDateParsing.swift"; sourceTree = "<group>"; };
 		000000000000000000001013 /* EvidenceReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModel.swift"; sourceTree = "<group>"; };
 		000000000000000000001015 /* EvidenceHubUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsage.swift"; sourceTree = "<group>"; };
@@ -245,6 +253,7 @@
 				000000000000000000001017 /* TrainingReadModel.swift */,
 				000000000000000000001019 /* TrainingSessionRenderItems.swift */,
 				0000000000000000000010CD /* TrainingSessionCorrectionValidation.swift */,
+				0000000000000000000010CF /* TrainingExerciseHistoryCalculator.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -389,6 +398,9 @@
 				000000000000000000001083 /* TrainingSessionDetailViewModel.swift */,
 				000000000000000000001085 /* TrainingAreaView.swift */,
 				000000000000000000001087 /* TrainingAreaViewModel.swift */,
+				0000000000000000000010D1 /* TrainingLibraryHeaderView.swift */,
+				0000000000000000000010D3 /* TrainingExerciseDetailViewModel.swift */,
+				0000000000000000000010D5 /* TrainingExerciseDetailView.swift */,
 			);
 			path = Training;
 			sourceTree = "<group>";
@@ -560,6 +572,7 @@
 				000000000000000000001018 /* TrainingReadModel.swift in Sources */,
 				00000000000000000000101A /* TrainingSessionRenderItems.swift in Sources */,
 				0000000000000000000010CE /* TrainingSessionCorrectionValidation.swift in Sources */,
+				0000000000000000000010D0 /* TrainingExerciseHistoryCalculator.swift in Sources */,
 				00000000000000000000101C /* HomeAPI.swift in Sources */,
 				00000000000000000000101E /* LogAPI.swift in Sources */,
 				000000000000000000001020 /* EvidenceAPI.swift in Sources */,
@@ -615,6 +628,9 @@
 				000000000000000000001084 /* TrainingSessionDetailViewModel.swift in Sources */,
 				000000000000000000001086 /* TrainingAreaView.swift in Sources */,
 				000000000000000000001088 /* TrainingAreaViewModel.swift in Sources */,
+				0000000000000000000010D2 /* TrainingLibraryHeaderView.swift in Sources */,
+				0000000000000000000010D4 /* TrainingExerciseDetailViewModel.swift in Sources */,
+				0000000000000000000010D6 /* TrainingExerciseDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

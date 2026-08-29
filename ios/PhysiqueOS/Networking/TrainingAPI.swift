@@ -9,9 +9,14 @@ protocol TrainingAPI: Sendable {
     func fetchTrainingLanding() async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
-    /// Fixture-backed for `"chest"` only this slice — establishing the
-    /// pattern, not every area (see `TrainingAreaReadModel`).
+    /// Fixture-backed for all 10 canonical areas (see `TrainingAreaReadModel`).
     func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel?
+    /// Mirrors `getExerciseDetailContent`/`getExerciseOccurrences`: `nil`
+    /// for an unresolvable exercise id, otherwise every historical
+    /// occurrence of that canonical exercise across every session
+    /// (area-agnostic, matching the web's own area-agnostic history query)
+    /// plus the computed benchmark/last-session/history projection.
+    func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel?
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file mirroring the
@@ -69,5 +74,71 @@ struct FixtureTrainingAPI: TrainingAPI {
 
     func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel? {
         try loadFixture().areas.first { $0.id == areaId }
+    }
+
+    /// Mirrors the real web query chain exactly: resolve the route's
+    /// exercise id to a canonical exercise id (here, via the Browse row
+    /// that carries it — `getCanonicalTrainingExerciseSlug`'s native
+    /// equivalent), then flat-scan every session for occurrences of that
+    /// canonical id (`getExerciseOccurrences`), area-agnostic. Sorting by
+    /// the raw ISO date string, descending, mirrors
+    /// `getTrainingDays`/`getTrainingRecords`'s own `localeCompare`-based
+    /// sort rather than parsing to `Date` for comparison.
+    func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel? {
+        let fixture = try loadFixture()
+        guard
+            let area = fixture.areas.first(where: { area in area.exercises.contains { $0.id == exerciseId } }),
+            let row = area.exercises.first(where: { $0.id == exerciseId }),
+            let canonicalExerciseId = row.canonicalExerciseId
+        else {
+            return nil
+        }
+
+        let occurrences = fixture.sessions
+            .flatMap { session in
+                session.exercises
+                    .filter { $0.canonicalExerciseId == canonicalExerciseId }
+                    .map { exercise in
+                        TrainingExerciseHistoryOccurrence(
+                            sessionId: session.id,
+                            sessionDate: session.date,
+                            exercise: exercise,
+                            relationship: Self.relationshipContext(for: exercise, in: session)
+                        )
+                    }
+            }
+            .sorted { $0.sessionDate > $1.sessionDate }
+
+        return TrainingExerciseDetailReadModel(
+            id: row.id,
+            title: row.label,
+            breadcrumbs: [
+                TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
+                TrainingBreadcrumb(label: "Training Library", destination: .progressStream(streamId: "training/library")),
+                TrainingBreadcrumb(label: area.title, destination: .trainingExercise(exerciseId: area.id)),
+            ],
+            scope: area.scope,
+            benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
+            lastSession: occurrences.first,
+            history: Array(occurrences.prefix(10))
+        )
+    }
+
+    /// `deriveTrainingExerciseRelationshipContext` — finds the
+    /// relationship group (if any) this occurrence's local exercise id
+    /// belongs to within its own session, and resolves the *other*
+    /// members' display names in their original group order.
+    private static func relationshipContext(
+        for exercise: TrainingExerciseOccurrence,
+        in session: TrainingSessionDetailReadModel
+    ) -> TrainingExerciseRelationshipContext? {
+        guard let group = session.exerciseRelationshipGroups.first(where: { $0.memberExerciseIds.contains(exercise.id) }) else {
+            return nil
+        }
+        let exercisesById = Dictionary(uniqueKeysWithValues: session.exercises.map { ($0.id, $0) })
+        let partnerNames = group.memberExerciseIds
+            .filter { $0 != exercise.id }
+            .compactMap { exercisesById[$0]?.name }
+        return TrainingExerciseRelationshipContext(relationshipType: group.relationshipType, partnerNames: partnerNames)
     }
 }
