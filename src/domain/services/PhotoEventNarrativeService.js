@@ -12,6 +12,8 @@ import {
   CADENCE_RMR_STRATEGIES,
   createCadenceEnergyAssessment,
 } from "./CadenceEnergyAssessmentService";
+import { resolveCommittedPhaseContext } from
+  "./FounderPhaseCorrectionService";
 
 const EVENT_VERSION = "photo_event_v4_0_0";
 
@@ -195,6 +197,11 @@ export function createPhotoEventNarrativeService({
         eventDate: session.captureDate,
       });
       const photoEventContext=await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate});
+      const publicationContext=createPhotoEventPublicationContext({
+        goal,
+        photoEventContext,
+        evidenceDate: session.captureDate,
+      });
       const completionComparisons=session.confirmationIntent?.confirmationPurpose==="visible_abs_completion"?selectVisibleAbsCompletionComparisons({sessions,finalSession:session,goalStartDate:goal?.startDate}):null;
       const narrative=composePhotoEventNarrative({session,goal,goalContext:photoEventContext,latestDexa,priorDexa,baselineDexa,executionSupport,confirmationIntent:session.confirmationIntent,completionComparisons,milestone:photoEventContext.futureMilestone,generatedAt:now().toISOString()});
       if (!narrative) return {
@@ -214,7 +221,7 @@ export function createPhotoEventNarrativeService({
           confidenceMode,
           artifact,
           session,
-          context: { ...photoEventContext, confidenceDomainStates },
+          context: { ...publicationContext, confidenceDomainStates },
           reason: reason ?? `Confirmed Photo Event ${session.id}.`,
           replacementAuthorized,
         });
@@ -260,6 +267,24 @@ export function createPhotoEventNarrativeService({
     },
   };
   return service;
+}
+
+function createPhotoEventPublicationContext({
+  goal,
+  photoEventContext,
+  evidenceDate,
+} = {}) {
+  if (!goal) return photoEventContext;
+  const phaseContext = resolveCommittedPhaseContext(goal, {
+    asOf: evidenceDate,
+  });
+  return {
+    ...photoEventContext,
+    activeGoal: structuredClone(phaseContext.goal),
+    activePhase: phaseContext.activePhase
+      ? structuredClone(phaseContext.activePhase)
+      : photoEventContext.activePhase,
+  };
 }
 
 function find(values,pattern){return values.find((value)=>pattern.test(value));}

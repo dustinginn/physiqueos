@@ -35,6 +35,26 @@ describe("Event Briefing Home relevance", () => {
       timeZone: "America/Los_Angeles",
     })).toBe(false);
   });
+
+  it("keeps an Aug 29 Photo Event published Aug 30 only until local midnight", () => {
+    const artifact = {
+      generatedAt: "2026-08-30T18:00:00.000Z",
+      trigger: { evidenceType: "photo_session" },
+      briefing: { photoEventNarrative: { eventDate: "2026-08-29" } },
+    };
+    const preservedArtifact = structuredClone(artifact);
+    expect(isEventBriefingRelevantForHome({
+      artifact,
+      localDate: "2026-08-30",
+      timeZone: "America/Los_Angeles",
+    })).toBe(true);
+    expect(isEventBriefingRelevantForHome({
+      artifact,
+      localDate: "2026-08-31",
+      timeZone: "America/Los_Angeles",
+    })).toBe(false);
+    expect(artifact).toEqual(preservedArtifact);
+  });
 });
 
 function dexa(generatedAt) {

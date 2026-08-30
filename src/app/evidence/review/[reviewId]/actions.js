@@ -26,9 +26,11 @@ import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterp
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
 import { createFounderDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
 import {
-  createFounderPhotoEventNarrativeService,
   createPhotoEventNarrativeService,
 } from "../../../../domain/services/PhotoEventNarrativeService";
+import {
+  createProductionPhotoEventNarrativeService,
+} from "../../../../application/composition/productionPhotoEventNarrativeComposition";
 import { filterEligibleEventBriefingTypes } from "../../../../domain/services/CoachingUpdatesReadService";
 import { createEvidenceConfirmationReadService } from "../../../../application/read-models/EvidenceConfirmationReadService";
 import {
@@ -922,7 +924,14 @@ function createHandlers({ evidencePackage, reviewId, user,
         if (type === "photo_session") {
           let result;
           try {
-            result = await createFounderPhotoEventNarrativeService({ repositories: FounderRepositories }).getOrCreateResult({ userId: user.id, sessionId: canonicalId });
+            const photoEventService =
+              await createProductionPhotoEventNarrativeService({
+                repositories: FounderRepositories,
+              });
+            result = await photoEventService.getOrCreateResult({
+              userId: user.id,
+              sessionId: canonicalId,
+            });
           } catch (error) {
             if (error?.code === "canonical_goal_objective_incomplete") {
               deferredReasons.push(error.code);
