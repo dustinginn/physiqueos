@@ -44,12 +44,14 @@ app_files = [
     ("Contracts", "TrainingPerformanceRecordsCalculator.swift"),
     ("Contracts", "TrainingReportingReadModel.swift"),
     ("Contracts", "TrainingLoggerReadModel.swift"),
+    ("Contracts", "LoggingSandbox.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "LogAPI.swift"),
     ("Networking", "EvidenceAPI.swift"),
     ("Networking", "TrainingAPI.swift"),
     ("Networking", "TrainingLoggerAPI.swift"),
     ("Networking", "TrainingLoggerDraftStore.swift"),
+    ("Networking", "LoggingSandboxStore.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "IconBadge.swift"),
     ("SharedUI", "CardContainer.swift"),
@@ -68,6 +70,7 @@ app_files = [
     ("SharedUI", "EvidenceSourcePicker.swift"),
     ("SharedUI", "EvidenceStreamPresentation.swift"),
     ("SharedUI", "InteractivePopGesture.swift"),
+    ("SharedUI", "NumericEditField.swift"),
     ("Presentation/Root", "RootTabView.swift"),
     ("Presentation/Root", "DestinationPlaceholderView.swift"),
     ("Presentation/Root", "AppDestinationRouterView.swift"),
@@ -111,6 +114,9 @@ app_files = [
     ("Presentation/Training", "TrainingReportingViewModel.swift"),
     ("Presentation/TrainingLogger", "TrainingLoggerView.swift"),
     ("Presentation/TrainingLogger", "TrainingLoggerViewModel.swift"),
+    ("Presentation/Logging", "ManualWeighInView.swift"),
+    ("Presentation/Logging", "EvidenceIntakeView.swift"),
+    ("Presentation/Logging", "LocalEvidenceReviewView.swift"),
 ]
 
 # Non-Swift app-target resources (group path -> filename) — copied into the
@@ -147,6 +153,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingLoggerTests.swift"),
+    ("PhysiqueOSTests", "LoggingSandboxTests.swift"),
 ]
 
 ui_test_files = [
@@ -161,7 +168,7 @@ DEPLOYMENT_TARGET = "18.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 3
+APP_BUILD_NUMBER = 4
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode

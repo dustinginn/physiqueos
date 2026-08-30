@@ -50,7 +50,7 @@ struct LogView: View {
 
                 TrainingLoggerCardView(onTap: onNavigate)
 
-                UploadCardView(localDate: log.localDate)
+                UploadCardView(localDate: log.localDate, onNavigate: onNavigate)
             }
         }
     }

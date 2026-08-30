@@ -53,6 +53,13 @@ extension AppDestination {
             }
         case "log":
             self = .trainingLogger
+        case "native.manual-weigh-in":
+            self = .manualWeighIn
+        case "native.evidence-intake":
+            self = .evidenceIntake
+        case "native.evidence-review":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .localEvidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .id, in: container,
@@ -75,7 +82,8 @@ extension AppDestination {
         case .trainingExercise(let exerciseId): try parameters.encode(exerciseId, forKey: .exerciseId)
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
         case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
-        case .photoUpload, .dexaUpload, .briefingList, .trainingLogger: break
+        case .localEvidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
+        case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake: break
         }
     }
 

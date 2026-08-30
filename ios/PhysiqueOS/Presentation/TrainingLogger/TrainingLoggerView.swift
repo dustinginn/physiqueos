@@ -8,6 +8,8 @@ struct TrainingLoggerView: View {
     @State private var provisionalName = ""
     @State private var provisionalAreaId = ""
     @State private var showingCancelWorkoutConfirmation = false
+    @State private var isNumericKeyboardVisible = false
+    @State private var numericEditBuffers: [String: String] = [:]
 
     var body: some View {
         Group {
@@ -89,12 +91,14 @@ struct TrainingLoggerView: View {
                 .accessibilityIdentifier("trainingLogger.startLogging")
             }
         case .workout:
-            let presentation = viewModel.workoutPresentation
-            persistentActionBar {
-                PrimaryActionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
-                    viewModel.reviewWorkout()
+            if NumericEditingContract.finishActionVisible(step: viewModel.draft?.step, keyboardVisible: isNumericKeyboardVisible) {
+                let presentation = viewModel.workoutPresentation
+                persistentActionBar {
+                    PrimaryActionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
+                        viewModel.reviewWorkout()
+                    }
+                    .accessibilityIdentifier("trainingLogger.finishWorkout")
                 }
-                .accessibilityIdentifier("trainingLogger.finishWorkout")
             }
         default:
             EmptyView()
@@ -575,19 +579,19 @@ struct TrainingLoggerView: View {
             Text("\(set.setNumber)")
                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 .frame(width: 30)
-            TextField("0", text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, keyPath: exercise.measurement == .duration ? \.durationSeconds : \.reps))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
+            NumericEditField(
+                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: exercise.measurement == .duration ? "duration" : "reps", keyPath: exercise.measurement == .duration ? \.durationSeconds : \.reps),
+                accessibilityLabel: exercise.measurement == .duration ? "Set \(set.setNumber) seconds" : "Set \(set.setNumber) reps",
+                onEditingChanged: { isNumericKeyboardVisible = $0 }
+            )
                 .frame(height: 34)
-                .background(PhysiqueOSTheme.surfaceMuted)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             if exercise.measurement == .repsLoad {
-                TextField("0", text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, keyPath: \.load))
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.center)
+                NumericEditField(
+                    text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: "load", keyPath: \.load),
+                    accessibilityLabel: "Set \(set.setNumber) load",
+                    onEditingChanged: { isNumericKeyboardVisible = $0 }
+                )
                     .frame(height: 34)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             Button {
                 viewModel.update { draft in
@@ -802,18 +806,22 @@ struct TrainingLoggerView: View {
         _ viewModel: TrainingLoggerViewModel,
         exerciseId: String,
         setId: String,
+        field: String,
         keyPath: WritableKeyPath<TrainingLoggerDraftSet, Double?>
     ) -> Binding<String> {
-        Binding(
+        let bufferKey = "\(exerciseId)|\(setId)|\(field)"
+        return Binding(
             get: {
+                if let buffer = numericEditBuffers[bufferKey] { return buffer }
                 guard let value = viewModel.draft?.exercises.first(where: { $0.id == exerciseId })?.sets.first(where: { $0.id == setId })?[keyPath: keyPath] else { return "" }
                 return value.rounded() == value ? String(Int(value)) : String(value)
             },
             set: { text in
+                numericEditBuffers[bufferKey] = text
                 viewModel.update { draft in
                     guard let exerciseIndex = draft.exercises.firstIndex(where: { $0.id == exerciseId }),
                           let setIndex = draft.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else { return }
-                    draft.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = Double(text)
+                    draft.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = NumericEditingContract.parsedValue(text)
                 }
             }
         )

@@ -34,7 +34,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testNormalPickerOnlyShowsPerformedExercisesAndPrioritizesThemInBroadBrowse() async throws {
         let config = try await configuration()
-        var draft = draft(areas: ["chest", "shoulders"])
+        let draft = draft(areas: ["chest", "shoulders"])
         let normal = draft.pickerExercises(in: config.exercises, browseAll: false, query: "")
         XCTAssertTrue(normal.allSatisfy(\.previouslyPerformed))
         XCTAssertFalse(normal.map(\.name).contains("Dumbbell Lateral Raise"))
@@ -289,11 +289,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildThreeInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildFourInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "3")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "4")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

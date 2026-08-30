@@ -49,6 +49,11 @@ enum AppDestination: Hashable, Codable {
     /// if unusual, current contract fact rather than inventing a nicer
     /// one; `serverDestinationId` intentionally returns `"log"` to match.
     case trainingLogger
+    /// Native-only typed routes for the fixture-backed logging sandbox.
+    /// They intentionally do not claim a server destination contract.
+    case manualWeighIn
+    case evidenceIntake
+    case localEvidenceReview(reviewId: String)
 
     /// The server's destination id string, for parity with
     /// `DestinationId` values and for the placeholder screen's display.
@@ -67,6 +72,9 @@ enum AppDestination: Hashable, Codable {
         case .progressStream: "progress.stream"
         case .trainingDay: "progress.stream"
         case .trainingLogger: "log"
+        case .manualWeighIn: "native.manual-weigh-in"
+        case .evidenceIntake: "native.evidence-intake"
+        case .localEvidenceReview: "native.evidence-review"
         }
     }
 }

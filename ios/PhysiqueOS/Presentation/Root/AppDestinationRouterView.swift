@@ -9,9 +9,24 @@ import SwiftUI
 /// falls through to the existing `DestinationPlaceholderView`.
 struct AppDestinationRouterView: View {
     let destination: AppDestination
+    var onReturnToLog: () -> Void = {}
 
     var body: some View {
         switch destination {
+        case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
+            ManualWeighInView(onReturnToLog: onReturnToLog)
+        case .manualWeighIn:
+            ManualWeighInView(onReturnToLog: onReturnToLog)
+        case .evidenceIntake:
+            EvidenceIntakeView()
+        case .photoUpload:
+            EvidenceIntakeView(initialScenario: .progressPhotos)
+        case .dexaUpload:
+            EvidenceIntakeView(initialScenario: .dexa)
+        case .localEvidenceReview(let reviewId):
+            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog)
+        case .evidenceReview(let reviewId):
+            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog)
         case .trainingLogger:
             TrainingLoggerView()
         case .trainingSession(let sessionId):
