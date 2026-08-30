@@ -3,6 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Scale } from "lucide-react";
+import {
+  createEvidenceUploadArtifactManifest,
+  EVIDENCE_UPLOAD_MANIFEST_FIELD,
+} from "../../domain/services/EvidenceUploadArtifactManifest";
 
 export default function UploadAnythingForm({
   action,
@@ -24,7 +28,12 @@ export default function UploadAnythingForm({
   async function submit(event) {
     event.preventDefault();
     if (submitting) return;
+    const selectedFiles = event.currentTarget.elements.namedItem("evidenceFiles")?.files ?? [];
     const formData = new FormData(event.currentTarget);
+    formData.set(
+      EVIDENCE_UPLOAD_MANIFEST_FIELD,
+      JSON.stringify(createEvidenceUploadArtifactManifest(selectedFiles))
+    );
     setUploadingDate(String(formData.get("evidenceDate") ?? ""));
     setSubmitting(true);
     setError(null);

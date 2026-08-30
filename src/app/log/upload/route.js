@@ -18,6 +18,12 @@ import {
   parseEvidenceRecoveryFormData,
 } from "../../../domain/services/EvidenceRecoveryContext";
 import { parsePrivateMediaReference } from "../../../contracts/v1/mediaIdentifiers.js";
+import {
+  assertEvidenceUploadReceiptMatchesManifest,
+  EVIDENCE_UPLOAD_MANIFEST_FIELD,
+  EvidenceUploadArtifactCompletenessError,
+  parseEvidenceUploadArtifactManifest,
+} from "../../../domain/services/EvidenceUploadArtifactManifest";
 
 export const runtime = "nodejs";
 
@@ -38,6 +44,10 @@ export async function POST(request) {
     const files = formData
       .getAll("evidenceFiles")
       .filter((file) => typeof file?.arrayBuffer === "function" && file.size > 0);
+    const uploadManifest = parseEvidenceUploadArtifactManifest(
+      formData.get(EVIDENCE_UPLOAD_MANIFEST_FIELD)
+    );
+    assertEvidenceUploadReceiptMatchesManifest({ manifest: uploadManifest, receivedFiles: files });
     const evidenceDate = normalizeDateKey(formData.get("evidenceDate")) ?? getTodayKey();
     const typedEvidence = normalizeOptionalText(formData.get("evidenceNote"));
     const isHistoricalEvidence = evidenceDate < getTodayKey();
@@ -54,6 +64,7 @@ export async function POST(request) {
       evidenceDate,
       expectedEvidenceType: recoveryContext?.expectedEvidenceType ?? "auto",
       files,
+      uploadManifest,
       typedEvidence,
       userId: user.id,
       photoSessionContext: {
@@ -112,6 +123,15 @@ export async function POST(request) {
   } catch (error) {
     if (error?.code === "CANONICAL_WRITES_PAUSED") {
       return redirectToLog({ error: "writes-paused" }, recoveryContext);
+    }
+    if (error instanceof EvidenceUploadArtifactCompletenessError) {
+      if (request.headers.get("accept")?.includes("application/json")) {
+        return NextResponse.json(
+          { code: error.code, error: error.message },
+          { status: error.status }
+        );
+      }
+      return redirectToLog({ error: "incomplete-upload" }, recoveryContext);
     }
     console.warn("[EvidenceIntake] Upload Anything route failed.", {
       error: error?.message,

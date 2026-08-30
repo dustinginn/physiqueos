@@ -58,6 +58,22 @@ function correctedPackage(base) {
 }
 
 describe("reprocessPendingReviewInPlace", () => {
+  it("uses shared eligibility to reread pending historical universal intake", async () => {
+    const state = fixture();
+    state.review.source = "historical_universal_intake";
+    const reinterpret = vi.fn(async () => correctedPackage(state.evidencePackage));
+    const service = createPendingEvidenceReviewReprocessingService({
+      repositories: state.repositories,
+      reinterpret,
+    });
+
+    const result = await service.reprocessPendingReviewInPlace(REVIEW_ID);
+
+    expect(result).toMatchObject({ changed: true, idempotent: false });
+    expect(reinterpret).toHaveBeenCalledTimes(1);
+    expect(result.review.status).toBe("pending");
+  });
+
   it("reprocesses the mixed Aug 9 screenshot shell with all typed movement detail", async () => {
     const typedText = [
       "Pull ups",

@@ -38,6 +38,7 @@ import {
   resolvePhotoEventContext,
 } from "../../../../domain/services/PhotoEventContextService";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
+import { createApplicationStoredArtifactLoader } from "../../../../application/media/ApplicationUploadService";
 import { produceTrainingPerformanceEvents } from "../../../../domain/services/TrainingPerformanceEventProducer";
 import {
   createTrainingPerformanceEventPersistenceService,
@@ -94,7 +95,10 @@ export async function reprocessEvidenceReview(formData) {
   const recoveryContext = resolveRecoveryContext(review, formData);
   let outcome = "failed";
   try {
-    const result = await createPendingEvidenceReviewReprocessingService({ repositories: FounderRepositories })
+    const result = await createPendingEvidenceReviewReprocessingService({
+      repositories: FounderRepositories,
+      loadArtifact: createApplicationStoredArtifactLoader({ userId: user.id }),
+    })
       .reprocessPendingReviewInPlace(reviewId);
     outcome = result.changed ? "updated" : "current";
   } catch (error) {

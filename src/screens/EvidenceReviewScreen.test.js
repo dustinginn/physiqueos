@@ -166,6 +166,8 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("Save and return later");
     expect(screen).toContain("Discard review");
     expect(screen).toContain("Read upload again");
+    expect(screen).toContain("reprocessEligibility.eligible");
+    expect(page).toContain("resolveEvidenceReviewReprocessEligibility");
   });
 
   it("shows explicit updated, current, and failed outcomes after a re-read", () => {

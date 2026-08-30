@@ -40,7 +40,7 @@ import { isEvidenceReviewCanonicalSaveComplete } from "../domain/services/Eviden
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, dexaEditOutcome = null, dexaMeasurementsAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessOutcome = null, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, dexaEditOutcome = null, dexaMeasurementsAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessEligibility = { eligible: false }, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
   const [nutritionDispositions, setNutritionDispositions] = useState(() =>
@@ -196,7 +196,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
             ) : <Card><p className="font-bold text-[var(--text-primary)]">This review was {status}.</p></Card>}
           </form>
         )}
-        {canEdit && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
+        {canEdit && reprocessEligibility.eligible && reprocessAction && <form action={reprocessAction} className="mt-3"><input name="reviewId" type="hidden" value={review.id} /><EvidenceRecoveryContextFields context={recoveryContext}/><ReprocessButton /></form>}
         {reprocessOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">Review updated from the original evidence.</p></Card>}
         {reprocessOutcome === "current" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">No newer interpretation is available.</p></Card>}
         {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Re-read failed. Your previous review is still intact.</p></Card>}

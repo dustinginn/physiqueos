@@ -13,6 +13,7 @@ import {
 import {
   prepareNutritionEvidencePackageForReview,
 } from "../../../../domain/services/CanonicalNutritionDayService";
+import { resolveEvidenceReviewReprocessEligibility } from "../../../../domain/services/EvidenceReviewReprocessEligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +39,14 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   const reprocessOutcome = ["updated", "current", "failed"].includes(query?.reprocess)
     ? query.reprocess
     : null;
-  const canonicalObjects = await FounderRepositories.canonicalEvidence
-    .listCanonicalEvidenceObjects(review.userId);
+  const [canonicalObjects, persistedPackage] = await Promise.all([
+    FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(review.userId),
+    review.interpretedEvidence?.package_id
+      ? FounderRepositories.evidencePackages.getEvidencePackageById(
+          review.interpretedEvidence.package_id
+        )
+      : null,
+  ]);
   const interpretedEvidence = prepareNutritionEvidencePackageForReview({
     canonicalObjects,
     evidencePackage: repairPendingReviewExerciseIdentities(
@@ -48,7 +55,13 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     reviewId,
   });
   const presentedReview = { ...review, interpretedEvidence };
+  const reprocessEligibility = resolveEvidenceReviewReprocessEligibility({
+    review,
+    evidencePackage: persistedPackage ??
+      (review.source === "dedicated_dexa" ? review.interpretedEvidence : null),
+    canonicalObjects,
+  });
   const dexaEditOutcome = ["updated", "stale"].includes(query?.dexa) ? query.dexa : null;
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
+  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessEligibility={reprocessEligibility} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
   }, { readModel: "route.evidence-review" });
 }

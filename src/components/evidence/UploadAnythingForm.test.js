@@ -11,6 +11,14 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain("router.push(result.reviewUrl)");
   });
 
+  it("sends a stable browser-selected artifact manifest with the multipart request", () => {
+    expect(source).toContain('elements.namedItem("evidenceFiles")?.files');
+    expect(source).toContain("createEvidenceUploadArtifactManifest(selectedFiles)");
+    expect(source).toContain("EVIDENCE_UPLOAD_MANIFEST_FIELD");
+    expect(source.indexOf("createEvidenceUploadArtifactManifest(selectedFiles)"))
+      .toBeLessThan(source.indexOf("fetch(action"));
+  });
+
   it("ties Uploading to the real request and preserves the selected evidence date", () => {
     expect(source).toContain("setSubmitting(true)");
     expect(source).toContain("setSubmitting(false)");

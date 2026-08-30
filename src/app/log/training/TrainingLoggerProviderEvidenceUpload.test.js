@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   assertApplicationUploadEntryAllowed: vi.fn(),
   buildTrainingLoggerEvidencePackage: vi.fn(),
   createEvidenceReviewService: vi.fn(),
+  createApplicationStoredArtifactLoader: vi.fn(),
   createProductionAppleHealthReconciliation: vi.fn(),
   createStoredEvidenceArtifactDescriptor: vi.fn((value) => ({
     fileName: value.file.name,
@@ -34,6 +35,7 @@ vi.mock("../../../application/composition/productionApplicationComposition.js", 
 
 vi.mock("../../../application/media/ApplicationUploadService", () => ({
   assertApplicationUploadEntryAllowed: mocks.assertApplicationUploadEntryAllowed,
+  createApplicationStoredArtifactLoader: mocks.createApplicationStoredArtifactLoader,
   storeApplicationUpload: mocks.storeApplicationUpload,
 }));
 vi.mock("../../../data/repositories/founderRepositories", () => ({
@@ -69,6 +71,20 @@ describe("Training Logger provider Apple Health evidence", () => {
     mocks.listCanonicalEvidenceObjects.mockResolvedValue([]);
     mocks.getEvidencePackageById.mockResolvedValue(null);
     mocks.createEvidenceReviewService.mockReturnValue({ stage: mocks.stage });
+    mocks.createApplicationStoredArtifactLoader.mockImplementation(({ userId }) =>
+      async ({ artifact }) => {
+        const grant = await mocks.authorizeRead({
+          artifactRef: artifact.storage_path,
+          principal: expect.objectContaining({ userId }),
+        });
+        const redemption = await mocks.redeemRead({ accessHandle: grant.accessHandle });
+        const response = await fetch(redemption.url);
+        return {
+          buffer: Buffer.from(await response.arrayBuffer()),
+          contentType: response.headers.get("content-type"),
+        };
+      }
+    );
     mocks.storeApplicationUpload.mockImplementation(async ({ artifactId }) => ({
       reference: `media://${artifactId}`,
     }));

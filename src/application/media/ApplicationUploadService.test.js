@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({
   assertLegacy: vi.fn(),
   getComposition: vi.fn(),
+  authorizeRead: vi.fn(),
+  redeemRead: vi.fn(),
   providerStore: vi.fn(),
 }));
 
@@ -15,6 +18,7 @@ vi.mock("../../platform/cutover/canonicalWriteFence.js", () => ({
 
 const {
   assertApplicationUploadEntryAllowed,
+  createApplicationStoredArtifactLoader,
   storeApplicationUpload,
 } = await import("./ApplicationUploadService.js");
 
@@ -52,5 +56,51 @@ describe("application upload provider boundary", () => {
     const env = { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "0" };
     assertApplicationUploadEntryAllowed({ operation: "legacy-upload", env });
     expect(mocks.assertLegacy).toHaveBeenCalledWith({ operation: "legacy-upload", env });
+  });
+
+  it("loads provider media through the authorized object-storage boundary with integrity verification", async () => {
+    const bytes = Buffer.from([1, 2, 3, 4]);
+    mocks.getComposition.mockResolvedValue({
+      media: { authorizeRead: mocks.authorizeRead },
+      mediaGateway: { redeemRead: mocks.redeemRead },
+    });
+    mocks.authorizeRead.mockResolvedValue({
+      accessHandle: "/api/v1/media/read?grant=opaque",
+      contentType: "image/png",
+      size: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+    mocks.redeemRead.mockResolvedValue({ url: "https://private-storage.invalid/object" });
+    const fetchImpl = vi.fn(async () => new Response(bytes, {
+      status: 200,
+      headers: { "content-type": "image/png" },
+    }));
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl,
+    });
+
+    await expect(loadArtifact({
+      artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101", mime_type: "image/png" },
+    })).resolves.toEqual({ buffer: bytes, contentType: "image/png" });
+    expect(mocks.authorizeRead).toHaveBeenCalledTimes(1);
+    expect(mocks.redeemRead).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://private-storage.invalid/object",
+      { cache: "no-store", redirect: "error" }
+    );
+  });
+
+  it("fails closed when the provider media composition is unavailable", async () => {
+    mocks.getComposition.mockResolvedValue({ media: null, mediaGateway: null });
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl: vi.fn(),
+    });
+    await expect(loadArtifact({
+      artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101" },
+    })).rejects.toMatchObject({ code: "PROVIDER_MEDIA_BINDING_UNAVAILABLE" });
   });
 });

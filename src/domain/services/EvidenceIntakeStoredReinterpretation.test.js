@@ -95,6 +95,62 @@ describe("stored Apple Health evidence reinterpretation", () => {
     );
   });
 
+  it("preserves stable source order for a strength workout and multiple Outdoor Walks", async () => {
+    const sourceArtifacts = ["strength", "walk-one", "walk-two"].map((id, index) => ({
+      id,
+      kind: "screenshot",
+      file_name: `${id}.png`,
+      mime_type: "image/png",
+      observed_date: "2026-08-21",
+      storage_path: `media://01a049eb-ea13-75e8-948d-6b82752ae20${index}`,
+      uploaded_at: "2026-08-30T18:55:56.626Z",
+    }));
+    mocks.interpretScreenshotsWithVision.mockImplementation(async ({ screenshots, submissionId }) => ({
+      evidencePackage: {
+        package_id: submissionId,
+        evidence_objects: [{
+          id: screenshots[0].id,
+          evidence_type: "training",
+          observed_at: screenshots[0].evidenceDate,
+          metadata: {
+            activity_type: screenshots[0].id === "strength"
+              ? "Traditional Strength Training"
+              : "Outdoor Walk",
+          },
+        }],
+        quality: { status: "complete" },
+        provenance: { source_artifacts: [] },
+      },
+    }));
+    const loadArtifact = vi.fn(async () => ({
+      buffer: Buffer.from([137, 80, 78, 71]),
+      contentType: "image/png",
+    }));
+
+    const result = await reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
+      evidencePackage: {
+        package_id: "evidence_submission_20260830185556626_images",
+        captured_at: "2026-08-30T18:55:56.626Z",
+        observed_date: "2026-08-21",
+        userId: "founder",
+        provenance: { source_artifacts: sourceArtifacts },
+      },
+      loadArtifact,
+      userId: "founder",
+    });
+
+    expect(loadArtifact.mock.calls.map(([{ artifact }]) => artifact.id))
+      .toEqual(["strength", "walk-one", "walk-two"]);
+    expect(result.evidencePackage.evidence_objects.map((item) => [
+      item.id,
+      item.metadata.activity_type,
+    ])).toEqual([
+      ["strength", "Traditional Strength Training"],
+      ["walk-one", "Outdoor Walk"],
+      ["walk-two", "Outdoor Walk"],
+    ]);
+  });
+
   it("rejects another owner's package before loading media", async () => {
     const loadArtifact = vi.fn();
     await expect(reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({

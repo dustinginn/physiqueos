@@ -15,6 +15,7 @@ import {
   extractOriginalImageCaptureMetadata,
   inferPhotoSessionCaptureMetadata,
 } from "./PhotoSessionMetadataService";
+import { assertStoredEvidenceArtifactsMatchManifest } from "./EvidenceUploadArtifactManifest";
 
 const EVIDENCE_SCHEMA_VERSION = "physiqueos-evidence-v1";
 const INTAKE_ENGINE_NAME = "PhysiqueOS Evidence Intake Engine";
@@ -33,6 +34,7 @@ export async function processEvidenceIntakeSubmission({
   userId = "founder",
   photoSessionContext = null,
   storeArtifact = storeEvidenceArtifact,
+  uploadManifest = null,
 } = {}) {
   const capturedAt = new Date().toISOString();
   const observedDate = normalizeDateKey(evidenceDate) ?? getLocalDateKey(capturedAt);
@@ -50,6 +52,9 @@ export async function processEvidenceIntakeSubmission({
     userId,
   });
   const storedArtifacts = storage.storedArtifacts;
+  if (uploadManifest) {
+    assertStoredEvidenceArtifactsMatchManifest({ manifest: uploadManifest, storedArtifacts });
+  }
   if (storage.error) {
     const evidencePackage = createFailedIngestionEvidencePackage({
       capturedAt,
@@ -103,7 +108,7 @@ export async function processEvidenceIntakeSubmission({
 
 export async function reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
   evidencePackage,
-  expectedEvidenceType = "training",
+  expectedEvidenceType = "auto",
   loadArtifact,
   userId = "founder",
 } = {}) {
@@ -111,21 +116,27 @@ export async function reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
     throw new Error("A persisted EvidencePackage and artifact loader are required.");
   }
   if (evidencePackage.userId && evidencePackage.userId !== userId) {
-    throw new Error("Apple Health evidence is unavailable.");
+    throw new Error("Stored evidence is unavailable.");
   }
 
-  const sourceArtifacts = (evidencePackage.provenance?.source_artifacts ?? [])
+  const retainedArtifacts = evidencePackage.provenance?.source_artifacts ?? [];
+  const sourceArtifacts = retainedArtifacts
     .filter((artifact) => artifact?.storage_path && artifact?.id);
-  if (sourceArtifacts.length === 0) {
-    throw new Error("The EvidencePackage has no reusable screenshot artifacts.");
+  const typedEvidence = retainedArtifacts
+    .filter((artifact) => artifact?.kind === "typed_evidence" && artifact?.text)
+    .map((artifact) => artifact.text)
+    .join("\n\n") || null;
+  if (sourceArtifacts.length === 0 && !typedEvidence) {
+    throw new Error("The EvidencePackage has no reusable source artifacts.");
   }
 
   const packageSubmissionId = String(
     evidencePackage.provenance?.submission_id ?? evidencePackage.package_id
   );
-  const submissionId = packageSubmissionId.endsWith("_images")
-    ? packageSubmissionId.slice(0, -"_images".length)
-    : packageSubmissionId;
+  const submissionId = packageSubmissionId.replace(
+    /_(?:images|typed|progress_photos)$/,
+    ""
+  );
   const capturedAt = evidencePackage.captured_at ?? new Date().toISOString();
   const evidenceDate = normalizeDateKey(
     evidencePackage.observed_date ??
@@ -165,7 +176,7 @@ export async function reinterpretEvidenceIntakeSubmissionFromStoredArtifacts({
     expectedEvidenceType,
     storedArtifacts,
     submissionId,
-    typedEvidence: null,
+    typedEvidence,
     userId,
   });
   if (reinterpreted.package_id !== evidencePackage.package_id) {
