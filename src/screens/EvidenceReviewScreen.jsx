@@ -40,9 +40,11 @@ import { isEvidenceReviewCanonicalSaveComplete } from "../domain/services/Eviden
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
-export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, dexaEditOutcome = null, dexaMeasurementsAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessEligibility = { eligible: false }, reprocessOutcome = null, review }) {
+export default function EvidenceReviewScreen({ canonicalExercises = [], confirmAction, dexaEditOutcome = null, dexaMeasurementsAction, discardAction, exerciseRelationshipAction, exerciseResolutionAction, exerciseVariantAction, photoEditOutcome = null, photoPoseAction, photoSessionMetadataAction, recoveryContext = null, reprocessAction, reprocessEligibility = { eligible: false }, reprocessOutcome = null, review }) {
   const evidencePackage = review.interpretedEvidence ?? {};
   const [itemDecisions, setItemDecisions] = useState(() => review.itemDecisions ?? {});
+  const [photoEditPending, setPhotoEditPending] = useState(false);
+  const photoEditPendingRef = useRef(false);
   const [nutritionDispositions, setNutritionDispositions] = useState(() =>
     Object.fromEntries((evidencePackage.evidence_objects ?? [])
       .filter((object) => object.evidence_type === "nutrition")
@@ -111,6 +113,23 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
       toggleEvidenceReviewItemDecision(current, item.object.id, item.included)
     );
   };
+  const submitPhotoEdit = async (action, formData) => {
+    if (!action || photoEditPendingRef.current) return;
+    photoEditPendingRef.current = true;
+    setPhotoEditPending(true);
+    try {
+      await action(formData);
+    } finally {
+      photoEditPendingRef.current = false;
+      setPhotoEditPending(false);
+    }
+  };
+  const photoPoseSubmit = photoPoseAction
+    ? (formData) => submitPhotoEdit(photoPoseAction, formData)
+    : null;
+  const photoSessionMetadataSubmit = photoSessionMetadataAction
+    ? (formData) => submitPhotoEdit(photoSessionMetadataAction, formData)
+    : null;
 
   if (status === "confirmed") return <EvidenceSavedScreen experience={experience} trainingAchievements={trainingAchievements} />;
   if (canonicalSaved) {
@@ -130,7 +149,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
 
         <div className="mt-6 space-y-4">
           {presentation.items.map((item) => (
-            <EvidenceCard canEdit={canEdit} dexaMeasurementsAction={dexaMeasurementsAction} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoPoseAction={photoPoseAction} photoSessionMetadataAction={photoSessionMetadataAction} recoveryContext={recoveryContext} review={review} />
+            <EvidenceCard canEdit={canEdit} dexaMeasurementsAction={dexaMeasurementsAction} exerciseRelationshipAction={exerciseRelationshipAction} exerciseVariantAction={exerciseVariantAction} item={item} key={item.object.id} nutritionDisposition={nutritionDispositions[item.object.id] ?? ""} onNutritionDisposition={(value) => setNutritionDispositions((current) => ({ ...current, [item.object.id]: value }))} onToggle={toggleItem} photoEditPending={photoEditPending} photoPoseAction={photoPoseSubmit} photoSessionMetadataAction={photoSessionMetadataSubmit} recoveryContext={recoveryContext} review={review} />
           ))}
         </div>
 
@@ -202,6 +221,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
         {reprocessOutcome === "failed" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">Re-read failed. Your previous review is still intact.</p></Card>}
         {dexaEditOutcome === "updated" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">DEXA measurements updated. Review them once more before saving.</p></Card>}
         {dexaEditOutcome === "stale" && <Card className="mt-3" variant="warning"><p aria-live="assertive" className="text-sm font-bold text-[var(--text-primary)]">This review changed before the DEXA correction was saved. Review the current values and try again.</p></Card>}
+        {photoEditOutcome === "stale" && <Card className="mt-3" variant="soft"><p aria-live="polite" className="text-sm font-bold text-[var(--text-primary)]">This photo review changed while an update was saving. Your saved selections are intact, and the current review has been refreshed.</p></Card>}
         {canEdit && <div className="mt-3 grid grid-cols-2 gap-3">
           <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-[var(--divider)] px-3 text-center text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={recoveryContext?.returnTo ?? "/log"}>Save and return later</Link>
           <DiscardReviewControl action={discardAction} recoveryContext={recoveryContext} reviewId={review.id} />
@@ -211,7 +231,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   );
 }
 
-function EvidenceCard({ canEdit, dexaMeasurementsAction, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoPoseAction, photoSessionMetadataAction, recoveryContext, review }) {
+function EvidenceCard({ canEdit, dexaMeasurementsAction, exerciseRelationshipAction, exerciseVariantAction, item, nutritionDisposition, onNutritionDisposition, onToggle, photoEditPending, photoPoseAction, photoSessionMetadataAction, recoveryContext, review }) {
   const Icon = ICONS[item.type] ?? HeartPulse;
   return (
     <Card className="space-y-5">
@@ -373,7 +393,7 @@ function EvidenceCard({ canEdit, dexaMeasurementsAction, exerciseRelationshipAct
         </section>
       )}
 
-      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} metadataAction={photoSessionMetadataAction} object={item.object} recoveryContext={recoveryContext} review={review} />}
+      {item.type === "photos" && <PhotoPreviews action={photoPoseAction} canEdit={canEdit && item.included} metadataAction={photoSessionMetadataAction} object={item.object} pending={photoEditPending} recoveryContext={recoveryContext} review={review} />}
       <button
         aria-label={`${item.included ? "Exclude" : "Include"} ${item.title} ${item.date ?? ""}`.trim()}
         className="min-h-12 w-full cursor-pointer rounded-2xl border border-[var(--divider)] px-4 text-sm font-extrabold text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-accent)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -857,10 +877,10 @@ function EvidenceSavedScreen({ experience, processing = false, processingNeedsAt
   );
 }
 
-function PhotoPreviews({ action, canEdit, metadataAction, object, recoveryContext, review }) {
+function PhotoPreviews({ action, canEdit, metadataAction, object, pending, recoveryContext, review }) {
   const photos = (object.photos ?? []).filter((photo) => photo.active !== false);
-  return <section aria-label="Photo pose review" className="space-y-4">
-    {(object.captureMetadata || object.goalRelationship) && <PhotoSessionMetadataReview action={metadataAction} canEdit={canEdit} object={object} recoveryContext={recoveryContext} review={review} />}
+  return <section aria-busy={pending} aria-label="Photo pose review" className="space-y-4">
+    {(object.captureMetadata || object.goalRelationship) && <PhotoSessionMetadataReview action={metadataAction} canEdit={canEdit} object={object} pending={pending} recoveryContext={recoveryContext} review={review} />}
     <div>
       <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Match each photo to its pose</h3>
       <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">Each selection stays attached to this uploaded image.</p>
@@ -885,20 +905,20 @@ function PhotoPreviews({ action, canEdit, metadataAction, object, recoveryContex
             <input name="photoId" type="hidden" value={photo.id} />
             <input name="sourceArtifactRef" type="hidden" value={photo.source_artifact_ref ?? ""} />
             <label className="block text-xs font-extrabold text-[var(--text-secondary)]" htmlFor={`pose-${photo.id}`}>Pose</label>
-            <select className="min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold text-[var(--text-primary)] disabled:opacity-50" defaultValue={poseId === "unknown" ? "" : poseId} disabled={!canEdit || !action} id={`pose-${photo.id}`} name="poseId" required>
+            <select className="min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold text-[var(--text-primary)] disabled:opacity-50" defaultValue={poseId === "unknown" ? "" : poseId} disabled={!canEdit || !action || pending} id={`pose-${photo.id}`} name="poseId" required>
               <option disabled value="">Choose pose</option>
               {CanonicalProgressPhotoCategories.map((pose) => <option key={pose.id} value={pose.id}>{pose.label}</option>)}
             </select>
-            <PhotoPoseSaveButton disabled={!canEdit || !action} />
+            <PhotoPoseSaveButton disabled={!canEdit || !action} reviewPending={pending} />
           </form>
         </div>
       </article>;
     })}
   </section>;
 }
-function PhotoPoseSaveButton({ disabled }) { const { pending } = useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending} type="submit">{pending ? "Saving pose\u2026" : "Save pose"}</button>; }
+function PhotoPoseSaveButton({ disabled, reviewPending }) { const { pending } = useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-40" disabled={disabled || pending || reviewPending} type="submit">{pending ? "Saving pose\u2026" : reviewPending ? "Photo update in progress\u2026" : "Save pose"}</button>; }
 
-function PhotoSessionMetadataReview({ action, canEdit, object, recoveryContext, review }) {
+function PhotoSessionMetadataReview({ action, canEdit, object, pending, recoveryContext, review }) {
   const captureNeedsReview = object.captureMetadata?.status === "needs_review";
   const goalNeedsReview = object.goalRelationship?.status === "needs_review";
   if (!captureNeedsReview && !goalNeedsReview) return <div className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-3"><p className="text-xs font-extrabold text-[var(--text-primary)]">Shared session details</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{formatSessionTime(object)} · {object.goalRelationship?.goalLabel ?? "No Goal relationship"}</p></div>;
@@ -906,12 +926,12 @@ function PhotoSessionMetadataReview({ action, canEdit, object, recoveryContext, 
   return <form action={action} className="space-y-3 rounded-2xl border border-[var(--divider)] bg-[var(--surface-muted)] p-3">
     <div><p className="text-xs font-extrabold text-[var(--text-primary)]">Shared session details</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">These values apply once to every photo in this capture session.</p></div>
     <input name="reviewId" type="hidden" value={review.id}/><input name="expectedUpdatedAt" type="hidden" value={review.updatedAt}/><input name="evidenceObjectId" type="hidden" value={object.id}/><EvidenceRecoveryContextFields context={recoveryContext}/>
-    {captureNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Time of day<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" name="timeOfDay" required><option disabled value="">Choose time of day</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></label> : <input name="timeOfDay" type="hidden" value={object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? ""}/>}
-    {goalNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Goal relationship<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" name="goalId" required={options.length > 0}><option value="">{options.length ? "Choose Goal" : "No Goal relationship"}</option>{options.map((goal)=><option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label> : <input name="goalId" type="hidden" value={object.goalRelationship?.goalIds?.[0] ?? ""}/>}
-    <PhotoSessionMetadataSaveButton disabled={!canEdit || !action}/>
+    {captureNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Time of day<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" disabled={pending} name="timeOfDay" required><option disabled value="">Choose time of day</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></label> : <input name="timeOfDay" type="hidden" value={object.captureMetadata?.timeOfDay ?? object.conditions?.timeOfDay ?? ""}/>}
+    {goalNeedsReview ? <label className="block text-xs font-extrabold text-[var(--text-secondary)]">Goal relationship<select className="mt-1 min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold" disabled={pending} name="goalId" required={options.length > 0}><option value="">{options.length ? "Choose Goal" : "No Goal relationship"}</option>{options.map((goal)=><option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label> : <input name="goalId" type="hidden" value={object.goalRelationship?.goalIds?.[0] ?? ""}/>}
+    <PhotoSessionMetadataSaveButton disabled={!canEdit || !action} reviewPending={pending}/>
   </form>;
 }
-function PhotoSessionMetadataSaveButton({ disabled }) { const { pending }=useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:opacity-40" disabled={disabled||pending} type="submit">{pending?"Saving session details\u2026":"Save session details"}</button>; }
+function PhotoSessionMetadataSaveButton({ disabled, reviewPending }) { const { pending }=useFormStatus(); return <button className="min-h-11 w-full rounded-xl border border-[var(--primary)] px-3 text-sm font-extrabold text-[var(--primary)] disabled:opacity-40" disabled={disabled||pending||reviewPending} type="submit">{pending?"Saving session details\u2026":reviewPending?"Photo update in progress\u2026":"Save session details"}</button>; }
 function formatSessionTime(object) { const time=object.captureMetadata?.timeOfDay??object.conditions?.timeOfDay; const label=time?`${time[0].toUpperCase()}${time.slice(1)}`:"Time unavailable"; return object.captureMetadata?.status==="inferred"?`${label} · Inferred from image metadata`:label; }
 
 function EvidenceRecoveryContextFields({ context }) {

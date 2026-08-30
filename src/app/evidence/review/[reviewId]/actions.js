@@ -477,13 +477,24 @@ export async function updateEvidenceReviewPhotoPose(formData) {
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
-  await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoPose(reviewId, {
-    expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
-    photoId: String(formData.get("photoId") ?? ""),
-    poseId: String(formData.get("poseId") ?? ""),
-    sourceArtifactRef: String(formData.get("sourceArtifactRef") ?? ""),
-    updatedBy: user.id,
-  });
+  try {
+    await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoPose(reviewId, {
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      photoId: String(formData.get("photoId") ?? ""),
+      poseId: String(formData.get("poseId") ?? ""),
+      sourceArtifactRef: String(formData.get("sourceArtifactRef") ?? ""),
+      updatedBy: user.id,
+    });
+  } catch (error) {
+    if (error?.code === "REVIEW_STALE") {
+      revalidatePath(`/evidence/review/${reviewId}`);
+      redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?photo=stale`,
+        recoveryContext
+      ));
+    }
+    throw error;
+  }
   revalidatePath(`/evidence/review/${reviewId}`);
   redirect(appendEvidenceRecoveryContext(
     `/evidence/review/${reviewId}?pose=saved`,
@@ -497,13 +508,24 @@ export async function updateEvidenceReviewPhotoSessionMetadata(formData) {
   const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
   if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
   const recoveryContext = resolveRecoveryContext(review, formData);
-  await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoSessionMetadata(reviewId, {
-    evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
-    expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
-    goalId: String(formData.get("goalId") ?? ""),
-    timeOfDay: String(formData.get("timeOfDay") ?? ""),
-    updatedBy: user.id,
-  });
+  try {
+    await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoSessionMetadata(reviewId, {
+      evidenceObjectId: String(formData.get("evidenceObjectId") ?? ""),
+      expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
+      goalId: String(formData.get("goalId") ?? ""),
+      timeOfDay: String(formData.get("timeOfDay") ?? ""),
+      updatedBy: user.id,
+    });
+  } catch (error) {
+    if (error?.code === "REVIEW_STALE") {
+      revalidatePath(`/evidence/review/${reviewId}`);
+      redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?photo=stale`,
+        recoveryContext
+      ));
+    }
+    throw error;
+  }
   revalidatePath(`/evidence/review/${reviewId}`);
   redirect(appendEvidenceRecoveryContext(
     `/evidence/review/${reviewId}?session=saved`,

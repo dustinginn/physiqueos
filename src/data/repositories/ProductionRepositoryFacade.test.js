@@ -67,7 +67,6 @@ describe("production repository facade", () => {
     "../../app/briefings/review/page.js",
     "../../app/briefings/weekly/page.js",
     "../../app/check-in/morning/page.js",
-    "../../app/evidence/review/[reviewId]/page.js",
     "../../app/goals/[goalId]/edit/page.js",
     "../../app/log/training/page.js",
     "../../app/profile/operating-plan/execution/[executionId]/page.js",
@@ -83,5 +82,15 @@ describe("production repository facade", () => {
   ])("enters the common read scope for audited direct composite page %s", (relativePath) => {
     const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
     expect(source).toContain("FounderRepositories.runInReadScope");
+  });
+
+  it("routes Evidence Review detail through its narrow provider-native read model", () => {
+    const source = fs.readFileSync(
+      new URL("../../app/evidence/review/[reviewId]/page.js", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("getProductionEvidenceReviewReadService().getReview(reviewId)");
+    expect(source).not.toContain("FounderRepositories.runInReadScope");
+    expect(source).not.toContain("listCanonicalEvidenceObjects");
   });
 });

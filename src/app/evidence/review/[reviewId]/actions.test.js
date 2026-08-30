@@ -58,6 +58,23 @@ vi.mock("../../../../data/repositories/founderRepositories", async () => {
           };
           return state.evidenceReviews[index];
         },
+        async updateReviewIfCurrent(reviewId, expectedUpdatedAt, changes) {
+          const state = getState();
+          const index = state.evidenceReviews.findIndex((review) => review.id === reviewId);
+          if (index < 0) return null;
+          if (state.evidenceReviews[index].updatedAt !== expectedUpdatedAt) {
+            throw Object.assign(new Error("This evidence review changed."), {
+              code: "REVIEW_STALE",
+            });
+          }
+          state.evidenceReviews[index] = {
+            ...state.evidenceReviews[index],
+            ...structuredClone(changes),
+            updatedAt: "2026-07-27T17:00:00.000Z",
+          };
+          state.reviewUpdateCount = (state.reviewUpdateCount ?? 0) + 1;
+          return structuredClone(state.evidenceReviews[index]);
+        },
         get claimEvidenceReviewCommit() {
           if (!getState().durableCommitClaims) return undefined;
           return async (reviewId, lifecycle) => {
@@ -352,7 +369,13 @@ vi.mock("../../../../domain/services/TrainingPerformanceIntelligenceService", ()
   createTrainingPerformanceIntelligenceReport: () => ({ summary: "ok", exerciseObservations: [] }),
 }));
 
-const { confirmEvidenceReview, continueEvidenceReviewInBackground, reprocessEvidenceReview } = await import("./actions.js");
+const {
+  confirmEvidenceReview,
+  continueEvidenceReviewInBackground,
+  reprocessEvidenceReview,
+  updateEvidenceReviewPhotoPose,
+  updateEvidenceReviewPhotoSessionMetadata,
+} = await import("./actions.js");
 
 function requireActiveTestClaim(state, reviewId, operationId) {
   const review = state.evidenceReviews.find((item) => item.id === reviewId);
@@ -639,6 +662,93 @@ async function continueInBackground(review, index = 1) {
     messageId: `message-${index}`,
   });
 }
+
+function createPendingPhotoEditState(store) {
+  const state = createIsolatedReviewState(store);
+  const review = state.evidenceReviews[0];
+  review.status = "pending";
+  review.commitProgress = {};
+  review.commitClaim = null;
+  review.updatedAt = "2026-08-30T22:42:43.354Z";
+  review.interpretedEvidence = {
+    package_id: "photo_package_1",
+    evidence_objects: [{
+      id: "photos_1",
+      evidence_type: "photo_session",
+      captureMetadata: { status: "needs_review", timeOfDay: null },
+      goalRelationship: {
+        status: "needs_review",
+        options: [{ id: "goal_1", title: "Goal One" }],
+      },
+      photos: [
+        { id: "front", source_artifact_ref: "media://front" },
+        { id: "rear", source_artifact_ref: "media://rear" },
+      ],
+    }],
+  };
+  state.reviewUpdateCount = 0;
+  state.useNextRedirectSemantics = true;
+  return state;
+}
+
+describe("photo review edit actions", () => {
+  beforeEach(() => {
+    revalidatePath.mockClear();
+    redirect.mockClear();
+    mockState.value = createPendingPhotoEditState(runtimeStore);
+  });
+
+  it("refreshes a stale pose edit without entering the generic failure boundary", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    const formData = new FormData();
+    formData.set("reviewId", review.id);
+    formData.set("expectedUpdatedAt", "stale-version");
+    formData.set("photoId", "front");
+    formData.set("sourceArtifactRef", "media://front");
+    formData.set("poseId", "front-relaxed");
+
+    await expectNextRedirect(
+      updateEvidenceReviewPhotoPose(formData),
+      `evidence/review/${review.id}?photo=stale`
+    );
+    expect(mockState.value.reviewUpdateCount).toBe(0);
+    expect(revalidatePath).toHaveBeenCalledWith(`/evidence/review/${review.id}`);
+  });
+
+  it("persists one current pose edit and redirects to the refreshed review", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    const formData = new FormData();
+    formData.set("reviewId", review.id);
+    formData.set("expectedUpdatedAt", review.updatedAt);
+    formData.set("photoId", "front");
+    formData.set("sourceArtifactRef", "media://front");
+    formData.set("poseId", "front-relaxed");
+
+    await expectNextRedirect(
+      updateEvidenceReviewPhotoPose(formData),
+      `evidence/review/${review.id}?pose=saved`
+    );
+    expect(mockState.value.reviewUpdateCount).toBe(1);
+    expect(mockState.value.evidenceReviews[0].interpretedEvidence.evidence_objects[0].photos[1])
+      .toMatchObject({ source_artifact_ref: "media://rear" });
+  });
+
+  it("uses the same optimistic boundary for session metadata", async () => {
+    const review = mockState.value.evidenceReviews[0];
+    const formData = new FormData();
+    formData.set("reviewId", review.id);
+    formData.set("expectedUpdatedAt", review.updatedAt);
+    formData.set("evidenceObjectId", "photos_1");
+    formData.set("goalId", "goal_1");
+    formData.set("timeOfDay", "afternoon");
+
+    await expectNextRedirect(
+      updateEvidenceReviewPhotoSessionMetadata(formData),
+      `evidence/review/${review.id}?session=saved`
+    );
+    expect(mockState.value.reviewUpdateCount).toBe(1);
+  });
+});
 
 describe("confirmEvidenceReview", () => {
   beforeEach(() => {

@@ -126,6 +126,44 @@ describe("PostgreSQL Founder repository facade", () => {
     }));
   });
 
+  it("updates one current Evidence Review row and rejects a stale concurrent edit before loading the runtime", async () => {
+    const database = fakeDatabase();
+    const review = database.runtime.evidenceReviews[0];
+    review.status = "pending";
+    review.updatedAt = "2026-08-30T22:42:45.701Z";
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess: vi.fn(async () => ({ authority: "provider-compatibility-nonauthoritative" })) },
+      createCommandId: ({ methodName }) => `review-${methodName}`,
+    });
+
+    const first = await repositories.evidenceReviews.updateReviewIfCurrent(
+      review.id,
+      "2026-08-30T22:42:45.701Z",
+      { photoPoseEditing: { updatedAt: "2026-08-30T22:44:19.013Z" } },
+    );
+    await expect(repositories.evidenceReviews.updateReviewIfCurrent(
+      review.id,
+      "2026-08-30T22:42:45.701Z",
+      { photoPoseEditing: { updatedAt: "2026-08-30T22:44:20.000Z" } },
+    )).rejects.toMatchObject({ code: "REVIEW_STALE" });
+
+    expect(first.photoPoseEditing.updatedAt).toBe("2026-08-30T22:44:19.013Z");
+    expect(database.runtime.evidenceReviews[0].photoPoseEditing.updatedAt)
+      .toBe("2026-08-30T22:44:19.013Z");
+    const queries = database.client.query.mock.calls.map(([sql]) =>
+      String(sql).replace(/\s+/g, " ").trim()
+    );
+    expect(queries.filter((sql) => sql.includes("SELECT record_id,payload FROM physiqueos.")))
+      .toHaveLength(0);
+    expect(queries.filter((sql) => sql.includes("collection_name='evidenceReviews' AND record_id=$2 FOR UPDATE")))
+      .toHaveLength(2);
+    expect(database.transactions).toEqual(["BEGIN", "COMMIT", "BEGIN", "ROLLBACK"]);
+  });
+
   it("persists a JSON-safe existing built-in exercise mapping through the provider facade", async () => {
     const database = fakeDatabase();
     const review = database.runtime.evidenceReviews[0];

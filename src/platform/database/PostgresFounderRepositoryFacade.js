@@ -20,6 +20,7 @@ import {
 
 const GUARDED_COMPATIBILITY_DATABASE = /^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/;
 const TARGETED_EVIDENCE_REVIEW_METHODS = new Set([
+  "updateReviewIfCurrent",
   "claimEvidenceReviewCommit",
   "recordEvidenceReviewCommitProgress",
   "releaseEvidenceReviewCommit",

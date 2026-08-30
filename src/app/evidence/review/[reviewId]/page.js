@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
 import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
 import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
@@ -14,19 +13,23 @@ import {
   prepareNutritionEvidencePackageForReview,
 } from "../../../../domain/services/CanonicalNutritionDayService";
 import { resolveEvidenceReviewReprocessEligibility } from "../../../../domain/services/EvidenceReviewReprocessEligibility";
+import { getProductionEvidenceReviewReadService } from "../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
 
 export default async function EvidenceReviewPage({ params, searchParams }) {
   const { reviewId } = await params;
   const query = await searchParams;
-  return FounderRepositories.runInReadScope(async () => {
-  const review = process.env.NODE_ENV !== "production" && reviewId === "fixture-mobile-review"
+  const fixtureReview = process.env.NODE_ENV !== "production" && reviewId === "fixture-mobile-review"
     ? createMobileEvidenceReviewFixture({
         newExercise: query?.state === "new-exercise",
         noneIncluded: query?.state === "none",
       })
-    : await FounderRepositories.evidenceReviews.getReviewById(reviewId);
+    : null;
+  const read = fixtureReview
+    ? { review: fixtureReview, evidencePackage: fixtureReview.interpretedEvidence, canonicalObjects: [] }
+    : await getProductionEvidenceReviewReadService().getReview(reviewId);
+  const review = read?.review;
   if (!review) notFound();
   const requestedRecoveryContext = parseEvidenceRecoverySearchParams(query) ??
     createEvidenceRecoveryContext(
@@ -39,14 +42,8 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   const reprocessOutcome = ["updated", "current", "failed"].includes(query?.reprocess)
     ? query.reprocess
     : null;
-  const [canonicalObjects, persistedPackage] = await Promise.all([
-    FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(review.userId),
-    review.interpretedEvidence?.package_id
-      ? FounderRepositories.evidencePackages.getEvidencePackageById(
-          review.interpretedEvidence.package_id
-        )
-      : null,
-  ]);
+  const canonicalObjects = read.canonicalObjects;
+  const persistedPackage = read.evidencePackage;
   const interpretedEvidence = prepareNutritionEvidencePackageForReview({
     canonicalObjects,
     evidencePackage: repairPendingReviewExerciseIdentities(
@@ -62,6 +59,6 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     canonicalObjects,
   });
   const dexaEditOutcome = ["updated", "stale"].includes(query?.dexa) ? query.dexa : null;
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessEligibility={reprocessEligibility} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
-  }, { readModel: "route.evidence-review" });
+  const photoEditOutcome = query?.photo === "stale" ? "stale" : null;
+  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoEditOutcome={photoEditOutcome} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessEligibility={reprocessEligibility} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
 }

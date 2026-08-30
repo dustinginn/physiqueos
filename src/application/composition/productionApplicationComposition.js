@@ -40,6 +40,11 @@ import {
   createRepositoryCoreNavigationReadStore,
 } from "../../platform/database/PostgresCoreNavigationReadStore.js";
 import { createCoreNavigationReadService } from "../core/CoreNavigationReadService.js";
+import {
+  createPostgresEvidenceReviewReadStore,
+  createRepositoryEvidenceReviewReadStore,
+} from "../../platform/database/PostgresEvidenceReviewReadStore.js";
+import { createEvidenceReviewReadService } from "../evidence/EvidenceReviewReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -169,6 +174,13 @@ export function getProductionCoreNavigationReadService(env = process.env) {
     ? createProviderCoreNavigationReadStore(env)
     : createRepositoryCoreNavigationReadStore({ readRuntimeStore: getFounderRuntimeStore });
   return createCoreNavigationReadService({ store });
+}
+
+export function getProductionEvidenceReviewReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderEvidenceReviewReadStore(env)
+    : createRepositoryEvidenceReviewReadStore({ repositories: LegacyFounderRepositories });
+  return createEvidenceReviewReadService({ store });
 }
 
 export function getProductionProviderReadinessComposition(env = process.env) {
@@ -361,6 +373,17 @@ function createProviderCoreNavigationReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.core_navigation_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderEvidenceReviewReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresEvidenceReviewReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.evidence_review_read.complete", event)
       : null,
   });
 }

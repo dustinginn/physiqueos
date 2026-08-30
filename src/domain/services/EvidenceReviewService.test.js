@@ -260,6 +260,72 @@ describe("EvidenceReviewService execution variant editing", () => {
 });
 
 describe("EvidenceReviewService photo session metadata", () => {
+  it("updates exactly one photo pose and preserves the other review occurrences", async () => {
+    const state = photoReviewFixture();
+    await createEvidenceReviewService({ repositories: repositories(state) })
+      .setPhotoPose(state.review.id, {
+        expectedUpdatedAt: state.review.updatedAt,
+        photoId: "front",
+        sourceArtifactRef: "media://front",
+        poseId: "front-relaxed",
+        updatedBy: "founder",
+      });
+
+    const photos = state.review.interpretedEvidence.evidence_objects[0].photos;
+    expect(state.reviewUpdateCount).toBe(1);
+    expect(photos[0]).toMatchObject({
+      id: "front-relaxed",
+      poseId: "front-relaxed",
+      identityStatus: "confirmed",
+      userConfirmedIdentity: true,
+    });
+    expect(photos[1]).toEqual({ id: "rear", source_artifact_ref: "media://rear" });
+  });
+
+  it("rejects a stale photo pose before mutating any review state", async () => {
+    const state = photoReviewFixture();
+    const before = structuredClone(state.review);
+    await expect(createEvidenceReviewService({ repositories: repositories(state) })
+      .setPhotoPose(state.review.id, {
+        expectedUpdatedAt: "stale-version",
+        photoId: "front",
+        sourceArtifactRef: "media://front",
+        poseId: "front-relaxed",
+        updatedBy: "founder",
+      })).rejects.toMatchObject({ code: "REVIEW_STALE" });
+    expect(state.review).toEqual(before);
+    expect(state.reviewUpdateCount ?? 0).toBe(0);
+  });
+
+  it("preserves current same-pose and different-pose correction semantics", async () => {
+    const state = photoReviewFixture();
+    const service = createEvidenceReviewService({ repositories: repositories(state) });
+    await service.setPhotoPose(state.review.id, {
+      expectedUpdatedAt: state.review.updatedAt,
+      photoId: "front",
+      sourceArtifactRef: "media://front",
+      poseId: "front-relaxed",
+      updatedBy: "founder",
+    });
+    await service.setPhotoPose(state.review.id, {
+      expectedUpdatedAt: state.review.updatedAt,
+      photoId: "front-relaxed",
+      sourceArtifactRef: "media://front",
+      poseId: "front-relaxed",
+      updatedBy: "founder",
+    });
+    await service.setPhotoPose(state.review.id, {
+      expectedUpdatedAt: state.review.updatedAt,
+      photoId: "front-relaxed",
+      sourceArtifactRef: "media://front",
+      poseId: "front-flexed",
+      updatedBy: "founder",
+    });
+    expect(state.reviewUpdateCount).toBe(3);
+    expect(state.review.interpretedEvidence.evidence_objects[0].photos[0])
+      .toMatchObject({ id: "front-flexed", poseId: "front-flexed" });
+  });
+
   it("updates shared Time of Day and Goal relationship once for the session", async () => {
     const state = reviewFixture();
     state.review.interpretedEvidence.evidence_objects[0] = {
@@ -284,6 +350,21 @@ describe("EvidenceReviewService photo session metadata", () => {
     expect(session.captureMetadata).toMatchObject({ status: "reviewed", timeOfDay: "afternoon" });
     expect(session.goalRelationship).toMatchObject({ status: "resolved", goalIds: ["goal_build"], source: "user_session_review" });
     expect(session.photos).toEqual([{ id: "front", view: "front", pose: "relaxed" }, { id: "rear", view: "back", pose: "relaxed" }]);
+  });
+
+  it("rejects stale session metadata without a partial review mutation", async () => {
+    const state = photoReviewFixture();
+    const before = structuredClone(state.review);
+    await expect(createEvidenceReviewService({ repositories: repositories(state) })
+      .setPhotoSessionMetadata(state.review.id, {
+        evidenceObjectId: "photos_1",
+        expectedUpdatedAt: "stale-version",
+        goalId: "goal_build",
+        timeOfDay: "afternoon",
+        updatedBy: "founder",
+      })).rejects.toMatchObject({ code: "REVIEW_STALE" });
+    expect(state.review).toEqual(before);
+    expect(state.reviewUpdateCount ?? 0).toBe(0);
   });
 });
 
@@ -381,6 +462,24 @@ function reviewFixture() {
       },
     },
   };
+}
+
+function photoReviewFixture() {
+  const state = reviewFixture();
+  state.review.interpretedEvidence.evidence_objects = [{
+    id: "photos_1",
+    evidence_type: "photo_session",
+    captureMetadata: { status: "needs_review", timeOfDay: null },
+    goalRelationship: {
+      status: "needs_review",
+      options: [{ id: "goal_build", title: "Build Lean Mass" }],
+    },
+    photos: [
+      { id: "front", source_artifact_ref: "media://front" },
+      { id: "rear", source_artifact_ref: "media://rear" },
+    ],
+  }];
+  return state;
 }
 
 function relationshipReviewFixture() {

@@ -105,6 +105,28 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(actions).toContain("setPhotoSessionMetadata");
   });
 
+  it("locks every photo review control while one edit is pending and refreshes stale edits", () => {
+    expect(screen).toContain("const [photoEditPending, setPhotoEditPending] = useState(false)");
+    expect(screen).toContain("const photoEditPendingRef = useRef(false)");
+    expect(screen).toContain("if (!action || photoEditPendingRef.current) return");
+    expect(screen).toContain("submitPhotoEdit(photoPoseAction, formData)");
+    expect(screen).toContain("submitPhotoEdit(photoSessionMetadataAction, formData)");
+    expect(screen).toContain("photoEditPending={photoEditPending}");
+    expect(screen).toContain("disabled={!canEdit || !action || pending}");
+    expect(screen).toContain('aria-busy={pending}');
+    expect(screen).toContain("Photo update in progress\\u2026");
+    expect(screen).toContain("Your saved selections are intact, and the current review has been refreshed.");
+    expect(actions).toContain('error?.code === "REVIEW_STALE"');
+    expect(actions).toContain('?photo=stale');
+  });
+
+  it("loads the review through the narrow provider read model", () => {
+    expect(page).toContain("getProductionEvidenceReviewReadService().getReview(reviewId)");
+    expect(page).not.toContain("FounderRepositories.withReadScope");
+    expect(page).not.toContain("listCanonicalEvidenceObjects");
+    expect(page).not.toContain("getEvidencePackageById");
+  });
+
   it("keeps pre-save failure copy distinct from durable post-save success", () => {
     expect(screen).toContain("const canContinue = hasCommitFailure(review)");
     expect(screen).toContain("Evidence was not saved");
