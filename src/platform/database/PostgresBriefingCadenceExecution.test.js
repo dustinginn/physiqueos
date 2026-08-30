@@ -43,6 +43,31 @@ describe("PostgreSQL briefing cadence execution ownership", () => {
     expect(row.status).toBe("succeeded");
   });
 
+  it("does not extend the retry window when the scheduler only observes cooldown", async () => {
+    let current = new Date("2026-08-30T08:20:00.000Z");
+    let row = null;
+    const pool = memoryPool(() => row, (values) => {
+      row = { status: values[3], result: values[4], problem: values[5] };
+    });
+    const store = createPostgresBriefingCadenceExecutionStore({
+      pool,
+      ownerUserId: "founder",
+      now: () => current,
+    });
+    const failure = occurrence({ resultStatus: "transient_failure" });
+    await store.record(failure);
+    const original = await store.getRetryState(failure);
+
+    current = new Date("2026-08-30T08:25:00.000Z");
+    await store.record(occurrence({
+      resultStatus: "transient_failure",
+      skipReason: "retry_cooldown",
+      failureCategory: "generator_timeout",
+    }));
+
+    expect(await store.getRetryState(failure)).toEqual(original);
+  });
+
   it("holds a PostgreSQL advisory lock across the owned execution", async () => {
     const queries = [];
     const release = vi.fn();

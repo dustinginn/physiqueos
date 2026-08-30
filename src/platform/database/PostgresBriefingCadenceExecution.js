@@ -141,6 +141,9 @@ export function occurrenceOperationId({
 }
 
 function nextRetryState(prior, record, observedAt) {
+  if (record.skipReason === "retry_cooldown") {
+    return prior;
+  }
   if (["generation_completed", "already_completed"].includes(record.resultStatus)) {
     return emptyRetryState();
   }
