@@ -25,6 +25,7 @@ struct TrainingSessionDetailView: View {
     @State private var correctionDraftText: String = ""
     @State private var correctionStatusMessage: String?
     @State private var localDraftCorrections: [String] = []
+    @FocusState private var isCorrectionEditorFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -32,10 +33,18 @@ struct TrainingSessionDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
         }
+        .scrollDismissesKeyboard(.immediately)
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { isCorrectionEditorFocused = false }
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+            }
+        }
         .task {
             if viewModel == nil { viewModel = TrainingSessionDetailViewModel(api: environment.trainingAPI, sessionId: sessionId) }
             await viewModel?.load()
@@ -161,6 +170,7 @@ struct TrainingSessionDetailView: View {
                             .allowsHitTesting(false)
                     }
                     TextEditor(text: $correctionDraftText)
+                        .focused($isCorrectionEditorFocused)
                         .physiqueOSFont(PhysiqueOSTypography.body14Regular)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         .scrollContentBackground(.hidden)

@@ -21,11 +21,9 @@ enum AppDestination: Hashable, Codable {
     /// `training.exercise` — a Training Area row's own destination
     /// (`/progress/training/library/:exerciseSlug`,
     /// `TRAINING_EXERCISE`/`getTrainingAreaNavigationGroups`,
-    /// `src/screens/ProgressPlaceholderScreen.jsx:986-996`). No Training
-    /// Library screen exists yet, so this falls to
-    /// `DestinationPlaceholderView` like `photoUpload`/`dexaUpload` already
-    /// do — the destination id is real and carried faithfully even before
-    /// its screen exists.
+    /// `src/screens/ProgressPlaceholderScreen.jsx:986-996`). The router
+    /// distinguishes canonical Training Area ids from individual exercise
+    /// ids and presents the corresponding typed Native screen.
     case trainingExercise(exerciseId: String)
     /// `progress.stream` — the server's catch-all `/progress/*` pattern.
     /// Log's Nutrition and (multi-session/no-id) Training rows resolve

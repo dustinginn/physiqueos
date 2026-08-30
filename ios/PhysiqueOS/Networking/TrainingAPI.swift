@@ -45,29 +45,42 @@ struct FixtureTrainingAPI: TrainingAPI {
         var reporting: ReportingFixtureSection
     }
 
-    /// Synthetic, already-classified fixture facts backing the Resistance
-    /// reporting page's Resistance Summary / Highlights / Needs Attention
-    /// sections — see `TrainingReportingReadModel.swift`'s top doc comment
-    /// for why this is a presentation fixture, not a ported detection
-    /// algorithm.
+    /// Synthetic, already-classified fixture facts shaped like the fields
+    /// `getResistanceReportingContent` actually consumes. The expensive
+    /// Training Performance Intelligence detection remains server-owned;
+    /// Native only performs the same presentation projection.
     private struct ReportingFixtureSection: Codable {
         var resistance: ResistanceReportingFixture
     }
 
     private struct ResistanceReportingFixture: Codable {
-        var statusGroups: [StatusGroupFixture]
-        var highlights: [ExerciseNoteFixture]
-        var needsAttention: [ExerciseNoteFixture]
+        var exerciseObservations: [ExerciseObservationFixture]
+        var categoryObservations: [CategoryObservationFixture]
     }
 
-    private struct StatusGroupFixture: Codable {
-        var label: String
-        var exerciseIds: [String]
-    }
-
-    private struct ExerciseNoteFixture: Codable {
+    private struct ExerciseObservationFixture: Codable {
         var exerciseId: String
-        var detail: String
+        var status: String
+        var latestDate: String?
+        var volumeTrendDirection: String?
+        var prEventId: String?
+    }
+
+    private struct CategoryObservationFixture: Codable {
+        var areaId: String
+        var latestTrainedAt: String?
+        var exerciseCount: Int
+        var latestKnownSets: Int?
+        var latestKnownVolume: Double?
+        var statusCounts: StatusCountsFixture
+    }
+
+    private struct StatusCountsFixture: Codable {
+        var improving: Int
+        var stable: Int
+        var plateauing: Int
+        var regressing: Int
+        var insufficientData: Int
     }
 
     /// Several canonical Training field names are genuinely snake_case in
@@ -153,7 +166,7 @@ struct FixtureTrainingAPI: TrainingAPI {
             benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
             performanceRecords: TrainingPerformanceRecordsCalculator.recordsReadModel(
                 canonicalExerciseId: canonicalExerciseId,
-                events: fixture.trainingPerformanceEvents
+                events: fixture.trainingPerformanceEvents.filter(TrainingPerformanceEventValidator.isValid)
             ),
             lastSession: occurrences.first,
             history: Array(occurrences.prefix(10))
@@ -177,6 +190,7 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: link.label,
                 summary: "Strength progression, PRs, and category momentum from training history.",
+                scope: fixture.landing.scope,
                 placeholderBody: nil,
                 resistance: Self.buildResistanceReport(fixture: fixture),
                 historyDays: nil
@@ -187,6 +201,7 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: "Training History",
                 summary: "Browse recent training days and open the sessions you want to review.",
+                scope: fixture.landing.scope,
                 placeholderBody: nil,
                 resistance: nil,
                 historyDays: fixture.days
@@ -197,6 +212,7 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: link.label,
                 summary: link.detail,
+                scope: fixture.landing.scope,
                 placeholderBody: "This page is now a permanent destination. It will grow into graphs, trends, comparisons, goal impact, and historical analysis as more canonical training evidence accumulates.",
                 resistance: nil,
                 historyDays: nil
@@ -204,13 +220,11 @@ struct FixtureTrainingAPI: TrainingAPI {
         }
     }
 
-    /// Synthesizes `getResistanceReportingContent`'s sections from fixture
-    /// facts: status groups/highlights/needs-attention resolve exercise
-    /// ids to the same Browse rows `TrainingAreaView` already shows;
-    /// Recent PRs reuses the exact same `trainingPerformanceEvents` data
-    /// `fetchTrainingExercise`'s Performance Records card does (not a
-    /// duplicated PR list); Category Rollups reuses the landing page's own
-    /// 10 Training Areas.
+    /// `getResistanceReportingContent`'s presentation projection over
+    /// synthetic, already-classified observations. Status groups,
+    /// highlights, needs-attention, recent PRs, and category rollups reuse
+    /// the same exercise/area destinations and durable PR events as the
+    /// rest of Training; no client-side performance detection is invented.
     private static func buildResistanceReport(fixture: TrainingFixtureFile) -> TrainingResistanceReportReadModel {
         let allExerciseRows = fixture.areas.flatMap(\.exercises)
         func row(exerciseId: String, detail: String?) -> TrainingReportingLinkRow? {
@@ -218,33 +232,88 @@ struct FixtureTrainingAPI: TrainingAPI {
             return TrainingReportingLinkRow(id: exerciseId, label: exercise.label, detail: detail, destination: .trainingExercise(exerciseId: exerciseId))
         }
 
-        let statusGroups = fixture.reporting.resistance.statusGroups.map { group in
+        let statusDefinitions: [(key: String, label: String, tone: TrainingResistanceStatusTone)] = [
+            ("improving", "Improving", .success),
+            ("stable", "Stable", .stable),
+            ("plateauing", "Plateauing", .warning),
+            ("regressing", "Regressing", .danger),
+        ]
+        let observations = fixture.reporting.resistance.exerciseObservations
+        let statusGroups = statusDefinitions.map { definition in
             TrainingResistanceStatusGroup(
-                label: group.label,
-                items: group.exerciseIds.compactMap { row(exerciseId: $0, detail: nil) }
+                label: definition.label,
+                tone: definition.tone,
+                items: observations
+                    .filter { $0.status == definition.key }
+                    .compactMap { observation in
+                        let latest = observation.latestDate.map { "Latest \(TrainingDateFormatting.short($0))" }
+                        let detail = [definition.label, latest].compactMap { $0 }.joined(separator: " · ")
+                        return row(exerciseId: observation.exerciseId, detail: detail)
+                    }
             )
         }
-        let highlights = fixture.reporting.resistance.highlights.compactMap { row(exerciseId: $0.exerciseId, detail: $0.detail) }
-        let needsAttention = fixture.reporting.resistance.needsAttention.compactMap { row(exerciseId: $0.exerciseId, detail: $0.detail) }
 
-        let recentPrs = fixture.trainingPerformanceEvents
-            .sorted { $0.workoutDate > $1.workoutDate }
-            .compactMap { event -> TrainingReportingLinkRow? in
-                guard let exercise = allExerciseRows.first(where: { $0.canonicalExerciseId == event.canonicalExerciseId }) else { return nil }
-                let title = event.eventType == .sessionVolumePR ? "Session volume record" : "Reps-at-load record"
-                return TrainingReportingLinkRow(
-                    id: event.id,
-                    label: exercise.label,
-                    detail: "\(title) · \(TrainingDateFormatting.short(event.workoutDate))",
-                    destination: .trainingExercise(exerciseId: exercise.id)
+        let eventById = Dictionary(uniqueKeysWithValues: fixture.trainingPerformanceEvents.map { ($0.id, $0) })
+        let recentPrs = observations.compactMap { observation -> TrainingReportingLinkRow? in
+            guard
+                let eventId = observation.prEventId,
+                let event = eventById[eventId],
+                let detail = formatRecentPr(event)
+            else {
+                return nil
+            }
+            return row(exerciseId: observation.exerciseId, detail: detail)
+        }
+
+        let highlights = observations
+            .filter { $0.status == "improving" }
+            .prefix(3)
+            .compactMap { observation -> TrainingReportingLinkRow? in
+                let detail: String
+                if let eventId = observation.prEventId, let event = eventById[eventId], let prDetail = formatRecentPr(event) {
+                    detail = prDetail
+                } else if observation.volumeTrendDirection == "up" {
+                    detail = "Volume moved up from the previous session."
+                } else {
+                    detail = "Recent same-exercise performance is improving."
+                }
+                return row(exerciseId: observation.exerciseId, detail: detail)
+            }
+
+        let needsAttention = observations
+            .filter { $0.status == "regressing" || $0.status == "plateauing" }
+            .compactMap { observation -> TrainingReportingLinkRow? in
+                let statusDetail = observation.status == "regressing"
+                    ? "Recent performance moved down."
+                    : "Multiple comparable sessions without clear overload."
+                let latest = observation.latestDate.map { "Latest \(TrainingDateFormatting.short($0))" }
+                return row(
+                    exerciseId: observation.exerciseId,
+                    detail: [statusDetail, latest].compactMap { $0 }.joined(separator: " · ")
                 )
             }
 
-        let categoryRollups = fixture.landing.trainingAreas.map { area in
-            TrainingReportingLinkRow(
+        let categoryById = Dictionary(
+            uniqueKeysWithValues: fixture.reporting.resistance.categoryObservations.map { ($0.areaId, $0) }
+        )
+        let categoryRollups = fixture.landing.trainingAreas.compactMap { area -> TrainingReportingLinkRow? in
+            guard let observation = categoryById[area.id] else { return nil }
+            var parts: [String] = []
+            if let latest = observation.latestTrainedAt {
+                parts.append("Latest \(TrainingDateFormatting.short(latest))")
+            }
+            parts.append("\(observation.exerciseCount) exercise\(observation.exerciseCount == 1 ? "" : "s")")
+            if let sets = observation.latestKnownSets, sets > 0 {
+                parts.append("\(sets) set\(sets == 1 ? "" : "s")")
+            }
+            if let volume = observation.latestKnownVolume, volume > 0 {
+                parts.append("\(formatNumber(volume)) lb")
+            }
+            parts.append(formatStatusCounts(observation.statusCounts))
+            return TrainingReportingLinkRow(
                 id: area.id,
                 label: area.label,
-                detail: area.exerciseCount > 0 ? "\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")" : nil,
+                detail: parts.joined(separator: " · "),
                 destination: area.destination
             )
         }
@@ -256,6 +325,43 @@ struct FixtureTrainingAPI: TrainingAPI {
             needsAttention: needsAttention,
             categoryRollups: categoryRollups
         )
+    }
+
+    private static func formatRecentPr(_ event: TrainingPerformanceEvent) -> String? {
+        switch TrainingPerformanceEventType(rawValue: event.eventType) {
+        case .sessionVolumePR:
+            guard let value = event.sessionVolume, value.isFinite, value > 0 else { return nil }
+            return "Volume PR: \(formatNumber(value)) \(event.unit ?? "lb")."
+        case .repsAtLoadPR:
+            guard let reps = event.reps, reps.isFinite, reps > 0 else { return nil }
+            let load: String
+            if event.loadUnit == "bodyweight" || event.load == nil || event.load == 0 {
+                load = "BW"
+            } else {
+                load = "\(formatNumber(event.load!)) \(event.loadUnit ?? "lb")"
+            }
+            return "New reps-at-load PR: \(formatNumber(reps)) reps at \(load)."
+        case .none:
+            return nil
+        }
+    }
+
+    private static func formatStatusCounts(_ counts: StatusCountsFixture) -> String {
+        var parts: [String] = []
+        if counts.improving > 0 { parts.append("\(counts.improving) improving") }
+        if counts.stable > 0 { parts.append("\(counts.stable) stable") }
+        if counts.plateauing > 0 { parts.append("\(counts.plateauing) plateauing") }
+        if counts.regressing > 0 { parts.append("\(counts.regressing) regressing") }
+        if counts.insufficientData > 0 { parts.append("\(counts.insufficientData) needs data") }
+        return parts.isEmpty ? "More history needed" : parts.joined(separator: " · ")
+    }
+
+    private static func formatNumber(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 3
+        return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }
 
     /// `deriveTrainingExerciseRelationshipContext` — finds the

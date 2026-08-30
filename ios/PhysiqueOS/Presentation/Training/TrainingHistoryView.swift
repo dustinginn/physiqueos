@@ -213,7 +213,7 @@ struct TrainingHistoryView: View {
         }
     }
 
-    // MARK: - Reporting (compact expandable summary of the 5 reporting links)
+    // MARK: - Reporting (compact expandable summary of all six reporting links)
 
     private func reportingCard(_ links: [TrainingReportingLink]) -> some View {
         CardContainer {
@@ -225,7 +225,7 @@ struct TrainingHistoryView: View {
                             Text("Review trends and summaries")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Resistance, cardio, volume, frequency, and consistency.")
+                            Text("Resistance, cardio, volume, frequency, consistency, and history.")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -244,9 +244,11 @@ struct TrainingHistoryView: View {
                                 TrainingLinkRow(label: link.label, detail: link.detail)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("training-report-\(link.id)")
                         }
                     }
                 }
+                .accessibilityIdentifier("training-reporting-disclosure")
             }
         }
     }
@@ -808,9 +810,13 @@ enum TrainingDateFormatting {
     }
 
     static func short(_ value: String) -> String {
-        if let date = date(from: value) {
+        // Web `formatDate` treats the first ten characters as a calendar
+        // date, not an instant. Preserve that date key so a UTC midnight
+        // never appears as the prior day in a western device time zone.
+        if let date = dateKeyFormatter.date(from: String(value.prefix(10))) {
             let display = DateFormatter()
             display.dateFormat = "MMM d"
+            display.timeZone = TimeZone(identifier: "UTC")
             return display.string(from: date)
         }
         return String(value.prefix(10))

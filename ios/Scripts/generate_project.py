@@ -135,8 +135,13 @@ test_files = [
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
 ]
 
+ui_test_files = [
+    ("PhysiqueOSUITests", "TrainingAcceptanceUITests.swift"),
+]
+
 BUNDLE_ID_APP = "com.physiqueos.native.dev"
 BUNDLE_ID_TEST = "com.physiqueos.native.dev.Tests"
+BUNDLE_ID_UI_TEST = "com.physiqueos.native.dev.UITests"
 DEPLOYMENT_TARGET = "18.0"
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
@@ -215,6 +220,24 @@ I("testResourcesPhase")
 I("testDependency")
 I("testContainerProxy")
 
+# UI-test objects are intentionally allocated after every pre-existing
+# project object. This keeps all established deterministic IDs stable while
+# making the accessibility acceptance target regeneration-safe.
+for group, fname in ui_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+I("fileref:PhysiqueOSUITests.xctest")
+I("group:PhysiqueOSUITests")
+I("uiTestTarget")
+I("uiTestConfigList")
+I("uiTestDebug")
+I("uiTestRelease")
+I("uiTestSourcesPhase")
+I("uiTestFrameworksPhase")
+I("uiTestResourcesPhase")
+I("uiTestDependency")
+I("uiTestContainerProxy")
+
 # ---------------- PBXBuildFile ----------------
 buildfile_lines = []
 for group, fname in app_files:
@@ -226,9 +249,19 @@ for group, fname in resource_files:
 for group, fname in test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
+for group, fname in ui_test_files:
+    bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
+    buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 
 # ---------------- PBXContainerItemProxy ----------------
 container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ = {{
+\t\t\tisa = PBXContainerItemProxy;
+\t\t\tcontainerPortal = {I('project')} /* Project object */;
+\t\t\tproxyType = 1;
+\t\t\tremoteGlobalIDString = {I('appTarget')};
+\t\t\tremoteInfo = PhysiqueOS;
+\t\t}};
+\t\t{I('uiTestContainerProxy')} /* PBXContainerItemProxy */ = {{
 \t\t\tisa = PBXContainerItemProxy;
 \t\t\tcontainerPortal = {I('project')} /* Project object */;
 \t\t\tproxyType = 1;
@@ -238,11 +271,12 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + resource_files + reference_only_files + test_files:
+for group, fname in app_files + resource_files + reference_only_files + test_files + ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOS.app')} /* PhysiqueOS.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; }};")
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOSTests.xctest')} /* PhysiqueOSTests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
+fileref_lines.append(f"\t\t{I('fileref:PhysiqueOSUITests.xctest')} /* PhysiqueOSUITests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
 
 # ---------------- PBXFrameworksBuildPhase ----------------
 frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
@@ -253,6 +287,13 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 \t\t{I('testFrameworksPhase')} /* Frameworks */ = {{
+\t\t\tisa = PBXFrameworksBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('uiTestFrameworksPhase')} /* Frameworks */ = {{
 \t\t\tisa = PBXFrameworksBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
@@ -325,11 +366,22 @@ group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = 
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
+ui_test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in ui_test_files)
+group_lines.append(f"""\t\t{I('group:PhysiqueOSUITests')} /* PhysiqueOSUITests */ = {{
+\t\t\tisa = PBXGroup;
+\t\t\tchildren = (
+{ui_test_refs}
+\t\t\t);
+\t\t\tpath = PhysiqueOSUITests;
+\t\t\tsourceTree = "<group>";
+\t\t}};""")
+
 group_lines.append(f"""\t\t{I('group:products')} /* Products */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
 \t\t\t\t{I('fileref:PhysiqueOS.app')} /* PhysiqueOS.app */,
 \t\t\t\t{I('fileref:PhysiqueOSTests.xctest')} /* PhysiqueOSTests.xctest */,
+\t\t\t\t{I('fileref:PhysiqueOSUITests.xctest')} /* PhysiqueOSUITests.xctest */,
 \t\t\t);
 \t\t\tname = Products;
 \t\t\tsourceTree = "<group>";
@@ -340,6 +392,7 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t\tchildren = (
 \t\t\t\t{I('group:PhysiqueOS')} /* PhysiqueOS */,
 \t\t\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */,
+\t\t\t\t{I('group:PhysiqueOSUITests')} /* PhysiqueOSUITests */,
 \t\t\t\t{I('group:products')} /* Products */,
 \t\t\t);
 \t\t\tsourceTree = "<group>";
@@ -349,6 +402,7 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files)
 app_resource_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */," for g, f in resource_files)
 test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files)
+ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
 \t\t\tisa = PBXSourcesBuildPhase;
@@ -365,6 +419,14 @@ sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
 {test_source_build_ids}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('uiTestSourcesPhase')} /* Sources */ = {{
+\t\t\tisa = PBXSourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{ui_test_source_build_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
 
 resources_phases = f"""\t\t{I('appResourcesPhase')} /* Resources */ = {{
@@ -376,6 +438,13 @@ resources_phases = f"""\t\t{I('appResourcesPhase')} /* Resources */ = {{
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 \t\t{I('testResourcesPhase')} /* Resources */ = {{
+\t\t\tisa = PBXResourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('uiTestResourcesPhase')} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
@@ -417,12 +486,35 @@ native_targets = f"""\t\t{I('appTarget')} /* PhysiqueOS */ = {{
 \t\t\tproductName = PhysiqueOSTests;
 \t\t\tproductReference = {I('fileref:PhysiqueOSTests.xctest')} /* PhysiqueOSTests.xctest */;
 \t\t\tproductType = "com.apple.product-type.bundle.unit-test";
+\t\t}};
+\t\t{I('uiTestTarget')} /* PhysiqueOSUITests */ = {{
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = {I('uiTestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
+\t\t\tbuildPhases = (
+\t\t\t\t{I('uiTestSourcesPhase')} /* Sources */,
+\t\t\t\t{I('uiTestFrameworksPhase')} /* Frameworks */,
+\t\t\t\t{I('uiTestResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t\t{I('uiTestDependency')} /* PBXTargetDependency */,
+\t\t\t);
+\t\t\tname = PhysiqueOSUITests;
+\t\t\tproductName = PhysiqueOSUITests;
+\t\t\tproductReference = {I('fileref:PhysiqueOSUITests.xctest')} /* PhysiqueOSUITests.xctest */;
+\t\t\tproductType = "com.apple.product-type.bundle.ui-testing";
 \t\t}};"""
 
 target_dependency = f"""\t\t{I('testDependency')} /* PBXTargetDependency */ = {{
 \t\t\tisa = PBXTargetDependency;
 \t\t\ttarget = {I('appTarget')} /* PhysiqueOS */;
 \t\t\ttargetProxy = {I('testContainerProxy')} /* PBXContainerItemProxy */;
+\t\t}};
+\t\t{I('uiTestDependency')} /* PBXTargetDependency */ = {{
+\t\t\tisa = PBXTargetDependency;
+\t\t\ttarget = {I('appTarget')} /* PhysiqueOS */;
+\t\t\ttargetProxy = {I('uiTestContainerProxy')} /* PBXContainerItemProxy */;
 \t\t}};"""
 
 # ---------------- PBXProject ----------------
@@ -437,6 +529,10 @@ project_obj = f"""\t\t{I('project')} /* Project object */ = {{
 \t\t\t\t\t\tCreatedOnToolsVersion = 26.0;
 \t\t\t\t\t}};
 \t\t\t\t\t{I('testTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 26.0;
+\t\t\t\t\t\tTestTargetID = {I('appTarget')};
+\t\t\t\t\t}};
+\t\t\t\t\t{I('uiTestTarget')} = {{
 \t\t\t\t\t\tCreatedOnToolsVersion = 26.0;
 \t\t\t\t\t\tTestTargetID = {I('appTarget')};
 \t\t\t\t\t}};
@@ -457,6 +553,7 @@ project_obj = f"""\t\t{I('project')} /* Project object */ = {{
 \t\t\ttargets = (
 \t\t\t\t{I('appTarget')} /* PhysiqueOS */,
 \t\t\t\t{I('testTarget')} /* PhysiqueOSTests */,
+\t\t\t\t{I('uiTestTarget')} /* PhysiqueOSUITests */,
 \t\t\t);
 \t\t}};"""
 
@@ -604,6 +701,32 @@ test_release = f"""\t\t{I('testRelease')} /* Release */ = {{
 \t\t\tname = Release;
 \t\t}};"""
 
+ui_test_common = f"""
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = 1;
+\t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
+\t\t\t\tGENERATE_INFOPLIST_FILE = YES;
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID_UI_TEST};
+\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tSWIFT_EMIT_LOC_STRINGS = NO;
+\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";
+\t\t\t\tTEST_TARGET_NAME = PhysiqueOS;"""
+
+ui_test_debug = f"""\t\t{I('uiTestDebug')} /* Debug */ = {{
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {{{ui_test_common}
+\t\t\t}};
+\t\t\tname = Debug;
+\t\t}};"""
+
+ui_test_release = f"""\t\t{I('uiTestRelease')} /* Release */ = {{
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {{{ui_test_common}
+\t\t\t}};
+\t\t\tname = Release;
+\t\t}};"""
+
 config_lists = f"""\t\t{I('projConfigList')} /* Build configuration list for PBXProject "PhysiqueOS" */ = {{
 \t\t\tisa = XCConfigurationList;
 \t\t\tbuildConfigurations = (
@@ -627,6 +750,15 @@ config_lists = f"""\t\t{I('projConfigList')} /* Build configuration list for PBX
 \t\t\tbuildConfigurations = (
 \t\t\t\t{I('testDebug')} /* Debug */,
 \t\t\t\t{I('testRelease')} /* Release */,
+\t\t\t);
+\t\t\tdefaultConfigurationIsVisible = 0;
+\t\t\tdefaultConfigurationName = Release;
+\t\t}};
+\t\t{I('uiTestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {{
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = (
+\t\t\t\t{I('uiTestDebug')} /* Debug */,
+\t\t\t\t{I('uiTestRelease')} /* Release */,
 \t\t\t);
 \t\t\tdefaultConfigurationIsVisible = 0;
 \t\t\tdefaultConfigurationName = Release;
@@ -687,6 +819,8 @@ pbxproj = f"""// !$*UTF8*$!
 {app_release}
 {test_debug}
 {test_release}
+{ui_test_debug}
+{ui_test_release}
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */

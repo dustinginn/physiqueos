@@ -9,6 +9,53 @@ import XCTest
 final class TrainingReadModelTests: XCTestCase {
     private let api = FixtureTrainingAPI()
 
+    private func performanceEvent(
+        id: String,
+        canonicalExerciseId: String = "x",
+        canonicalExerciseName: String = "Example Exercise",
+        eventType: TrainingPerformanceEventType,
+        workoutDate: String,
+        previousBaselineValue: Double? = nil,
+        improvement: Double? = nil,
+        unit: String? = nil,
+        load: Double? = nil,
+        loadUnit: String? = nil,
+        reps: Double? = nil,
+        sessionVolume: Double? = nil,
+        executionVariant: TrainingExecutionVariant? = nil,
+        relationshipContext: TrainingPerformanceRelationshipContext? = nil,
+        schemaVersion: String = TrainingPerformanceRecordsCalculator.schemaVersion,
+        category: String = TrainingPerformanceRecordsCalculator.category
+    ) -> TrainingPerformanceEvent {
+        var event = TrainingPerformanceEvent(
+            id: id,
+            schemaVersion: schemaVersion,
+            category: category,
+            eventType: eventType.rawValue,
+            sourceReviewId: "review-\(id)",
+            sourceEvidencePackageId: "evidence-\(id)",
+            sourceCanonicalTrainingId: "canonical-\(id)",
+            sourceSessionId: "session-\(id)",
+            sourceAnalysisId: "analysis-\(id)",
+            canonicalExerciseId: canonicalExerciseId,
+            canonicalExerciseName: canonicalExerciseName,
+            workoutDate: workoutDate,
+            currentValue: sessionVolume ?? reps,
+            executionVariant: executionVariant,
+            relationshipContext: relationshipContext,
+            previousBaselineValue: previousBaselineValue,
+            improvement: improvement,
+            unit: unit,
+            load: load,
+            loadUnit: loadUnit,
+            reps: reps,
+            sessionVolume: sessionVolume,
+            createdAt: "\(workoutDate)T12:00:00.000Z"
+        )
+        event.id = TrainingPerformanceEventValidator.expectedId(for: event) ?? id
+        return event
+    }
+
     // MARK: - Fixture decoding integrity
 
     func testLandingDecodesWithoutError() async throws {
@@ -729,15 +776,15 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(record.executionVariant?.label, "Static Hold")
     }
 
-    /// A first-ever record with no prior baseline must omit the detail
-    /// line entirely (`nil`), not show "Previous: —" or similar.
-    func testBenchPressRecordWithNoPriorBaselineOmitsDetail() async throws {
+    func testBenchPressRecordPreservesPreviousBaselineAndSupersetContext() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
         let unwrapped = try XCTUnwrap(exercise)
         let model = try XCTUnwrap(unwrapped.performanceRecords)
         let record = try XCTUnwrap(model.records.first)
         XCTAssertEqual(record.value, "6 reps at 155 lb")
-        XCTAssertNil(record.detail)
+        XCTAssertEqual(record.detail, "Previous: 5 reps at this load")
+        XCTAssertEqual(record.relationshipContext?.relationshipType, "superset")
+        XCTAssertEqual(record.relationshipContext?.orderedPartners.map(\.name), ["Cable Fly"])
     }
 
     /// `createTrainingLibraryExerciseRecordsReadModel` returns `nil` (not
@@ -758,34 +805,112 @@ final class TrainingReadModelTests: XCTestCase {
     /// itself.
     func testPerformanceRecordsOrderByDateThenTypeThenValueThenId() throws {
         let events = [
-            TrainingPerformanceEvent(id: "b", canonicalExerciseId: "x", eventType: .repsAtLoadPR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: nil, unit: nil, reps: 10, load: 100, loadUnit: "lb", previousBaselineValue: nil, improvement: nil),
-            TrainingPerformanceEvent(id: "a", canonicalExerciseId: "x", eventType: .sessionVolumePR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: 2000, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
-            TrainingPerformanceEvent(id: "c", canonicalExerciseId: "x", eventType: .sessionVolumePR, workoutDate: "2026-08-22", executionVariant: nil, sessionVolume: 1500, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
+            performanceEvent(id: "b", eventType: .repsAtLoadPR, workoutDate: "2026-08-20", load: 100, loadUnit: "lb", reps: 10),
+            performanceEvent(id: "a", eventType: .sessionVolumePR, workoutDate: "2026-08-20", unit: "lb", sessionVolume: 2000),
+            performanceEvent(id: "c", eventType: .sessionVolumePR, workoutDate: "2026-08-22", unit: "lb", sessionVolume: 1500),
         ]
         let model = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events))
-        XCTAssertEqual(model.records.map(\.sourceEventId), ["c", "a", "b"])
+        XCTAssertEqual(model.records.map(\.workoutDate), ["2026-08-22", "2026-08-20", "2026-08-20"])
+        XCTAssertEqual(model.records.map(\.achievementType), [.sessionVolumePR, .sessionVolumePR, .repsAtLoadPR])
     }
 
     func testPerformanceRecordsTruncateAtFiveWithACountLabel() {
         let events = (1...7).map { index in
-            TrainingPerformanceEvent(
-                id: "event-\(index)", canonicalExerciseId: "x", eventType: .repsAtLoadPR,
-                workoutDate: String(format: "2026-08-%02d", index), executionVariant: nil,
-                sessionVolume: nil, unit: nil, reps: 10, load: Double(index), loadUnit: "lb",
-                previousBaselineValue: nil, improvement: nil
+            performanceEvent(
+                id: "event-\(index)", eventType: .repsAtLoadPR,
+                workoutDate: String(format: "2026-08-%02d", index),
+                load: Double(index), loadUnit: "lb", reps: 10
             )
         }
         let model = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events)
         XCTAssertEqual(model?.records.count, 5)
+        XCTAssertEqual(model?.visibleCount, 5)
+        XCTAssertEqual(model?.totalCount, 7)
+        XCTAssertEqual(model?.hiddenCount, 2)
         XCTAssertEqual(model?.countLabel, "Showing 5 of 7 records")
     }
 
     func testPerformanceRecordsCalculatorReturnsNilForEmptyOrMismatchedEvents() {
         XCTAssertNil(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: []))
         let mismatched = [
-            TrainingPerformanceEvent(id: "a", canonicalExerciseId: "other", eventType: .sessionVolumePR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: 2000, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
+            performanceEvent(id: "a", canonicalExerciseId: "other", eventType: .sessionVolumePR, workoutDate: "2026-08-20", unit: "lb", sessionVolume: 2000),
         ]
         XCTAssertNil(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: mismatched))
+    }
+
+    func testPerformanceRecordsRejectMalformedSchemaCategoryNameDateAndType() {
+        let valid = performanceEvent(id: "valid", eventType: .sessionVolumePR, workoutDate: "2026-08-20", unit: "lb", sessionVolume: 2000)
+        var wrongSchema = valid
+        wrongSchema.id = "schema"
+        wrongSchema.schemaVersion = "training_performance_event_v0"
+        var wrongCategory = valid
+        wrongCategory.id = "category"
+        wrongCategory.category = "training"
+        var blankName = valid
+        blankName.id = "name"
+        blankName.canonicalExerciseName = "  "
+        var invalidDate = valid
+        invalidDate.id = "date"
+        invalidDate.workoutDate = "2026-02-30"
+        var unsupportedType = valid
+        unsupportedType.id = "type"
+        unsupportedType.eventType = "future_record_type"
+
+        let model = TrainingPerformanceRecordsCalculator.recordsReadModel(
+            canonicalExerciseId: " x ",
+            events: [wrongSchema, wrongCategory, blankName, invalidDate, unsupportedType, valid]
+        )
+        XCTAssertEqual(model?.records.map(\.sourceEventId), [valid.id])
+        XCTAssertEqual(model?.canonicalExerciseName, "Example Exercise")
+    }
+
+    func testPerformanceRecordsDeduplicateBeforeValidationAndRequireExactImprovement() {
+        let malformedFirst = performanceEvent(
+            id: "duplicate", eventType: .sessionVolumePR, workoutDate: "2026-08-20",
+            previousBaselineValue: 1800, improvement: 199, unit: "lb", sessionVolume: 2000,
+            schemaVersion: "invalid"
+        )
+        let validDuplicate = performanceEvent(
+            id: "duplicate", eventType: .sessionVolumePR, workoutDate: "2026-08-20",
+            previousBaselineValue: 1800, improvement: 200, unit: "lb", sessionVolume: 2000
+        )
+        XCTAssertNil(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: [malformedFirst, validDuplicate]))
+
+        let mismatchedDelta = performanceEvent(
+            id: "delta", eventType: .sessionVolumePR, workoutDate: "2026-08-20",
+            previousBaselineValue: 1800, improvement: 199, unit: "lb", sessionVolume: 2000
+        )
+        let record = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: [mismatchedDelta])?.records.first
+        XCTAssertEqual(record?.previousBaseline, "Previous: 1,800 lb")
+        XCTAssertNil(record?.improvement)
+        XCTAssertEqual(record?.detail, "Previous: 1,800 lb")
+    }
+
+    func testDurablePerformanceEventValidationRejectsBrokenProducerSemantics() {
+        let valid = performanceEvent(
+            id: "valid-durable", eventType: .sessionVolumePR, workoutDate: "2026-08-20",
+            previousBaselineValue: 1800, improvement: 200, unit: "lb", sessionVolume: 2000
+        )
+        XCTAssertTrue(TrainingPerformanceEventValidator.isValid(valid))
+
+        var badCurrent = valid
+        badCurrent.currentValue = 1999
+        XCTAssertFalse(TrainingPerformanceEventValidator.isValid(badCurrent))
+        var badImprovement = valid
+        badImprovement.improvement = 199
+        XCTAssertFalse(TrainingPerformanceEventValidator.isValid(badImprovement))
+        var badSource = valid
+        badSource.sourceAnalysisId = "  "
+        XCTAssertFalse(TrainingPerformanceEventValidator.isValid(badSource))
+        var badIdentity = valid
+        badIdentity.id = "training_performance_event_tampered"
+        XCTAssertFalse(TrainingPerformanceEventValidator.isValid(badIdentity))
+    }
+
+    func testFirstRecordWithoutBaselineOmitsDetail() {
+        let event = performanceEvent(id: "first", eventType: .repsAtLoadPR, workoutDate: "2026-08-20", load: 100, loadUnit: "lb", reps: 10)
+        let record = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: [event])?.records.first
+        XCTAssertNil(record?.detail)
     }
 
     // MARK: - Reporting (completeness sweep, Known Gap 2)
@@ -834,14 +959,16 @@ final class TrainingReadModelTests: XCTestCase {
         let report = try await api.fetchTrainingReporting(reportId: "resistance")
         let unwrapped = try XCTUnwrap(report)
         XCTAssertEqual(unwrapped.title, "Resistance Training")
+        XCTAssertEqual(unwrapped.scope.dateRangeLabel, "Complete history")
         let resistance = try XCTUnwrap(unwrapped.resistance)
         XCTAssertEqual(resistance.statusGroups.map(\.label), ["Improving", "Stable", "Plateauing", "Regressing"])
-        XCTAssertEqual(resistance.statusGroups.first?.items.map(\.label), ["Lat Pulldown", "Push-ups"])
+        XCTAssertEqual(resistance.statusGroups.map(\.tone), [.success, .stable, .warning, .danger])
+        XCTAssertEqual(resistance.statusGroups.first?.items.map(\.label), ["Lat Pulldown", "Push-ups", "Overhead Triceps Extension"])
         XCTAssertFalse(resistance.recentPrs.isEmpty)
         XCTAssertFalse(resistance.highlights.isEmpty)
         XCTAssertFalse(resistance.needsAttention.isEmpty)
-        // All 10 canonical areas, matching the landing page's own grid.
-        XCTAssertEqual(resistance.categoryRollups.count, 10)
+        XCTAssertEqual(resistance.categoryRollups.map(\.label), ["Chest", "Back", "Shoulders", "Triceps"])
+        XCTAssertEqual(resistance.categoryRollups.first?.detail, "Latest Aug 26 · 3 exercises · 7 sets · 3,890 lb · 1 improving · 1 plateauing · 1 needs data")
     }
 
     /// Recent PRs on the Resistance report must reuse the exact same
@@ -851,6 +978,7 @@ final class TrainingReadModelTests: XCTestCase {
         let report = try await api.fetchTrainingReporting(reportId: "resistance")
         let resistance = try XCTUnwrap(report?.resistance)
         XCTAssertEqual(resistance.recentPrs.count, 3)
+        XCTAssertEqual(resistance.recentPrs.first?.detail, "Volume PR: 3,340 lb.")
         for pr in resistance.recentPrs {
             guard case .trainingExercise = pr.destination else {
                 return XCTFail("Expected a trainingExercise destination for \(pr.label).")

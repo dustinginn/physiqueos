@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "000000000000000000001088"
+               BlueprintIdentifier = "0000000000000000000010D3"
                BuildableName = "PhysiqueOS.app"
                BlueprintName = "PhysiqueOS"
                ReferencedContainer = "container:PhysiqueOS.xcodeproj">
@@ -28,9 +28,23 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "00000000000000000000108F"
+               BlueprintIdentifier = "0000000000000000000010DA"
                BuildableName = "PhysiqueOSTests.xctest"
                BlueprintName = "PhysiqueOSTests"
+               ReferencedContainer = "container:PhysiqueOS.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "0000000000000000000010E7"
+               BuildableName = "PhysiqueOSUITests.xctest"
+               BlueprintName = "PhysiqueOSUITests"
                ReferencedContainer = "container:PhysiqueOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,9 +60,19 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "00000000000000000000108F"
+               BlueprintIdentifier = "0000000000000000000010DA"
                BuildableName = "PhysiqueOSTests.xctest"
                BlueprintName = "PhysiqueOSTests"
+               ReferencedContainer = "container:PhysiqueOS.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "0000000000000000000010E7"
+               BuildableName = "PhysiqueOSUITests.xctest"
+               BlueprintName = "PhysiqueOSUITests"
                ReferencedContainer = "container:PhysiqueOS.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -68,7 +92,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "000000000000000000001088"
+            BlueprintIdentifier = "0000000000000000000010D3"
             BuildableName = "PhysiqueOS.app"
             BlueprintName = "PhysiqueOS"
             ReferencedContainer = "container:PhysiqueOS.xcodeproj">
@@ -85,7 +109,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "000000000000000000001088"
+            BlueprintIdentifier = "0000000000000000000010D3"
             BuildableName = "PhysiqueOS.app"
             BlueprintName = "PhysiqueOS"
             ReferencedContainer = "container:PhysiqueOS.xcodeproj">

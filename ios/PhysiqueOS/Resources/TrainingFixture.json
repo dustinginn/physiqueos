@@ -578,49 +578,127 @@
   ],
   "trainingPerformanceEvents": [
     {
-      "id": "perf-event-lat-pulldown-volume",
-      "canonical_exercise_id": "lat_pulldown",
-      "event_type": "session_volume_pr",
-      "workout_date": "2026-08-24",
-      "session_volume": 3340,
+      "id": "training_performance_event_d018fa4468cdcd222d8fce6da1ca87be",
+      "schemaVersion": "training_performance_event_v1",
+      "category": "training_performance",
+      "eventType": "session_volume_pr",
+      "sourceReviewId": "review-fixture-002",
+      "sourceEvidencePackageId": "evidence-package-fixture-002",
+      "sourceCanonicalTrainingId": "canonical-training-fixture-002",
+      "sourceSessionId": "session-fixture-002",
+      "sourceAnalysisId": "analysis-fixture-002",
+      "workoutDate": "2026-08-24",
+      "canonicalExerciseId": "lat_pulldown",
+      "canonicalExerciseName": "Lat Pulldown",
+      "currentValue": 3340,
+      "previousBaselineValue": 3060,
+      "improvement": 280,
       "unit": "lb",
-      "previous_baseline_value": 3060,
-      "improvement": 280
+      "load": null,
+      "loadUnit": null,
+      "reps": null,
+      "sessionVolume": 3340,
+      "createdAt": "2026-08-24T13:00:00Z"
     },
     {
-      "id": "perf-event-triceps-reps-at-load",
-      "canonical_exercise_id": "overhead_triceps_extension",
-      "event_type": "reps_at_load_pr",
-      "workout_date": "2026-08-26",
-      "reps": 10,
+      "id": "training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385",
+      "schemaVersion": "training_performance_event_v1",
+      "category": "training_performance",
+      "eventType": "reps_at_load_pr",
+      "sourceReviewId": "review-fixture-001",
+      "sourceEvidencePackageId": "evidence-package-fixture-001",
+      "sourceCanonicalTrainingId": "canonical-training-fixture-001",
+      "sourceSessionId": "session-fixture-001",
+      "sourceAnalysisId": "analysis-fixture-001",
+      "workoutDate": "2026-08-26",
+      "canonicalExerciseId": "overhead_triceps_extension",
+      "canonicalExerciseName": "Overhead Triceps Extension",
+      "currentValue": 10,
+      "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" },
+      "previousBaselineValue": 8,
+      "improvement": 2,
+      "unit": "reps",
       "load": 40,
-      "load_unit": "lb",
-      "previous_baseline_value": 8,
-      "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" }
+      "loadUnit": "lb",
+      "reps": 10,
+      "sessionVolume": null,
+      "createdAt": "2026-08-26T13:00:00Z"
     },
     {
-      "id": "perf-event-bench-press-reps-at-load",
-      "canonical_exercise_id": "barbell_bench_press",
-      "event_type": "reps_at_load_pr",
-      "workout_date": "2026-08-26",
-      "reps": 6,
+      "id": "training_performance_event_5ce7057c13ee8cf7784752a36c97456b",
+      "schemaVersion": "training_performance_event_v1",
+      "category": "training_performance",
+      "eventType": "reps_at_load_pr",
+      "sourceReviewId": "review-fixture-001",
+      "sourceEvidencePackageId": "evidence-package-fixture-001",
+      "sourceCanonicalTrainingId": "canonical-training-fixture-001",
+      "sourceSessionId": "session-fixture-001",
+      "sourceAnalysisId": "analysis-fixture-001",
+      "workoutDate": "2026-08-26",
+      "canonicalExerciseId": "barbell_bench_press",
+      "canonicalExerciseName": "Bench Press",
+      "currentValue": 6,
+      "relationshipContext": {
+        "relationshipType": "superset",
+        "memberIndex": 0,
+        "orderedPartners": [
+          { "canonicalExerciseId": "cable_fly", "name": "Cable Fly" }
+        ],
+        "comparisonKey": "superset|partners:cable_fly"
+      },
+      "previousBaselineValue": 5,
+      "improvement": 1,
+      "unit": "reps",
       "load": 155,
-      "load_unit": "lb"
+      "loadUnit": "lb",
+      "reps": 6,
+      "sessionVolume": null,
+      "createdAt": "2026-08-26T13:00:00Z"
     }
   ],
   "reporting": {
     "resistance": {
-      "statusGroups": [
-        { "label": "Improving", "exerciseIds": ["lat-pulldown", "push-ups"] },
-        { "label": "Stable", "exerciseIds": ["seated-cable-row"] },
-        { "label": "Plateauing", "exerciseIds": ["bench-press"] },
-        { "label": "Regressing", "exerciseIds": [] }
+      "exerciseObservations": [
+        { "exerciseId": "lat-pulldown", "status": "improving", "latestDate": "2026-08-24", "volumeTrendDirection": "up", "prEventId": "training_performance_event_d018fa4468cdcd222d8fce6da1ca87be" },
+        { "exerciseId": "push-ups", "status": "improving", "latestDate": "2026-08-26", "volumeTrendDirection": "up", "prEventId": null },
+        { "exerciseId": "overhead-triceps-extension", "status": "improving", "latestDate": "2026-08-26", "volumeTrendDirection": null, "prEventId": "training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385" },
+        { "exerciseId": "seated-cable-row", "status": "stable", "latestDate": "2026-08-24", "volumeTrendDirection": null, "prEventId": null },
+        { "exerciseId": "face-pull", "status": "stable", "latestDate": "2026-08-24", "volumeTrendDirection": null, "prEventId": null },
+        { "exerciseId": "bench-press", "status": "plateauing", "latestDate": "2026-08-26", "volumeTrendDirection": null, "prEventId": "training_performance_event_5ce7057c13ee8cf7784752a36c97456b" }
       ],
-      "highlights": [
-        { "exerciseId": "lat-pulldown", "detail": "New best set logged Aug 24." }
-      ],
-      "needsAttention": [
-        { "exerciseId": "bench-press", "detail": "No comparable prior superset session yet." }
+      "categoryObservations": [
+        {
+          "areaId": "chest",
+          "latestTrainedAt": "2026-08-26",
+          "exerciseCount": 3,
+          "latestKnownSets": 7,
+          "latestKnownVolume": 3890,
+          "statusCounts": { "improving": 1, "stable": 0, "plateauing": 1, "regressing": 0, "insufficientData": 1 }
+        },
+        {
+          "areaId": "back",
+          "latestTrainedAt": "2026-08-24",
+          "exerciseCount": 2,
+          "latestKnownSets": 5,
+          "latestKnownVolume": 5740,
+          "statusCounts": { "improving": 1, "stable": 1, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+        },
+        {
+          "areaId": "shoulders",
+          "latestTrainedAt": "2026-08-24",
+          "exerciseCount": 1,
+          "latestKnownSets": 3,
+          "latestKnownVolume": 1800,
+          "statusCounts": { "improving": 0, "stable": 1, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+        },
+        {
+          "areaId": "triceps",
+          "latestTrainedAt": "2026-08-26",
+          "exerciseCount": 1,
+          "latestKnownSets": 4,
+          "latestKnownVolume": 800,
+          "statusCounts": { "improving": 1, "stable": 0, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+        }
       ]
     }
   }

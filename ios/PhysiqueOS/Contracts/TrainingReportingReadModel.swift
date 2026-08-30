@@ -16,16 +16,17 @@ struct TrainingReportingReadModel: Identifiable {
     var eyebrow: String
     var title: String
     var summary: String
+    /// The same accepted inert fixture snapshot rendered on every current
+    /// Training deep page; live goal/date scoping remains server-owned.
+    var scope: TrainingScopeContext
     /// Populated only for `cardio`/`volume`/`frequency`/`consistency` —
     /// the literal "Foundation" card body text every one of those pages
     /// shows verbatim on the web today.
     var placeholderBody: String?
     /// Populated only for `resistance`.
     var resistance: TrainingResistanceReportReadModel?
-    /// Populated only for `history` — reuses `TrainingDayReadModel` as-is
-    /// (date/label/summary/sessions), the same shape `TrainingDayView`
-    /// already renders, since `TrainingDayHistoryCard`'s per-day/per-
-    /// session fields are identical to what that type already carries.
+    /// Populated only for `history` — each row links directly to its
+    /// Training Day, matching `TrainingDayHistoryCard`.
     var historyDays: [TrainingDayReadModel]?
 }
 
@@ -46,17 +47,24 @@ struct TrainingResistanceReportReadModel {
     var recentPrs: [TrainingReportingLinkRow]
     var highlights: [TrainingReportingLinkRow]
     var needsAttention: [TrainingReportingLinkRow]
-    /// `CategoryRollups` — reuses the same 10 canonical areas the
-    /// Training landing page's own "Training Areas" grid already shows.
+    /// `CategoryRollups` — only actual category observations, in canonical
+    /// area order. Areas without a performance observation are absent.
     var categoryRollups: [TrainingReportingLinkRow]
 }
 
 struct TrainingResistanceStatusGroup: Identifiable {
     var label: String
+    var tone: TrainingResistanceStatusTone
     var items: [TrainingReportingLinkRow]
 
     var id: String { label }
     var count: Int { items.count }
+}
+
+/// `TrainingAnalysisDrawerGroup.TONES`: status meaning is visible through
+/// semantic color rather than four visually identical neutral tiles.
+enum TrainingResistanceStatusTone: String {
+    case success, stable, warning, danger
 }
 
 /// A generic label/detail/destination row — reused across Recent PRs,

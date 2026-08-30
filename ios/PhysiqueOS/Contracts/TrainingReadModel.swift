@@ -128,7 +128,7 @@ struct TrainingAreaSummary: Codable, Equatable, Identifiable {
     var destination: AppDestination
 }
 
-/// `getTrainingReportingLinks()` — always these exact 5 links today.
+/// `getTrainingReportingLinks()` — always these exact 6 links today.
 struct TrainingReportingLink: Codable, Equatable, Identifiable {
     var id: String
     var label: String
@@ -434,8 +434,8 @@ extension TrainingExerciseOccurrence {
 // sections for this route (`showSourceWorkouts: false` on the real
 // `/progress/training/library/...` page — `page.js:84` — suppresses the
 // fifth, "Source workouts"): Current Benchmark, an optional Performance
-// Records card (not yet ported — see this slice's final report), Last
-// Session, and Recent History. This is the same read/transport boundary
+// Records card, Last Session, and Recent History. This is the same
+// read/transport boundary
 // Workout Logger prepopulation should consume later — the benchmark/
 // history computation lives here, not duplicated per-screen.
 
@@ -544,26 +544,56 @@ enum TrainingPerformanceEventType: String, Codable {
     case repsAtLoadPR = "reps_at_load_pr"
 }
 
-/// A single already-detected PR event, as a live backend would supply it.
-/// Field presence depends on `eventType`: `sessionVolumePR` uses
-/// `sessionVolume`/`unit`; `repsAtLoadPR` uses `reps`/`load`/`loadUnit`.
-/// `previousBaselineValue`/`improvement` are optional on both (a first-ever
-/// record has no prior baseline).
-struct TrainingPerformanceEvent: Codable, Equatable, Identifiable {
+/// A single already-detected PR event using the complete durable event
+/// transport produced by `createTrainingPerformanceEvent`. Fields that the
+/// JavaScript read-model service treats defensively are optional here too,
+/// allowing one malformed event to be rejected by the pure calculator
+/// without weakening validation or invalidating unrelated events.
+struct TrainingPerformanceEvent: Codable, Equatable {
     var id: String
+    var schemaVersion: String
+    var category: String
+    /// Kept as transport text so an unsupported future event type is
+    /// ignored exactly as `Object.hasOwn(TYPE_ORDER, event.eventType)` does
+    /// on the web instead of failing the entire fixture decode.
+    var eventType: String
+    var sourceReviewId: String?
+    var sourceEvidencePackageId: String?
+    var sourceCanonicalTrainingId: String?
+    var sourceSessionId: String?
+    var sourceAnalysisId: String?
     var canonicalExerciseId: String
-    var eventType: TrainingPerformanceEventType
+    var canonicalExerciseName: String
     /// A bare `"YYYY-MM-DD"` key (`isDateKey` on the web) — not a full
     /// ISO-8601 timestamp like session dates.
     var workoutDate: String
+    var currentValue: Double?
     var executionVariant: TrainingExecutionVariant?
-    var sessionVolume: Double?
-    var unit: String?
-    var reps: Double?
-    var load: Double?
-    var loadUnit: String?
+    var relationshipContext: TrainingPerformanceRelationshipContext?
     var previousBaselineValue: Double?
     var improvement: Double?
+    var unit: String?
+    var load: Double?
+    var loadUnit: String?
+    var reps: Double?
+    var sessionVolume: Double?
+    var createdAt: String?
+}
+
+/// `relationshipContext` is durable event context, not a second exercise
+/// relationship model. It mirrors the subset emitted by
+/// `deriveTrainingExerciseRelationshipContext` and retained unchanged by
+/// `TrainingLibraryExerciseRecordsService.toItem`.
+struct TrainingPerformanceRelationshipContext: Codable, Equatable {
+    var relationshipType: String
+    var memberIndex: Int?
+    var orderedPartners: [TrainingPerformanceRelationshipPartner]
+    var comparisonKey: String?
+}
+
+struct TrainingPerformanceRelationshipPartner: Codable, Equatable {
+    var canonicalExerciseId: String
+    var name: String
 }
 
 /// One row in the Performance Records card — `toItem`'s output shape,
@@ -571,15 +601,19 @@ struct TrainingPerformanceEvent: Codable, Equatable, Identifiable {
 /// the web, `compareRecords` never reads it).
 struct TrainingPerformanceRecord: Identifiable, Equatable {
     var id: String
+    var canonicalExerciseId: String
+    var canonicalExerciseName: String
     var title: String
     var value: String
-    /// The joined "Previous: … · Improved by …" string, or `nil` — the
-    /// only record-history field the card actually renders (the web's
-    /// separate `previousBaseline`/`improvement` fields are not consumed
-    /// by `ExercisePerformanceRecordsCard`, so this port skips them too).
+    var previousBaseline: String?
+    var improvement: String?
+    /// The joined "Previous: … · Improved by …" string, or `nil`.
     var detail: String?
     var workoutDate: String
     var executionVariant: TrainingExecutionVariant?
+    /// Preserved even though the current card does not render it, matching
+    /// the web read model's durable superset/relationship context.
+    var relationshipContext: TrainingPerformanceRelationshipContext?
     var achievedValue: Double
     var achievementType: TrainingPerformanceEventType
     var sourceEventId: String
@@ -589,8 +623,14 @@ struct TrainingPerformanceRecord: Identifiable, Equatable {
 /// always `nil` (not an empty-records object) when there is nothing to
 /// show, matching the web's `null`-vs-object distinction exactly.
 struct TrainingPerformanceRecordsReadModel: Equatable {
+    var id: String
     var heading: String
+    var canonicalExerciseId: String
+    var canonicalExerciseName: String
     var records: [TrainingPerformanceRecord]
+    var visibleCount: Int
+    var totalCount: Int
+    var hiddenCount: Int
     /// `"Showing {visible} of {total} records"`, or `nil` when nothing was
     /// truncated.
     var countLabel: String?

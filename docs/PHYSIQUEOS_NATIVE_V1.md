@@ -1483,3 +1483,94 @@ Completes the Training Library/history layer the Founder uses constantly, ahead 
 **Founder decisions still open:** whether to build the Performance Records card (a real web feature, deliberately not ported this slice — see above) in a follow-up; unchanged from section 56/57 — the `formatExerciseSetSummary` no-detail-text bug and Training's scope-selector interactivity.
 
 **Cost implications.** None. No new dependency, service, or entitlement.
+
+## 59. Native Training completeness and fidelity sweep (2026-08-30)
+
+This section supersedes section 58's then-accurate statement that Performance
+Records had not been ported; the historical section remains unchanged. Claude's
+interrupted candidate was first preserved exactly on local branch
+native-v1-training-sweep-takeover as
+3bc26a8a8c5ba883357830991da61b92c9ef25a5, then completed in place rather
+than reconstructed from a200f22.
+
+**Completed inventory.** The fixture-backed Training system now covers the
+landing; Latest Training Day disclosure and typed View Training Day route;
+Training Library/Browse; all ten Training Areas, exercise rows, and honest
+empty areas; exercise detail in web order (Current Benchmark → optional
+Performance Records → Last Session → Recent History); Reporting and all six
+destinations; Recent Training History preview and Show All; Training Day;
+Workout Detail; Add / Correct Workout Details; Current Protocol; Related Goals;
+and Data Sources. A final current-web source trace found no other reachable
+read/browse/history/reporting/correction surface omitted.
+
+**Performance Records.** Native now consumes the durable producer event shape
+rather than a Native-only PR model: schema/category/type, provenance IDs,
+canonical exercise ID/name, calendar date, current/previous/improvement values,
+units and type-specific metrics, variant context, relationship/superset
+context, and deterministic SHA-256 identity are preserved and validated.
+Validation rejects malformed schema/category/type/provenance/name/date/value,
+identity, variant, and relationship semantics; raw IDs are deduplicated before
+validation. Qualifying records use the web service's ordering and five-record
+limit, carry visible/total/hidden counts, and omit the card when none qualify.
+Synthetic fixtures cover session-volume, reps-at-load, variant, and superset
+records. Native presents these events but does not detect or persist them.
+
+**Reporting.** Resistance rollups now use only actual synthetic performance
+observations, with latest date, sets, volume, Improving/Stable/Plateauing/
+Regressing counts and matching tones, recent PRs, highlights, needs-attention,
+category details, source/details framing, exact empty copy, and typed links.
+History Reporting renders each day as a direct Training Day link, replacing the
+interrupted accordion/session-link interpretation. Cardio, Volume, Frequency,
+and Consistency intentionally retain the current web Foundation presentation;
+no speculative analytics were invented.
+
+**Re-audited boundaries.** Training Library preserves the web header,
+breadcrumbs, scope framing, ten-area order, counts, chevrons, routes, and empty
+states. Current Protocol remains an informational disclosure. Related Goals
+preserves typed goalDetail intent while Native Goals honestly remains the
+generic placeholder. Data Sources remains informational. Recent history is
+newest-first with correct preview/list summaries, local calendar-date
+formatting, empty state, and typed navigation. Add / Correct preserves original
+evidence, validates input, saves only an in-memory local draft, displays the
+explicit device-only/no-live-endpoint status, and never claims a canonical
+save; a Native keyboard Done control keeps the interaction usable.
+
+**Navigation and presentation audit.** Every visible Training affordance was
+exercised as typed navigation, disclosure, sheet, local fixture action, or
+intentional deferment. The inert goal-scope pills remain the one accepted
+fixture exception; no fake Swift goal/date scoping was added. Plus Jakarta Sans
+and centralized formatting remain in use. The pass corrected stale route
+commentary, bare-date timezone drift, Reporting hierarchy/copy/status colors,
+direct History navigation, and source/details framing while retaining the
+verified Training icon vocabulary.
+
+**Verification.** The project now includes a PhysiqueOSUITests target in the
+generated Xcode project and shared scheme. Three accessibility-driven journeys
+actually tap through Library → Chest → exercise history, all corrected
+Reporting paths, and Show All → Training Day → Workout Detail → typed/saved
+local correction. Twelve keep-always screenshots form the Founder review
+batch. Final xcodebuild build succeeded and xcodebuild test passed 144/144
+outcomes on iPhone 17 / iOS 26.5 with zero failures or skips. The known older
+actor-isolation test warnings and Xcode LLDB debugger-version diagnostic remain
+non-actionable and unchanged; no new actionable warning was introduced.
+
+**Intentional differences/deferred work.** Goal scope remains inert until
+server-owned Goal/date semantics exist; Related Goals still reaches the Goals
+placeholder; Foundation reports remain static because the web is static;
+Training data and observations remain synthetic; the correction action remains
+local-only. Workout Logger has not begun.
+
+**POST-STABILIZATION INTEGRATION REQUIREMENTS.** A future authenticated
+TrainingAPI must read server-owned landing/library/day/session/history,
+reporting observations, goal/date scope, and durable performance events; Native
+must not become the PR producer or authority. Add / Correct must eventually
+call the existing server-owned canonical evidence correction/confirmation
+command so provenance is unioned without destructive replacement. Native Goals
+must eventually resolve the already-typed Related Goals routes. None of those
+shared/backend changes was made here.
+
+**Production and cost.** No DigitalOcean, PostgreSQL, production API,
+authentication, worker/outbox, deployment/runtime, backend authority, shared
+domain architecture, or separate production worktree state was touched. No
+incremental cost, paid service, dependency, infrastructure, entitlement, or
+deployment was added.

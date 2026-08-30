@@ -1,20 +1,15 @@
 import SwiftUI
 
-/// A Training Reporting page (`/progress/training/reporting/:reportId`) —
-/// mirrors `getReportingContent` (`TrainingKnowledgeScreen.jsx`) exactly.
-/// `reportId` is one of 6 fixed values (`getTrainingReportingLinks()`):
-/// **resistance** and **history** have real content; **cardio**,
-/// **volume**, **frequency**, and **consistency** all render the
-/// identical static "Foundation" placeholder card on the web today —
-/// verified directly from source, not a native shortcut. Header,
-/// breadcrumbs (`Training` → `Reporting`, both pointing back to the
-/// Training landing page — confirmed from `page.js`'s own `navigation`
-/// prop, not assumed), and the scope selector are shared across all 6.
+/// `/progress/training/reporting/:reportId`, matching the current web
+/// hierarchy and behavior: Resistance and History have real content;
+/// Cardio, Volume, Frequency, and Consistency intentionally share the
+/// current Foundation placeholder. Goal/date scope remains the accepted
+/// inert fixture snapshot rather than fake client-side filtering.
 struct TrainingReportingView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingReportingViewModel?
     @State private var selectedStatusGroup: TrainingResistanceStatusGroup?
-    @State private var expandedHistoryDayDates: Set<String> = []
+    @State private var selectedAnalysisSheet: TrainingReportingAnalysisSheet?
     let reportId: String
 
     var body: some View {
@@ -28,8 +23,16 @@ struct TrainingReportingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task {
-            if viewModel == nil { viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId) }
+            if viewModel == nil {
+                viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
+            }
             await viewModel?.load()
+        }
+        .sheet(item: $selectedStatusGroup) { group in
+            TrainingResistanceStatusSheet(group: group)
+        }
+        .sheet(item: $selectedAnalysisSheet) { sheet in
+            TrainingReportingAnalysisSheetView(sheet: sheet)
         }
     }
 
@@ -53,6 +56,7 @@ struct TrainingReportingView: View {
         case .loaded(.some(let report)):
             VStack(alignment: .leading, spacing: 16) {
                 header(for: report)
+                TrainingScopeSelectorView(scope: report.scope)
                 if let placeholderBody = report.placeholderBody {
                     foundationCard(placeholderBody)
                 } else if let resistance = report.resistance {
@@ -64,23 +68,28 @@ struct TrainingReportingView: View {
         }
     }
 
+    /// `TrainingReportingHeader`: Training and Training Library are always
+    /// present; only Training History also shows the Reporting parent.
     private func header(for report: TrainingReportingReadModel) -> some View {
-        TrainingLibraryHeaderView(
+        var breadcrumbs = [
+            TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
+            TrainingBreadcrumb(label: "Training Library", destination: .progressStream(streamId: "training/library")),
+        ]
+        if report.id == "history" {
+            breadcrumbs.append(
+                TrainingBreadcrumb(label: "Reporting", destination: .progressStream(streamId: "training"))
+            )
+        }
+        return TrainingLibraryHeaderView(
             eyebrow: report.eyebrow,
             title: report.title,
-            breadcrumbs: [
-                TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
-                TrainingBreadcrumb(label: "Reporting", destination: .progressStream(streamId: "training")),
-            ],
+            breadcrumbs: breadcrumbs,
             summary: report.summary
         )
     }
 
-    // MARK: - Cardio / Volume / Frequency / Consistency (identical placeholder)
+    // MARK: - Cardio / Volume / Frequency / Consistency
 
-    /// Verbatim text every one of these four report pages shows today —
-    /// reproduced exactly, not shortened or reworded, since it is the
-    /// real current web copy.
     private func foundationCard(_ body: String) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 8) {
@@ -99,51 +108,125 @@ struct TrainingReportingView: View {
     @ViewBuilder
     private func resistanceSections(_ resistance: TrainingResistanceReportReadModel) -> some View {
         resistanceSummaryCard(resistance.statusGroups)
-        linkListCard(title: "Recent PRs", rows: resistance.recentPrs, emptyText: "No PRs yet.")
-        linkListCard(title: "Highlights", rows: resistance.highlights, emptyText: "No clear positive signals yet.")
-        linkListCard(title: "Needs Attention", rows: resistance.needsAttention, emptyText: "Nothing needs attention right now.")
-        linkListCard(title: "Category Rollups", rows: resistance.categoryRollups, emptyText: nil)
-        CardContainer(padding: .sm) {
-            HStack {
-                Text("Source")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Spacer(minLength: 8)
-                Text("Training sessions")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .sheet(item: $selectedStatusGroup) { group in
-            TrainingResistanceStatusSheet(group: group)
-        }
+        linkListCard(
+            title: "Recent PRs",
+            rows: resistance.recentPrs,
+            emptyText: "No recent PRs yet.",
+            previewLimit: 3,
+            sheetTitle: "Recent PRs",
+            sheetDescription: "All recent personal records in the current reporting order."
+        )
+        linkListCard(
+            title: "Highlights",
+            rows: resistance.highlights,
+            emptyText: "No clear positive signals yet."
+        )
+        linkListCard(
+            title: "Needs Attention",
+            rows: resistance.needsAttention,
+            emptyText: "No clear training concerns yet.",
+            previewLimit: 3,
+            sheetTitle: "Needs Attention",
+            sheetDescription: "Exercises requiring review, with the latest supporting date."
+        )
+        linkListCard(
+            title: "Category Rollups",
+            rows: resistance.categoryRollups,
+            emptyText: "Resistance category history will appear as exercises accumulate.",
+            previewLimit: 3,
+            sheetTitle: "All Categories",
+            sheetDescription: "Choose a category to continue in the Training Library.",
+            viewAllLabel: "View all categories →"
+        )
+        detailsCard()
     }
 
-    /// `StatusDrawers`: 4 fixed categories (Improving/Stable/Plateauing/
-    /// Regressing), each a tappable tile showing its count; tapping opens
-    /// a sheet listing that group's exercises with real navigation —
-    /// mirroring `TrainingAnalysisDrawerGroup`'s bottom-sheet drill-down.
     private func resistanceSummaryCard(_ groups: [TrainingResistanceStatusGroup]) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Resistance Summary")
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                    spacing: 8
+                ) {
                     ForEach(groups) { group in
                         Button {
                             selectedStatusGroup = group
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
                                 Text(group.label)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                Spacer(minLength: 4)
                                 Text("\(group.count)")
                                     .physiqueOSFont(PhysiqueOSTypography.metricValue)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .foregroundStyle(statusColor(group.tone))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, minHeight: 56)
+                            .background(statusColor(group.tone).opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(statusColor(group.tone).opacity(0.24), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Shows exercises in this status group")
+                    }
+                }
+            }
+        }
+    }
+
+    private func statusColor(_ tone: TrainingResistanceStatusTone) -> Color {
+        switch tone {
+        case .success: PhysiqueOSTheme.chartSuccess
+        case .stable: PhysiqueOSTheme.chartEvidence
+        case .warning: PhysiqueOSTheme.chartEffort
+        case .danger: PhysiqueOSTheme.destructive
+        }
+    }
+
+    private func linkListCard(
+        title: String,
+        rows: [TrainingReportingLinkRow],
+        emptyText: String,
+        previewLimit: Int? = nil,
+        sheetTitle: String? = nil,
+        sheetDescription: String? = nil,
+        viewAllLabel: String = "View all →"
+    ) -> some View {
+        let visibleRows = previewLimit.map { Array(rows.prefix($0)) } ?? rows
+        return CardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                TrainingSectionHeaderView(title: title)
+                if rows.isEmpty {
+                    Text(emptyText)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(visibleRows) { row in
+                            NavigationLink(value: row.destination) {
+                                TrainingLinkRow(label: row.label, detail: row.detail)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    if let previewLimit, rows.count > previewLimit {
+                        Button {
+                            selectedAnalysisSheet = TrainingReportingAnalysisSheet(
+                                title: sheetTitle ?? title,
+                                description: sheetDescription ?? "Select an exercise to review its training history.",
+                                rows: rows
+                            )
+                        } label: {
+                            Text(viewAllLabel)
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -152,37 +235,27 @@ struct TrainingReportingView: View {
         }
     }
 
-    private func linkListCard(title: String, rows: [TrainingReportingLinkRow], emptyText: String?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: title)
-                if rows.isEmpty {
-                    if let emptyText {
-                        Text(emptyText)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(rows) { row in
-                            NavigationLink(value: row.destination) {
-                                TrainingLinkRow(label: row.label, detail: row.detail)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+    private func detailsCard() -> some View {
+        CardContainer(padding: .sm) {
+            VStack(alignment: .leading, spacing: 10) {
+                TrainingSectionHeaderView(title: "Details")
+                Divider().overlay(PhysiqueOSTheme.divider)
+                HStack {
+                    Text("Source")
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    Spacer(minLength: 8)
+                    Text("Training sessions")
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
             }
         }
     }
 
     // MARK: - History
 
-    /// `TrainingDayHistoryCard`: up to 20 days, newest first (reusing the
-    /// same `TrainingDayReadModel` order `fetchTrainingDay`/`TrainingDayView`
-    /// already established), each an inline-expand accordion revealing
-    /// that day's sessions — tapping a session is real navigation to
-    /// Workout Detail, unlike the exercise-detail page's history rows.
+    /// Current web `TrainingDayHistoryCard`: up to 20 day rows, each a
+    /// direct link to Training Day. Session drill-down happens from there.
     private func historyCard(_ days: [TrainingDayReadModel]) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
@@ -192,18 +265,15 @@ struct TrainingReportingView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 0) {
                         ForEach(days.prefix(20), id: \.date) { day in
-                            TrainingReportingHistoryDayRow(
-                                day: day,
-                                isExpanded: expandedHistoryDayDates.contains(day.date)
-                            ) {
-                                if expandedHistoryDayDates.contains(day.date) {
-                                    expandedHistoryDayDates.remove(day.date)
-                                } else {
-                                    expandedHistoryDayDates.insert(day.date)
-                                }
+                            NavigationLink(value: AppDestination.trainingDay(date: day.date)) {
+                                TrainingLinkRow(
+                                    label: day.label,
+                                    detail: TrainingDayView.formatSummary(day.summary)
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -212,27 +282,68 @@ struct TrainingReportingView: View {
     }
 }
 
-// MARK: - Resistance Summary drill-down sheet
+// MARK: - Reporting sheets
 
-/// `TrainingAnalysisDrawerGroup`'s bottom sheet: the tapped status
-/// category's exercises, each a real link to its Training Library page.
+private struct TrainingReportingAnalysisSheet: Identifiable {
+    let id = UUID()
+    let title: String
+    let description: String
+    let rows: [TrainingReportingLinkRow]
+}
+
+private struct TrainingReportingAnalysisSheetView: View {
+    let sheet: TrainingReportingAnalysisSheet
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(sheet.description)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    VStack(spacing: 0) {
+                        ForEach(sheet.rows) { row in
+                            NavigationLink(value: row.destination) {
+                                TrainingLinkRow(label: row.label, detail: row.detail)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(PhysiqueOSTheme.background)
+            .navigationTitle(sheet.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct TrainingResistanceStatusSheet: View {
     let group: TrainingResistanceStatusGroup
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("\(group.label) exercises from current resistance-training analysis.")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     if group.items.isEmpty {
-                        Text("No exercises in this category yet.")
+                        Text("No exercises in this group.")
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     } else {
-                        ForEach(group.items) { item in
-                            NavigationLink(value: item.destination) {
-                                TrainingLinkRow(label: item.label, detail: item.detail)
+                        VStack(spacing: 0) {
+                            ForEach(group.items) { item in
+                                NavigationLink(value: item.destination) {
+                                    TrainingLinkRow(label: item.label, detail: item.detail)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -245,58 +356,5 @@ private struct TrainingResistanceStatusSheet: View {
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])
-    }
-}
-
-// MARK: - History day accordion row
-
-private struct TrainingReportingHistoryDayRow: View {
-    let day: TrainingDayReadModel
-    let isExpanded: Bool
-    let onToggle: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: onToggle) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(day.label)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(TrainingDayView.formatSummary(day.summary))
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 8) {
-                    Divider().overlay(PhysiqueOSTheme.divider)
-                    VStack(spacing: 8) {
-                        ForEach(day.sessions) { session in
-                            NavigationLink(value: session.destination) {
-                                TrainingLinkRow(label: session.title, detail: session.detail)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .padding(.top, 10)
-            }
-        }
-        .padding(12)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
