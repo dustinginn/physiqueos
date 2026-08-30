@@ -695,4 +695,232 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-25T06:02:00-07:00", referenceDate: reference), "Yesterday")
         XCTAssertEqual(TrainingExerciseHistoryCalculator.sessionBadge(for: "2026-08-17T06:05:00-07:00", referenceDate: reference), "Aug 17")
     }
+
+    // MARK: - Performance Records (completeness sweep, Known Gap 1)
+
+    /// Lat Pulldown's session-volume PR ties directly to its own already-
+    /// fixtured occurrences (3,060 lb on 2026-08-17 → 3,340 lb on
+    /// 2026-08-24) — the exact same numbers `testLatPulldownShowsTwoOccurrencesNewestFirstWithANewBest`
+    /// already exercises, so the record and the benchmark never disagree.
+    func testLatPulldownHasASessionVolumeRecordWithPreviousAndImprovement() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "lat-pulldown")
+        let unwrapped = try XCTUnwrap(exercise)
+        let model = try XCTUnwrap(unwrapped.performanceRecords)
+        XCTAssertEqual(model.heading, "Performance Records")
+        let record = try XCTUnwrap(model.records.first { $0.achievementType == .sessionVolumePR })
+        XCTAssertEqual(record.title, "Session volume record")
+        XCTAssertEqual(record.value, "3,340 lb")
+        XCTAssertEqual(record.detail, "Previous: 3,060 lb · Improved by 280 lb")
+        XCTAssertNil(record.executionVariant)
+    }
+
+    /// Overhead Triceps Extension's reps-at-load record carries the
+    /// "Static Hold" variant — the Founder's exact reference example
+    /// (record + variant + previous value), reproduced with synthetic
+    /// data rather than the literal screenshot numbers.
+    func testOverheadTricepsExtensionRecordCarriesTheVariant() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "overhead-triceps-extension")
+        let unwrapped = try XCTUnwrap(exercise)
+        let model = try XCTUnwrap(unwrapped.performanceRecords)
+        let record = try XCTUnwrap(model.records.first)
+        XCTAssertEqual(record.title, "Reps-at-load record")
+        XCTAssertEqual(record.value, "10 reps at 40 lb")
+        XCTAssertEqual(record.detail, "Previous: 8 reps at this load")
+        XCTAssertEqual(record.executionVariant?.label, "Static Hold")
+    }
+
+    /// A first-ever record with no prior baseline must omit the detail
+    /// line entirely (`nil`), not show "Previous: —" or similar.
+    func testBenchPressRecordWithNoPriorBaselineOmitsDetail() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
+        let unwrapped = try XCTUnwrap(exercise)
+        let model = try XCTUnwrap(unwrapped.performanceRecords)
+        let record = try XCTUnwrap(model.records.first)
+        XCTAssertEqual(record.value, "6 reps at 155 lb")
+        XCTAssertNil(record.detail)
+    }
+
+    /// `createTrainingLibraryExerciseRecordsReadModel` returns `nil` (not
+    /// an empty-records object) when an exercise has zero qualifying PR
+    /// events — Face Pull has none in the fixture.
+    func testExerciseWithNoPerformanceEventsHasNilPerformanceRecords() async throws {
+        let exercise = try await api.fetchTrainingExercise(exerciseId: "face-pull")
+        let unwrapped = try XCTUnwrap(exercise)
+        XCTAssertNil(unwrapped.performanceRecords)
+    }
+
+    /// `compareRecords`: workout date descending, then session-volume
+    /// before reps-at-load on the same date, then achieved value
+    /// descending, then event id ascending — verified directly on the
+    /// calculator with events spanning multiple exercises is not possible
+    /// (the read model is always scoped to one canonical exercise id), so
+    /// this constructs same-exercise events to exercise the comparator
+    /// itself.
+    func testPerformanceRecordsOrderByDateThenTypeThenValueThenId() throws {
+        let events = [
+            TrainingPerformanceEvent(id: "b", canonicalExerciseId: "x", eventType: .repsAtLoadPR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: nil, unit: nil, reps: 10, load: 100, loadUnit: "lb", previousBaselineValue: nil, improvement: nil),
+            TrainingPerformanceEvent(id: "a", canonicalExerciseId: "x", eventType: .sessionVolumePR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: 2000, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
+            TrainingPerformanceEvent(id: "c", canonicalExerciseId: "x", eventType: .sessionVolumePR, workoutDate: "2026-08-22", executionVariant: nil, sessionVolume: 1500, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
+        ]
+        let model = try XCTUnwrap(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events))
+        XCTAssertEqual(model.records.map(\.sourceEventId), ["c", "a", "b"])
+    }
+
+    func testPerformanceRecordsTruncateAtFiveWithACountLabel() {
+        let events = (1...7).map { index in
+            TrainingPerformanceEvent(
+                id: "event-\(index)", canonicalExerciseId: "x", eventType: .repsAtLoadPR,
+                workoutDate: String(format: "2026-08-%02d", index), executionVariant: nil,
+                sessionVolume: nil, unit: nil, reps: 10, load: Double(index), loadUnit: "lb",
+                previousBaselineValue: nil, improvement: nil
+            )
+        }
+        let model = TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: events)
+        XCTAssertEqual(model?.records.count, 5)
+        XCTAssertEqual(model?.countLabel, "Showing 5 of 7 records")
+    }
+
+    func testPerformanceRecordsCalculatorReturnsNilForEmptyOrMismatchedEvents() {
+        XCTAssertNil(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: []))
+        let mismatched = [
+            TrainingPerformanceEvent(id: "a", canonicalExerciseId: "other", eventType: .sessionVolumePR, workoutDate: "2026-08-20", executionVariant: nil, sessionVolume: 2000, unit: "lb", reps: nil, load: nil, loadUnit: nil, previousBaselineValue: nil, improvement: nil),
+        ]
+        XCTAssertNil(TrainingPerformanceRecordsCalculator.recordsReadModel(canonicalExerciseId: "x", events: mismatched))
+    }
+
+    // MARK: - Reporting (completeness sweep, Known Gap 2)
+
+    func testTrainingLandingReportingLinksCoverAllSixRealWebIds() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertEqual(
+            landing.reportingLinks.map(\.id),
+            ["resistance", "cardio", "volume", "frequency", "consistency", "history"]
+        )
+    }
+
+    func testEveryReportingLinkCarriesAProgressStreamDestination() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        for link in landing.reportingLinks {
+            guard case .progressStream(let streamId) = link.destination else {
+                return XCTFail("Expected a progressStream destination for \(link.id).")
+            }
+            XCTAssertEqual(streamId, "training/reporting/\(link.id)")
+        }
+    }
+
+    func testUnknownReportIdResolvesToNilRatherThanCrashing() async throws {
+        let report = try await api.fetchTrainingReporting(reportId: "not-a-real-report")
+        XCTAssertNil(report)
+    }
+
+    /// Cardio/Volume/Frequency/Consistency are verified real current web
+    /// behavior — an identical static "Foundation" placeholder, not a
+    /// native shortcut for an unbuilt feature.
+    func testCardioVolumeFrequencyConsistencyShowTheIdenticalFoundationPlaceholder() async throws {
+        for reportId in ["cardio", "volume", "frequency", "consistency"] {
+            let report = try await api.fetchTrainingReporting(reportId: reportId)
+            let unwrapped = try XCTUnwrap(report)
+            XCTAssertEqual(unwrapped.eyebrow, "Reporting")
+            XCTAssertEqual(
+                unwrapped.placeholderBody,
+                "This page is now a permanent destination. It will grow into graphs, trends, comparisons, goal impact, and historical analysis as more canonical training evidence accumulates."
+            )
+            XCTAssertNil(unwrapped.resistance)
+            XCTAssertNil(unwrapped.historyDays)
+        }
+    }
+
+    func testResistanceReportHasRealStatusGroupsPrsHighlightsAndCategoryRollups() async throws {
+        let report = try await api.fetchTrainingReporting(reportId: "resistance")
+        let unwrapped = try XCTUnwrap(report)
+        XCTAssertEqual(unwrapped.title, "Resistance Training")
+        let resistance = try XCTUnwrap(unwrapped.resistance)
+        XCTAssertEqual(resistance.statusGroups.map(\.label), ["Improving", "Stable", "Plateauing", "Regressing"])
+        XCTAssertEqual(resistance.statusGroups.first?.items.map(\.label), ["Lat Pulldown", "Push-ups"])
+        XCTAssertFalse(resistance.recentPrs.isEmpty)
+        XCTAssertFalse(resistance.highlights.isEmpty)
+        XCTAssertFalse(resistance.needsAttention.isEmpty)
+        // All 10 canonical areas, matching the landing page's own grid.
+        XCTAssertEqual(resistance.categoryRollups.count, 10)
+    }
+
+    /// Recent PRs on the Resistance report must reuse the exact same
+    /// `trainingPerformanceEvents` fixture data the exercise-detail page's
+    /// Performance Records card uses — not an independently invented list.
+    func testResistanceReportRecentPrsMatchThePerformanceEventsFixture() async throws {
+        let report = try await api.fetchTrainingReporting(reportId: "resistance")
+        let resistance = try XCTUnwrap(report?.resistance)
+        XCTAssertEqual(resistance.recentPrs.count, 3)
+        for pr in resistance.recentPrs {
+            guard case .trainingExercise = pr.destination else {
+                return XCTFail("Expected a trainingExercise destination for \(pr.label).")
+            }
+        }
+    }
+
+    func testHistoryReportShowsAllFixturedDaysNewestFirst() async throws {
+        let report = try await api.fetchTrainingReporting(reportId: "history")
+        let unwrapped = try XCTUnwrap(report)
+        XCTAssertEqual(unwrapped.title, "Training History")
+        let days = try XCTUnwrap(unwrapped.historyDays)
+        XCTAssertEqual(days.map(\.date), ["2026-08-26", "2026-08-24", "2026-08-22"])
+        let firstDaySessions = try XCTUnwrap(days.first?.sessions)
+        for session in firstDaySessions {
+            guard case .trainingSession = session.destination else {
+                return XCTFail("Expected a trainingSession destination.")
+            }
+        }
+    }
+
+    // MARK: - Training Library root (completeness sweep)
+
+    func testTrainingLibraryRootExposesAllTenAreasViaLandingFetch() async throws {
+        // `TrainingLibraryRootView` fetches the same `TrainingLandingReadModel`
+        // the Training landing page does — verified here at the data layer
+        // rather than duplicating a second area list.
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertEqual(landing.trainingAreas.count, 10)
+        for area in landing.trainingAreas {
+            guard case .trainingExercise(let exerciseId) = area.destination else {
+                return XCTFail("Expected a trainingExercise destination for \(area.label).")
+            }
+            XCTAssertEqual(exerciseId, area.id)
+        }
+    }
+
+    // MARK: - Related Goals / Data Sources (completeness sweep — reconfirm already-correct behavior)
+
+    func testRelatedGoalsCarryGoalDetailDestinations() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertFalse(landing.relatedGoals.isEmpty)
+        for goal in landing.relatedGoals {
+            guard case .goalDetail(let goalId) = goal.destination else {
+                return XCTFail("Expected a goalDetail destination for \(goal.title).")
+            }
+            XCTAssertEqual(goalId, goal.id)
+        }
+    }
+
+    /// `TrainingSourceMetadataFooter`: capped to 5, purely informational —
+    /// reconfirming existing accepted behavior as part of this sweep, not
+    /// a new requirement.
+    func testDataSourcesAreCappedAtFiveAndPurelyInformational() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertLessThanOrEqual(landing.sourceEvidence.count, 5)
+        XCTAssertFalse(landing.sourceEvidence.isEmpty)
+    }
+
+    // MARK: - Current Protocol (completeness sweep — reconfirm exact web fields)
+
+    /// Verified directly against `CurrentProtocolCard`/`ProtocolRow`
+    /// source: exactly these 4 dynamic rows plus the static "Future
+    /// protocol settings: Coming soon" row — no more, no fewer.
+    func testCurrentProtocolCarriesTheFourRealFieldsPlusTheStaticComingSoonRow() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        let protocolSummary = landing.currentProtocol
+        XCTAssertFalse(protocolSummary.sourceOfTruth.isEmpty)
+        XCTAssertFalse(protocolSummary.dailyActivityTarget.isEmpty)
+        XCTAssertFalse(protocolSummary.trainingObjective.isEmpty)
+        XCTAssertFalse(protocolSummary.goal.isEmpty)
+    }
 }

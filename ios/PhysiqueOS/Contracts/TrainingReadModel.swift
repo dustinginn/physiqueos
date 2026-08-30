@@ -449,6 +449,12 @@ struct TrainingExerciseDetailReadModel: Identifiable, Equatable {
     /// `CurrentExerciseBenchmarkCard`'s own "No matching history yet."
     /// empty state.
     var benchmark: TrainingExerciseBenchmark?
+    /// `exerciseRecords` — `nil` whenever there are no qualifying PR events
+    /// for this canonical exercise (`createTrainingLibraryExerciseRecordsReadModel`
+    /// returns `null`, not an empty list). Unlike Benchmark/Last Session,
+    /// the web has no "no records yet" placeholder for this card — it is
+    /// simply absent, and so is this field's rendering.
+    var performanceRecords: TrainingPerformanceRecordsReadModel?
     /// `occurrences[0]` — `nil` when the exercise has never been logged.
     var lastSession: TrainingExerciseHistoryOccurrence?
     /// `occurrences.slice(0, 10)` (`ExerciseHistoryCard`, `:1421`), newest
@@ -514,4 +520,78 @@ struct TrainingExerciseBenchmark: Equatable {
         if comparison.contains("matched") { return .matched }
         return .belowOrUnknown
     }
+}
+
+// MARK: - Performance Records ("Durable achievements", `ExercisePerformanceRecordsCard`)
+//
+// Mirrors `createTrainingLibraryExerciseRecordsReadModel`
+// (`TrainingLibraryExerciseRecordsService.js`) — a pure presentation layer
+// over already-detected PR *events*. The actual PR-detection algorithm
+// (`TrainingPerformanceEventProducer.js`, fed by an AI evidence-analysis
+// pipeline) is explicitly out of scope for this port: this fixture-only
+// slice supplies synthetic, already-detected `TrainingPerformanceEvent`
+// records directly (see `TrainingFixture.json`'s `trainingPerformanceEvents`),
+// exactly the same transport shape a live backend would eventually supply,
+// so only the fetch changes when a live implementation lands — the
+// read-model transformation below (`TrainingPerformanceRecordsCalculator`)
+// does not.
+
+/// The only two record types the server currently supports
+/// (`TRAINING_PERFORMANCE_EVENT_TYPES`) — verified exhaustively from
+/// source; there is no third type and no generic "PR" catch-all.
+enum TrainingPerformanceEventType: String, Codable {
+    case sessionVolumePR = "session_volume_pr"
+    case repsAtLoadPR = "reps_at_load_pr"
+}
+
+/// A single already-detected PR event, as a live backend would supply it.
+/// Field presence depends on `eventType`: `sessionVolumePR` uses
+/// `sessionVolume`/`unit`; `repsAtLoadPR` uses `reps`/`load`/`loadUnit`.
+/// `previousBaselineValue`/`improvement` are optional on both (a first-ever
+/// record has no prior baseline).
+struct TrainingPerformanceEvent: Codable, Equatable, Identifiable {
+    var id: String
+    var canonicalExerciseId: String
+    var eventType: TrainingPerformanceEventType
+    /// A bare `"YYYY-MM-DD"` key (`isDateKey` on the web) — not a full
+    /// ISO-8601 timestamp like session dates.
+    var workoutDate: String
+    var executionVariant: TrainingExecutionVariant?
+    var sessionVolume: Double?
+    var unit: String?
+    var reps: Double?
+    var load: Double?
+    var loadUnit: String?
+    var previousBaselineValue: Double?
+    var improvement: Double?
+}
+
+/// One row in the Performance Records card — `toItem`'s output shape,
+/// ported field-for-field (`orderingKey` omitted: verified dead code on
+/// the web, `compareRecords` never reads it).
+struct TrainingPerformanceRecord: Identifiable, Equatable {
+    var id: String
+    var title: String
+    var value: String
+    /// The joined "Previous: … · Improved by …" string, or `nil` — the
+    /// only record-history field the card actually renders (the web's
+    /// separate `previousBaseline`/`improvement` fields are not consumed
+    /// by `ExercisePerformanceRecordsCard`, so this port skips them too).
+    var detail: String?
+    var workoutDate: String
+    var executionVariant: TrainingExecutionVariant?
+    var achievedValue: Double
+    var achievementType: TrainingPerformanceEventType
+    var sourceEventId: String
+}
+
+/// `createTrainingLibraryExerciseRecordsReadModel`'s return shape —
+/// always `nil` (not an empty-records object) when there is nothing to
+/// show, matching the web's `null`-vs-object distinction exactly.
+struct TrainingPerformanceRecordsReadModel: Equatable {
+    var heading: String
+    var records: [TrainingPerformanceRecord]
+    /// `"Showing {visible} of {total} records"`, or `nil` when nothing was
+    /// truncated.
+    var countLabel: String?
 }

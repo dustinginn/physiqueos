@@ -5,16 +5,16 @@ import SwiftUI
 /// `getExerciseDetailContent` (`TrainingKnowledgeScreen.jsx:1154-1199`)
 /// exactly: `TrainingLibraryHeaderView` (shared with `TrainingAreaView`) →
 /// the same inert scope selector every Training Library page shows →
-/// Current Benchmark → Last Session → Recent History. The web's fifth
-/// section, a "Source workouts" metadata footer, is deliberately not
-/// reproduced here — `page.js:84` passes `showSourceWorkouts: false` on
-/// the real `/progress/training/library/...` route, so it never renders
-/// there either. A "Performance Records" card (`ExercisePerformanceRecordsCard`)
-/// also exists on the web between Benchmark and Last Session, gated on a
-/// separate PR-detection read model (`TrainingLibraryExerciseRecordsService`,
-/// session-volume/reps-at-load records); it is not ported this slice — see
-/// this slice's final report for the reasoning and its own tracked
-/// decision.
+/// Current Benchmark → Performance Records → Last Session → Recent
+/// History. The web's sixth section, a "Source workouts" metadata footer,
+/// is deliberately not reproduced here — `page.js:84` passes
+/// `showSourceWorkouts: false` on the real `/progress/training/library/...`
+/// route, so it never renders there either. Performance Records
+/// (`ExercisePerformanceRecordsCard`) is a pure presentation layer over
+/// already-detected PR events (`TrainingPerformanceRecordsCalculator`
+/// ports `createTrainingLibraryExerciseRecordsReadModel` exactly); it is
+/// omitted entirely (not shown empty) whenever there are no qualifying
+/// events for this exercise, matching the web's own `null`-model behavior.
 ///
 /// History rows are inline-expand accordions, not navigation links: the
 /// web's own `ExerciseHistoryCard` renders a plain `<details>/<summary>`
@@ -65,6 +65,7 @@ struct TrainingExerciseDetailView: View {
                 TrainingLibraryHeaderView(title: exercise.title, breadcrumbs: exercise.breadcrumbs)
                 TrainingScopeSelectorView(scope: exercise.scope)
                 benchmarkCard(exercise.benchmark)
+                performanceRecordsCard(exercise.performanceRecords)
                 lastSessionCard(exercise.lastSession)
                 historyCard(exercise.history)
             }
@@ -121,6 +122,72 @@ struct TrainingExerciseDetailView: View {
         case .newBest: PhysiqueOSTheme.accent
         case .matched: PhysiqueOSTheme.chartSuccess
         case .belowOrUnknown: PhysiqueOSTheme.chartEffort
+        }
+    }
+
+    // MARK: - Performance Records
+
+    /// `ExercisePerformanceRecordsCard` (`TrainingKnowledgeScreen.jsx:1212-1259`):
+    /// "Durable achievements" eyebrow, `model.heading` ("Performance
+    /// Records"), a divided list of records (title, optional
+    /// "Variant: {label}" line, value, trailing date, optional detail),
+    /// and an optional truncation label. Entirely absent — not an empty
+    /// card — when `model` is `nil`.
+    @ViewBuilder
+    private func performanceRecordsCard(_ model: TrainingPerformanceRecordsReadModel?) -> some View {
+        if let model {
+            CardContainer {
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Durable Achievements")
+                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                            .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        Text(model.heading)
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    }
+                    VStack(spacing: 0) {
+                        ForEach(model.records) { record in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(alignment: .top, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(record.title)
+                                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        if let variant = record.executionVariant {
+                                            Text("Variant: \(variant.label)")
+                                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                        }
+                                        Text(record.value)
+                                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                            .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Text(TrainingDateFormatting.short(record.workoutDate))
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                                if let detail = record.detail {
+                                    Text(detail)
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
+                            }
+                            .padding(.vertical, 8)
+
+                            if record.id != model.records.last?.id {
+                                Divider().overlay(PhysiqueOSTheme.divider)
+                            }
+                        }
+                    }
+                    if let countLabel = model.countLabel {
+                        Text(countLabel)
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                }
+            }
         }
     }
 

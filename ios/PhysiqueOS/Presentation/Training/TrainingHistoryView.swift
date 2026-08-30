@@ -592,9 +592,12 @@ enum TrainingAreaIcon {
     }
 }
 
-private struct TrainingLinkRow: View {
+/// Not `private`: also reused by `TrainingReportingView` for PR/highlight/
+/// needs-attention/category-rollup rows, which share this exact
+/// label+detail+chevron shape.
+struct TrainingLinkRow: View {
     let label: String
-    let detail: String
+    var detail: String?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -602,9 +605,11 @@ private struct TrainingLinkRow: View {
                 Text(label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let detail {
+                    Text(detail)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
@@ -787,8 +792,19 @@ private struct FlowLayout: Layout {
 /// Not `private`: also used by `TrainingExerciseHistoryCalculator` for
 /// benchmark/history-row date formatting.
 enum TrainingDateFormatting {
+    private static let dateKeyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    /// Handles both full ISO-8601 session timestamps and the bare
+    /// `"YYYY-MM-DD"` date keys `TrainingPerformanceEvent.workoutDate`
+    /// uses (`isDateKey` on the web) — `ISO8601DateFormatter` alone
+    /// rejects the latter.
     static func date(from value: String) -> Date? {
-        ISO8601DateFormatter().date(from: value)
+        ISO8601DateFormatter().date(from: value) ?? dateKeyFormatter.date(from: value)
     }
 
     static func short(_ value: String) -> String {

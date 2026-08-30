@@ -17,6 +17,11 @@ protocol TrainingAPI: Sendable {
     /// (area-agnostic, matching the web's own area-agnostic history query)
     /// plus the computed benchmark/last-session/history projection.
     func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel?
+    /// Mirrors `getReportingContent`: `nil` for an id outside the fixed
+    /// `reportingLinks` set (matching the web's `notFound()` guard),
+    /// otherwise the report's content — real data for `resistance` and
+    /// `history`, the identical static placeholder for the other four.
+    func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel?
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file mirroring the
@@ -36,6 +41,33 @@ struct FixtureTrainingAPI: TrainingAPI {
         var days: [TrainingDayReadModel]
         var sessions: [TrainingSessionDetailReadModel]
         var areas: [TrainingAreaReadModel]
+        var trainingPerformanceEvents: [TrainingPerformanceEvent]
+        var reporting: ReportingFixtureSection
+    }
+
+    /// Synthetic, already-classified fixture facts backing the Resistance
+    /// reporting page's Resistance Summary / Highlights / Needs Attention
+    /// sections — see `TrainingReportingReadModel.swift`'s top doc comment
+    /// for why this is a presentation fixture, not a ported detection
+    /// algorithm.
+    private struct ReportingFixtureSection: Codable {
+        var resistance: ResistanceReportingFixture
+    }
+
+    private struct ResistanceReportingFixture: Codable {
+        var statusGroups: [StatusGroupFixture]
+        var highlights: [ExerciseNoteFixture]
+        var needsAttention: [ExerciseNoteFixture]
+    }
+
+    private struct StatusGroupFixture: Codable {
+        var label: String
+        var exerciseIds: [String]
+    }
+
+    private struct ExerciseNoteFixture: Codable {
+        var exerciseId: String
+        var detail: String
     }
 
     /// Several canonical Training field names are genuinely snake_case in
@@ -119,8 +151,110 @@ struct FixtureTrainingAPI: TrainingAPI {
             ],
             scope: area.scope,
             benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
+            performanceRecords: TrainingPerformanceRecordsCalculator.recordsReadModel(
+                canonicalExerciseId: canonicalExerciseId,
+                events: fixture.trainingPerformanceEvents
+            ),
             lastSession: occurrences.first,
             history: Array(occurrences.prefix(10))
+        )
+    }
+
+    /// Mirrors `getReportingContent` exactly: `report.reportingLinks`
+    /// gates which ids are valid (the web's `notFound()` guard), then
+    /// `resistance`/`history` get real content and every other id falls
+    /// through to the identical static "Foundation" placeholder body.
+    func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel? {
+        let fixture = try loadFixture()
+        guard let link = fixture.landing.reportingLinks.first(where: { $0.id == reportId }) else {
+            return nil
+        }
+
+        switch reportId {
+        case "resistance":
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: link.label,
+                summary: "Strength progression, PRs, and category momentum from training history.",
+                placeholderBody: nil,
+                resistance: Self.buildResistanceReport(fixture: fixture),
+                historyDays: nil
+            )
+        case "history":
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: "Training History",
+                summary: "Browse recent training days and open the sessions you want to review.",
+                placeholderBody: nil,
+                resistance: nil,
+                historyDays: fixture.days
+            )
+        default:
+            return TrainingReportingReadModel(
+                id: reportId,
+                eyebrow: "Reporting",
+                title: link.label,
+                summary: link.detail,
+                placeholderBody: "This page is now a permanent destination. It will grow into graphs, trends, comparisons, goal impact, and historical analysis as more canonical training evidence accumulates.",
+                resistance: nil,
+                historyDays: nil
+            )
+        }
+    }
+
+    /// Synthesizes `getResistanceReportingContent`'s sections from fixture
+    /// facts: status groups/highlights/needs-attention resolve exercise
+    /// ids to the same Browse rows `TrainingAreaView` already shows;
+    /// Recent PRs reuses the exact same `trainingPerformanceEvents` data
+    /// `fetchTrainingExercise`'s Performance Records card does (not a
+    /// duplicated PR list); Category Rollups reuses the landing page's own
+    /// 10 Training Areas.
+    private static func buildResistanceReport(fixture: TrainingFixtureFile) -> TrainingResistanceReportReadModel {
+        let allExerciseRows = fixture.areas.flatMap(\.exercises)
+        func row(exerciseId: String, detail: String?) -> TrainingReportingLinkRow? {
+            guard let exercise = allExerciseRows.first(where: { $0.id == exerciseId }) else { return nil }
+            return TrainingReportingLinkRow(id: exerciseId, label: exercise.label, detail: detail, destination: .trainingExercise(exerciseId: exerciseId))
+        }
+
+        let statusGroups = fixture.reporting.resistance.statusGroups.map { group in
+            TrainingResistanceStatusGroup(
+                label: group.label,
+                items: group.exerciseIds.compactMap { row(exerciseId: $0, detail: nil) }
+            )
+        }
+        let highlights = fixture.reporting.resistance.highlights.compactMap { row(exerciseId: $0.exerciseId, detail: $0.detail) }
+        let needsAttention = fixture.reporting.resistance.needsAttention.compactMap { row(exerciseId: $0.exerciseId, detail: $0.detail) }
+
+        let recentPrs = fixture.trainingPerformanceEvents
+            .sorted { $0.workoutDate > $1.workoutDate }
+            .compactMap { event -> TrainingReportingLinkRow? in
+                guard let exercise = allExerciseRows.first(where: { $0.canonicalExerciseId == event.canonicalExerciseId }) else { return nil }
+                let title = event.eventType == .sessionVolumePR ? "Session volume record" : "Reps-at-load record"
+                return TrainingReportingLinkRow(
+                    id: event.id,
+                    label: exercise.label,
+                    detail: "\(title) · \(TrainingDateFormatting.short(event.workoutDate))",
+                    destination: .trainingExercise(exerciseId: exercise.id)
+                )
+            }
+
+        let categoryRollups = fixture.landing.trainingAreas.map { area in
+            TrainingReportingLinkRow(
+                id: area.id,
+                label: area.label,
+                detail: area.exerciseCount > 0 ? "\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")" : nil,
+                destination: area.destination
+            )
+        }
+
+        return TrainingResistanceReportReadModel(
+            statusGroups: statusGroups,
+            recentPrs: recentPrs,
+            highlights: highlights,
+            needsAttention: needsAttention,
+            categoryRollups: categoryRollups
         )
     }
 

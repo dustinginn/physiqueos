@@ -1,20 +1,29 @@
 import SwiftUI
 
-/// Mirrors `TrainingLibraryHeader` (`TrainingKnowledgeScreen.jsx:181-220`):
-/// a static "Training Library" eyebrow, the page's own title, and a
-/// breadcrumb pill row (`getTrainingLibraryHeaderItems`) — no description
-/// line for either a bare Training Area page or an exercise-detail page
-/// (`getLibraryContent`/`getExerciseDetailContent` both set `summary:
-/// null`). Shared by `TrainingAreaView` and `TrainingExerciseDetailView`,
-/// the two screens that render this exact web header.
+/// Mirrors `TrainingLibraryHeader`/`TrainingReportingHeader`
+/// (`TrainingKnowledgeScreen.jsx:181-220` and the reporting equivalent):
+/// a small eyebrow, the page's own title, a breadcrumb pill row, and an
+/// optional description line — only the bare Training Library root page
+/// and Reporting pages have a description; a bare Training Area page or
+/// an exercise-detail page set `summary: null` (`getLibraryContent`/
+/// `getExerciseDetailContent`), so `summary` defaults to `nil` for those
+/// call sites. `eyebrow` defaults to "Training Library" (every
+/// `navigationMode: "training-library"` page); Reporting pages
+/// (`navigationMode: "training-reporting"`) pass `"Reporting"` instead —
+/// same header shape, different static label, verified from source rather
+/// than assumed identical. Shared by `TrainingAreaView`,
+/// `TrainingExerciseDetailView`, `TrainingLibraryRootView`, and
+/// `TrainingReportingView`.
 struct TrainingLibraryHeaderView: View {
+    var eyebrow: String = "Training Library"
     let title: String
     let breadcrumbs: [TrainingBreadcrumb]
+    var summary: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Training Library")
+                Text(eyebrow)
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
                 Text(title)
@@ -38,6 +47,11 @@ struct TrainingLibraryHeaderView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+            if let summary {
+                Text(summary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

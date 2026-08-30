@@ -41,6 +41,8 @@ app_files = [
     ("Contracts", "TrainingSessionRenderItems.swift"),
     ("Contracts", "TrainingSessionCorrectionValidation.swift"),
     ("Contracts", "TrainingExerciseHistoryCalculator.swift"),
+    ("Contracts", "TrainingPerformanceRecordsCalculator.swift"),
+    ("Contracts", "TrainingReportingReadModel.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "LogAPI.swift"),
     ("Networking", "EvidenceAPI.swift"),
@@ -99,6 +101,10 @@ app_files = [
     ("Presentation/Training", "TrainingLibraryHeaderView.swift"),
     ("Presentation/Training", "TrainingExerciseDetailViewModel.swift"),
     ("Presentation/Training", "TrainingExerciseDetailView.swift"),
+    ("Presentation/Training", "TrainingLibraryRootView.swift"),
+    ("Presentation/Training", "TrainingLibraryRootViewModel.swift"),
+    ("Presentation/Training", "TrainingReportingView.swift"),
+    ("Presentation/Training", "TrainingReportingViewModel.swift"),
 ]
 
 # Non-Swift app-target resources (group path -> filename) — copied into the

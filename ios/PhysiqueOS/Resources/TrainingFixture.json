@@ -54,7 +54,8 @@
       { "id": "cardio", "label": "Cardio", "detail": "Calories, exercise minutes, distance, pace, and heart-rate trends.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/cardio" } } },
       { "id": "volume", "label": "Volume", "detail": "Sets, reps, loads, and weekly work by exercise or muscle group.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/volume" } } },
       { "id": "frequency", "label": "Frequency", "detail": "How often each area, modality, and exercise appears.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/frequency" } } },
-      { "id": "consistency", "label": "Consistency", "detail": "Logging cadence and evidence coverage over time.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/consistency" } } }
+      { "id": "consistency", "label": "Consistency", "detail": "Training cadence across days, weeks, cuts, and protocol phases.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/consistency" } } },
+      { "id": "history", "label": "History", "detail": "Chronological training days and sessions.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/history" } } }
     ],
     "trainingDays": [
       {
@@ -574,5 +575,53 @@
       },
       "exercises": []
     }
-  ]
+  ],
+  "trainingPerformanceEvents": [
+    {
+      "id": "perf-event-lat-pulldown-volume",
+      "canonical_exercise_id": "lat_pulldown",
+      "event_type": "session_volume_pr",
+      "workout_date": "2026-08-24",
+      "session_volume": 3340,
+      "unit": "lb",
+      "previous_baseline_value": 3060,
+      "improvement": 280
+    },
+    {
+      "id": "perf-event-triceps-reps-at-load",
+      "canonical_exercise_id": "overhead_triceps_extension",
+      "event_type": "reps_at_load_pr",
+      "workout_date": "2026-08-26",
+      "reps": 10,
+      "load": 40,
+      "load_unit": "lb",
+      "previous_baseline_value": 8,
+      "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" }
+    },
+    {
+      "id": "perf-event-bench-press-reps-at-load",
+      "canonical_exercise_id": "barbell_bench_press",
+      "event_type": "reps_at_load_pr",
+      "workout_date": "2026-08-26",
+      "reps": 6,
+      "load": 155,
+      "load_unit": "lb"
+    }
+  ],
+  "reporting": {
+    "resistance": {
+      "statusGroups": [
+        { "label": "Improving", "exerciseIds": ["lat-pulldown", "push-ups"] },
+        { "label": "Stable", "exerciseIds": ["seated-cable-row"] },
+        { "label": "Plateauing", "exerciseIds": ["bench-press"] },
+        { "label": "Regressing", "exerciseIds": [] }
+      ],
+      "highlights": [
+        { "exerciseId": "lat-pulldown", "detail": "New best set logged Aug 24." }
+      ],
+      "needsAttention": [
+        { "exerciseId": "bench-press", "detail": "No comparable prior superset session yet." }
+      ]
+    }
+  }
 }

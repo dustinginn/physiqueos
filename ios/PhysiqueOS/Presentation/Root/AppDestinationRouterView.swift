@@ -18,6 +18,20 @@ struct AppDestinationRouterView: View {
             TrainingDayView(date: date)
         case .progressStream(let streamId) where streamId == "training":
             TrainingHistoryView()
+        // The bare Training Library root (`/progress/training/library`,
+        // no area/exercise segment) — the same 10 canonical areas the
+        // landing page's own "Training Areas" grid shows, rendered as a
+        // plain Browse list instead of a tile grid (verified from source:
+        // `getLibraryChildren` returns the identical `FLAT_TRAINING_NAV_GROUPS`
+        // set for an empty path).
+        case .progressStream(let streamId) where streamId == "training/library":
+            TrainingLibraryRootView()
+        // Reporting: `training/reporting/{reportId}` — one screen handles
+        // all 6 real `reportingLinks` ids (resistance/cardio/volume/
+        // frequency/consistency/history); `TrainingReportingView` itself
+        // renders the correct content per id.
+        case .progressStream(let streamId) where streamId.hasPrefix("training/reporting/"):
+            TrainingReportingView(reportId: String(streamId.dropFirst("training/reporting/".count)))
         // All 10 canonical Training Areas are fixture-backed (see
         // TrainingFixture.json's `areas` array) — `TrainingAreaView` is
         // fully generic over `areaId` and already renders an honest empty
