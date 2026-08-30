@@ -5,7 +5,10 @@ import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeSt
 import { createDurableMigrationControlStore, resolveMigrationControlPath } from "../../platform/cutover/DurableMigrationControlStore.js";
 import { createProductionApplicationCompositionRuntime } from "../../platform/cutover/ProductionApplicationCompositionRuntime.js";
 import { createPhase5ProviderApplicationComposition } from "../../platform/database/phase5ProviderComposition.js";
-import { createPostgresFounderReadScope } from "../../platform/database/PostgresFounderRepositoryFacade.js";
+import {
+  createPostgresFounderReadScope,
+  executePostgresFounderRuntimeMutation,
+} from "../../platform/database/PostgresFounderRepositoryFacade.js";
 import { loadCanonicalRuntime } from "../../platform/migration/phase4CanonicalImport.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
@@ -67,6 +70,77 @@ export async function runProductionApplicationReadScope(callback, metadata = {},
   if (typeof callback !== "function") throw new Error("Production application read scope requires a callback.");
   if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") return callback();
   return getOrCreateProviderRuntime(env).readScope.run(callback, metadata);
+}
+
+export async function getProductionApplicationCanonicalCommitComposition(
+  env = process.env
+) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" ||
+      env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  const compatibilityMode = env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
+  const authorityStore = createPostgresCombinedRuntimeAuthorityStore({
+    pool: runtime.pool,
+    environment: required(
+      env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT,
+      "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"
+    ),
+  });
+  if (compatibilityMode) {
+    assertCompatibilityOwnerIdentity(runtime.ownerUserId, {
+      expectedOwnerUserId:
+        env.PHYSIQUEOS_COMPATIBILITY_EXPECTED_OWNER_USER_ID ?? null,
+    });
+    const expectedDatabaseName = required(
+      env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME,
+      "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME"
+    );
+    const database = await runtime.pool.query("SELECT current_database() AS database");
+    if (database.rows[0]?.database !== expectedDatabaseName) {
+      throw Object.assign(
+        new Error("Provider compatibility database identity does not match."),
+        { code: "PROVIDER_COMPATIBILITY_TARGET_REJECTED" }
+      );
+    }
+    const state = (await authorityStore.read()).state;
+    assertCompatibilityRuntimeAuthorityState(state, {
+      environment: env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT,
+      databaseName: expectedDatabaseName,
+    });
+  }
+  return Object.freeze({
+    mutateRuntimeBounded: ({
+      commandId,
+      operation,
+      allowedCollections,
+      readCollections,
+      readApplicationContext = true,
+      readImportMetadata = true,
+      allowApplicationContextMutation = false,
+      mutate,
+    }) => executePostgresFounderRuntimeMutation({
+      pool: runtime.pool,
+      ownerUserId: runtime.ownerUserId,
+      authorityStore,
+      migrationOperationId: compatibilityMode
+        ? null
+        : env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+      compatibilityMode,
+      requireCompatibilityAuthority: compatibilityMode,
+      commandId,
+      operation,
+      mutate,
+      bounded: true,
+      allowedCollections,
+      readCollections,
+      readApplicationContext,
+      readImportMetadata,
+      allowApplicationContextMutation,
+      returnReceipt: true,
+    }),
+  });
 }
 
 export function getProductionTrainingNavigationReadService(env = process.env) {

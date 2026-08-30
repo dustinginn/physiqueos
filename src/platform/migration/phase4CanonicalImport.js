@@ -77,10 +77,22 @@ export async function importCanonicalPackage({
   }
 }
 
-export async function loadCanonicalRuntime({ query, ownerUserId }) {
+export async function loadCanonicalRuntime({
+  query,
+  ownerUserId,
+  collections = FOUNDATION_SOURCE_COLLECTIONS,
+  includeApplicationContext = true,
+  includeImportMetadata = true,
+}) {
   if (typeof query !== "function") throw new Error("Canonical runtime loading requires a query function.");
-  const runtime = {};
-  for (const collection of FOUNDATION_SOURCE_COLLECTIONS) {
+  const selectedCollections = normalizeRuntimeCollections(collections);
+  const runtime = Object.fromEntries(
+    FOUNDATION_SOURCE_COLLECTIONS.map((collection) => [
+      collection,
+      isSingletonCollection(collection) ? null : [],
+    ])
+  );
+  for (const collection of selectedCollections) {
     const table = assertKnownPhase4Collection(collection);
     const result = await query(
       `SELECT record_id,payload FROM physiqueos.${table}
@@ -90,15 +102,19 @@ export async function loadCanonicalRuntime({ query, ownerUserId }) {
     const payloads = result.rows.map((row) => row.payload);
     runtime[collection] = isSingletonCollection(collection) ? payloads[0] ?? null : payloads;
   }
-  const metadata = await query(
-    `SELECT report,source_sha256 FROM physiqueos.phase4_import_runs
-     WHERE result='succeeded' ORDER BY completed_at DESC LIMIT 1`
-  );
-  const applicationContext = await query(
-    `SELECT operating_rhythm,adaptive_trust_profile,retired_milestones
-       FROM physiqueos.canonical_application_context WHERE owner_user_id=$1`,
-    [ownerUserId],
-  );
+  const metadata = includeImportMetadata
+    ? await query(
+        `SELECT report,source_sha256 FROM physiqueos.phase4_import_runs
+         WHERE result='succeeded' ORDER BY completed_at DESC LIMIT 1`
+      )
+    : { rows: [] };
+  const applicationContext = includeApplicationContext
+    ? await query(
+        `SELECT operating_rhythm,adaptive_trust_profile,retired_milestones
+           FROM physiqueos.canonical_application_context WHERE owner_user_id=$1`,
+        [ownerUserId],
+      )
+    : { rows: [] };
   const runtimeMetadata = await query(
     `SELECT runtime_version,revision,last_command_id,updated_at,imported_at
        FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
@@ -119,6 +135,18 @@ export async function loadCanonicalRuntime({ query, ownerUserId }) {
     milestones: context.retired_milestones ?? [],
     phase4Import: metadata.rows[0] ?? null,
   });
+}
+
+function normalizeRuntimeCollections(collections) {
+  const unique = [];
+  const seen = new Set();
+  for (const collection of collections ?? []) {
+    assertKnownPhase4Collection(collection);
+    if (seen.has(collection)) continue;
+    seen.add(collection);
+    unique.push(collection);
+  }
+  return unique;
 }
 
 async function upsertApplicationContext(client, ownerUserId, context = {}) {

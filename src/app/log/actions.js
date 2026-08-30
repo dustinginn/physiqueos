@@ -2,20 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { loadApplicationRuntimeBindings } from "../../application/runtime/ApplicationCanonicalRuntime";
+import { loadApplicationCanonicalCommitBindings } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
 import { createDailyCheckIn } from "../../domain/models/dailyCheckIn";
-import { createMorningCheckInPersistenceService } from "../../domain/services/MorningCheckInPersistenceService";
 import {
-  getLocalDateKey,
+  createMorningCheckInPersistenceService,
+  MorningCheckInPersistenceValidationError,
+} from "../../domain/services/MorningCheckInPersistenceService";
+import {
   getLocalDayWindow,
-  resolveLocalTimeZone,
 } from "../../domain/utils/localDate";
 
 export async function saveDirectWeighIn(formData) {
-  const user = await FounderRepositories.users.getCurrentUser();
-  if (!user) throw new Error("Founder user is not available.");
-
   const rawWeight = String(formData.get("weight") ?? "").trim();
   const parsedWeight = Number(rawWeight);
   if (!rawWeight || !Number.isFinite(parsedWeight)) {
@@ -27,43 +25,42 @@ export async function saveDirectWeighIn(formData) {
   }
 
   const now = new Date();
-  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
-  const today = getLocalDateKey(now, timeZone);
   let measurementDate;
   try {
     measurementDate = getLocalDayWindow({
       dateKey: String(formData.get("evidenceDate") ?? "").trim(),
-      timeZone,
+      timeZone: "UTC",
     }).dateKey;
   } catch {
     return directWeighInFailure("Choose a valid weigh-in date.");
   }
-  if (measurementDate > today) {
-    return directWeighInFailure("A weigh-in cannot be logged for a future date.");
-  }
 
-  const bindings = await loadApplicationRuntimeBindings();
-  const result = await createMorningCheckInPersistenceService({
-    ...bindings,
-    now: () => now,
-  }).save({
-    user,
-    weightValue,
-    today: measurementDate,
-    createdAt: now.toISOString(),
-    at: now,
-    timeZone,
-    notes: null,
-    protocolChangeNote: null,
-    estimatedCalories: null,
-    estimatedCaloriesBurned: null,
-    proteinTarget: null,
-    proteinAchieved: null,
-    weighInContext: resolveDefaultWeighInContext(
-      user.preferences?.defaultWeighInContext
-    ),
-    reconciliationSubmissions: [],
-  });
+  const bindings = await loadApplicationCanonicalCommitBindings();
+  let result;
+  try {
+    result = await createMorningCheckInPersistenceService({
+      ...bindings,
+      now: () => now,
+    }).save({
+      weightValue,
+      measurementDate,
+      createdAt: now.toISOString(),
+      at: now,
+      notes: null,
+      protocolChangeNote: null,
+      estimatedCalories: null,
+      estimatedCaloriesBurned: null,
+      proteinTarget: null,
+      proteinAchieved: null,
+      weighInContext: null,
+      reconciliationSubmissions: [],
+    });
+  } catch (error) {
+    if (error instanceof MorningCheckInPersistenceValidationError) {
+      return directWeighInFailure(error.message);
+    }
+    throw error;
+  }
 
   if (result.status !== "unchanged") {
     revalidatePath("/");
@@ -73,11 +70,11 @@ export async function saveDirectWeighIn(formData) {
     if (result.analysisId) revalidatePath(`/analysis/${result.analysisId}`);
   }
 
-  const dateLabel = formatWeighInDate(measurementDate, today);
+  const dateLabel = formatWeighInDate(result.date, result.currentDate);
   return Object.freeze({
     ok: true,
     status: result.status,
-    date: measurementDate,
+    date: result.date,
     message: result.status === "unchanged"
       ? `That weigh-in is already logged for ${dateLabel}.`
       : `Weigh-in logged for ${dateLabel}.`,
@@ -226,17 +223,4 @@ function formatWeighInDate(date, today) {
     month: "short",
     day: "numeric",
   });
-}
-
-function resolveDefaultWeighInContext(defaultContext = {}) {
-  return {
-    timing: defaultContext?.timing ?? "morning",
-    nutritionState: defaultContext?.nutritionState ?? "fasted",
-    intakeState: defaultContext?.intakeState ?? "before_food_water",
-    scale: defaultContext?.scale ?? "normal_home_scale",
-    confidence: defaultContext?.confidence ?? "high",
-    conditions: [],
-    notes: null,
-    isDefault: true,
-  };
 }

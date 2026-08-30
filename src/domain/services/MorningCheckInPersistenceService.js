@@ -12,20 +12,63 @@ import {
 import {
   createBriefingReconciliationEnqueueService,
 } from "./BriefingReconciliationEnqueueService";
+import {
+  getLocalDateKey,
+  getLocalDayWindow,
+  resolveLocalTimeZone,
+} from "../utils/localDate";
 
 const BODY_FAT_GOAL_ID = "goal_maintain_8_9_body_fat";
 const LEAN_MASS_GOAL_ID = "goal_preserve_lean_mass";
 const VISIBLE_ABS_GOAL_ID = "goal_visible_abs_at_rest";
 
+export const MORNING_CHECK_IN_BOUNDED_COLLECTIONS = Object.freeze([
+  "weightEntries",
+  "dailyCheckIns",
+  "canonicalEvidenceObjects",
+  "analyses",
+  "reminders",
+  "briefingReconciliationWorkItems",
+]);
+
+export const MORNING_CHECK_IN_BOUNDED_READ_COLLECTIONS = Object.freeze([
+  "user",
+  "goals",
+  "weightEntries",
+  "dexaScans",
+  "protocols",
+  "protocolVersions",
+  "executionItems",
+  "reminders",
+  "progressPhotos",
+  "dailyCheckIns",
+  "dailyBriefings",
+  "briefingReconciliationWorkItems",
+  "analyses",
+  "evidencePackages",
+  "evidenceReviews",
+  "canonicalEvidenceObjects",
+]);
+
+export class MorningCheckInPersistenceValidationError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.name = "MorningCheckInPersistenceValidationError";
+    this.code = code;
+  }
+}
+
 export function createMorningCheckInPersistenceService({
   runtimeStorePath,
   liveStore,
+  mutateCanonicalRuntime = null,
   now = () => new Date(),
   createUnitOfWork = (options) => createFounderStoreUnitOfWork(options),
   briefingCoordinator = createBriefingReconciliationEnqueueService({ now }),
   faults = {},
 } = {}) {
-  if (!runtimeStorePath || !liveStore) {
+  if ((!runtimeStorePath || !liveStore) &&
+      typeof mutateCanonicalRuntime !== "function") {
     throw new Error("Morning Check-In persistence requires a bound Founder store.");
   }
 
@@ -33,6 +76,51 @@ export function createMorningCheckInPersistenceService({
     async save(command = {}) {
       const recordedAt = toDate(command.at ?? now());
       const createdAt = command.createdAt ?? recordedAt.toISOString();
+
+      if (typeof mutateCanonicalRuntime === "function") {
+        const committed = await mutateCanonicalRuntime({
+          operation: "direct-weigh-in",
+          allowedCollections: MORNING_CHECK_IN_BOUNDED_COLLECTIONS,
+          readCollections: MORNING_CHECK_IN_BOUNDED_READ_COLLECTIONS,
+          readApplicationContext: false,
+          readImportMetadata: false,
+          allowApplicationContextMutation: false,
+          async mutate(candidate, { commandId }) {
+            const boundedService = createMorningCheckInPersistenceService({
+              runtimeStorePath: "/tmp/physiqueos-bounded-direct-weigh-in.json",
+              liveStore: candidate,
+              now: () => recordedAt,
+              createUnitOfWork: () => createBoundedCandidateUnitOfWork({
+                candidate,
+                commandId,
+              }),
+              briefingCoordinator,
+              faults,
+            });
+            return boundedService.save(resolveCandidateCommand({
+              candidate,
+              command,
+              createdAt,
+              recordedAt,
+            }));
+          },
+        });
+        return Object.freeze({
+          ...committed.result,
+          committed: committed.changedCollections.length > 0,
+          revision: committed.revision,
+          commitId: committed.commitId,
+          changedCollections: Object.freeze([...committed.changedCollections]),
+          memoryProfile: committed.memoryProfile,
+        });
+      }
+
+      command = resolveCandidateCommand({
+        candidate: liveStore,
+        command,
+        createdAt,
+        recordedAt,
+      });
       const transaction = createUnitOfWork({
         filePath: runtimeStorePath,
         liveStore,
@@ -304,6 +392,8 @@ export function createMorningCheckInPersistenceService({
             status: stagedResult.status,
             committed: false,
             analysisId: stagedResult.analysisId,
+            date: command.today,
+            currentDate: command.currentDate,
             revision: liveStore.revision ?? 0,
             commitId: liveStore.lastCommitId ?? null,
           });
@@ -322,6 +412,8 @@ export function createMorningCheckInPersistenceService({
           status: stagedResult.status,
           committed: true,
           analysisId: stagedResult.analysisId,
+          date: command.today,
+          currentDate: command.currentDate,
           briefingReconciliation: freezeBriefingReconciliation(
             stagedResult.briefingReconciliation
           ),
@@ -337,6 +429,140 @@ export function createMorningCheckInPersistenceService({
         throw error;
       }
     },
+  };
+}
+
+function createBoundedCandidateUnitOfWork({ candidate, commandId }) {
+  return {
+    begin() {
+      let status = "open";
+      let result;
+      const assertOpen = () => {
+        if (status !== "open") throw new Error("The bounded direct-weigh-in transaction is closed.");
+      };
+      return {
+        get status() {
+          return status;
+        },
+        async mutate(callback) {
+          assertOpen();
+          result = await callback(candidate);
+          return result;
+        },
+        abort() {
+          assertOpen();
+          status = "aborted";
+          return { status };
+        },
+        async commit({ finalizeCandidate, validateFinalized } = {}) {
+          assertOpen();
+          status = "committing";
+          await finalizeCandidate?.({ stagedState: candidate, commitId: commandId });
+          if (typeof validateFinalized === "function" &&
+              await validateFinalized(candidate) === false) {
+            throw Object.assign(
+              new Error("Finalized bounded direct-weigh-in candidate was rejected."),
+              { code: "VALIDATION_FAILED" }
+            );
+          }
+          status = "committed";
+          return {
+            status,
+            committed: true,
+            revision: Number(candidate.revision ?? 0) + 1,
+            commitId: commandId,
+            result,
+          };
+        },
+      };
+    },
+  };
+}
+
+function resolveCandidateCommand({ candidate, command, createdAt, recordedAt }) {
+  const user = command.user ?? candidate.user;
+  if (!user?.id) {
+    throw new MorningCheckInPersistenceValidationError(
+      "Founder user is not available.",
+      "founder_unavailable"
+    );
+  }
+  const timeZone = resolveLocalTimeZone(
+    command.timeZone ?? user.timeZone ?? user.timezone
+  );
+  const currentDate = getLocalDateKey(recordedAt, timeZone);
+  let measurementDate = command.today ?? currentDate;
+  if (command.measurementDate != null) {
+    try {
+      measurementDate = getLocalDayWindow({
+        dateKey: String(command.measurementDate).trim(),
+        timeZone,
+      }).dateKey;
+    } catch {
+      throw new MorningCheckInPersistenceValidationError(
+        "Choose a valid weigh-in date.",
+        "invalid_date"
+      );
+    }
+  }
+  if (measurementDate > currentDate) {
+    throw new MorningCheckInPersistenceValidationError(
+      "A weigh-in cannot be logged for a future date.",
+      "future_date"
+    );
+  }
+  return {
+    ...command,
+    user,
+    timeZone,
+    today: measurementDate,
+    currentDate,
+    createdAt,
+    at: recordedAt,
+    weighInContext: resolveCandidateWeighInContext(
+      user,
+      command.weighInContext
+    ),
+  };
+}
+
+function resolveCandidateWeighInContext(user, override) {
+  const defaults = user.preferences?.defaultWeighInContext ?? {};
+  const base = {
+    timing: defaults.timing ?? "morning",
+    nutritionState: defaults.nutritionState ?? "fasted",
+    intakeState: defaults.intakeState ?? "before_food_water",
+    scale: defaults.scale ?? "normal_home_scale",
+    confidence: defaults.confidence ?? "high",
+  };
+  if (!override) {
+    return {
+      ...base,
+      conditions: [],
+      notes: null,
+      isDefault: true,
+    };
+  }
+  if (override.isDefault !== false) {
+    return {
+      ...base,
+      ...Object.fromEntries(
+        Object.entries(override).filter(([, value]) => value != null && value !== "")
+      ),
+      conditions: override.conditions ?? [],
+      notes: override.notes ?? null,
+      isDefault: true,
+    };
+  }
+  return {
+    ...base,
+    ...Object.fromEntries(
+      Object.entries(override).filter(([, value]) => value != null && value !== "")
+    ),
+    conditions: override.conditions ?? [],
+    notes: override.notes ?? null,
+    confidence: "context_adjusted",
+    isDefault: false,
   };
 }
 

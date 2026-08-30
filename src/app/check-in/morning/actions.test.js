@@ -29,8 +29,12 @@ describe("Morning Check-In reconciliation action wiring", () => {
       source.match(
         /resolveLocalTimeZone\(user\.timeZone \?\? user\.timezone\)/g
       )
-    ).toHaveLength(3);
+    ).toHaveLength(2);
     expect(source).toContain("getLocalDateKey(now, timeZone)");
+    expect(persistence).toContain(
+      "command.timeZone ?? user.timeZone ?? user.timezone"
+    );
+    expect(persistence).toContain("getLocalDateKey(recordedAt, timeZone)");
   });
 
   it("does not contain automatic carry-forward, cloning, or schedule mutation", () => {

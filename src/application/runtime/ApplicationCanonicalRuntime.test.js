@@ -4,6 +4,7 @@ const composition = vi.hoisted(() => ({ current: null }));
 
 vi.mock("../composition/productionApplicationComposition.js", () => ({
   getProductionApplicationComposition: () => composition.current,
+  getProductionApplicationCanonicalCommitComposition: () => composition.current,
 }));
 
 import {

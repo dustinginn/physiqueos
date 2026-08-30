@@ -8,7 +8,11 @@ import {
   createNodeFounderStoreFileSystem,
 } from "../../data/repositories/FounderStoreUnitOfWork";
 import { createWeightEntry } from "../models/weightEntry";
-import { createMorningCheckInPersistenceService } from "./MorningCheckInPersistenceService";
+import {
+  createMorningCheckInPersistenceService,
+  MORNING_CHECK_IN_BOUNDED_COLLECTIONS,
+  MORNING_CHECK_IN_BOUNDED_READ_COLLECTIONS,
+} from "./MorningCheckInPersistenceService";
 
 const USER_ID = "user_founder_001";
 const NOW = new Date("2026-08-09T15:24:17.685Z");
@@ -33,10 +37,12 @@ describe("MorningCheckInPersistenceService", () => {
     }));
     const persisted = readStore(fixture.filePath);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "saved",
       committed: true,
       analysisId: "analysis_morning_weight_20260809152417685",
+      date: TODAY,
+      currentDate: TODAY,
       revision: 12,
       commitId: "morning-commit-1",
     });
@@ -291,6 +297,158 @@ describe("MorningCheckInPersistenceService", () => {
     expect(persisted.analyses).toHaveLength(0);
     expect(fixture.liveStore).toEqual(persisted);
   });
+
+  it("uses one lock-owned bounded mutation without a baseline clone chain", async () => {
+    const fixture = createFixture({ reminders: [reminder("priority_1")] });
+    const provider = createBoundedProvider(fixture.liveStore);
+    const service = createMorningCheckInPersistenceService({
+      mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
+      now: () => NOW,
+    });
+
+    const result = await service.save({
+      ...command({
+        reconciliationSubmissions: [submission("priority_1", "completed")],
+      }),
+      user: undefined,
+      today: undefined,
+      timeZone: undefined,
+      weighInContext: null,
+    });
+
+    expect(provider.mutateCanonicalRuntime).toHaveBeenCalledOnce();
+    expect(provider.inputs[0]).toMatchObject({
+      operation: "direct-weigh-in",
+      allowedCollections: MORNING_CHECK_IN_BOUNDED_COLLECTIONS,
+      readCollections: MORNING_CHECK_IN_BOUNDED_READ_COLLECTIONS,
+      readApplicationContext: false,
+      readImportMetadata: false,
+      allowApplicationContextMutation: false,
+    });
+    expect(provider.inputs[0]).not.toHaveProperty("expectedRuntime");
+    expect(result).toMatchObject({
+      status: "saved",
+      committed: true,
+      date: TODAY,
+      currentDate: TODAY,
+      revision: 12,
+      commitId: "bounded-weight-commit",
+      changedCollections: expect.arrayContaining([
+        "weightEntries",
+        "dailyCheckIns",
+        "canonicalEvidenceObjects",
+        "analyses",
+        "reminders",
+      ]),
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        collectionSnapshotMode: "digest",
+        boundedCollectionCloneCount: 6,
+        runtimeCollectionLoadCount: 16,
+      },
+    });
+    expect(provider.runtime.weightEntries.filter(todayWeight)).toHaveLength(1);
+    expect(provider.runtime.dailyCheckIns.filter(todayCheckIn)).toHaveLength(1);
+    expect(provider.runtime.canonicalEvidenceObjects).toHaveLength(1);
+    expect(provider.runtime.analyses).toHaveLength(1);
+    expect(provider.runtime.reminders[0].completedAt)
+      .toBe(`${YESTERDAY}T20:00:00`);
+  });
+
+  it("keeps bounded retries idempotent and bounded failures atomic", async () => {
+    const fixture = createFixture();
+    const provider = createBoundedProvider(fixture.liveStore);
+    const service = createMorningCheckInPersistenceService({
+      mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
+      now: () => NOW,
+    });
+    const boundedCommand = {
+      ...command(),
+      user: undefined,
+      today: undefined,
+      timeZone: undefined,
+      weighInContext: null,
+    };
+
+    const first = await service.save(boundedCommand);
+    const accepted = structuredClone(provider.runtime);
+    const retry = await service.save(boundedCommand);
+    expect(first).toMatchObject({ committed: true, status: "saved" });
+    expect(retry).toMatchObject({ committed: false, status: "unchanged" });
+    expect(provider.runtime).toEqual(accepted);
+
+    const beforeFailure = structuredClone(provider.runtime);
+    const failing = createMorningCheckInPersistenceService({
+      mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
+      now: () => NOW,
+      faults: {
+        afterWeightMutation() {
+          throw new Error("bounded staged failure");
+        },
+      },
+    });
+    await expect(failing.save({
+      ...boundedCommand,
+      measurementDate: "2026-08-07",
+      weightValue: 168.2,
+    })).rejects.toThrow("bounded staged failure");
+    expect(provider.runtime).toEqual(beforeFailure);
+  });
+
+  it("preserves historical isolation and same-date correction semantics in the bounded path", async () => {
+    const fixture = createFixture();
+    const provider = createBoundedProvider(fixture.liveStore);
+    const service = createMorningCheckInPersistenceService({
+      mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
+      now: () => NOW,
+    });
+    const historical = {
+      ...command(),
+      user: undefined,
+      today: undefined,
+      timeZone: undefined,
+      measurementDate: "2026-08-07",
+      weightValue: 168.2,
+      weighInContext: null,
+      reconciliationSubmissions: [],
+    };
+
+    const saved = await service.save(historical);
+    const retry = await service.save(historical);
+    const corrected = await service.save({
+      ...historical,
+      weightValue: 168.0,
+    });
+
+    expect(saved).toMatchObject({
+      status: "saved",
+      committed: true,
+      date: "2026-08-07",
+      currentDate: TODAY,
+    });
+    expect(retry).toMatchObject({ status: "unchanged", committed: false });
+    expect(corrected).toMatchObject({ status: "saved", committed: true });
+    const weights = provider.runtime.weightEntries.filter(
+      (item) => item.measuredAt === "2026-08-07"
+    );
+    expect(weights).toHaveLength(1);
+    expect(weights[0]).toMatchObject({
+      id: "weight_2026_08_07",
+      weight: { value: 168, unit: "lb" },
+    });
+    expect(weights[0].correctionHistory).toHaveLength(1);
+    expect(weights[0].correctionHistory[0].previousEntry.weight.value).toBe(168.2);
+    expect(provider.runtime.canonicalEvidenceObjects.filter(
+      (item) => item.canonicalId === `morning_weight|${USER_ID}|2026-08-07`
+    )).toHaveLength(1);
+    expect(provider.runtime.dailyCheckIns.filter(
+      (item) => item.date === "2026-08-07"
+    )).toHaveLength(1);
+    expect(provider.runtime.dailyCheckIns.filter(todayCheckIn)).toHaveLength(0);
+    expect(provider.runtime.reminders).toEqual([]);
+  });
 });
 
 function createFixture({ reminders = [] } = {}) {
@@ -329,6 +487,7 @@ function createFixture({ reminders = [] } = {}) {
     goalConfidenceHistory: [],
     goalConfidenceContinuitySeeds: [],
     canonicalEvidenceObjects: [],
+    briefingReconciliationWorkItems: [],
   };
   fs.writeFileSync(filePath, `${JSON.stringify(liveStore)}\n`);
   return { directory, filePath, liveStore };
@@ -428,4 +587,81 @@ function todayWeight(item) {
 
 function todayCheckIn(item) {
   return item.userId === USER_ID && item.date === TODAY;
+}
+
+function createBoundedProvider(source) {
+  let runtime = structuredClone(source);
+  const inputs = [];
+  const mutateCanonicalRuntime = vi.fn(async (input) => {
+    inputs.push(input);
+    const readable = new Set(input.readCollections ?? Object.keys(runtime));
+    const candidate = Object.fromEntries(
+      Object.entries(runtime).map(([name, value]) => {
+        if (readable.has(name) || [
+          "version",
+          "revision",
+          "lastCommitId",
+          "updatedAt",
+          "importedAt",
+        ].includes(name)) {
+          return [name, value];
+        }
+        return [name, Array.isArray(value) ? [] : null];
+      })
+    );
+    for (const collection of input.allowedCollections) {
+      const value = candidate[collection];
+      candidate[collection] = Array.isArray(value)
+        ? [...value]
+        : value && typeof value === "object"
+          ? { ...value }
+          : value;
+    }
+    const before = Object.fromEntries(input.allowedCollections.map((name) => [
+      name,
+      JSON.stringify(candidate[name]),
+    ]));
+    const result = await input.mutate(candidate, {
+      commandId: "bounded-weight-commit",
+    });
+    const changedCollections = input.allowedCollections.filter(
+      (name) => before[name] !== JSON.stringify(candidate[name])
+    );
+    if (changedCollections.length > 0) {
+      runtime = {
+        ...runtime,
+        ...Object.fromEntries(changedCollections.map((name) => [
+          name,
+          candidate[name],
+        ])),
+        revision: Number(runtime.revision ?? 0) + 1,
+        lastCommitId: "bounded-weight-commit",
+      };
+    }
+    return {
+      committed: true,
+      commitId: "bounded-weight-commit",
+      revision: Number(runtime.revision ?? 0),
+      result,
+      changedCollections,
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        collectionSnapshotMode: "digest",
+        boundedCollectionCloneCount:
+          input.allowedCollections.filter((name) =>
+            source[name] && typeof source[name] === "object"
+          ).length,
+        runtimeCollectionLoadCount: input.readCollections.length,
+      },
+    };
+  });
+  return {
+    inputs,
+    mutateCanonicalRuntime,
+    get runtime() {
+      return runtime;
+    },
+  };
 }

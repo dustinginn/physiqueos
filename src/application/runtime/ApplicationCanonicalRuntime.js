@@ -55,7 +55,7 @@ export async function loadApplicationCanonicalCommitBindings() {
   if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
     return loadApplicationRuntimeBindings();
   }
-  const composition = await providerComposition();
+  const composition = await providerCanonicalCommitComposition();
   if (typeof composition.mutateRuntimeBounded !== "function") {
     throw unavailable("bounded canonical mutation");
   }
@@ -137,6 +137,13 @@ export function createProviderFounderStoreUnitOfWork({
 async function providerComposition() {
   const { getProductionApplicationComposition } = await import("../composition/productionApplicationComposition.js");
   return getProductionApplicationComposition();
+}
+
+async function providerCanonicalCommitComposition() {
+  const { getProductionApplicationCanonicalCommitComposition } = await import(
+    "../composition/productionApplicationComposition.js"
+  );
+  return getProductionApplicationCanonicalCommitComposition();
 }
 
 function publish(target, source) {

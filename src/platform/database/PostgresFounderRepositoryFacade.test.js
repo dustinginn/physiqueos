@@ -206,6 +206,9 @@ describe("PostgreSQL Founder repository facade", () => {
       bounded: true,
       returnReceipt: true,
       allowedCollections: ["canonicalEvidenceObjects"],
+      readCollections: ["canonicalEvidenceObjects"],
+      readApplicationContext: false,
+      readImportMetadata: false,
       allowApplicationContextMutation: false,
       mutate(runtime) {
         expect(Object.isFrozen(runtime)).toBe(false);
@@ -230,12 +233,32 @@ describe("PostgreSQL Founder repository facade", () => {
         fullRuntimeSerializationCount: 0,
         collectionSnapshotMode: "digest",
         boundedCollectionCloneCount: 1,
+        runtimeCollectionLoadCount: 1,
       },
     });
     expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
     expect(database.runtime.canonicalEvidenceObjects.some(
       (item) => item.canonicalId === "training|2026-08-26|bounded"
     )).toBe(true);
+    const queries = database.client.query.mock.calls.map(([sql]) =>
+      String(sql).replace(/\s+/g, " ").trim()
+    );
+    const lockIndex = queries.findIndex((sql) =>
+      sql.includes("pg_advisory_xact_lock")
+    );
+    const runtimeLoadIndex = queries.findIndex((sql) =>
+      sql.includes("SELECT record_id,payload FROM physiqueos.")
+    );
+    const collectionLoads = queries.filter((sql) =>
+      sql.includes("SELECT record_id,payload FROM physiqueos.")
+    );
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(runtimeLoadIndex).toBeGreaterThan(lockIndex);
+    expect(collectionLoads).toHaveLength(1);
+    expect(queries.some((sql) => sql.includes("phase4_import_runs"))).toBe(false);
+    expect(queries.some((sql) =>
+      sql.includes("canonical_application_context")
+    )).toBe(false);
   });
 
   it("rolls back a bounded mutation that escapes its declared collection scope", async () => {

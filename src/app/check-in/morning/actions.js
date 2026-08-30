@@ -7,7 +7,10 @@ import {
   getLocalDateKey,
   resolveLocalTimeZone,
 } from "../../../domain/utils/localDate";
-import { loadApplicationRuntimeBindings } from "../../../application/runtime/ApplicationCanonicalRuntime";
+import {
+  loadApplicationCanonicalCommitBindings,
+  loadApplicationRuntimeBindings,
+} from "../../../application/runtime/ApplicationCanonicalRuntime";
 import { createRecoveryCheckInIngestionService } from "../../../domain/services/RecoveryCheckInIngestionService";
 import { createMorningCheckInPersistenceService } from "../../../domain/services/MorningCheckInPersistenceService";
 import {
@@ -84,12 +87,6 @@ export async function saveStructuredRecoveryCheckIn(formData) {
 }
 
 export async function saveMorningCheckIn(formData) {
-  const user = await FounderRepositories.users.getCurrentUser();
-
-  if (!user) {
-    throw new Error("Founder user is not available.");
-  }
-
   const rawWeight = String(formData.get("weight") ?? "").trim();
   const parsedWeight = Number(rawWeight);
 
@@ -100,8 +97,6 @@ export async function saveMorningCheckIn(formData) {
   if (weightValue < 50 || weightValue > 1000) throw new Error("Morning weight must be between 50 and 1,000 lb.");
 
   const now = new Date();
-  const timeZone = resolveLocalTimeZone(user.timeZone ?? user.timezone);
-  const today = getLocalDateKey(now, timeZone);
   const createdAt = now.toISOString();
   const notes = normalizeOptionalText(formData.get("notes"));
   const protocolChangeNote = normalizeOptionalText(formData.get("protocolChanges"));
@@ -111,22 +106,16 @@ export async function saveMorningCheckIn(formData) {
   );
   const proteinTarget = normalizeOptionalNumber(formData.get("proteinTarget"));
   const proteinAchieved = normalizeOptionalNumber(formData.get("proteinAchieved"));
-  const weighInContext = resolveWeighInContext(
-    formData,
-    user.preferences?.defaultWeighInContext
-  );
-  const bindings = await loadApplicationRuntimeBindings();
+  const weighInContext = resolveWeighInContextOverride(formData);
+  const bindings = await loadApplicationCanonicalCommitBindings();
   const service = createMorningCheckInPersistenceService({
     ...bindings,
     now: () => now,
   });
   const result = await service.save({
-    user,
     weightValue,
-    today,
     createdAt,
     at: now,
-    timeZone,
     notes,
     protocolChangeNote,
     estimatedCalories,
@@ -163,30 +152,16 @@ function normalizeOptionalNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function resolveWeighInContext(formData, defaultContext = {}) {
-  const baseContext = {
-    timing: defaultContext?.timing ?? "morning",
-    nutritionState: defaultContext?.nutritionState ?? "fasted",
-    intakeState: defaultContext?.intakeState ?? "before_food_water",
-    scale: defaultContext?.scale ?? "normal_home_scale",
-    confidence: defaultContext?.confidence ?? "high",
-  };
+function resolveWeighInContextOverride(formData) {
   const hasOverride = formData.get("contextOverride") === "on";
 
-  if (!hasOverride) {
-    return {
-      ...baseContext,
-      conditions: [],
-      notes: null,
-      isDefault: true,
-    };
-  }
+  if (!hasOverride) return null;
 
   return {
-    timing: String(formData.get("weighInTiming") || baseContext.timing),
-    nutritionState: String(formData.get("nutritionState") || baseContext.nutritionState),
-    intakeState: String(formData.get("intakeState") || baseContext.intakeState),
-    scale: String(formData.get("scaleContext") || baseContext.scale),
+    timing: normalizeOptionalText(formData.get("weighInTiming")),
+    nutritionState: normalizeOptionalText(formData.get("nutritionState")),
+    intakeState: normalizeOptionalText(formData.get("intakeState")),
+    scale: normalizeOptionalText(formData.get("scaleContext")),
     conditions: formData.getAll("conditions").map(String),
     confidence: "context_adjusted",
     notes: normalizeOptionalText(formData.get("contextNotes")),

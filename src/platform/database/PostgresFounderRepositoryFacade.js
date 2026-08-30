@@ -264,6 +264,9 @@ export async function executePostgresFounderRuntimeMutation({
   mutate,
   bounded = false,
   allowedCollections = null,
+  readCollections = null,
+  readApplicationContext = true,
+  readImportMetadata = true,
   allowApplicationContextMutation = true,
   returnReceipt = false,
 } = {}) {
@@ -284,6 +287,9 @@ export async function executePostgresFounderRuntimeMutation({
     const loadedRuntime = await loadCanonicalRuntime({
       query: (text, values) => client.query(text, values),
       ownerUserId,
+      ...(readCollections ? { collections: readCollections } : {}),
+      includeApplicationContext: readApplicationContext,
+      includeImportMetadata: readImportMetadata,
     });
     const runtime = bounded
       ? createShallowWritableFounderRuntime(loadedRuntime)
@@ -338,6 +344,8 @@ export async function executePostgresFounderRuntimeMutation({
             fullRuntimeSerializationCount: expectedRuntime ? 2 : 0,
             collectionSnapshotMode: bounded ? "digest" : "canonical_json",
             boundedCollectionCloneCount: detachedCollectionCount,
+            runtimeCollectionLoadCount: readCollections?.length ??
+              FOUNDATION_SOURCE_COLLECTIONS.length,
           }),
         })
       : clonedResult;
