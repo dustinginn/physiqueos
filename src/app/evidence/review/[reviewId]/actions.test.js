@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { canonicalJson } from "../../../../contracts/v1/canonicalJson";
 import { prepareCanonicalExerciseIdentitiesForConfirmation } from "../../../../domain/services/CanonicalExerciseLibraryService";
 import { reconcileConfirmedEvidencePackage } from "../../../../domain/services/CanonicalEvidenceService";
+import { createEvidenceReviewContinuationKey } from "../../../../domain/services/EvidenceReviewBackgroundContinuation";
 
 const runtimeStore = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "private/founder/runtime-store.json"), "utf8")
@@ -351,7 +352,7 @@ vi.mock("../../../../domain/services/TrainingPerformanceIntelligenceService", ()
   createTrainingPerformanceIntelligenceReport: () => ({ summary: "ok", exerciseObservations: [] }),
 }));
 
-const { confirmEvidenceReview, reprocessEvidenceReview } = await import("./actions.js");
+const { confirmEvidenceReview, continueEvidenceReviewInBackground, reprocessEvidenceReview } = await import("./actions.js");
 
 function requireActiveTestClaim(state, reviewId, operationId) {
   const review = state.evidenceReviews.find((item) => item.id === reviewId);
@@ -629,6 +630,16 @@ async function expectNextRedirect(promise, destinationPart) {
   });
 }
 
+async function continueInBackground(review, index = 1) {
+  const continuationKey = createEvidenceReviewContinuationKey(review);
+  expect(continuationKey).toBeTruthy();
+  return continueEvidenceReviewInBackground({
+    reviewId: review.id,
+    continuationKey,
+    messageId: `message-${index}`,
+  });
+}
+
 describe("confirmEvidenceReview", () => {
   beforeEach(() => {
     revalidatePath.mockClear();
@@ -825,7 +836,7 @@ describe("confirmEvidenceReview", () => {
 
     await expectNextRedirect(
       confirmEvidenceReview(confirmationForm(review)),
-      `/evidence/review/${review.id}?resume=continuing`
+      `/evidence/review/${review.id}?saved=1`
     );
 
     const continued = mockState.value.evidenceReviews[0];
@@ -847,24 +858,15 @@ describe("confirmEvidenceReview", () => {
     );
     const canonicalBefore = structuredClone(mockState.value.canonicalEvidenceObjects);
 
-    await expectNextRedirect(
-      confirmEvidenceReview(confirmationForm(review)),
-      "resume=continuing"
-    );
+    await expect(continueInBackground(review, 1)).resolves.toMatchObject({ state: "processing" });
     expect(mockState.value.evidenceReviews[0].commitProgress.event_eligibility.status)
       .toBe("completed");
 
-    await expectNextRedirect(
-      confirmEvidenceReview(confirmationForm(review)),
-      "resume=continuing"
-    );
+    await expect(continueInBackground(review, 2)).resolves.toMatchObject({ state: "processing" });
     expect(mockState.value.evidenceReviews[0].commitProgress.briefing.status)
       .toBe("completed");
 
-    await expectNextRedirect(
-      confirmEvidenceReview(confirmationForm(review)),
-      `confirmed=1`
-    );
+    await expect(continueInBackground(review, 3)).resolves.toMatchObject({ state: "confirmed" });
 
     const confirmed = mockState.value.evidenceReviews[0];
     expect(confirmed.status).toBe("confirmed");
@@ -882,6 +884,18 @@ describe("confirmEvidenceReview", () => {
     expect(mockState.value.failCommitCalls).toBe(0);
     expect(mockState.value.canonicalCommitCalls).toBe(0);
     expect(mockState.value.canonicalEvidenceObjects).toEqual(canonicalBefore);
+
+    const countsBeforeStaleDelivery = {
+      claims: mockState.value.claimCalls,
+      completions: mockState.value.completeCommitCalls,
+    };
+    await expect(continueEvidenceReviewInBackground({
+      reviewId: review.id,
+      continuationKey: `${review.id}:stale`,
+      messageId: "message-stale",
+    })).resolves.toMatchObject({ state: "stale" });
+    expect(mockState.value.claimCalls).toBe(countsBeforeStaleDelivery.claims);
+    expect(mockState.value.completeCommitCalls).toBe(countsBeforeStaleDelivery.completions);
   });
 
   it("reclaims an expired started Training-event step and skips every completed predecessor", async () => {
@@ -924,10 +938,7 @@ describe("confirmEvidenceReview", () => {
       review.commitProgress[step].attempts,
     ]));
 
-    await expectNextRedirect(
-      confirmEvidenceReview(confirmationForm(review)),
-      "resume=continuing"
-    );
+    await expect(continueInBackground(review, 1)).resolves.toMatchObject({ state: "processing" });
 
     expect(review.commitProgress.training_performance_events).toMatchObject({
       status: "completed",
@@ -952,12 +963,12 @@ describe("confirmEvidenceReview", () => {
     mockState.value = createExpiredFirstStepRecoveryState(runtimeStore);
     const review = mockState.value.evidenceReviews[0];
 
-    for (let request = 0; request < 12 && review.status !== "confirmed"; request += 1) {
-      const expectedRedirect = request < 8 ? "resume=continuing" : "confirmed=1";
-      await expectNextRedirect(
-        confirmEvidenceReview(confirmationForm(review)),
-        expectedRedirect
-      );
+    await expectNextRedirect(
+      confirmEvidenceReview(confirmationForm(review)),
+      "saved=1"
+    );
+    for (let request = 1; request < 12 && review.status !== "confirmed"; request += 1) {
+      await continueInBackground(review, request);
     }
 
     expect(review.status).toBe("confirmed");
@@ -993,7 +1004,7 @@ describe("confirmEvidenceReview", () => {
 
     await expectNextRedirect(
       confirmEvidenceReview(confirmationForm(review)),
-      "resume=continuing"
+      "saved=1"
     );
 
     expect(mockState.value.canonicalCommitCalls).toBe(0);
@@ -1017,7 +1028,7 @@ describe("confirmEvidenceReview", () => {
 
     await expectNextRedirect(
       confirmEvidenceReview(confirmationForm(review)),
-      `/evidence/review/${review.id}?resume=paused`
+      `/evidence/review/${review.id}?saved=1&processing=attention`
     );
 
     const failed = mockState.value.evidenceReviews[0];
@@ -1099,7 +1110,7 @@ describe("confirmEvidenceReview", () => {
       },
     });
     expect(redirect).toHaveBeenCalledWith(
-      expect.stringContaining(`/evidence/review/${review.id}?resume=paused`)
+      expect.stringContaining(`/evidence/review/${review.id}?saved=1&processing=attention`)
     );
   });
 

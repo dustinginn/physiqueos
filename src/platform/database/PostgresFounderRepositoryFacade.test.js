@@ -120,6 +120,10 @@ describe("PostgreSQL Founder repository facade", () => {
       commitProgress: { canonical_commit: { status: "completed" } },
     });
     expect(database.metadata.revision).toBe(5004);
+    expect(database.outbox).toContainEqual(expect.objectContaining({
+      reviewId: review.id,
+      continuationKey: expect.stringContaining(":compatibility_writes:not_started:0"),
+    }));
   });
 
   it("persists a JSON-safe existing built-in exercise mapping through the provider facade", async () => {
@@ -570,7 +574,7 @@ function fakeDatabase() {
         imported_at: "2026-08-13T00:00:00.000Z" }], rowCount: 1 };
     }
     if (normalized.startsWith("INSERT INTO physiqueos.outbox_messages")) {
-      outbox.push(JSON.parse(values[3]));
+      outbox.push(JSON.parse(values.length >= 7 ? values[6] : values[3]));
       return { rows: [], rowCount: 1 };
     }
     throw new Error(`Unexpected SQL in fake database: ${normalized}`);

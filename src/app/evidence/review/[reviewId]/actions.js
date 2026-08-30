@@ -75,6 +75,10 @@ import {
 import {
   CanonicalCommitRecoveryDisposition,
 } from "../../../../domain/services/EvidenceCanonicalCommitRecoveryService";
+import {
+  createEvidenceReviewContinuationKey,
+  isEvidenceReviewCanonicalSaveComplete,
+} from "../../../../domain/services/EvidenceReviewBackgroundContinuation";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -105,14 +109,41 @@ export async function reprocessEvidenceReview(formData) {
 }
 
 export async function confirmEvidenceReview(formData) {
+  return executeEvidenceReviewConfirmation(formData, { mode: "interactive" });
+}
+
+export async function continueEvidenceReviewInBackground({
+  reviewId,
+  continuationKey,
+  messageId,
+}) {
+  const formData = new FormData();
+  formData.set("reviewId", String(reviewId ?? ""));
+  return executeEvidenceReviewConfirmation(formData, {
+    mode: "background",
+    continuationKey: String(continuationKey ?? ""),
+    operationId: `evidence-review-background:${String(messageId ?? "")}`,
+  });
+}
+
+async function executeEvidenceReviewConfirmation(formData, {
+  mode,
+  continuationKey = null,
+  operationId: requestedOperationId = null,
+}) {
+  const background = mode === "background";
   const reviewId = String(formData.get("reviewId") ?? "");
+  const operationId = requestedOperationId ?? randomUUID();
   const service = createEvidenceReviewService({ repositories: FounderRepositories });
   const runInReadScope = FounderRepositories.runInReadScope ?? ((callback) => callback());
   const { review, user, canonicalCommitRecovery } = await runInReadScope(async () => {
     const currentReview = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
     const currentUser = await FounderRepositories.users.getCurrentUser();
     let currentCanonicalCommitRecovery = null;
-    if (currentReview?.status === "committing") {
+    if (
+      currentReview?.status === "committing" ||
+      (background && isEvidenceReviewCanonicalSaveComplete(currentReview))
+    ) {
       currentCanonicalCommitRecovery = await assertDurableResumeState(
         currentReview,
         currentUser,
@@ -126,15 +157,25 @@ export async function confirmEvidenceReview(formData) {
     };
   }, { readModel: "action.evidence-review-confirmation-start" });
   if (!review || !user || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  if (background) {
+    const currentContinuationKey = createEvidenceReviewContinuationKey(review);
+    const sameRecoverableOperation = ["in_progress", "failed"].includes(review.commitClaim?.status) &&
+      review.commitClaim?.operationId === operationId;
+    if (!sameRecoverableOperation && continuationKey !== currentContinuationKey) {
+      return Object.freeze({ state: "stale", reviewId, continuationKey: currentContinuationKey });
+    }
+  }
   const recoveryContext = resolveRecoveryContext(review, formData);
   if (review.status === "confirmed") {
+    if (background) return Object.freeze({ state: "confirmed", reviewId });
     if (recoveryContext) {
       revalidatePath(recoveryContext.returnTo);
       return redirect(recoveryContext.returnTo);
     }
     return redirect(`/evidence/review/${reviewId}?confirmed=1`);
   }
-  const resuming = review.status === "committing";
+  const resuming = review.status === "committing" ||
+    (background && isEvidenceReviewCanonicalSaveComplete(review));
   let evidencePackage = structuredClone(review.interpretedEvidence);
   if (!resuming) {
     try { evidencePackage = JSON.parse(String(formData.get("evidenceJson") ?? "")); }
@@ -169,7 +210,6 @@ export async function confirmEvidenceReview(formData) {
     validateDexaObjectsBeforeCommit(evidencePackage);
   }
 
-  const operationId = randomUUID();
   const claimedReview = await service.beginCommit(reviewId, {
     evidencePackage,
     operationId,
@@ -196,9 +236,16 @@ export async function confirmEvidenceReview(formData) {
     );
     if (!orchestrationResult.complete) {
       await service.pauseCommit(reviewId, { operationId });
+      if (background) {
+        return Object.freeze({
+          state: "processing",
+          reviewId,
+          completedStep: orchestrationResult.executedSteps[0] ?? null,
+        });
+      }
       revalidatePath(`/evidence/review/${reviewId}`);
       continuationPath = appendEvidenceRecoveryContext(
-        `/evidence/review/${reviewId}?resume=continuing`,
+        `/evidence/review/${reviewId}?saved=1`,
         recoveryContext
       );
     } else {
@@ -206,6 +253,15 @@ export async function confirmEvidenceReview(formData) {
     }
   } catch (error) {
     await service.failCommit(reviewId, error, { operationId });
+    if (background) throw error;
+    const canonicalSaveCompleted = isEvidenceReviewCanonicalSaveComplete(review) ||
+      orchestrationResult?.executedSteps?.includes("canonical_commit");
+    if (canonicalSaveCompleted) {
+      return redirect(appendEvidenceRecoveryContext(
+        `/evidence/review/${reviewId}?saved=1&processing=attention`,
+        recoveryContext
+      ));
+    }
     if (error?.retryableFailures?.length) {
       try {
         revalidatePath(`/evidence/review/${reviewId}`);
@@ -225,6 +281,9 @@ export async function confirmEvidenceReview(formData) {
   }
   if (continuationPath) redirect(continuationPath);
   const publication = publishPostConfirmationRefreshes(orchestrationResult);
+  if (background) {
+    return Object.freeze({ state: "confirmed", reviewId, publication: publication.status });
+  }
   if (recoveryContext) {
     revalidatePath(recoveryContext.returnTo);
     redirect(recoveryContext.returnTo);

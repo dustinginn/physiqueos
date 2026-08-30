@@ -31,12 +31,16 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).not.toMatch(/setTimeout|Personal Best|Protein Target Reached|Volume record/);
   });
 
-  it("shows quiet success only for a confirmed review and continues through the existing Log destination", () => {
+  it("shows quiet success for durable canonical save and continues through the existing Log destination", () => {
     expect(screen).toContain('status === "confirmed"');
+    expect(screen).toContain("isEvidenceReviewCanonicalSaveComplete(review)");
     expect(screen).toContain("<EvidenceSavedScreen");
+    expect(screen).toContain("Evidence saved");
+    expect(screen).toContain("Your evidence has been added. PhysiqueOS is finishing updates in the background.");
+    expect(screen).toContain("Some follow-up processing still needs attention.");
     expect(screen).toContain("createEvidenceSuccessNavigation");
     expect(screen).toContain("window.location.assign(destination)");
-    expect(screen).toContain('type="button">Continue</button>');
+    expect(screen).toContain('processing ? "Back to Log" : "Continue"');
     expect(screen).not.toMatch(/router\.refresh|router\.push|href="\/log\?saved=1"/);
     expect(screen).toContain("Continue");
   });
@@ -101,12 +105,12 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(actions).toContain("setPhotoSessionMetadata");
   });
 
-  it("offers a bounded continuation after any recoverable commit failure", () => {
+  it("keeps pre-save failure copy distinct from durable post-save success", () => {
     expect(screen).toContain("const canContinue = hasCommitFailure(review)");
-    expect(screen).toContain("Your ${experience.noun} is saved");
+    expect(screen).toContain("Evidence was not saved");
     expect(screen).toContain('retry ? "Continue"');
-    expect(screen).toContain("We couldn’t finish the follow-up step.");
-    expect(screen).toContain("without re-uploading or repeating completed work");
+    expect(screen).toContain("PhysiqueOS couldn’t complete the save.");
+    expect(screen).toContain("Some follow-up processing still needs attention.");
   });
 
   it("auto-continues once per durable checkpoint and shows pending feedback", () => {
@@ -117,6 +121,12 @@ describe("EvidenceReviewScreen selection interaction", () => {
     expect(screen).toContain("function EvidenceContinuationButton()");
     expect(screen).toContain('disabled={pending}');
     expect(screen).toContain('pending ? "Continuing\\u2026" : "Continue saving"');
+  });
+
+  it("does not present continuation controls after canonical save", () => {
+    expect(screen).toContain("if (canonicalSaved)");
+    expect(screen.indexOf("if (canonicalSaved)")).toBeLessThan(screen.indexOf("<EvidenceCommitRecoveryForm"));
+    expect(screen).toContain("processingNeedsAttention");
   });
 
   it("submits local decisions only with final confirmation", () => {

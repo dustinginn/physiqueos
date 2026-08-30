@@ -14,6 +14,9 @@ import {
   createShallowWritableFounderRuntime,
   detachBoundedFounderCollections,
 } from "./BoundedFounderRuntimeMutation.js";
+import {
+  createEvidenceReviewContinuationMessage,
+} from "../../domain/services/EvidenceReviewBackgroundContinuation.js";
 
 const GUARDED_COMPATIBILITY_DATABASE = /^physiqueos_phase5_(?:test|restore)_provider(?:_|$)/;
 const TARGETED_EVIDENCE_REVIEW_METHODS = new Set([
@@ -160,6 +163,9 @@ export async function executePostgresEvidenceReviewMutation({
       throw Object.assign(new Error("Evidence review changed during confirmation."), {
         code: "EVIDENCE_REVIEW_CONCURRENCY_CONFLICT",
       });
+    }
+    if (methodName === "releaseEvidenceReviewCommit") {
+      await enqueueEvidenceReviewContinuation(client, review);
     }
     await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
     await client.query("COMMIT");
@@ -404,6 +410,21 @@ async function bumpRuntimeMetadata(client, { ownerUserId, commandId, now }) {
     throw error;
   }
   return Number(result.rows[0]?.revision ?? 0);
+}
+
+async function enqueueEvidenceReviewContinuation(client, review) {
+  const message = createEvidenceReviewContinuationMessage(review, {
+    createId: randomUUID,
+  });
+  if (!message) return null;
+  return client.query(
+    `INSERT INTO physiqueos.outbox_messages
+      (id,user_id,operation_id,topic,dedupe_key,payload_version,payload,due_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,now())
+     ON CONFLICT (topic,dedupe_key) DO NOTHING`,
+    [message.id, message.userId, message.operationId, message.topic,
+      message.dedupeKey, message.payloadVersion, JSON.stringify(message.payload)],
+  );
 }
 
 function snapshotCollections(runtime) {

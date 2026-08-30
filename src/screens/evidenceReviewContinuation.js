@@ -2,7 +2,6 @@ import { POST_CONFIRMATION_STEP_ORDER } from "../domain/services/PostConfirmatio
 
 export function createEvidenceReviewContinuationKey(review) {
   if (!review || review.status !== "committing" || review.confirmation) return null;
-
   const progress = review.commitProgress ?? {};
   const nextStep = POST_CONFIRMATION_STEP_ORDER.find(
     (step) => progress[step]?.status !== "completed"
@@ -11,7 +10,6 @@ export function createEvidenceReviewContinuationKey(review) {
   const completedSteps = POST_CONFIRMATION_STEP_ORDER.filter(
     (step) => progress[step]?.status === "completed"
   );
-
   return [
     review.id,
     completedSteps.join(","),

@@ -36,6 +36,7 @@ import {
   createEvidenceReviewContinuationKey,
   submitEvidenceReviewContinuation,
 } from "./evidenceReviewContinuation";
+import { isEvidenceReviewCanonicalSaveComplete } from "../domain/services/EvidenceReviewBackgroundContinuation";
 
 const ICONS = { activity: Activity, dexa: FileText, nutrition: Utensils, photos: Camera, training: Dumbbell, weight: Scale };
 
@@ -54,6 +55,7 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   const experience = createEvidenceExperiencePresentation(review);
   const trainingAchievements = createTrainingPerformanceSuccessPresentation(review);
   const status = review.status;
+  const canonicalSaved = isEvidenceReviewCanonicalSaveComplete(review);
   const canEdit = ["pending", "commit_failed"].includes(status);
   const canContinue = hasCommitFailure(review);
   const blockingPhotoIssue = presentation.items.some((item) => item.included && hasIncompletePhotoSet(item.object));
@@ -111,6 +113,9 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
   };
 
   if (status === "confirmed") return <EvidenceSavedScreen experience={experience} trainingAchievements={trainingAchievements} />;
+  if (canonicalSaved) {
+    return <EvidenceSavedScreen experience={experience} processing processingNeedsAttention={status === "partially_committed"} />;
+  }
 
   return (
     <main className="app-surface min-h-screen">
@@ -149,9 +154,9 @@ export default function EvidenceReviewScreen({ canonicalExercises = [], confirmA
             <div className="flex gap-3">
               <AlertTriangle aria-hidden="true" size={20} />
               <div>
-                <h2 className="font-extrabold">{`Your ${experience.noun} is saved`}</h2>
+                <h2 className="font-extrabold">Evidence was not saved</h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  We couldn’t finish the follow-up step. Continue without re-uploading or repeating completed work.
+                  PhysiqueOS couldn’t complete the save. Review the current page before trying again.
                 </p>
               </div>
             </div>
@@ -812,7 +817,7 @@ function DiscardSubmitButton() {
   return <button className="min-h-12 w-full cursor-pointer rounded-2xl bg-red-600 px-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={pending} type="submit">{pending ? "Discarding..." : "Discard review"}</button>;
 }
 
-function EvidenceSavedScreen({ experience, trainingAchievements }) {
+function EvidenceSavedScreen({ experience, processing = false, processingNeedsAttention = false, trainingAchievements }) {
   const [continueNavigation] = useState(() =>
     createEvidenceSuccessNavigation((destination) => {
       window.location.assign(destination);
@@ -824,9 +829,15 @@ function EvidenceSavedScreen({ experience, trainingAchievements }) {
       <section aria-live="polite" className="mx-auto flex min-h-screen max-w-[393px] flex-col items-center justify-center px-6 pb-24 text-center" role="status">
         {experience.friendlyDate && <p className="mb-7 text-sm font-bold text-[var(--text-secondary)]">{experience.friendlyDate}</p>}
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-success)] text-[var(--chart-1)]"><Check aria-hidden="true" size={30} strokeWidth={3} /></span>
-        <h1 className="mt-7 text-3xl font-extrabold text-[var(--text-primary)]">{experience.savedTitle}</h1>
-        <p className="mt-3 max-w-xs text-base leading-7 text-[var(--text-secondary)]">{experience.savedBody}</p>
-        {trainingAchievements && (
+        <h1 className="mt-7 text-3xl font-extrabold text-[var(--text-primary)]">{processing ? "Evidence saved" : experience.savedTitle}</h1>
+        <p className="mt-3 max-w-xs text-base leading-7 text-[var(--text-secondary)]">
+          {processingNeedsAttention
+            ? "Your evidence has been added. Some follow-up processing still needs attention."
+            : processing
+              ? "Your evidence has been added. PhysiqueOS is finishing updates in the background."
+              : experience.savedBody}
+        </p>
+        {!processing && trainingAchievements && (
           <section className="mt-7 w-full rounded-2xl border border-[var(--divider)] bg-[var(--surface-elevated)] p-4 text-left">
             <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--chart-1)]">{trainingAchievements.heading}</p>
             <p className="mt-1 text-sm font-extrabold text-[var(--text-primary)]">{trainingAchievements.summary}</p>
@@ -840,7 +851,7 @@ function EvidenceSavedScreen({ experience, trainingAchievements }) {
             </div>
           </section>
         )}
-        <button className="mt-9 min-h-14 w-full rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" onClick={continueNavigation} type="button">Continue</button>
+        <button className="mt-9 min-h-14 w-full rounded-2xl bg-[var(--primary)] px-4 font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" onClick={continueNavigation} type="button">{processing ? "Back to Log" : "Continue"}</button>
       </section>
     </main>
   );

@@ -14,6 +14,12 @@ import { createPostgresCombinedRuntimeAuthorityStore } from "../src/platform/cut
 import { createAuthorityGatedWorker } from "../src/platform/jobs/AuthorityGatedWorker.js";
 import { readSpacesConfig } from "../src/platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../src/platform/object-storage/SpacesPrivateObjectProvider.js";
+import {
+  EVIDENCE_REVIEW_CONTINUATION_TOPIC,
+} from "../src/domain/services/EvidenceReviewBackgroundContinuation.js";
+import {
+  createEvidenceReviewContinuationWorkerHandler,
+} from "../src/platform/jobs/EvidenceReviewContinuationWorker.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
@@ -52,6 +58,14 @@ const simplifiedOperationStore = simplifiedMigration
 const handlers = Object.freeze({
   "foundation.synthetic": async ({ messageId }) => logger.info("foundation.synthetic", { messageId }),
   "foundation.synthetic.failure": async () => { throw new WorkerMessageError("SYNTHETIC_FAILURE", "Synthetic staging failure requested."); },
+  [EVIDENCE_REVIEW_CONTINUATION_TOPIC]: createEvidenceReviewContinuationWorkerHandler({
+    continueReview: async (input) => {
+      const { continueEvidenceReviewInBackground } = await import(
+        "../src/app/evidence/review/[reviewId]/actions.js"
+      );
+      return continueEvidenceReviewInBackground(input);
+    },
+  }),
   ...(process.env.PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED === "1" ? {
     [PROVIDER_MIGRATION_DRY_RUN_TOPIC]: createProviderMigrationDryRunWorkerHandler({
       store: createPostgresProviderMigrationDryRunStore({
