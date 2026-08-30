@@ -118,6 +118,12 @@ resource_files = [
     ("Resources/Fonts", "OFL.txt"),
 ]
 
+# AppIcon is allocated after all established project objects so registering
+# the packaging asset does not renumber the existing deterministic IDs.
+late_resource_files = [
+    ("Resources", "Assets.xcassets"),
+]
+
 # Files that must be visible/navigable in Xcode and resolvable by path (an
 # Info.plist referenced via the INFOPLIST_FILE build setting) but are NOT
 # copied via a Sources/Resources build phase themselves.
@@ -153,6 +159,8 @@ DEPLOYMENT_TARGET = "18.0"
 DEVELOPMENT_TEAM = "33GMTRM6G9"
 
 def file_type_for(fname):
+    if fname.endswith(".xcassets"):
+        return "folder.assetcatalog"
     if fname.endswith(".json"):
         return "text.json"
     if fname.endswith(".plist"):
@@ -237,6 +245,9 @@ I("uiTestFrameworksPhase")
 I("uiTestResourcesPhase")
 I("uiTestDependency")
 I("uiTestContainerProxy")
+for group, fname in late_resource_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
 
 # ---------------- PBXBuildFile ----------------
 buildfile_lines = []
@@ -244,6 +255,9 @@ for group, fname in app_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for group, fname in resource_files:
+    bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
+    buildfile_lines.append(f"\t\t{bf} /* {fname} in Resources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
+for group, fname in late_resource_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Resources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for group, fname in test_files:
@@ -271,7 +285,7 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + resource_files + reference_only_files + test_files + ui_test_files:
+for group, fname in app_files + resource_files + late_resource_files + reference_only_files + test_files + ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 fileref_lines.append(f"\t\t{I('fileref:PhysiqueOS.app')} /* PhysiqueOS.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; }};")
@@ -305,6 +319,7 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 all_members = (
     [(g, f) for g, f in app_files]
     + [(g, f) for g, f in resource_files]
+    + [(g, f) for g, f in late_resource_files]
     + [(g, f) for g, f in reference_only_files]
 )
 
@@ -400,7 +415,10 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 
 # ---------------- PBXNativeTarget ----------------
 app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files)
-app_resource_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */," for g, f in resource_files)
+app_resource_build_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
+    for g, f in resource_files + late_resource_files
+)
 test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files)
 
@@ -639,6 +657,7 @@ proj_release = f"""\t\t{I('projRelease')} /* Release */ = {{
 \t\t}};"""
 
 app_common = f"""
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
 \t\t\t\tCURRENT_PROJECT_VERSION = 1;
@@ -838,6 +857,6 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files), "resources:", len(resource_files),
+print("app files:", len(app_files), "resources:", len(resource_files + late_resource_files),
       "reference-only:", len(reference_only_files), "test files:", len(test_files))
 print("development team:", DEVELOPMENT_TEAM)

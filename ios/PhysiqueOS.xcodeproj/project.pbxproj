@@ -92,6 +92,7 @@
 		0000000000000000000010A6 /* TrainingFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A5 /* TrainingFixture.json */; };
 		0000000000000000000010A8 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A7 /* PlusJakartaSans[wght].ttf */; };
 		0000000000000000000010AA /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A9 /* OFL.txt */; };
+		0000000000000000000010F1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F0 /* Assets.xcassets */; };
 		0000000000000000000010AD /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AC /* AppTabTests.swift */; };
 		0000000000000000000010AF /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AE /* HomeReadModelTests.swift */; };
 		0000000000000000000010B1 /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B0 /* LogReadModelTests.swift */; };
@@ -205,6 +206,7 @@
 		0000000000000000000010A5 /* TrainingFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000010A7 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
 		0000000000000000000010A9 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
+		0000000000000000000010F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		0000000000000000000010AB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		0000000000000000000010AC /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000010AE /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 				0000000000000000000010A1 /* LogFixture.json */,
 				0000000000000000000010A3 /* EvidenceFixture.json */,
 				0000000000000000000010A5 /* TrainingFixture.json */,
+				0000000000000000000010F0 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -609,6 +612,7 @@
 				0000000000000000000010A6 /* TrainingFixture.json in Resources */,
 				0000000000000000000010A8 /* PlusJakartaSans[wght].ttf in Resources */,
 				0000000000000000000010AA /* OFL.txt in Resources */,
+				0000000000000000000010F1 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -872,6 +876,7 @@
 		0000000000000000000010D5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -898,6 +903,7 @@
 		0000000000000000000010D6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
