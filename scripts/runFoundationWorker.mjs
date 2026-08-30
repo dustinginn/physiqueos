@@ -5,6 +5,7 @@ import { createPostgresPool } from "../src/platform/database/pool.js";
 import { createFoundationPostgresAdapters } from "../src/platform/database/foundationPostgresComposition.js";
 import { createDurableOutboxWorker, WorkerMessageError } from "../src/platform/jobs/DurableOutboxWorker.js";
 import { runWorkerLoop } from "../src/platform/jobs/workerLoop.js";
+import { runBriefingCadenceLoop } from "../src/platform/jobs/BriefingCadenceWorker.js";
 import { readBuildIdentity } from "../src/platform/observability/buildIdentity.js";
 import { createStructuredLogger } from "../src/platform/observability/structuredLogger.js";
 import { createPostgresProviderMigrationDryRunStore } from "../src/platform/cutover/PostgresProviderMigrationDryRunStore.js";
@@ -36,6 +37,9 @@ const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE ===
 const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT")
   : null;
+const ownerUserId = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
+  ? required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID")
+  : null;
 const compatibilityDatabaseName = compatibilityMode
   ? required(process.env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME")
   : null;
@@ -51,7 +55,7 @@ if (compatibilityMode) {
 const simplifiedOperationStore = simplifiedMigration
   ? simplifiedMigration.createPostgresSimplifiedProviderMigrationOperationStore({
       pool,
-      ownerUserId: required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID"),
+      ownerUserId,
     })
   : null;
 
@@ -156,6 +160,8 @@ if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
   process.stdout.write(`${JSON.stringify({
     status: "PROVIDER_WORKER_APPLICATION_LOOP_READY",
     workerPid: process.pid,
+    briefingCadenceSchedulerRegistered:
+      process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1",
     simplifiedMigrationHandlerRegistered: Boolean(simplifiedOperationStore),
     migrationCoordinatorProcessModel: "in-process-existing-worker",
   })}\n`);
@@ -163,8 +169,38 @@ if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
 } else {
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
   try {
-    await runWorkerLoop({ worker: effectiveWorker, signal: controller.signal });
+    const loops = [
+      runWorkerLoop({ worker: effectiveWorker, signal: controller.signal }),
+    ];
+    if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {
+      const [{ createProviderBriefingCadenceRunner }, { loadApplicationRuntimeBindings }] =
+        await Promise.all([
+          import("../src/application/composition/providerBriefingCadenceComposition.js"),
+          import("../src/application/runtime/ApplicationCanonicalRuntime.js"),
+        ]);
+      const cadenceRunner = createProviderBriefingCadenceRunner({
+        pool,
+        ownerUserId,
+        authorityStore: createPostgresCombinedRuntimeAuthorityStore({
+          pool,
+          environment: authorityEnvironment,
+        }),
+        loadRuntimeBindings: loadApplicationRuntimeBindings,
+        runtimeIdentity: {
+          buildId: buildIdentity.buildId,
+          sourceCommit: buildIdentity.gitSha,
+          workerId: worker.workerId,
+        },
+      });
+      loops.push(runBriefingCadenceLoop({
+        execute: cadenceRunner.execute,
+        signal: controller.signal,
+        logger,
+      }));
+    }
+    await Promise.all(loops);
   } catch (error) {
+    controller.abort();
     logger.error("worker.crashed", { code: error?.code ?? "WORKER_CRASHED" });
     process.exitCode = 1;
   } finally {

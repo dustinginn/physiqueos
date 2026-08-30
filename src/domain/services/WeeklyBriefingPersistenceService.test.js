@@ -343,7 +343,7 @@ describe("WeeklyBriefingPersistenceService", () => {
     ).toMatch(/across 7 paired days/);
     expect(narrative.context).toMatchObject({
       activeGoalSummary: { title: "Build Lean Mass" },
-      activePhase: { name: "Establish Maintenance" },
+      activePhase: { name: "Lean Mass Build" },
       operatingState: { value: "calibration" },
     });
     expect(after.revision).toBe(before.revision + 1);

@@ -3,6 +3,8 @@ import {
   createMidweekEvidenceWindow,
   selectScheduledBriefingCadence,
 } from "./BriefingEvidenceWindowService";
+import { isEventBriefingRelevantForHome } from
+  "./EventBriefingHomeRelevanceService";
 
 export function resolveHomeBriefingSelection({
   dailyArtifact = null,
@@ -91,12 +93,7 @@ export function isEventActiveForHome({ artifact, localDate, timeZone }) {
   if (!artifact || artifact.lifecycle?.consumedAt) return false;
   if (!artifact.briefing || artifact.artifactType !== "event") return false;
   if (hasInvalidLifecycleStatus(artifact)) return false;
-  if (!["progress_photo", "photo_session"].includes(artifact.trigger?.evidenceType)) return true;
-  const eventDate = artifact.briefing?.photoEventNarrative?.eventDate ?? artifact.trigger?.occurredAt ?? artifact.generatedAt;
-  const eventLocalDate = getLocalDateKey(eventDate, timeZone);
-  if (eventLocalDate === localDate) return true;
-  const publicationLocalDate = getLocalDateKey(artifact.generatedAt, timeZone);
-  return eventLocalDate === shiftDate(localDate, -1) && publicationLocalDate === localDate;
+  return isEventBriefingRelevantForHome({ artifact, localDate, timeZone });
 }
 
 function cadenceSelection(artifact, cadence, localDate, reason) {

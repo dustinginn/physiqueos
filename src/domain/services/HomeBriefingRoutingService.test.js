@@ -211,7 +211,7 @@ describe("artifact-backed Home briefing routing", () => {
     })).toBe(false);
   });
 
-  it("keeps consumed Photo Events suppressed and preserves DEXA lifecycle behavior", () => {
+  it("keeps consumed Photo Events suppressed and bounds DEXA Home relevance", () => {
     expect(isEventActiveForHome({
       artifact: {
         ...photoEvent,
@@ -220,16 +220,27 @@ describe("artifact-backed Home briefing routing", () => {
       localDate: "2026-07-22",
       timeZone: "America/Los_Angeles",
     })).toBe(false);
+    const dexaEvent = {
+      ...photoEvent,
+      generatedAt: "2026-07-22T18:00:00Z",
+      trigger: { evidenceType: "dexa", evidenceId: "scan" },
+      briefing: { dexaEventNarrative: { scanDate: "2026-07-01" } },
+    };
     expect(isEventActiveForHome({
-      artifact: {
-        ...photoEvent,
-        generatedAt: "2026-07-01T18:00:00Z",
-        trigger: { evidenceType: "dexa", evidenceId: "scan" },
-        briefing: { dexaEventNarrative: { scanDate: "2026-07-01" } },
-      },
+      artifact: dexaEvent,
       localDate: "2026-07-22",
       timeZone: "America/Los_Angeles",
     })).toBe(true);
+    expect(isEventActiveForHome({
+      artifact: dexaEvent,
+      localDate: "2026-07-23",
+      timeZone: "America/Los_Angeles",
+    })).toBe(false);
+    expect(dexaEvent).toMatchObject({
+      id: "event",
+      trigger: { evidenceId: "scan" },
+      lifecycle: {},
+    });
   });
 
   it("promotes Monthly on its delivery date without hiding an active Event", () => {

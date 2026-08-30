@@ -183,6 +183,7 @@ async function evaluateEntry({
   );
   const timed = await withTimeout(operation, policy.generatorTimeoutMs);
   if (timed.timedOut) {
+    lock.releaseAfter?.(operation);
     return finish("transient_failure", {
       ...base,
       artifactOutcome: "generator_timeout",

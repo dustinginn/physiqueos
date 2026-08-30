@@ -85,7 +85,7 @@ describe("Home briefing availability", () => {
     });
   });
 
-  it("preserves event-only, cadence-only, consumed-event, and DEXA behavior", () => {
+  it("preserves event-only, cadence-only, consumed-event, and fresh DEXA behavior", () => {
     expect(resolveHomeBriefingSlots({
       eventArtifact: photoEvent(),
       now: new Date("2026-07-22T18:00:00Z"),
@@ -117,6 +117,7 @@ describe("Home briefing availability", () => {
     });
     expect(resolveHomeBriefingSlots({
       eventArtifact: photoEvent({
+        generatedAt: "2026-07-26T17:30:00Z",
         trigger: { evidenceType: "dexa", evidenceId: "scan" },
         briefing: { dexaEventNarrative: { hero: { body: "DEXA ready" } } },
       }),
@@ -126,6 +127,39 @@ describe("Home briefing availability", () => {
     })).toMatchObject({
       activeEventSelection: { briefingType: "event" },
       currentCadenceSelection: { briefingType: "weekly" },
+    });
+  });
+
+  it("routes current Weekly when a historical DEXA Event is no longer relevant", () => {
+    const historicalDexa = photoEvent({
+      id: "dexa-event-aug-15",
+      generatedAt: "2026-08-15T19:02:57.601Z",
+      trigger: { evidenceType: "dexa", evidenceId: "scan-aug-15" },
+      briefing: { dexaEventNarrative: { hero: { body: "DEXA ready" } } },
+    });
+    const currentWeekly = cadenceArtifact(
+      "weekly",
+      "2026-08-30",
+      "2026-08-23",
+      "2026-08-29"
+    );
+    const slots = resolveHomeBriefingSlots({
+      eventArtifact: historicalDexa,
+      weeklyArtifact: currentWeekly,
+      now: new Date("2026-08-30T18:00:00Z"),
+      timeZone: "America/Los_Angeles",
+    });
+    expect(slots).toMatchObject({
+      activeEventSelection: null,
+      currentCadenceSelection: {
+        briefingType: "weekly",
+        artifact: { id: "weekly-briefing" },
+      },
+    });
+    expect(historicalDexa).toMatchObject({
+      id: "dexa-event-aug-15",
+      lifecycle: {},
+      trigger: { evidenceId: "scan-aug-15" },
     });
   });
 

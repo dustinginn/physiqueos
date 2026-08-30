@@ -2,6 +2,8 @@ import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
+import { createSeedRepositories } from
+  "../../data/repositories/createSeedRepositories";
 import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore";
 import {
   createMonthlyEvidenceWindow,
@@ -136,10 +138,22 @@ describe("Monthly production cadence", () => {
         artifact: persisted,
       };
     });
+    const historicalRuntime = structuredClone(getFounderRuntimeStore());
+    const activeGoal = historicalRuntime.goals.find((goal) =>
+      goal.primary && goal.status === "active");
+    const julyPhaseId =
+      "goal_phase_7ab0d230-ea5b-485b-8368-0e695224de08";
+    activeGoal.currentPhaseId = julyPhaseId;
+    activeGoal.phases = activeGoal.phases.map((phase) => ({
+      ...phase,
+      status: phase.id === julyPhaseId ? "active" : "planned",
+      completedAt: phase.id === julyPhaseId ? null : phase.completedAt,
+    }));
+    const snapshotRepositories = createSeedRepositories(historicalRuntime);
     const repositories = {
-      ...FounderRepositories,
+      ...snapshotRepositories,
       dailyBriefings: {
-        ...FounderRepositories.dailyBriefings,
+        ...snapshotRepositories.dailyBriefings,
         getBriefingByEvidenceWindow: vi.fn(async () => persisted),
       },
     };
