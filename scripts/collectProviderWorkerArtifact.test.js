@@ -113,6 +113,21 @@ describe("provider worker artifact collector", () => {
       simplifiedMigrationHandlerRegistered: true,
       migrationCoordinatorProcessModel: "in-process-existing-worker",
     });
+    const continuationImportFixture = path.join(outputRoot, "evidence-continuation-import.mjs");
+    await write(continuationImportFixture, [
+      'import { register } from "node:module";',
+      'register("./scripts/sourceModuleResolutionHook.mjs", import.meta.url);',
+      'const actions = await import("./src/app/evidence/review/[reviewId]/actions.js");',
+      'if (typeof actions.continueEvidenceReviewInBackground !== "function") process.exit(2);',
+    ].join("\n"));
+    const continuationImport = spawnSync(process.execPath, [continuationImportFixture], {
+      cwd: outputRoot,
+      encoding: "utf8",
+      timeout: 30_000,
+      env: providerBootProbeEnvironment(),
+    });
+    expect(continuationImport.status, continuationImport.stderr).toBe(0);
+    expect(continuationImport.stderr).not.toContain("ERR_MODULE_NOT_FOUND");
     const workerSource = await fs.readFile(path.join(outputRoot, "scripts/runFoundationWorker.mjs"), "utf8");
     expect(workerSource.indexOf('register("./sourceModuleResolutionHook.mjs"'))
       .toBeLessThan(workerSource.indexOf("await loadSimplifiedMigrationModules()"));

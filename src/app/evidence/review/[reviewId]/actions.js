@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache.js";
+import { redirect } from "next/navigation.js";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
 import { createEvidenceReviewService } from "../../../../domain/services/EvidenceReviewService";
 import { createWeightEntry } from "../../../../domain/models/weightEntry";
