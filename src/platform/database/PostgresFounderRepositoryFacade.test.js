@@ -5,6 +5,7 @@ import { getWeightTimelineReport } from "../../domain/services/WeightEvidenceCon
 import { getTrainingTimelineReport } from "../../domain/services/TrainingEvidenceContextService.js";
 import { getPhotosTimelineReport } from "../../domain/services/PhotosEvidenceContextService.js";
 import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContextService.js";
+import { createEvidenceReviewService } from "../../domain/services/EvidenceReviewService.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createProductionRepositoryFacade } from "../../data/repositories/founderRepositories.js";
 import { runInactiveLegacyWebReadScope } from "../../application/auth/legacyWebContext.js";
@@ -119,6 +120,69 @@ describe("PostgreSQL Founder repository facade", () => {
       commitProgress: { canonical_commit: { status: "completed" } },
     });
     expect(database.metadata.revision).toBe(5004);
+  });
+
+  it("persists a JSON-safe existing built-in exercise mapping through the provider facade", async () => {
+    const database = fakeDatabase();
+    const review = database.runtime.evidenceReviews[0];
+    review.status = "pending";
+    review.updatedAt = "2026-08-29T23:37:26.823Z";
+    review.interpretedEvidence = {
+      package_id: "mapping-package",
+      evidence_objects: [{
+        id: "training-session",
+        evidence_type: "training",
+        exercises: [{
+          id: "lateral-occurrence",
+          name: "Lateral Machine Raises",
+          sets: [{ reps: 10, weight: 75 }],
+          resolutionStatus: "unresolved_provisional",
+          provisionalExercise: {
+            provisionalExerciseId: "lateral-provisional",
+            resolutionStatus: "unresolved",
+          },
+        }],
+      }],
+    };
+    const canonicalExerciseLibraryBefore = structuredClone(
+      database.runtime.canonicalExerciseLibrary
+    );
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: {
+        assertCompatibilityAccess: vi.fn(async () => ({
+          authority: "provider-compatibility-nonauthoritative",
+        })),
+      },
+      now: () => new Date("2026-08-29T23:38:00.000Z"),
+      createCommandId: () => "existing-exercise-mapping-command",
+    });
+
+    await createEvidenceReviewService({
+      repositories,
+      now: () => new Date("2026-08-29T23:38:00.000Z"),
+    }).resolveProvisionalExercise(review.id, {
+      expectedUpdatedAt: review.updatedAt,
+      provisionalExerciseId: "lateral-provisional",
+      mode: "existing",
+      canonicalExerciseId: "lateral_raise_machine",
+      updatedBy: PHASE5_SYNTHETIC_OWNER_ID,
+    });
+
+    const persisted = database.runtime.evidenceReviews[0]
+      .interpretedEvidence.evidence_objects[0].exercises[0];
+    expect(persisted).toMatchObject({
+      canonicalExerciseId: "lateral_raise_machine",
+      laterality: null,
+      name: "Lateral Raises Machine",
+      resolutionStatus: "resolved_existing_canonical",
+    });
+    expect(database.runtime.canonicalExerciseLibrary)
+      .toEqual(canonicalExerciseLibraryBefore);
+    expect(database.transactions).toEqual(["BEGIN", "COMMIT"]);
   });
 
   it("executes a bounded canonical commit through a writable shell over the frozen loaded runtime", async () => {

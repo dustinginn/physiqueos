@@ -166,7 +166,7 @@ export function resolveProvisionalExerciseInPackage(
           canonical.primary_muscle_group_id ?? null,
         primary_muscle_groups: canonical.primary_muscle_groups,
         movement_pattern: canonical.movement_pattern,
-        laterality: canonical.laterality,
+        laterality: canonical.laterality ?? null,
         resolutionStatus: resolution.mode === "new"
           ? "resolved_new_canonical"
           : "resolved_existing_canonical",

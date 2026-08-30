@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEvidenceReviewService } from "./EvidenceReviewService";
+import { canonicalJson } from "../../contracts/v1/canonicalJson";
+import { listCanonicalTrainingExerciseIdentities } from "../models/trainingExerciseIdentity";
 
 describe("EvidenceReviewService provisional exercise safety", () => {
   it("blocks beginCommit while a provisional exercise is unresolved", async () => {
@@ -41,6 +43,53 @@ describe("EvidenceReviewService provisional exercise safety", () => {
     await expect(service.beginCommit(state.review.id)).resolves.toMatchObject({
       status: "committing",
     });
+  });
+
+  it("persists an existing built-in mapping once and rejects a stale replay", async () => {
+    const state = reviewFixture();
+    const expectedUpdatedAt = state.review.updatedAt;
+    const canonicalBefore = structuredClone(
+      listCanonicalTrainingExerciseIdentities().find(
+        (candidate) => candidate.id === "lateral_raise_machine"
+      )
+    );
+    const service = createEvidenceReviewService({
+      repositories: repositories(state),
+      now: () => new Date("2026-07-29T20:00:00.000Z"),
+    });
+
+    await service.resolveProvisionalExercise(state.review.id, {
+      expectedUpdatedAt,
+      provisionalExerciseId: "provisional_1",
+      mode: "existing",
+      canonicalExerciseId: "lateral_raise_machine",
+      updatedBy: "founder",
+    });
+
+    const exercise = state.review.interpretedEvidence.evidence_objects[0]
+      .exercises[0];
+    expect(exercise).toMatchObject({
+      canonicalExerciseId: "lateral_raise_machine",
+      laterality: null,
+      name: "Lateral Raises Machine",
+      resolutionStatus: "resolved_existing_canonical",
+    });
+    expect(() => canonicalJson(state.review)).not.toThrow();
+    expect(state.reviewUpdateCount).toBe(1);
+    expect(exercise.provisionalExercise.confirmedDefinition).toBeNull();
+    expect(canonicalBefore.aliases).not.toContain("Lateral Machine Raises");
+    expect(listCanonicalTrainingExerciseIdentities().find(
+      (candidate) => candidate.id === "lateral_raise_machine"
+    )).toEqual(canonicalBefore);
+
+    await expect(service.resolveProvisionalExercise(state.review.id, {
+      expectedUpdatedAt,
+      provisionalExerciseId: "provisional_1",
+      mode: "existing",
+      canonicalExerciseId: "lateral_raise_machine",
+      updatedBy: "founder",
+    })).rejects.toMatchObject({ code: "REVIEW_STALE" });
+    expect(state.reviewUpdateCount).toBe(1);
   });
 
   it.each(["", "Glute Muscles", "removed_group"])(
@@ -295,6 +344,7 @@ function repositories(state) {
       },
       updateReviewIfCurrent: async (_id, expectedUpdatedAt, patch) => {
         if (state.review.updatedAt !== expectedUpdatedAt) throw new Error("stale");
+        state.reviewUpdateCount = (state.reviewUpdateCount ?? 0) + 1;
         state.review = {
           ...state.review,
           ...structuredClone(patch),

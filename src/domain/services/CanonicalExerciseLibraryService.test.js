@@ -11,8 +11,10 @@ import {
 } from "./CanonicalExerciseLibraryService";
 import {
   registerRuntimeTrainingExercises,
+  listCanonicalTrainingExerciseIdentities,
 } from "../models/trainingExerciseIdentity";
 import { afterEach } from "vitest";
+import { canonicalJson } from "../../contracts/v1/canonicalJson";
 
 afterEach(() => registerRuntimeTrainingExercises([]));
 
@@ -92,6 +94,36 @@ describe("canonical exercise review resolution", () => {
     );
     expect(resolved.evidence_objects[0].exercises[0].canonicalExerciseId).toBe("spider_curls");
     expect(canonicalDefinitionsPendingCreation(resolved)).toEqual([]);
+    expect(resolved.evidence_objects[0].exercises[0].laterality)
+      .toBe("bilateral");
+  });
+
+  it("maps a built-in identity without laterality into a JSON-safe null", () => {
+    const canonical = listCanonicalTrainingExerciseIdentities().find(
+      (candidate) => candidate.id === "lateral_raise_machine"
+    );
+    const canonicalBefore = structuredClone(canonical);
+
+    expect(Object.hasOwn(canonical, "laterality")).toBe(false);
+    expect(Object.hasOwn(canonical, "equipment")).toBe(true);
+    expect(Object.hasOwn(canonical, "body_region")).toBe(true);
+    expect(Object.hasOwn(canonical, "movement_pattern")).toBe(true);
+
+    const resolved = resolveProvisionalExerciseInPackage(
+      fixture(), "provisional_1", { mode: "existing", canonical }
+    );
+    const exercise = resolved.evidence_objects[0].exercises[0];
+
+    expect(exercise).toMatchObject({
+      canonicalExerciseId: "lateral_raise_machine",
+      laterality: null,
+      name: "Lateral Raises Machine",
+      resolutionStatus: "resolved_existing_canonical",
+    });
+    expect(() => canonicalJson(resolved)).not.toThrow();
+    expect(canonicalDefinitionsPendingCreation(resolved)).toEqual([]);
+    expect(canonical.aliases).not.toContain("Lateral Machine Raises");
+    expect(canonical).toEqual(canonicalBefore);
   });
 
   it("records explicit removal", () => {
