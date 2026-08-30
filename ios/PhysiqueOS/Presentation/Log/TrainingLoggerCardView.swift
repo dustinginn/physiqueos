@@ -1,10 +1,8 @@
 import SwiftUI
 
 /// Mirrors `TrainingLoggerCard` inside `LogHubScreen.jsx`: an accent-tinted
-/// promo card linking to Training Logger. Training Logger itself is a
-/// major later Stage 1 priority but explicitly out of scope for this
-/// slice — tapping this card correctly represents the destination without
-/// pretending the workflow exists (`AppDestination.trainingLogger`).
+/// promo card linking to the fixture-backed Native Training Logger through
+/// the typed `AppDestination.trainingLogger` route.
 struct TrainingLoggerCardView: View {
     var onTap: (AppDestination) -> Void
 

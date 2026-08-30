@@ -12,6 +12,8 @@ struct AppDestinationRouterView: View {
 
     var body: some View {
         switch destination {
+        case .trainingLogger:
+            TrainingLoggerView()
         case .trainingSession(let sessionId):
             TrainingSessionDetailView(sessionId: sessionId)
         case .trainingDay(let date):

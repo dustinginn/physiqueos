@@ -17,9 +17,10 @@ import Foundation
 ///
 /// This file mirrors that same three-projection shape — deliberately not a
 /// second, unified Swift canonical workout model — and only covers the
-/// read-only history/detail vertical this slice implements. Live Workout
-/// and the Training Logger's write-path/draft state are out of scope (see
-/// `AppDestination.trainingLogger`).
+/// read-only history/detail vertical. The fixture-backed Training Logger
+/// intentionally keeps its local capture draft separate, but reuses this
+/// file's occurrence/set/variant/relationship contracts and the shared
+/// history calculator for previous-performance matching.
 
 // MARK: - Training landing page (`/progress/training`)
 //
@@ -484,6 +485,11 @@ struct TrainingExerciseHistoryOccurrence: Identifiable, Equatable {
 struct TrainingExerciseRelationshipContext: Equatable {
     var relationshipType: String
     var partnerNames: [String]
+    /// Logger comparison uses canonical partner identity, matching the web's
+    /// relationship comparison key. Older read fixtures that predate this
+    /// field fall back to normalized partner names for presentation-only
+    /// history, so accepted Training screens remain source-compatible.
+    var partnerCanonicalExerciseIds: [String] = []
 
     /// Mirrors `formatRelationshipContext` exactly: `"Superset with A + B"`
     /// when there are partner names, else the bare relationship type.

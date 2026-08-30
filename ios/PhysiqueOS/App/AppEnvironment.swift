@@ -12,16 +12,22 @@ final class AppEnvironment {
     let logAPI: LogAPI
     let evidenceAPI: EvidenceAPI
     let trainingAPI: TrainingAPI
+    let trainingLoggerAPI: TrainingLoggerAPI
+    let trainingLoggerDraftStore: TrainingLoggerDraftStore
 
     init(
         homeAPI: HomeAPI = FixtureHomeAPI(),
         logAPI: LogAPI = FixtureLogAPI(),
         evidenceAPI: EvidenceAPI = FixtureEvidenceAPI(),
-        trainingAPI: TrainingAPI = FixtureTrainingAPI()
+        trainingAPI: TrainingAPI = FixtureTrainingAPI(),
+        trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
+        trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore()
     ) {
         self.homeAPI = homeAPI
         self.logAPI = logAPI
         self.evidenceAPI = evidenceAPI
         self.trainingAPI = trainingAPI
+        self.trainingLoggerAPI = trainingLoggerAPI
+        self.trainingLoggerDraftStore = trainingLoggerDraftStore
     }
 }

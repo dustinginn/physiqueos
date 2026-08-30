@@ -37,6 +37,7 @@ struct TrainingHistoryView: View {
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

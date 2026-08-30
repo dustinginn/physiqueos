@@ -1574,3 +1574,111 @@ authentication, worker/outbox, deployment/runtime, backend authority, shared
 domain architecture, or separate production worktree state was touched. No
 incremental cost, paid service, dependency, infrastructure, entitlement, or
 deployment was added.
+
+## 60. Native Workout Logger fixture vertical and TestFlight housekeeping (2026-08-30)
+
+Completes the next Native V1 daily-driver slice from accepted `native-v1`
+checkpoint `8fcd38e`: the Log hub's typed Training Logger route now resolves to
+a real fixture-backed capture workflow, while all production and canonical
+authority remains unchanged.
+
+**Source-first Logger contract.** The implementation was traced from the
+current web `/log/training` route and `TrainingLoggerClient`, its preview state,
+draft recovery, exercise-occurrence history, variant, relationship, suggestion,
+progression, Apple Health, and production integration services. Native follows
+the current hierarchy: Start Workout / Log Past Workout; multi-area selection;
+performed-history-first exercise selection with explicit broader-registry and
+provisional-new-exercise paths; compact set entry; occurrence-level variants;
+two-member superset relationships; atomic exercise substitution; summary;
+optional Apple Health boundary; and Evidence Review handoff.
+
+**Architecture and previous performance.** `TrainingLoggerAPI` is a read-only
+fixture seam and `TrainingLoggerDraft` is a Codable device-local capture model,
+not a second canonical TrainingSession. The Logger reuses
+`TrainingExerciseOccurrence`, `TrainingSet`, `TrainingExecutionVariant`,
+`TrainingExerciseRelationshipContext`, and
+`TrainingExerciseHistoryCalculator`. Its previous-performance query is strict:
+the occurrence must precede the workout's calendar date and match the exact
+variant and canonical superset-partner comparison key. The matching prior sets
+prepopulate as editable, incomplete rows. No progression target is calculated.
+Fixtures cover loaded, bodyweight, and timed work plus ordinary, variant, and
+superset histories using synthetic data only.
+
+**Capture behavior.** Live mode uses today's local calendar date; past mode
+stores the selected calendar date without inventing a time. Training Areas are
+multi-select. The normal picker only exposes previously performed movements;
+"Add new exercise" broadens to the synthetic canonical registry and permits a
+provisional local occurrence whose provenance explicitly requires canonical
+review. Duplicate canonical identities are rejected. Set rows support compact
+reps/load, bodyweight reps, or duration entry; add/remove; prior-value editing;
+and done state. Exercise actions support the web's current Static Hold,
+3-Second Pause, and Slow Eccentric options, removal, ordering, two-member
+superset create/remove, and substitution. Every mutation auto-saves through an
+injected draft store; Save & Leave and Resume make the local boundary explicit.
+
+**Summary and evidence boundary.** Summary reports only the current web fields:
+exercises, completed sets, variants, and supersets. Native does not invent
+calories when no source value exists. Apple Health is an honest informational
+stage: the sandbox reads or writes no Health data and can continue without it.
+Evidence Review then states explicitly that no canonical TrainingSession,
+production Evidence Review, or confirmation commit exists. Completing the demo
+only clears the device-local draft; it never claims server success.
+
+**Navigation correction.** Training's custom `Evidence Hub` back control hides
+the system back item, which also disables UIKit's interactive-pop recognizer.
+The pushed Training landing now applies one shared UIKit bridge that restores
+the standard recognizer only when navigation depth is greater than one.
+Standard pushed screens retain their system behavior, while tab roots remain
+depth-one and cannot accidentally swipe-pop. The Logger itself keeps the
+standard NavigationStack back button and typed `AppDestination.trainingLogger`
+route. A pure depth policy regression test covers the root-versus-pushed rule.
+
+**TestFlight housekeeping.** The source-controlled app Info.plist now declares
+`ITSAppUsesNonExemptEncryption = false`, matching Apple's documented semantics
+for an app that uses no non-exempt cryptography. Build numbering now has one
+authoritative input: `APP_BUILD_NUMBER` in
+`ios/Scripts/generate_project.py`. For the next release, increment that one
+constant, run `python3 ios/Scripts/generate_project.py`, then run
+`python3 ios/Scripts/verify_release_configuration.py` before build/archive.
+Never hand-edit `CURRENT_PROJECT_VERSION` in the generated project. Marketing
+version remains 1.0, build remains 2 for this candidate, bundle id remains
+`com.physiqueos.native.dev`, and AppIcon/signing settings are preserved.
+
+**Verification.** The generated project includes the Logger sources, synthetic
+fixture, and unit tests. The focused unit invocation selects
+`PhysiqueOSTests` only; no XCUITest is executed or expanded. Coverage includes
+route identity, canonical area order/multi-select, picker ordering/search,
+strict previous-performance/date/variant/relationship matching, prepopulation,
+loaded/bodyweight/timed validation, set and exercise mutation, ordering,
+variant/superset create/remove, substitution, provisional identity, draft
+round-trip, summary, navigation-depth policy, export-compliance metadata,
+version/build, and bundle identity. Simulator interaction exercised the real
+Log entry through local completion, including relaunch/resume, numeric edit,
+done state, variant, superset, summary, Apple Health, and Evidence Review.
+
+**Intentional differences from web.** Native remains fixture-backed. No
+goal/date suggestion or progression target is manufactured. Calories are
+omitted because the fixture has no authoritative value. Apple Health attachment
+is visibly unavailable rather than simulated. The three current web variant
+options are preserved; on-the-fly creation is not invented. A compact header
+Review affordance keeps the daily-driver action reachable on long Native set
+lists while retaining the bottom action. The provisional exercise stops at the
+review boundary and cannot mutate the canonical registry.
+
+**POST-STABILIZATION INTEGRATION REQUIREMENTS.** A future authenticated Logger
+must obtain server-owned performed-exercise/history, goal/date suggestion, and
+any progression semantics; implement the missing shared contract for organic
+new-variant creation if the product accepts it; use a real HealthKit adapter and
+provenance-preserving Evidence Review; and invoke the existing canonical
+confirmation pipeline atomically for workout plus approved new-exercise
+identity. Native must not become canonical authority or bypass evidence review.
+
+**Founder decisions still open.** Whether organic execution-variant creation
+should be promoted into the shared web/domain contract; when to connect
+HealthKit; and when this fixture workflow is accepted for the live command
+integration phase.
+
+**Production and cost.** No production worktree, DigitalOcean, PostgreSQL,
+production API/authentication, worker/outbox, deployment, shared backend/domain
+authority, canonical data, or TestFlight upload was touched. No new dependency,
+service, entitlement, infrastructure, or incremental paid cost was introduced.

@@ -49,8 +49,8 @@ enum TrainingExerciseHistoryCalculator {
         return "\(formatter.string(from: NSNumber(value: value.rounded())) ?? "\(Int(value.rounded()))") lb"
     }
 
-    private static let ordinaryVariantKey = "ordinary"
-    private static let standaloneRelationshipKey = "standalone"
+    static let ordinaryVariantKey = "ordinary"
+    static let standaloneRelationshipKey = "standalone"
 
     private static func variantKey(_ exercise: TrainingExerciseOccurrence) -> String {
         exercise.executionVariant?.key ?? ordinaryVariantKey
@@ -58,7 +58,32 @@ enum TrainingExerciseHistoryCalculator {
 
     private static func relationshipKey(_ relationship: TrainingExerciseRelationshipContext?) -> String {
         guard let relationship else { return standaloneRelationshipKey }
-        return "\(relationship.relationshipType):\(relationship.partnerNames.sorted().joined(separator: ","))"
+        let partnerIdentity = relationship.partnerCanonicalExerciseIds.isEmpty
+            ? relationship.partnerNames.map { $0.lowercased() }
+            : relationship.partnerCanonicalExerciseIds
+        return "\(relationship.relationshipType):\(partnerIdentity.sorted().joined(separator: ","))"
+    }
+
+    /// The Logger's source-derived previous-performance lookup. The web
+    /// requires a strict match on canonical exercise (already scoped by the
+    /// caller), execution variant, relationship/superset comparison key, and
+    /// a workout date strictly before the draft date. Keeping this beside the
+    /// read-side benchmark calculator prevents a second, weaker Native-only
+    /// history algorithm from emerging in the capture workflow.
+    static func previousComparableOccurrence(
+        in occurrences: [TrainingExerciseHistoryOccurrence],
+        before workoutDate: String,
+        executionVariant: TrainingExecutionVariant?,
+        relationship: TrainingExerciseRelationshipContext?
+    ) -> TrainingExerciseHistoryOccurrence? {
+        let requestedVariant = executionVariant?.key ?? ordinaryVariantKey
+        let requestedRelationship = relationshipKey(relationship)
+        return occurrences
+            .filter { $0.sessionDate < workoutDate }
+            .filter { variantKey($0.exercise) == requestedVariant }
+            .filter { relationshipKey($0.relationship) == requestedRelationship }
+            .sorted { $0.sessionDate > $1.sessionDate }
+            .first
     }
 
     /// `getCurrentExerciseBenchmark` (`TrainingKnowledgeScreen.jsx:1639-1692`),

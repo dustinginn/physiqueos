@@ -43,10 +43,13 @@ app_files = [
     ("Contracts", "TrainingExerciseHistoryCalculator.swift"),
     ("Contracts", "TrainingPerformanceRecordsCalculator.swift"),
     ("Contracts", "TrainingReportingReadModel.swift"),
+    ("Contracts", "TrainingLoggerReadModel.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "LogAPI.swift"),
     ("Networking", "EvidenceAPI.swift"),
     ("Networking", "TrainingAPI.swift"),
+    ("Networking", "TrainingLoggerAPI.swift"),
+    ("Networking", "TrainingLoggerDraftStore.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "IconBadge.swift"),
     ("SharedUI", "CardContainer.swift"),
@@ -64,6 +67,7 @@ app_files = [
     ("SharedUI", "EvidenceAttachment.swift"),
     ("SharedUI", "EvidenceSourcePicker.swift"),
     ("SharedUI", "EvidenceStreamPresentation.swift"),
+    ("SharedUI", "InteractivePopGesture.swift"),
     ("Presentation/Root", "RootTabView.swift"),
     ("Presentation/Root", "DestinationPlaceholderView.swift"),
     ("Presentation/Root", "AppDestinationRouterView.swift"),
@@ -105,6 +109,8 @@ app_files = [
     ("Presentation/Training", "TrainingLibraryRootViewModel.swift"),
     ("Presentation/Training", "TrainingReportingView.swift"),
     ("Presentation/Training", "TrainingReportingViewModel.swift"),
+    ("Presentation/TrainingLogger", "TrainingLoggerView.swift"),
+    ("Presentation/TrainingLogger", "TrainingLoggerViewModel.swift"),
 ]
 
 # Non-Swift app-target resources (group path -> filename) — copied into the
@@ -114,6 +120,7 @@ resource_files = [
     ("Resources", "LogFixture.json"),
     ("Resources", "EvidenceFixture.json"),
     ("Resources", "TrainingFixture.json"),
+    ("Resources", "TrainingLoggerFixture.json"),
     ("Resources/Fonts", "PlusJakartaSans[wght].ttf"),
     ("Resources/Fonts", "OFL.txt"),
 ]
@@ -139,6 +146,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
+    ("PhysiqueOSTests", "TrainingLoggerTests.swift"),
 ]
 
 ui_test_files = [
@@ -149,6 +157,11 @@ BUNDLE_ID_APP = "com.physiqueos.native.dev"
 BUNDLE_ID_TEST = "com.physiqueos.native.dev.Tests"
 BUNDLE_ID_UI_TEST = "com.physiqueos.native.dev.UITests"
 DEPLOYMENT_TARGET = "18.0"
+
+# One authoritative TestFlight build number. Increment this value, run this
+# generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
+# generated project by hand.
+APP_BUILD_NUMBER = 2
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
@@ -660,7 +673,7 @@ app_common = f"""
 \t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
-\t\t\t\tCURRENT_PROJECT_VERSION = 2;
+\t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
 \t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
 \t\t\t\tGENERATE_INFOPLIST_FILE = YES;
 \t\t\t\tINFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";

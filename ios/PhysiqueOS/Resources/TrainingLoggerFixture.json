@@ -1,0 +1,233 @@
+{
+  "areas": [
+    { "id": "chest", "label": "Chest" },
+    { "id": "back", "label": "Back" },
+    { "id": "shoulders", "label": "Shoulders" },
+    { "id": "biceps", "label": "Biceps" },
+    { "id": "triceps", "label": "Triceps" },
+    { "id": "core", "label": "Core" },
+    { "id": "quads", "label": "Quads" },
+    { "id": "hamstrings", "label": "Hamstrings" },
+    { "id": "glutes", "label": "Glutes" },
+    { "id": "calves", "label": "Calves" }
+  ],
+  "variants": [
+    { "key": "static_hold", "label": "Static Hold", "raw_label": "Static Hold" },
+    { "key": "3_second_pause", "label": "3-Second Pause", "raw_label": "3-Second Pause" },
+    { "key": "slow_eccentric", "label": "Slow Eccentric", "raw_label": "Slow Eccentric" }
+  ],
+  "exercises": [
+    {
+      "canonical_exercise_id": "bench-press",
+      "name": "Bench Press",
+      "area_id": "chest",
+      "equipment": "Barbell",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-bench-ordinary",
+          "workout_date": "2026-08-25",
+          "sets": [
+            { "set_number": 1, "reps": 8, "weight": 135, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 8, "weight": 135, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 7, "weight": 135, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "session_id": "logger-history-bench-superset",
+          "workout_date": "2026-08-20",
+          "relationship": {
+            "relationship_type": "superset",
+            "partner_names": ["Cable Fly"],
+            "partner_canonical_exercise_ids": ["cable-fly"]
+          },
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 115, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 9, "weight": 115, "weight_unit": "lb" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "cable-fly",
+      "name": "Cable Fly",
+      "area_id": "chest",
+      "equipment": "Cable",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-cable-ordinary",
+          "workout_date": "2026-08-24",
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 30, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 30, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 10, "weight": 30, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "session_id": "logger-history-cable-superset",
+          "workout_date": "2026-08-20",
+          "relationship": {
+            "relationship_type": "superset",
+            "partner_names": ["Bench Press"],
+            "partner_canonical_exercise_ids": ["bench-press"]
+          },
+          "sets": [
+            { "set_number": 1, "reps": 14, "weight": 25, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 25, "weight_unit": "lb" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "push-ups",
+      "name": "Push-ups",
+      "area_id": "chest",
+      "equipment": "Bodyweight",
+      "measurement": "bodyweight_reps",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-pushups",
+          "workout_date": "2026-08-23",
+          "sets": [
+            { "set_number": 1, "reps": 20, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" },
+            { "set_number": 2, "reps": 18, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "lat-pulldown",
+      "name": "Lat Pulldown",
+      "area_id": "back",
+      "equipment": "Cable",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-lat",
+          "workout_date": "2026-08-22",
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 110, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 9, "weight": 120, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 8, "weight": 130, "weight_unit": "lb" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "seated-cable-row",
+      "name": "Seated Cable Row",
+      "area_id": "back",
+      "equipment": "Cable",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": []
+    },
+    {
+      "canonical_exercise_id": "dumbbell-lateral-raise",
+      "name": "Dumbbell Lateral Raise",
+      "area_id": "shoulders",
+      "equipment": "Dumbbell",
+      "measurement": "reps_load",
+      "previously_performed": false,
+      "history": []
+    },
+    {
+      "canonical_exercise_id": "spider-curls",
+      "name": "Spider Curls",
+      "area_id": "biceps",
+      "equipment": "Dumbbell",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-spider",
+          "workout_date": "2026-08-21",
+          "execution_variant": { "key": "slow_eccentric", "label": "Slow Eccentric", "raw_label": "Slow Eccentric" },
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 25, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 9, "weight": 25, "weight_unit": "lb" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "cable-triceps-pushdown",
+      "name": "Cable Triceps Pushdown",
+      "area_id": "triceps",
+      "equipment": "Cable",
+      "measurement": "reps_load",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-pushdown",
+          "workout_date": "2026-08-26",
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 50, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 11, "weight": 50, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 10, "weight": 50, "weight_unit": "lb" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "plank",
+      "name": "Plank",
+      "area_id": "core",
+      "equipment": "Bodyweight",
+      "measurement": "duration",
+      "previously_performed": true,
+      "history": [
+        {
+          "session_id": "logger-history-plank",
+          "workout_date": "2026-08-24",
+          "sets": [
+            { "set_number": 1, "duration_seconds": 45, "set_type": "duration" },
+            { "set_number": 2, "duration_seconds": 40, "set_type": "duration" },
+            { "set_number": 3, "duration_seconds": 35, "set_type": "duration" }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_exercise_id": "leg-extension",
+      "name": "Leg Extension",
+      "area_id": "quads",
+      "equipment": "Machine",
+      "measurement": "reps_load",
+      "previously_performed": false,
+      "history": []
+    },
+    {
+      "canonical_exercise_id": "romanian-deadlift",
+      "name": "Romanian Deadlift",
+      "area_id": "hamstrings",
+      "equipment": "Barbell",
+      "measurement": "reps_load",
+      "previously_performed": false,
+      "history": []
+    },
+    {
+      "canonical_exercise_id": "hip-thrust",
+      "name": "Hip Thrust",
+      "area_id": "glutes",
+      "equipment": "Barbell",
+      "measurement": "reps_load",
+      "previously_performed": false,
+      "history": []
+    },
+    {
+      "canonical_exercise_id": "standing-calf-raise",
+      "name": "Standing Calf Raise",
+      "area_id": "calves",
+      "equipment": "Machine",
+      "measurement": "reps_load",
+      "previously_performed": false,
+      "history": []
+    }
+  ]
+}
