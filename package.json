@@ -24,6 +24,7 @@
     "validate:phase5": "node scripts/validatePhase5Foundation.mjs",
     "test:phase6": "vitest --config vitest.phase6.config.js run",
     "validate:phase6": "node scripts/validatePhase6Compatibility.mjs",
+    "validate:upload-proxy": "node scripts/validateUploadProxyBodyLimit.mjs",
     "test:migration-safety": "vitest --config vitest.migration-safety.config.js run",
     "test:access-gate": "vitest --config vitest.access-gate.config.js run",
     "test:migration-remediation": "vitest --config vitest.migration-safety.config.js run && vitest --config vitest.phase4.config.js run",

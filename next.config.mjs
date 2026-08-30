@@ -3,6 +3,7 @@ import { assertProviderBuildLocation } from "./scripts/providerBuildSafety.mjs";
 
 /** @type {import('next').NextConfig} */
 const isProviderFullRuntime = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1";
+const uploadBodySizeLimit = "50mb";
 if (isProviderFullRuntime) assertProviderBuildLocation();
 
 const nextConfig = {
@@ -10,8 +11,9 @@ const nextConfig = {
   distDir: process.env.PHYSIQUEOS_BUILD_DIST_DIR || ".next",
   turbopack: {},
   experimental: {
+    proxyClientMaxBodySize: uploadBodySizeLimit,
     serverActions: {
-      bodySizeLimit: "50mb",
+      bodySizeLimit: uploadBodySizeLimit,
     },
   },
   ...(isProviderFullRuntime ? { output: "standalone" } : {}),

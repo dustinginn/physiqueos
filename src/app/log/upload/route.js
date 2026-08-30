@@ -139,6 +139,13 @@ export async function POST(request) {
       stack: error?.stack,
     });
 
+    if (request.headers.get("accept")?.includes("application/json")) {
+      return NextResponse.json(
+        { error: "Your upload could not be prepared for review." },
+        { status: 500 }
+      );
+    }
+
     return redirectToLog({ error: "intake-failed" }, recoveryContext);
   }
 }

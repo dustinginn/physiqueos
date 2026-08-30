@@ -91,4 +91,19 @@ describe("universal Evidence upload completeness boundary", () => {
     expect(mocks.saveEvidencePackage).toHaveBeenCalledTimes(1);
     expect(mocks.stage).toHaveBeenCalledTimes(1);
   });
+
+  it("returns a stable JSON failure instead of redirect HTML for browser fetch errors", async () => {
+    const selected = [new File([[1]], "photo.png", { type: "image/png" })];
+    mocks.processEvidenceIntakeSubmission.mockRejectedValueOnce(
+      new TypeError("Failed to parse body as FormData.")
+    );
+    const response = await POST(uploadRequest({ selected }));
+    expect(response.status).toBe(500);
+    expect(response.headers.get("location")).toBeNull();
+    await expect(response.json()).resolves.toEqual({
+      error: "Your upload could not be prepared for review.",
+    });
+    expect(mocks.saveEvidencePackage).not.toHaveBeenCalled();
+    expect(mocks.stage).not.toHaveBeenCalled();
+  });
 });
