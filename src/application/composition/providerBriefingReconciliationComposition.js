@@ -79,6 +79,9 @@ export function createProviderBriefingReconciliationDependencies({
     unitOfWorkOptions: {
       lockContext: { operation: "current_briefing_revision_publication" },
     },
+    ...(typeof runtimeBindings.mutateCanonicalRuntime === "function"
+      ? { mutateCanonicalRuntime: runtimeBindings.mutateCanonicalRuntime }
+      : {}),
   };
   const publicationService =
     createCanonicalBriefingConfidencePublicationService(persistenceOptions);

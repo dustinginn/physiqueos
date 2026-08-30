@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInterpretationV2Fixture } from "../../fixtures/interpretationV2Fixtures";
 import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { ConfidencePublisherRegistry } from
@@ -157,9 +157,63 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
     });
     expect(JSON.parse(fs.readFileSync(fixture.filePath, "utf8")).revision).toBe(7);
   });
+
+  it("publishes through one bounded provider mutation without full-runtime unit of work", async () => {
+    const fixture = setup({ bounded: true });
+    const result = await fixture.finalizer.finalize(fixture.request());
+
+    expect(result.commitResult).toMatchObject({
+      status: "published_reaffirmation",
+      committed: true,
+      memoryProfile: {
+        runtimeLoadCount: 1,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        runtimeCollectionLoadCount: 4,
+      },
+    });
+    expect(fixture.unitOfWorkFactory).not.toHaveBeenCalled();
+    expect(fixture.boundedCalls).toHaveLength(1);
+    expect(fixture.boundedCalls[0]).toMatchObject({
+      operation: "briefing-confidence-publication",
+      allowedCollections: [
+        "dailyBriefings",
+        "goalConfidenceSnapshots",
+        "goalConfidenceHistory",
+        "confidenceInitializationArtifacts",
+      ],
+      readCollections: [
+        "dailyBriefings",
+        "goalConfidenceSnapshots",
+        "goalConfidenceHistory",
+        "confidenceInitializationArtifacts",
+      ],
+      readApplicationContext: false,
+      readImportMetadata: false,
+    });
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
+    expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(2);
+  });
+
+  it("recognizes an exact bounded provider replay without duplicating publication", async () => {
+    const fixture = setup({ bounded: true });
+    const first = await fixture.finalizer.finalize(fixture.request());
+    const replay = await fixture.finalizer.finalize(fixture.request({
+      expectedRevision: first.commitResult.revision,
+      expectedSemanticDigest: undefined,
+    }));
+
+    expect(replay.commitResult).toMatchObject({
+      status: "matched",
+      committed: false,
+    });
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
+    expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(2);
+    expect(fixture.boundedCalls).toHaveLength(2);
+  });
 });
 
-function setup() {
+function setup({ bounded = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "confidence-v2-"));
   directories.push(directory);
   const filePath = path.join(directory, "store.json");
@@ -185,9 +239,49 @@ function setup() {
   };
   fs.writeFileSync(filePath, `${JSON.stringify(store)}\n`);
   const liveStore = structuredClone(store);
+  const boundedCalls = [];
+  const unitOfWorkFactory = vi.fn(() => {
+    throw new Error("Full-runtime unit of work must not be constructed.");
+  });
+  const mutateCanonicalRuntime = bounded
+    ? async (input) => {
+      boundedCalls.push(input);
+      const before = Object.fromEntries(input.readCollections.map((name) => [
+        name,
+        JSON.stringify(liveStore[name] ?? []),
+      ]));
+      const candidate = Object.fromEntries(input.readCollections.map((name) => [
+        name,
+        structuredClone(liveStore[name] ?? []),
+      ]));
+      const commandId = `bounded-commit-${boundedCalls.length}`;
+      const result = await input.mutate(candidate, { commandId });
+      const changedCollections = input.allowedCollections.filter((name) =>
+        before[name] !== JSON.stringify(candidate[name] ?? []));
+      for (const name of changedCollections) {
+        liveStore[name] = structuredClone(candidate[name]);
+      }
+      if (changedCollections.length) liveStore.revision += 1;
+      return {
+        committed: true,
+        commitId: commandId,
+        revision: liveStore.revision,
+        result,
+        changedCollections,
+        memoryProfile: {
+          runtimeLoadCount: 1,
+          runtimeCloneCount: 0,
+          fullRuntimeSerializationCount: 0,
+          boundedCollectionCloneCount: input.allowedCollections.length,
+          runtimeCollectionLoadCount: input.readCollections.length,
+        },
+      };
+    }
+    : null;
   const publication = createCanonicalBriefingConfidencePublicationService({
     filePath, liveStore, registry: ConfidencePublisherRegistry,
     now: () => new Date("2026-08-01T12:00:00.000Z"),
+    ...(bounded ? { mutateCanonicalRuntime, unitOfWorkFactory } : {}),
   });
   const baseline = publication.captureBaseline();
   const input = createInterpretationV2Fixture();
@@ -201,7 +295,8 @@ function setup() {
     now: () => new Date("2026-08-01T12:00:00.000Z"),
   });
   return {
-    filePath, publication, finalizer,
+    filePath, publication, finalizer, liveStore, boundedCalls,
+    unitOfWorkFactory,
     request: (overrides = {}) => ({
       publisherType: "weekly_briefing", userId: "user-one",
       occurrenceId: "weekly-one", artifactId: "weekly-one",

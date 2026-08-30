@@ -11,12 +11,16 @@ import {
 } from "../../data/repositories/founderRuntimeStore.js";
 
 export async function loadApplicationCanonicalRuntime() {
+  return structuredClone(await loadApplicationCanonicalRuntimeSnapshot());
+}
+
+export async function loadApplicationCanonicalRuntimeSnapshot() {
   if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
     return structuredClone(getFounderRuntimeStore());
   }
   const composition = await providerComposition();
   if (typeof composition.loadRuntime !== "function") throw unavailable("read");
-  return structuredClone(await composition.loadRuntime());
+  return composition.loadRuntime();
 }
 
 export function createApplicationRuntimeBindings() {

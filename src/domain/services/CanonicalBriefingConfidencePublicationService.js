@@ -24,21 +24,36 @@ import {
 export const CANONICAL_BRIEFING_CONFIDENCE_PUBLICATION_VERSION =
   "canonical_briefing_confidence_publication_v2";
 
+const BRIEFING_PUBLICATION_COLLECTIONS = Object.freeze([
+  "dailyBriefings",
+  "goalConfidenceSnapshots",
+  "goalConfidenceHistory",
+  "confidenceInitializationArtifacts",
+]);
+
 export function createCanonicalBriefingConfidencePublicationService(options = {}) {
   const filePath = options.filePath ?? resolveFounderRuntimeStorePath();
   const liveStore = options.liveStore ?? getFounderRuntimeStore();
   const readText = options.readText ?? ((target) => fs.readFileSync(target, "utf8"));
   const unitOfWorkFactory = options.unitOfWorkFactory ?? createFounderStoreUnitOfWork;
+  const mutateCanonicalRuntime = options.mutateCanonicalRuntime ?? null;
   const registry = options.registry ?? ConfidencePublisherRegistry;
   const now = options.now ?? (() => new Date());
   return Object.freeze({
-    captureBaseline() { return capture(filePath, readText); },
+    captureBaseline() {
+      return typeof mutateCanonicalRuntime === "function"
+        ? captureLoadedStore(liveStore)
+        : capture(filePath, readText);
+    },
     async publish(command = {}) {
       try {
         registry.assertAuthorization(command.authorization);
         validateCommand(command);
       } catch (error) {
         return failure(error.code ?? "semantic_conflict", error);
+      }
+      if (typeof mutateCanonicalRuntime === "function") {
+        return publishBounded({ command, mutateCanonicalRuntime, now });
       }
       const baseline = capture(filePath, readText);
       if (command.expectedRevision != null &&
@@ -167,6 +182,138 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
   });
 }
 
+async function publishBounded({ command, mutateCanonicalRuntime, now }) {
+  try {
+    const committed = await mutateCanonicalRuntime({
+      operation: "briefing-confidence-publication",
+      allowedCollections: BRIEFING_PUBLICATION_COLLECTIONS,
+      readCollections: BRIEFING_PUBLICATION_COLLECTIONS,
+      readApplicationContext: false,
+      readImportMetadata: false,
+      allowApplicationContextMutation: false,
+      async mutate(candidate, { commandId }) {
+        ensureCollections(candidate);
+        const existingHistory = (candidate.goalConfidenceHistory ?? [])
+          .find((item) => item.assessmentId === command.assessment.id ||
+            item.assessment?.idempotencyKey === command.assessment.idempotencyKey);
+        const existingArtifact = findArtifact(candidate, command.artifact);
+        if (existingHistory || existingArtifact) {
+          if (existingHistory?.assessmentId === command.assessment.id &&
+              existingArtifact?.confidencePublication?.assessmentId ===
+                command.assessment.id) {
+            return { matched: true, artifact: structuredClone(existingArtifact) };
+          }
+          if (existingHistory) {
+            throw semanticFailure("publication_identity_conflict",
+              "Publication idempotency identity already has different semantics.");
+          }
+        }
+        const existingOccurrence = findOccurrenceArtifact(
+          candidate, command.artifact);
+        const replacementTarget = existingOccurrence ?? existingArtifact;
+        const completableClaim = isCompletableClaim(
+          replacementTarget, command.artifact);
+        if (replacementTarget && !completableClaim) {
+          const lineage = command.assessment.replacementLineage;
+          const replacedAssessmentId =
+            replacementTarget.confidencePublication?.assessmentId ?? null;
+          if (command.replacementAuthorized !== true ||
+              lineage.replacesArtifactId !== replacementTarget.id ||
+              lineage.replacesAssessmentId !== replacedAssessmentId) {
+            throw semanticFailure("replacement_lineage_conflict",
+              "Existing briefing replacement requires explicit, exact lineage authorization.");
+          }
+        } else if (command.replacementAuthorized === true) {
+          throw semanticFailure("replacement_target_missing",
+            "Authorized replacement target was not found.");
+        }
+        const current = currentSnapshot(candidate, command.assessment);
+        const actualPrior = current?.currentAssessmentId ?? null;
+        if (actualPrior !== (command.expectedPriorAssessmentId ?? null) ||
+            actualPrior !== (command.assessment.priorAssessmentId ?? null)) {
+          throw semanticFailure("expected_prior_conflict",
+            "Canonical predecessor changed.");
+        }
+        const priorAssessment = current
+          ? findAssessment(candidate, current.currentAssessmentId) : null;
+        const priorCutoff = priorAssessment?.sourceCutoff ??
+          priorAssessment?.evidenceCutoff ?? null;
+        if (priorCutoff && Date.parse(command.assessment.sourceCutoff) <
+            Date.parse(priorCutoff)) {
+          throw semanticFailure("temporal_cutoff_conflict",
+            "A canonical successor cannot move the evidence cutoff backward.");
+        }
+        if (current && command.replacementAuthorized !== true &&
+            command.assessment.publisherType === "goal_initialization") {
+          throw semanticFailure("initialization_conflict",
+            "Goal initialization cannot replace a series.");
+        }
+
+        stageAssessment(candidate, command.assessment);
+        if (command.assessment.publisherType === "goal_initialization") {
+          candidate.confidenceInitializationArtifacts = [
+            ...(candidate.confidenceInitializationArtifacts ?? []),
+            structuredClone(command.artifact),
+          ];
+        } else {
+          const repository = createDailyBriefingRepository(candidate.dailyBriefings);
+          if (isCompletableClaim(findArtifact(candidate, command.artifact),
+              command.artifact)) {
+            await repository.completeScheduledBriefing(
+              structuredClone(command.artifact));
+          } else {
+            await repository.createDailyBriefing(
+              structuredClone(command.artifact),
+              { replacementReason:
+                  command.assessment.sourceLineage?.reason ?? null }
+            );
+          }
+        }
+        const committedAt = now().toISOString();
+        finalizeRecords(candidate, command.assessment.id, commandId, committedAt);
+        if (validateCandidate(candidate, command, { commitId: commandId })
+          ?.valid !== true) {
+          throw semanticFailure("publication_validation_failed",
+            "Finalized briefing publication candidate was rejected.");
+        }
+        return { matched: false, artifact: structuredClone(command.artifact) };
+      },
+    });
+    if (committed.result.matched) {
+      return {
+        status: "matched",
+        committed: false,
+        assessmentId: command.assessment.id,
+        artifact: committed.result.artifact,
+        revision: committed.revision,
+        commitId: committed.commitId,
+        memoryProfile: committed.memoryProfile,
+      };
+    }
+    return {
+      status: command.assessment.priorAssessmentId
+        ? command.assessment.movement === "no_meaningful_change"
+          ? "published_reaffirmation" : "published_successor"
+        : "published_initial",
+      committed: true,
+      assessmentId: command.assessment.id,
+      artifact: committed.result.artifact,
+      revision: committed.revision,
+      commitId: committed.commitId,
+      memoryProfile: committed.memoryProfile,
+    };
+  } catch (error) {
+    if (error?.publicationStatus) {
+      return failure(error.publicationStatus, error);
+    }
+    if (error.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT ||
+        error.code === "FOUNDER_STORE_REVISION_CONFLICT") {
+      return failure("baseline_conflict", error);
+    }
+    return failure("persistence_failure", error);
+  }
+}
+
 function validateCommand(command) {
   validateCanonicalConfidenceAssessment(command.assessment);
   if (command.authorization.publisherType !== command.assessment.publisherType ||
@@ -279,6 +426,13 @@ function capture(filePath, readText) {
   const store = JSON.parse(readText(filePath));
   return { store, revision: getFounderStoreRevision(store),
     semanticDigest: createFounderRuntimeSemanticDigest(store) };
+}
+function captureLoadedStore(store) {
+  return { store, revision: getFounderStoreRevision(store),
+    semanticDigest: createFounderRuntimeSemanticDigest(store) };
+}
+function semanticFailure(publicationStatus, message) {
+  return Object.assign(new Error(message), { publicationStatus });
 }
 function failure(status, error, committed = false) {
   return { status, committed, error: { code: status,

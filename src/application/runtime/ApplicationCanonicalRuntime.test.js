@@ -12,6 +12,7 @@ import {
   createProviderFounderStoreUnitOfWork,
   loadApplicationCanonicalCommitBindings,
   loadApplicationCanonicalRuntime,
+  loadApplicationCanonicalRuntimeSnapshot,
 } from "./ApplicationCanonicalRuntime.js";
 
 describe("provider application canonical runtime", () => {
@@ -114,6 +115,18 @@ describe("provider application canonical runtime", () => {
         fullRuntimeSerializationCount: 0,
       },
     });
+  });
+
+  it("exposes one immutable provider snapshot without another full-runtime clone", async () => {
+    const persisted = Object.freeze(runtime());
+    const loadRuntime = vi.fn(async () => persisted);
+    composition.current = { loadRuntime };
+
+    const snapshot = await loadApplicationCanonicalRuntimeSnapshot();
+
+    expect(snapshot).toBe(persisted);
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(loadRuntime).toHaveBeenCalledOnce();
   });
 });
 

@@ -173,7 +173,10 @@ if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
       runWorkerLoop({ worker: effectiveWorker, signal: controller.signal }),
     ];
     if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {
-      const [{ createProviderBriefingCadenceRunner }, { loadApplicationRuntimeBindings }] =
+      const [{ createProviderBriefingCadenceRunner }, {
+        loadApplicationCanonicalCommitBindings,
+        loadApplicationCanonicalRuntimeSnapshot,
+      }] =
         await Promise.all([
           import("../src/application/composition/providerBriefingCadenceComposition.js"),
           import("../src/application/runtime/ApplicationCanonicalRuntime.js"),
@@ -185,7 +188,8 @@ if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
           pool,
           environment: authorityEnvironment,
         }),
-        loadRuntimeBindings: loadApplicationRuntimeBindings,
+        loadCanonicalRuntime: loadApplicationCanonicalRuntimeSnapshot,
+        loadCanonicalCommitBindings: loadApplicationCanonicalCommitBindings,
         runtimeIdentity: {
           buildId: buildIdentity.buildId,
           sourceCommit: buildIdentity.gitSha,

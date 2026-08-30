@@ -2,11 +2,17 @@ import { createSeedRepositories } from
   "../../data/repositories/createSeedRepositories";
 import { createBriefingCadenceExecutor } from
   "../../domain/services/BriefingCadenceExecutorService";
-import { createFounderMidweekBriefingService } from
+import { BRIEFING_CADENCE_CATCH_UP_POLICY } from
+  "../../domain/services/BriefingCadenceRegistryService";
+import { createCanonicalBriefingConfidencePublicationService } from
+  "../../domain/services/CanonicalBriefingConfidencePublicationService";
+import { createMidweekBriefingService } from
   "../../domain/services/MidweekBriefingService";
 import { createFounderMonthlyBriefingService } from
   "../../domain/services/MonthlyBriefingService";
-import { createFounderWeeklyNarrativeService } from
+import { createPICadenceBriefingLifecycleService } from
+  "../../domain/services/PICadenceBriefingLifecycleService";
+import { createWeeklyNarrativeService } from
   "../../domain/services/WeeklyNarrativeService";
 import { RuntimeAuthority } from
   "../../platform/cutover/CombinedRuntimeAuthorityState";
@@ -14,19 +20,19 @@ import {
   createPostgresBriefingCadenceExecutionLock,
   createPostgresBriefingCadenceExecutionStore,
 } from "../../platform/database/PostgresBriefingCadenceExecution";
-import { createProviderBriefingReconciliationDependencies } from
-  "./providerBriefingReconciliationComposition";
 
 export function createProviderBriefingCadenceRunner({
   pool,
   ownerUserId,
   authorityStore,
-  loadRuntimeBindings,
+  loadCanonicalRuntime,
+  loadCanonicalCommitBindings,
   now = () => new Date(),
   runtimeIdentity = null,
 } = {}) {
   if (!pool || !ownerUserId || !authorityStore?.read ||
-      typeof loadRuntimeBindings !== "function") {
+      typeof loadCanonicalRuntime !== "function" ||
+      typeof loadCanonicalCommitBindings !== "function") {
     throw new Error("Provider briefing cadence runner requires provider runtime dependencies.");
   }
   const executionStore = createPostgresBriefingCadenceExecutionStore({
@@ -41,8 +47,11 @@ export function createProviderBriefingCadenceRunner({
   return Object.freeze({
     async execute({ asOf = now() } = {}) {
       await assertProviderAuthority(authorityStore);
-      const runtimeBindings = await loadRuntimeBindings();
-      const repositories = createSeedRepositories(runtimeBindings.liveStore, {
+      const [canonicalRuntime, commitBindings] = await Promise.all([
+        loadCanonicalRuntime(),
+        loadCanonicalCommitBindings(),
+      ]);
+      const repositories = createSeedRepositories(canonicalRuntime, {
         onChange() {
           const error = new Error(
             "Provider briefing cadence snapshot repositories are read-only."
@@ -51,31 +60,36 @@ export function createProviderBriefingCadenceRunner({
           throw error;
         },
       });
-      const dependencies = createProviderBriefingReconciliationDependencies({
-        runtimeBindings,
+      const publicationService =
+        createCanonicalBriefingConfidencePublicationService({
+          filePath: "provider://canonical-runtime",
+          liveStore: canonicalRuntime,
+          mutateCanonicalRuntime: commitBindings.mutateCanonicalRuntime,
+          now: () => asOf,
+        });
+      const cadenceLifecycle = createPICadenceBriefingLifecycleService({
+        publicationService,
         now: () => asOf,
       });
       const executor = createBriefingCadenceExecutor({
         repositories,
         generators: {
-          weekly: createFounderWeeklyNarrativeService({
+          weekly: createWeeklyNarrativeService({
             repositories,
             now: () => asOf,
-            weeklyPersistence: dependencies.weeklyPersistence,
-            confidenceStoreResolver: dependencies.readCanonicalStore,
-            cadenceLifecycle: dependencies.cadenceLifecycle,
+            confidenceStoreResolver: async () => canonicalRuntime,
+            cadenceLifecycle,
           }),
-          midweek: createFounderMidweekBriefingService({
+          midweek: createMidweekBriefingService({
             repositories,
             now: () => asOf,
-            midweekPersistence: dependencies.midweekPersistence,
-            confidenceStoreResolver: dependencies.readCanonicalStore,
-            cadenceLifecycle: dependencies.cadenceLifecycle,
+            confidenceStoreResolver: async () => canonicalRuntime,
+            cadenceLifecycle,
           }),
           monthly: createFounderMonthlyBriefingService({
             repositories,
             now: () => asOf,
-            publicationService: dependencies.publicationService,
+            publicationService,
           }),
         },
         executionStore,
@@ -83,6 +97,10 @@ export function createProviderBriefingCadenceRunner({
         now: () => asOf,
         source: "provider-worker-scheduler",
         runtimeIdentity,
+        policy: {
+          ...BRIEFING_CADENCE_CATCH_UP_POLICY,
+          generatorTimeoutMs: 120_000,
+        },
       });
       return executor.execute({ userId: ownerUserId, asOf });
     },
