@@ -181,6 +181,53 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(draft.exercises[0].sets[0].load, 140)
     }
 
+    func testActiveAndPastWorkoutsAddExercisesWithoutLosingSetEditsOrCreatingDuplicates() async throws {
+        let config = try await configuration()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        for mode in [TrainingLoggerMode.live, .past] {
+            var draft = draft(mode: mode)
+            draft.addExercise(bench)
+            draft.exercises[0].sets[0].reps = 12
+            draft.exercises[0].sets[0].isCompleted = true
+            draft.step = .workout
+            draft.beginAddingExercises()
+            XCTAssertTrue(draft.isAddingExercises)
+            XCTAssertTrue(draft.exerciseWasPresentBeforePicker(bench))
+            draft.addExercise(bench)
+            draft.addExercise(fly)
+            draft.finishExerciseSelection()
+            XCTAssertEqual(draft.step, .workout)
+            XCTAssertEqual(draft.exercises.count, 2)
+            XCTAssertEqual(draft.exercises[0].sets[0].reps, 12)
+            XCTAssertTrue(draft.exercises[0].sets[0].isCompleted)
+        }
+    }
+
+    func testNumericFocusOrderSkipsInapplicableFieldsAcrossMeasurementTypes() async throws {
+        let config = try await configuration()
+        var draft = draft(areas: ["chest", "core"])
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "push-ups" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "plank" }))
+        let targets = TrainingLoggerNumericFocusOrder.targets(for: draft)
+        XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[0].id }.map(\.kind), [.reps, .load, .reps, .load, .reps, .load])
+        XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[1].id }.map(\.kind), Array(repeating: .reps, count: draft.exercises[1].sets.count))
+        XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[2].id }.map(\.kind), [.duration, .duration, .duration])
+        XCTAssertEqual(TrainingLoggerNumericFocusOrder.next(after: targets[0].id, in: draft), targets[1].id)
+        XCTAssertNil(TrainingLoggerNumericFocusOrder.next(after: targets.last!.id, in: draft))
+    }
+
+    func testSupportingWorkoutEvidencePreservesOrderDeduplicatesAndRemoves() {
+        var draft = draft()
+        let photo = TrainingLoggerSupportingEvidence(id: "p", displayName: "Health 1.png", source: .photos)
+        let file = TrainingLoggerSupportingEvidence(id: "f", displayName: "Health 2.pdf", source: .files)
+        draft.addSupportingEvidence([photo, file, photo])
+        XCTAssertEqual(draft.supportingEvidenceAssets, [photo, file])
+        draft.removeSupportingEvidence(id: photo.id)
+        XCTAssertEqual(draft.supportingEvidenceAssets, [file])
+    }
+
     func testBodyweightAndTimedSetsPreserveTheirMeasurementSemantics() async throws {
         let config = try await configuration()
         let pushups = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "push-ups" })
@@ -289,11 +336,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildFiveInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildSixInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "5")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "6")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

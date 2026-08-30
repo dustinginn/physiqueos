@@ -20,14 +20,14 @@ struct UploadCardView: View {
     var body: some View {
         VStack(spacing: 14) {
             CardContainer(padding: .sm, background: PhysiqueOSTheme.surfaceAccent) {
-                Button { onNavigate(.manualWeighIn) } label: {
+                Button { onNavigate(.checkIn(checkInType: "morning")) } label: {
                     HStack(spacing: 12) {
                         IconBadge(systemImage: "scalemass.fill", color: .primary, size: .md)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Morning Weigh-In")
+                            Text("Morning Check-In")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Log today’s morning weight.")
+                            Text("Reconcile yesterday’s priorities and log today’s weight.")
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -41,6 +41,14 @@ struct UploadCardView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("log.morningWeighIn")
             }
+
+            Button { onNavigate(.manualWeighIn) } label: {
+                Label("Log weight for another date", systemImage: "calendar.badge.plus")
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
 
             CardContainer(padding: .sm) {
                 VStack(alignment: .leading, spacing: 14) {

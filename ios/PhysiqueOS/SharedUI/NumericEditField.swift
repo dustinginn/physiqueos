@@ -7,6 +7,9 @@ import UIKit
 struct NumericEditField: UIViewRepresentable {
     @Binding var text: String
     var accessibilityLabel: String
+    var fieldID: String? = nil
+    var focusedFieldID: Binding<String?>? = nil
+    var nextFieldID: String? = nil
     var onEditingChanged: (Bool) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -27,7 +30,7 @@ struct NumericEditField: UIViewRepresentable {
         toolbar.sizeToFit()
         toolbar.items = [
             UIBarButtonItem(systemItem: .flexibleSpace),
-            UIBarButtonItem(title: "Done", style: .done, target: context.coordinator, action: #selector(Coordinator.done)),
+            UIBarButtonItem(title: nextFieldID == nil ? "Done" : "Next", style: .done, target: context.coordinator, action: #selector(Coordinator.advance)),
         ]
         field.inputAccessoryView = toolbar
         return field
@@ -37,6 +40,17 @@ struct NumericEditField: UIViewRepresentable {
         context.coordinator.parent = self
         if field.text != text { field.text = text }
         field.accessibilityLabel = accessibilityLabel
+        if let fieldID, let focusedFieldID {
+            if focusedFieldID.wrappedValue == fieldID, !field.isFirstResponder {
+                field.becomeFirstResponder()
+            } else if focusedFieldID.wrappedValue != fieldID, field.isFirstResponder {
+                field.resignFirstResponder()
+            }
+        }
+        if let toolbar = field.inputAccessoryView as? UIToolbar,
+           let action = toolbar.items?.last {
+            action.title = nextFieldID == nil ? "Done" : "Next"
+        }
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
@@ -51,15 +65,25 @@ struct NumericEditField: UIViewRepresentable {
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
             activeField = textField
+            parent.focusedFieldID?.wrappedValue = parent.fieldID
             parent.onEditingChanged(true)
             guard NumericEditingContract.shouldSelectAllOnFocus(textField.text ?? "") else { return }
             DispatchQueue.main.async { textField.selectAll(nil) }
         }
 
         func textFieldDidEndEditing(_ textField: UITextField) {
+            if parent.focusedFieldID?.wrappedValue == parent.fieldID {
+                parent.focusedFieldID?.wrappedValue = nil
+            }
             parent.onEditingChanged(false)
         }
 
-        @objc func done() { activeField?.resignFirstResponder() }
+        @objc func advance() {
+            if let next = parent.nextFieldID {
+                parent.focusedFieldID?.wrappedValue = next
+            } else {
+                activeField?.resignFirstResponder()
+            }
+        }
     }
 }

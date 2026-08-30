@@ -6,6 +6,7 @@ final class LoggingSandboxStore {
     var evidenceDraft: EvidenceIntakeDraft
     var interpretationState: EvidenceInterpretationState = .editing
     private(set) var reviews: [String: LocalEvidenceReview]
+    private(set) var morningPriorities: [MorningPriorityItem]
 
     init(
         now: Date = Date(),
@@ -15,6 +16,11 @@ final class LoggingSandboxStore {
         self.weighIns = weighIns
         self.reviews = reviews
         self.evidenceDraft = .fresh(now: now)
+        let priorDay = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+        self.morningPriorities = [
+            .init(id: "priority-mobility", title: "Mobility", detail: "10 minutes", occurrenceDate: priorDay, disposition: nil, note: ""),
+            .init(id: "priority-evening", title: "Evening routine", detail: "Complete before bed", occurrenceDate: priorDay, disposition: nil, note: ""),
+        ]
     }
 
     @discardableResult
@@ -41,6 +47,23 @@ final class LoggingSandboxStore {
     }
 
     func weighIn(on date: Date) -> LocalWeightEntry? { weighIns[Self.dateKey(date)] }
+
+    func updateMorningPriority(id: String, disposition: MorningPriorityDisposition, note: String? = nil) {
+        guard let index = morningPriorities.firstIndex(where: { $0.id == id }) else { return }
+        morningPriorities[index].disposition = disposition
+        if let note { morningPriorities[index].note = note }
+    }
+
+    func saveMorningCheckIn(weightText: String, now: Date = Date()) -> Result<MorningCheckInResult, LoggingSandboxError> {
+        guard morningPriorities.allSatisfy({ $0.disposition != nil }) else {
+            return .failure(.init(message: "Choose an outcome for each unfinished priority."))
+        }
+        switch saveWeighIn(weightText: weightText, unit: .lb, date: now, now: now) {
+        case .failure(let error): return .failure(error)
+        case .success(let weight):
+            return .success(.init(weight: weight, reconciledPriorityCount: morningPriorities.count))
+        }
+    }
 
     func resetEvidenceDraft(now: Date = Date()) {
         evidenceDraft = .fresh(now: now)
@@ -76,10 +99,11 @@ final class LoggingSandboxStore {
         guard interpretationState == .pending else {
             return .failure(.init(message: "No evidence is waiting for interpretation."))
         }
-        guard let category = evidenceDraft.scenario.category else {
+        let scenario = EvidenceSandboxRouter.scenario(for: evidenceDraft)
+        guard let category = scenario.category else {
             return .failure(.init(message: "This upload could not be prepared for review."))
         }
-        return .success(createReview(category: category, scenario: evidenceDraft.scenario, now: now))
+        return .success(createReview(category: category, scenario: scenario, now: now))
     }
 
     func retryInterpretation() { interpretationState = .editing }
@@ -88,10 +112,11 @@ final class LoggingSandboxStore {
         if let review = reviews[id] { return review }
         if id.hasPrefix("local-review-") { return nil }
         var draft = EvidenceIntakeDraft.fresh()
-        draft.details = "Workout details from the selected upload."
-        draft.attachments = [.init(id: "pending-file", displayName: "workout-summary.png", source: .photos)]
+        let scenario: EvidenceFixtureScenario = id == "review-fixture-001" ? .weight : .generic
+        draft.details = scenario == .weight ? "Morning weight" : "Uploaded evidence"
+        draft.attachments = [.init(id: "pending-file", displayName: scenario == .weight ? "scale.png" : "evidence.png", source: .photos)]
         let fixture = LoggingSandboxFixtureFactory.review(
-            id: id, category: .training, scenario: .training, draft: draft
+            id: id, category: scenario.category ?? .generic, scenario: scenario, draft: draft
         )
         reviews[id] = fixture
         return fixture

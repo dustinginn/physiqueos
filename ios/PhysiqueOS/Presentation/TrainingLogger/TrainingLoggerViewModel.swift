@@ -86,7 +86,13 @@ final class TrainingLoggerViewModel {
             validationMessage = "Add at least one exercise."
             return
         }
-        go(to: .workout)
+        update { $0.finishExerciseSelection() }
+    }
+
+    func beginAddingExercises() {
+        searchText = ""
+        isBrowsingAllExercises = false
+        update { $0.beginAddingExercises() }
     }
 
     func reviewWorkout() {
@@ -119,7 +125,12 @@ final class TrainingLoggerViewModel {
 
     func pickerExercises() -> [TrainingLoggerCatalogExercise] {
         guard let draft, let configuration else { return [] }
-        return draft.pickerExercises(in: configuration.exercises, browseAll: isBrowsingAllExercises, query: searchText)
+        return draft.pickerExercises(
+            in: configuration.exercises,
+            browseAll: isBrowsingAllExercises,
+            query: searchText,
+            includeAllAreas: draft.isAddingExercises
+        )
     }
 
     func areaLabel(_ id: String) -> String {
@@ -128,6 +139,10 @@ final class TrainingLoggerViewModel {
 
     func isSelected(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
         draft?.exercises.contains(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) == true
+    }
+
+    func isLockedDuringAdd(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
+        draft?.exerciseWasPresentBeforePicker(exercise) == true
     }
 
     var selectionPresentation: TrainingLoggerSelectionPresentation {

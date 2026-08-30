@@ -1,4 +1,6 @@
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TrainingLoggerView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -9,7 +11,11 @@ struct TrainingLoggerView: View {
     @State private var provisionalAreaId = ""
     @State private var showingCancelWorkoutConfirmation = false
     @State private var isNumericKeyboardVisible = false
+    @State private var focusedNumericFieldID: String?
     @State private var numericEditBuffers: [String: String] = [:]
+    @State private var isSupportingPhotosPickerPresented = false
+    @State private var isSupportingFilePickerPresented = false
+    @State private var supportingPhotoItems: [PhotosPickerItem] = []
 
     var body: some View {
         Group {
@@ -53,6 +59,25 @@ struct TrainingLoggerView: View {
             await viewModel?.load()
         }
         .onDisappear { viewModel?.persist() }
+        .onChange(of: focusedNumericFieldID) { isNumericKeyboardVisible = focusedNumericFieldID != nil }
+        .photosPicker(isPresented: $isSupportingPhotosPickerPresented, selection: $supportingPhotoItems, matching: .images)
+        .onChange(of: supportingPhotoItems) {
+            guard !supportingPhotoItems.isEmpty else { return }
+            let start = viewModel?.draft?.supportingEvidenceAssets.filter { $0.source == .photos }.count ?? 0
+            let assets = supportingPhotoItems.indices.map { index in
+                TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: "Apple Health Screenshot \(start + index + 1)", source: .photos)
+            }
+            viewModel?.update { $0.addSupportingEvidence(assets) }
+            supportingPhotoItems = []
+        }
+        .fileImporter(isPresented: $isSupportingFilePickerPresented, allowedContentTypes: [.image, .pdf], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            viewModel?.update { draft in
+                draft.addSupportingEvidence(urls.map {
+                    .init(id: UUID().uuidString, displayName: $0.lastPathComponent, source: .files)
+                })
+            }
+        }
     }
 
     private func content(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -84,8 +109,12 @@ struct TrainingLoggerView: View {
         switch viewModel.draft?.step {
         case .exercises:
             let presentation = viewModel.selectionPresentation
+            let adding = viewModel.draft?.isAddingExercises == true
             persistentActionBar {
-                PrimaryActionButton(title: presentation.startTitle, isEnabled: presentation.canStart) {
+                PrimaryActionButton(
+                    title: adding ? "Return to workout · \(viewModel.draft?.addedExerciseCount ?? 0) added" : presentation.startTitle,
+                    isEnabled: adding || presentation.canStart
+                ) {
                     viewModel.continueFromExercises()
                 }
                 .accessibilityIdentifier("trainingLogger.startLogging")
@@ -201,7 +230,8 @@ struct TrainingLoggerView: View {
 
     private func exercisePicker(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            stepHeader(viewModel, step: "2 of 3", title: "Choose exercises", subtitle: "Performed exercises first")
+            let adding = viewModel.draft?.isAddingExercises == true
+            stepHeader(viewModel, step: adding ? "Active workout" : "2 of 3", title: adding ? "Add exercises" : "Choose exercises", subtitle: "Performed exercises first")
 
             TextField("Search exercises", text: Binding(
                 get: { viewModel.searchText },
@@ -258,13 +288,17 @@ struct TrainingLoggerView: View {
             }
 
             validation(viewModel)
-            secondaryButton("Back to Training Areas") { viewModel.go(to: .areas) }
+            secondaryButton(adding ? "Return to workout" : "Back to Training Areas") {
+                if adding { viewModel.continueFromExercises() } else { viewModel.go(to: .areas) }
+            }
         }
     }
 
     private func exerciseSelectionRow(_ exercise: TrainingLoggerCatalogExercise, viewModel: TrainingLoggerViewModel) -> some View {
         let selected = viewModel.isSelected(exercise)
+        let locked = viewModel.isLockedDuringAdd(exercise)
         return Button {
+            guard !locked else { return }
             viewModel.update { draft in
                 if let selectedExercise = draft.exercises.first(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) {
                     draft.removeExercise(id: selectedExercise.id)
@@ -280,6 +314,7 @@ struct TrainingLoggerView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(locked)
         .accessibilityLabel("\(exercise.name), \(selected ? "selected" : "not selected")")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("trainingLogger.exercise.\(exercise.canonicalExerciseId)")
@@ -370,12 +405,23 @@ struct TrainingLoggerView: View {
                 .controlSize(.regular)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
 
+                Button {
+                    focusedNumericFieldID = nil
+                    viewModel.beginAddingExercises()
+                } label: {
+                    Label("Add Exercise", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                }
+                .buttonStyle(.bordered)
+                .tint(PhysiqueOSTheme.accent)
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .accessibilityIdentifier("trainingLogger.addExercise")
+
                 ForEach(draft.exercises) { exercise in
                     exerciseCard(exercise, viewModel: viewModel)
                 }
             }
             validation(viewModel)
-            secondaryButton("Back to exercises") { viewModel.go(to: .exercises) }
         }
         .confirmationDialog(
             "Cancel this workout?",
@@ -575,21 +621,30 @@ struct TrainingLoggerView: View {
     }
 
     private func setRow(exercise: TrainingLoggerDraftExercise, set: TrainingLoggerDraftSet, viewModel: TrainingLoggerViewModel) -> some View {
-        HStack(spacing: 8) {
+        let primaryKind: TrainingLoggerNumericFieldKind = exercise.measurement == .duration ? .duration : .reps
+        let primaryID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: primaryKind).id
+        return HStack(spacing: 8) {
             Text("\(set.setNumber)")
                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 .frame(width: 30)
             NumericEditField(
                 text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: exercise.measurement == .duration ? "duration" : "reps", keyPath: exercise.measurement == .duration ? \.durationSeconds : \.reps),
                 accessibilityLabel: exercise.measurement == .duration ? "Set \(set.setNumber) seconds" : "Set \(set.setNumber) reps",
-                onEditingChanged: { isNumericKeyboardVisible = $0 }
+                fieldID: primaryID,
+                focusedFieldID: $focusedNumericFieldID,
+                nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: primaryID, in: $0) },
+                onEditingChanged: numericEditingChanged
             )
                 .frame(height: 34)
             if exercise.measurement == .repsLoad {
+                let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
                 NumericEditField(
                     text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: "load", keyPath: \.load),
                     accessibilityLabel: "Set \(set.setNumber) load",
-                    onEditingChanged: { isNumericKeyboardVisible = $0 }
+                    fieldID: loadID,
+                    focusedFieldID: $focusedNumericFieldID,
+                    nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: loadID, in: $0) },
+                    onEditingChanged: numericEditingChanged
                 )
                     .frame(height: 34)
             }
@@ -626,7 +681,7 @@ struct TrainingLoggerView: View {
 
     private func summary(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            stepHeader(viewModel, step: "Review workout", title: "Workout summary", subtitle: "Review captured work before the evidence boundary.")
+            stepHeader(viewModel, step: "Workout Review", title: "Review your workout", subtitle: "Check every completed set and add optional Apple Health screenshots.")
             if let draft = viewModel.draft {
                 let summary = draft.summary()
                 HStack(spacing: 8) {
@@ -638,58 +693,74 @@ struct TrainingLoggerView: View {
                 CardContainer {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(draft.exercises) { exercise in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    Text(exerciseContext(exercise, draft: draft))
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                Text(exerciseContext(exercise, draft: draft))
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                ForEach(exercise.sets.filter(\.isCompleted)) { set in
+                                    Text(reviewSetLine(set, measurement: exercise.measurement))
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                                 }
-                                Spacer()
-                                Text("\(exercise.sets.filter(\.isCompleted).count) sets")
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
                             }
+                            if exercise.id != draft.exercises.last?.id { Divider().overlay(PhysiqueOSTheme.divider) }
+                        }
+                    }
+                }
+
+                CardContainer {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Supporting Apple Health screenshots")
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        Text("Optional · attach screenshots from the matching Apple Health workout.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        HStack(spacing: 10) {
+                            Button { isSupportingPhotosPickerPresented = true } label: { Label("Photos", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity) }
+                            Button { isSupportingFilePickerPresented = true } label: { Label("Files", systemImage: "folder").frame(maxWidth: .infinity) }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(PhysiqueOSTheme.accent)
+                        ForEach(draft.supportingEvidenceAssets) { asset in
+                            HStack {
+                                Image(systemName: asset.source == .photos ? "photo" : "doc")
+                                Text(asset.displayName).lineLimit(1)
+                                Spacer()
+                                Button { viewModel.update { $0.removeSupportingEvidence(id: asset.id) } } label: { Image(systemName: "xmark.circle.fill") }
+                            }
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
                     }
                 }
             }
-            PrimaryActionButton(title: "Finish Workout / Review") { viewModel.go(to: .evidence) }
+            PrimaryActionButton(title: "Continue to confirmation") { viewModel.go(to: .review) }
                 .accessibilityIdentifier("trainingLogger.finishReview")
             secondaryButton("Back to set entry") { viewModel.go(to: .workout) }
         }
     }
 
     private func evidence(_ viewModel: TrainingLoggerViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Evidence", title: "Apple Health reconciliation", subtitle: "Optional evidence can help reconcile duration and energy data before review.")
-            CardContainer {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("No Apple Health workout linked", systemImage: "heart.slash")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text("You can continue without an Apple Health workout and add supporting evidence later.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-            PrimaryActionButton(title: "Continue without Apple Health") { viewModel.go(to: .review) }
-                .accessibilityIdentifier("trainingLogger.continueWithoutHealth")
-            secondaryButton("Back to summary") { viewModel.go(to: .summary) }
-        }
+        summary(viewModel) // Build-5 saved drafts migrate directly to the combined review.
     }
 
     private func review(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Evidence Review", title: "Does this look right?", subtitle: "Check the workout details before finishing.")
+            loggerHeader(eyebrow: "Final Confirmation", title: "Finish this workout?", subtitle: "Confirm the workout and any supporting screenshots together.")
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Workout ready", systemImage: "checkmark.shield")
+                    Label("Workout ready", systemImage: "checkmark.circle")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text("Exercises, sets, variants, and relationships are ready for your final check.")
+                    if let draft = viewModel.draft {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(draft.exercises.count) exercises · \(draft.completedSetCount) completed sets")
+                            Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
+                        }
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
                     if viewModel.draft?.exercises.contains(where: \.isProvisional) == true {
                         Text("New exercises will remain attached to this workout.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -699,7 +770,7 @@ struct TrainingLoggerView: View {
             }
             PrimaryActionButton(title: "Finish Workout") { viewModel.completeLocalCapture() }
                 .accessibilityIdentifier("trainingLogger.completeLocal")
-            secondaryButton("Back") { viewModel.go(to: .evidence) }
+            secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
         }
     }
 
@@ -821,5 +892,31 @@ struct TrainingLoggerView: View {
                 }
             }
         )
+    }
+
+    private func reviewSetLine(_ set: TrainingLoggerDraftSet, measurement: TrainingLoggerMeasurement) -> String {
+        switch measurement {
+        case .repsLoad:
+            return "Set \(set.setNumber) · \(formatNumber(set.reps)) reps × \(formatNumber(set.load)) lb"
+        case .bodyweightReps:
+            return "Set \(set.setNumber) · \(formatNumber(set.reps)) reps · Bodyweight"
+        case .duration:
+            return "Set \(set.setNumber) · \(formatNumber(set.durationSeconds)) seconds"
+        }
+    }
+
+    private func formatNumber(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    private func numericEditingChanged(_ editing: Bool) {
+        if editing {
+            isNumericKeyboardVisible = true
+        } else {
+            DispatchQueue.main.async {
+                isNumericKeyboardVisible = focusedNumericFieldID != nil
+            }
+        }
     }
 }

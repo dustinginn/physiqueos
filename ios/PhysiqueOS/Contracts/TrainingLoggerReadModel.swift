@@ -92,6 +92,13 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var exercises: [TrainingLoggerDraftExercise]
     var relationships: [TrainingLoggerDraftRelationship]
     var step: TrainingLoggerStep
+    /// Present only while the accepted picker is being reused from set entry.
+    /// Optional keeps build-5 drafts forward-decodable.
+    var exercisePickerReturnStep: TrainingLoggerStep?
+    var exercisePickerExistingExerciseIds: [String]?
+    /// Manual Apple Health screenshots are supporting workout evidence today.
+    /// A future HealthKit adapter can populate this same boundary.
+    var supportingEvidence: [TrainingLoggerSupportingEvidence]?
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String) -> Self {
         .init(
@@ -101,7 +108,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             selectedAreaIds: [],
             exercises: [],
             relationships: [],
-            step: .areas
+            step: .areas,
+            exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil,
+            supportingEvidence: nil
         )
     }
 
@@ -115,6 +125,24 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
 
     var variantCount: Int { exercises.filter { $0.executionVariant != nil }.count }
     var supersetCount: Int { relationships.count }
+    var isAddingExercises: Bool { exercisePickerReturnStep == .workout }
+    var supportingEvidenceAssets: [TrainingLoggerSupportingEvidence] { supportingEvidence ?? [] }
+    var addedExerciseCount: Int {
+        guard isAddingExercises else { return exercises.count }
+        let existing = Set(exercisePickerExistingExerciseIds ?? [])
+        return exercises.filter { !existing.contains($0.id) }.count
+    }
+}
+
+struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {
+    enum Source: String, Codable, Equatable {
+        case photos = "Photos"
+        case files = "Files"
+    }
+
+    var id: String
+    var displayName: String
+    var source: Source
 }
 
 struct TrainingLoggerDraftExercise: Codable, Equatable, Identifiable {
@@ -243,11 +271,16 @@ extension TrainingLoggerDraft {
         }
     }
 
-    func pickerExercises(in catalog: [TrainingLoggerCatalogExercise], browseAll: Bool, query: String) -> [TrainingLoggerCatalogExercise] {
+    func pickerExercises(
+        in catalog: [TrainingLoggerCatalogExercise],
+        browseAll: Bool,
+        query: String,
+        includeAllAreas: Bool = false
+    ) -> [TrainingLoggerCatalogExercise] {
         let selected = Set(selectedAreaIds)
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return catalog
-            .filter { selected.contains($0.areaId) }
+            .filter { includeAllAreas || selected.contains($0.areaId) }
             .filter { browseAll || $0.previouslyPerformed }
             .filter { normalizedQuery.isEmpty || $0.name.lowercased().contains(normalizedQuery) }
             .sorted {
@@ -275,6 +308,39 @@ extension TrainingLoggerDraft {
             isProvisional: false,
             provenance: nil
         ))
+    }
+
+    mutating func beginAddingExercises() {
+        exercisePickerReturnStep = .workout
+        exercisePickerExistingExerciseIds = exercises.map(\.id)
+        step = .exercises
+    }
+
+    mutating func finishExerciseSelection() {
+        step = exercisePickerReturnStep ?? .workout
+        exercisePickerReturnStep = nil
+        exercisePickerExistingExerciseIds = nil
+    }
+
+    func exerciseWasPresentBeforePicker(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
+        guard isAddingExercises,
+              let draftExercise = exercises.first(where: {
+                  $0.canonicalExerciseId == exercise.canonicalExerciseId
+              }) else { return false }
+        return Set(exercisePickerExistingExerciseIds ?? []).contains(draftExercise.id)
+    }
+
+    mutating func addSupportingEvidence(_ assets: [TrainingLoggerSupportingEvidence]) {
+        var current = supportingEvidenceAssets
+        var identities = Set(current.map { "\($0.source.rawValue)|\($0.displayName)" })
+        for asset in assets where identities.insert("\(asset.source.rawValue)|\(asset.displayName)").inserted {
+            current.append(asset)
+        }
+        supportingEvidence = current
+    }
+
+    mutating func removeSupportingEvidence(id: String) {
+        supportingEvidence = supportingEvidenceAssets.filter { $0.id != id }
     }
 
     mutating func addProvisionalExercise(name: String, areaId: String) {
@@ -447,5 +513,44 @@ extension TrainingLoggerDraft {
             && relationship == nil
         exercises[index].progressionRecommendation = canRecommend ? item.progressionRecommendation : nil
         exercises[index].progressionChoice = exercises[index].progressionRecommendation == nil ? nil : .previous
+    }
+}
+
+enum TrainingLoggerNumericFieldKind: String, Equatable {
+    case reps
+    case load
+    case duration
+}
+
+struct TrainingLoggerNumericFieldTarget: Equatable, Identifiable {
+    var exerciseId: String
+    var setId: String
+    var kind: TrainingLoggerNumericFieldKind
+    var id: String { "\(exerciseId)|\(setId)|\(kind.rawValue)" }
+}
+
+enum TrainingLoggerNumericFocusOrder {
+    static func targets(for draft: TrainingLoggerDraft) -> [TrainingLoggerNumericFieldTarget] {
+        draft.exercises.flatMap { exercise in
+            exercise.sets.flatMap { set -> [TrainingLoggerNumericFieldTarget] in
+                switch exercise.measurement {
+                case .repsLoad:
+                    return [
+                        .init(exerciseId: exercise.id, setId: set.id, kind: .reps),
+                        .init(exerciseId: exercise.id, setId: set.id, kind: .load),
+                    ]
+                case .bodyweightReps:
+                    return [.init(exerciseId: exercise.id, setId: set.id, kind: .reps)]
+                case .duration:
+                    return [.init(exerciseId: exercise.id, setId: set.id, kind: .duration)]
+                }
+            }
+        }
+    }
+
+    static func next(after id: String, in draft: TrainingLoggerDraft) -> String? {
+        let ids = targets(for: draft).map(\.id)
+        guard let index = ids.firstIndex(of: id), ids.indices.contains(index + 1) else { return nil }
+        return ids[index + 1]
     }
 }

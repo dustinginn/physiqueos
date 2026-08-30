@@ -146,6 +146,23 @@ struct EvidenceIntakeView: View {
             }
 
             CardContainer {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Evidence type").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        Text("Choose a type if it is not obvious from the files or details.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    Spacer()
+                    Picker("Evidence type", selection: draftScenario) {
+                        ForEach(EvidenceFixtureScenario.allCases) { scenario in Text(scenario.title).tag(scenario) }
+                    }
+                    .labelsHidden()
+                    .tint(PhysiqueOSTheme.accent)
+                }
+            }
+
+            CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Add details")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
@@ -210,5 +227,9 @@ struct EvidenceIntakeView: View {
 
     private var draftDetails: Binding<String> {
         .init(get: { store.evidenceDraft.details }, set: { store.evidenceDraft.details = $0 })
+    }
+
+    private var draftScenario: Binding<EvidenceFixtureScenario> {
+        .init(get: { store.evidenceDraft.scenario }, set: { store.evidenceDraft.scenario = $0 })
     }
 }

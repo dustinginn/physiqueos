@@ -20,6 +20,26 @@ struct LocalWeightEntry: Codable, Equatable {
     var correctionCount: Int
 }
 
+enum MorningPriorityDisposition: String, Codable, CaseIterable, Identifiable {
+    case completed, skipped, note
+    var id: String { rawValue }
+    var label: String { switch self { case .completed: "Completed"; case .skipped: "Skipped"; case .note: "Add note" } }
+}
+
+struct MorningPriorityItem: Codable, Equatable, Identifiable {
+    var id: String
+    var title: String
+    var detail: String
+    var occurrenceDate: Date
+    var disposition: MorningPriorityDisposition?
+    var note: String
+}
+
+struct MorningCheckInResult: Equatable {
+    var weight: LocalWeightEntry
+    var reconciledPriorityCount: Int
+}
+
 enum ManualWeighInValidation {
     static func error(weightText: String, unit: WeightUnit, date: Date, maximumDate: Date) -> String? {
         let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -74,6 +94,7 @@ enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
 }
 
 enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
+    case automatic
     case training
     case cardio
     case nutrition
@@ -87,6 +108,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .automatic: "Automatic"
         case .training: "Training · strength"
         case .cardio: "Training · cardio"
         case .nutrition: "Nutrition screenshot"
@@ -100,6 +122,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
 
     var category: EvidenceCategory? {
         switch self {
+        case .automatic: nil
         case .training, .cardio: .training
         case .nutrition: .nutrition
         case .weight: .weight
@@ -139,12 +162,27 @@ struct EvidenceIntakeDraft: Codable, Equatable {
             occurrenceDate: now,
             details: "",
             attachments: [],
-            scenario: .training
+            scenario: .automatic
         )
     }
 
     var hasContent: Bool {
         !attachments.isEmpty || !details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+enum EvidenceSandboxRouter {
+    static func scenario(for draft: EvidenceIntakeDraft) -> EvidenceFixtureScenario {
+        guard draft.scenario == .automatic else { return draft.scenario }
+        let text = (draft.details + " " + draft.attachments.map(\.displayName).joined(separator: " ")).lowercased()
+        if text.contains("dexa") || text.contains("body composition") { return .dexa }
+        if ["progress", "front", "side", "rear", "pose"].contains(where: text.contains) { return .progressPhotos }
+        if ["nutrition", "meal", "calorie", "protein", "macro"].contains(where: text.contains) { return .nutrition }
+        if ["scale", "weigh", "weight"].contains(where: text.contains) { return .weight }
+        if ["activity", "rings", "steps", "move goal"].contains(where: text.contains) { return .activity }
+        if ["cardio", "treadmill", "stair", "run", "cycle"].contains(where: text.contains) { return .cardio }
+        if ["workout", "training", "bench", "sets"].contains(where: text.contains) { return .training }
+        return .generic
     }
 }
 

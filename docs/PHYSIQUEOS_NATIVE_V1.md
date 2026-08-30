@@ -1954,3 +1954,65 @@ No backend, production data, production worktree, deployment, HealthKit sync,
 or TestFlight upload changed. The next review candidate is build 5; version 1.0,
 bundle id `com.physiqueos.native.dev`, signing, AppIcon, and the non-exempt-
 encryption declaration remain unchanged.
+
+## 64. TestFlight build-5 feedback: Logger completion, Morning Check-In, and evidence gate (2026-08-30)
+
+Physical build-5 testing established three product corrections now represented
+in the Native sandbox. An active live or past workout can reopen the existing
+performed-first/search/registry exercise picker, append additional exercises,
+prevent duplicate canonical identities, and return without losing set edits,
+Done states, variants, Supersets, or draft state. Numeric entry follows the
+applicable reps/load sequence (or bodyweight reps / timed duration sequence)
+with keyboard Next and final Done while retaining select-all, true-blank edit,
+and hidden-Finish-while-editing behavior.
+
+Workout completion is now one detailed Workout Review followed by one concise
+final confirmation. Review shows exercises in order, every completed set,
+measurement values, variant and relationship context, and optional ordered,
+removable Apple Health screenshot attachments from Photos or Files. The former
+standalone Apple Health reconciliation step is not in the normal route. Manual
+screenshots implement supporting evidence only; they do not imply HealthKit
+access or synchronization.
+
+Current web `MorningCheckInScreen`, `MorningPriorityReconciliationService`, and
+`MorningCheckInPersistenceService` establish Morning Check-In as a today-only
+workflow combining prior-day unfinished-priority outcomes (Completed, Skipped,
+or Add note) with today’s weight. Native now reflects that contract. Historical
+weight remains a separate Log Weight route with occurrence date and unit so a
+backfill is never represented as today’s check-in.
+
+Universal Upload preserves multiple Photos/Files, removal, details, and the
+occurrence date. The current supported review inventory is Training strength,
+Training cardio, Nutrition, Weight, Activity, DEXA, Progress Photos, and generic
+fallback. Automatic sandbox routing uses selected asset names/details; a small
+Evidence type menu lets a Founder deliberately exercise a particular supported
+review on a device without claiming production interpretation.
+
+### Pre-production-data evidence acceptance gate
+
+Before any Founder production data is connected, every supported review family
+must pass on the Native client: entry/upload, source attachments where relevant,
+occurrence date, correct routing, type-specific presentation, correction and
+include/exclude where available, confirmation, completion/navigation, and no
+cross-category routing. Training strength and cardio are separate acceptance
+rows even though both share the Training review family. Energy and Recovery are
+not universal-upload Evidence Review categories in current web source and are
+outside this gate unless that product contract changes.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Replace local Morning Check-In priority/weight reads and writes with the
+  existing server-owned execution occurrences and same-day weight command.
+- Replace deterministic upload routing with authenticated evidence upload,
+  interpretation, and the existing server-owned review payloads.
+- Preserve occurrence versus upload time and ordered multi-asset packages at
+  the live media boundary.
+- Allow a future HealthKit adapter to provide the same supporting-workout-
+  evidence boundary used by manual screenshots; do not add a second finish flow.
+- Connect final workout/evidence confirmation to existing canonical owners only
+  after every evidence matrix row passes Founder acceptance.
+
+No backend, production data/worktree, DigitalOcean, PostgreSQL, authentication,
+workers, deployment, or HealthKit entitlement changed. No paid dependency or
+incremental infrastructure cost was added. Version remains 1.0; the next local
+TestFlight candidate build number is 6 and is not authorized for upload.

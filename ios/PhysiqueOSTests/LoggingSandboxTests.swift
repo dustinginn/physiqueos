@@ -80,6 +80,39 @@ final class LoggingSandboxTests: XCTestCase {
         }
     }
 
+    func testAutomaticEvidenceRoutingCoversEverySupportedReviewWithoutCrossCategoryLeakage() throws {
+        let cases: [(String, EvidenceFixtureScenario, EvidenceCategory)] = [
+            ("bench press workout sets", .training, .training),
+            ("stair stepper cardio", .cardio, .training),
+            ("nutrition calories protein", .nutrition, .nutrition),
+            ("scale weight", .weight, .weight),
+            ("activity rings steps", .activity, .activity),
+            ("DEXA body composition", .dexa, .dexa),
+            ("front side rear progress", .progressPhotos, .progressPhotos),
+            ("miscellaneous receipt", .generic, .generic),
+        ]
+        for (details, scenario, category) in cases {
+            let store = LoggingSandboxStore(now: date(2026, 8, 30))
+            store.evidenceDraft.details = details
+            XCTAssertEqual(EvidenceSandboxRouter.scenario(for: store.evidenceDraft), scenario)
+            _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+            let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+            XCTAssertEqual(store.review(id: id)?.category, category)
+        }
+    }
+
+    func testMorningCheckInRequiresEveryPreviousDayPriorityAndSavesTodaysWeight() throws {
+        let now = date(2026, 8, 30)
+        let store = LoggingSandboxStore(now: now)
+        XCTAssertFailure(store.saveMorningCheckIn(weightText: "166.4", now: now), "Choose an outcome for each unfinished priority.")
+        store.updateMorningPriority(id: "priority-mobility", disposition: .completed)
+        store.updateMorningPriority(id: "priority-evening", disposition: .note, note: "Travel day")
+        let result = try value(store.saveMorningCheckIn(weightText: "166.4", now: now))
+        XCTAssertEqual(result.reconciledPriorityCount, 2)
+        XCTAssertEqual(result.weight.dateKey, "2026-08-30")
+        XCTAssertEqual(store.weighIn(on: now)?.value, 166.4)
+    }
+
     func testCategorySpecificReviewFieldsMatchCurrentWebPresentationSemantics() {
         let draft = preparedStore(scenario: .training).evidenceDraft
         let training = LoggingSandboxFixtureFactory.review(category: .training, scenario: .training, draft: draft)

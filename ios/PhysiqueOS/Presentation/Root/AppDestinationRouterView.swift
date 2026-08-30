@@ -15,7 +15,7 @@ struct AppDestinationRouterView: View {
     var body: some View {
         switch destination {
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
-            ManualWeighInView(onReturnToLog: onReturnToLog)
+            MorningCheckInView()
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
