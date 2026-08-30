@@ -65,11 +65,11 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(store.evidenceDraft.details, "Backlog item")
     }
 
-    func testRecognizedFixtureScenariosCreateEverySupportedReviewType() throws {
+    func testSupportedUploadExamplesCreateWebBackedReviewTypes() throws {
         let cases: [(EvidenceFixtureScenario, EvidenceCategory)] = [
             (.training, .training), (.cardio, .training), (.nutrition, .nutrition),
             (.weight, .weight), (.activity, .activity), (.dexa, .dexa),
-            (.progressPhotos, .progressPhotos), (.recovery, .recovery), (.generic, .generic),
+            (.progressPhotos, .progressPhotos), (.generic, .generic),
         ]
 
         for (scenario, category) in cases {
@@ -83,91 +83,35 @@ final class LoggingSandboxTests: XCTestCase {
     func testCategorySpecificReviewFieldsMatchCurrentWebPresentationSemantics() {
         let draft = preparedStore(scenario: .training).evidenceDraft
         let training = LoggingSandboxFixtureFactory.review(category: .training, scenario: .training, draft: draft)
-        XCTAssertTrue(Set(training.fields.map(\.id)).isSuperset(of: ["activityType", "exercise1", "variant", "relationship", "healthLink"]))
+        XCTAssertEqual(Set(training.fields.map(\.id)), ["exercises", "sets", "duration", "activeCalories", "appleLink", "source", "benchPress", "cableFly"])
 
         let nutrition = LoggingSandboxFixtureFactory.review(category: .nutrition, scenario: .nutrition, draft: draft)
-        XCTAssertTrue(Set(nutrition.fields.map(\.id)).isSuperset(of: ["meal", "calories", "protein", "carbs", "fat", "reconciliation"]))
+        XCTAssertEqual(Set(nutrition.fields.map(\.id)), ["calories", "protein", "carbs", "fat", "source", "meals"])
 
         let activity = LoggingSandboxFixtureFactory.review(category: .activity, scenario: .activity, draft: draft)
-        XCTAssertTrue(Set(activity.fields.map(\.id)).isSuperset(of: ["activeCalories", "exerciseMinutes", "separateWorkouts"]))
+        XCTAssertEqual(Set(activity.fields.map(\.id)), ["activeCalories", "exerciseMinutes", "duration", "source"])
 
         let dexa = LoggingSandboxFixtureFactory.review(category: .dexa, scenario: .dexa, draft: draft)
-        XCTAssertTrue(Set(dexa.fields.map(\.id)).isSuperset(of: ["totalMass", "bodyFat", "fatMass", "leanMass", "bmc", "rmr", "vatMass", "vatVolume"]))
+        XCTAssertEqual(Set(dexa.fields.map(\.id)), ["totalMass", "bodyFat", "fatMass", "leanMass", "source"])
 
         let photos = LoggingSandboxFixtureFactory.review(category: .progressPhotos, scenario: .progressPhotos, draft: draft)
-        XCTAssertTrue(Set(photos.fields.map(\.id)).isSuperset(of: ["grouping", "front", "side", "rear", "timeOfDay", "goalRelationship"]))
+        XCTAssertEqual(Set(photos.fields.map(\.id)), ["poses", "timeOfDay", "goalRelationship", "source"])
     }
 
-    func testAmbiguousEvidenceRequiresFounderClassificationBeforeReview() throws {
-        let store = preparedStore(scenario: .ambiguous)
-        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
-        _ = try value(store.finishInterpretation(now: date(2026, 8, 30)))
-        XCTAssertEqual(store.interpretationState, .ambiguous)
-
-        let reviewId = store.resolveAmbiguity(as: .weight, now: date(2026, 8, 30))
-        let review = try XCTUnwrap(store.review(id: reviewId))
-        XCTAssertEqual(review.category, .weight)
-        XCTAssertNotNil(review.warning)
-    }
-
-    func testNeedsMoreInformationRequiresClarificationAndRetainsSources() throws {
-        let store = preparedStore(scenario: .needsMoreInformation)
-        store.addAttachments([.init(id: "source", displayName: "unknown.png", source: .photos)])
-        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
-        _ = try value(store.finishInterpretation(now: date(2026, 8, 30)))
-        XCTAssertEqual(store.interpretationState, .needsMoreInformation)
-        XCTAssertFailure(store.continueAfterClarification(now: date(2026, 8, 30)), "Add the missing context before continuing.")
-
-        store.evidenceDraft.clarification = "This is a recovery note."
-        let reviewId = try value(store.continueAfterClarification(now: date(2026, 8, 30)))
-        XCTAssertEqual(store.review(id: reviewId)?.sourceAssets.first?.id, "source")
-    }
-
-    func testUnsupportedEvidenceCanContinueOnlyAsHonestGenericReview() throws {
-        let store = preparedStore(scenario: .unsupported)
-        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
-        _ = try value(store.finishInterpretation(now: date(2026, 8, 30)))
-        XCTAssertEqual(store.interpretationState, .unsupported)
-
-        let reviewId = store.continueUnsupportedAsGeneric(now: date(2026, 8, 30))
-        let review = try XCTUnwrap(store.review(id: reviewId))
-        XCTAssertEqual(review.category, .generic)
-        XCTAssertTrue(review.warning?.contains("not recognized") == true)
-    }
-
-    func testLocalFailureRetryPreservesDateDetailsAndAssets() throws {
-        let store = preparedStore(scenario: .localFailure)
-        let occurrence = date(2026, 7, 14)
-        store.evidenceDraft.occurrenceDate = occurrence
-        store.addAttachments([.init(id: "file", displayName: "history.pdf", source: .files)])
-        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
-        _ = try value(store.finishInterpretation(now: date(2026, 8, 30)))
-        XCTAssertEqual(store.interpretationState, .failed)
-
-        store.retryInterpretation()
-        XCTAssertEqual(store.interpretationState, .editing)
-        XCTAssertEqual(store.evidenceDraft.occurrenceDate, occurrence)
-        XCTAssertEqual(store.evidenceDraft.attachments.map(\.id), ["file"])
-        XCTAssertEqual(store.evidenceDraft.details, "Fixture evidence details")
-    }
-
-    func testCorrectionValidationAndLocalCompletionNeverClaimCanonicalSuccess() throws {
+    func testReviewRequiresInclusionAndCompletesWithoutMutatingItsSourceFields() throws {
         let store = preparedStore(scenario: .weight)
         _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
         let reviewId = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
 
-        store.updateReview(id: reviewId) { review in
-            review.correctionNote = "Corrected the scale reading."
-            review.fields[0].value = "not a number"
-        }
+        let originalFields = try XCTUnwrap(store.review(id: reviewId)).fields
+        store.updateReview(id: reviewId) { $0.included = false }
         XCTAssertFalse(try XCTUnwrap(store.review(id: reviewId)).canConfirm)
         XCTAssertFailure(store.confirmReview(id: reviewId), "Complete required fields and include the evidence before confirming.")
 
-        store.updateReview(id: reviewId) { $0.fields[0].value = "166.4" }
+        store.updateReview(id: reviewId) { $0.included = true }
         let confirmed = try value(store.confirmReview(id: reviewId))
-        XCTAssertEqual(confirmed.status, .confirmedLocally)
-        XCTAssertTrue(confirmed.provenance.contains("Device-only fixture"))
-        XCTAssertFalse(confirmed.provenance.localizedCaseInsensitiveContains("production saved"))
+        XCTAssertEqual(confirmed.status, .confirmed)
+        XCTAssertEqual(confirmed.fields, originalFields)
     }
 
     func testSaveForLaterPreservesReviewAndDiscardRemovesIt() throws {
@@ -206,7 +150,7 @@ final class LoggingSandboxTests: XCTestCase {
 
     private func preparedStore(scenario: EvidenceFixtureScenario) -> LoggingSandboxStore {
         let store = LoggingSandboxStore(now: date(2026, 8, 30))
-        store.evidenceDraft.details = "Fixture evidence details"
+        store.evidenceDraft.details = "Uploaded evidence details"
         store.evidenceDraft.scenario = scenario
         return store
     }

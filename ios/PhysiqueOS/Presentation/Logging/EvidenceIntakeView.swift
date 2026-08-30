@@ -10,8 +10,8 @@ struct EvidenceIntakeView: View {
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var errorMessage: String?
     @State private var showingDiscard = false
-    @State private var ambiguityChoice: EvidenceCategory = .training
     var initialScenario: EvidenceFixtureScenario? = nil
+    var onNavigate: (AppDestination) -> Void = { _ in }
 
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
@@ -19,7 +19,7 @@ struct EvidenceIntakeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                stateContent
+                editing
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -33,14 +33,14 @@ struct EvidenceIntakeView: View {
                     .disabled(!store.evidenceDraft.hasContent)
             }
         }
-        .confirmationDialog("Discard this local evidence draft?", isPresented: $showingDiscard, titleVisibility: .visible) {
-            Button("Discard Draft", role: .destructive) {
+        .confirmationDialog("Discard this upload?", isPresented: $showingDiscard, titleVisibility: .visible) {
+            Button("Discard Upload", role: .destructive) {
                 store.resetEvidenceDraft()
                 dismiss()
             }
             Button("Keep Editing", role: .cancel) {}
         } message: {
-            Text("Selected asset names, date, and details will be removed from this device-only session.")
+            Text("Selected files, date, and details will be removed.")
         }
         .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photoItems, matching: .images)
         .onChange(of: photoItems) {
@@ -67,39 +67,15 @@ struct EvidenceIntakeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("EVIDENCE INTAKE")
+            Text("UPLOAD")
                 .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                 .foregroundStyle(PhysiqueOSTheme.accent)
-            Text("Add what happened")
+            Text("What happened?")
                 .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text("Photos and Files are equal sources. Assets stay staged locally until you review or discard them.")
+            Text("Add one file, several files, or just a note.")
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-    }
-
-    @ViewBuilder
-    private var stateContent: some View {
-        switch store.interpretationState {
-        case .editing:
-            editing
-        case .pending:
-            messageState(icon: "waveform.path.ecg", title: "Interpretation pending", body: "The assets are retained locally. Continue to run the selected deterministic fixture—no production AI or worker is being called.") {
-                handle(store.finishInterpretation())
-            }
-        case .ambiguous:
-            ambiguous
-        case .needsMoreInformation:
-            needsInformation
-        case .unsupported:
-            unsupported
-        case .failed:
-            messageState(icon: "exclamationmark.triangle.fill", title: "Local interpretation failed", body: "Your draft and selected assets are intact. Retry without reselecting anything.") {
-                store.retryInterpretation()
-            }
-        case .ready(let reviewId):
-            ready(reviewId: reviewId)
         }
     }
 
@@ -107,14 +83,17 @@ struct EvidenceIntakeView: View {
         VStack(alignment: .leading, spacing: 14) {
             CardContainer {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Sources")
+                    Text("Upload files")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    Text("Choose screenshots, photos, or PDFs. You can select more than one.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     HStack(spacing: 10) {
                         sourceButton("Choose Photos", icon: "photo.on.rectangle") { isPhotosPickerPresented = true }
                         sourceButton("Choose Files", icon: "folder") { isFilePickerPresented = true }
                     }
                     if store.evidenceDraft.attachments.isEmpty {
-                        Text("No assets selected. A typed note can also be submitted by itself.")
+                        Text("No files selected")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textMuted)
                     } else {
@@ -147,7 +126,7 @@ struct EvidenceIntakeView: View {
                             case .files: isFilePickerPresented = true
                             }
                         } label: {
-                            Text("Add or reselect assets")
+                            Text("Add or reselect files")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.accent)
                         }
@@ -159,165 +138,35 @@ struct EvidenceIntakeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("When did this happen?")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    Text("Use the workout, meal, scan, measurement, or photo capture date—not the upload date.")
+                    Text("Use the date the workout, meal, scan, or activity happened.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    DateField(date: draftDate, maximumDate: Date(), label: "Evidence occurrence date")
+                    DateField(date: draftDate, maximumDate: Date(), label: "Evidence date")
                 }
             }
 
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Details / notes")
+                    Text("Add details")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    Text("Add any details that help PhysiqueOS understand what you’re logging.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     TextEditor(text: draftDetails)
                         .frame(minHeight: 96)
                         .padding(8)
                         .scrollContentBackground(.hidden)
                         .background(PhysiqueOSTheme.surfaceMuted)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                    Text("Typed details are retained as source evidence and remain visible during review.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-            }
-
-            CardContainer(background: PhysiqueOSTheme.surfaceAccent) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Sandbox interpretation case")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    Picker("Fixture case", selection: draftScenario) {
-                        ForEach(EvidenceFixtureScenario.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                    Text("This selector makes recognized, ambiguous, incomplete, unsupported, and failure states deterministic and testable. It does not represent AI confidence.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    Button {
-                        store.addAttachments([
-                            .init(id: UUID().uuidString, displayName: "progress-front.jpg", source: .photos),
-                            .init(id: UUID().uuidString, displayName: "historical-report.pdf", source: .files),
-                        ])
-                    } label: {
-                        Label("Stage sample photo + PDF", systemImage: "shippingbox.fill")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("evidenceIntake.sampleBatch")
                 }
             }
 
             if let errorMessage { errorBanner(errorMessage) }
-            PrimaryActionButton(title: "Continue to interpretation", tone: .dark, isEnabled: store.evidenceDraft.hasContent) {
-                handle(store.submitEvidence())
+            PrimaryActionButton(title: "Submit evidence", tone: .dark, isEnabled: store.evidenceDraft.hasContent) {
+                submit()
             }
             .accessibilityIdentifier("evidenceIntake.continue")
         }
-    }
-
-    private var ambiguous: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            messageCard(icon: "questionmark.diamond.fill", title: "Classification is ambiguous", body: "The fixture cannot choose a category honestly. Your date, notes, and every asset are still attached.")
-            CardContainer {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("What is this primarily about?")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    Picker("Evidence type", selection: $ambiguityChoice) {
-                        ForEach(EvidenceCategory.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                    PrimaryActionButton(title: "Use \(ambiguityChoice.title)") {
-                        _ = store.resolveAmbiguity(as: ambiguityChoice)
-                    }
-                }
-            }
-            editAgainButton
-        }
-    }
-
-    private var needsInformation: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            messageCard(icon: "text.bubble.fill", title: "More information needed", body: "The source does not contain enough context to create a category-specific review. Add what the evidence represents.")
-            CardContainer {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Missing context")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    TextEditor(text: clarification)
-                        .frame(minHeight: 90)
-                        .padding(8)
-                        .scrollContentBackground(.hidden)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    if let errorMessage { errorBanner(errorMessage) }
-                    PrimaryActionButton(title: "Continue with context") {
-                        switch store.continueAfterClarification() {
-                        case .success: errorMessage = nil
-                        case .failure(let error): errorMessage = error.message
-                        }
-                    }
-                }
-            }
-            editAgainButton
-        }
-    }
-
-    private var unsupported: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            messageCard(icon: "doc.questionmark.fill", title: "Source not recognized", body: "No supported evidence type or values were inferred. You can preserve the upload as generic evidence using only your source and description.")
-            PrimaryActionButton(title: "Review as generic evidence") {
-                _ = store.continueUnsupportedAsGeneric()
-            }
-            editAgainButton
-        }
-    }
-
-    private func ready(reviewId: String) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            messageCard(icon: "checkmark.shield.fill", title: "Ready for Evidence Review", body: "A local interpreted fixture is ready. Nothing has been canonically saved.")
-            NavigationLink(value: AppDestination.localEvidenceReview(reviewId: reviewId)) {
-                Text("Review interpreted evidence")
-                    .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(PhysiqueOSTheme.accent)
-                    .clipShape(Capsule())
-            }
-            .accessibilityIdentifier("evidenceIntake.review")
-            editAgainButton
-        }
-    }
-
-    private func messageState(icon: String, title: String, body: String, action: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            messageCard(icon: icon, title: title, body: body)
-            PrimaryActionButton(title: store.interpretationState == .failed ? "Retry" : "Continue fixture interpretation", action: action)
-            editAgainButton
-        }
-    }
-
-    private func messageCard(icon: String, title: String, body: String) -> some View {
-        CardContainer(background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 10) {
-                Label(title, systemImage: icon)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(body)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-    }
-
-    private var editAgainButton: some View {
-        Button("Back to draft") {
-            store.retryInterpretation()
-            errorMessage = nil
-        }
-        .frame(maxWidth: .infinity)
-        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-        .foregroundStyle(PhysiqueOSTheme.accent)
     }
 
     private func sourceButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -342,26 +191,24 @@ struct EvidenceIntakeView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func handle(_ result: Result<String?, LoggingSandboxError>) {
-        switch result {
-        case .success: errorMessage = nil
+    private func submit() {
+        switch store.submitEvidence() {
         case .failure(let error): errorMessage = error.message
+        case .success:
+            switch store.finishInterpretation() {
+            case .failure(let error): errorMessage = error.message
+            case .success(let reviewId):
+                errorMessage = nil
+                if let reviewId { onNavigate(.localEvidenceReview(reviewId: reviewId)) }
+            }
         }
     }
 
     private var draftDate: Binding<Date> {
-        .init(get: { store.evidenceDraft.occurrenceDate }, set: { store.evidenceDraft.occurrenceDate = $0; store.retryInterpretation() })
+        .init(get: { store.evidenceDraft.occurrenceDate }, set: { store.evidenceDraft.occurrenceDate = $0 })
     }
 
     private var draftDetails: Binding<String> {
-        .init(get: { store.evidenceDraft.details }, set: { store.evidenceDraft.details = $0; store.retryInterpretation() })
-    }
-
-    private var draftScenario: Binding<EvidenceFixtureScenario> {
-        .init(get: { store.evidenceDraft.scenario }, set: { store.evidenceDraft.scenario = $0; store.retryInterpretation() })
-    }
-
-    private var clarification: Binding<String> {
-        .init(get: { store.evidenceDraft.clarification }, set: { store.evidenceDraft.clarification = $0 })
+        .init(get: { store.evidenceDraft.details }, set: { store.evidenceDraft.details = $0 })
     }
 }

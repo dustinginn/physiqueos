@@ -27,7 +27,7 @@ struct UploadCardView: View {
                             Text("Morning Weigh-In")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Log today or choose a historical measurement date.")
+                            Text("Log today’s morning weight.")
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -47,10 +47,10 @@ struct UploadCardView: View {
                     HStack(spacing: 12) {
                         IconBadge(systemImage: "square.and.arrow.up", color: .primary, size: .md)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Add Evidence")
+                            Text("Upload")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Add one asset, a batch, or typed details.")
+                            Text("Add one file, several files, or just a note.")
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -88,7 +88,7 @@ struct UploadCardView: View {
                         Button { onNavigate(.evidenceIntake) } label: {
                             HStack(spacing: 7) {
                                 Image(systemName: "doc.text.fill")
-                                Text("Local draft · \(store.evidenceDraft.attachments.count) asset\(store.evidenceDraft.attachments.count == 1 ? "" : "s")")
+                                Text("Continue draft · \(store.evidenceDraft.attachments.count) file\(store.evidenceDraft.attachments.count == 1 ? "" : "s")")
                                 Spacer()
                                 Image(systemName: "chevron.right")
                             }

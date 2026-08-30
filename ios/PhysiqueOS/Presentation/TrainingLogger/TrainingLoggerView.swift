@@ -116,7 +116,7 @@ struct TrainingLoggerView: View {
 
     private func entry(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Training Logger", title: "Log the work. Keep the context.", subtitle: "Start now or capture a past workout with the same evidence-aware structure.")
+            loggerHeader(eyebrow: "Training Logger", title: "Log the work. Keep the context.", subtitle: "Start now or capture a past workout with the same exercise and set details.")
 
             if viewModel.savedDraft != nil {
                 CardContainer {
@@ -124,7 +124,7 @@ struct TrainingLoggerView: View {
                         Text("Saved workout")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text("Resume your device-only draft without losing sets or exercise context.")
+                        Text("Pick up where you left off without losing sets or exercise details.")
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         PrimaryActionButton(title: "Resume workout") { viewModel.resume() }
@@ -148,7 +148,7 @@ struct TrainingLoggerView: View {
                             Text("Log Past Workout")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Use the workout date—no invented historical time.")
+                            Text("Choose when the workout happened.")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -317,7 +317,7 @@ struct TrainingLoggerView: View {
                 Text("Create new exercise")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("This stays provisional until canonical review. It does not modify the exercise registry.")
+                Text("Give the exercise a name and choose its Training Area.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 TextField("Exercise name", text: $provisionalName)
@@ -387,7 +387,7 @@ struct TrainingLoggerView: View {
             }
             Button("Keep Workout", role: .cancel) {}
         } message: {
-            Text("This discards the device-only draft and all set edits. Save & Leave keeps it.")
+            Text("This discards the workout and all set edits. Save & Leave keeps it.")
         }
     }
 
@@ -668,13 +668,9 @@ struct TrainingLoggerView: View {
                     Label("No Apple Health workout linked", systemImage: "heart.slash")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text("Apple Health import is not connected in the Native sandbox. No health data has been read or written.")
+                    Text("You can continue without an Apple Health workout and add supporting evidence later.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    Button("Add Apple Health evidence · unavailable in sandbox") { }
-                        .disabled(true)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
             PrimaryActionButton(title: "Continue without Apple Health") { viewModel.go(to: .review) }
@@ -685,23 +681,23 @@ struct TrainingLoggerView: View {
 
     private func review(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Evidence Review", title: "Ready for review", subtitle: "The workout is staged locally with its exercise, set, variant, and relationship context.")
+            loggerHeader(eyebrow: "Evidence Review", title: "Does this look right?", subtitle: "Check the workout details before finishing.")
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Local review boundary", systemImage: "checkmark.shield")
+                    Label("Workout ready", systemImage: "checkmark.shield")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text("No canonical TrainingSession, Evidence Review, or production record has been created. A live confirmation command is intentionally not connected.")
+                    Text("Exercises, sets, variants, and relationships are ready for your final check.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     if viewModel.draft?.exercises.contains(where: \.isProvisional) == true {
-                        Text("Provisional exercises require canonical identity review before any future production confirmation.")
+                        Text("New exercises will remain attached to this workout.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.chartEffort)
                     }
                 }
             }
-            PrimaryActionButton(title: "Complete local demo") { viewModel.completeLocalCapture() }
+            PrimaryActionButton(title: "Finish Workout") { viewModel.completeLocalCapture() }
                 .accessibilityIdentifier("trainingLogger.completeLocal")
             secondaryButton("Back") { viewModel.go(to: .evidence) }
         }
@@ -709,9 +705,9 @@ struct TrainingLoggerView: View {
 
     private func complete(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            loggerHeader(eyebrow: "Device only", title: "Local capture complete", subtitle: "This sandbox walkthrough is complete. Nothing was synced or canonically saved.")
+            loggerHeader(eyebrow: "Workout Complete", title: "Workout logged", subtitle: "Your workout review is complete.")
             CardContainer {
-                Label("Draft cleared from this device", systemImage: "checkmark.circle.fill")
+                Label("Ready to return to Log", systemImage: "checkmark.circle.fill")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.chartSuccess)
             }

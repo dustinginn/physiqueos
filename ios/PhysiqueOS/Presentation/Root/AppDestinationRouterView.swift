@@ -10,6 +10,7 @@ import SwiftUI
 struct AppDestinationRouterView: View {
     let destination: AppDestination
     var onReturnToLog: () -> Void = {}
+    var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
         switch destination {
@@ -18,11 +19,11 @@ struct AppDestinationRouterView: View {
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
-            EvidenceIntakeView()
+            EvidenceIntakeView(onNavigate: onNavigate)
         case .photoUpload:
-            EvidenceIntakeView(initialScenario: .progressPhotos)
+            EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
         case .dexaUpload:
-            EvidenceIntakeView(initialScenario: .dexa)
+            EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
         case .localEvidenceReview(let reviewId):
             LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog)
         case .evidenceReview(let reviewId):

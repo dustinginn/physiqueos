@@ -76,41 +76,10 @@ final class LoggingSandboxStore {
         guard interpretationState == .pending else {
             return .failure(.init(message: "No evidence is waiting for interpretation."))
         }
-        switch evidenceDraft.scenario {
-        case .ambiguous:
-            interpretationState = .ambiguous
-            return .success(nil)
-        case .needsMoreInformation:
-            interpretationState = .needsMoreInformation
-            return .success(nil)
-        case .unsupported:
-            interpretationState = .unsupported
-            return .success(nil)
-        case .localFailure:
-            interpretationState = .failed
-            return .success(nil)
-        default:
-            guard let category = evidenceDraft.scenario.category else { return .failure(.init(message: "No review category is available.")) }
-            return .success(createReview(category: category, scenario: evidenceDraft.scenario, now: now))
+        guard let category = evidenceDraft.scenario.category else {
+            return .failure(.init(message: "This upload could not be prepared for review."))
         }
-    }
-
-    func resolveAmbiguity(as category: EvidenceCategory, now: Date = Date()) -> String {
-        createReview(category: category, scenario: scenario(for: category), now: now,
-                     warning: "You resolved an ambiguous fixture classification. Verify every field before confirming.")
-    }
-
-    func continueAfterClarification(now: Date = Date()) -> Result<String, LoggingSandboxError> {
-        guard !evidenceDraft.clarification.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .failure(.init(message: "Add the missing context before continuing."))
-        }
-        return .success(createReview(category: .generic, scenario: .generic, now: now,
-                                     warning: "Additional context was supplied after the fixture requested more information."))
-    }
-
-    func continueUnsupportedAsGeneric(now: Date = Date()) -> String {
-        createReview(category: .generic, scenario: .generic, now: now,
-                     warning: "The source was not recognized. Only your description will be reviewed; no extracted facts are claimed.")
+        return .success(createReview(category: category, scenario: evidenceDraft.scenario, now: now))
     }
 
     func retryInterpretation() { interpretationState = .editing }
@@ -118,13 +87,12 @@ final class LoggingSandboxStore {
     func review(id: String) -> LocalEvidenceReview? {
         if let review = reviews[id] { return review }
         if id.hasPrefix("local-review-") { return nil }
-        // Web-backed pending fixture ids remain navigable without pretending
-        // their server record exists in this sandbox.
         var draft = EvidenceIntakeDraft.fresh()
-        draft.details = "Pending web review represented by a deterministic Native fixture."
-        draft.attachments = [.init(id: "fixture-file", displayName: "pending-upload.png", source: .photos)]
-        let fixture = LoggingSandboxFixtureFactory.review(id: id, category: .training, scenario: .training, draft: draft,
-            warning: "This pending item is a local fixture representation, not a fetched production review.")
+        draft.details = "Workout details from the selected upload."
+        draft.attachments = [.init(id: "pending-file", displayName: "workout-summary.png", source: .photos)]
+        let fixture = LoggingSandboxFixtureFactory.review(
+            id: id, category: .training, scenario: .training, draft: draft
+        )
         reviews[id] = fixture
         return fixture
     }
@@ -142,7 +110,7 @@ final class LoggingSandboxStore {
     func confirmReview(id: String) -> Result<LocalEvidenceReview, LoggingSandboxError> {
         guard var review = review(id: id) else { return .failure(.init(message: "This review is unavailable.")) }
         guard review.canConfirm else { return .failure(.init(message: "Complete required fields and include the evidence before confirming.")) }
-        review.status = .confirmedLocally
+        review.status = .confirmed
         reviews[id] = review
         evidenceDraft = .fresh()
         interpretationState = .editing
@@ -157,28 +125,14 @@ final class LoggingSandboxStore {
     private func createReview(
         category: EvidenceCategory,
         scenario: EvidenceFixtureScenario,
-        now: Date,
-        warning: String? = nil
+        now: Date
     ) -> String {
         let id = "local-review-\(UUID().uuidString)"
         reviews[id] = LoggingSandboxFixtureFactory.review(
-            id: id, category: category, scenario: scenario, draft: evidenceDraft, now: now, warning: warning
+            id: id, category: category, scenario: scenario, draft: evidenceDraft, now: now
         )
         interpretationState = .ready(reviewId: id)
         return id
-    }
-
-    private func scenario(for category: EvidenceCategory) -> EvidenceFixtureScenario {
-        switch category {
-        case .training: .training
-        case .nutrition: .nutrition
-        case .weight: .weight
-        case .activity: .activity
-        case .dexa: .dexa
-        case .progressPhotos: .progressPhotos
-        case .recovery: .recovery
-        case .generic: .generic
-        }
     }
 
     static func dateKey(_ date: Date) -> String {

@@ -44,7 +44,6 @@ enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
     case activity
     case dexa
     case progressPhotos = "progress_photos"
-    case recovery
     case generic
 
     var id: String { rawValue }
@@ -57,8 +56,7 @@ enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
         case .activity: "Activity"
         case .dexa: "DEXA"
         case .progressPhotos: "Progress Photos"
-        case .recovery: "Energy / Recovery"
-        case .generic: "Generic Evidence"
+        case .generic: "Evidence"
         }
     }
 
@@ -70,7 +68,6 @@ enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
         case .activity: "figure.walk"
         case .dexa: "doc.text.fill"
         case .progressPhotos: "camera.fill"
-        case .recovery: "heart.text.square.fill"
         case .generic: "tray.full.fill"
         }
     }
@@ -84,12 +81,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
     case activity
     case dexa
     case progressPhotos = "progress_photos"
-    case recovery
     case generic
-    case ambiguous
-    case needsMoreInformation = "needs_more_information"
-    case unsupported
-    case localFailure = "local_failure"
 
     var id: String { rawValue }
 
@@ -102,12 +94,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
         case .activity: "Apple Activity summary"
         case .dexa: "DEXA report"
         case .progressPhotos: "Progress photos"
-        case .recovery: "Energy / recovery"
-        case .generic: "Generic evidence"
-        case .ambiguous: "Ambiguous"
-        case .needsMoreInformation: "Needs more information"
-        case .unsupported: "Unsupported / unrecognized"
-        case .localFailure: "Local processing failure"
+        case .generic: "Evidence"
         }
     }
 
@@ -119,9 +106,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
         case .activity: .activity
         case .dexa: .dexa
         case .progressPhotos: .progressPhotos
-        case .recovery: .recovery
         case .generic: .generic
-        case .ambiguous, .needsMoreInformation, .unsupported, .localFailure: nil
         }
     }
 }
@@ -140,10 +125,6 @@ struct SandboxAttachment: Codable, Equatable, Identifiable {
 enum EvidenceInterpretationState: Equatable {
     case editing
     case pending
-    case ambiguous
-    case needsMoreInformation
-    case unsupported
-    case failed
     case ready(reviewId: String)
 }
 
@@ -152,15 +133,13 @@ struct EvidenceIntakeDraft: Codable, Equatable {
     var details: String
     var attachments: [SandboxAttachment]
     var scenario: EvidenceFixtureScenario
-    var clarification: String
 
     static func fresh(now: Date = Date()) -> Self {
         .init(
             occurrenceDate: now,
             details: "",
             attachments: [],
-            scenario: .training,
-            clarification: ""
+            scenario: .training
         )
     }
 
@@ -187,7 +166,7 @@ struct EvidenceReviewField: Codable, Equatable, Identifiable {
 
 enum LocalEvidenceReviewStatus: String, Codable, Equatable {
     case awaitingConfirmation
-    case confirmedLocally
+    case confirmed
 }
 
 struct LocalEvidenceReview: Codable, Equatable, Identifiable {
@@ -195,17 +174,11 @@ struct LocalEvidenceReview: Codable, Equatable, Identifiable {
     var category: EvidenceCategory
     var title: String
     var occurrenceDate: Date
-    var addedAt: Date
     var sourceAssets: [SandboxAttachment]
     var typedDetails: String
-    var confidence: String
-    var provenance: String
     var fields: [EvidenceReviewField]
-    var notes: String
     var included: Bool
-    var correctionNote: String
     var status: LocalEvidenceReviewStatus
-    var warning: String?
 
     var hasRequiredValues: Bool {
         fields.allSatisfy(\.isValid)
@@ -220,112 +193,84 @@ enum LoggingSandboxFixtureFactory {
         category: EvidenceCategory,
         scenario: EvidenceFixtureScenario,
         draft: EvidenceIntakeDraft,
-        now: Date = Date(),
-        warning: String? = nil
+        now _: Date = Date()
     ) -> LocalEvidenceReview {
         let title: String
-        let confidence: String
         let fields: [EvidenceReviewField]
         switch category {
         case .training:
             let cardio = scenario == .cardio
             title = cardio ? "Stair Stepper" : "Detailed strength workout"
-            confidence = cardio ? "Medium · type recognized; duration editable" : "High · exercise names need your review"
             fields = cardio ? [
-                field("activityType", "Activity type", "Stair Stepper"),
                 field("duration", "Duration", "42", "min"),
                 field("activeCalories", "Active calories", "386", "cal", required: false),
                 field("heartRate", "Average heart rate", "128", "bpm", required: false),
-                field("healthLink", "Apple Health relationship", "Not linked in sandbox", required: false),
+                field("source", "Source", "Apple Health", required: false),
             ] : [
-                field("activityType", "Activity type", "Traditional Strength Training"),
-                field("exercise1", "Exercise 1", "Bench Press · 3 sets"),
-                field("exercise2", "Exercise 2", "Cable Fly · 3 sets"),
-                field("variant", "Execution variant", "Standard"),
-                field("relationship", "Exercise relationship", "Standalone · no Superset"),
+                field("exercises", "Exercises", "2"),
+                field("sets", "Sets", "6"),
                 field("duration", "Apple duration", "Unavailable", required: false),
-                field("healthLink", "Apple Health relationship", "Not linked in sandbox", required: false),
+                field("activeCalories", "Active calories", "Unavailable", required: false),
+                field("appleLink", "Apple link", "Not linked", required: false),
+                field("source", "Source", "Submitted evidence", required: false),
+                field("benchPress", "Bench Press", "3 sets · Standard"),
+                field("cableFly", "Cable Fly", "3 sets"),
             ]
         case .nutrition:
-            title = "Nutrition Day"
-            confidence = "Medium · screenshot interpretation fixture"
+            title = "Nutrition"
             fields = [
-                field("meal", "Meal / day context", "Full day summary"),
-                field("calories", "Calories", "2475", "kcal"),
+                field("calories", "Calories", "2475", "cal"),
                 field("protein", "Protein", "188", "g"),
-                field("carbs", "Carbohydrates", "262", "g"),
+                field("carbs", "Carbs", "262", "g"),
                 field("fat", "Fat", "71", "g"),
-                field("reconciliation", "Existing-day handling", "Replace existing / add distinct meal"),
+                field("source", "Source", "Screenshot + Typed evidence", required: false),
+                field("meals", "Meals", "Breakfast · Lunch · Dinner"),
             ]
         case .weight:
-            title = "Uploaded Weight Evidence"
-            confidence = "Medium · value must be confirmed"
+            title = "Weight"
             fields = [
-                field("weight", "Reviewed weight", "166.8", "lb"),
-                field("sourceConcept", "Source", "Scale screenshot", required: false),
+                field("weight", "Weight", "166.8", "lb"),
+                field("source", "Source", "Screenshot", required: false),
             ]
         case .activity:
-            title = "Daily Activity"
-            confidence = "High · Apple Activity summary fixture"
+            title = "Activity"
             fields = [
                 field("activeCalories", "Active calories", "742", "cal"),
                 field("exerciseMinutes", "Exercise", "64", "min"),
-                field("standHours", "Stand", "12", "hr", required: false),
-                field("separateWorkouts", "Separately owned workouts", "2 referenced · not imported", required: false),
+                field("duration", "Duration", "16", "hr", required: false),
+                field("source", "Source", "Screenshot", required: false),
             ]
         case .dexa:
-            title = "DEXA Scan"
-            confidence = "Medium · PDF fields require confirmation"
+            title = "DEXA"
             fields = [
-                field("totalMass", "Total mass", "171.4", "lb"),
-                field("bodyFat", "Body fat", "8.3", "%"),
-                field("fatMass", "Fat mass", "14.3", "lb"),
+                field("totalMass", "Weight", "171.4", "lb"),
                 field("leanMass", "Lean mass", "150.0", "lb"),
-                field("bmc", "Bone mineral content", "7.1", "lb"),
-                field("rmr", "Resting metabolic rate", "1836", "kcal/day", required: false),
-                field("vatMass", "VAT mass", "0.44", "lb", required: false),
-                field("vatVolume", "VAT volume", "12.9", "in³", required: false),
+                field("fatMass", "Fat mass", "14.3", "lb"),
+                field("bodyFat", "Body fat", "8.3", "%"),
+                field("source", "Source", "Submitted evidence", required: false),
             ]
         case .progressPhotos:
-            title = "Progress Photo Session"
-            confidence = "User supplied · poses remain editable"
+            title = "Progress Photos"
             fields = [
-                field("grouping", "Session grouping", "One capture session"),
-                field("front", "Photo 1 orientation", "Front relaxed"),
-                field("side", "Photo 2 orientation", "Side relaxed"),
-                field("rear", "Photo 3 orientation", "Rear relaxed", required: false),
+                field("poses", "Poses", "3 photos · Front Relaxed, Side Relaxed, Rear Relaxed"),
                 field("timeOfDay", "Time of day", "Morning", required: false),
-                field("goalRelationship", "Goal relationship", "No Goal relationship in sandbox", required: false),
-            ]
-        case .recovery:
-            title = "Energy / Recovery"
-            confidence = "Medium · generic source-supported interpretation"
-            fields = [
-                field("energy", "Energy", "7", "/ 10"),
-                field("sleep", "Sleep", "7.5", "hr", required: false),
-                field("soreness", "Soreness", "Low", required: false),
+                field("goalRelationship", "Goal relationship", "Visible Abs", required: false),
+                field("source", "Source", "Submitted evidence", required: false),
             ]
         case .generic:
-            title = "Generic Evidence"
-            confidence = "Unclassified · no AI certainty claimed"
-            fields = [field("description", "What this evidence shows", draft.details)]
+            title = "Evidence"
+            fields = [field("description", "Details", draft.details)]
         }
         return .init(
             id: id,
             category: category,
             title: title,
             occurrenceDate: draft.occurrenceDate,
-            addedAt: now,
             sourceAssets: draft.attachments,
             typedDetails: draft.details,
-            confidence: confidence,
-            provenance: "Device-only fixture interpretation · source evidence retained",
             fields: fields,
-            notes: "",
             included: true,
-            correctionNote: "",
-            status: .awaitingConfirmation,
-            warning: warning
+            status: .awaitingConfirmation
         )
     }
 

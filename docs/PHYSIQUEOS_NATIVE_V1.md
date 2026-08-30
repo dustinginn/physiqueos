@@ -1750,6 +1750,13 @@ infrastructure, paid service, or incremental cost was introduced.
 
 ## 62. Native logging-completeness sandbox milestone (2026-08-30)
 
+> **Historical implementation note — not accepted as product UX.** The initial
+> implementation described in this section overexposed fixture, classification,
+> provenance, and authority mechanics. Its user-facing state inventory is
+> superseded by section 63. Retained value from this checkpoint is limited to
+> typed navigation, attachment handling, date/draft state, review separation,
+> validation, and the Workout Logger interaction fixes.
+
 This milestone starts from accepted local `native-v1` tip `9ee94a8` (including
 fixture-backed Workout Logger `a64cce7`) and makes every meaningful current web
 Log/evidence-ingestion path representable in the Native sandbox. The Native
@@ -1888,3 +1895,62 @@ The source-controlled candidate build number for this complete logging milestone
 is 4. Marketing version 1.0, bundle id `com.physiqueos.native.dev`, AppIcon,
 signing, and `ITSAppUsesNonExemptEncryption = false` remain unchanged. Build 4
 must not be uploaded until Founder simulator/screenshot review is accepted.
+
+## 63. Source-grounded logging reconciliation and subtraction (2026-08-30)
+
+Build 4 was not accepted for TestFlight. A direct re-audit of current web
+`LogHubScreen`, `UploadAnythingForm`, Morning Check-In, `EvidenceReviewScreen`,
+the review presentation/experience/success services, and the dedicated DEXA
+and Progress Photo upload surfaces established the actual product contract:
+
+| Real web surface | Reconciled Native behavior |
+|---|---|
+| Log hub | Keeps Logged Today, pending uploads, Training Logger, Morning Weigh-In, and Upload entry points. |
+| Morning Check-In | Presents today’s lb weight, 50–1,000 validation, same-day correction/no-op context, Save Weight, and standard back navigation. Direct historical/date and kg controls were removed because current Morning Check-In does not expose them. |
+| Upload | Offers Photos and Files, multi-selection, selected-file removal, typed details, and “When did this happen?” using the event date. A note may be submitted without a file. |
+| Upload preparation | Submit transitions directly to review. Internal deterministic example selection is not shown to the user. |
+| Evidence Review | Uses “Does this look right?”, occurrence date, type-specific web presentation metrics, Included/Excluded, include/exclude, Ready to add, Save included evidence, Read upload again, Save and return later, and Discard review. |
+| Training review | Shows the web-backed workout title, exercise/set summary, duration/calorie/link/source context. The separate Workout Logger remains the detailed set-entry workflow. |
+| Nutrition review | Shows calories, protein, carbs, fat, source, and meal summary. Same-date replace/additive behavior remains a live-integration requirement. |
+| Weight review | Shows uploaded weight and source, distinct from typed Morning Check-In. |
+| Activity review | Shows active calories, exercise minutes, duration, and source. |
+| DEXA review | Shows only the shared review presentation fields: weight, lean mass, fat mass, body fat, and source. The dedicated web DEXA entry surface owns its additional confirmed input fields. |
+| Progress Photos review | Shows poses, session time, Goal relationship, and source. Dedicated pose/session editing remains a live-integration requirement. |
+| Generic review | Uses the web fallback card for retained scalar/details content. |
+| Completion | Uses a quiet Review Complete state and Continue. It does not claim that history, Health, or a remote service changed. |
+
+The dedicated Native ambiguity chooser, more-information form, unsupported
+classification screen, generic processing framework, confidence/provenance
+dashboard, added-at metadata panel, correction-note form, and technical local/
+canonical/production receipts were removed. Current web source does not expose
+those as normal Log or Evidence Review product workflows. Internal safety and
+fixture mechanics remain implementation concerns in code/tests rather than
+normal product copy.
+
+Historical semantics remain where web exposes them: Upload’s date is the date
+the workout, meal, scan, activity, measurement, or photo happened. The current
+Morning Check-In itself remains today-only. Photos and Files remain first-class
+Native pickers, and one intake retains ordered multi-asset selection and removal.
+
+The approved Workout Logger interaction work is unchanged: Finish Workout is
+hidden while a numeric editor owns the keyboard, populated reps/load selects all
+on focus, and either field may be cleared to a true empty edit buffer.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Connect Morning Check-In to its authenticated same-day weight command and
+  existing-entry correction semantics.
+- Upload selected media/notes through the authorized evidence intake boundary,
+  preserve event/upload timestamps, and fetch the staged review.
+- Decode server-owned type-specific review data and item decisions; connect
+  re-read, discard, type-specific correction, confirmation, and success routing.
+- Preserve existing Nutrition same-date reconciliation, Training identity/
+  variant/Superset resolution, DEXA validation, Progress Photo pose/session
+  review, and Apple Health reconciliation in their current backend owners.
+- Add an approved durable draft policy before relying on intake state across
+  process termination.
+
+No backend, production data, production worktree, deployment, HealthKit sync,
+or TestFlight upload changed. The next review candidate is build 5; version 1.0,
+bundle id `com.physiqueos.native.dev`, signing, AppIcon, and the non-exempt-
+encryption declaration remain unchanged.
