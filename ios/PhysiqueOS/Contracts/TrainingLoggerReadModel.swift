@@ -44,6 +44,7 @@ struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     var measurement: TrainingLoggerMeasurement
     var previouslyPerformed: Bool
     var history: [TrainingLoggerHistoryRecord]
+    var progressionRecommendation: TrainingLoggerProgressionRecommendation?
 
     var historyOccurrences: [TrainingExerciseHistoryOccurrence] {
         history.map { record in
@@ -108,6 +109,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
         exercises.flatMap(\.sets).filter(\.isCompleted).count
     }
 
+    var totalSetCount: Int {
+        exercises.reduce(0) { $0 + $1.sets.count }
+    }
+
     var variantCount: Int { exercises.filter { $0.executionVariant != nil }.count }
     var supersetCount: Int { relationships.count }
 }
@@ -121,6 +126,8 @@ struct TrainingLoggerDraftExercise: Codable, Equatable, Identifiable {
     var executionVariant: TrainingExecutionVariant?
     var sets: [TrainingLoggerDraftSet]
     var previousPerformance: TrainingLoggerPreviousPerformance?
+    var progressionRecommendation: TrainingLoggerProgressionRecommendation?
+    var progressionChoice: TrainingLoggerProgressionChoice?
     var isProvisional: Bool
     var provenance: String?
 }
@@ -184,6 +191,34 @@ struct TrainingLoggerPreviousPerformance: Codable, Equatable {
     var compactSummary: String {
         sets.map(\.glance).joined(separator: " · ")
     }
+
+    var compactLine: String {
+        "Previous \(sets.first?.glance ?? compactSummary) · \(workoutDate) · \(contextLabel)"
+    }
+}
+
+enum TrainingLoggerProgressionState: String, Codable, Equatable {
+    case opportunity
+    case maintain
+    case recover
+}
+
+enum TrainingLoggerProgressionChoice: String, Codable, Equatable {
+    case suggestion
+    case previous
+}
+
+struct TrainingLoggerProgressionRecommendation: Codable, Equatable {
+    var state: TrainingLoggerProgressionState
+    var eyebrow: String
+    var message: String
+    var prescription: String
+    var suggestedLoad: Double?
+    var suggestedReps: Double?
+
+    var hasExplicitTarget: Bool {
+        suggestedLoad != nil && suggestedReps != nil
+    }
 }
 
 struct TrainingLoggerDraftRelationship: Codable, Equatable, Identifiable {
@@ -235,6 +270,8 @@ extension TrainingLoggerDraft {
             executionVariant: nil,
             sets: sets,
             previousPerformance: previous,
+            progressionRecommendation: previous == nil ? nil : catalogExercise.progressionRecommendation,
+            progressionChoice: previous == nil || catalogExercise.progressionRecommendation == nil ? nil : .previous,
             isProvisional: false,
             provenance: nil
         ))
@@ -253,6 +290,8 @@ extension TrainingLoggerDraft {
             executionVariant: nil,
             sets: (1...3).map(TrainingLoggerDraftSet.empty),
             previousPerformance: nil,
+            progressionRecommendation: nil,
+            progressionChoice: nil,
             isProvisional: true,
             provenance: "User-entered during local Native workout capture; requires canonical review."
         ))
@@ -292,6 +331,34 @@ extension TrainingLoggerDraft {
         refreshPreviousPerformance(at: index, catalog: catalog)
     }
 
+    mutating func applyProgressionSuggestion(to exerciseId: String) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }),
+              let recommendation = exercises[index].progressionRecommendation,
+              recommendation.hasExplicitTarget,
+              let suggestedReps = recommendation.suggestedReps,
+              let suggestedLoad = recommendation.suggestedLoad else { return }
+        exercises[index].progressionChoice = .suggestion
+        for setIndex in exercises[index].sets.indices {
+            exercises[index].sets[setIndex].reps = suggestedReps
+            exercises[index].sets[setIndex].load = suggestedLoad
+            exercises[index].sets[setIndex].isCompleted = false
+        }
+    }
+
+    mutating func keepPreviousPerformance(for exerciseId: String) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }),
+              let previous = exercises[index].previousPerformance,
+              !previous.sets.isEmpty else { return }
+        exercises[index].progressionChoice = .previous
+        for setIndex in exercises[index].sets.indices {
+            let source = previous.sets[min(setIndex, previous.sets.count - 1)]
+            exercises[index].sets[setIndex].reps = source.reps
+            exercises[index].sets[setIndex].load = source.weight
+            exercises[index].sets[setIndex].durationSeconds = source.durationSeconds
+            exercises[index].sets[setIndex].isCompleted = false
+        }
+    }
+
     mutating func setSuperset(firstId: String, secondId: String, catalog: [TrainingLoggerCatalogExercise]) {
         guard firstId != secondId,
               exercises.contains(where: { $0.id == firstId }),
@@ -320,6 +387,8 @@ extension TrainingLoggerDraft {
         exercises[index].measurement = replacement.measurement
         exercises[index].executionVariant = nil
         exercises[index].previousPerformance = previous
+        exercises[index].progressionRecommendation = previous == nil ? nil : replacement.progressionRecommendation
+        exercises[index].progressionChoice = previous == nil || replacement.progressionRecommendation == nil ? nil : .previous
         exercises[index].sets = previous?.sets.enumerated().map { TrainingLoggerDraftSet(source: $0.element, number: $0.offset + 1) }
             ?? (1...3).map(TrainingLoggerDraftSet.empty)
         exercises[index].isProvisional = false
@@ -372,5 +441,11 @@ extension TrainingLoggerDraft {
             variant: exercises[index].executionVariant,
             relationship: relationshipContext(for: exercises[index].id)
         )
+        let relationship = relationshipContext(for: exercises[index].id)
+        let canRecommend = exercises[index].previousPerformance != nil
+            && exercises[index].executionVariant == nil
+            && relationship == nil
+        exercises[index].progressionRecommendation = canRecommend ? item.progressionRecommendation : nil
+        exercises[index].progressionChoice = exercises[index].progressionRecommendation == nil ? nil : .previous
     }
 }

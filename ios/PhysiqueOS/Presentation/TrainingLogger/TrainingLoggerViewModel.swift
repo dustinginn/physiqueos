@@ -54,6 +54,13 @@ final class TrainingLoggerViewModel {
         draft = nil
     }
 
+    func cancelWorkout() {
+        draftStore.discard()
+        savedDraft = nil
+        draft = nil
+        validationMessage = nil
+    }
+
     func update(_ mutation: (inout TrainingLoggerDraft) -> Void) {
         guard var draft else { return }
         mutation(&draft)
@@ -119,6 +126,18 @@ final class TrainingLoggerViewModel {
         configuration?.areas.first(where: { $0.id == id })?.label ?? id.capitalized
     }
 
+    func isSelected(_ exercise: TrainingLoggerCatalogExercise) -> Bool {
+        draft?.exercises.contains(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) == true
+    }
+
+    var selectionPresentation: TrainingLoggerSelectionPresentation {
+        TrainingLoggerSelectionPresentation(draft: draft)
+    }
+
+    var workoutPresentation: TrainingLoggerWorkoutPresentation? {
+        draft.map(TrainingLoggerWorkoutPresentation.init)
+    }
+
     static func dateKey(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -126,5 +145,38 @@ final class TrainingLoggerViewModel {
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+}
+
+struct TrainingLoggerSelectionPresentation: Equatable {
+    var selectedCount: Int
+    var startTitle: String
+    var canStart: Bool
+
+    init(draft: TrainingLoggerDraft?) {
+        selectedCount = draft?.exercises.count ?? 0
+        startTitle = "Start logging · \(selectedCount) selected"
+        canStart = selectedCount > 0
+    }
+}
+
+struct TrainingLoggerWorkoutPresentation: Equatable {
+    var eyebrow: String
+    var context: String
+    var progress: String
+    var completedSetCount: Int
+    var totalSetCount: Int
+    var canFinish: Bool
+
+    init(_ draft: TrainingLoggerDraft) {
+        let exerciseLabel = "\(draft.exercises.count) exercise\(draft.exercises.count == 1 ? "" : "s")"
+        eyebrow = draft.mode == .live ? "Workout in progress" : "Past workout entry"
+        context = draft.mode == .live
+            ? "Started now · \(exerciseLabel)"
+            : "\(draft.workoutDate) · \(exerciseLabel)"
+        completedSetCount = draft.completedSetCount
+        totalSetCount = draft.totalSetCount
+        progress = "\(completedSetCount)/\(totalSetCount) sets"
+        canFinish = completedSetCount > 0 && draft.validationMessages().isEmpty
     }
 }

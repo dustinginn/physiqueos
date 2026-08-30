@@ -44,6 +44,27 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(draft.pickerExercises(in: config.exercises, browseAll: true, query: "lateral").map(\.name), ["Dumbbell Lateral Raise"])
     }
 
+    func testExerciseSelectionPresentationTracksSelectedStateCountAndCTA() async throws {
+        let config = try await configuration()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        var draft = draft()
+        var presentation = TrainingLoggerSelectionPresentation(draft: draft)
+        XCTAssertEqual(presentation.selectedCount, 0)
+        XCTAssertEqual(presentation.startTitle, "Start logging · 0 selected")
+        XCTAssertFalse(presentation.canStart)
+        draft.addExercise(bench)
+        draft.addExercise(fly)
+        XCTAssertTrue(draft.exercises.contains { $0.canonicalExerciseId == bench.canonicalExerciseId })
+        XCTAssertFalse(draft.exercises.contains { $0.canonicalExerciseId == "push-ups" })
+        presentation = TrainingLoggerSelectionPresentation(draft: draft)
+        XCTAssertEqual(presentation.selectedCount, 2)
+        XCTAssertEqual(presentation.startTitle, "Start logging · 2 selected")
+        XCTAssertTrue(presentation.canStart)
+        draft.removeExercise(id: draft.exercises[0].id)
+        XCTAssertEqual(TrainingLoggerSelectionPresentation(draft: draft).selectedCount, 1)
+    }
+
     func testAddingExerciseReusesExactPreviousPerformanceAndPrepopulatesSets() async throws {
         let config = try await configuration()
         let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
@@ -55,6 +76,29 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(exercise.sets.map(\.reps), [8, 8, 7])
         XCTAssertEqual(exercise.sets.map(\.load), [135, 135, 135])
         XCTAssertTrue(exercise.sets.allSatisfy { !$0.isCompleted })
+        XCTAssertEqual(exercise.previousPerformance?.compactLine, "Previous 8 x 135 lb · 2026-08-25 · Ordinary · Standalone")
+    }
+
+    func testLiveAndPastWorkoutPresentationUseOperationalIdentity() async throws {
+        let config = try await configuration()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        var live = draft()
+        live.addExercise(bench)
+        var livePresentation = TrainingLoggerWorkoutPresentation(live)
+        XCTAssertEqual(livePresentation.eyebrow, "Workout in progress")
+        XCTAssertEqual(livePresentation.context, "Started now · 1 exercise")
+        XCTAssertEqual(livePresentation.progress, "0/3 sets")
+        XCTAssertFalse(livePresentation.canFinish)
+        live.exercises[0].sets[0].isCompleted = true
+        livePresentation = TrainingLoggerWorkoutPresentation(live)
+        XCTAssertEqual(livePresentation.progress, "1/3 sets")
+        XCTAssertTrue(livePresentation.canFinish)
+
+        var past = draft(mode: .past, date: "2026-08-28")
+        past.addExercise(bench)
+        let pastPresentation = TrainingLoggerWorkoutPresentation(past)
+        XCTAssertEqual(pastPresentation.eyebrow, "Past workout entry")
+        XCTAssertEqual(pastPresentation.context, "2026-08-28 · 1 exercise")
     }
 
     func testPreviousPerformanceIsStrictlyBeforePastWorkoutDate() async throws {
@@ -79,6 +123,25 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(draft.exercises.first?.previousPerformance?.contextLabel, "Slow Eccentric")
         draft.applyVariant(nil, to: id, catalog: config.exercises)
         XCTAssertNil(draft.exercises.first?.previousPerformance)
+    }
+
+    func testProgressionSuggestionAppearsOnlyForExplicitExactComparableContext() async throws {
+        let config = try await configuration()
+        let pushdown = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-triceps-pushdown" })
+        let variant = try XCTUnwrap(config.variants.first)
+        var draft = draft(areas: ["triceps"])
+        draft.addExercise(pushdown)
+        let exerciseId = try XCTUnwrap(draft.exercises.first?.id)
+        XCTAssertEqual(draft.exercises.first?.progressionRecommendation?.eyebrow, "Maintain current performance")
+        XCTAssertEqual(draft.exercises.first?.progressionChoice, .previous)
+        draft.applyProgressionSuggestion(to: exerciseId)
+        XCTAssertEqual(draft.exercises.first?.progressionChoice, .suggestion)
+        XCTAssertEqual(draft.exercises.first?.sets.map(\.reps), [12, 12, 12])
+        XCTAssertEqual(draft.exercises.first?.sets.map(\.load), [50, 50, 50])
+        draft.applyVariant(variant, to: exerciseId, catalog: config.exercises)
+        XCTAssertNil(draft.exercises.first?.previousPerformance)
+        XCTAssertNil(draft.exercises.first?.progressionRecommendation)
+        XCTAssertNil(draft.exercises.first?.progressionChoice)
     }
 
     func testSupersetComparisonIsolationUsesCanonicalPartnerIdentity() async throws {
@@ -194,6 +257,21 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertNil(store.load())
     }
 
+    @MainActor
+    func testSaveAndLeavePersistsWhileCancelDiscardsLocalDraft() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: store)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        XCTAssertNotNil(store.load())
+        viewModel.persist()
+        XCTAssertNotNil(store.load(), "Save & Leave must retain the current device-only draft.")
+        viewModel.cancelWorkout()
+        XCTAssertNil(store.load(), "Cancel must intentionally discard the local draft.")
+        XCTAssertNil(viewModel.draft)
+        XCTAssertNil(viewModel.savedDraft)
+    }
+
     func testSummaryCountsOnlyCompletedSetsAndRealContext() async throws {
         let config = try await configuration()
         var draft = draft()
@@ -211,11 +289,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwoInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildThreeInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "2")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "3")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

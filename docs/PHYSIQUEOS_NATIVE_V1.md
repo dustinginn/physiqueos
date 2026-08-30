@@ -1682,3 +1682,68 @@ integration phase.
 production API/authentication, worker/outbox, deployment, shared backend/domain
 authority, canonical data, or TestFlight upload was touched. No new dependency,
 service, entitlement, infrastructure, or incremental paid cost was introduced.
+
+## 61. Native Workout Logger operational-density refinement (2026-08-30)
+
+Refines the accepted fixture-backed Logger from `a64cce7` without rebuilding
+its capture, identity, draft, history-comparison, variant, relationship, or
+evidence contracts. The web remains the product/behavior reference, while the
+rendering deliberately follows iPhone conventions for high-frequency entry.
+
+**Exercise selection.** The picker now presents full-width, full-row tappable
+exercise choices with name, Training Area, equipment, and an explicit circle
+or purple checked state. Performed exercises remain first; search, broader
+registry access, and provisional Add New Exercise remain available without
+dominating the normal path. The selected count appears both beside the section
+label and in a persistent safe-area action, `Start logging · N selected`, which
+is disabled at zero and remains reachable while the list scrolls.
+
+**Operational workout identity and density.** Set entry no longer presents as
+wizard step 3. Live capture says `Workout in progress`, `Training Logger`,
+`Started now · N exercises`; historical capture says `Past workout entry` with
+the selected calendar date. Both show completed/total set progress and a compact
+progress bar. Exercise cards remove nested previous-performance chrome, reduce
+outer/card/row spacing, use table-like 42-point set rows, and keep Done as a
+comfortable Native target. A normal three-set card is materially shorter while
+retaining exercise context, strict comparable history, actions, set number,
+reps/load/unit, remove, and Add Set.
+
+**Source-backed progression guidance.** The synthetic Cable Triceps Pushdown
+fixture carries the current web fixture's explicit maintain recommendation:
+`Repeat 50 lb × 12 with clean reps`, with Use suggestion and Keep previous.
+Guidance is exposed only for its exact ordinary/standalone comparable context;
+applying a variant or superset invalidates both the comparable occurrence and
+recommendation. Bench Press with 3-Second Pause continues to state honestly
+that no comparable prior performance exists. No Native recommendation is
+calculated or invented.
+
+**Draft exit and completion.** Save & Leave persists the device-only draft and
+returns to Log. Cancel Workout is a separate destructive action with a native
+confirmation that explains it discards local set edits. Navigation disappearance
+continues to persist rather than discard an active draft, so standard back or
+interactive-pop behavior cannot silently erase work. Finish Workout is a
+persistent safe-area action above the floating tab bar and software keyboard;
+it enables only after at least one valid completed set and continues into the
+unchanged summary, Apple Health, and local Evidence Review boundaries.
+
+**Release and verification boundary.** Marketing version remains 1.0, bundle
+id remains `com.physiqueos.native.dev`, AppIcon/signing/export-compliance
+settings remain unchanged, and the source-controlled app build number advances
+from 2 to the next unique candidate, 3. Unit coverage adds selection/CTA state,
+live/past identity, completed/total progress, compact previous context,
+context-gated progression, finish eligibility, and Save & Leave versus Cancel
+semantics. XCUITest is neither run nor modified. The Training → Evidence
+interactive-pop bridge remains unchanged; physical edge-swipe acceptance stays
+a real-device/TestFlight check.
+
+**POST-STABILIZATION INTEGRATION REQUIREMENTS.** Live progression guidance must
+come from the existing server-owned progression service with exact comparison
+context and provenance. Live save/cancel/finish must use the authenticated,
+canonical confirmation pipeline and server-owned draft policy. HealthKit and
+Evidence Review remain future approved integrations; Native must not become
+canonical authority.
+
+**Production and cost.** No production worktree, backend/domain architecture,
+DigitalOcean, PostgreSQL, authentication, worker/outbox, deployment, canonical
+data, or TestFlight upload was touched. No new dependency, entitlement,
+infrastructure, paid service, or incremental cost was introduced.

@@ -7,6 +7,7 @@ struct TrainingLoggerView: View {
     @State private var pastWorkoutDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
     @State private var provisionalName = ""
     @State private var provisionalAreaId = ""
+    @State private var showingCancelWorkoutConfirmation = false
 
     var body: some View {
         Group {
@@ -28,7 +29,7 @@ struct TrainingLoggerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .toolbar {
-            if let viewModel, let draft = viewModel.draft, draft.step != .complete {
+            if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save & Leave") {
                         viewModel.persist()
@@ -69,7 +70,44 @@ struct TrainingLoggerView: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
         }
+        .scrollDismissesKeyboard(.interactively)
         .physiqueOSScrollBottomClearance()
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            persistentAction(viewModel)
+        }
+    }
+
+    @ViewBuilder
+    private func persistentAction(_ viewModel: TrainingLoggerViewModel) -> some View {
+        switch viewModel.draft?.step {
+        case .exercises:
+            let presentation = viewModel.selectionPresentation
+            persistentActionBar {
+                PrimaryActionButton(title: presentation.startTitle, isEnabled: presentation.canStart) {
+                    viewModel.continueFromExercises()
+                }
+                .accessibilityIdentifier("trainingLogger.startLogging")
+            }
+        case .workout:
+            let presentation = viewModel.workoutPresentation
+            persistentActionBar {
+                PrimaryActionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
+                    viewModel.reviewWorkout()
+                }
+                .accessibilityIdentifier("trainingLogger.finishWorkout")
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func persistentActionBar<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .top) { Divider().overlay(PhysiqueOSTheme.divider) }
     }
 
     private func entry(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -158,8 +196,8 @@ struct TrainingLoggerView: View {
     }
 
     private func exercisePicker(_ viewModel: TrainingLoggerViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            stepHeader(viewModel, step: "2 of 3", title: "Choose exercises", subtitle: "Previously performed movements appear first. Browse the registry only when needed.")
+        VStack(alignment: .leading, spacing: 12) {
+            stepHeader(viewModel, step: "2 of 3", title: "Choose exercises", subtitle: "Performed exercises first")
 
             TextField("Search exercises", text: Binding(
                 get: { viewModel.searchText },
@@ -171,64 +209,41 @@ struct TrainingLoggerView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .accessibilityIdentifier("trainingLogger.exerciseSearch")
 
-            if let selected = viewModel.draft?.exercises, !selected.isEmpty {
-                CardContainer {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Selected · \(selected.count)")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        ForEach(selected) { exercise in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(exercise.name)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    Text(exercise.isProvisional ? "Provisional · review required" : viewModel.areaLabel(exercise.areaId))
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(exercise.isProvisional ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.textMuted)
-                                }
-                                Spacer()
-                                Button { viewModel.update { $0.removeExercise(id: exercise.id) } } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                }
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                .accessibilityLabel("Remove \(exercise.name)")
-                            }
-                        }
-                    }
-                }
-            }
-
             VStack(alignment: .leading, spacing: 8) {
-                Text(viewModel.isBrowsingAllExercises ? "Exercise registry" : "Previously performed")
-                    .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                HStack {
+                    Text(viewModel.isBrowsingAllExercises ? "Exercise registry" : "Previously performed")
+                        .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    Spacer()
+                    Text("\(viewModel.selectionPresentation.selectedCount) selected")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                }
                 ForEach(viewModel.pickerExercises()) { exercise in
+                    exerciseSelectionRow(exercise, viewModel: viewModel)
+                }
+                ForEach(viewModel.draft?.exercises.filter(\.isProvisional) ?? []) { exercise in
                     Button {
-                        viewModel.update { $0.addExercise(exercise) }
+                        viewModel.update { $0.removeExercise(id: exercise.id) }
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "plus.circle.fill").foregroundStyle(PhysiqueOSTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(exercise.name)
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text([viewModel.areaLabel(exercise.areaId), exercise.equipment].compactMap { $0 }.joined(separator: " · "))
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 9)
+                        exerciseSelectionLabel(
+                            name: exercise.name,
+                            detail: "\(viewModel.areaLabel(exercise.areaId)) · Provisional review",
+                            selected: true
+                        )
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.draft?.exercises.contains(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) == true)
-                    .opacity(viewModel.draft?.exercises.contains(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) == true ? 0.45 : 1)
-                    .accessibilityIdentifier("trainingLogger.add.\(exercise.canonicalExerciseId)")
+                    .accessibilityIdentifier("trainingLogger.provisional.\(exercise.id)")
                 }
             }
 
-            Button(viewModel.isBrowsingAllExercises ? "Show performed exercises" : "Add new exercise") {
+            Button {
                 viewModel.isBrowsingAllExercises.toggle()
+            } label: {
+                Label(
+                    viewModel.isBrowsingAllExercises ? "Show performed exercises" : "Add New Exercise",
+                    systemImage: viewModel.isBrowsingAllExercises ? "clock.arrow.circlepath" : "plus.circle"
+                )
             }
             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             .foregroundStyle(PhysiqueOSTheme.accent)
@@ -239,9 +254,57 @@ struct TrainingLoggerView: View {
             }
 
             validation(viewModel)
-            PrimaryActionButton(title: "Start set entry") { viewModel.continueFromExercises() }
             secondaryButton("Back to Training Areas") { viewModel.go(to: .areas) }
         }
+    }
+
+    private func exerciseSelectionRow(_ exercise: TrainingLoggerCatalogExercise, viewModel: TrainingLoggerViewModel) -> some View {
+        let selected = viewModel.isSelected(exercise)
+        return Button {
+            viewModel.update { draft in
+                if let selectedExercise = draft.exercises.first(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) {
+                    draft.removeExercise(id: selectedExercise.id)
+                } else {
+                    draft.addExercise(exercise)
+                }
+            }
+        } label: {
+            exerciseSelectionLabel(
+                name: exercise.name,
+                detail: [viewModel.areaLabel(exercise.areaId), exercise.equipment].compactMap { $0 }.joined(separator: " · "),
+                selected: selected
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(exercise.name), \(selected ? "selected" : "not selected")")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("trainingLogger.exercise.\(exercise.canonicalExerciseId)")
+    }
+
+    private func exerciseSelectionLabel(name: String, detail: String, selected: Bool) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(detail)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(selected ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.textMuted)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(selected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textMuted)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 8)
+        .background(selected ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(selected ? PhysiqueOSTheme.accent.opacity(0.8) : PhysiqueOSTheme.divider)
+        )
     }
 
     private func provisionalExerciseForm(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -276,49 +339,95 @@ struct TrainingLoggerView: View {
     }
 
     private func workout(_ viewModel: TrainingLoggerViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            stepHeader(viewModel, step: "3 of 3", title: "Log workout", subtitle: "Confirm or edit the prior setup. Only checked sets count as completed.")
-            if let draft = viewModel.draft {
-                HStack {
-                    Label(draft.mode.title, systemImage: draft.mode == .live ? "bolt.fill" : "calendar")
-                    Spacer()
-                    Text(draft.workoutDate)
-                }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        VStack(alignment: .leading, spacing: 8) {
+            if let draft = viewModel.draft, let presentation = viewModel.workoutPresentation {
+                workoutIdentity(draft: draft, presentation: presentation)
 
-                Button {
-                    viewModel.reviewWorkout()
-                } label: {
-                    HStack {
-                        Label("Review workout", systemImage: "checklist")
-                        Spacer()
-                        Text("\(draft.completedSetCount) done")
-                        Image(systemName: "chevron.right")
+                HStack(spacing: 8) {
+                    Button {
+                        viewModel.persist()
+                        dismiss()
+                    } label: {
+                        Label("Save & Leave", systemImage: "arrow.left")
+                            .frame(maxWidth: .infinity)
                     }
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .padding(12)
-                    .background(PhysiqueOSTheme.surfaceAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                    .accessibilityIdentifier("trainingLogger.inlineSaveAndLeave")
+
+                    Button(role: .destructive) {
+                        showingCancelWorkoutConfirmation = true
+                    } label: {
+                        Label("Cancel Workout", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .tint(PhysiqueOSTheme.destructive)
+                    .accessibilityIdentifier("trainingLogger.cancelWorkout")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("trainingLogger.headerReviewWorkout")
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
 
                 ForEach(draft.exercises) { exercise in
                     exerciseCard(exercise, viewModel: viewModel)
                 }
             }
             validation(viewModel)
-            PrimaryActionButton(title: "Review workout") { viewModel.reviewWorkout() }
-                .accessibilityIdentifier("trainingLogger.reviewWorkout")
             secondaryButton("Back to exercises") { viewModel.go(to: .exercises) }
+        }
+        .confirmationDialog(
+            "Cancel this workout?",
+            isPresented: $showingCancelWorkoutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Cancel Workout", role: .destructive) {
+                viewModel.cancelWorkout()
+            }
+            Button("Keep Workout", role: .cancel) {}
+        } message: {
+            Text("This discards the device-only draft and all set edits. Save & Leave keeps it.")
         }
     }
 
+    private func workoutIdentity(
+        draft: TrainingLoggerDraft,
+        presentation: TrainingLoggerWorkoutPresentation
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(draft.mode == .live ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
+                            .frame(width: 8, height: 8)
+                        Text(presentation.eyebrow.uppercased())
+                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                            .foregroundStyle(PhysiqueOSTheme.accent)
+                    }
+                    Text("Training Logger")
+                        .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(presentation.context)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                Spacer(minLength: 8)
+                Text(presentation.progress)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(Capsule())
+            }
+            ProgressView(value: Double(presentation.completedSetCount), total: Double(max(1, presentation.totalSetCount)))
+                .tint(PhysiqueOSTheme.chartSuccess)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trainingLogger.workoutIdentity")
+    }
+
     private func exerciseCard(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
-        CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 12) {
+        CardContainer(padding: .none) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(exercise.name)
@@ -331,27 +440,27 @@ struct TrainingLoggerView: View {
                     Spacer()
                     exerciseMenu(exercise, viewModel: viewModel)
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
 
                 if let previous = exercise.previousPerformance {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Previous · \(previous.workoutDate)")
-                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        Text(previous.compactSummary)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(previous.contextLabel)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    Text(previous.compactLine)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 7)
                 } else {
                     Text("No comparable prior performance for this variant and relationship context.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 7)
+                }
+
+                if let recommendation = exercise.progressionRecommendation {
+                    progressionGuidance(recommendation, exercise: exercise, viewModel: viewModel)
                 }
 
                 setColumnHeader(for: exercise.measurement)
@@ -362,13 +471,49 @@ struct TrainingLoggerView: View {
                     viewModel.update { $0.addSet(to: exercise.id) }
                 } label: {
                     Label("Add set", systemImage: "plus")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .frame(maxWidth: .infinity, minHeight: 34)
                 }
                 .foregroundStyle(PhysiqueOSTheme.accent)
                 .accessibilityIdentifier("trainingLogger.addSet.\(exercise.id)")
             }
         }
         .accessibilityIdentifier("trainingLogger.exerciseCard.\(exercise.name)")
+    }
+
+    private func progressionGuidance(
+        _ recommendation: TrainingLoggerProgressionRecommendation,
+        exercise: TrainingLoggerDraftExercise,
+        viewModel: TrainingLoggerViewModel
+    ) -> some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(recommendation.eyebrow.uppercased())
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(recommendation.prescription)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            }
+            Spacer(minLength: 4)
+            Button("Use suggestion") {
+                viewModel.update { $0.applyProgressionSuggestion(to: exercise.id) }
+            }
+            .disabled(!recommendation.hasExplicitTarget)
+            .buttonStyle(.borderedProminent)
+            .tint(exercise.progressionChoice == .suggestion ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
+            Button("Keep previous") {
+                viewModel.update { $0.keepPreviousPerformance(for: exercise.id) }
+            }
+            .buttonStyle(.bordered)
+            .tint(exercise.progressionChoice == .previous ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textSecondary)
+        }
+        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+        .controlSize(.small)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(PhysiqueOSTheme.surfaceAccent.opacity(0.7))
+        .accessibilityIdentifier("trainingLogger.progression.\(exercise.id)")
     }
 
     private func exerciseMenu(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
@@ -420,6 +565,9 @@ struct TrainingLoggerView: View {
         }
         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
         .foregroundStyle(PhysiqueOSTheme.textMuted)
+        .frame(height: 28)
+        .padding(.horizontal, 10)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.7))
     }
 
     private func setRow(exercise: TrainingLoggerDraftExercise, set: TrainingLoggerDraftSet, viewModel: TrainingLoggerViewModel) -> some View {
@@ -430,14 +578,14 @@ struct TrainingLoggerView: View {
             TextField("0", text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, keyPath: exercise.measurement == .duration ? \.durationSeconds : \.reps))
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.center)
-                .padding(.vertical, 9)
+                .frame(height: 34)
                 .background(PhysiqueOSTheme.surfaceMuted)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             if exercise.measurement == .repsLoad {
                 TextField("0", text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, keyPath: \.load))
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
-                    .padding(.vertical, 9)
+                    .frame(height: 34)
                     .background(PhysiqueOSTheme.surfaceMuted)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
@@ -451,19 +599,25 @@ struct TrainingLoggerView: View {
                 Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 21))
                     .foregroundStyle(set.isCompleted ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
-                    .frame(width: 42)
+                    .frame(width: 42, height: 40)
             }
             .accessibilityLabel(set.isCompleted ? "Mark set incomplete" : "Mark set complete")
             Button {
                 viewModel.update { $0.removeSet(exerciseId: exercise.id, setId: set.id) }
             } label: {
-                Image(systemName: "trash").foregroundStyle(PhysiqueOSTheme.textMuted)
+                Image(systemName: "trash")
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .frame(width: 24, height: 40)
             }
             .disabled(exercise.sets.count <= 1)
             .opacity(exercise.sets.count <= 1 ? 0.35 : 1)
         }
         .physiqueOSFont(PhysiqueOSTypography.body14Regular)
         .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        .frame(height: 42)
+        .padding(.horizontal, 10)
+        .background(set.isCompleted ? PhysiqueOSTheme.chartSuccess.opacity(0.08) : Color.clear)
+        .overlay(alignment: .bottom) { Divider().overlay(PhysiqueOSTheme.divider) }
     }
 
     private func summary(_ viewModel: TrainingLoggerViewModel) -> some View {

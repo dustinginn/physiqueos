@@ -162,6 +162,14 @@
       "equipment": "Cable",
       "measurement": "reps_load",
       "previously_performed": true,
+      "progression_recommendation": {
+        "state": "maintain",
+        "eyebrow": "Maintain current performance",
+        "message": "Your current load is moving at the right pace.",
+        "prescription": "Repeat 50 lb × 12 with clean reps",
+        "suggested_load": 50,
+        "suggested_reps": 12
+      },
       "history": [
         {
           "session_id": "logger-history-pushdown",
