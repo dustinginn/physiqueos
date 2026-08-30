@@ -80,10 +80,7 @@ export function createPICadenceBriefingLifecycleService({
         replacesArtifactId: replacementTarget?.id ?? null,
         replacesAssessmentId:
           replacementTarget?.confidencePublication?.assessmentId ?? null,
-        sourceLineage: { reason, artifactVersion: artifact.version,
-          evidenceWindowId: artifact.evidenceWindow.id,
-          dependencyManifestFingerprint:
-            artifact.dependencyManifest?.fingerprint ?? null },
+        sourceLineage: createCadenceSourceLineage({ reason, artifact }),
         elapsedTimeAdequacy: cadence === "midweek" ? "partial" : "adequate",
         phaseReviewContext: {
           activeGoal, activePhase,
@@ -113,6 +110,16 @@ export function createPICadenceBriefingLifecycleService({
       return result.commitResult ?? typed(result.status, "Cadence finalization did not commit.");
     },
   });
+}
+
+export function createCadenceSourceLineage({ reason, artifact } = {}) {
+  return {
+    reason,
+    artifactVersion: artifact?.version ?? null,
+    evidenceWindowId: artifact?.evidenceWindow?.id ?? null,
+    dependencyManifestFingerprint:
+      artifact?.dependencyManifest?.fingerprint ?? null,
+  };
 }
 
 function typed(status, message) {
