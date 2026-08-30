@@ -1747,3 +1747,144 @@ canonical authority.
 DigitalOcean, PostgreSQL, authentication, worker/outbox, deployment, canonical
 data, or TestFlight upload was touched. No new dependency, entitlement,
 infrastructure, paid service, or incremental cost was introduced.
+
+## 62. Native logging-completeness sandbox milestone (2026-08-30)
+
+This milestone starts from accepted local `native-v1` tip `9ee94a8` (including
+fixture-backed Workout Logger `a64cce7`) and makes every meaningful current web
+Log/evidence-ingestion path representable in the Native sandbox. The Native
+implementation is deliberately device-local and deterministic: it exercises
+product state, correction, review, and navigation contracts without suggesting
+that an upload, canonical save, production-history update, or Health sync took
+place.
+
+### Source inventory and web-to-Native disposition
+
+The audit traced `src/app/log/page.js`, `src/screens/LogHubScreen.jsx`,
+`src/components/evidence/UploadAnythingForm.jsx`, `src/app/log/actions.js`,
+`src/app/log/upload/route.js`, `src/application/log/LogReadService.js`,
+`src/screens/MorningCheckInScreen.jsx`, the typed Morning Check-In route/actions,
+`src/domain/services/EvidenceIntakeService.js`, screenshot/text/PDF interpreters,
+`src/app/evidence/review/[reviewId]/page.js` and actions,
+`src/screens/EvidenceReviewScreen.jsx`, Evidence Review presentation/experience/
+success services, the Training Logger route/client/services, and the dedicated
+DEXA and Progress Photo upload screens/actions. The resulting reachable-surface
+map is below; “local” always means synthetic fixture/session state.
+
+| Web label/surface | Web source | Destination/state and presentation | Native disposition | Fixture/live boundary |
+|---|---|---|---|---|
+| Log | Log page + `LogHubScreen` | Root hub/navigation | Implemented | Fixture read model; live Log read remains required |
+| Logged Today | `LogReadService` + hub rows | Typed progress/session routes | Accepted | Existing Native fixture routes |
+| Uploads ready to review | hub pending card | `/evidence/review/:id` navigation | Implemented | Unknown web ids resolve to clearly labelled local review fixtures; live review fetch required |
+| Training Logger | `/log/training` | Full logger workflow | Accepted + fixed | Device draft only; live confirmation required |
+| Morning Weigh-In / Log weigh-in | upload disclosure, Home Morning Check-In | Inline action or typed check-in destination | Implemented as typed Native screen | Local synthetic `LocalWeightEntry`; live persistence required |
+| Current-date weight | direct weigh-in action | Validation then result/refresh | Implemented | lb/kg validation; no canonical write |
+| Historical/backdated weight | upload evidence date + direct action | Same action with occurrence date | Implemented | Occurrence date separated from recorded-at time |
+| Existing weight correction / unchanged | direct action + Morning Check-In | Replace/no-change semantics | Implemented locally | Same value/unit is an idempotent no-op; a changed same-date value increments local correction count; live idempotency required |
+| Add Evidence | Upload Anything | Inline form → interpretation | Implemented as typed navigation | Local intake state |
+| Choose Photos | browser file input modality | System asset selection | Implemented first-class | Photos picker; no upload |
+| Choose Files | browser file input modality | System document selection | Implemented first-class | File importer; no upload |
+| Multiple assets | `multiple` input + intake service | One evidence package | Implemented | Local batch retained; live package reconciliation required |
+| Selected asset list / remove / reselect | browser selection semantics | Form-local state | Native improvement implemented explicitly | Asset names/source only; bytes remain picker-owned |
+| Details / typed note | Upload Anything textarea | Typed source artifact | Implemented | Retained visibly through review |
+| When did this happen? | upload date input | Evidence occurrence date | Implemented | Future dates rejected; upload time remains separate |
+| Submit / interpretation pending | Upload form + intake route/service | Inline busy state → review | Implemented | Explicit deterministic pending step; no worker or AI called |
+| Recognized classification | intake/interpreters | Evidence objects/review category | Implemented | Deterministic category fixtures, not inferred certainty |
+| Ambiguous classification | interpreter uncertainty/review boundary | Needs user category | Implemented | User must select a category; assets/date retained |
+| Needs more information | incomplete interpretation | Clarification before review | Implemented | Required local clarification; then honest generic review |
+| Unsupported/unrecognized | `unknown`/`unrecognized`, empty objects | Intake error/generic fallback | Implemented | Can continue only as generic source + user description |
+| Intake failure / retry | failed ingestion + Log error/reprocess | Visible failure and retry | Implemented | Draft/assets retained; deterministic retry |
+| Evidence Review shell | review page/screen | Navigation; editable cards; confirmation | Implemented | Local review boundary only |
+| Include/exclude evidence | review item decisions | Inline decision | Implemented | Blocks confirmation when excluded |
+| Source, date, confidence, provenance | review presentation | Card metadata | Implemented | Fixture confidence is labelled; source retained |
+| Add / Correct Workout Details | Training review | Training evidence object, exercise/set/relationship context | Implemented | Strength/cardio fixtures; accepted Logger owns detailed set/variant/superset capture; no second Training model |
+| Apple Health workout relationship | Training reconciliation | Linked/unlinked source workout | Implemented as explicit unavailable relationship | No HealthKit read/write/sync |
+| Nutrition Review | Nutrition presenter/reconciliation | Calories/macros/meals; replace/additive choice | Implemented | Meal/day scope and existing-day handling editable; live reconciliation required |
+| Weight Review | weight presenter | Uploaded reviewed value | Implemented | Kept distinct from manual weigh-in |
+| Activity Review | ActivityDay presenter | Move calories, exercise minutes, stand/workout refs | Implemented | Daily activity separate from workout ownership; no Health sync |
+| DEXA Review | DEXA presenter/editor | Total/body-fat/fat/lean/BMC/RMR/VAT and correction | Implemented | Only source-supported fields; live PDF parser and canonical validation required |
+| Progress Photos Review | photo session presenter/editors | Batch, capture date, grouping, orientations, time/Goal context, notes | Implemented | Historical capture date preserved; live media/session write required |
+| Energy / Recovery and other types | generic presenter fallback | Generic evidence card | Implemented with source-supported fixture fields | No invented canonical Recovery schema |
+| Generic evidence | generic presenter | Scalar/source details | Implemented | User description/source only when unrecognized |
+| Re-read / correction / retry | reprocess and type-specific update actions | Inline actions/status | Implemented as local correction/retry | Live optimistic concurrency/reprocessing required |
+| Save and return later | review navigation | Back to the intake state, then Log | Implemented | Review and source draft remain reopenable in the session store |
+| Discard review / discard draft | review action + overlay | Destructive confirmation | Implemented | Removes local state only |
+| Confirmation / committing / partial failure | confirmation orchestrator | Commit/retry/confirmed state | Represented at honest local boundary | Durable canonical orchestration intentionally deferred |
+| Completion / return | success navigation | Return to Log/history/briefing | Implemented | Says “Local review complete”; never claims history/briefing update |
+| Dedicated DEXA / photo upload pages | DEXA and Progress Photo routes | Specialized intake → review | Covered through unified Native intake/review | Live specialized media contracts required |
+| Morning Check-In recovery context | Morning Check-In → Log/review | Typed return/recovery navigation | Morning-weight typed route preserved; broad recovery orchestration deferred | Live recovery keys/return commands required |
+
+### Native fixture architecture and behavior
+
+`LoggingSandboxStore` owns one session-local evidence draft, local weigh-in
+entries, interpretation state, and local reviews. `EvidenceIntakeDraft` retains
+Photos/Files together, typed details, occurrence date, clarification, and the
+selected deterministic case. Every submission visibly passes through pending
+interpretation. Recognized fixtures cover strength Training, cardio Training,
+Nutrition, Weight, Activity, DEXA, Progress Photos, Energy/Recovery, and generic
+evidence; separate fixtures cover ambiguity, missing information, unsupported
+sources, and local failure. Review fields are editable, required fields and
+include/exclude gate confirmation, correction notes are retained, and source
+assets/date/confidence/provenance remain visible. Completion is labelled local
+and device-only.
+
+Historical semantics are uniform: the event/capture/measurement date is stored
+on the draft/review and displayed independently from the local added-at time.
+This applies to weight, Training, Nutrition, Activity, DEXA, Progress Photos,
+Recovery, and generic evidence. Multi-asset groups remain one local intake and
+one review; no canonical package or cross-asset reconciliation is claimed.
+
+### Workout Logger fixes
+
+Logger set fields now use a UIKit-backed decimal editor with explicit string
+buffers. A populated field selects all text when focused so the next keystroke
+replaces it. Deleting leaves a genuinely empty string and writes `nil` to the
+draft until a valid value is entered; no zero, old value, or numeric placeholder
+is forced back into the editor. The editor supplies a Done accessory. While a
+numeric editor is focused, the persistent Finish Workout safe-area action is
+absent; it returns to its normal bottom location after keyboard dismissal.
+Existing prepopulation, validation, summary, draft persistence, Save & Leave,
+cancel, and recovery contracts remain unchanged.
+
+### Intentional Native improvements
+
+Native makes Photos and Files two equal choices in one contextually anchored
+menu instead of relying on one browser input; shows every selected asset with its source and removal
+control; exposes event date before review; keeps ambiguity and unsupported
+states actionable without pretending recognition; and consistently explains
+the local/canonical boundary at intake, review, and completion. These changes
+reduce hidden browser behavior and dead ends without removing web information
+or adding a production claim.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Add an authenticated Native Log command/read API for manual weight,
+  same-date idempotency/correction, pending-review fetch, and history refresh.
+- Upload real Photos/File bytes through the existing authorized media boundary,
+  persist one evidence package with occurrence/upload times, and support durable
+  multi-asset reconciliation and recovery.
+- Invoke the existing interpretation/reprocessing workers and return explicit
+  pending, ambiguity, missing-information, unsupported, and retryable-failure
+  contracts instead of fixture cases.
+- Decode server-owned type-specific reviews, preserve authoritative item
+  decisions and provenance, and call the existing canonical confirmation/
+  continuation orchestrator. Native must not become canonical authority.
+- Reuse the existing canonical TrainingSession/exercise identity/variant/
+  relationship model and Apple Health reconciliation. Add a HealthKit adapter
+  only after explicit product approval; never imply continuous sync.
+- Implement authoritative Nutrition replace/additive reconciliation, DEXA
+  validation/concurrency, Progress Photo media/session/pose persistence, and
+  Morning Check-In recovery-context return behavior.
+- Persist drafts/reviews across process termination under an approved server or
+  encrypted local policy. Current evidence drafts survive navigation within the
+  running app only; picker bytes are not copied into app storage.
+
+No backend, production API/authentication, DigitalOcean, PostgreSQL, worker/
+outbox, deployment, canonical data, production worktree, Health entitlement,
+or TestFlight upload was changed. No dependency, paid service, infrastructure,
+or incremental cost was added.
+
+The source-controlled candidate build number for this complete logging milestone
+is 4. Marketing version 1.0, bundle id `com.physiqueos.native.dev`, AppIcon,
+signing, and `ITSAppUsesNonExemptEncryption = false` remain unchanged. Build 4
+must not be uploaded until Founder simulator/screenshot review is accepted.
