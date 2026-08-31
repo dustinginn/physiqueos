@@ -24,7 +24,8 @@ export function createPostgresOutboxStore({ query }) {
       return firstRow(await query(
         `UPDATE physiqueos.outbox_messages SET status = 'succeeded', completed_at = $3,
                 claimed_by = NULL, claim_expires_at = NULL, updated_at = $3
-          WHERE id = $1 AND claimed_by = $2 AND status = 'processing' RETURNING *`,
+          WHERE id = $1 AND claimed_by = $2 AND status = 'processing'
+            AND claim_expires_at > $3 RETURNING *`,
         [id, workerId, at],
       ));
     },
@@ -36,7 +37,8 @@ export function createPostgresOutboxStore({ query }) {
                 dead_at = CASE WHEN $7::boolean THEN $3::timestamptz ELSE NULL::timestamptz END,
                 last_error_code = $5, last_error_detail = $6,
                 claimed_by = NULL, claim_expires_at = NULL, updated_at = $3
-          WHERE id = $1 AND claimed_by = $2 AND status = 'processing' RETURNING *`,
+          WHERE id = $1 AND claimed_by = $2 AND status = 'processing'
+            AND claim_expires_at > $3 RETURNING *`,
         [id, workerId, at, dueAt, errorCode, errorDetail, terminal],
       ));
     },

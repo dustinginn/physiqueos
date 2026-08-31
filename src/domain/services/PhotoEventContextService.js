@@ -7,6 +7,16 @@ export async function resolvePhotoEventContext({ repositories, userId, evidenceD
     repositories.executionItems?.listExecutionItems?.(userId) ?? [],
     repositories.dexaScans?.listDEXAScans?.(userId) ?? [],
   ]);
+  return composePhotoEventContext({ activeGoal, goals, executionItems, dexaScans, evidenceDate });
+}
+
+export function composePhotoEventContext({
+  activeGoal = null,
+  goals = [],
+  executionItems = [],
+  dexaScans = [],
+  evidenceDate,
+} = {}) {
   const phaseContext = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: evidenceDate }) : null;
   const committedGoal = phaseContext?.goal ?? activeGoal;
   const activePhase = phaseContext?.activePhase ?? null;

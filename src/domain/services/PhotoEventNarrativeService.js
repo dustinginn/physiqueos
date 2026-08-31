@@ -2,7 +2,7 @@ import { createPhotoSessionReadModels } from "./CanonicalPhotoSessionReadService
 import { semanticDeduplicate } from "./GalleryInterpretationService";
 import { evaluatePhotoGoalConfirmation, selectVisibleAbsCompletionComparisons } from "./PhotoGoalConfirmationService";
 import { getProgressPhotoDisplayLabel, getProgressPhotoProseLabel } from "../models/progressPhotoPoseVocabulary";
-import { resolvePhotoEventContext } from "./PhotoEventContextService";
+import { composePhotoEventContext, resolvePhotoEventContext } from "./PhotoEventContextService";
 import { createCanonicalBriefingConfidencePublicationService } from
   "./CanonicalBriefingConfidencePublicationService";
 import {
@@ -145,10 +145,14 @@ export function createPhotoEventNarrativeService({
   repositories,
   now = () => new Date(),
   eventLifecycle = null,
+  createEventLifecycle = null,
+  loadInputs = null,
 } = {}) {
   const service = {
     async getLatest({ userId, sessionId }) {
-      const artifacts = await repositories.dailyBriefings.listDailyBriefings(userId);
+      const artifacts = loadInputs
+        ? (await loadInputs({ userId, sessionId })).artifacts
+        : await repositories.dailyBriefings.listDailyBriefings(userId);
       return artifacts.filter((item)=>item.artifactType==="event"&&item.trigger?.evidenceType==="photo_session"&&item.trigger?.evidenceId===sessionId).sort((a,b)=>String(b.generatedAt).localeCompare(String(a.generatedAt)))[0]??null;
     },
     async getOrCreate({ userId, sessionId, preview = false }) {
@@ -165,9 +169,13 @@ export function createPhotoEventNarrativeService({
       reason = null,
       ignoreExisting = false,
     }) {
-      const [canonicalObjects, legacyPhotos, weights, analyses, goal, dexaScans, artifacts] = await Promise.all([
-        repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId), repositories.progressPhotos.listPhotos(userId), repositories.weights.listWeightEntries(userId), repositories.analyses.listAnalyses(), repositories.goals.getActiveGoal(userId), repositories.dexaScans.listDEXAScans(userId), repositories.dailyBriefings.listDailyBriefings(userId),
-      ]);
+      const inputs = loadInputs
+        ? await loadInputs({ userId, sessionId })
+        : await loadRepositoryInputs({ repositories, userId });
+      const {
+        canonicalObjects, legacyPhotos, weights, analyses, goal, goals = [],
+        executionItems = [], dexaScans, artifacts,
+      } = inputs;
       const sessions = createPhotoSessionReadModels({ canonicalObjects, legacyPhotos, weights, analyses });
       const session = sessions.find((item)=>item.id===sessionId || item.hiddenProvenanceAliases?.includes(sessionId));
       if (!session) return {
@@ -196,7 +204,10 @@ export function createPhotoEventNarrativeService({
         dexaScans,
         eventDate: session.captureDate,
       });
-      const photoEventContext=await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate});
+      const photoEventContext=loadInputs
+        ? composePhotoEventContext({ activeGoal: goal, goals, executionItems, dexaScans,
+          evidenceDate: session.captureDate })
+        : await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate});
       const publicationContext=createPhotoEventPublicationContext({
         goal,
         photoEventContext,
@@ -215,8 +226,9 @@ export function createPhotoEventNarrativeService({
         artifactId: null,
       };
       const artifact={id:eventId,userId,artifactType:"event",cadence:"event",generatedAt:narrative.generatedAt,trigger:{evidenceType:"photo_session",evidenceId:session.id},lifecycle:{openedAt:null,consumedAt:null},briefing:{version:EVENT_VERSION,photoEventNarrative:narrative}};
-      if (!preview && eventLifecycle) {
-        const result = await eventLifecycle.publish({
+      const lifecycle = eventLifecycle ?? createEventLifecycle?.(inputs);
+      if (!preview && lifecycle) {
+        const result = await lifecycle.publish({
           operation,
           confidenceMode,
           artifact,
@@ -267,6 +279,19 @@ export function createPhotoEventNarrativeService({
     },
   };
   return service;
+}
+
+async function loadRepositoryInputs({ repositories, userId }) {
+  const [canonicalObjects, legacyPhotos, weights, analyses, goal, dexaScans, artifacts] = await Promise.all([
+    repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
+    repositories.progressPhotos.listPhotos(userId),
+    repositories.weights.listWeightEntries(userId),
+    repositories.analyses.listAnalyses(),
+    repositories.goals.getActiveGoal(userId),
+    repositories.dexaScans.listDEXAScans(userId),
+    repositories.dailyBriefings.listDailyBriefings(userId),
+  ]);
+  return { canonicalObjects, legacyPhotos, weights, analyses, goal, dexaScans, artifacts };
 }
 
 function createPhotoEventPublicationContext({

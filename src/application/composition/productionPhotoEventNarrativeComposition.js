@@ -1,7 +1,8 @@
 import {
   loadApplicationCanonicalCommitBindings,
-  loadApplicationCanonicalRuntimeSnapshot,
 } from "../runtime/ApplicationCanonicalRuntime";
+import { getProductionPhotoEventReadStore } from
+  "./productionApplicationComposition";
 import {
   createFounderPhotoEventNarrativeService,
   createPhotoEventNarrativeService,
@@ -17,19 +18,16 @@ export async function createProductionPhotoEventNarrativeService({
   repositories,
   now = () => new Date(),
   env = process.env,
-  loadCanonicalRuntime = loadApplicationCanonicalRuntimeSnapshot,
   loadCanonicalCommitBindings = loadApplicationCanonicalCommitBindings,
+  readStore = null,
 } = {}) {
   if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1") {
     return createFounderPhotoEventNarrativeService({ repositories, now });
   }
-  const [canonicalRuntime, commitBindings] = await Promise.all([
-    loadCanonicalRuntime(),
-    loadCanonicalCommitBindings(),
-  ]);
+  const commitBindings = await loadCanonicalCommitBindings();
   return createProviderPhotoEventNarrativeService({
     repositories,
-    canonicalRuntime,
+    readStore: readStore ?? getProductionPhotoEventReadStore(env),
     mutateCanonicalRuntime: commitBindings.mutateCanonicalRuntime,
     now,
   });
@@ -37,11 +35,11 @@ export async function createProductionPhotoEventNarrativeService({
 
 export function createProviderPhotoEventNarrativeService({
   repositories,
-  canonicalRuntime,
+  readStore,
   mutateCanonicalRuntime,
   now = () => new Date(),
 } = {}) {
-  if (!repositories || !canonicalRuntime ||
+  if (!repositories || typeof readStore?.loadInputs !== "function" ||
       typeof mutateCanonicalRuntime !== "function") {
     const error = new Error(
       "Provider Photo Event publication requires canonical runtime bindings."
@@ -49,19 +47,19 @@ export function createProviderPhotoEventNarrativeService({
     error.code = "PROVIDER_PHOTO_EVENT_RUNTIME_BINDINGS_REQUIRED";
     throw error;
   }
-  const publicationService =
-    createCanonicalBriefingConfidencePublicationService({
-      filePath: "provider://photo-event-publication",
-      liveStore: canonicalRuntime,
-      mutateCanonicalRuntime,
-      now,
-    });
   return createPhotoEventNarrativeService({
     repositories,
     now,
-    eventLifecycle: createPIPhotoEventLifecycleService({
-      publicationService,
-      now,
-    }),
+    loadInputs: (args) => readStore.loadInputs(args),
+    createEventLifecycle: ({ publicationStore }) =>
+      createPIPhotoEventLifecycleService({
+        publicationService: createCanonicalBriefingConfidencePublicationService({
+          filePath: "provider://photo-event-publication",
+          liveStore: publicationStore,
+          mutateCanonicalRuntime,
+          now,
+        }),
+        now,
+      }),
   });
 }

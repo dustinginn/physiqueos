@@ -50,6 +50,8 @@ import {
   createRepositoryEvidenceReviewReadStore,
 } from "../../platform/database/PostgresEvidenceReviewReadStore.js";
 import { createEvidenceReviewReadService } from "../evidence/EvidenceReviewReadService.js";
+import { createPostgresPhotoEventReadStore } from
+  "../../platform/database/PostgresPhotoEventReadStore.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -193,6 +195,21 @@ export function getProductionEvidenceReviewReadService(env = process.env) {
     ? createProviderEvidenceReviewReadStore(env)
     : createRepositoryEvidenceReviewReadStore({ repositories: LegacyFounderRepositories });
   return createEvidenceReviewReadService({ store });
+}
+
+export function getProductionPhotoEventReadStore(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" ||
+      env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresPhotoEventReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.photo_event_read.complete", event)
+      : null,
+  });
 }
 
 export function getProductionProviderReadinessComposition(env = process.env) {

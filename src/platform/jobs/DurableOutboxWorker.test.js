@@ -22,6 +22,28 @@ describe("durable outbox worker", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("cannot acknowledge or reschedule after another worker acquires an expired lease", async () => {
+    const store = durableStore([message()]);
+    let now = at(0);
+    const worker = createDurableOutboxWorker({
+      store,
+      handlers: { "synthetic.test": async () => {
+        now = at(61);
+        await store.claimNext({ workerId: "replacement", now,
+          leaseExpiresAt: at(121) });
+      } },
+      workerId: "slow-worker",
+      buildId: "build",
+      clock: () => now,
+    });
+    await expect(worker.runOnce()).resolves.toMatchObject({
+      outcome: "retry_scheduled", persisted: false,
+    });
+    expect(store.state[0]).toMatchObject({
+      status: "processing", claimed_by: "replacement", attempt_count: 2,
+    });
+  });
+
   it("persists bounded retries and terminal failure", async () => {
     const store = durableStore([{ ...message(), attempt_count: 7 }]);
     const worker = createDurableOutboxWorker({ store, handlers: { "synthetic.test": async () => { throw Object.assign(new Error("secret detail"), { code: "SYNTHETIC_FAILURE" }); } }, workerId: "worker", buildId: "build", clock: () => at(0), maximumAttempts: 8 });
@@ -84,14 +106,14 @@ function durableStore(seed) {
       Object.assign(item, { status: "processing", claimed_by: workerId, claim_expires_at: leaseExpiresAt, attempt_count: item.attempt_count + 1 });
       return structuredClone(item);
     },
-    async acknowledge({ id, workerId }) {
-      const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing");
+    async acknowledge({ id, workerId, at: observedAt }) {
+      const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing" && entry.claim_expires_at > observedAt);
       if (!item) return null;
       Object.assign(item, { status: "succeeded", claimed_by: null, claim_expires_at: null });
       return structuredClone(item);
     },
-    async fail({ id, workerId, dueAt, errorCode, errorDetail, terminal }) {
-      const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing");
+    async fail({ id, workerId, at: observedAt, dueAt, errorCode, errorDetail, terminal }) {
+      const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing" && entry.claim_expires_at > observedAt);
       if (!item) return null;
       Object.assign(item, { status: terminal ? "dead" : "pending", due_at: dueAt, last_error_code: errorCode, last_error_detail: errorDetail, claimed_by: null, claim_expires_at: null });
       return structuredClone(item);

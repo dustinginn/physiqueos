@@ -35,6 +35,7 @@ export default defineConfig({
       "src/domain/services/PendingPhotoReviewEditing.test.js",
       "src/domain/services/PhotoEventContextService.test.js",
       "src/domain/services/PhotoEventNarrativeService.test.js",
+      "src/application/composition/productionPhotoEventNarrativeComposition.test.js",
       "src/domain/services/PhotoPIObservationCompatibility.test.js",
       "src/screens/PhotoEventBriefingScreen.test.js",
       "src/screens/PhotosEvidenceContextProduction.test.js",

@@ -6,6 +6,12 @@ import {
   createProviderPhotoEventNarrativeService,
 } from "./productionPhotoEventNarrativeComposition";
 
+vi.mock("./productionApplicationComposition", () => ({
+  getProductionPhotoEventReadStore: vi.fn(() => {
+    throw new Error("A test provider read store must be injected.");
+  }),
+}));
+
 vi.mock("../../data/repositories/founderRuntimeStore", () => ({
   getFounderRuntimeStore: vi.fn(() => {
     throw Object.assign(new Error("legacy read forbidden"), {
@@ -20,7 +26,7 @@ vi.mock("../../data/repositories/founderRuntimeStore", () => ({
 }));
 
 describe("provider Photo Event narrative composition", () => {
-  it("publishes an Aug 29 event and Confidence without legacy persistence", async () => {
+  it("publishes an Aug 22 event and Confidence without changing the current Weekly", async () => {
     const fixture = providerFixture();
     const service = await fixture.createService();
 
@@ -36,11 +42,14 @@ describe("provider Photo Event narrative composition", () => {
       created: true,
     });
     expect(result.artifact.briefing.photoEventNarrative.eventDate)
-      .toBe("2026-08-29");
+      .toBe("2026-08-22");
     expect(result.artifact.confidencePublication.publisherType)
       .toBe("photo_event_briefing");
-    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
-    expect(fixture.liveStore.dailyBriefings[0].id).toBe(fixture.eventId);
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(2);
+    expect(fixture.liveStore.dailyBriefings.find((item) =>
+      item.id === fixture.eventId)).toBeTruthy();
+    expect(fixture.liveStore.dailyBriefings.find((item) =>
+      item.id === "weekly_briefing_2026-08-23_2026-08-29")?.version).toBe(1);
     expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(
       fixture.initialHistoryCount + 1
     );
@@ -70,7 +79,7 @@ describe("provider Photo Event narrative composition", () => {
       artifactId: fixture.eventId,
       created: false,
     });
-    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(2);
     expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(
       fixture.initialHistoryCount + 1
     );
@@ -80,7 +89,7 @@ describe("provider Photo Event narrative composition", () => {
   it("fails closed when the provider mutation binding is absent", () => {
     expect(() => createProviderPhotoEventNarrativeService({
       repositories: {},
-      canonicalRuntime: {},
+      readStore: { loadInputs: vi.fn() },
     })).toThrowError(expect.objectContaining({
       code: "PROVIDER_PHOTO_EVENT_RUNTIME_BINDINGS_REQUIRED",
     }));
@@ -110,9 +119,9 @@ function providerFixture() {
     persistedAt: prior.provenance.generatedAt,
     assessment: prior,
   };
-  const sessionId = "photo_session_user_founder_001_2026-08-29";
+  const sessionId = "photo_session_user_founder_001_2026-08-22";
   const eventId = `event_briefing_progress_photo_${sessionId}`;
-  const photoId = "canonical_photo_user_founder_001_2026-08-29_front_relaxed";
+  const photoId = "canonical_photo_user_founder_001_2026-08-22_front_relaxed";
   const photo = {
     id: "aug-29-front-relaxed",
     canonicalPhotoId: photoId,
@@ -128,24 +137,24 @@ function providerFixture() {
     userConfirmedIdentity: true,
     sourceOrder: 0,
     order: 0,
-    captureDate: "2026-08-29",
-    occurrenceTimestamp: "2026-08-29",
+    captureDate: "2026-08-22",
+    occurrenceTimestamp: "2026-08-22",
     sourceIds: ["aug-29-front-relaxed"],
-    storage_path: "private/founder/photos/uploads/2026-08-29-front-relaxed.jpeg",
+    storage_path: "private/founder/photos/uploads/2026-08-22-front-relaxed.jpeg",
   };
   const canonicalSession = {
     canonicalId: sessionId,
     createdAt: "2026-08-30T18:00:00.000Z",
     updatedAt: "2026-08-30T18:00:00.000Z",
     evidence_type: "photo_session",
-    firstObservedAt: "2026-08-29",
-    lastObservedAt: "2026-08-29",
+    firstObservedAt: "2026-08-22",
+    lastObservedAt: "2026-08-22",
     payload: {
       id: "provisional_session_2026-08-29",
       evidence_type: "photo_session",
       provisional: false,
-      observed_at: "2026-08-29",
-      captureDate: "2026-08-29",
+      observed_at: "2026-08-22",
+      captureDate: "2026-08-22",
       sessionId,
       userId: "user_founder_001",
       completionState: "complete",
@@ -170,7 +179,7 @@ function providerFixture() {
     weightEntries: [],
     progressPhotos: [],
     analyses: [{
-      id: "analysis_aug_29_front_relaxed",
+      id: "analysis_aug_22_front_relaxed",
       evidenceIds: [photoId],
       summary: "Waist appears modestly tighter.",
       source: { type: "vision" },
@@ -185,7 +194,13 @@ function providerFixture() {
       },
     }],
     canonicalEvidenceObjects: [canonicalSession],
-    dailyBriefings: [],
+    dailyBriefings: [{
+      id: "weekly_briefing_2026-08-23_2026-08-29",
+      version: 1,
+      userId: "user_founder_001",
+      artifactType: "weekly",
+      generatedAt: "2026-08-30T17:29:58.135Z",
+    }],
     goalConfidenceSnapshots: [structuredClone(snapshot)],
     goalConfidenceHistory: [structuredClone(history)],
     goalConfidenceContinuitySeeds: [],
@@ -240,7 +255,20 @@ function providerFixture() {
       return createProductionPhotoEventNarrativeService({
         repositories,
         env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
-        loadCanonicalRuntime: async () => runtime,
+        readStore: {
+          loadInputs: async () => ({
+            canonicalObjects: structuredClone(runtime.canonicalEvidenceObjects),
+            legacyPhotos: structuredClone(runtime.progressPhotos),
+            weights: structuredClone(runtime.weightEntries),
+            analyses: structuredClone(runtime.analyses),
+            goal: structuredClone(runtime.goals.find((item) => item.status === "active")),
+            goals: structuredClone(runtime.goals),
+            executionItems: structuredClone(runtime.executionItems),
+            dexaScans: structuredClone(runtime.dexaScans),
+            artifacts: structuredClone(runtime.dailyBriefings),
+            publicationStore: runtime,
+          }),
+        },
         loadCanonicalCommitBindings: async () => ({
           mutateCanonicalRuntime,
         }),

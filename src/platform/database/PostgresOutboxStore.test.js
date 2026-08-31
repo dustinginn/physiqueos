@@ -35,4 +35,15 @@ describe("Postgres outbox topic filtering", () => {
     await expect(store.claimNext({ ...base, allowedTopics: ["same", "same"] })).rejects.toThrow(/unique non-empty exact identities/);
     await expect(store.claimNext({ ...base, allowedTopics: [" topic"] })).rejects.toThrow(/unique non-empty exact identities/);
   });
+
+  it("acknowledges and fails only while the durable lease is still owned", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresOutboxStore({ query });
+    const at = new Date("2026-08-30T20:00:30.000Z");
+    await store.acknowledge({ id: "message", workerId: "worker", at });
+    await store.fail({ id: "message", workerId: "worker", at,
+      dueAt: at, errorCode: "FAILED", errorDetail: "protected", terminal: false });
+    expect(query.mock.calls[0][0]).toContain("claim_expires_at > $3");
+    expect(query.mock.calls[1][0]).toContain("claim_expires_at > $3");
+  });
 });

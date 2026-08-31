@@ -11,6 +11,7 @@ export default defineConfig({
       "src/platform/object-storage/SpacesBucketProvisioner.test.js",
       "src/application/objects/PrivateObjectService.test.js",
       "src/platform/jobs/DurableOutboxWorker.test.js",
+      "src/platform/database/PostgresOutboxStore.test.js",
       "src/platform/backup/phase2Operations.test.js",
       "src/platform/http/foundationServer.test.js",
     ],

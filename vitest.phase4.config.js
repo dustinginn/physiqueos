@@ -16,6 +16,7 @@ export default defineConfig({
       "src/platform/database/PostgresTrainingNavigationReadStore.test.js",
       "src/platform/database/PostgresProgressHubReadStore.test.js",
       "src/platform/database/PostgresCoreNavigationReadStore.test.js",
+      "src/platform/database/PostgresPhotoEventReadStore.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,
