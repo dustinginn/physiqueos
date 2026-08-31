@@ -47,6 +47,10 @@ describe("PostgreSQL core navigation read store", () => {
     ["core.navigation.log", ["user", "evidenceReviews", "canonicalEvidenceObjects"]],
     ["core.navigation.goals", ["user", "goals", "dailyBriefings", "analyses"]],
     ["core.navigation.operating-plan", ["user", "goals", "canonicalEvidenceObjects"]],
+    ["core.navigation.training-logger", ["user", "goals", "canonicalEvidenceObjects"]],
+    ["core.navigation.morning-check-in", ["user", "weightEntries", "reminders", "dailyCheckIns"]],
+    ["core.navigation.profile", ["user", "goals", "protocols", "reminders"]],
+    ["core.navigation.tracking", ["user", "executionItems", "protocols", "reminders"]],
   ])("keeps %s to one provider query", async (readModel, collections) => {
     const query = vi.fn(async () => ({ rows: [] }));
     const complete = vi.fn();

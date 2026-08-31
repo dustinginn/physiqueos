@@ -1,14 +1,9 @@
-import { FounderRepositories } from "../../data/repositories/founderRepositories";
-import { createYouProfileService } from "../../domain/services/YouProfileService";
+import { getProductionCoreNavigationReadService } from "../../application/composition/productionApplicationComposition";
 import YouScreen from "../../screens/YouScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const service = createYouProfileService({
-    repositories: FounderRepositories,
-  });
-  const profile = await service.getYouProfile();
-
+  const profile = await getProductionCoreNavigationReadService().getProfile();
   return <YouScreen profile={profile} />;
 }

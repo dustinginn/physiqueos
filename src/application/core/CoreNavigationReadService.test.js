@@ -7,6 +7,8 @@ import { createRepositoryCoreNavigationReadStore } from "../../platform/database
 import { createGoalsHubReadService } from "../goals/GoalsHubReadService.js";
 import { createLogReadService } from "../log/LogReadService.js";
 import { createOperatingPlanReadService } from "../plan/OperatingPlanReadService.js";
+import { createYouProfileService } from "../../domain/services/YouProfileService.js";
+import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import {
   CORE_NAVIGATION_COLLECTIONS,
   createCoreNavigationReadService,
@@ -54,6 +56,42 @@ describe("provider-native core navigation reads", () => {
     );
   });
 
+  it("keeps the Profile output equivalent", async () => {
+    const { legacyRepositories, narrow } = services();
+    expect(await narrow.getProfile()).toEqual(
+      await createYouProfileService({ repositories: legacyRepositories }).getYouProfile()
+    );
+  });
+
+  it("keeps Tracking output equivalent", async () => {
+    const { narrow, runtime } = services();
+    expect(await narrow.getTracking()).toEqual({
+      morningWeighIn: resolveMorningWeighInSupport({
+        executionItems: runtime.executionItems,
+        protocols: runtime.protocols,
+        reminders: runtime.reminders,
+        userId: runtime.user.id,
+      }),
+    });
+  });
+
+  it("provides bounded Workout Logger and Morning Check-In models", async () => {
+    const { narrow } = services();
+    const logger = await narrow.getTrainingLogger();
+    const morning = await narrow.getMorningCheckIn();
+    expect(logger).toMatchObject({
+      initialDate: "2026-08-29",
+      initialCanonicalExercises: expect.any(Array),
+      initialHistorySessions: expect.any(Array),
+      initialPerformedExerciseIds: expect.any(Array),
+    });
+    expect(morning).toMatchObject({
+      today: "2026-08-29",
+      reconciliationItems: expect.any(Array),
+      briefingReconciliation: expect.any(Object),
+    });
+  });
+
   it("uses screen-specific collection sets without reconstructing unrelated domains", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.home).not.toContain("evidencePackages");
     expect(CORE_NAVIGATION_COLLECTIONS.home).not.toContain("trainingPerformanceEvents");
@@ -63,6 +101,9 @@ describe("provider-native core navigation reads", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.goals).not.toContain("executionItems");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("dailyBriefings");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("analyses");
+    expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual(["user", "goals", "canonicalEvidenceObjects"]);
+    expect(CORE_NAVIGATION_COLLECTIONS.profile).not.toContain("canonicalEvidenceObjects");
+    expect(CORE_NAVIGATION_COLLECTIONS.tracking).toEqual(["user", "executionItems", "protocols", "reminders"]);
   });
 
   it("routes all four production surfaces through the narrow composition", () => {
@@ -71,6 +112,10 @@ describe("provider-native core navigation reads", () => {
       "src/app/log/page.js",
       "src/screens/GoalsHubScreen.jsx",
       "src/app/profile/operating-plan/page.js",
+      "src/app/log/training/page.js",
+      "src/app/check-in/morning/page.js",
+      "src/app/profile/page.js",
+      "src/app/profile/operating-plan/tracking/page.js",
     ]) {
       const source = fs.readFileSync(route, "utf8");
       expect(source).toContain("getProductionCoreNavigationReadService");

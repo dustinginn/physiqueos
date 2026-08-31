@@ -107,7 +107,7 @@ function normalizeCollection(value) {
 }
 
 function canonicalEvidencePredicate(readModel) {
-  if (["core.navigation.home", "core.navigation.goals"].includes(readModel)) {
+  if (["core.navigation.home", "core.navigation.goals", "core.navigation.training-logger"].includes(readModel)) {
     return `AND (collection_name<>'canonicalEvidenceObjects' OR
       COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='training')`;
   }

@@ -4,6 +4,13 @@ import { createHomeBriefingService } from "../../domain/services/HomeBriefingSer
 import { createGoalsHubReadService } from "../goals/GoalsHubReadService.js";
 import { createLogReadService } from "../log/LogReadService.js";
 import { createOperatingPlanReadService } from "../plan/OperatingPlanReadService.js";
+import { createYouProfileService } from "../../domain/services/YouProfileService.js";
+import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
+import { createMorningPriorityReconciliationService } from "../../domain/services/MorningPriorityReconciliationService.js";
+import { createBriefingReconciliationPresentation } from "../../domain/services/BriefingReconciliationPresentationService.js";
+import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/MorningEvidenceRecoveryService.js";
+import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
+import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -25,6 +32,17 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
     "user", "goals", "operatingPlan", "protocols", "protocolVersions",
     "executionItems", "reminders", "nutritionContext", "canonicalEvidenceObjects",
   ]),
+  trainingLogger: Object.freeze(["user", "goals", "canonicalEvidenceObjects"]),
+  morningCheckIn: Object.freeze([
+    "user", "weightEntries", "reminders", "dailyCheckIns", "dexaScans",
+    "progressPhotos", "canonicalEvidenceObjects", "evidenceReviews", "executionItems",
+    "protocols", "protocolVersions", "briefingReconciliationWorkItems",
+  ]),
+  profile: Object.freeze([
+    "user", "goals", "protocols", "reminders", "nutritionContext",
+    "weightEntries", "dexaScans", "progressPhotos",
+  ]),
+  tracking: Object.freeze(["user", "executionItems", "protocols", "reminders"]),
 });
 
 export function createCoreNavigationReadService({ store, now = () => new Date() } = {}) {
@@ -55,6 +73,77 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
     getOperatingPlan() {
       return withContext("core.navigation.operating-plan", "operatingPlan", ({ principal, repositories }) =>
         createOperatingPlanReadService({ repositories }).getOperatingPlan({ principal }));
+    },
+    getTrainingLogger() {
+      return withContext("core.navigation.training-logger", "trainingLogger", ({ runtime }) => {
+        const user = runtime.user;
+        const initialDate = getLocalDateKey(now(), user?.timeZone ?? user?.timezone ?? "America/Los_Angeles");
+        const confirmedTrainingRecords = (runtime.canonicalEvidenceObjects ?? []).filter((record) =>
+          evidenceType(record) === "training" &&
+          record.quality?.status !== "superseded" &&
+          !record.quality?.supersededBy
+        );
+        const performedExerciseIds = [...new Set(confirmedTrainingRecords
+          .flatMap((record) => (record.payload ?? record).exercises ?? [])
+          .map((exercise) => exercise.canonicalExerciseId)
+          .filter(Boolean))];
+        const historySessions = confirmedTrainingRecords
+          .map(projectTrainingHistorySession)
+          .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
+          .slice(0, 120);
+        return Object.freeze({
+          goalContext: projectGoalContext((runtime.goals ?? []).find((goal) => goal.status === "active") ?? null, initialDate),
+          initialCanonicalExercises: listCanonicalTrainingExerciseIdentities(),
+          initialDate,
+          initialHistorySessions: historySessions,
+          initialPerformedExerciseIds: performedExerciseIds,
+        });
+      });
+    },
+    getMorningCheckIn() {
+      return withContext("core.navigation.morning-check-in", "morningCheckIn", async ({ ownerUserId, repositories, runtime }) => {
+        const user = runtime.user;
+        const current = now();
+        const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
+        const today = getLocalDateKey(current, timeZone);
+        const reconciliationSelection = await createMorningPriorityReconciliationService({
+          repositories,
+          now: () => current,
+        }).getSelection({ userId: ownerUserId, timeZone, at: current });
+        const ordered = [...(runtime.weightEntries ?? [])]
+          .sort((left, right) => String(right.measuredAt).localeCompare(String(left.measuredAt)));
+        const existing = ordered.find((item) => String(item.measuredAt).slice(0, 10) === today) ?? null;
+        const previous = ordered.find((item) => String(item.measuredAt).slice(0, 10) < today) ?? null;
+        const existingCheckIn = (runtime.dailyCheckIns ?? []).find((item) => item.date === today) ?? null;
+        return Object.freeze({
+          briefingReconciliation: createBriefingReconciliationPresentation({
+            evidenceDate: reconciliationSelection.window.previousLocalDate,
+            hasPendingConfirmation: reconciliationSelection.evidenceRecoveryItems.some(
+              (item) => item.status === MORNING_EVIDENCE_RECOVERY_STATUSES.PENDING_CONFIRMATION
+            ),
+            workItems: runtime.briefingReconciliationWorkItems ?? [],
+          }),
+          existingRecovery: existingCheckIn?.recovery ?? null,
+          today,
+          existingWeight: existing?.weight?.value ?? null,
+          previousWeight: previous?.weight?.value ?? null,
+          reconciliationItems: reconciliationSelection.items,
+        });
+      });
+    },
+    getProfile() {
+      return withContext("core.navigation.profile", "profile", ({ repositories }) =>
+        createYouProfileService({ repositories }).getYouProfile());
+    },
+    getTracking() {
+      return withContext("core.navigation.tracking", "tracking", ({ ownerUserId, runtime }) => Object.freeze({
+        morningWeighIn: resolveMorningWeighInSupport({
+          executionItems: runtime.executionItems ?? [],
+          protocols: runtime.protocols ?? [],
+          reminders: runtime.reminders ?? [],
+          userId: ownerUserId,
+        }),
+      }));
     },
   });
 
@@ -162,6 +251,49 @@ function compactObject(value) {
 
 function evidenceType(record) {
   return (record?.payload ?? record)?.evidence_type ?? null;
+}
+
+function projectTrainingHistorySession(record) {
+  const session = record.payload ?? record;
+  return {
+    id: session.id ?? record.canonicalId,
+    evidence_type: "training",
+    observed_at: session.observed_at ?? record.lastObservedAt,
+    exercises: (session.exercises ?? []).map((exercise) => ({
+      id: exercise.id,
+      canonicalExerciseId: exercise.canonicalExerciseId,
+      name: exercise.name,
+      body_region: exercise.body_region,
+      equipment: exercise.equipment,
+      ...(exercise.executionVariant ? { executionVariant: exercise.executionVariant } : {}),
+      sets: (exercise.sets ?? []).map((set) => ({
+        reps: set.reps,
+        weight: set.weight ?? set.load,
+        weight_unit: set.weight_unit ?? set.unit ?? "lb",
+      })),
+    })),
+    exerciseRelationshipGroups: session.exerciseRelationshipGroups ?? [],
+  };
+}
+
+function projectGoalContext(goal, date) {
+  if (!goal) return null;
+  const phases = goal.phasePlan?.phases ?? goal.phases ?? goal.phaseTimeline ?? [];
+  const phase = phases.find((candidate) =>
+    (!candidate.startDate || candidate.startDate <= date) &&
+    (!candidate.endDate || date <= candidate.endDate)
+  ) ?? goal.currentPhase ?? null;
+  return {
+    id: goal.id,
+    title: goal.title,
+    type: goal.type,
+    strategy: goal.strategy?.type ?? goal.strategy ?? null,
+    phase: phase ? {
+      type: phase.type ?? null,
+      label: phase.label ?? phase.name ?? phase.title ?? null,
+      name: phase.name ?? null,
+    } : null,
+  };
 }
 
 function createReadPrincipal(userId) {

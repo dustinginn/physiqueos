@@ -62,9 +62,7 @@ describe("production repository facade", () => {
 
   it.each([
     "../../app/briefings/weekly/page.js",
-    "../../app/check-in/morning/page.js",
     "../../app/goals/[goalId]/edit/page.js",
-    "../../app/log/training/page.js",
     "../../app/profile/operating-plan/execution/[executionId]/page.js",
     "../../app/profile/operating-plan/execution/dexa/page.js",
     "../../app/profile/operating-plan/execution/peptides/[protocolId]/page.js",
@@ -73,7 +71,6 @@ describe("production repository facade", () => {
     "../../app/profile/operating-plan/supplements/[protocolId]/edit/page.js",
     "../../app/profile/operating-plan/supplements/new/page.js",
     "../../app/profile/operating-plan/tracking/morning-weigh-in/page.js",
-    "../../app/profile/operating-plan/tracking/page.js",
     "../../app/profile/protocols/[protocolId]/page.js",
   ])("enters the common read scope for audited direct composite page %s", (relativePath) => {
     const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
@@ -84,9 +81,13 @@ describe("production repository facade", () => {
     "../../app/briefings/monthly/[artifactId]/page.js",
     "../../app/briefings/review/[artifactId]/page.js",
     "../../app/briefings/review/page.js",
-  ])("routes audited Briefing page %s through the provider-native navigation read model", (relativePath) => {
+    "../../app/check-in/morning/page.js",
+    "../../app/log/training/page.js",
+    "../../app/profile/page.js",
+    "../../app/profile/operating-plan/tracking/page.js",
+  ])("routes audited page %s through a provider-native navigation read model", (relativePath) => {
     const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
-    expect(source).toContain("getProductionBriefingNavigationReadService");
+    expect(source).toMatch(/getProduction(?:Briefing|Core)NavigationReadService/);
     expect(source).not.toMatch(/FounderRepositories\.runInReadScope|loadCanonicalRuntime/);
   });
 
