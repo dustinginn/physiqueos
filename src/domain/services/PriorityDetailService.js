@@ -24,6 +24,7 @@ import {
   resolveMorningWeighInSupport,
 } from "./TrackingSupportService";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+import { isReminderOccurrenceCompleted } from "./ReminderOccurrenceCompletion.js";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -137,7 +138,8 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           goals,
           operatingPlan,
           operatingRhythm,
-          occurrenceDate: dateKey(now()),
+          occurrenceDate: getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone)),
+          timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
         });
       }
 
@@ -155,6 +157,8 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           reminder,
           goals,
           operatingPlan,
+          occurrenceDate: getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone)),
+          timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
         });
       }
 
@@ -171,7 +175,8 @@ function createExecutionPriorityDetail({
   protocol,
 }) {
   if (!protocol || !projection) return null;
-  const actionable =
+  const completed = projection.occurrenceCompleted === true;
+  const actionable = !completed &&
     projection.operationalState ===
     ExecutionPriorityOperationalState.ACTIONABLE;
   const setupRequired = [
@@ -200,7 +205,9 @@ function createExecutionPriorityDetail({
     title: projection.title,
     eyebrow: "Priority Detail",
     subtitle: projection.timeOfDayLabel,
-    status: actionable
+    status: completed
+      ? "Completed"
+      : actionable
       ? "Open"
       : setupRequired
         ? "Setup required"
@@ -311,7 +318,8 @@ function createNonDosingSupportPriorityDetail({
   protocol,
 }) {
   if (!protocol || !projection) return null;
-  const actionable =
+  const completed = projection.occurrenceCompleted === true;
+  const actionable = !completed &&
     projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
@@ -323,7 +331,7 @@ function createNonDosingSupportPriorityDetail({
     title: projection.title,
     eyebrow: "Priority Detail",
     subtitle: projection.timeOfDayLabel,
-    status: actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    status: completed ? "Completed" : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
     completable: actionable && projection.completable,
     completionContext:
       actionable && projection.completable
@@ -394,7 +402,8 @@ function createSupplementSupportPriorityDetail({
   protocol,
 }) {
   if (!protocol || !projection) return null;
-  const actionable =
+  const completed = projection.occurrenceCompleted === true;
+  const actionable = !completed &&
     projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
@@ -410,7 +419,7 @@ function createSupplementSupportPriorityDetail({
     title: projection.title,
     eyebrow: "Priority Detail",
     subtitle: projection.timeOfDayLabel,
-    status: actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    status: completed ? "Completed" : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
     completable: actionable && projection.completable,
     completionContext:
       actionable && projection.completable
@@ -551,8 +560,10 @@ function createLegacyReminderOnlyProtocolPriorityDetail({
   operatingPlan,
   operatingRhythm,
   occurrenceDate,
+  timeZone,
 }) {
   if (!protocol) return null;
+  const completed = isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone });
 
   const transition = resolveProtocolDoseTransition(protocol, occurrenceDate);
   const currentDose = formatDose(transition.effectiveDose);
@@ -569,9 +580,9 @@ function createLegacyReminderOnlyProtocolPriorityDetail({
     title: protocol.name,
     eyebrow: "Priority Detail",
     subtitle: reminder.schedule?.timeOfDay === "night" ? "Tonight" : "Today",
-    status: "Open",
-    completable: true,
-    completionContext: {
+    status: completed ? "Completed" : "Open",
+    completable: !completed,
+    completionContext: completed ? null : {
       occurrenceDate,
       dose: currentDose,
       protocolId: protocol.id,
@@ -814,14 +825,16 @@ function formatProgressPhotoScheduleSubtitle(schedule = {}) {
   return "Scheduled for today.";
 }
 
-function createReminderPriorityDetail({ reminder, goals, operatingPlan }) {
+function createReminderPriorityDetail({ reminder, goals, operatingPlan, occurrenceDate, timeZone }) {
+  const completed = isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone });
   return {
     id: reminder.id,
     title: reminder.title,
     eyebrow: "Priority Detail",
     subtitle: formatSchedule(reminder.schedule),
-    status: "Open",
-    completable: true,
+    status: completed ? "Completed" : "Open",
+    completable: !completed,
+    completionContext: completed ? null : { occurrenceDate, dose: null, protocolId: null },
     action: {
       label: "Continue",
       href: "/",

@@ -84,6 +84,24 @@ describe("Execution-backed priority detail", () => {
     expect(JSON.stringify(detail)).not.toContain("1 mg");
   });
 
+  it("shows a same-day completed occurrence without offering Mark Complete", async () => {
+    const detail = await service({
+      executionItems: [execution({ timeline: [phase("0.75")] })],
+      protocol,
+      reminderRecord: {
+        ...reminder,
+        completedAt: "2026-07-30T19:15:00Z",
+      },
+    }).getPriorityDetail(reminder.id);
+
+    expect(detail).toMatchObject({
+      status: "Completed",
+      completable: false,
+      completionContext: null,
+    });
+    expect(section(detail, "Completion")).toBeUndefined();
+  });
+
   it("returns missing-Execution setup detail without reading protocol doseHistory", async () => {
     const detail = await service({
       executionItems: [],
@@ -148,7 +166,7 @@ describe("Execution-backed priority detail", () => {
   });
 });
 
-function service({ executionItems, protocol: protocolRecord }) {
+function service({ executionItems, protocol: protocolRecord, reminderRecord = reminder }) {
   const repositories = {
     users: {
       getCurrentUser: async () => ({
@@ -160,7 +178,7 @@ function service({ executionItems, protocol: protocolRecord }) {
       listGoals: async () => [],
     },
     reminders: {
-      getReminderById: async () => reminder,
+      getReminderById: async () => reminderRecord,
     },
     protocols: {
       listProtocols: async () => [protocolRecord],

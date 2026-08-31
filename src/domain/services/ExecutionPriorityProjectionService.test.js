@@ -167,6 +167,30 @@ describe("canonical Execution priority projection", () => {
     expect(result.priorityId).toContain("execution-priority-execution_shared_peptide");
   });
 
+  it("suppresses a completed local-date occurrence but allows the next due date", () => {
+    const completedReminder = {
+      ...reminder,
+      completedAt: "2026-07-30T18:00:00Z",
+    };
+    const sameDay = projectExecutionPriority({
+      executionItem: peptideExecution(),
+      localDate: "2026-07-30",
+      protocol,
+      reminder: completedReminder,
+      timeZone: "America/Los_Angeles",
+    });
+    const laterOccurrence = projectExecutionPriority({
+      executionItem: peptideExecution({ preferredSchedule: schedule(["thursday"]) }),
+      localDate: "2026-08-06",
+      protocol,
+      reminder: completedReminder,
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(sameDay).toMatchObject({ occurrenceCompleted: true, completable: false });
+    expect(laterOccurrence).toMatchObject({ occurrenceCompleted: false, completable: true });
+  });
+
   it("supports future peptide identities and supplement models without title branches", () => {
     const future = projectExecutionPriority({
       executionItem: peptideExecution({

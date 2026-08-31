@@ -12,6 +12,7 @@ describe("PriorityCompletionService", () => {
       mutateCanonicalRuntime,
       now: () => new Date("2026-08-31T12:00:00Z"),
     }).complete({ priorityId: "reminder" });
+    expect(result.status).toBe("completed");
     expect(result.completion.completedAt).toBe("2026-08-31T12:00:00.000Z");
     expect(mutateCanonicalRuntime).toHaveBeenCalledWith(expect.objectContaining({
       allowedCollections: ["reminders"],
@@ -39,5 +40,63 @@ describe("PriorityCompletionService", () => {
       completionHistory: [{ id: "reminder:2026-08-31", canonicalEvidenceId: null }],
     });
     expect(JSON.stringify(candidate)).not.toContain("undefined");
+  });
+
+  it("returns an idempotent result without rewriting a same-date completion", async () => {
+    const original = {
+      id: "reminder",
+      active: true,
+      completedAt: "2026-08-31T15:12:06.241Z",
+    };
+    const mutateCanonicalRuntime = vi.fn(async (options) => {
+      const candidate = { reminders: [structuredClone(original)] };
+      const before = JSON.stringify(candidate);
+      const result = await options.mutate(candidate);
+      return {
+        result,
+        changedCollections: before === JSON.stringify(candidate) ? [] : ["reminders"],
+        revision: 10,
+      };
+    });
+    const result = await createPriorityCompletionService({
+      mutateCanonicalRuntime,
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({
+      priorityId: "reminder",
+      occurrenceDate: "2026-08-31",
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(result).toMatchObject({
+      status: "already_completed",
+      changedCollections: [],
+      completion: { completedAt: original.completedAt },
+    });
+  });
+
+  it("allows a genuinely new occurrence without treating the prior day as complete", async () => {
+    let candidate;
+    const mutateCanonicalRuntime = async (options) => {
+      candidate = {
+        reminders: [{
+          id: "reminder",
+          active: true,
+          completedAt: "2026-08-30T16:00:00Z",
+        }],
+      };
+      const result = await options.mutate(candidate);
+      return { result, changedCollections: ["reminders"], revision: 11 };
+    };
+    const result = await createPriorityCompletionService({
+      mutateCanonicalRuntime,
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({
+      priorityId: "reminder",
+      occurrenceDate: "2026-08-31",
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(result.status).toBe("completed");
+    expect(candidate.reminders[0].completedAt).toBe("2026-08-31T16:00:00.000Z");
   });
 });

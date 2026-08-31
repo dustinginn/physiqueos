@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import IconBadge from "../ui/IconBadge";
+import PriorityCompletionForm from "./PriorityCompletionForm";
 
 const iconMap = {
   activity: Activity,
@@ -136,19 +137,12 @@ export default function FocusTile({
           </span>
         </Link>
 
-        <form action={completeAction} className="shrink-0">
-          <input name="priorityId" type="hidden" value={completionId} />
-          <input name="occurrenceDate" type="hidden" value={completionContext?.occurrenceDate ?? ""} />
-          <input name="dose" type="hidden" value={completionContext?.dose ?? ""} />
-          <input name="protocolId" type="hidden" value={completionContext?.protocolId ?? ""} />
-          <button
-            aria-label={`Mark ${label} complete`}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--divider)] bg-[var(--surface)] text-transparent transition hover:border-[var(--confidence)] hover:text-[var(--confidence)]"
-            type="submit"
-          >
-            <Check size={13} strokeWidth={2.5} aria-hidden="true" />
-          </button>
-        </form>
+        <PriorityCompletionForm
+          action={completeAction}
+          completionContext={completionContext}
+          label={label}
+          priorityId={completionId}
+        />
       </div>
     );
   }

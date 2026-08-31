@@ -4,6 +4,7 @@ import {
   resolveLocalTimeZone,
 } from "../utils/localDate";
 import { resolveExecutionPhase } from "./ExecutionPhaseResolver";
+import { isReminderOccurrenceCompleted } from "./ReminderOccurrenceCompletion.js";
 
 export const ExecutionPriorityOperationalState = Object.freeze({
   ACTIONABLE: "actionable",
@@ -70,6 +71,10 @@ export function projectExecutionPriority({
     protocolRootId,
     executionItem?.id
   );
+  const occurrenceCompleted = isReminderOccurrenceCompleted(reminder, {
+    occurrenceDate: resolvedLocalDate,
+    timeZone: resolvedTimeZone,
+  });
 
   if (!executionItem) {
     const occurrenceEligible =
@@ -82,6 +87,7 @@ export function projectExecutionPriority({
       historyAnchorId,
       localDate: resolvedLocalDate,
       occurrenceEligible,
+      occurrenceCompleted,
       operationalReason: ExecutionPriorityOperationalReason.MISSING_EXECUTION,
       operationalState: ExecutionPriorityOperationalState.MISSING_EXECUTION,
       priorityId,
@@ -107,6 +113,7 @@ export function projectExecutionPriority({
       historyAnchorId,
       localDate: resolvedLocalDate,
       occurrenceEligible: false,
+      occurrenceCompleted,
       operationalReason: ExecutionPriorityOperationalReason.EXECUTION_INACTIVE,
       operationalState: ExecutionPriorityOperationalState.INACTIVE,
       priorityId,
@@ -125,6 +132,7 @@ export function projectExecutionPriority({
       historyAnchorId,
       localDate: resolvedLocalDate,
       occurrenceEligible: false,
+      occurrenceCompleted,
       operationalReason:
         ExecutionPriorityOperationalReason.NOT_SCHEDULED_TODAY,
       operationalState:
@@ -159,6 +167,7 @@ export function projectExecutionPriority({
     localDate: resolvedLocalDate,
     nextPhase: phaseResolution.next,
     occurrenceEligible: true,
+    occurrenceCompleted,
     operationalReason: missingRequiredPhase
       ? ExecutionPriorityOperationalReason.MISSING_ACTIVE_PHASE
       : missingHistoryAnchor
@@ -240,6 +249,7 @@ function createProjection({
   localDate,
   nextPhase = null,
   occurrenceEligible,
+  occurrenceCompleted = false,
   operationalReason,
   operationalState,
   priorityId,
@@ -262,6 +272,7 @@ function createProjection({
         : "active"
       : "missing",
     occurrenceEligible,
+    occurrenceCompleted,
     scheduleWeekdays: schedule?.daysOfWeek ?? [],
     exactLocalTime: schedule?.timeOfDay ?? null,
     timeOfDayLabel: formatTimeOfDayLabel(schedule?.timeOfDay),
@@ -278,7 +289,8 @@ function createProjection({
     executionHref,
     completable:
       operationalState === ExecutionPriorityOperationalState.ACTIONABLE &&
-      Boolean(historyAnchorId),
+      Boolean(historyAnchorId) &&
+      !occurrenceCompleted,
     provenance: {
       priorityIdentity: historyAnchorId ? "reminder" : "execution",
       historyAnchor: historyAnchorId ? "reminder" : null,
