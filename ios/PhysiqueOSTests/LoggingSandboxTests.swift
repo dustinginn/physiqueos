@@ -69,7 +69,8 @@ final class LoggingSandboxTests: XCTestCase {
         let cases: [(EvidenceFixtureScenario, EvidenceCategory)] = [
             (.training, .training), (.cardio, .training), (.nutrition, .nutrition),
             (.weight, .weight), (.activity, .activity), (.dexa, .dexa),
-            (.progressPhotos, .progressPhotos), (.generic, .generic),
+            (.progressPhotos, .progressPhotos), (.labs, .labs), (.recovery, .recovery), (.generic, .generic),
+            (.mixed, .nutrition),
         ]
 
         for (scenario, category) in cases {
@@ -89,6 +90,8 @@ final class LoggingSandboxTests: XCTestCase {
             ("activity rings steps", .activity, .activity),
             ("DEXA body composition", .dexa, .dexa),
             ("front side rear progress", .progressPhotos, .progressPhotos),
+            ("CBC lab panel bloodwork", .labs, .labs),
+            ("sleep recovery readiness", .recovery, .recovery),
             ("miscellaneous receipt", .generic, .generic),
         ]
         for (details, scenario, category) in cases {
@@ -99,6 +102,17 @@ final class LoggingSandboxTests: XCTestCase {
             let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
             XCTAssertEqual(store.review(id: id)?.category, category)
         }
+    }
+
+    func testAutomaticMixedUploadPreservesRecognizedSiblingCategories() throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.details = "nutrition calories and activity rings"
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: store.evidenceDraft), .mixed)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        let review = try XCTUnwrap(store.review(id: id))
+        XCTAssertEqual(review.items.map(\.category), [.nutrition, .activity])
+        XCTAssertEqual(review.completionTitle, "Evidence review complete")
     }
 
     func testMorningCheckInRequiresEveryPreviousDayPriorityAndSavesTodaysWeight() throws {
@@ -133,25 +147,35 @@ final class LoggingSandboxTests: XCTestCase {
         let review = try XCTUnwrap(store.review(id: id))
         XCTAssertEqual(review.category, .weight)
         XCTAssertEqual(review.status, .awaitingConfirmation)
-        XCTAssertTrue(review.fields.contains { $0.id == "weight" })
+        XCTAssertTrue(review.items[0].fields.contains { $0.id == "weight" })
     }
 
     func testCategorySpecificReviewFieldsMatchCurrentWebPresentationSemantics() {
         let draft = preparedStore(scenario: .training).evidenceDraft
         let training = LoggingSandboxFixtureFactory.review(category: .training, scenario: .training, draft: draft)
-        XCTAssertEqual(Set(training.fields.map(\.id)), ["exercises", "sets", "duration", "activeCalories", "appleLink", "source", "benchPress", "cableFly"])
+        XCTAssertEqual(training.items.map(\.title), ["Traditional Strength Training", "Outdoor Walk", "Indoor Cycling"])
+        XCTAssertEqual(training.items[0].exercises.map(\.name), ["Bench Press", "Cable Fly"])
+        XCTAssertEqual(training.items[0].exercises[0].sets.map(\.summary), ["8 reps @ 180 lb", "8 reps @ 180 lb", "7 reps @ 180 lb"])
 
         let nutrition = LoggingSandboxFixtureFactory.review(category: .nutrition, scenario: .nutrition, draft: draft)
-        XCTAssertEqual(Set(nutrition.fields.map(\.id)), ["calories", "protein", "carbs", "fat", "source", "meals"])
+        XCTAssertEqual(Set(nutrition.items[0].fields.map(\.id)), ["calories", "protein", "carbs", "fat", "source"])
+        XCTAssertEqual(nutrition.items[0].meals.map(\.name), ["Breakfast", "Dinner"])
+        XCTAssertTrue(nutrition.items[0].nutritionReplacementRequired)
 
         let activity = LoggingSandboxFixtureFactory.review(category: .activity, scenario: .activity, draft: draft)
-        XCTAssertEqual(Set(activity.fields.map(\.id)), ["activeCalories", "exerciseMinutes", "duration", "source"])
+        XCTAssertEqual(Set(activity.items[0].fields.map(\.id)), ["activeCalories", "exerciseMinutes", "duration", "source"])
 
         let dexa = LoggingSandboxFixtureFactory.review(category: .dexa, scenario: .dexa, draft: draft)
-        XCTAssertEqual(Set(dexa.fields.map(\.id)), ["totalMass", "bodyFat", "fatMass", "leanMass", "source"])
+        XCTAssertEqual(Set(dexa.items[0].fields.map(\.id)), ["totalMass", "bodyFat", "fatMass", "leanMass", "source"])
 
         let photos = LoggingSandboxFixtureFactory.review(category: .progressPhotos, scenario: .progressPhotos, draft: draft)
-        XCTAssertEqual(Set(photos.fields.map(\.id)), ["poses", "timeOfDay", "goalRelationship", "source"])
+        XCTAssertEqual(Set(photos.items[0].fields.map(\.id)), ["poses", "timeOfDay", "goalRelationship", "source"])
+
+        let labs = LoggingSandboxFixtureFactory.review(category: .labs, scenario: .labs, draft: draft)
+        XCTAssertEqual(Set(labs.items[0].fields.map(\.id)), ["panel", "hemoglobin", "source"])
+
+        let recovery = LoggingSandboxFixtureFactory.review(category: .recovery, scenario: .recovery, draft: draft)
+        XCTAssertEqual(Set(recovery.items[0].fields.map(\.id)), ["sleep", "source"])
     }
 
     func testReviewRequiresInclusionAndCompletesWithoutMutatingItsSourceFields() throws {
@@ -159,15 +183,82 @@ final class LoggingSandboxTests: XCTestCase {
         _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
         let reviewId = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
 
-        let originalFields = try XCTUnwrap(store.review(id: reviewId)).fields
-        store.updateReview(id: reviewId) { $0.included = false }
+        let originalFields = try XCTUnwrap(store.review(id: reviewId)).items[0].fields
+        store.updateReviewItem(reviewId: reviewId, itemId: "weight") { $0.included = false }
         XCTAssertFalse(try XCTUnwrap(store.review(id: reviewId)).canConfirm)
         XCTAssertFailure(store.confirmReview(id: reviewId), "Complete required fields and include the evidence before confirming.")
 
-        store.updateReview(id: reviewId) { $0.included = true }
+        store.updateReviewItem(reviewId: reviewId, itemId: "weight") { $0.included = true }
         let confirmed = try value(store.confirmReview(id: reviewId))
         XCTAssertEqual(confirmed.status, .confirmed)
-        XCTAssertEqual(confirmed.fields, originalFields)
+        XCTAssertEqual(confirmed.items[0].fields, originalFields)
+    }
+
+    func testMultiWorkoutPackagePreservesIndependentCardsAndDecisions() throws {
+        let store = preparedStore(scenario: .training)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewId = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        let initial = try XCTUnwrap(store.review(id: reviewId))
+        XCTAssertEqual(initial.items.map(\.title), ["Traditional Strength Training", "Outdoor Walk", "Indoor Cycling"])
+        store.updateReviewItem(reviewId: reviewId, itemId: "walk") { $0.included = false }
+        let updated = try XCTUnwrap(store.review(id: reviewId))
+        XCTAssertEqual(updated.includedCount, 2)
+        XCTAssertEqual(updated.excludedCount, 1)
+        XCTAssertTrue(updated.canConfirm)
+    }
+
+    func testNutritionReplacementChoiceBlocksThenAllowsConfirmation() throws {
+        let store = preparedStore(scenario: .nutrition)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        XCTAssertFalse(try XCTUnwrap(store.review(id: id)).canConfirm)
+        store.updateReviewItem(reviewId: id, itemId: "nutrition") { $0.nutritionDisposition = .replaceExisting }
+        XCTAssertTrue(try XCTUnwrap(store.review(id: id)).canConfirm)
+    }
+
+    func testDEXADedicatedIntakeRequiresPDFValuesAndFounderConfirmation() throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .dexa
+        store.evidenceDraft.attachments = [.init(id: "pdf", displayName: "BodySpec.pdf", source: .files)]
+        XCTAssertFailure(store.submitEvidence(now: date(2026, 8, 30)), "Confirm the required DEXA values before continuing.")
+        store.evidenceDraft.dexa.totalMass = "171.4"
+        store.evidenceDraft.dexa.bodyFatPercentage = "8.3"
+        store.evidenceDraft.dexa.fatMass = "14.3"
+        store.evidenceDraft.dexa.leanMass = "150"
+        store.evidenceDraft.dexa.boneMineralContent = "6.8"
+        store.evidenceDraft.dexa.restingMetabolicRate = "1842"
+        store.evidenceDraft.dexa.vatMass = "0.42"
+        store.evidenceDraft.dexa.vatVolume = "11.8"
+        store.evidenceDraft.dexa.valuesConfirmed = true
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        XCTAssertEqual(
+            Set(try XCTUnwrap(store.review(id: id)).items[0].fields.map(\.id)),
+            ["totalMass", "bodyFat", "fatMass", "leanMass", "boneMineral", "rmr", "vatMass", "vatVolume", "source"]
+        )
+    }
+
+    func testProgressPhotoIntakePreservesOrderIdentityAndSessionConfirmation() throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.setEvidenceScenario(.progressPhotos)
+        store.addAttachments([
+            .init(id: "front", displayName: "front.jpg", source: .photos),
+            .init(id: "rear", displayName: "rear.jpg", source: .photos),
+        ])
+        XCTAssertFailure(store.submitEvidence(now: date(2026, 8, 30)), "Confirm every photo identity before continuing.")
+        for identity in store.evidenceDraft.photoIdentities {
+            store.updatePhotoIdentity(id: identity.id) { $0.confirmed = true }
+        }
+        store.evidenceDraft.photoSession.originalUnedited = true
+        store.moveAttachment(id: "rear", by: -1)
+        XCTAssertEqual(store.evidenceDraft.attachments.map(\.id), ["rear", "front"])
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        XCTAssertFalse(try XCTUnwrap(store.review(id: id)).canConfirm)
+        store.updateReviewItem(reviewId: id, itemId: "photos") { item in
+            item.fields[item.fields.firstIndex(where: { $0.id == "timeOfDay" })!].value = "Morning"
+        }
+        XCTAssertTrue(try XCTUnwrap(store.review(id: id)).canConfirm)
     }
 
     func testSaveForLaterPreservesReviewAndDiscardRemovesIt() throws {
@@ -208,6 +299,20 @@ final class LoggingSandboxTests: XCTestCase {
         let store = LoggingSandboxStore(now: date(2026, 8, 30))
         store.evidenceDraft.details = "Uploaded evidence details"
         store.evidenceDraft.scenario = scenario
+        if scenario == .dexa {
+            store.evidenceDraft.attachments = [.init(id: "pdf", displayName: "BodySpec.pdf", source: .files)]
+            store.evidenceDraft.dexa.totalMass = "171.4"
+            store.evidenceDraft.dexa.bodyFatPercentage = "8.3"
+            store.evidenceDraft.dexa.fatMass = "14.3"
+            store.evidenceDraft.dexa.leanMass = "150"
+            store.evidenceDraft.dexa.valuesConfirmed = true
+        }
+        if scenario == .progressPhotos {
+            store.setEvidenceScenario(.progressPhotos)
+            store.addAttachments([.init(id: "photo", displayName: "front.jpg", source: .photos)])
+            store.evidenceDraft.photoIdentities.indices.forEach { store.evidenceDraft.photoIdentities[$0].confirmed = true }
+            store.evidenceDraft.photoSession.originalUnedited = true
+        }
         return store
     }
 

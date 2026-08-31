@@ -2016,3 +2016,82 @@ No backend, production data/worktree, DigitalOcean, PostgreSQL, authentication,
 workers, deployment, or HealthKit entitlement changed. No paid dependency or
 incremental infrastructure cost was added. Version remains 1.0; the next local
 TestFlight candidate build number is 6 and is not authorized for upload.
+
+## 65. Source-grounded upload workflow parity scrub (2026-08-30)
+
+Build 6 exposed an important distinction: matching the shared Evidence Review
+shell is not equivalent to preserving the whole upload workflow. This pass
+re-audited current production web source, including `LogHubScreen.jsx`,
+`UploadAnythingForm.jsx`, the Log upload action/route, `EvidenceIntakeService`,
+`EvidenceReviewScreen.jsx`, `EvidenceReviewPresentationService`,
+`EvidenceExperiencePresentationService`, `EvidenceSuccessNavigationService`,
+`TrainingPerformanceSuccessPresentationService`, the review route/actions and
+tests, `DEXAUploadScreen.jsx` plus its action/contract, and
+`ProgressPhotoUploadScreen.jsx` plus its action/tests. Native now treats a
+review as a package of independently includable evidence objects instead of a
+single generic card.
+
+### Current web upload workflow inventory and Native disposition
+
+| Workflow | Current web steps that must survive | Native sandbox disposition |
+|---|---|---|
+| Universal upload | Photos/files or typed note; multiple artifacts; event date; submit; visible upload-preparation state; staged review | Preserved. Photos and Files remain separate iOS pickers; ordered removal/reselection, details, occurrence date, discard, and the preparation screen are present. |
+| Mixed upload package | Each screenshot interpreted independently; recognized siblings retained; related same-type artifacts reconciled; unrecognized/failed siblings do not erase valid records | Package model implemented. Deterministic mixed Nutrition + Activity input produces two review cards with independent inclusion; no single-card flattening. Live per-file diagnostics remain server-owned. |
+| Shared Evidence Review | One card per evidence object; Included/Excluded; include/exclude; live included/excluded counts; Save included evidence; Read upload again; Save and return later; destructive discard; type-aware completion and return to Log | Preserved as package-level Native UI and store state. A review cannot confirm with no included items or an unresolved domain-specific decision. |
+| Training upload | One card per detected workout; duration, active calories, average heart rate, source; structured strength exercises in order with all sets; variants; Superset relationships; provisional identity and structural correction where present | Strength fixture renders every exercise/set plus variant and Superset context. Its package also retains separate Walk and Indoor Cycling workout cards. Cards are independently includable. Valid variant correction is available; live provisional identity/structural actions remain an integration boundary. |
+| Training post-confirmation | Only persisted, newly created performance events appear; supported receipts are session-volume and reps-at-load records with prior baseline where valid | Completion can exercise the web-backed Workout achievements receipt. Plateau/no-improvement text was not invented because current upload success source only presents newly created record events. |
+| Nutrition | Daily calories/protein/carbs/fat/source; ordered meals; expandable food/brand/serving/calorie detail; meal-total reconciliation; same-day replacement decision and projected daily total | Full fixture detail is preserved. A same-date example blocks save until Replace existing or Add as a distinct meal is chosen. |
+| Weight evidence | Reviewed uploaded weight plus source, distinct from direct weigh-in | Preserved as its own review item. Manual/Morning weight behavior is unchanged. |
+| Activity | ActivityDay active calories, exercise minutes, duration, source | Preserved as its own review item and remains separate from detected workout cards. |
+| Dedicated DEXA | Raw BodySpec PDF; measured date; founder-confirmed Total Mass, Body Fat, Fat Tissue, Lean Tissue, Bone Mineral, RMR, VAT Mass, VAT Volume; explicit value confirmation; shared Evidence Review | Restored before shared review. Required mass/body-fat values, PDF, and confirmation gate submission; optional supported values remain blank rather than inferred and remain visible in review when supplied. |
+| Dedicated Progress Photos | Multi-photo selection; ordered identities; replace/remove/reorder; orientation, contraction, pose variant/custom label, Goal role, tags; confirm every identity; capture date; session conditions; original/unedited confirmation; shared review | Restored before shared review. Native retains ordered identities, pose controls, Goal role/tags, session conditions, capture date, removal/reselection, and original/unedited gate. Shared review retains pose correction and shared session summary. |
+| Lab Panel | Intake recognizes `lab_panel`/`labs`; current shared presenter uses the generic scalar fallback | Distinct deterministic Lab Panel routing and review are present. No Native-only laboratory interpretation or specialist workflow was invented. |
+| Recovery Day | Intake recognizes `recovery_day`/`recovery`; current shared presenter uses the generic scalar fallback (for example retained sleep duration) | Distinct deterministic Recovery routing and review are present. It remains separate from Activity and does not imply HealthKit sync. |
+| Generic fallback | Retained non-internal scalar/details content in the shared card | Preserved without inventing a generalized classification dashboard. |
+| Re-read/recovery | Re-read original upload with updated/current/failed outcome; prior review survives failure; save for later; discard with confirmation | Asset-backed reviews retain the re-read control and current-state result; note-only reviews do not offer a meaningless file re-read. Save-for-later and confirmed discard return directly to Log. Live updated/failed reprocessing outcomes require the server worker and optimistic concurrency contract. |
+| Completion | Type-aware success; Training may add a validated achievement receipt; Continue returns to Log | A quiet review completion remains local and returns through the existing Log navigation; it does not claim Health sync or production mutation. |
+
+### Acceptance gate
+
+Before production data is connected, physical Native acceptance must cover:
+universal single- and multi-asset upload, mixed-category packages, structured
+Training, cardio/other workouts, Nutrition including same-date replacement,
+uploaded Weight, Activity, dedicated DEXA, dedicated Progress Photos, generic
+Lab Panel and Recovery fallback cards, independent include/exclude, correction controls, re-read, save for
+later, discard, confirmation, achievements where a validated receipt exists,
+and return navigation. Passing only the first upload screen or a single generic
+review card does not satisfy this gate.
+
+### Intentional Native presentation differences
+
+Native retains the approved split Photos/Files source menu and uses compact
+iOS cards, menus, disclosure groups, pickers, and confirmation dialogs. Those
+are presentation changes only. The web's workflow steps, record boundaries,
+date meaning, domain-specific details, and confirmation gates remain visible.
+The explicitly approved combined Workout Logger review remains unchanged and
+does not set precedent for shortening universal evidence workflows.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Replace deterministic routing with authenticated upload and the existing
+  per-artifact interpretation/reconciliation service, preserving mixed-package
+  results and per-file outcomes.
+- Decode server-owned review objects and persisted item decisions; wire real
+  re-read outcomes, optimistic concurrency, save-for-later durability, discard,
+  and exactly-once confirmation.
+- Reuse existing Training exercise identity, variant, Superset, structural
+  correction, and durable performance-event services; do not create Native
+  canonical ownership.
+- Wire same-date Nutrition replacement to the authoritative whole-day merge and
+  duplicate-active-day invariant.
+- Send the dedicated DEXA and Progress Photo input contracts through their
+  current validation/media boundaries, including authorized preview delivery
+  and photo-session metadata persistence.
+- Keep ActivityDay and workout ownership distinct; live Apple Health remains a
+  separately approved future adapter.
+
+No production worktree, backend/API, authentication, DigitalOcean, PostgreSQL,
+worker/outbox, deployment, canonical data, or TestFlight state was touched. No
+paid service, entitlement, dependency, or incremental infrastructure cost was
+added. Version 1.0/build 6 metadata is unchanged; build 7 is the next available
+TestFlight candidate and has not been prepared, pushed, or uploaded.

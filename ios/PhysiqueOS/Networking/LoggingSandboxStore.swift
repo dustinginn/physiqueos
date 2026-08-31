@@ -78,11 +78,33 @@ final class LoggingSandboxStore {
                 evidenceDraft.attachments.append(attachment)
             }
         }
+        syncPhotoIdentities()
         interpretationState = .editing
     }
 
     func removeAttachment(id: String) {
         evidenceDraft.attachments.removeAll { $0.id == id }
+        evidenceDraft.photoIdentities.removeAll { $0.attachmentId == id }
+        interpretationState = .editing
+    }
+
+    func moveAttachment(id: String, by offset: Int) {
+        guard let index = evidenceDraft.attachments.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard evidenceDraft.attachments.indices.contains(destination) else { return }
+        evidenceDraft.attachments.swapAt(index, destination)
+        syncPhotoIdentities()
+    }
+
+    func setEvidenceScenario(_ scenario: EvidenceFixtureScenario) {
+        evidenceDraft.scenario = scenario
+        if scenario == .progressPhotos { syncPhotoIdentities() }
+        interpretationState = .editing
+    }
+
+    func updatePhotoIdentity(id: String, _ mutation: (inout ProgressPhotoIdentityDraft) -> Void) {
+        guard let index = evidenceDraft.photoIdentities.firstIndex(where: { $0.id == id }) else { return }
+        mutation(&evidenceDraft.photoIdentities[index])
         interpretationState = .editing
     }
 
@@ -90,6 +112,26 @@ final class LoggingSandboxStore {
         guard evidenceDraft.hasContent else { return .failure(.init(message: "Add a photo, file, or details before continuing.")) }
         guard Calendar.current.startOfDay(for: evidenceDraft.occurrenceDate) <= Calendar.current.startOfDay(for: now) else {
             return .failure(.init(message: "Evidence cannot be dated in the future."))
+        }
+        if evidenceDraft.scenario == .dexa {
+            guard evidenceDraft.attachments.contains(where: { $0.source == .files && $0.displayName.lowercased().hasSuffix(".pdf") }) else {
+                return .failure(.init(message: "Choose the raw DEXA PDF before continuing."))
+            }
+            guard evidenceDraft.dexa.hasRequiredValues, evidenceDraft.dexa.valuesConfirmed else {
+                return .failure(.init(message: "Confirm the required DEXA values before continuing."))
+            }
+        }
+        if evidenceDraft.scenario == .progressPhotos {
+            syncPhotoIdentities()
+            guard !evidenceDraft.photoIdentities.isEmpty else {
+                return .failure(.init(message: "Choose at least one progress photo."))
+            }
+            guard evidenceDraft.photoIdentities.allSatisfy(\.confirmed) else {
+                return .failure(.init(message: "Confirm every photo identity before continuing."))
+            }
+            guard evidenceDraft.photoSession.originalUnedited else {
+                return .failure(.init(message: "Confirm that these are original, unedited photos."))
+            }
         }
         interpretationState = .pending
         return .success(nil)
@@ -132,6 +174,13 @@ final class LoggingSandboxStore {
         reviews[id] = review
     }
 
+    func updateReviewItem(reviewId: String, itemId: String, _ mutation: (inout EvidenceReviewItem) -> Void) {
+        updateReview(id: reviewId) { review in
+            guard let index = review.items.firstIndex(where: { $0.id == itemId }) else { return }
+            mutation(&review.items[index])
+        }
+    }
+
     func confirmReview(id: String) -> Result<LocalEvidenceReview, LoggingSandboxError> {
         guard var review = review(id: id) else { return .failure(.init(message: "This review is unavailable.")) }
         guard review.canConfirm else { return .failure(.init(message: "Complete required fields and include the evidence before confirming.")) }
@@ -158,6 +207,15 @@ final class LoggingSandboxStore {
         )
         interpretationState = .ready(reviewId: id)
         return id
+    }
+
+    private func syncPhotoIdentities() {
+        let photos = evidenceDraft.attachments.filter { $0.source == .photos }
+        let existing = Dictionary(uniqueKeysWithValues: evidenceDraft.photoIdentities.map { ($0.attachmentId, $0) })
+        let defaults = LoggingSandboxFixtureFactory.defaultPhotoIdentities(for: photos)
+        evidenceDraft.photoIdentities = photos.enumerated().map { index, attachment in
+            existing[attachment.id] ?? defaults[index]
+        }
     }
 
     static func dateKey(_ date: Date) -> String {
