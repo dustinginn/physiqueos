@@ -1,5 +1,6 @@
 import {
   assertValidTrainingPerformanceEvent,
+  haveSameTrainingPerformanceEventAchievementSemantics,
   haveSameTrainingPerformanceEventSemantics,
 } from "../models/trainingPerformanceEvent";
 import {
@@ -68,7 +69,7 @@ export function createTrainingPerformanceEventPersistenceService({
           newEvents.push(event);
           continue;
         }
-        if (!haveSameTrainingPerformanceEventSemantics(existing, event)) {
+        if (!haveSameTrainingPerformanceEventAchievementSemantics(existing, event)) {
           transaction.abort();
           return result(TrainingPerformanceEventPersistenceOutcome.COLLISION, {
             collisionEventId: event.id,
@@ -120,7 +121,7 @@ export function createTrainingPerformanceEventPersistenceService({
               );
               return (
                 matches.length === 1 &&
-                haveSameTrainingPerformanceEventSemantics(matches[0], event)
+                haveSameTrainingPerformanceEventAchievementSemantics(matches[0], event)
               );
             });
             return (
@@ -201,7 +202,7 @@ async function persistBoundedEventBatch({
             newEvents.push(event);
             continue;
           }
-          if (!haveSameTrainingPerformanceEventSemantics(existing, event)) {
+          if (!haveSameTrainingPerformanceEventAchievementSemantics(existing, event)) {
             throw collision(event.id);
           }
           existingEvents.push(existing);
@@ -262,7 +263,7 @@ async function persistBoundedEventBatch({
             (item) => item.id === event.id
           );
           return matches.length === 1 &&
-            haveSameTrainingPerformanceEventSemantics(matches[0], event);
+            haveSameTrainingPerformanceEventAchievementSemantics(matches[0], event);
         });
         if (
           !eventsAreValid ||
@@ -350,8 +351,23 @@ function deduplicateInput(events) {
   return [...byId.values()];
 }
 function haveSameBatchSemantics(left, right) {
-  const semantic = ({ sourceCommitId: _sourceCommitId, ...value } = {}) => value;
-  return JSON.stringify(semantic(left)) === JSON.stringify(semantic(right));
+  const semantic = ({
+    sourceCommitId: _sourceCommitId,
+    version: _version,
+    ...value
+  } = {}) => value;
+  return stableStringify(semantic(left)) === stableStringify(semantic(right));
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function result(outcome, values = {}) {

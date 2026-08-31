@@ -211,6 +211,134 @@ describe("TrainingPerformanceEventPersistenceService", () => {
     expect(fixture.runtime.piTrainingConfidenceWorkItems).toHaveLength(1);
   });
 
+  it("matches persisted achievements from another source while preserving original provenance", async () => {
+    const originalEvents = [volumeEvent(), repsEvent()].map((event) => ({
+      ...event,
+      version: 5,
+    }));
+    const replayEvents = originalEvents.map((event) => ({
+      ...event,
+      sourceReviewId: "review-2",
+      sourceEvidencePackageId: "package-2",
+      sourceAnalysisId: "analysis-2",
+      createdAt: "2026-08-30T05:21:00.000Z",
+      version: undefined,
+    }));
+    const fixture = createBoundedFixture({
+      trainingPerformanceEvents: originalEvents,
+    });
+    const batch = eventBatch(replayEvents);
+
+    const persisted = await fixture.service.persistEventBatch(replayEvents, {
+      batchId: batch.id,
+      batch,
+      mutateCandidate(candidate) {
+        candidate.piTrainingConfidenceWorkItems = [
+          ...(candidate.piTrainingConfidenceWorkItems ?? []),
+          { id: "work-review-2", performanceEventBatchId: batch.id },
+        ];
+      },
+      finalizeCandidate({ stagedState, commitId }) {
+        stagedState.trainingPerformanceEventBatches =
+          stagedState.trainingPerformanceEventBatches.map((item) =>
+            item.id === batch.id ? { ...item, sourceCommitId: commitId } : item
+          );
+      },
+      validateFinalized(candidate) {
+        return candidate.piTrainingConfidenceWorkItems.filter(
+          (item) => item.performanceEventBatchId === batch.id
+        ).length === 1;
+      },
+    });
+
+    expect(persisted).toMatchObject({
+      outcome: Outcome.MIXED,
+      committed: true,
+      newEvents: [],
+    });
+    expect(persisted.existingEvents).toHaveLength(2);
+    expect(fixture.runtime.trainingPerformanceEvents).toEqual(originalEvents);
+    expect(fixture.runtime.trainingPerformanceEventBatches).toHaveLength(1);
+    expect(fixture.runtime.piTrainingConfidenceWorkItems).toHaveLength(1);
+  });
+
+  it("replays a provider-versioned finalized batch idempotently", async () => {
+    const events = [volumeEvent(), repsEvent()];
+    const persistedEvents = events.map((event) => ({ ...event, version: 5 }));
+    const batch = eventBatch(events);
+    const persistedBatch = {
+      ...batch,
+      sourceCommitId: "prior-commit",
+      version: 3,
+    };
+    const fixture = createBoundedFixture({
+      trainingPerformanceEvents: persistedEvents,
+      trainingPerformanceEventBatches: [persistedBatch],
+      piTrainingConfidenceWorkItems: [
+        { id: "work-current", performanceEventBatchId: batch.id },
+      ],
+    });
+    const before = structuredClone(fixture.runtime);
+
+    const replay = await fixture.service.persistEventBatch(events, {
+      batchId: batch.id,
+      batch,
+      validateFinalized(candidate) {
+        return candidate.piTrainingConfidenceWorkItems.filter(
+          (item) => item.performanceEventBatchId === batch.id
+        ).length === 1;
+      },
+    });
+
+    expect(replay).toMatchObject({
+      outcome: Outcome.MATCHED,
+      committed: false,
+      newEvents: [],
+    });
+    expect(replay.existingEvents).toHaveLength(2);
+    expect(fixture.runtime).toEqual(before);
+  });
+
+  it("keeps incompatible same-ID candidates inside one input batch fail-closed", async () => {
+    const event = volumeEvent();
+    const conflicting = {
+      ...event,
+      previousBaselineValue: event.previousBaselineValue - 10,
+      improvement: event.improvement + 10,
+    };
+    const fixture = createBoundedFixture();
+
+    await expect(fixture.service.persistEventBatch([event, conflicting]))
+      .rejects.toThrow("input contains an identity collision");
+    expect(fixture.mutationCalls).toBe(0);
+    expect(fixture.runtime.trainingPerformanceEvents).toEqual([]);
+  });
+
+  it("rejects a finalized batch true-semantic mismatch despite provider metadata normalization", async () => {
+    const events = [volumeEvent(), repsEvent()];
+    const batch = eventBatch(events);
+    const fixture = createBoundedFixture({
+      trainingPerformanceEvents: events,
+      trainingPerformanceEventBatches: [{
+        ...batch,
+        performanceEventIds: [events[0].id],
+        sourceCommitId: "prior-commit",
+        version: 3,
+      }],
+    });
+
+    const replay = await fixture.service.persistEventBatch(events, {
+      batchId: batch.id,
+      batch,
+    });
+
+    expect(replay).toMatchObject({
+      outcome: Outcome.COLLISION,
+      committed: false,
+      collisionEventId: batch.id,
+    });
+  });
+
   it("fails closed on a partial persisted batch and leaves the baseline unchanged", async () => {
     const events = [volumeEvent(), repsEvent()];
     const batch = eventBatch(events);
@@ -277,13 +405,14 @@ function createFixture({ events = [], createUnitOfWork } = {}) {
 function createBoundedFixture({
   trainingPerformanceEvents = [],
   trainingPerformanceEventBatches = [],
+  piTrainingConfidenceWorkItems = [],
   failBeforePublish = false,
 } = {}) {
   let runtime = {
     revision: 17,
     trainingPerformanceEvents: structuredClone(trainingPerformanceEvents),
     trainingPerformanceEventBatches: structuredClone(trainingPerformanceEventBatches),
-    piTrainingConfidenceWorkItems: [],
+    piTrainingConfidenceWorkItems: structuredClone(piTrainingConfidenceWorkItems),
     unrelatedFounderState: { payload: "x".repeat(2_000_000) },
   };
   const original = Object.freeze({ ...runtime });

@@ -194,8 +194,24 @@ export function haveSameTrainingPerformanceEventSemantics(left, right) {
   return stableStringify(withoutCreatedAt(left)) === stableStringify(withoutCreatedAt(right));
 }
 
+export function haveSameTrainingPerformanceEventAchievementSemantics(left, right) {
+  return stableStringify(withoutSourceProvenanceAndProviderMetadata(left)) ===
+    stableStringify(withoutSourceProvenanceAndProviderMetadata(right));
+}
+
 function withoutCreatedAt({ createdAt: _createdAt, ...event } = {}) {
   return event;
+}
+
+function withoutSourceProvenanceAndProviderMetadata({
+  sourceReviewId: _sourceReviewId,
+  sourceEvidencePackageId: _sourceEvidencePackageId,
+  sourceAnalysisId: _sourceAnalysisId,
+  createdAt: _createdAt,
+  version: _version,
+  ...achievement
+} = {}) {
+  return achievement;
 }
 
 function hash(value) {
