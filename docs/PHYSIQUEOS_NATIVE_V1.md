@@ -2166,3 +2166,152 @@ No production worktree, backend/API, authentication, DigitalOcean, PostgreSQL,
 worker/outbox, deployment, canonical data, or TestFlight state changed. No paid
 dependency or incremental infrastructure cost was added. Version 1.0/build 6
 metadata remains unchanged; build 7 remains the next available candidate.
+
+## 67. Native Operating Plan read/browse/sandbox-editor vertical (2026-08-31)
+
+The Native Operating Plan entry point and vertical are implemented from the
+current reachable web source, not from this document's or the prompt's own
+assumptions. The audit covered `src/app/profile/operating-plan/**`,
+`src/app/profile/protocols/**`, `OperatingPlanReadService.js`,
+`OperatingPlanStrategyDetailService.js`, `StrategyEditorService.js`,
+`OperatingPlanEnergyStrategyService.js`, `TrainingProtocolBuilderService.js`,
+`ActivityProtocolBuilderService.js`, `CoachingUpdatesReadService.js`,
+`ProtocolDetailScreen.jsx`, `StrategyDomainScreen.jsx`,
+`PeptideExecutionManagementService.js`/`PeptideDosingStrategyModel.js`,
+`SupplementStrategyEditorScreen.jsx`, `TrackingSupportService.js`, their
+tests, and `src/data/seed/*` for synthetic sample values. Several audited
+routes turned out to be dead code kept for historical/test reference —
+`energy/new` unconditionally redirects, `protocols/page.js` unconditionally
+redirects, and top-level `operating-plan/actions.js`'s `saveOperatingPlan`
+is imported by nothing — and were **not** ported as if they were live.
+
+### Reachable web inventory and Native disposition
+
+| Operating Plan surface | Current product content | Native disposition |
+|---|---|---|
+| Landing/overview (`operating-plan/page.js` → `OperatingPlanScreen.jsx`) | Energy, Nutrition, Training, Recovery, Peptide, Supplement, Tracking, Coaching Updates sections, each with real items/hrefs; Supplements carries an "Add Supplement" header action; Activity has no section (dead `buildActivityPlanItem`) | Implemented as the Operating Plan landing, same eight sections in the same order, same Add Supplement action. Activity is correctly omitted — porting it would have invented a section the web itself doesn't render. |
+| Strategy detail (`strategy/[strategyType]/[strategyId]`) | Energy, Nutrition, Training, Coaching Updates only — Recovery/Peptide/Supplement/Activity are not strategy types (verified against `composeOperatingPlanStrategyDetail`'s exact allowlist) | Implemented as one generic detail view over the same four types, same field labels/order per type, same `editHref`/`editLabel` rule (Energy has none). |
+| Strategy editors (`.../edit`, `StrategyEditorService.js`) | Nutrition (protein basis/ratio or fixed grams, carbohydrate/fat approach) and Training (per-area weekly frequency, priorities, progression pace) are real editable forms; Coaching Updates' web editor additionally bundles Progress Photos cadence and DEXA appointment scheduling into the same save | Nutrition and Training editors are fully implemented with the same fields/validation ranges (protein ratio 0.5–2.0, fixed protein 50–400g, 0–7 sessions/area with ≥1 total, ≥1 priority). Coaching Updates' editor is implemented for its own four cadence/notification fields only — the bundled Progress Photos/DEXA scheduling is intentionally not reproduced; those surfaces are outside this slice's evidence-intake boundary. |
+| Energy strategy (`OperatingPlanEnergyStrategyService.js`) | Derived from the active goal/phase binding, not from a builder UI — `energy/new` is a confirmed-dead redirect; the web has no live Energy editor today | Implemented as view-only, matching web exactly — no editor destination exists for Energy. |
+| Phase history | The web's own read model resolves only the *current* phase-bound Energy strategy; prior phases remain in `goal.phases[]`/`goal.phaseStrategies[]` but are not exposed as a list by any Operating Plan screen | **Deliberate, documented Native-only addition** (`OperatingPlanEnergyPhaseSnapshotReadModel`), built at explicit product direction so the read model/UI cannot silently erase the Phase 1 → Phase 2 distinction. The fixture models exactly the given scenario: Phase 1 Maintenance Calibration (completed, its own intake/activity targets) preserved beside the active Phase 2 Lean Mass Build energy strategy (distinct intake/activity targets) — reusing the same goal/phase identity (`goal_fixture_build_lean_mass`, `phase_fixture_maintenance`, `phase_fixture_lean_mass_build`) the Goals vertical's own fixture already established, so the two verticals tell one consistent story. This is explicitly a Native presentation-layer addition, not a claim that the web exposes this history today — recorded as a live-integration requirement below. |
+| Protocols: Recovery/Peptide/Supplement (`/profile/protocols/[protocolId]` → `StrategyDomainScreen.jsx`) | A category roll-up of every active protocol sharing that category, keyed by one representative protocol id; per-method purpose/support summary, and (peptide) current dose/schedule | Implemented as one domain roll-up view. Native enhancement: Supplement rows additionally surface Pause/Restore inline rather than only through a separately-routed non-active-protocol detail path the web uses for that action — a presentation placement choice, not a claim about web layout. |
+| Peptide execution/dosing (`execution/peptides/[protocolId]`, `PeptideDosingStrategyModel.js`) | Real dosing-pattern state machine (stay/titrate up/titrate down/up-hold-down/custom), starting/target dose, step amount/interval, hold duration, and a dosing-phase timeline; edited via the same route's `?edit=1` toggle | Implemented as detail + an in-place edit toggle (mirroring the web's same-route pattern instead of a second push destination), with the same pattern-conditional fields and validation. The fixture exercises both an up-hold-down pattern with three timeline phases (Retatrutide) and a stay pattern (Tesamorelin). |
+| Recovery support (`execution/[executionId]`, generic `ExecutionItemBuilderScreen`) | Cadence (daily/weekly/specific days), days, time of day, reminder/support preference | Implemented as detail + the same in-place edit toggle pattern, same fields and validation (days required for specific-weekday cadence). |
+| Supplement strategy (`supplements/new`, `supplements/[id]/edit`, `SupplementStrategyEditorScreen.jsx`) | Name, purpose, current strategy/role, goal, and (create-only) start date — dose/timing/reminders explicitly excluded ("stay in Execution," per the web's own copy) | Implemented as one create/edit form with the same fields, same create-only start date, and the same explicit dose/timing/reminders exclusion. Saving a new supplement adds it to the Supplement domain roll-up immediately. |
+| Tracking (`operating-plan/tracking`) | A single Morning Weigh-In support-scheduling card, linking out to (not implementing) weigh-in logging | Section is present on the landing page for information-architecture fidelity, but its item carries no destination — Tracking's own sub-page is a Weight-logging-adjacent support editor, out of this slice's write boundary. |
+| Coaching Updates surface | `strategyType: "briefings"` on the generic strategy route; not a separate Briefings vertical | Implemented as part of the generic strategy detail/editor above. Not turned into Briefings, and no confidence/narrative automation was added. |
+
+### Architecture and presentation
+
+`Contracts/OperatingPlanReadModel.swift` holds every Operating Plan
+read/editor model, field-for-field against the audited web shapes, plus the
+one explicitly-documented native-only phase-history extension above and
+pure validation functions mirroring `StrategyEditorService.js`'s exact
+ranges. `Networking/OperatingPlanSandboxStore.swift` is the fixture-backed,
+local-only mutable store — architecturally the same role
+`LoggingSandboxStore` already plays for Log's sandbox, not a second pattern:
+it loads `Resources/OperatingPlanFixture.json` once, and every editor save
+(Nutrition, Training, Coaching Updates, Peptide dosing, Recovery support,
+Supplement strategy, Supplement pause/restore) mutates only that in-memory
+copy. Nothing under `ios/` reaches a server. Views hold `@Environment
+(AppEnvironment.self)` and read/write `environment.operatingPlanStore`
+directly with local `@State` for form drafts — no `ViewModel` layer was
+introduced, matching the established sandbox-editor convention rather than
+the async-`API`-plus-`ViewModel` convention used by read-only verticals like
+Goals (Operating Plan's edits are genuinely local and synchronous, so that
+heavier shape would have been unearned complexity).
+
+Visual composition mirrors the web's actual Operating Plan screens, not
+Goals' gradient "atmospheric" card language: `Card.jsx` + `IconBadge.jsx`
+are plain, densely stacked, compact rows, so `Presentation/OperatingPlan/
+OperatingPlanComponents.swift` composes the existing shared `CardContainer`/
+`IconBadge`/`SectionHeading` rather than introducing new visual chrome.
+Section/tone-to-icon mapping is copied from `OperatingPlanScreen.jsx`'s own
+icon map and `IconBadge.jsx`'s tone slots, not invented.
+
+### Navigation
+
+`YouPlaceholderView` (the "You" tab, `route: "profile"`) gained one real
+doorway — Operating Plan — matching `YouScreen.jsx`'s own entry point into
+`/profile/operating-plan`; this is the smallest source-faithful route into
+the vertical the current navigation architecture needed. The rest of
+`YouPlaceholderView` (Operating Status, Goals doorway, Integrations
+doorway) remains an honest placeholder — building out the full Profile/You
+screen was not this slice's scope. `RootTabView` gained a `youPath`
+`NavigationStack` (previously bare), matching the pattern every other tab
+already uses. The bottom tab bar itself is unchanged — five tabs, same
+order, no new tab added.
+
+`AppDestination` gained eight native-only cases (`operatingPlan`,
+`operatingPlanStrategy`, `operatingPlanStrategyEdit`,
+`operatingPlanProtocolDomain`, `operatingPlanPeptideExecution`,
+`operatingPlanRecoverySupport`, `operatingPlanSupplementNew`,
+`operatingPlanSupplementEdit`), each encoding to a `native.operating-plan*`
+id in the same `{id, parameters}` wire shape as the rest of the registry —
+native-only because the web's own `OperatingPlanReadService`/
+`OperatingPlanStrategyDetailService` return raw `href` strings, not typed
+destination objects, so there is no existing `DestinationId` to mirror
+(the same justification already recorded for `manualWeighIn`/
+`evidenceIntake`/`localEvidenceReview`). Peptide execution and Recovery
+support editing use an in-place `isEditing` toggle on one view rather than
+a second push destination, deliberately mirroring the web's own `?edit=1`
+query-param pattern on the same route.
+
+### Verification
+
+`xcodebuild build` succeeded with zero warnings/errors. `xcodebuild test`
+(`-only-testing:PhysiqueOSTests`, explicitly excluding
+`PhysiqueOSUITests`) passed all 232 tests — 197 pre-existing plus 35 new
+`OperatingPlanReadModelTests` covering fixture integrity, landing
+section/order fidelity, the Energy phase-history distinction, every
+strategy type's fields, protocol domain roll-ups (Recovery/Peptide/
+Supplement), Peptide dosing patterns and validation, Recovery support
+validation, Nutrition/Training/Coaching editor save-and-reread, Supplement
+create/edit/lifecycle, typed-destination wire-shape round-trips, and the
+same `NaturalCapitalizationCheck` mid-sentence-prose rule Home's tests
+already established (reused, not duplicated) against every new prose
+string this slice introduces. All pre-existing tests remained green
+throughout. The project generator (`ios/Scripts/generate_project.py`) was
+extended with the eleven new/changed file entries and re-run; build number
+and signing configuration were not touched.
+
+Screenshotted on the iPhone 17 Simulator (iOS 26.6, portrait, no iPad) via
+a temporary local default-navigation-state change reverted before this
+patch's final commit (the same technique already used for a prior slice's
+Log verification): the You tab's Operating Plan doorway, the Operating
+Plan landing (all eight sections), the Energy strategy detail with its
+Phase 1/Phase 2 history cards, a Peptide's dosing detail/timeline, and the
+Training strategy editor (live Stepper/pill controls over the real
+`DEFAULT_TRAINING_FREQUENCIES`-equivalent fixture values) were all visually
+confirmed rendering correctly.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Expose one authenticated, versioned Operating Plan read model (landing,
+  strategy detail, protocol domain roll-ups, peptide/recovery execution,
+  supplement strategy) whose server-owned values replace
+  `OperatingPlanSandboxStore`'s fixture reads without changing views.
+- Connect Nutrition/Training/Coaching Updates strategy saves, Peptide dosing
+  saves, Recovery support saves, and Supplement create/edit/pause/restore
+  only through the existing server-owned optimistic-concurrency
+  (`expectedRevision`/`expectedCurrentVersionId`) and idempotent successor-
+  version command boundaries already established for these domains in web.
+  Native must not independently commit a protocol version.
+- Expose a real Energy phase-history endpoint (or extend
+  `OperatingPlanReadService`) so the native-only
+  `OperatingPlanEnergyPhaseSnapshotReadModel` addition can be replaced by
+  genuine server data instead of fixture-only history.
+- Bundle Progress Photos cadence and DEXA appointment scheduling into the
+  Coaching Updates save only once those verticals' own write surfaces are
+  in scope for Native — do not extend Operating Plan to reach into them
+  first.
+- Deliver real review cadence, real current strategy values, and real
+  protocol/goal linkage through the existing typed destinations rather than
+  fixture defaults.
+
+No production worktree, backend/API, authentication, DigitalOcean,
+PostgreSQL, worker/outbox, deployment, canonical data, or TestFlight state
+changed. No paid dependency, cloud resource, or incremental infrastructure
+cost was added — this patch is $0 incremental. Version 1.0/build 6 metadata,
+signing configuration, and Info.plist remain unchanged; build 7 remains the
+next available candidate.
