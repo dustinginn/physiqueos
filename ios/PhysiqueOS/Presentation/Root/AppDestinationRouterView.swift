@@ -81,6 +81,12 @@ struct AppDestinationRouterView: View {
             OperatingPlanPeptideExecutionView(protocolId: protocolId)
         case .operatingPlanRecoverySupport(let executionId):
             OperatingPlanRecoverySupportView(executionId: executionId)
+        case .operatingPlanTracking:
+            OperatingPlanTrackingView(onNavigate: onNavigate)
+        case .operatingPlanTrackingSupport(let executionId):
+            OperatingPlanTrackingSupportView(executionId: executionId)
+        case .operatingPlanSupplementSupport(let protocolId):
+            OperatingPlanSupplementSupportView(protocolId: protocolId)
         case .operatingPlanSupplementNew:
             OperatingPlanSupplementEditorView(protocolId: nil)
         case .operatingPlanSupplementEdit(let protocolId):

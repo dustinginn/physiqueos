@@ -18,8 +18,6 @@ struct OperatingPlanRecoverySupportView: View {
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
     private var support: OperatingPlanRecoverySupportReadModel? { store.recoverySupport(executionId: executionId) }
 
-    private static let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
     var body: some View {
         ScrollView {
             content
@@ -64,12 +62,11 @@ struct OperatingPlanRecoverySupportView: View {
                 CardContainer(padding: .sm) {
                     VStack(alignment: .leading, spacing: 8) {
                         OperatingPlanFieldRow(label: "Summary", value: support.supportSummary)
-                        OperatingPlanFieldRow(label: "Cadence", value: support.cadence.label)
-                        if !support.days.isEmpty {
-                            OperatingPlanFieldRow(label: "Days", value: support.days.joined(separator: ", "))
-                        }
-                        OperatingPlanFieldRow(label: "Time of Day", value: support.timeOfDay.label)
-                        OperatingPlanFieldRow(label: "Reminder", value: support.support.label)
+                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSandboxStore.formatSupportSchedule(support.supportSchedule))
+                        OperatingPlanFieldRow(label: "Starts", value: OperatingPlanDateValues.readableDate(support.supportSchedule.startDate))
+                        OperatingPlanFieldRow(label: "Ends", value: support.supportSchedule.endDate.map(OperatingPlanDateValues.readableDate) ?? "Until changed")
+                        OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
+                        if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
                     }
                 }
             }
@@ -86,45 +83,26 @@ struct OperatingPlanRecoverySupportView: View {
         VStack(alignment: .leading, spacing: 18) {
             OperatingPlanScreenHeader(eyebrow: "Recovery", title: "Edit \(draft.name) Support", subtitle: "Adjust when and how this support method is scheduled.")
 
-            OperatingPlanSection("Cadence") {
-                HStack(spacing: 8) {
-                    ForEach(ExecutionCadence.allCases) { cadence in
-                        OperatingPlanChoicePill(title: cadence.label, isSelected: draft.cadence == cadence) {
-                            self.draft?.cadence = cadence
-                        }
-                    }
-                }
-            }
-
-            if draft.cadence == .specificWeekdays {
-                OperatingPlanSection("Days") {
-                    FlowPills(items: Self.weekdays, isSelected: { draft.days.contains($0) }, label: \.self) { day in
-                        if let index = self.draft?.days.firstIndex(of: day) {
-                            self.draft?.days.remove(at: index)
-                        } else {
-                            self.draft?.days.append(day)
-                        }
-                    }
-                }
-            }
-
-            OperatingPlanSection("Time of Day") {
-                HStack(spacing: 8) {
-                    ForEach(TimeOfDayChoice.allCases) { choice in
-                        OperatingPlanChoicePill(title: choice.label, isSelected: draft.timeOfDay == choice) {
-                            self.draft?.timeOfDay = choice
-                        }
-                    }
-                }
-            }
+            OperatingPlanSupportScheduleEditor(schedule: Binding(
+                get: { draft.supportSchedule }, set: { self.draft?.supportSchedule = $0 }
+            ))
 
             OperatingPlanSection("Reminder") {
                 HStack(spacing: 8) {
-                    ForEach(ExecutionSupport.allCases) { option in
-                        OperatingPlanChoicePill(title: option.label, isSelected: draft.support == option) {
-                            self.draft?.support = option
+                    ForEach(OperatingPlanReminderPreference.allCases) { option in
+                        OperatingPlanChoicePill(title: option.label, isSelected: draft.reminderPreference == option) {
+                            self.draft?.reminderPreference = option
                         }
                     }
+                }
+            }
+
+            OperatingPlanSection("Execution Notes") {
+                CardContainer(padding: .sm) {
+                    TextField("Optional notes shown when this priority is opened", text: Binding(
+                        get: { draft.notes }, set: { self.draft?.notes = $0 }
+                    ), axis: .vertical)
+                    .lineLimit(3...6)
                 }
             }
 

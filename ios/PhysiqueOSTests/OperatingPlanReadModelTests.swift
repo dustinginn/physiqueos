@@ -25,11 +25,12 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertTrue(otherSections.allSatisfy { !$0.supplementsAction })
     }
 
-    func testTrackingSectionIsPresentButNotAWriteSurfaceHere() throws {
+    func testTrackingSectionRoutesToItsWebBackedSupportSurface() throws {
         let store = makeStore()
         let tracking = try XCTUnwrap(store.landing.sections.first { $0.id == "tracking" })
-        XCTAssertNil(tracking.items.first?.destination, "Tracking must not claim a Weight-logging write surface in this slice")
-        XCTAssertNotNil(tracking.items.first?.status)
+        XCTAssertEqual(tracking.items.first?.destination, .operatingPlanTracking)
+        XCTAssertEqual(store.tracking.title, "Morning Weigh-In")
+        XCTAssertFalse(store.tracking.completion.isEmpty)
     }
 
     func testEveryLandingDestinationResolvesToARealDestinationId() throws {
@@ -49,9 +50,9 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertNil(energy.editLabel)
         XCTAssertNil(energy.editDestination)
         XCTAssertEqual(energy.fields.map(\.label), [
-            "Plan Type", "Caloric Intake", "Activity Target", "Evidence Monitoring", "Strategic Review", "Strategy Changes",
+            "Current Energy Phase", "Caloric Intake", "Activity Target", "Calibration Approach",
         ])
-        XCTAssertEqual(energy.fields.first { $0.label == "Strategy Changes" }?.value, "Adjusted as the evidence supports it")
+        XCTAssertEqual(energy.fields.first { $0.label == "Current Energy Phase" }?.value, "Bulk")
     }
 
     func testEnergyPhaseHistoryPreservesPhaseOneWhilePhaseTwoIsActive() throws {
@@ -64,6 +65,19 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertTrue(phaseTwo.isActive)
         XCTAssertNotEqual(phaseOne.caloricIntake, phaseTwo.caloricIntake)
         XCTAssertNotEqual(phaseOne.activityTarget, phaseTwo.activityTarget)
+    }
+
+    func testEnergyPhaseHistoryReusesGoalsPhaseIdentity() async throws {
+        let energy = try XCTUnwrap(makeStore().strategyDetail(strategyType: "energy", strategyId: "strategy_fixture_energy"))
+        let detail = try await FixtureGoalsAPI().fetchGoalDetail(goalId: "goal_fixture_build_lean_mass")
+        let goal = try XCTUnwrap(detail?.active)
+        XCTAssertEqual(Set(energy.energyPhaseHistory.map(\.goalId)), [goal.id])
+        XCTAssertEqual(Set(energy.energyPhaseHistory.map(\.id)), Set(goal.phases.map(\.id)))
+        for snapshot in energy.energyPhaseHistory {
+            let phase = try XCTUnwrap(goal.phases.first { $0.id == snapshot.id })
+            XCTAssertEqual(snapshot.phaseOrder, phase.order)
+            XCTAssertEqual(snapshot.isActive, phase.id == goal.activePhaseId && phase.status == .active)
+        }
     }
 
     func testNonEnergyStrategyTypesCarryNoPhaseHistory() throws {
@@ -92,8 +106,8 @@ final class OperatingPlanReadModelTests: XCTestCase {
         let store = makeStore()
         let training = try XCTUnwrap(store.strategyDetail(strategyType: "training", strategyId: "strategy_fixture_training"))
         XCTAssertEqual(training.editLabel, "Edit Strategy")
-        XCTAssertEqual(training.fields.map(\.label), ["Weekly Structure", "Training Focus", "Progression", "Current Goal Phase", "Training Context"])
-        XCTAssertEqual(training.fields.first { $0.label == "Training Context" }?.value, "Goal-level strategy")
+        XCTAssertEqual(training.fields.map(\.label), ["Weekly Structure", "Training Focus", "Progression", "Current Phase"])
+        XCTAssertEqual(training.fields.first { $0.label == "Current Phase" }?.value, "Lean Mass Build")
         let editor = try XCTUnwrap(store.trainingEditor(strategyId: "strategy_fixture_training"))
         // Matches TrainingProtocolBuilderService.js's DEFAULT_TRAINING_FREQUENCIES exactly.
         let byArea = Dictionary(uniqueKeysWithValues: editor.frequencies.map { ($0.area, $0.count) })
@@ -179,6 +193,15 @@ final class OperatingPlanReadModelTests: XCTestCase {
         guard case .failure = result else { return XCTFail("Expected validation failure") }
     }
 
+    func testPeptideDosingValidationRejectsInvalidDateWindow() throws {
+        var dosing = try XCTUnwrap(makeStore().peptideExecution(protocolId: "protocol_fixture_peptide_tesamorelin")?.dosing)
+        dosing.startDate = "not-a-date"
+        XCTAssertEqual(PeptideDosingValidation.error(model: dosing), "Choose a valid dosing start date.")
+        dosing.startDate = "2026-08-15"
+        dosing.endDate = "2026-08-14"
+        XCTAssertEqual(PeptideDosingValidation.error(model: dosing), "Choose an end date after the dosing start date.")
+    }
+
     func testPeptideDosingSaveUpdatesExecutionAndDomainDose() throws {
         let store = makeStore()
         var dosing = try XCTUnwrap(store.peptideExecution(protocolId: "protocol_fixture_peptide_tesamorelin")).dosing
@@ -189,6 +212,43 @@ final class OperatingPlanReadModelTests: XCTestCase {
         let domain = try XCTUnwrap(store.protocolDomain(protocolId: "protocol_fixture_peptide_tesamorelin"))
         let method = try XCTUnwrap(domain.methods.first { $0.protocolId == "protocol_fixture_peptide_tesamorelin" })
         XCTAssertEqual(method.currentDose, "3 mg")
+        XCTAssertEqual(store.peptideExecution(protocolId: "protocol_fixture_peptide_tesamorelin")?.timeline.last?.doseAmount, 3)
+    }
+
+    func testPeptideSupportSavePreservesScheduleDosingReminderAndNotes() throws {
+        let store = makeStore()
+        var execution = try XCTUnwrap(store.peptideExecution(protocolId: "protocol_fixture_peptide_retatrutide"))
+        execution.supportSchedule.frequency = .specificDays
+        execution.supportSchedule.daysOfWeek = [.monday, .thursday]
+        execution.dosing.holdUnit = .days
+        execution.dosing.decreaseUnit = .days
+        execution.reminderPreference = .none
+        execution.notes = "Updated execution context."
+        guard case .success = store.savePeptideExecution(execution) else { return XCTFail("Expected save to succeed") }
+        let saved = try XCTUnwrap(store.peptideExecution(protocolId: execution.protocolId))
+        XCTAssertEqual(saved.supportSchedule.daysOfWeek, [.monday, .thursday])
+        XCTAssertEqual(saved.dosing.holdUnit, .days)
+        XCTAssertEqual(saved.dosing.decreaseUnit, .days)
+        XCTAssertEqual(saved.reminderPreference, .none)
+        XCTAssertEqual(saved.notes, "Updated execution context.")
+    }
+
+    func testCustomPeptidePatternPreservesLegacyTimelineWithoutStructuredDoseValidation() throws {
+        var execution = try XCTUnwrap(makeStore().peptideExecution(protocolId: "protocol_fixture_peptide_tesamorelin"))
+        execution.dosing.pattern = .custom
+        execution.dosing.startingDoseAmount = 0
+        execution.dosing.startingDoseUnit = ""
+        XCTAssertNil(PeptideDosingValidation.error(model: execution.dosing))
+        XCTAssertNil(PeptideDosingTimelineBuilder.build(from: execution.dosing))
+    }
+
+    func testStructuredPeptideTimelineRegeneratesThroughPeakHoldAndLanding() throws {
+        let dosing = try XCTUnwrap(makeStore().peptideExecution(protocolId: "protocol_fixture_peptide_retatrutide")?.dosing)
+        let timeline = try XCTUnwrap(PeptideDosingTimelineBuilder.build(from: dosing))
+        XCTAssertEqual(timeline.first?.doseAmount, 2)
+        XCTAssertEqual(timeline.last?.doseAmount, 2)
+        XCTAssertTrue(timeline.contains { $0.doseAmount == 6 && $0.label.contains("Hold") })
+        XCTAssertEqual(timeline.last?.status, "active")
     }
 
     // MARK: - Recovery support editor
@@ -196,8 +256,8 @@ final class OperatingPlanReadModelTests: XCTestCase {
     func testRecoverySupportValidationRequiresDaysForSpecificWeekdays() throws {
         let store = makeStore()
         var support = try XCTUnwrap(store.recoverySupport(executionId: "execution_fixture_foam_roll"))
-        support.cadence = .specificWeekdays
-        support.days = []
+        support.supportSchedule.frequency = .specificDays
+        support.supportSchedule.daysOfWeek = []
         XCTAssertNotNil(RecoverySupportValidation.error(model: support))
         let result = store.saveRecoverySupport(support)
         guard case .failure = result else { return XCTFail("Expected validation failure") }
@@ -206,10 +266,12 @@ final class OperatingPlanReadModelTests: XCTestCase {
     func testRecoverySupportSavePersistsCadenceChange() throws {
         let store = makeStore()
         var support = try XCTUnwrap(store.recoverySupport(executionId: "execution_fixture_foam_roll"))
-        support.cadence = .weekly
+        support.supportSchedule.frequency = .weekly
+        support.supportSchedule.daysOfWeek = [.sunday]
         let result = store.saveRecoverySupport(support)
         guard case .success = result else { return XCTFail("Expected save to succeed") }
-        XCTAssertEqual(store.recoverySupport(executionId: "execution_fixture_foam_roll")?.cadence, .weekly)
+        XCTAssertEqual(store.recoverySupport(executionId: "execution_fixture_foam_roll")?.supportSchedule.frequency, .weekly)
+        XCTAssertEqual(store.recoverySupport(executionId: "execution_fixture_foam_roll")?.supportSchedule.daysOfWeek, [.sunday])
     }
 
     // MARK: - Nutrition / Training / Coaching editor save + validation
@@ -259,10 +321,44 @@ final class OperatingPlanReadModelTests: XCTestCase {
     func testCoachingEditorSaveUpdatesNotificationField() throws {
         let store = makeStore()
         var editor = try XCTUnwrap(store.coachingEditor(strategyId: "strategy_fixture_coaching"))
-        editor.notifyWhenReady = false
+        editor.notificationPreference = .availableWithoutNotification
         store.saveCoaching(editor)
         let detail = try XCTUnwrap(store.strategyDetail(strategyType: "briefings", strategyId: "strategy_fixture_coaching"))
         XCTAssertEqual(detail.fields.first { $0.label == "Notifications" }?.value, "Available without notification")
+    }
+
+    func testCoachingEditorPreservesAllReachableWebSchedules() throws {
+        let store = makeStore()
+        var editor = try XCTUnwrap(store.coachingEditor(strategyId: "strategy_fixture_coaching"))
+        XCTAssertEqual(editor.midweek.localTime, "18:00")
+        XCTAssertEqual(editor.weekly.localTime, "09:00")
+        XCTAssertEqual(editor.monthly.dayOfMonth, 1)
+        XCTAssertEqual(editor.photos.cadence, .everyTwoWeeks)
+        XCTAssertEqual(Set(editor.dexa.reminderPreferences), Set(DexaReminderPreference.allCases))
+        editor.monthly.enabled = false
+        editor.photoEventBriefingEnabled = false
+        guard case .success = store.saveCoaching(editor) else { return XCTFail("Expected save to succeed") }
+        let saved = try XCTUnwrap(store.coachingEditor(strategyId: editor.strategyId))
+        XCTAssertFalse(saved.monthly.enabled)
+        XCTAssertFalse(saved.photoEventBriefingEnabled)
+    }
+
+    func testTrackingSupportSavePreservesRecurringSchedule() throws {
+        let store = makeStore()
+        var tracking = store.tracking
+        tracking.supportSchedule.timing = .specific
+        tracking.supportSchedule.specificTime = "07:15"
+        tracking.reminderPreference = .none
+        guard case .success = store.saveTracking(tracking) else { return XCTFail("Expected save to succeed") }
+        XCTAssertEqual(store.tracking.supportSchedule.specificTime, "07:15")
+        XCTAssertEqual(store.tracking.reminderPreference, .none)
+    }
+
+    func testOperatingPlanLocalDateAndTimeControlsRoundTripWithoutTimezoneShift() throws {
+        let dateKey = "2026-10-31"
+        let timeKey = "18:00"
+        XCTAssertEqual(OperatingPlanDateValues.dateKey(from: OperatingPlanDateValues.date(from: dateKey)), dateKey)
+        XCTAssertEqual(OperatingPlanDateValues.timeKey(from: OperatingPlanDateValues.time(from: timeKey)), timeKey)
     }
 
     // MARK: - Supplement strategy editor (create, edit, cancel-equivalent, lifecycle)
@@ -300,6 +396,8 @@ final class OperatingPlanReadModelTests: XCTestCase {
         let domain = try XCTUnwrap(store.protocolDomain(protocolId: newProtocolId))
         XCTAssertTrue(domain.methods.contains { $0.protocolId == newProtocolId && $0.name == "Creatine" })
         XCTAssertEqual(store.supplementStatus(protocolId: newProtocolId), "active")
+        XCTAssertEqual(domain.methods.first { $0.protocolId == newProtocolId }?.editDestination, .operatingPlanSupplementSupport(protocolId: newProtocolId))
+        XCTAssertNotNil(store.supplementSupport(protocolId: newProtocolId))
     }
 
     func testSupplementEditPreservesExistingProtocolIdentity() throws {
@@ -339,6 +437,18 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertEqual(store.supplementStatus(protocolId: protocolId), "paused")
     }
 
+    func testSupplementSupportRemainsSeparateFromStrategyEditing() throws {
+        let store = makeStore()
+        let protocolId = "protocol_fixture_supplement_tongkat_ali"
+        var support = try XCTUnwrap(store.supplementSupport(protocolId: protocolId))
+        let strategyBefore = store.supplementEditor(protocolId: protocolId)
+        support.doseAmount = "3"
+        support.supportSchedule.timing = .evening
+        guard case .success = store.saveSupplementSupport(support) else { return XCTFail("Expected save to succeed") }
+        XCTAssertEqual(store.supplementSupport(protocolId: protocolId)?.doseAmount, "3")
+        XCTAssertEqual(store.supplementEditor(protocolId: protocolId), strategyBefore)
+    }
+
     // MARK: - Typed navigation destinations
 
     func testOperatingPlanDestinationsRoundTrip() throws {
@@ -349,8 +459,11 @@ final class OperatingPlanReadModelTests: XCTestCase {
             .operatingPlanProtocolDomain(protocolId: "protocol_fixture_peptide_retatrutide"),
             .operatingPlanPeptideExecution(protocolId: "protocol_fixture_peptide_retatrutide"),
             .operatingPlanRecoverySupport(executionId: "execution_fixture_foam_roll"),
+            .operatingPlanTracking,
+            .operatingPlanTrackingSupport(executionId: "execution_morning_weigh_in"),
             .operatingPlanSupplementNew,
             .operatingPlanSupplementEdit(protocolId: "protocol_fixture_supplement_tongkat_ali"),
+            .operatingPlanSupplementSupport(protocolId: "protocol_fixture_supplement_tongkat_ali"),
         ]
         for destination in destinations {
             let encoded = try JSONEncoder().encode(destination)

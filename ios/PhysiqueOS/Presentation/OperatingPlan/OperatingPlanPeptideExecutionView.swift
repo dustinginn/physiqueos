@@ -11,7 +11,7 @@ struct OperatingPlanPeptideExecutionView: View {
     let protocolId: String
 
     @State private var isEditing = false
-    @State private var draft: PeptideDosingStrategyReadModel?
+    @State private var draft: OperatingPlanPeptideExecutionReadModel?
     @State private var errorMessage: String?
 
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
@@ -44,7 +44,7 @@ struct OperatingPlanPeptideExecutionView: View {
     private var content: some View {
         if let execution {
             if isEditing, let draft {
-                editor(execution: execution, draft: draft)
+                editor(draft: draft)
             } else {
                 detail(execution)
             }
@@ -60,14 +60,11 @@ struct OperatingPlanPeptideExecutionView: View {
             OperatingPlanSection("Current Dosing") {
                 CardContainer(padding: .sm) {
                     VStack(alignment: .leading, spacing: 8) {
-                        OperatingPlanFieldRow(label: "Pattern", value: execution.dosing.pattern.label)
-                        OperatingPlanFieldRow(label: "Starting Dose", value: "\(formatted(execution.dosing.startingDoseAmount)) \(execution.dosing.startingDoseUnit)")
-                        if execution.dosing.pattern.usesTarget {
-                            OperatingPlanFieldRow(label: "Target Dose", value: "\(formatted(execution.dosing.targetDoseAmount)) \(execution.dosing.startingDoseUnit)")
-                        }
-                        if execution.dosing.pattern.usesStep {
-                            OperatingPlanFieldRow(label: "Step", value: "+\(formatted(execution.dosing.stepAmount)) \(execution.dosing.startingDoseUnit) every \(execution.dosing.stepInterval) \(execution.dosing.stepUnit.label.lowercased())")
-                        }
+                        OperatingPlanFieldRow(label: "Current dose", value: currentDose(execution))
+                        OperatingPlanFieldRow(label: "Current phase", value: currentPhase(execution))
+                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSandboxStore.formatSupportSchedule(execution.supportSchedule))
+                        OperatingPlanFieldRow(label: "Next dose change", value: nextDoseChange(execution))
+                        OperatingPlanFieldRow(label: "Status", value: execution.state == .invalid ? "Needs dosing update" : "Current")
                     }
                 }
             }
@@ -96,86 +93,191 @@ struct OperatingPlanPeptideExecutionView: View {
             }
 
             PrimaryActionButton(title: "Edit Support") {
-                draft = execution.dosing
+                draft = execution
                 isEditing = true
             }
             .accessibilityIdentifier("operatingPlan.peptide.editSupport")
         }
     }
 
-    private func editor(execution: OperatingPlanPeptideExecutionReadModel, draft: PeptideDosingStrategyReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            OperatingPlanScreenHeader(eyebrow: "Peptide", title: "Edit \(execution.name) Support", subtitle: "Adjust the dosing pattern. Timeline history is preserved.")
+    private func editor(draft: OperatingPlanPeptideExecutionReadModel) -> some View {
+        let dosing = draft.dosing
+        return VStack(alignment: .leading, spacing: 18) {
+            OperatingPlanScreenHeader(eyebrow: "PEPTIDE SUPPORT", title: "Edit Support", subtitle: "Describe the schedule and dosing strategy you intend to follow. The dated support plan is generated for you.")
+
+            OperatingPlanSupportScheduleEditor(schedule: Binding(
+                get: { draft.supportSchedule }, set: { self.draft?.supportSchedule = $0 }
+            ))
 
             OperatingPlanSection("Pattern") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
                     ForEach(PeptideDosingPattern.allCases) { pattern in
-                        OperatingPlanChoicePill(title: pattern.label, isSelected: draft.pattern == pattern) {
-                            self.draft?.pattern = pattern
+                        OperatingPlanChoicePill(title: pattern.label, isSelected: dosing.pattern == pattern) {
+                            self.draft?.dosing.pattern = pattern
                         }
                     }
                 }
             }
 
-            OperatingPlanSection("Starting Dose") {
-                doseStepper(value: Binding(get: { draft.startingDoseAmount }, set: { self.draft?.startingDoseAmount = $0 }), unit: draft.startingDoseUnit)
-            }
-
-            if draft.pattern.usesTarget {
-                OperatingPlanSection("Target Dose") {
-                    doseStepper(value: Binding(get: { draft.targetDoseAmount }, set: { self.draft?.targetDoseAmount = $0 }), unit: draft.startingDoseUnit)
+            if dosing.pattern != .custom {
+                OperatingPlanSection("Starting Dose") {
+                    CardContainer(padding: .sm) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            doseStepper(value: Binding(get: { dosing.startingDoseAmount }, set: { self.draft?.dosing.startingDoseAmount = $0 }), unit: dosing.startingDoseUnit)
+                            TextField("Unit", text: Binding(
+                                get: { dosing.startingDoseUnit },
+                                set: { self.draft?.dosing.startingDoseUnit = $0 }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                        }
+                    }
+                    DateField(date: Binding(
+                        get: { OperatingPlanDateValues.date(from: dosing.startDate) },
+                        set: { self.draft?.dosing.startDate = OperatingPlanDateValues.dateKey(from: $0) }
+                    ), label: "Dosing start date")
                 }
             }
 
-            if draft.pattern.usesStep {
+            if dosing.pattern.usesTarget {
+                OperatingPlanSection("Target Dose") {
+                    doseStepper(value: Binding(get: { dosing.targetDoseAmount }, set: { self.draft?.dosing.targetDoseAmount = $0 }), unit: dosing.startingDoseUnit)
+                }
+            }
+
+            if dosing.pattern.usesStep {
                 OperatingPlanSection("Step") {
                     CardContainer(padding: .sm) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Stepper(value: Binding(get: { draft.stepAmount }, set: { self.draft?.stepAmount = $0 }), in: 0...5, step: 0.25) {
-                                Text("+\(formatted(draft.stepAmount)) \(draft.startingDoseUnit) per step")
+                            Stepper(value: Binding(get: { dosing.stepAmount }, set: { self.draft?.dosing.stepAmount = $0 }), in: 0...5, step: 0.25) {
+                                Text("\(dosing.pattern == .titrateDown ? "−" : "+")\(formatted(dosing.stepAmount)) \(dosing.startingDoseUnit) per step")
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             }
-                            Stepper(value: Binding(get: { draft.stepInterval }, set: { self.draft?.stepInterval = $0 }), in: 1...12) {
-                                Text("Every \(draft.stepInterval) \(draft.stepUnit.label.lowercased())")
+                            Stepper(value: Binding(get: { dosing.stepInterval }, set: { self.draft?.dosing.stepInterval = $0 }), in: 1...12) {
+                                Text("Every \(dosing.stepInterval) \(dosing.stepUnit.label.lowercased())")
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             }
+                            intervalUnitPicker(value: Binding(
+                                get: { dosing.stepUnit }, set: { self.draft?.dosing.stepUnit = $0 }
+                            ))
                         }
                     }
                 }
             }
 
-            if draft.pattern.usesHold {
-                OperatingPlanSection("Hold Duration") {
+            if dosing.pattern.usesHold {
+                OperatingPlanSection("Hold and Landing") {
                     CardContainer(padding: .sm) {
-                        Stepper(value: Binding(get: { draft.holdDurationWeeks }, set: { self.draft?.holdDurationWeeks = $0 }), in: 0...12) {
-                            Text("\(draft.holdDurationWeeks) weeks")
+                        VStack(alignment: .leading, spacing: 10) {
+                        Stepper(value: Binding(get: { dosing.holdDuration }, set: { self.draft?.dosing.holdDuration = $0 }), in: 1...52) {
+                            Text("Hold for \(dosing.holdDuration) \(dosing.holdUnit.label.lowercased())")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         }
+                        intervalUnitPicker(value: Binding(
+                            get: { dosing.holdUnit }, set: { self.draft?.dosing.holdUnit = $0 }
+                        ))
+                        Stepper(value: Binding(get: { dosing.decreaseAmount }, set: { self.draft?.dosing.decreaseAmount = $0 }), in: 0...5, step: 0.25) {
+                            Text("Decrease by \(formatted(dosing.decreaseAmount)) \(dosing.startingDoseUnit)")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        }
+                        Stepper(value: Binding(get: { dosing.decreaseInterval }, set: { self.draft?.dosing.decreaseInterval = $0 }), in: 1...12) {
+                            Text("Decrease every \(dosing.decreaseInterval) \(dosing.decreaseUnit.label.lowercased())")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        }
+                        intervalUnitPicker(value: Binding(
+                            get: { dosing.decreaseUnit }, set: { self.draft?.dosing.decreaseUnit = $0 }
+                        ))
+                        Stepper(value: Binding(get: { dosing.landingDoseAmount }, set: { self.draft?.dosing.landingDoseAmount = $0 }), in: 0...20, step: 0.25) {
+                            Text("Landing dose \(formatted(dosing.landingDoseAmount)) \(dosing.startingDoseUnit)")
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        }
+                        }
                     }
+                }
+            }
+
+            if dosing.pattern != .custom {
+                OperatingPlanSection("Final State") {
+                    HStack(spacing: 8) {
+                        OperatingPlanChoicePill(title: "Until changed", isSelected: dosing.endDate == nil) { self.draft?.dosing.endDate = nil }
+                        OperatingPlanChoicePill(title: "Choose end date", isSelected: dosing.endDate != nil) {
+                            self.draft?.dosing.endDate = dosing.endDate ?? dosing.startDate
+                        }
+                    }
+                    if dosing.endDate != nil {
+                        DateField(date: Binding(
+                            get: { OperatingPlanDateValues.date(from: dosing.endDate ?? dosing.startDate) },
+                            set: { self.draft?.dosing.endDate = OperatingPlanDateValues.dateKey(from: $0) }
+                        ), label: "End date")
+                    }
+                }
+            }
+
+            OperatingPlanSection("Reminder") {
+                HStack(spacing: 8) {
+                    ForEach(OperatingPlanReminderPreference.allCases) { preference in
+                        OperatingPlanChoicePill(title: preference.label, isSelected: draft.reminderPreference == preference) {
+                            self.draft?.reminderPreference = preference
+                        }
+                    }
+                }
+            }
+
+            OperatingPlanSection("Execution Notes") {
+                CardContainer(padding: .sm) {
+                    TextField("Optional notes shown when this priority is opened", text: Binding(
+                        get: { draft.notes }, set: { self.draft?.notes = $0 }
+                    ), axis: .vertical)
+                    .lineLimit(3...6)
                 }
             }
 
             if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-            PrimaryActionButton(title: "Save Dosing") { save(draft) }
+            PrimaryActionButton(title: "Save Support") { save(draft) }
                 .accessibilityIdentifier("operatingPlan.peptide.save")
         }
     }
 
     private func doseStepper(value: Binding<Double>, unit: String) -> some View {
-        CardContainer(padding: .sm) {
-            Stepper(value: value, in: 0...20, step: 0.25) {
-                Text("\(formatted(value.wrappedValue)) \(unit)")
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        Stepper(value: value, in: 0...20, step: 0.25) {
+            Text("\(formatted(value.wrappedValue)) \(unit)")
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+    }
+
+    private func intervalUnitPicker(value: Binding<PeptideDoseStepUnit>) -> some View {
+        HStack(spacing: 8) {
+            ForEach(PeptideDoseStepUnit.allCases) { unit in
+                OperatingPlanChoicePill(title: unit.label, isSelected: value.wrappedValue == unit) {
+                    value.wrappedValue = unit
+                }
             }
         }
     }
 
-    private func save(_ model: PeptideDosingStrategyReadModel) {
-        switch store.savePeptideDosing(protocolId: protocolId, model: model) {
+    private func currentDose(_ execution: OperatingPlanPeptideExecutionReadModel) -> String {
+        guard let phase = execution.timeline.first(where: { $0.status == "active" }) else { return "No active phase" }
+        return "\(formatted(phase.doseAmount)) \(phase.doseUnit)"
+    }
+
+    private func currentPhase(_ execution: OperatingPlanPeptideExecutionReadModel) -> String {
+        guard let phase = execution.timeline.first(where: { $0.status == "active" }) else { return "Not active" }
+        return phase.window
+    }
+
+    private func nextDoseChange(_ execution: OperatingPlanPeptideExecutionReadModel) -> String {
+        guard let phase = execution.timeline.first(where: { ["scheduled", "upcoming"].contains($0.status) }) else {
+            return "None scheduled"
+        }
+        return "\(phase.window) · \(formatted(phase.doseAmount)) \(phase.doseUnit)"
+    }
+
+    private func save(_ model: OperatingPlanPeptideExecutionReadModel) {
+        switch store.savePeptideExecution(model) {
         case .success:
             errorMessage = nil
             isEditing = false

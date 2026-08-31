@@ -96,6 +96,14 @@ extension AppDestination {
         case "native.operating-plan.protocol.recovery":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .operatingPlanRecoverySupport(executionId: try parameters.decode(String.self, forKey: .executionId))
+        case "native.operating-plan.tracking":
+            self = .operatingPlanTracking
+        case "native.operating-plan.tracking.support":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanTrackingSupport(executionId: try parameters.decode(String.self, forKey: .executionId))
+        case "native.operating-plan.protocol.supplement.support":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanSupplementSupport(protocolId: try parameters.decode(String.self, forKey: .protocolId))
         case "native.operating-plan.supplement.new":
             self = .operatingPlanSupplementNew
         case "native.operating-plan.supplement.edit":
@@ -139,9 +147,11 @@ extension AppDestination {
         case .operatingPlanProtocolDomain(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanPeptideExecution(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanRecoverySupport(let executionId): try parameters.encode(executionId, forKey: .executionId)
+        case .operatingPlanTrackingSupport(let executionId): try parameters.encode(executionId, forKey: .executionId)
+        case .operatingPlanSupplementSupport(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
-             .operatingPlan, .operatingPlanSupplementNew:
+             .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew:
             break
         }
     }

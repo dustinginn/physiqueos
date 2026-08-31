@@ -63,8 +63,9 @@ enum AppDestination: Hashable, Codable {
     /// browse/sandbox vertical (`src/app/profile/operating-plan/**`,
     /// `src/app/profile/protocols/**`). Like the logging-sandbox cases
     /// above, these do not claim a server destination contract — the web's
-    /// `OperatingPlanReadService`/`OperatingPlanStrategyDetailService`
-    /// return raw `href` strings, not typed destination objects, so there
+    /// `OperatingPlanScreen.jsx`'s landing composer and
+    /// `OperatingPlanStrategyDetailService` return raw `href` strings,
+    /// not typed destination objects, so there
     /// is no existing `DestinationId` to mirror.
     case operatingPlan
     /// `strategy/[strategyType]/[strategyId]` — `strategyType` is one of
@@ -89,6 +90,9 @@ enum AppDestination: Hashable, Codable {
     /// method — same in-place `?edit=1` toggle pattern as peptide
     /// execution above.
     case operatingPlanRecoverySupport(executionId: String)
+    case operatingPlanTracking
+    case operatingPlanTrackingSupport(executionId: String)
+    case operatingPlanSupplementSupport(protocolId: String)
     case operatingPlanSupplementNew
     case operatingPlanSupplementEdit(protocolId: String)
 
@@ -120,6 +124,9 @@ enum AppDestination: Hashable, Codable {
         case .operatingPlanProtocolDomain: "native.operating-plan.protocol"
         case .operatingPlanPeptideExecution: "native.operating-plan.protocol.peptide"
         case .operatingPlanRecoverySupport: "native.operating-plan.protocol.recovery"
+        case .operatingPlanTracking: "native.operating-plan.tracking"
+        case .operatingPlanTrackingSupport: "native.operating-plan.tracking.support"
+        case .operatingPlanSupplementSupport: "native.operating-plan.protocol.supplement.support"
         case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
         case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
         }

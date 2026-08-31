@@ -6,12 +6,8 @@ import SwiftUI
 /// that category. `DOMAIN_PRESENTATION`'s icon/tone/title per category is
 /// mirrored via `OperatingPlanIcon`/`ProtocolCategory`.
 ///
-/// Native enhancement: Supplement rows additionally surface Pause/Restore
-/// inline (`supplementActions.js`'s `pauseSupplement`/`restoreSupplement`)
-/// rather than only via a separately-routed non-active protocol detail
-/// screen — the web reaches that action from a harder-to-discover path;
-/// surfacing it directly on the row is a presentation choice, not a claim
-/// about a different web layout.
+/// Supplement rows retain the distinct web Strategy and Support edit
+/// concepts; Pause/Restore remains a separate lifecycle action.
 struct OperatingPlanProtocolDomainView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -93,6 +89,11 @@ struct OperatingPlanProtocolDomainView: View {
                             .foregroundStyle(PhysiqueOSTheme.accent)
                     }
                     if category == .supplement {
+                        if !isPaused {
+                            Button("Edit Strategy") { onNavigate(.operatingPlanSupplementEdit(protocolId: method.protocolId)) }
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                        }
                         let action = environment.operatingPlanStore.lifecycleAction(protocolId: method.protocolId)
                         Button(action.label) {
                             environment.operatingPlanStore.setSupplementPaused(protocolId: method.protocolId, paused: action.isPause)

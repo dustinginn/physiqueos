@@ -23,6 +23,8 @@ final class OperatingPlanSandboxStore {
     private var protocolDomains: [ProtocolCategory: OperatingPlanProtocolDomainReadModel]
     private var peptideExecutions: [String: OperatingPlanPeptideExecutionReadModel]
     private var recoverySupports: [String: OperatingPlanRecoverySupportReadModel]
+    private var supplementSupports: [String: OperatingPlanSupplementSupportReadModel]
+    private(set) var tracking: OperatingPlanTrackingReadModel
     private var supplements: [String: SupplementEditorReadModel]
     private var supplementLifecycle: [String: String]
     private let goalOptions: [OperatingPlanGoalLinkReadModel]
@@ -45,6 +47,8 @@ final class OperatingPlanSandboxStore {
         })
         self.peptideExecutions = Dictionary(uniqueKeysWithValues: fixture.peptideExecutions.map { ($0.protocolId, $0) })
         self.recoverySupports = Dictionary(uniqueKeysWithValues: fixture.recoverySupports.map { ($0.executionId, $0) })
+        self.supplementSupports = Dictionary(uniqueKeysWithValues: fixture.supplementSupports.map { ($0.protocolId, $0) })
+        self.tracking = fixture.tracking
         self.supplements = Dictionary(uniqueKeysWithValues: fixture.supplements.map { ($0.protocolId ?? "", $0) })
         self.supplementLifecycle = fixture.supplementLifecycle
         self.goalOptions = fixture.goalOptions
@@ -90,7 +94,7 @@ final class OperatingPlanSandboxStore {
         }
         trainingEditors[model.strategyId] = model
         if var detail = strategyDetails[model.strategyId] {
-            let currentPhase = detail.fields.first(where: { $0.label == "Current Goal Phase" })?.value ?? "Lean Mass Build"
+            let currentPhase = detail.fields.first(where: { $0.label == "Current Phase" })?.value ?? "Lean Mass Build"
             detail.fields = Self.trainingFields(model, currentGoalPhase: currentPhase)
             strategyDetails[model.strategyId] = detail
         }
@@ -101,6 +105,17 @@ final class OperatingPlanSandboxStore {
 
     func coachingEditor(strategyId: String) -> CoachingUpdatesEditorReadModel? {
         coachingEditors[strategyId]
+    }
+
+    // MARK: - Tracking
+
+    @discardableResult
+    func saveTracking(_ model: OperatingPlanTrackingReadModel) -> Result<Void, OperatingPlanSandboxError> {
+        if let error = SupportScheduleValidation.error(model: model.supportSchedule) {
+            return .failure(.init(message: error))
+        }
+        tracking = model
+        return .success(())
     }
 
     @discardableResult
@@ -134,6 +149,28 @@ final class OperatingPlanSandboxStore {
     }
 
     @discardableResult
+    func savePeptideExecution(_ model: OperatingPlanPeptideExecutionReadModel) -> Result<Void, OperatingPlanSandboxError> {
+        if let error = SupportScheduleValidation.error(model: model.supportSchedule) ?? PeptideDosingValidation.error(model: model.dosing) {
+            return .failure(.init(message: error))
+        }
+        var saved = model
+        if let generated = PeptideDosingTimelineBuilder.build(from: model.dosing) {
+            saved.timeline = generated
+            saved.state = .canonical
+        }
+        peptideExecutions[saved.protocolId] = saved
+        if let category = category(forProtocolId: saved.protocolId), var domain = protocolDomains[category],
+           let index = domain.methods.firstIndex(where: { $0.protocolId == saved.protocolId }) {
+            let current = saved.timeline.first(where: { $0.status == "active" })
+            domain.methods[index].currentDose = current.map { Self.formatDose($0.doseAmount, $0.doseUnit) }
+                ?? Self.formatDose(saved.dosing.startingDoseAmount, saved.dosing.startingDoseUnit)
+            domain.methods[index].currentSchedule = Self.formatSupportSchedule(saved.supportSchedule)
+            protocolDomains[category] = domain
+        }
+        return .success(())
+    }
+
+    @discardableResult
     func savePeptideDosing(protocolId: String, model: PeptideDosingStrategyReadModel) -> Result<Void, OperatingPlanSandboxError> {
         if let error = PeptideDosingValidation.error(model: model) {
             return .failure(.init(message: error))
@@ -142,14 +179,7 @@ final class OperatingPlanSandboxStore {
             return .failure(.init(message: "This peptide protocol is unavailable."))
         }
         execution.dosing = model
-        execution.state = .canonical
-        peptideExecutions[protocolId] = execution
-        if let category = category(forProtocolId: protocolId), var domain = protocolDomains[category],
-           let index = domain.methods.firstIndex(where: { $0.protocolId == protocolId }) {
-            domain.methods[index].currentDose = Self.formatDose(model.startingDoseAmount, model.startingDoseUnit)
-            protocolDomains[category] = domain
-        }
-        return .success(())
+        return savePeptideExecution(execution)
     }
 
     // MARK: - Recovery support
@@ -164,6 +194,31 @@ final class OperatingPlanSandboxStore {
             return .failure(.init(message: error))
         }
         recoverySupports[model.executionId] = model
+        if var domain = protocolDomains[.recovery],
+           let index = domain.methods.firstIndex(where: { $0.editDestination == .operatingPlanRecoverySupport(executionId: model.executionId) }) {
+            domain.methods[index].supportSummary = Self.formatSupportSchedule(model.supportSchedule)
+            protocolDomains[.recovery] = domain
+        }
+        return .success(())
+    }
+
+    // MARK: - Supplement support
+
+    func supplementSupport(protocolId: String) -> OperatingPlanSupplementSupportReadModel? {
+        supplementSupports[protocolId]
+    }
+
+    @discardableResult
+    func saveSupplementSupport(_ model: OperatingPlanSupplementSupportReadModel) -> Result<Void, OperatingPlanSandboxError> {
+        if let error = SupportScheduleValidation.error(model: model.supportSchedule) {
+            return .failure(.init(message: error))
+        }
+        supplementSupports[model.protocolId] = model
+        if var domain = protocolDomains[.supplement],
+           let index = domain.methods.firstIndex(where: { $0.protocolId == model.protocolId }) {
+            domain.methods[index].supportSummary = Self.formatSupportSchedule(model.supportSchedule)
+            protocolDomains[.supplement] = domain
+        }
         return .success(())
     }
 
@@ -203,7 +258,7 @@ final class OperatingPlanSandboxStore {
         let method = OperatingPlanSupportMethodReadModel(
             id: "method-\(protocolId)", protocolId: protocolId, name: saved.name, purpose: saved.purpose,
             supportSummary: saved.role, currentDose: nil, currentSchedule: nil,
-            editDestination: .operatingPlanSupplementEdit(protocolId: protocolId)
+            editDestination: .operatingPlanSupplementSupport(protocolId: protocolId)
         )
         if let index = domain.methods.firstIndex(where: { $0.protocolId == protocolId }) {
             domain.methods[index] = method
@@ -211,6 +266,26 @@ final class OperatingPlanSandboxStore {
             domain.methods.append(method)
         }
         protocolDomains[.supplement] = domain
+        if supplementSupports[protocolId] == nil {
+            supplementSupports[protocolId] = OperatingPlanSupplementSupportReadModel(
+                protocolId: protocolId,
+                name: saved.name,
+                supportSummary: "Daily · Morning",
+                doseAmount: "",
+                doseUnit: "",
+                supportSchedule: OperatingPlanSupportScheduleReadModel(
+                    frequency: .daily,
+                    daysOfWeek: [],
+                    intervalDays: 1,
+                    timing: .morning,
+                    specificTime: "",
+                    startDate: saved.startDate,
+                    endDate: nil
+                ),
+                reminderPreference: .none,
+                notes: ""
+            )
+        }
         supplementLifecycle[protocolId] = model.mode == .create ? "active" : (supplementLifecycle[protocolId] ?? "active")
         return .success(protocolId)
     }
@@ -247,19 +322,48 @@ final class OperatingPlanSandboxStore {
             .init(label: "Weekly Structure", value: "\(model.totalWeeklySessions) area sessions"),
             .init(label: "Training Focus", value: model.priorities.map(\.label).joined(separator: ", ")),
             .init(label: "Progression", value: model.progression.label),
-            .init(label: "Current Goal Phase", value: currentGoalPhase),
-            .init(label: "Training Context", value: "Goal-level strategy"),
+            .init(label: "Current Phase", value: currentGoalPhase),
         ]
     }
 
     static func coachingFields(_ model: CoachingUpdatesEditorReadModel) -> [OperatingPlanStrategyFieldReadModel] {
         [
-            .init(label: "Midweek Calibration", value: "\(model.midweekCalibrationEnabled ? "On" : "Off") · \(model.midweekTimeOfDay.label)"),
-            .init(label: "Weekly Synthesis", value: "\(model.weeklySynthesisEnabled ? "On" : "Off") · \(model.weeklyTimeOfDay.label)"),
-            .init(label: "Routine Daily Briefings", value: model.routineDailyBriefingsEnabled ? "On" : "Off"),
-            .init(label: "Notifications", value: model.notifyWhenReady ? "Notify when ready" : "Available without notification"),
-            .init(label: "Event Briefings", value: "Photo and DEXA remain active when eligible"),
+            .init(label: "Midweek Calibration", value: coachingScheduleSummary(model.midweek)),
+            .init(label: "Weekly Synthesis", value: coachingScheduleSummary(model.weekly)),
+            .init(label: "Routine Daily Briefings", value: "Off"),
+            .init(label: "Notifications", value: model.notificationPreference == .notifyWhenReady ? "Notify when ready" : "Available without notification"),
+            .init(label: "Event Briefings", value: eventBriefingSummary(model)),
         ]
+    }
+
+    static func formatSupportSchedule(_ model: OperatingPlanSupportScheduleReadModel) -> String {
+        let cadence: String
+        switch model.frequency {
+        case .daily: cadence = "Daily"
+        case .weekly: cadence = model.daysOfWeek.first.map { "\($0.label)s" } ?? "Weekly"
+        case .specificDays: cadence = model.daysOfWeek.map(\.shortLabel).joined(separator: ", ")
+        case .everyXDays: cadence = model.intervalDays == 2 ? "Every other day" : "Every \(model.intervalDays) days"
+        }
+        let time = model.timing == .specific ? formattedLocalTime(model.specificTime) : model.timing.label
+        return [cadence, time].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private static func coachingScheduleSummary(_ model: CoachingUpdateScheduleReadModel) -> String {
+        model.enabled ? "On · \(model.day.label) · \(formattedLocalTime(model.localTime))" : "Off"
+    }
+
+    private static func eventBriefingSummary(_ model: CoachingUpdatesEditorReadModel) -> String {
+        let enabled = [model.photoEventBriefingEnabled ? "Photo" : nil, model.dexaEventBriefingEnabled ? "DEXA" : nil].compactMap { $0 }
+        return enabled.isEmpty ? "Off" : "\(enabled.joined(separator: " and ")) active when eligible"
+    }
+
+    static func formattedLocalTime(_ value: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        guard let date = formatter.date(from: value) else { return value }
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
     }
 
     private static func formatDose(_ amount: Double, _ unit: String) -> String {
@@ -293,6 +397,8 @@ private struct OperatingPlanFixtureFile: Codable {
     var protocolDomains: [String: OperatingPlanProtocolDomainReadModel]
     var peptideExecutions: [OperatingPlanPeptideExecutionReadModel]
     var recoverySupports: [OperatingPlanRecoverySupportReadModel]
+    var supplementSupports: [OperatingPlanSupplementSupportReadModel]
+    var tracking: OperatingPlanTrackingReadModel
     var supplements: [SupplementEditorReadModel]
     var supplementLifecycle: [String: String]
     var goalOptions: [OperatingPlanGoalLinkReadModel]
