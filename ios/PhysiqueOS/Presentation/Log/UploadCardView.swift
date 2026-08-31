@@ -19,29 +19,6 @@ struct UploadCardView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            CardContainer(padding: .sm, background: PhysiqueOSTheme.surfaceAccent) {
-                Button { onNavigate(.checkIn(checkInType: "morning")) } label: {
-                    HStack(spacing: 12) {
-                        IconBadge(systemImage: "scalemass.fill", color: .primary, size: .md)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Morning Check-In")
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Reconcile yesterday’s priorities and log today’s weight.")
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("log.morningWeighIn")
-            }
-
             Button { onNavigate(.manualWeighIn) } label: {
                 Label("Log weight for another date", systemImage: "calendar.badge.plus")
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
@@ -58,7 +35,7 @@ struct UploadCardView: View {
                             Text("Upload")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Add one file, several files, or just a note.")
+                            Text("Add photos, files, or a note.")
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -75,7 +52,7 @@ struct UploadCardView: View {
                             .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(PhysiqueOSTheme.textPrimary)
+                            .background(PhysiqueOSTheme.accent)
                             .clipShape(Capsule())
                             .contentShape(Rectangle())
                     }
@@ -116,16 +93,13 @@ struct UploadCardView: View {
         )
         .onChange(of: photosSelection) {
             guard !photosSelection.isEmpty else { return }
-            let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
-            store.addAttachments(photosSelection.indices.map { index in
-                .init(
-                    id: UUID().uuidString,
-                    displayName: "Photo \(start + index + 1)",
-                    source: .photos
-                )
-            })
+            let items = photosSelection
             photosSelection = []
-            onNavigate(.evidenceIntake)
+            Task { @MainActor in
+                let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
+                store.addAttachments(await EvidenceAttachmentLoader.photos(items, startingAt: start))
+                onNavigate(.evidenceIntake)
+            }
         }
         .fileImporter(
             isPresented: $isFilePickerPresented,
@@ -133,9 +107,7 @@ struct UploadCardView: View {
             allowsMultipleSelection: true
         ) { result in
             guard case .success(let urls) = result, !urls.isEmpty else { return }
-            store.addAttachments(urls.map {
-                .init(id: UUID().uuidString, displayName: $0.lastPathComponent, source: .files)
-            })
+            store.addAttachments(EvidenceAttachmentLoader.files(urls))
             onNavigate(.evidenceIntake)
         }
     }

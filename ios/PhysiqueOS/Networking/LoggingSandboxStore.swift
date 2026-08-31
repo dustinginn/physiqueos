@@ -5,6 +5,7 @@ final class LoggingSandboxStore {
     private(set) var weighIns: [String: LocalWeightEntry]
     var evidenceDraft: EvidenceIntakeDraft
     var interpretationState: EvidenceInterpretationState = .editing
+    private(set) var pipelineTimings = EvidencePipelineTimings()
     private(set) var reviews: [String: LocalEvidenceReview]
     private(set) var morningPriorities: [MorningPriorityItem]
 
@@ -68,18 +69,23 @@ final class LoggingSandboxStore {
     func resetEvidenceDraft(now: Date = Date()) {
         evidenceDraft = .fresh(now: now)
         interpretationState = .editing
+        pipelineTimings = .init()
     }
 
     func addAttachments(_ attachments: [SandboxAttachment]) {
-        var identities = Set(evidenceDraft.attachments.map { "\($0.source.rawValue)|\($0.displayName)" })
+        var identities = Set(evidenceDraft.attachments.map(\.id))
         for attachment in attachments {
-            let identity = "\(attachment.source.rawValue)|\(attachment.displayName)"
-            if identities.insert(identity).inserted {
+            if identities.insert(attachment.id).inserted {
                 evidenceDraft.attachments.append(attachment)
             }
         }
+        EvidenceLocalInterpretation.applyExtractedDEXAValues(to: &evidenceDraft)
         syncPhotoIdentities()
         interpretationState = .editing
+    }
+
+    func recordAssetLoading(duration: TimeInterval) {
+        pipelineTimings.assetLoadingSeconds = duration
     }
 
     func removeAttachment(id: String) {
@@ -98,6 +104,7 @@ final class LoggingSandboxStore {
 
     func setEvidenceScenario(_ scenario: EvidenceFixtureScenario) {
         evidenceDraft.scenario = scenario
+        EvidenceLocalInterpretation.applyExtractedDEXAValues(to: &evidenceDraft)
         if scenario == .progressPhotos { syncPhotoIdentities() }
         interpretationState = .editing
     }
@@ -110,15 +117,15 @@ final class LoggingSandboxStore {
 
     func submitEvidence(now: Date = Date()) -> Result<String?, LoggingSandboxError> {
         guard evidenceDraft.hasContent else { return .failure(.init(message: "Add a photo, file, or details before continuing.")) }
-        guard Calendar.current.startOfDay(for: evidenceDraft.occurrenceDate) <= Calendar.current.startOfDay(for: now) else {
+        guard !evidenceDraft.attachments.contains(where: { $0.loadError != nil }) else {
+            return .failure(.init(message: "Remove and reselect any item that could not be loaded."))
+        }
+        guard ManualWeighInValidation.calendar.startOfDay(for: evidenceDraft.occurrenceDate) <= ManualWeighInValidation.calendar.startOfDay(for: now) else {
             return .failure(.init(message: "Evidence cannot be dated in the future."))
         }
         if evidenceDraft.scenario == .dexa {
             guard evidenceDraft.attachments.contains(where: { $0.source == .files && $0.displayName.lowercased().hasSuffix(".pdf") }) else {
                 return .failure(.init(message: "Choose the raw DEXA PDF before continuing."))
-            }
-            guard evidenceDraft.dexa.hasRequiredValues, evidenceDraft.dexa.valuesConfirmed else {
-                return .failure(.init(message: "Confirm the required DEXA values before continuing."))
             }
         }
         if evidenceDraft.scenario == .progressPhotos {
@@ -137,15 +144,31 @@ final class LoggingSandboxStore {
         return .success(nil)
     }
 
-    func finishInterpretation(now: Date = Date()) -> Result<String?, LoggingSandboxError> {
+    @MainActor
+    func finishInterpretation(now: Date = Date()) async -> Result<String?, LoggingSandboxError> {
         guard interpretationState == .pending else {
             return .failure(.init(message: "No evidence is waiting for interpretation."))
         }
-        let scenario = EvidenceSandboxRouter.scenario(for: evidenceDraft)
-        guard let category = scenario.category else {
-            return .failure(.init(message: "This upload could not be prepared for review."))
+        let start = ContinuousClock.now
+        let prepared = await EvidenceLocalInterpretation.prepare(evidenceDraft)
+        pipelineTimings.interpretationSeconds = seconds(since: start)
+        evidenceDraft = prepared
+        let reconciliationStart = ContinuousClock.now
+        let scenario = EvidenceSandboxRouter.scenario(for: prepared)
+        let id = "local-review-\(UUID().uuidString)"
+        switch EvidenceLocalInterpretation.buildReview(id: id, draft: prepared, scenario: scenario) {
+        case .failure(let error):
+            interpretationState = .editing
+            return .failure(error)
+        case .success(var review):
+            applyNutritionReconciliation(to: &review)
+            reviews[id] = review
+            pipelineTimings.reconciliationSeconds = seconds(since: reconciliationStart)
+            pipelineTimings.reviewReadySeconds = (pipelineTimings.assetLoadingSeconds ?? 0) + (pipelineTimings.interpretationSeconds ?? 0) + (pipelineTimings.reconciliationSeconds ?? 0)
+            evidenceDraft = .fresh(now: now)
+            interpretationState = .ready(reviewId: id)
+            return .success(id)
         }
-        return .success(createReview(category: category, scenario: scenario, now: now))
     }
 
     func retryInterpretation() { interpretationState = .editing }
@@ -155,13 +178,10 @@ final class LoggingSandboxStore {
         if id.hasPrefix("local-review-") { return nil }
         var draft = EvidenceIntakeDraft.fresh()
         let scenario: EvidenceFixtureScenario = id == "review-fixture-001" ? .weight : .generic
-        draft.details = scenario == .weight ? "Morning weight" : "Uploaded evidence"
-        draft.attachments = [.init(id: "pending-file", displayName: scenario == .weight ? "scale.png" : "evidence.png", source: .photos)]
-        let fixture = LoggingSandboxFixtureFactory.review(
-            id: id, category: scenario.category ?? .generic, scenario: scenario, draft: draft
-        )
-        reviews[id] = fixture
-        return fixture
+        draft.details = scenario == .weight ? "Weight value needs review" : "Upload details need review"
+        guard case .success(let review) = EvidenceLocalInterpretation.buildReview(id: id, draft: draft, scenario: scenario) else { return nil }
+        reviews[id] = review
+        return review
     }
 
     func containsReview(id: String) -> Bool {
@@ -193,26 +213,34 @@ final class LoggingSandboxStore {
 
     func discardReview(id: String) {
         reviews.removeValue(forKey: id)
+        evidenceDraft = .fresh()
         interpretationState = .editing
     }
 
-    private func createReview(
-        category: EvidenceCategory,
-        scenario: EvidenceFixtureScenario,
-        now: Date
-    ) -> String {
-        let id = "local-review-\(UUID().uuidString)"
-        reviews[id] = LoggingSandboxFixtureFactory.review(
-            id: id, category: category, scenario: scenario, draft: evidenceDraft, now: now
-        )
-        interpretationState = .ready(reviewId: id)
-        return id
+    @MainActor
+    func reprocessReview(id: String) async -> Result<LocalEvidenceReview, LoggingSandboxError> {
+        guard let existing = reviews[id] else { return .failure(.init(message: "This review is unavailable.")) }
+        var draft = EvidenceIntakeDraft.fresh(now: existing.occurrenceDate)
+        draft.occurrenceDate = existing.occurrenceDate
+        draft.details = existing.typedDetails
+        draft.attachments = existing.sourceAssets
+        let category = Set(existing.items.filter(\.included).map(\.category))
+        draft.scenario = category.count == 1 ? scenario(for: category.first!) : .automatic
+        let prepared = await EvidenceLocalInterpretation.prepare(draft)
+        let selectedScenario = category.count > 1 ? .mixed : draft.scenario
+        switch EvidenceLocalInterpretation.buildReview(id: id, draft: prepared, scenario: selectedScenario) {
+        case .failure(let error): return .failure(error)
+        case .success(var refreshed):
+            applyNutritionReconciliation(to: &refreshed)
+            reviews[id] = refreshed
+            return .success(refreshed)
+        }
     }
 
     private func syncPhotoIdentities() {
         let photos = evidenceDraft.attachments.filter { $0.source == .photos }
         let existing = Dictionary(uniqueKeysWithValues: evidenceDraft.photoIdentities.map { ($0.attachmentId, $0) })
-        let defaults = LoggingSandboxFixtureFactory.defaultPhotoIdentities(for: photos)
+        let defaults = EvidenceLocalInterpretation.defaultPhotoIdentities(for: photos)
         evidenceDraft.photoIdentities = photos.enumerated().map { index, attachment in
             existing[attachment.id] ?? defaults[index]
         }
@@ -222,8 +250,38 @@ final class LoggingSandboxStore {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
+        formatter.timeZone = ManualWeighInValidation.calendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+
+    private func applyNutritionReconciliation(to review: inout LocalEvidenceReview) {
+        let confirmedNutritionDates = Set(reviews.values
+            .filter { $0.status == .confirmed }
+            .flatMap(\.items)
+            .filter { $0.category == .nutrition && $0.included }
+            .map { Self.dateKey($0.occurrenceDate) })
+        for index in review.items.indices where review.items[index].category == .nutrition {
+            review.items[index].nutritionReplacementRequired = confirmedNutritionDates.contains(Self.dateKey(review.items[index].occurrenceDate))
+        }
+    }
+
+    private func scenario(for category: EvidenceCategory) -> EvidenceFixtureScenario {
+        switch category {
+        case .training: .training
+        case .nutrition: .nutrition
+        case .weight: .weight
+        case .activity: .activity
+        case .dexa: .dexa
+        case .progressPhotos: .progressPhotos
+        case .labs: .labs
+        case .recovery: .recovery
+        case .generic: .generic
+        }
+    }
+
+    private func seconds(since start: ContinuousClock.Instant) -> Double {
+        let duration = start.duration(to: .now)
+        return Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1_000_000_000_000_000_000
     }
 }

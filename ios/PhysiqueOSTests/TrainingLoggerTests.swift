@@ -101,6 +101,24 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(pastPresentation.context, "2026-08-28 · 1 exercise")
     }
 
+    func testCompletionAchievementRequiresActualImprovementAgainstComparableHistory() async throws {
+        let config = try await configuration()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        var draft = draft()
+        draft.addExercise(bench)
+        draft.exercises[0].sets[0].isCompleted = true
+        XCTAssertTrue(draft.performanceAchievementLines.isEmpty)
+        draft.exercises[0].sets[0].load = 999
+        draft.exercises[0].sets[0].reps = 20
+        XCTAssertTrue(draft.performanceAchievementLines.isEmpty, "A load absent from prior history is not matched-load evidence.")
+        let comparableSet = try XCTUnwrap(draft.exercises[0].previousPerformance?.sets.first)
+        draft.exercises[0].sets[0].load = comparableSet.weight
+        draft.exercises[0].sets[0].reps = try XCTUnwrap(comparableSet.reps) + 1
+        XCTAssertEqual(draft.performanceAchievementLines, ["Bench Press · better reps at matched load"])
+        draft.exercises[0].previousPerformance = nil
+        XCTAssertTrue(draft.performanceAchievementLines.isEmpty, "No comparable context must never invent a PR.")
+    }
+
     func testPreviousPerformanceIsStrictlyBeforePastWorkoutDate() async throws {
         let config = try await configuration()
         let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })

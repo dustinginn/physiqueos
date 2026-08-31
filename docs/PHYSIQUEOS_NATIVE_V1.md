@@ -2322,3 +2322,62 @@ cost was added — this patch is $0 incremental. Version 1.0/build 7 metadata,
 signing configuration, and Info.plist remain unchanged. Xcode/Mac build and
 unit verification are Native acceptance work for this candidate, not a
 post-stabilization integration requirement.
+
+## 2026-08-31 — Build 8 Logging and Evidence Intake stabilization candidate
+
+Build 8 physical-device feedback exposed three connected sandbox defects:
+Photos/Files retained names rather than bytes, review composition substituted
+canned scenario values for submitted evidence, and discard removed the review
+while leaving its intake draft/assets alive. Native now retains every selected
+asset's identity, bytes, content type, order, occurrence date, and details.
+Images are read locally with Apple Vision, PDFs with PDFKit, and text files
+directly. These are read/compute-only Apple frameworks: no production request,
+write, paid API, or new service is involved.
+
+Automatic typing consumes actual typed/extracted text and file metadata.
+Recognized packages enter Training, Nutrition, Weight, Activity, DEXA, Progress
+Photos, Labs, or Recovery review; mixed packages retain independent records.
+An unresolved package asks the user to choose a type rather than silently
+claiming generic recognition. Explicit selection remains the permanent manual
+fallback. Review values come only from submitted input or user correction;
+missing values stay blank and correctable. No demo meal, macro, activity,
+weight, scan, workout, or performance value is substituted.
+
+Completing intake moves the exact package into pending review and clears the
+draft. Save and return later preserves that review unchanged. Read upload again
+reprocesses its preserved bytes. Discard removes the review and transient draft,
+so later uploads cannot inherit discarded assets. Timings distinguish asset
+load, interpretation, reconciliation, and review-ready stages for the daily-
+driver three-second budget.
+
+Progress Photos show actual submitted previews and begin with unconfirmed poses.
+Orientation and relaxed/contracted confirmation uses a warm pending and green
+confirmed state. Goal relationship, source/provenance, tags, manual ordering,
+location, lighting, and session-note controls are no longer Founder-facing.
+Shared session review is limited to time of day, fasted, post-workout, pump, and
+original/unedited confirmation. Evidence Review also removes Source and the
+Ready-to-add item-count card globally while retaining provenance in contracts.
+
+Log keeps Training Logger, historical weight, Upload, pending review, and note-
+only upload; Morning Check-In remains Home-owned. Priority outcomes have strong
+semantic confirmation, notes use a multiline editor, and weight shows `150.5`
+as an example. The accepted Workout Logger review/final confirmation remains
+intact. Completion shows performance feedback only when strict comparable
+variant/relationship history proves an improvement. Date-only logging uses the
+Pacific product calendar explicitly. Evidence history was not started and
+Operating Plan behavior was unchanged.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Add the authenticated interpretation service only through a proven compute-
+  only, noncanonical sandbox boundary. Until then, anything local OCR/PDF/text
+  extraction cannot read remains blank and correctable; no fake success.
+- Route confirmed packages through existing server-owned Training, Nutrition,
+  Weight, Activity, DEXA, Progress Photos, Labs, and Recovery commands without
+  making universal intake a duplicate domain authority.
+- Preserve exact pending assets/corrections and discard semantics when pending
+  reviews move from memory to authenticated persistence.
+- During production-data migration, migrate all existing Operating Plan values,
+  including schedules/times, cadences, enabled states, phase history/strategy,
+  every protocol, Tracking, Progress Photos/DEXA schedules, reminders, and
+  support schedules. Never reconstruct Founder preferences from fixture defaults.

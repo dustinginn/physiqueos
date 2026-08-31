@@ -137,6 +137,30 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
         let existing = Set(exercisePickerExistingExerciseIds ?? [])
         return exercises.filter { !existing.contains($0.id) }.count
     }
+
+    /// Uses only the already strict-matched previous-performance context.
+    /// No achievement is emitted when variant/relationship comparison was unavailable.
+    var performanceAchievementLines: [String] {
+        exercises.compactMap { exercise in
+            guard let previous = exercise.previousPerformance else { return nil }
+            let completed = exercise.sets.filter(\.isCompleted)
+            switch exercise.measurement {
+            case .repsLoad:
+                let improved = completed.contains { current in
+                    guard let load = current.load, let reps = current.reps else { return false }
+                    guard let priorBest = previous.sets.filter({ $0.weight == load }).compactMap(\.reps).max() else { return false }
+                    return reps > priorBest
+                }
+                return improved ? "\(exercise.name) · better reps at matched load" : nil
+            case .bodyweightReps:
+                guard let priorBest = previous.sets.compactMap(\.reps).max() else { return nil }
+                return completed.compactMap(\.reps).max().map { $0 > priorBest } == true ? "\(exercise.name) · bodyweight rep best" : nil
+            case .duration:
+                guard let priorBest = previous.sets.compactMap(\.durationSeconds).max() else { return nil }
+                return completed.compactMap(\.durationSeconds).max().map { $0 > priorBest } == true ? "\(exercise.name) · duration best" : nil
+            }
+        }
+    }
 }
 
 struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {

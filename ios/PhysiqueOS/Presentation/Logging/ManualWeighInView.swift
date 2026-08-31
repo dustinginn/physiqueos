@@ -23,7 +23,7 @@ struct MorningCheckInView: View {
                 ForEach(store.morningPriorities) { priority in priorityCard(priority) }
                 CardContainer { VStack(alignment: .leading, spacing: 10) {
                     Text("What’s your weight today?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
+                    HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight", placeholder: "150.5").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
                 } }
                 if let message { Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive) }
                 PrimaryActionButton(title: "Complete Morning Check-In") { save() }.accessibilityIdentifier("morningCheckIn.save")
@@ -34,17 +34,34 @@ struct MorningCheckInView: View {
     }
 
     private func priorityCard(_ priority: MorningPriorityItem) -> some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            Text(priority.title).physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-            Text(priority.detail).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            HStack(spacing: 6) { ForEach(MorningPriorityDisposition.allCases) { disposition in
-                Button(disposition.label) { store.updateMorningPriority(id: priority.id, disposition: disposition) }
-                    .buttonStyle(.bordered).tint(priority.disposition == disposition ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textSecondary).controlSize(.small)
-            } }
-            if priority.disposition == .note {
-                TextField("Add a note", text: Binding(get: { store.morningPriorities.first(where: { $0.id == priority.id })?.note ?? "" }, set: { store.updateMorningPriority(id: priority.id, disposition: .note, note: $0) })).textFieldStyle(.roundedBorder)
-            }
-        } }
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(priority.title).physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                Text(priority.detail).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                HStack(spacing: 6) { ForEach(MorningPriorityDisposition.allCases) { disposition in
+                    Button(disposition.label) { store.updateMorningPriority(id: priority.id, disposition: disposition) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(priority.disposition == disposition ? dispositionColor(disposition) : PhysiqueOSTheme.surfaceElevated)
+                        .foregroundStyle(priority.disposition == disposition ? Color.white : PhysiqueOSTheme.textSecondary)
+                        .controlSize(.small)
+                } }
+                if priority.disposition == .note {
+                    ZStack(alignment: .topLeading) {
+                        if (store.morningPriorities.first(where: { $0.id == priority.id })?.note ?? "").isEmpty {
+                            Text("Add context if it will help later.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textMuted).padding(.horizontal, 12).padding(.vertical, 14)
+                        }
+                        TextEditor(text: Binding(get: { store.morningPriorities.first(where: { $0.id == priority.id })?.note ?? "" }, set: { store.updateMorningPriority(id: priority.id, disposition: .note, note: $0) }))
+                            .frame(minHeight: 96).padding(6).scrollContentBackground(.hidden).background(Color.clear)
+                    }
+                    .background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }.padding(.vertical, 10)
+            Divider().overlay(PhysiqueOSTheme.divider)
+        }
+    }
+
+    private func dispositionColor(_ disposition: MorningPriorityDisposition) -> Color {
+        switch disposition { case .completed: PhysiqueOSTheme.chartSuccess; case .skipped: .orange; case .note: PhysiqueOSTheme.accent }
     }
 
     private func save() {

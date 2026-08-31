@@ -7,6 +7,7 @@ import UIKit
 struct NumericEditField: UIViewRepresentable {
     @Binding var text: String
     var accessibilityLabel: String
+    var placeholder: String? = nil
     var fieldID: String? = nil
     var focusedFieldID: Binding<String?>? = nil
     var nextFieldID: String? = nil
@@ -24,6 +25,7 @@ struct NumericEditField: UIViewRepresentable {
         field.layer.cornerRadius = 8
         field.clipsToBounds = true
         field.accessibilityLabel = accessibilityLabel
+        field.placeholder = placeholder
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
 
         let toolbar = UIToolbar()
@@ -40,6 +42,7 @@ struct NumericEditField: UIViewRepresentable {
         context.coordinator.parent = self
         if field.text != text { field.text = text }
         field.accessibilityLabel = accessibilityLabel
+        field.placeholder = placeholder
         if let fieldID, let focusedFieldID {
             if focusedFieldID.wrappedValue == fieldID, !field.isFirstResponder {
                 field.becomeFirstResponder()

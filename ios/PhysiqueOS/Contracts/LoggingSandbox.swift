@@ -41,6 +41,12 @@ struct MorningCheckInResult: Equatable {
 }
 
 enum ManualWeighInValidation {
+    static var calendar: Calendar {
+        var value = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return value
+    }
+
     static func error(weightText: String, unit: WeightUnit, date: Date, maximumDate: Date) -> String? {
         let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(trimmed), value.isFinite else { return "Enter a valid weight." }
@@ -50,7 +56,7 @@ enum ManualWeighInValidation {
                 ? "Weight must be between 50 and 1,000 lb."
                 : "Weight must be between 22.7 and 453.6 kg."
         }
-        guard Calendar.current.startOfDay(for: date) <= Calendar.current.startOfDay(for: maximumDate) else {
+        guard calendar.startOfDay(for: date) <= calendar.startOfDay(for: maximumDate) else {
             return "A weigh-in cannot be logged for a future date."
         }
         return nil
@@ -120,14 +126,14 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
         case .automatic: "Automatic"
         case .training: "Training · strength"
         case .cardio: "Training · cardio"
-        case .nutrition: "Nutrition screenshot"
-        case .weight: "Uploaded weight"
-        case .activity: "Apple Activity summary"
-        case .dexa: "DEXA report"
-        case .progressPhotos: "Progress photos"
-        case .labs: "Lab results"
-        case .recovery: "Sleep / recovery"
-        case .mixed: "Mixed upload"
+        case .nutrition: "Nutrition"
+        case .weight: "Weight"
+        case .activity: "Activity"
+        case .dexa: "DEXA"
+        case .progressPhotos: "Progress Photos"
+        case .labs: "Lab Panel"
+        case .recovery: "Recovery"
+        case .mixed: "Multiple types"
         case .generic: "Evidence"
         }
     }
@@ -158,15 +164,28 @@ struct SandboxAttachment: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var source: Source
+    var contentType: String? = nil
+    var data: Data? = nil
+    var extractedText: String? = nil
+    var loadError: String? = nil
+
+    var isImage: Bool {
+        contentType?.hasPrefix("image/") == true || displayName.range(of: #"\.(png|jpe?g|heic|heif)$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    var isPDF: Bool {
+        contentType == "application/pdf" || displayName.lowercased().hasSuffix(".pdf")
+    }
 }
 
 protocol EvidenceLabeledChoice { var label: String { get } }
 
 enum ProgressPhotoOrientation: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
-    case front, rear, side, leftSide = "left_side", rightSide = "right_side"
+    case unconfirmed, front, rear, side, leftSide = "left_side", rightSide = "right_side"
     var id: String { rawValue }
     var label: String {
         switch self {
+        case .unconfirmed: "Choose orientation"
         case .front: "Front"
         case .rear: "Rear"
         case .side: "Side"
@@ -177,7 +196,13 @@ enum ProgressPhotoOrientation: String, Codable, CaseIterable, Identifiable, Evid
 }
 
 enum ProgressPhotoContraction: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
-    case relaxed, flexed
+    case unconfirmed, relaxed, flexed
+    var id: String { rawValue }
+    var label: String { self == .unconfirmed ? "Choose condition" : rawValue.capitalized }
+}
+
+enum ProgressPhotoTimeOfDay: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case morning, afternoon, evening
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
 }
@@ -206,6 +231,7 @@ struct ProgressPhotoIdentityDraft: Codable, Equatable, Identifiable {
     var confirmed: Bool
 
     var poseLabel: String {
+        guard orientation != .unconfirmed, contraction != .unconfirmed else { return "Pose not confirmed" }
         if poseVariant == .other, !customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return customLabel
         }
@@ -215,13 +241,10 @@ struct ProgressPhotoIdentityDraft: Codable, Equatable, Identifiable {
 }
 
 struct ProgressPhotoSessionDraft: Codable, Equatable {
-    var morning: Bool? = nil
+    var timeOfDay: ProgressPhotoTimeOfDay? = nil
     var fasted: Bool?
     var postWorkout: Bool?
     var pump: Bool?
-    var lighting = ""
-    var location = ""
-    var notes = ""
     var originalUnedited = false
 }
 
@@ -250,6 +273,13 @@ enum EvidenceInterpretationState: Equatable {
     case ready(reviewId: String)
 }
 
+struct EvidencePipelineTimings: Equatable {
+    var assetLoadingSeconds: Double?
+    var interpretationSeconds: Double?
+    var reconciliationSeconds: Double?
+    var reviewReadySeconds: Double?
+}
+
 struct EvidenceIntakeDraft: Codable, Equatable {
     var occurrenceDate: Date
     var details: String
@@ -274,31 +304,53 @@ struct EvidenceIntakeDraft: Codable, Equatable {
     var hasContent: Bool {
         !attachments.isEmpty || !details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    var submittedText: String {
+        ([details] + attachments.compactMap(\.extractedText))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
 }
 
 enum EvidenceSandboxRouter {
     static func scenario(for draft: EvidenceIntakeDraft) -> EvidenceFixtureScenario {
         guard draft.scenario == .automatic else { return draft.scenario }
-        let text = (draft.details + " " + draft.attachments.map(\.displayName).joined(separator: " ")).lowercased()
-        let categoryMatches = [
-            ["nutrition", "meal", "calorie", "protein", "macro"].contains(where: text.contains),
-            ["activity", "rings", "steps", "move goal"].contains(where: text.contains),
-            ["workout", "training", "bench", "sets", "cardio", "treadmill", "stair", "run", "cycle"].contains(where: text.contains),
-            ["scale", "weigh", "weight"].contains(where: text.contains),
-            ["labs", "lab panel", "bloodwork", "blood test"].contains(where: text.contains),
-            ["recovery", "sleep", "hrv", "readiness"].contains(where: text.contains),
-        ].filter { $0 }.count
-        if categoryMatches > 1 { return .mixed }
-        if text.contains("dexa") || text.contains("body composition") { return .dexa }
-        if ["labs", "lab panel", "bloodwork", "blood test"].contains(where: text.contains) { return .labs }
-        if ["recovery", "sleep", "hrv", "readiness"].contains(where: text.contains) { return .recovery }
-        if ["progress", "front", "side", "rear", "pose"].contains(where: text.contains) { return .progressPhotos }
-        if ["nutrition", "meal", "calorie", "protein", "macro"].contains(where: text.contains) { return .nutrition }
-        if ["scale", "weigh", "weight"].contains(where: text.contains) { return .weight }
-        if ["activity", "rings", "steps", "move goal"].contains(where: text.contains) { return .activity }
-        if ["cardio", "treadmill", "stair", "run", "cycle"].contains(where: text.contains) { return .cardio }
-        if ["workout", "training", "bench", "sets"].contains(where: text.contains) { return .training }
-        return .generic
+        let categories = detectedCategories(for: draft)
+        if categories.count > 1 { return .mixed }
+        return switch categories.first {
+        case .training: draft.submittedText.lowercased().range(of: #"\b(walk|run|cycling|treadmill|stair|elliptical|rowing)\b"#, options: .regularExpression) != nil ? .cardio : .training
+        case .nutrition: .nutrition
+        case .weight: .weight
+        case .activity: .activity
+        case .dexa: .dexa
+        case .progressPhotos: .progressPhotos
+        case .labs: .labs
+        case .recovery: .recovery
+        case .generic, .none: .automatic
+        }
+    }
+
+    static func detectedCategories(for draft: EvidenceIntakeDraft) -> [EvidenceCategory] {
+        let text = (draft.submittedText + "\n" + draft.attachments.map(\.displayName).joined(separator: "\n")).lowercased()
+        var result: [EvidenceCategory] = []
+        func add(_ category: EvidenceCategory, when condition: Bool) {
+            if condition, !result.contains(category) { result.append(category) }
+        }
+        add(.dexa, when: containsAny(text, ["dexa", "bodyspec", "body composition", "lean tissue", "fat tissue", "bone mineral content", "vat volume"]))
+        add(.labs, when: containsAny(text, ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]))
+        add(.recovery, when: containsAny(text, ["sleep", "hrv", "readiness", "recovery score", "time asleep"]))
+        add(.progressPhotos, when: containsAny(text, ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]))
+        add(.nutrition, when: containsAny(text, ["nutrition", "calories", "protein", "carbohydrate", "carbs", "meal", "macros"]))
+        let trainingSignal = containsAny(text, ["workout", "training", "sets", "reps", "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl", "treadmill", "stair stepper", "outdoor walk", "indoor walk", "cycling", "elliptical", "rowing"])
+        add(.training, when: trainingSignal)
+        add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal)
+        let weightSignal = containsAny(text, ["morning weight", "body weight", "weighed in", "scale weight"]) || text.range(of: #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#, options: .regularExpression) != nil
+        add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
+        return result
+    }
+
+    private static func containsAny(_ text: String, _ terms: [String]) -> Bool {
+        terms.contains(where: text.contains)
     }
 }
 
@@ -365,11 +417,23 @@ struct EvidenceReviewItem: Codable, Equatable, Identifiable {
     var nutritionReplacementRequired = false
     var nutritionDisposition: NutritionReviewDisposition?
 
-    var hasRequiredValues: Bool { fields.allSatisfy(\.isValid) }
+    var hasRequiredValues: Bool {
+        guard fields.allSatisfy(\.isValid) else { return false }
+        let populated = Set(fields.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.id))
+        return switch category {
+        case .training: !exercises.isEmpty || !populated.isEmpty
+        case .nutrition: !populated.intersection(["calories", "protein", "carbs", "fat"]).isEmpty
+        case .weight: populated.contains("weight")
+        case .activity: !populated.intersection(["activeCalories", "exerciseMinutes", "steps", "duration", "distance", "heartRate"]).isEmpty
+        case .dexa: ["totalMass", "bodyFat", "fatMass", "leanMass"].allSatisfy(populated.contains)
+        case .progressPhotos: true
+        case .labs, .recovery, .generic: !populated.isEmpty
+        }
+    }
     var specialReviewComplete: Bool {
         let photoMetadataReady = fields
-            .filter { ["timeOfDay", "goalRelationship"].contains($0.id) }
-            .allSatisfy { $0.value != "Needs session review" }
+            .filter { ["timeOfDay", "fasted", "originalUnedited"].contains($0.id) }
+            .allSatisfy { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return (!nutritionReplacementRequired || nutritionDisposition != nil) &&
         (category != .progressPhotos || (photoIdentities.allSatisfy(\.confirmed) && photoMetadataReady))
     }
@@ -387,6 +451,7 @@ struct LocalEvidenceReview: Codable, Equatable, Identifiable {
     var typedDetails: String
     var items: [EvidenceReviewItem]
     var status: LocalEvidenceReviewStatus
+    var interpretationMessage: String? = nil
 
     var category: EvidenceCategory { items.first?.category ?? .generic }
     var occurrenceDate: Date { items.first?.occurrenceDate ?? .distantPast }
@@ -409,156 +474,6 @@ struct LocalEvidenceReview: Codable, Equatable, Identifiable {
         case .recovery: "Recovery review complete"
         case .generic: "Review complete"
         }
-    }
-}
-
-enum LoggingSandboxFixtureFactory {
-    static func review(
-        id: String = UUID().uuidString,
-        category: EvidenceCategory,
-        scenario: EvidenceFixtureScenario,
-        draft: EvidenceIntakeDraft,
-        now _: Date = Date()
-    ) -> LocalEvidenceReview {
-        let items: [EvidenceReviewItem]
-        switch category {
-        case .training:
-            let cardio = scenario == .cardio
-            items = cardio ? [workoutItem(id: "cardio", title: "Stair Stepper", date: draft.occurrenceDate, duration: "42 min", calories: "386 cal", heartRate: "128 bpm")] : trainingPackage(date: draft.occurrenceDate)
-        case .nutrition:
-            items = [nutritionItem(date: draft.occurrenceDate)]
-        case .weight:
-            items = [item("weight", .weight, "Weight", draft.occurrenceDate, [
-                field("weight", "Weight", "166.8", "lb"),
-                field("source", "Source", "Screenshot", required: false),
-            ])]
-        case .activity:
-            items = [item("activity", .activity, "Activity", draft.occurrenceDate, [
-                field("activeCalories", "Active calories", "742", "cal"),
-                field("exerciseMinutes", "Exercise", "64", "min"),
-                field("duration", "Duration", "16", "hr", required: false),
-                field("source", "Source", "Screenshot", required: false),
-            ])]
-        case .dexa:
-            let dexa = draft.dexa
-            var fields = [
-                field("totalMass", "Weight", dexa.totalMass.isEmpty ? "171.4" : dexa.totalMass, "lb"),
-                field("leanMass", "Lean mass", dexa.leanMass.isEmpty ? "150.0" : dexa.leanMass, "lb"),
-                field("fatMass", "Fat mass", dexa.fatMass.isEmpty ? "14.3" : dexa.fatMass, "lb"),
-                field("bodyFat", "Body fat", dexa.bodyFatPercentage.isEmpty ? "8.3" : dexa.bodyFatPercentage, "%"),
-            ]
-            fields.append(contentsOf: [
-                ("boneMineral", "Bone mineral", dexa.boneMineralContent, "lb"),
-                ("rmr", "RMR", dexa.restingMetabolicRate, "kcal"),
-                ("vatMass", "VAT mass", dexa.vatMass, "lb"),
-                ("vatVolume", "VAT volume", dexa.vatVolume, "in³"),
-            ].compactMap { id, label, value, unit in
-                value.isEmpty ? nil : field(id, label, value, unit, required: false)
-            })
-            fields.append(field("source", "Source", "Submitted evidence", required: false))
-            items = [item("dexa", .dexa, "DEXA", draft.occurrenceDate, fields)]
-        case .progressPhotos:
-            let identities = draft.photoIdentities.isEmpty ? defaultPhotoIdentities(for: draft.attachments) : draft.photoIdentities
-            let timeOfDay = draft.photoSession.morning == true ? "Morning" : draft.photoSession.morning == false ? "Not morning" : "Needs session review"
-            let goalRelationship = identities.contains(where: { $0.goalRole == .primary }) ? "Linked Goal" : "Needs session review"
-            items = [.init(id: "photos", category: .progressPhotos, title: "Progress Photos", occurrenceDate: draft.occurrenceDate, fields: [
-                field("poses", "Poses", identities.map(\.poseLabel).joined(separator: ", ")),
-                field("timeOfDay", "Time of day", timeOfDay, required: false),
-                field("goalRelationship", "Goal relationship", goalRelationship, required: false),
-                field("source", "Source", "Submitted evidence", required: false),
-            ], photoIdentities: identities)]
-        case .labs:
-            items = [item("labs", .labs, "Lab Panel", draft.occurrenceDate, [
-                field("panel", "Panel", "Complete Blood Count", required: false),
-                field("hemoglobin", "Hemoglobin", "14.8", "g/dL", required: false),
-                field("source", "Source", "Submitted evidence", required: false),
-            ])]
-        case .recovery:
-            items = [item("recovery", .recovery, "Recovery Day", draft.occurrenceDate, [
-                field("sleep", "Sleep", "7.8", "hr", required: false),
-                field("source", "Source", "Submitted evidence", required: false),
-            ])]
-        case .generic:
-            items = scenario == .mixed ? mixedPackage(date: draft.occurrenceDate) : [item("generic", .generic, "Evidence", draft.occurrenceDate, [field("description", "Details", draft.details.isEmpty ? "Submitted file" : draft.details, required: false)])]
-        }
-        return .init(
-            id: id,
-            sourceAssets: draft.attachments,
-            typedDetails: draft.details,
-            items: items,
-            status: .awaitingConfirmation
-        )
-    }
-
-    private static func item(_ id: String, _ category: EvidenceCategory, _ title: String, _ date: Date, _ fields: [EvidenceReviewField]) -> EvidenceReviewItem {
-        .init(id: id, category: category, title: title, occurrenceDate: date, fields: fields)
-    }
-
-    private static func workoutItem(id: String, title: String, date: Date, duration: String, calories: String, heartRate: String, exercises: [EvidenceReviewExercise] = []) -> EvidenceReviewItem {
-        .init(id: id, category: .training, title: title, occurrenceDate: date, fields: [
-            field("duration", "Duration", duration, required: false),
-            field("activeCalories", "Active calories", calories, required: false),
-            field("heartRate", "Average heart rate", heartRate, required: false),
-            field("source", "Source", "Screenshot + Typed evidence", required: false),
-        ], exercises: exercises)
-    }
-
-    private static func trainingPackage(date: Date) -> [EvidenceReviewItem] {
-        let bench = EvidenceReviewExercise(id: "bench", name: "Bench Press", variant: "3-Second Pause", relationship: "Superset with Cable Fly", sets: [
-            .init(id: "bench-1", summary: "8 reps @ 180 lb"), .init(id: "bench-2", summary: "8 reps @ 180 lb"), .init(id: "bench-3", summary: "7 reps @ 180 lb"),
-        ])
-        let fly = EvidenceReviewExercise(id: "fly", name: "Cable Fly", variant: nil, relationship: "Superset with Bench Press", sets: [
-            .init(id: "fly-1", summary: "12 reps @ 45 lb"), .init(id: "fly-2", summary: "11 reps @ 45 lb"), .init(id: "fly-3", summary: "10 reps @ 45 lb"),
-        ])
-        return [
-            workoutItem(id: "strength", title: "Traditional Strength Training", date: date, duration: "1 hr 17 min", calories: "483 cal", heartRate: "114 bpm", exercises: [bench, fly]),
-            workoutItem(id: "walk", title: "Outdoor Walk", date: date, duration: "31 min", calories: "146 cal", heartRate: "102 bpm"),
-            workoutItem(id: "cycle", title: "Indoor Cycling", date: date, duration: "24 min", calories: "238 cal", heartRate: "136 bpm"),
-        ]
-    }
-
-    private static func nutritionItem(date: Date) -> EvidenceReviewItem {
-        let breakfast = EvidenceReviewMeal(id: "breakfast", name: "Breakfast", summary: "440 cal · 62 g protein · 37 g carbs · 6 g fat", foods: [
-            .init(id: "eggs", name: "Egg whites and eggs", detail: "1 serving", calories: "280 cal"),
-            .init(id: "oats", name: "Oatmeal", detail: "1 bowl", calories: "160 cal"),
-        ])
-        let dinner = EvidenceReviewMeal(id: "dinner", name: "Dinner", summary: "813 cal · 60 g protein · 74 g carbs · 39 g fat", foods: [
-            .init(id: "chicken", name: "Chicken and rice", detail: "1 plate", calories: "813 cal"),
-        ])
-        return .init(id: "nutrition", category: .nutrition, title: "Nutrition", occurrenceDate: date, fields: [
-            field("calories", "Calories", "2475", "cal"), field("protein", "Protein", "188", "g"),
-            field("carbs", "Carbs", "262", "g"), field("fat", "Fat", "71", "g"),
-            field("source", "Source", "Screenshot + Typed evidence", required: false),
-        ], meals: [breakfast, dinner], nutritionReplacementRequired: true)
-    }
-
-    private static func mixedPackage(date: Date) -> [EvidenceReviewItem] {
-        [
-            nutritionItem(date: date),
-            item("activity", .activity, "Activity", date, [
-                field("activeCalories", "Active calories", "742", "cal"),
-                field("exerciseMinutes", "Exercise", "64", "min"),
-                field("source", "Source", "Screenshot", required: false),
-            ]),
-        ]
-    }
-
-    static func defaultPhotoIdentities(for attachments: [SandboxAttachment]) -> [ProgressPhotoIdentityDraft] {
-        let photos = attachments.filter { $0.source == .photos }
-        return photos.enumerated().map { index, attachment in
-            let orientations: [ProgressPhotoOrientation] = [.front, .side, .rear]
-            return .init(id: "pose-\(attachment.id)", attachmentId: attachment.id, orientation: orientations[index % orientations.count], contraction: .relaxed, poseVariant: .standard, customLabel: "", goalRole: index == 0 ? .primary : .supporting, tags: "", confirmed: false)
-        }
-    }
-
-    private static func field(
-        _ id: String,
-        _ label: String,
-        _ value: String,
-        _ unit: String? = nil,
-        required: Bool = true
-    ) -> EvidenceReviewField {
-        .init(id: id, label: label, value: value, unit: unit, required: required)
     }
 }
 

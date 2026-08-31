@@ -49,17 +49,24 @@ struct EvidenceIntakeView: View {
         }
         .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photoItems, matching: .images)
         .onChange(of: photoItems) {
-            let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
-            store.addAttachments(photoItems.indices.map { index in
-                .init(id: UUID().uuidString, displayName: "Photo \(start + index + 1)", source: .photos)
-            })
+            let items = photoItems
             photoItems = []
+            Task { @MainActor in
+                let clock = ContinuousClock.now
+                let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
+                let loaded = await EvidenceAttachmentLoader.photos(items, startingAt: start)
+                store.addAttachments(loaded)
+                store.recordAssetLoading(duration: elapsed(since: clock))
+                reportLoadingFailures(in: loaded)
+            }
         }
         .fileImporter(isPresented: $isFilePickerPresented, allowedContentTypes: [.image, .pdf, .plainText], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
-                store.addAttachments(urls.map {
-                    .init(id: UUID().uuidString, displayName: $0.lastPathComponent, source: .files)
-                })
+                let clock = ContinuousClock.now
+                let loaded = EvidenceAttachmentLoader.files(urls)
+                store.addAttachments(loaded)
+                store.recordAssetLoading(duration: elapsed(since: clock))
+                reportLoadingFailures(in: loaded)
             }
         }
         .onAppear {
@@ -123,9 +130,9 @@ struct EvidenceIntakeView: View {
                                         .foregroundStyle(PhysiqueOSTheme.accent)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(attachment.displayName).lineLimit(1)
-                                        Text(attachment.source.rawValue)
+                                        Text(attachment.loadError ?? attachment.source.rawValue)
                                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                            .foregroundStyle(attachment.loadError == nil ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.destructive)
                                     }
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                     Spacer()
@@ -277,6 +284,10 @@ struct EvidenceIntakeView: View {
                 ForEach(Array(store.evidenceDraft.photoIdentities.enumerated()), id: \.element.id) { index, identity in
                     CardContainer {
                         VStack(alignment: .leading, spacing: 10) {
+                            if let attachment = store.evidenceDraft.attachments.first(where: { $0.id == identity.attachmentId }),
+                               let data = attachment.data, let image = UIImage(data: data) {
+                                Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Photo \(index + 1)").physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -286,30 +297,28 @@ struct EvidenceIntakeView: View {
                                 Text(identity.confirmed ? "Confirmed" : "Review")
                                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                                     .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(identity.confirmed ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceMuted).clipShape(Capsule())
+                                    .foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
+                                    .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.yellow).opacity(0.16)).clipShape(Capsule())
                             }
                             HStack(spacing: 8) {
                                 photoPicker("Orientation", selection: photoOrientationBinding(identity), values: ProgressPhotoOrientation.allCases)
                                 photoPicker("Contraction", selection: photoContractionBinding(identity), values: ProgressPhotoContraction.allCases)
                             }
-                            HStack(spacing: 8) {
-                                photoPicker("Pose", selection: photoVariantBinding(identity), values: ProgressPhotoPoseVariant.allCases)
-                                photoPicker("Goal role", selection: photoGoalBinding(identity), values: ProgressPhotoGoalRole.allCases)
-                            }
+                            photoPicker("Pose", selection: photoVariantBinding(identity), values: ProgressPhotoPoseVariant.allCases)
                             if identity.poseVariant == .other {
                                 TextField("Custom pose label", text: photoTextBinding(identity, keyPath: \.customLabel))
                                     .textFieldStyle(.roundedBorder)
                             }
-                            TextField("Optional tags", text: photoTextBinding(identity, keyPath: \.tags)).textFieldStyle(.roundedBorder)
                             HStack(spacing: 8) {
-                                Button("Move up") { store.moveAttachment(id: identity.attachmentId, by: -1) }.disabled(index == 0)
-                                Button("Move down") { store.moveAttachment(id: identity.attachmentId, by: 1) }.disabled(index == store.evidenceDraft.photoIdentities.count - 1)
                                 Spacer()
                                 Button(identity.confirmed ? "Confirmed" : "Confirm") {
-                                    store.updatePhotoIdentity(id: identity.id) { $0.confirmed = true }
+                                    store.updatePhotoIdentity(id: identity.id) { value in
+                                        value.confirmed = value.orientation != .unconfirmed && value.contraction != .unconfirmed
+                                    }
                                 }
+                                .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
                             }
-                            .buttonStyle(.bordered).controlSize(.small).tint(PhysiqueOSTheme.accent)
+                            .buttonStyle(.borderedProminent).controlSize(.small).tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
                         }
                     }
                 }
@@ -317,17 +326,15 @@ struct EvidenceIntakeView: View {
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    HStack(spacing: 8) {
-                        triStatePicker("Morning", keyPath: \.morning)
-                        triStatePicker("Fasted", keyPath: \.fasted)
-                    }
+                    Picker("Time of day", selection: Binding(get: { store.evidenceDraft.photoSession.timeOfDay }, set: { store.evidenceDraft.photoSession.timeOfDay = $0 })) {
+                        Text("Choose").tag(ProgressPhotoTimeOfDay?.none)
+                        ForEach(ProgressPhotoTimeOfDay.allCases) { Text($0.label).tag(Optional($0)) }
+                    }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+                    triStatePicker("Fasted", keyPath: \.fasted)
                     HStack(spacing: 8) {
                         triStatePicker("Post-workout", keyPath: \.postWorkout)
                         triStatePicker("Pump", keyPath: \.pump)
                     }
-                    TextField("Lighting consistency", text: photoSessionTextBinding(\.lighting)).textFieldStyle(.roundedBorder)
-                    TextField("Location", text: photoSessionTextBinding(\.location)).textFieldStyle(.roundedBorder)
-                    TextField("Session notes", text: photoSessionTextBinding(\.notes)).textFieldStyle(.roundedBorder)
                     Toggle("These are original, unedited photos.", isOn: Binding(get: { store.evidenceDraft.photoSession.originalUnedited }, set: { store.evidenceDraft.photoSession.originalUnedited = $0 }))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold).tint(PhysiqueOSTheme.accent)
                 }
@@ -351,9 +358,6 @@ struct EvidenceIntakeView: View {
     private func photoVariantBinding(_ identity: ProgressPhotoIdentityDraft) -> Binding<ProgressPhotoPoseVariant> {
         .init(get: { store.evidenceDraft.photoIdentities.first(where: { $0.id == identity.id })?.poseVariant ?? identity.poseVariant }, set: { value in store.updatePhotoIdentity(id: identity.id) { $0.poseVariant = value; $0.confirmed = false } })
     }
-    private func photoGoalBinding(_ identity: ProgressPhotoIdentityDraft) -> Binding<ProgressPhotoGoalRole> {
-        .init(get: { store.evidenceDraft.photoIdentities.first(where: { $0.id == identity.id })?.goalRole ?? identity.goalRole }, set: { value in store.updatePhotoIdentity(id: identity.id) { $0.goalRole = value; $0.confirmed = false } })
-    }
     private func photoTextBinding(_ identity: ProgressPhotoIdentityDraft, keyPath: WritableKeyPath<ProgressPhotoIdentityDraft, String>) -> Binding<String> {
         .init(get: { store.evidenceDraft.photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? "" }, set: { value in store.updatePhotoIdentity(id: identity.id) { $0[keyPath: keyPath] = value; $0.confirmed = false } })
     }
@@ -368,10 +372,6 @@ struct EvidenceIntakeView: View {
         }
         .pickerStyle(.menu).frame(maxWidth: .infinity).tint(PhysiqueOSTheme.accent)
     }
-    private func photoSessionTextBinding(_ keyPath: WritableKeyPath<ProgressPhotoSessionDraft, String>) -> Binding<String> {
-        .init(get: { store.evidenceDraft.photoSession[keyPath: keyPath] }, set: { store.evidenceDraft.photoSession[keyPath: keyPath] = $0 })
-    }
-
     private func submit() {
         switch store.submitEvidence() {
         case .failure(let error): errorMessage = error.message
@@ -379,8 +379,7 @@ struct EvidenceIntakeView: View {
             errorMessage = nil
             isPreparing = true
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(350))
-                switch store.finishInterpretation() {
+                switch await store.finishInterpretation() {
                 case .failure(let error): errorMessage = error.message; isPreparing = false
                 case .success(let reviewId):
                     isPreparing = false
@@ -400,5 +399,15 @@ struct EvidenceIntakeView: View {
 
     private var draftScenario: Binding<EvidenceFixtureScenario> {
         .init(get: { store.evidenceDraft.scenario }, set: { store.setEvidenceScenario($0) })
+    }
+
+    private func reportLoadingFailures(in attachments: [SandboxAttachment]) {
+        let failures = attachments.filter { $0.loadError != nil }
+        if !failures.isEmpty { errorMessage = "\(failures.count) selected item\(failures.count == 1 ? "" : "s") could not be loaded. Remove and reselect the highlighted item\(failures.count == 1 ? "" : "s")." }
+    }
+
+    private func elapsed(since start: ContinuousClock.Instant) -> Double {
+        let duration = start.duration(to: .now)
+        return Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1_000_000_000_000_000_000
     }
 }

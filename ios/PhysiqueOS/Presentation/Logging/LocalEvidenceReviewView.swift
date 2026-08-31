@@ -4,91 +4,60 @@ struct LocalEvidenceReviewView: View {
     @Environment(AppEnvironment.self) private var environment
     let reviewId: String
     var onReturnToLog: () -> Void = {}
-
     @State private var errorMessage: String?
+    @State private var rereadMessage: String?
+    @State private var isRereading = false
     @State private var showingDiscard = false
-    @State private var reprocessMessage: String?
-
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
     var body: some View {
         ScrollView {
             if let review = store.review(id: reviewId) {
-                Group {
-                    if review.status == .confirmed { completion(review) }
-                    else { reviewContent(review) }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                Group { if review.status == .confirmed { completion(review) } else { reviewBody(review) } }
+                    .padding(.horizontal, 16).padding(.vertical, 12)
             } else {
                 ContentUnavailableView("Review unavailable", systemImage: "doc.questionmark", description: Text("Return to Log and start a new upload."))
-                    .padding()
             }
         }
         .background(PhysiqueOSTheme.background)
-        .navigationTitle("Evidence Review")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Evidence Review").navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("Discard this review?", isPresented: $showingDiscard, titleVisibility: .visible) {
-            Button("Discard Review", role: .destructive) {
-                store.discardReview(id: reviewId)
-                onReturnToLog()
-            }
+            Button("Discard Review", role: .destructive) { store.discardReview(id: reviewId); onReturnToLog() }
             Button("Keep Review", role: .cancel) {}
-        } message: {
-            Text("This review will not be added to your history. If you change your mind, you will need to start a new upload.")
-        }
+        } message: { Text("This review and its selected assets will be permanently removed.") }
     }
 
-    private func reviewContent(_ review: LocalEvidenceReview) -> some View {
+    private func reviewBody(_ review: LocalEvidenceReview) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(reviewEyebrow(review)).physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
                 Text("Does this look right?").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                Text("Review what PhysiqueOS understood before saving it. You can exclude anything that should not become part of your history.")
+                Text("Review what PhysiqueOS found. Correct anything that was not read accurately, or exclude it from this upload.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
-
-            ForEach(review.items) { item in reviewCard(item) }
-
-            CardContainer(background: review.includedCount > 0 ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceMuted) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Ready to add").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    Text("\(review.includedCount) evidence \(review.includedCount == 1 ? "item" : "items")").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    if review.excludedCount > 0 {
-                        Text("\(review.excludedCount) excluded").physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                    if !review.canConfirm {
-                        Text(review.includedCount == 0 ? "Select at least one item to continue." : "Finish the highlighted review choices before saving.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-            }
-
+            if let message = review.interpretationMessage { banner(message, destructive: false) }
+            ForEach(review.items) { item in reviewSection(item, review: review) }
+            if !review.canConfirm { banner(review.includedCount == 0 ? "Include at least one record to continue." : "Complete the highlighted fields before saving.", destructive: false) }
             if let errorMessage { banner(errorMessage, destructive: true) }
             PrimaryActionButton(title: "Save included evidence", isEnabled: review.canConfirm) {
-                switch store.confirmReview(id: reviewId) {
-                case .success: errorMessage = nil
-                case .failure(let error): errorMessage = error.message
-                }
-            }
-            .accessibilityIdentifier("evidenceReview.confirm")
-
+                switch store.confirmReview(id: reviewId) { case .success: errorMessage = nil; case .failure(let error): errorMessage = error.message }
+            }.accessibilityIdentifier("evidenceReview.confirm")
             if !review.sourceAssets.isEmpty {
-                Button("Read upload again") { reprocessMessage = "This review is already up to date." }.secondaryReviewButton()
-                if let reprocessMessage { banner(reprocessMessage, destructive: false) }
+                Button(isRereading ? "Reading upload…" : "Read upload again") { reread() }.secondaryReviewButton().disabled(isRereading)
+                if let rereadMessage { banner(rereadMessage, destructive: false) }
             }
-
-            HStack(spacing: 10) {
-                Button("Save and return later", action: onReturnToLog).secondaryReviewButton()
-                Button("Discard review", role: .destructive) { showingDiscard = true }.secondaryReviewButton()
-            }
+            Button("Save and return later", action: onReturnToLog).secondaryReviewButton()
+            Button("Discard review", role: .destructive) { showingDiscard = true }
+                .frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(PhysiqueOSTheme.destructive)
+                .background(PhysiqueOSTheme.destructive.opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 12))
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
         }
     }
 
-    private func reviewCard(_ item: EvidenceReviewItem) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
+    private func reviewSection(_ item: EvidenceReviewItem, review: LocalEvidenceReview) -> some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
                     IconBadge(systemImage: item.category.systemImage, color: .primary, size: .md)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.dateFormatter.string(from: item.occurrenceDate)).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -96,221 +65,131 @@ struct LocalEvidenceReviewView: View {
                     }
                     Spacer()
                     Text(item.included ? "Included" : "Excluded").physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(item.included ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceMuted).clipShape(Capsule())
+                        .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
                 }
-
-                if !item.fields.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(item.fields) { metric($0) }
-                    }
-                }
-                if !item.exercises.isEmpty { exerciseReview(item) }
-                if !item.meals.isEmpty { mealReview(item) }
+                fields(item)
+                if !item.exercises.isEmpty { exercises(item) }
+                if !item.meals.isEmpty { meals(item) }
                 if item.nutritionReplacementRequired { nutritionReplacement(item) }
-                if item.category == .progressPhotos { photoReview(item) }
+                if item.category == .progressPhotos { photos(item, review: review) }
+                Button(item.included ? "Exclude from upload" : "Include in upload") { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { $0.included.toggle() } }.secondaryReviewButton()
+            }.padding(.vertical, 8)
+            Divider().overlay(PhysiqueOSTheme.divider)
+        }
+    }
 
-                Button(item.included ? "Exclude from log" : "Include in log") {
-                    store.updateReviewItem(reviewId: reviewId, itemId: item.id) { $0.included.toggle() }
-                }
-                .secondaryReviewButton()
+    private func fields(_ item: EvidenceReviewItem) -> some View {
+        VStack(spacing: 0) {
+            ForEach(item.fields.filter { !["source", "goalRelationship", "linkedGoal"].contains($0.id) }) { field in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(field.label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    Spacer()
+                    if item.category == .progressPhotos {
+                        Text(field.value.isEmpty ? "Needs review" : field.value).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .foregroundStyle(field.required && field.value.isEmpty ? Color.orange : PhysiqueOSTheme.textPrimary)
+                    } else {
+                        TextField(field.required ? "Required" : "Optional", text: fieldBinding(item, field)).multilineTextAlignment(.trailing)
+                            .keyboardType(field.unit == nil ? .default : .decimalPad).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        if let unit = field.unit { Text(unit).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textMuted) }
+                    }
+                }.padding(.vertical, 9)
+                Divider().overlay(PhysiqueOSTheme.divider)
             }
         }
     }
 
-    private func exerciseReview(_ item: EvidenceReviewItem) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func exercises(_ item: EvidenceReviewItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Exercises").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.exercises) { exercise in
                 VStack(alignment: .leading, spacing: 5) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        Spacer()
-                        Menu(exercise.variant.map { "Variant: \($0)" } ?? "Add variant") {
-                            variantButton("Standard", exercise: exercise, item: item)
-                            variantButton("3-Second Pause", exercise: exercise, item: item)
-                            variantButton("Static Hold", exercise: exercise, item: item)
-                        }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    }
-                    if let relationship = exercise.relationship {
-                        Text(relationship).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    ForEach(exercise.sets) { set in
-                        Text("• \(set.summary)").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-                .padding(12).background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 12))
+                    HStack { Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy); Spacer(); Menu(exercise.variant ?? "Standard") { variant("Standard", exercise, item); variant("3-Second Pause", exercise, item); variant("Static Hold", exercise, item) }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold) }
+                    if let relationship = exercise.relationship { Text(relationship).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent) }
+                    ForEach(exercise.sets) { set in Text("• \(set.summary)").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary) }
+                }.padding(.vertical, 6)
             }
         }
     }
 
-    private func variantButton(_ label: String, exercise: EvidenceReviewExercise, item: EvidenceReviewItem) -> some View {
-        Button(label) {
-            store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in
-                guard let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) else { return }
-                updated.exercises[index].variant = label == "Standard" ? nil : label
-            }
-        }
-    }
-
-    private func mealReview(_ item: EvidenceReviewItem) -> some View {
+    private func meals(_ item: EvidenceReviewItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Meals").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-            ForEach(item.meals) { meal in
-                DisclosureGroup {
-                    VStack(spacing: 8) {
-                        ForEach(meal.foods) { food in
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(food.name).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    Text(food.detail).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
-                                }
-                                Spacer()
-                                if let calories = food.calories { Text(calories).physiqueOSFont(PhysiqueOSTypography.caption12Semibold) }
-                            }
-                        }
-                    }.padding(.top, 8)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(meal.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        Text(meal.summary).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-                .padding(12).background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            Text("Meals read from this upload").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+            ForEach(item.meals) { meal in DisclosureGroup { ForEach(meal.foods) { food in Text(food.name).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).padding(.vertical, 3) } } label: { VStack(alignment: .leading, spacing: 2) { Text(meal.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy); Text(meal.summary).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textSecondary) } } }
         }
     }
 
     private func nutritionReplacement(_ item: EvidenceReviewItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Update this Nutrition Day").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-            Text("Choose how this upload should relate to the Nutrition Day already on this date.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Picker("Nutrition update", selection: nutritionDispositionBinding(item)) {
-                Text("Choose").tag(NutritionReviewDisposition?.none)
-                ForEach(NutritionReviewDisposition.allCases) { Text($0.label).tag(Optional($0)) }
-            }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-            Text("Projected daily total: 2,475 cal. Unchanged meals will remain unchanged.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Picker("Nutrition update", selection: nutritionBinding(item)) { Text("Choose").tag(NutritionReviewDisposition?.none); ForEach(NutritionReviewDisposition.allCases) { Text($0.label).tag(Optional($0)) } }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
         }
-        .padding(12).background(PhysiqueOSTheme.surfaceAccent).clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func photoReview(_ item: EvidenceReviewItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Match each photo to its pose").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+    private func photos(_ item: EvidenceReviewItem, review: LocalEvidenceReview) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Confirm each pose").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.photoIdentities) { identity in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        Text(identity.goalRole.label).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    Spacer()
-                    Menu("Edit pose") {
-                        ForEach(ProgressPhotoOrientation.allCases) { orientation in
-                            Button(orientation.label) { updateReviewPhoto(item, identity, orientation) }
-                        }
-                    }
-                }
-                .padding(10).background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 8) {
+                    if let asset = review.sourceAssets.first(where: { $0.id == identity.attachmentId }), let data = asset.data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 10)) }
+                    HStack { Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.caption12Semibold); Spacer(); Text(identity.confirmed ? "Confirmed" : "Needs review").physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange) }
+                    HStack {
+                        Menu("Orientation") { ForEach(ProgressPhotoOrientation.allCases.filter { $0 != .unconfirmed }) { value in Button(value.label) { updatePhoto(item, identity, orientation: value) } } }
+                        Menu("Condition") { ForEach(ProgressPhotoContraction.allCases.filter { $0 != .unconfirmed }) { value in Button(value.label) { updatePhoto(item, identity, contraction: value) } } }
+                    }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold).tint(PhysiqueOSTheme.accent)
+                    Button("Confirm pose") { confirmPhoto(item, identity) }.buttonStyle(.borderedProminent).tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange).disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
+                }.padding(10).background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.yellow).opacity(0.12)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
             Text("Shared session details").physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-            Text("\(item.fields.first(where: { $0.id == "timeOfDay" })?.value ?? "Needs session review") · \(item.fields.first(where: { $0.id == "goalRelationship" })?.value ?? "Needs session review"). These values apply once to every photo in this capture session.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            HStack(spacing: 8) {
-                Menu("Time of day") {
-                    ForEach(["Morning", "Afternoon", "Evening"], id: \.self) { value in
-                        Button(value) { updateReviewField(item, id: "timeOfDay", value: value) }
-                    }
+            sessionChoiceRow(
+                label: "Time of day",
+                value: item.fields.first(where: { $0.id == "timeOfDay" })?.value,
+                choices: ProgressPhotoTimeOfDay.allCases.map(\.label)
+            ) { updateField(item, "timeOfDay", $0) }
+            sessionChoiceRow(
+                label: "Fasted",
+                value: item.fields.first(where: { $0.id == "fasted" })?.value,
+                choices: ["Yes", "No"]
+            ) { updateField(item, "fasted", $0) }
+        }
+    }
+
+    private func sessionChoiceRow(label: String, value: String?, choices: [String], onSelect: @escaping (String) -> Void) -> some View {
+        HStack {
+            Text(label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Spacer()
+            Menu {
+                ForEach(choices, id: \.self) { choice in Button(choice) { onSelect(choice) } }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(value?.isEmpty == false ? value! : "Choose")
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
                 }
-                Menu("Goal relationship") {
-                    Button("Linked Goal") { updateReviewField(item, id: "goalRelationship", value: "Linked Goal") }
-                    Button("Context only") { updateReviewField(item, id: "goalRelationship", value: "Context only") }
-                }
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(value?.isEmpty == false ? PhysiqueOSTheme.textPrimary : Color.orange)
             }
-            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold).tint(PhysiqueOSTheme.accent)
         }
-    }
-
-    private func updateReviewField(_ item: EvidenceReviewItem, id: String, value: String) {
-        store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in
-            guard let index = updated.fields.firstIndex(where: { $0.id == id }) else { return }
-            updated.fields[index].value = value
-        }
-    }
-
-    private func updateReviewPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, _ orientation: ProgressPhotoOrientation) {
-        store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in
-            guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }
-            updated.photoIdentities[index].orientation = orientation
-            updated.photoIdentities[index].confirmed = true
-        }
-    }
-
-    private func nutritionDispositionBinding(_ item: EvidenceReviewItem) -> Binding<NutritionReviewDisposition?> {
-        .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.nutritionDisposition }, set: { value in
-            store.updateReviewItem(reviewId: reviewId, itemId: item.id) { $0.nutritionDisposition = value }
-        })
+        .padding(.vertical, 9)
     }
 
     private func completion(_ review: LocalEvidenceReview) -> some View {
-        VStack(alignment: .center, spacing: 18) {
-            Image(systemName: "checkmark").font(.system(size: 28, weight: .bold)).foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                .frame(width: 64, height: 64).background(PhysiqueOSTheme.surfaceAccent).clipShape(Circle())
+        VStack(spacing: 18) {
+            Image(systemName: "checkmark").font(.system(size: 28, weight: .bold)).foregroundStyle(PhysiqueOSTheme.chartSuccess).frame(width: 64, height: 64).background(PhysiqueOSTheme.chartSuccess.opacity(0.14)).clipShape(Circle())
             Text(review.completionTitle).physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-            Text("You finished reviewing \(review.includedCount) evidence \(review.includedCount == 1 ? "item" : "items").")
-                .multilineTextAlignment(.center).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            if review.items.contains(where: { $0.included && $0.category == .training && !$0.exercises.isEmpty }) {
-                CardContainer {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Workout achievements").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        Label("Bench Press · Reps-at-load record", systemImage: "trophy.fill")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy).foregroundStyle(PhysiqueOSTheme.accent)
-                        Text("180 lb · improved from the matched prior best of 7 reps.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-            }
+            Text("Your included records have been reviewed.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             PrimaryActionButton(title: "Continue", action: onReturnToLog)
-        }
-        .frame(maxWidth: .infinity).padding(.top, 40)
+        }.frame(maxWidth: .infinity).padding(.top, 40)
     }
 
-    private func metric(_ field: EvidenceReviewField) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(field.label.uppercased()).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text([field.value, field.unit].compactMap { $0 }.joined(separator: " ")).physiqueOSFont(PhysiqueOSTypography.label14Heavy).lineLimit(3)
-        }
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
-        .padding(10).background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func banner(_ text: String, destructive: Bool) -> some View {
-        Text(text).physiqueOSFont(PhysiqueOSTypography.calloutStrong)
-            .foregroundStyle(destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary)
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .background((destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.surfaceMuted).opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func reviewEyebrow(_ review: LocalEvidenceReview) -> String {
-        if Set(review.items.map(\.category)).count > 1 { return "UPLOAD FOUND" }
-        return switch review.category {
-        case .training: "WORKOUT FOUND"
-        case .nutrition: "NUTRITION FOUND"
-        case .activity: "ACTIVITY FOUND"
-        case .weight, .dexa, .progressPhotos, .labs, .recovery, .generic: "UPLOAD FOUND"
-        }
-    }
-
-    private static let dateFormatter: DateFormatter = { let formatter = DateFormatter(); formatter.dateStyle = .medium; return formatter }()
+    private func reread() { isRereading = true; rereadMessage = nil; Task { @MainActor in switch await store.reprocessReview(id: reviewId) { case .success: rereadMessage = "The selected upload was read again. Review the refreshed values."; case .failure(let error): errorMessage = error.message }; isRereading = false } }
+    private func fieldBinding(_ item: EvidenceReviewItem, _ field: EvidenceReviewField) -> Binding<String> { .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.fields.first(where: { $0.id == field.id })?.value ?? "" }, set: { updateField(item, field.id, $0) }) }
+    private func updateField(_ item: EvidenceReviewItem, _ id: String, _ value: String) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.fields.firstIndex(where: { $0.id == id }) { updated.fields[index].value = value } } }
+    private func updatePhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, orientation: ProgressPhotoOrientation? = nil, contraction: ProgressPhotoContraction? = nil) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; if let orientation { updated.photoIdentities[index].orientation = orientation }; if let contraction { updated.photoIdentities[index].contraction = contraction }; updated.photoIdentities[index].confirmed = false } }
+    private func confirmPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; updated.photoIdentities[index].confirmed = updated.photoIdentities[index].orientation != .unconfirmed && updated.photoIdentities[index].contraction != .unconfirmed } }
+    private func variant(_ label: String, _ exercise: EvidenceReviewExercise, _ item: EvidenceReviewItem) -> some View { Button(label) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) { updated.exercises[index].variant = label == "Standard" ? nil : label } } } }
+    private func nutritionBinding(_ item: EvidenceReviewItem) -> Binding<NutritionReviewDisposition?> { .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.nutritionDisposition }, set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { $0.nutritionDisposition = value } }) }
+    private func banner(_ text: String, destructive: Bool) -> some View { Text(text).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background((destructive ? PhysiqueOSTheme.destructive : Color.yellow).opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 12)) }
+    private func reviewEyebrow(_ review: LocalEvidenceReview) -> String { Set(review.items.map(\.category)).count > 1 ? "UPLOAD FOUND" : (review.category == .training ? "WORKOUT FOUND" : "\(review.category.title.uppercased()) FOUND") }
+    private static let dateFormatter: DateFormatter = { let f = DateFormatter(); f.dateStyle = .medium; return f }()
 }
 
-private extension View {
-    func secondaryReviewButton() -> some View {
-        frame(maxWidth: .infinity, minHeight: 48)
-            .background(PhysiqueOSTheme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-    }
-}
+private extension View { func secondaryReviewButton() -> some View { frame(maxWidth: .infinity, minHeight: 48).background(PhysiqueOSTheme.surfaceElevated).clipShape(RoundedRectangle(cornerRadius: 12)).physiqueOSFont(PhysiqueOSTypography.label14Heavy) } }
