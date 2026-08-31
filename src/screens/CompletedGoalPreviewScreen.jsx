@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowLeft, ArrowRight, Check, ScanLine, Sparkles, Trophy } from "lucide-react";
 
-export default function CompletedGoalPreviewScreen({ journey }) {
+export default function CompletedGoalPreviewScreen({ from, journey }) {
+  const fromYou = from === "you";
   return <main className="app-surface mx-auto min-h-screen w-full max-w-[393px] overflow-x-hidden"><div className="px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-10">
-    <Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href="/goals"><ArrowLeft size={18}/>Goals</Link>
+    <Link className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]" href={fromYou ? "/profile" : "/goals"}><ArrowLeft size={18}/>{fromYou ? "You" : "Goals"}</Link>
 
     <section data-testid="completed-goal-hero" className="overflow-hidden rounded-[30px] border border-amber-300/50 bg-gradient-to-br from-amber-100 via-[var(--surface-elevated)] to-emerald-50 p-5 shadow-[0_28px_70px_-38px_rgba(180,83,9,.65)] dark:border-amber-300/20 dark:from-amber-300/[.12] dark:via-white/[.06] dark:to-emerald-300/[.06]">
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.16em] text-amber-700 dark:text-amber-300">Completed goal</p><h1 className="mt-3 break-words text-[32px] font-black leading-none text-[var(--text-primary)]">{journey.hero.title}</h1><p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-300/10 dark:text-emerald-300"><Check size={14}/>{journey.hero.status}</p></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-400/20 text-amber-700 dark:text-amber-300"><Trophy size={24}/></span></div>

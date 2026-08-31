@@ -59,6 +59,11 @@ import {
 import { createEvidenceReviewReadService } from "../evidence/EvidenceReviewReadService.js";
 import { createPostgresPhotoEventReadStore } from
   "../../platform/database/PostgresPhotoEventReadStore.js";
+import {
+  createPostgresCompletedGoalReadStore,
+  createRepositoryCompletedGoalReadStore,
+} from "../../platform/database/PostgresCompletedGoalReadStore.js";
+import { createCompletedGoalReadService } from "../goals/CompletedGoalReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -195,6 +200,13 @@ export function getProductionProgressPhotosReadService(env = process.env) {
     ? createProviderProgressPhotosReadStore(env)
     : createRepositoryProgressPhotosReadStore({ repositories: LegacyFounderRepositories });
   return createProgressPhotosReadService({ store });
+}
+
+export function getProductionCompletedGoalReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderCompletedGoalReadStore(env)
+    : createRepositoryCompletedGoalReadStore({ repositories: LegacyFounderRepositories });
+  return createCompletedGoalReadService({ store });
 }
 
 export function getProductionPhotoEventBriefingReadService(env = process.env) {
@@ -470,6 +482,17 @@ function createProviderEvidenceReviewReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.evidence_review_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderCompletedGoalReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresCompletedGoalReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.completed_goal_read.complete", event)
       : null,
   });
 }

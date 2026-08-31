@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const journey = {
-  hero: { title: "Visible Abs", status: "Completed", dates: "May 24 → Jul 18", achievement: "7.7% Body Fat" },
+  hero: { title: "Visible Abs at Rest", status: "Completed", dates: "May 24 → Jul 18", achievement: "7.7% Body Fat" },
   recap: "A completed journey.",
   highlights: [{ date: "2026-07-18", title: "Visible abs achieved", body: "The finish line aligned." }],
   photos: { beginning: { date: "2026-05-21", href: "/api/private-evidence/founder/photos/first.jpeg" }, completion: { date: "2026-07-18", href: "/api/private-evidence/founder/photos/final.jpeg" }, historyHref: "/progress/photos" },
@@ -22,6 +22,12 @@ describe("CompletedGoalPreviewScreen", () => {
     expect(html).toContain('href="/briefings/dexa/final"');
     expect(html).toContain('href="/goals/build-lean-mass"');
     expect(html).not.toMatch(/Supporting Goal|Maintain 8-9% Body Fat/);
+  });
+
+  it("preserves the return destination when opened from You", () => {
+    const html = renderToStaticMarkup(React.createElement(CompletedGoalPreviewScreen, { from: "you", journey }));
+    expect(html).toContain('href="/profile"');
+    expect(html).toContain(">You<");
   });
 
   it("uses the canonical centered mobile shell with bottom-navigation clearance", () => {

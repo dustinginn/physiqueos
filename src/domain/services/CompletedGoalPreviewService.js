@@ -31,7 +31,7 @@ export function composeCompletedGoalPreview({ goals = [], dexaScans = [], progre
   return {
     preview: { readOnly: true, canonicalGoalId: VISIBLE_ABS_GOAL_ID, supportingGoalIds: ["goal_preserve_lean_mass", "goal_maintain_8_9_body_fat"] },
     hero: {
-      title: "Visible Abs",
+      title: normalizeGoalTitle(goal?.title),
       status: "Completed",
       dates: `${formatDate(goal?.startDate)} → ${formatDate(COMPLETION_DATE)}`,
       achievement: `${formatNumber(finalScan?.bodyFatPercentage, 1)}% Body Fat`,
@@ -100,4 +100,5 @@ function poseId(photo) { return photo?.poseId ?? `${photo?.view ?? ""}-${photo?.
 function formatNumber(value, digits) { return Number.isFinite(value) ? value.toFixed(digits) : "—"; }
 function formatMetric(value, unit) { return Number.isFinite(value) ? `${value.toFixed(1)}${unit === "%" ? "" : " "}${unit}` : "—"; }
 function formatDate(value) { if (!value) return "—"; const [year, month, day] = value.split("-").map(Number); return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+function normalizeGoalTitle(value) { return /visible abs/i.test(String(value ?? "")) ? "Visible Abs at Rest" : value ?? "Visible Abs at Rest"; }
 function privateEvidenceUrl(value) { if (!value) return null; const mediaId=parsePrivateMediaReference(value);if(mediaId)return `/api/private-evidence/media/${mediaId}`;if(String(value).startsWith("media://"))return null;return `/api/private-evidence/${String(value).replace(/^private[\\/]/, "").replaceAll("\\", "/")}`; }

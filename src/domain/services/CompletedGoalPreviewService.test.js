@@ -26,7 +26,7 @@ describe("CompletedGoalPreviewService", () => {
   it("composes one read-only Visible Abs keepsake from historical evidence", () => {
     const result = composeCompletedGoalPreview({ goals, dexaScans, progressPhotos, briefings, currentGoal: { id: "build", title: "Build Lean Mass" } });
     expect(result.preview).toEqual({ readOnly: true, canonicalGoalId: "goal_visible_abs_at_rest", supportingGoalIds: ["goal_preserve_lean_mass", "goal_maintain_8_9_body_fat"] });
-    expect(result.hero).toMatchObject({ title: "Visible Abs", status: "Completed", dates: "May 24 → Jul 18", achievement: "7.7% Body Fat" });
+    expect(result.hero).toMatchObject({ title: "Visible Abs at Rest", status: "Completed", dates: "May 24 → Jul 18", achievement: "7.7% Body Fat" });
     expect(result.photos.beginning.href).toBe("/api/private-evidence/founder/photos/first.jpeg");
     expect(result.photos.completion).toEqual({ date: "2026-07-18", href: "/api/private-evidence/founder/photos/final.jpeg", evidenceId: finalEvidenceId });
     expect(result.photos.completion.href).not.toContain("july-11");

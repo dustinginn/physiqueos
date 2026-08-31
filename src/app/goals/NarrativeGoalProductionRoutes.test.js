@@ -27,7 +27,8 @@ describe("Narrative Goal production routes", () => {
 
   it("promotes the approved completed Visible Abs keepsake into production", () => {
     expect(visibleAbsRoute).toContain("CompletedGoalPreviewScreen");
-    expect(visibleAbsRoute).toContain("getCompletedGoalPreview");
+    expect(visibleAbsRoute).toContain("getProductionCompletedGoalReadService");
+    expect(visibleAbsRoute).toContain("searchParams");
     expect(visibleAbsRoute).not.toMatch(/NarrativeGoalPreviewScreen|getNarrativeGoalPresentation|redirect|save|update|persist/i);
   });
 
