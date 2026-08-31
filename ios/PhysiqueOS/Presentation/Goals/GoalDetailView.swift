@@ -66,12 +66,11 @@ private struct ActiveGoalDetailContent: View {
     let onNavigate: (AppDestination) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
             hero
-            goalProgress
             journey
             if let phase = goal.activePhase { currentPhase(phase) }
-            readiness
+            whatsNext
             guardrail
             evidenceAnchors
             trainingProgress
@@ -81,10 +80,10 @@ private struct ActiveGoalDetailContent: View {
     }
 
     private var hero: some View {
-        GoalAtmosphericCard(tone: .activeGoal, padding: 16, cornerRadius: 22) {
-            VStack(alignment: .leading, spacing: 12) {
+        GoalAtmosphericCard(tone: .activeGoal, padding: 20, cornerRadius: 30) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text(goal.status)
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                             .foregroundStyle(PhysiqueOSTheme.accent)
@@ -99,53 +98,25 @@ private struct ActiveGoalDetailContent: View {
                     Image(systemName: "dumbbell.fill")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(PhysiqueOSTheme.accent)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 48, height: 48)
                         .background(PhysiqueOSTheme.accent.opacity(0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
-                HStack(alignment: .center, spacing: 11) {
-                    ConfidenceRing(value: goal.confidence.value, label: "Goal", size: 68, lineWidth: 5)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(goal.confidence.band)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(goal.confidence.explanation)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        Text(goal.dateRange)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                }
-            }
-        }
-    }
-
-    private var goalProgress: some View {
-        GoalSection(eyebrow: "Overall journey", title: "Goal Progress") {
-            CardContainer(padding: .sm) {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(goal.goalProgress.label)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Spacer()
-                        Text("\(goal.goalProgress.percentage)%")
-                            .physiqueOSFont(PhysiqueOSTypography.goalProgressValue)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    AnimatedProgressBar(
-                        value: goal.goalProgress.percentage,
-                        color: PhysiqueOSTheme.accent,
-                        accessibilityLabel: "Goal progress"
-                    )
-                    Text(goal.goalProgress.detail)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                HStack(spacing: 8) {
+                    Image(systemName: "gauge.with.dots.needle.33percent")
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    Text("\(goal.confidence.value)% · \(goal.confidence.band)")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    Spacer(minLength: 8)
+                    Text(goal.dateRange)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
         }
+        .padding(.bottom, 12)
     }
 
     private var journey: some View {
@@ -163,31 +134,51 @@ private struct ActiveGoalDetailContent: View {
     }
 
     private func currentPhase(_ phase: GoalPhaseReadModel) -> some View {
-        GoalAccentCard(tint: PhysiqueOSTheme.chartSuccess, tone: .activePhase, eyebrow: "Where you are", title: "Current Phase") {
-            VStack(alignment: .leading, spacing: 9) {
+        GoalAtmosphericCard(tone: .activePhase, padding: 20, cornerRadius: 28) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Where you are", systemImage: "figure.strengthtraining.traditional")
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                Text("Current Phase")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(phase.name)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(phase.purpose)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                GoalProgressBlock(progress: phase.progress, color: PhysiqueOSTheme.chartSuccess, label: "Phase progress")
-                GoalLabeledBody(label: "Evidence in view", text: phase.evidence)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    GoalContextMetric(label: "Goal Progress", value: "\(goal.goalProgress.percentage)%")
+                    GoalContextMetric(label: "Strategic Review", value: goal.trainingProgress.reviewDate)
+                }
+                AnimatedProgressBar(
+                    value: goal.goalProgress.percentage,
+                    color: PhysiqueOSTheme.chartSuccess,
+                    accessibilityLabel: "Goal progress"
+                )
+                GoalContextBody(label: "Evidence in View", text: phase.evidence)
+                GoalContextBody(label: "What's Next", text: phase.progress.detail)
             }
         }
+        .padding(.vertical, 12)
     }
 
-    private var readiness: some View {
-        GoalSection(eyebrow: "Phase decision", title: "Ready to Move Forward When") {
-            VStack(spacing: 8) {
-                ForEach(Array(goal.readiness.enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+    private var whatsNext: some View {
+        GoalAtmosphericCard(tone: .activePhase, padding: 18, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("What's Next", systemImage: "sparkles")
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                Text("Goal review comes next")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                ForEach(Array(goal.readiness.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                            .frame(width: 28, height: 28)
-                            .background(PhysiqueOSTheme.chartSuccess.opacity(0.12))
-                            .clipShape(Circle())
+                            .accessibilityHidden(true)
                         Text(item)
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -196,39 +187,53 @@ private struct ActiveGoalDetailContent: View {
                 }
             }
         }
+        .padding(.bottom, 12)
     }
 
     private var guardrail: some View {
-        GoalAccentCard(tint: PhysiqueOSTheme.accent, tone: .guardrail, eyebrow: "Non-negotiable", title: "Guardrail") {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(goal.guardrail.title)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Spacer(minLength: 8)
-                    Text(goal.guardrail.state)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                }
+        GoalAtmosphericCard(tone: .guardrail, padding: 20, cornerRadius: 28) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Non-negotiable", systemImage: "shield.checkered")
+                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text("Guardrail")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(goal.guardrail.title)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(goal.guardrail.scope)
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
                 Text(goal.guardrail.body)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(goal.guardrail.state)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(PhysiqueOSTheme.accent.opacity(0.12))
+                    .clipShape(Capsule())
             }
         }
+        .padding(.vertical, 12)
     }
 
     private var evidenceAnchors: some View {
         GoalSection(eyebrow: "What progress means", title: "Evidence Anchors") {
-            VStack(spacing: 8) {
-                CardContainer(padding: .sm, background: Color.black.opacity(0.34)) {
-                    VStack(alignment: .leading, spacing: 11) {
-                        Label("Authoritative DEXA · \(goal.evidence.date)", systemImage: "viewfinder")
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 20) {
+                    GoalMetric(label: "Goal Progress", value: "\(goal.goalProgress.percentage)%")
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    GoalMetric(label: "Remaining", value: "\(max(0, 100 - goal.goalProgress.percentage))%")
+                }
+                GoalEvidenceCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Label("Goal baseline DEXA · \(goal.evidence.date)", systemImage: "viewfinder")
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                             .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             GoalMetric(label: "Body Fat", value: goal.evidence.bodyFat)
                             GoalMetric(label: "Lean Mass", value: goal.evidence.leanMass)
                             GoalMetric(label: "Fat Mass", value: goal.evidence.fatMass)
@@ -236,8 +241,16 @@ private struct ActiveGoalDetailContent: View {
                         }
                     }
                 }
-                CardContainer(padding: .sm, background: PhysiqueOSTheme.surfaceMuted) {
-                    GoalLabeledBody(label: "Weight and energy", text: goal.evidence.support)
+                GoalEvidenceCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Weight and energy", systemImage: "gauge.with.dots.needle.33percent")
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text(goal.evidence.support)
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .lineSpacing(3)
+                    }
                 }
             }
         }
@@ -288,12 +301,12 @@ private struct ActiveGoalDetailContent: View {
 
     private var turningPoints: some View {
         GoalSection(eyebrow: "Major milestones", title: "Evidence Turning Points") {
-            VStack(spacing: 12) {
+            VStack(spacing: 20) {
                 ForEach(goal.turningPoints) { item in
-                    HStack(alignment: .top, spacing: 12) {
-                        Capsule()
-                            .fill(PhysiqueOSTheme.accent)
-                            .frame(width: 2, height: 58)
+                    HStack(alignment: .top, spacing: 16) {
+                        Rectangle()
+                            .fill(PhysiqueOSTheme.divider)
+                            .frame(width: 2)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.date)
                                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
@@ -314,22 +327,28 @@ private struct ActiveGoalDetailContent: View {
 
     private var currentStrategy: some View {
         GoalSection(eyebrow: "How the goal is supported", title: "Current Strategy") {
-            VStack(spacing: 9) {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            VStack(spacing: 16) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(goal.strategy) { item in
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(item.label)
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Goal support")
-                                .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            if item.label == "Energy", let detail = goal.activePhase?.strategy.first {
+                                Text(detail)
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            } else {
+                                Text("Goal support")
+                                    .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
+                        .padding(16)
                         .background(PhysiqueOSTheme.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 13))
-                        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(PhysiqueOSTheme.divider))
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(PhysiqueOSTheme.divider))
                     }
                 }
                 GoalNavigationButton(title: "Review Strategy") {
@@ -349,8 +368,8 @@ struct GoalSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(eyebrow)
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -361,6 +380,10 @@ struct GoalSection<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 26)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(PhysiqueOSTheme.divider)
+        }
     }
 }
 
@@ -400,17 +423,17 @@ struct GoalPhaseCard: View {
     var body: some View {
         GoalAtmosphericCard(
             tone: phase.status == .completed ? .completed : (phase.status == .active ? .activePhase : .neutral),
-            padding: 13,
-            cornerRadius: 20
+            padding: 16,
+            cornerRadius: 24
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     Text("\(phase.order)")
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                         .foregroundStyle(tint)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 36, height: 36)
                         .background(tint.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Phase \(phase.order)")
@@ -428,9 +451,6 @@ struct GoalPhaseCard: View {
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textMuted)
                     }
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .padding(.top, 14)
                 }
                 AnimatedProgressBar(value: phase.progress.percentage, color: tint, accessibilityLabel: "Phase progress")
                 HStack(alignment: .firstTextBaseline) {
@@ -483,6 +503,54 @@ struct GoalLabeledBody: View {
     }
 }
 
+private struct GoalContextMetric: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct GoalContextBody: View {
+    let label: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(text)
+                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+    }
+}
+
+private struct GoalEvidenceCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(20)
+            .background(PhysiqueOSTheme.surfaceMuted)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(PhysiqueOSTheme.divider)
+            )
+    }
+}
+
 struct GoalMetric: View {
     let label: String
     let value: String
@@ -513,11 +581,11 @@ struct GoalNavigationButton: View {
                 Image(systemName: "arrow.right")
             }
             .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 44)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
             .background(PhysiqueOSTheme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(PhysiqueOSTheme.divider))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(PhysiqueOSTheme.divider))
         }
         .buttonStyle(.plain)
     }
