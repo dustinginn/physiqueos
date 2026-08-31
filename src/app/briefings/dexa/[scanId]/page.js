@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
-import { createDEXAEventNarrativeService } from "../../../../domain/services/DEXAEventNarrativeService";
 import DEXAEventBriefingScreen from "../../../../screens/DEXAEventBriefingScreen";
 import PhaseReviewCard from "../../../../components/goals/PhaseReviewCard";
 import { submitProductionPhaseReviewDecision } from "./actions";
-import { loadApplicationCanonicalRuntime } from "../../../../application/runtime/ApplicationCanonicalRuntime";
+import { getProductionBriefingNavigationReadService } from "../../../../application/composition/productionApplicationComposition";
 import { resolvePhaseReviewArtifactRead } from
   "../../../../domain/services/PhaseReviewArtifactReadService";
 import { projectDEXAEventNarrativePresentation } from
@@ -13,13 +11,12 @@ import { projectDEXAEventNarrativePresentation } from
 export const dynamic = "force-dynamic";
 export default async function DEXAEventPage({ params }) {
   const { scanId } = await params;
-  const user = await FounderRepositories.users.getCurrentUser();
-  const artifact = await createDEXAEventNarrativeService({ repositories: FounderRepositories })
-    .getByScanId({ userId: user.id, scanId });
+  const context = await getProductionBriefingNavigationReadService().getDexaArtifact({ scanId });
+  const { artifact } = context;
   if (!artifact) notFound();
-  const store = await loadApplicationCanonicalRuntime();
+  const store = { goals: context.goals, dexaScans: context.dexaScans, revision: context.revision };
   const phaseReviewRead = resolvePhaseReviewArtifactRead({ artifact, store,
-    decisionHistory: store.phaseReviewDecisions ?? [] });
+    decisionHistory: context.phaseReviewDecisions });
   return <DEXAEventBriefingScreen
     narrative={projectDEXAEventNarrativePresentation(artifact.briefing.dexaEventNarrative)}
     phaseReview={phaseReviewRead

@@ -1196,6 +1196,37 @@ export function createTrainingLandingReports({
   return Object.freeze({ globalReport, scopedReport });
 }
 
+export function createTrainingReportingReports({
+  canonicalEvidenceObjects = [],
+  dateWindow = null,
+  evidencePackages = [],
+  goals = [],
+} = {}) {
+  const canonicalPayloads = getCanonicalPayloads({ canonicalEvidenceObjects, evidencePackages });
+  const trainingSessions = sortByDate(canonicalPayloads.filter(isTrainingSession), "observed_at");
+  const activityDays = getActivityDaysWithTrainingAggregates({
+    explicitActivityDays: sortByDate(canonicalPayloads.filter(isActivityDay), "observed_at"),
+    trainingSessions,
+  });
+  const context = {
+    activityDays,
+    dexaScans: [],
+    goals,
+    nutritionContext: null,
+    nutritionDays: [],
+    photoSessions: [],
+    progressPhotos: [],
+    protocols: [],
+    trainingSessions,
+    weights: [],
+  };
+  const globalReport = buildPlaceholderReportFromContext({ context, streamId: "training" });
+  const scopedReport = dateWindow
+    ? buildPlaceholderReportFromContext({ context, options: { dateWindow }, streamId: "training" })
+    : globalReport;
+  return Object.freeze({ globalReport, scopedReport });
+}
+
 function buildTrainingLandingReport(context, evidenceWindow) {
   const stream = buildProgressHub(context).streams.find(
     (item) => item.id === "training"

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { loadApplicationCanonicalCommitBindings } from "../../../application/runtime/ApplicationCanonicalRuntime";
+import { createPriorityCompletionService } from "../../../application/priorities/PriorityCompletionService";
 
 export async function completePriority(formData) {
   const priorityId = String(formData.get("priorityId") ?? "");
@@ -14,18 +15,10 @@ export async function completePriority(formData) {
   const occurrenceDate = String(formData.get("occurrenceDate") ?? "");
   const dose = String(formData.get("dose") ?? "");
   const protocolId = String(formData.get("protocolId") ?? "");
-  if (occurrenceDate && dose && protocolId) {
-    await FounderRepositories.reminders.completeReminderFromEvidence(priorityId, {
-      id: `${priorityId}:${occurrenceDate}`,
-      completedAt: new Date().toISOString(),
-      evidenceDate: occurrenceDate,
-      effectiveDose: dose,
-      protocolId,
-      satisfactionType: "scheduled_protocol_execution",
-    });
-  } else {
-    await FounderRepositories.reminders.completeReminder(priorityId);
-  }
+  const bindings = await loadApplicationCanonicalCommitBindings();
+  await createPriorityCompletionService({
+    mutateCanonicalRuntime: bindings.mutateCanonicalRuntime,
+  }).complete({ priorityId, occurrenceDate, dose, protocolId });
 
   revalidatePath("/");
   revalidatePath("/log");

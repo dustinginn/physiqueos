@@ -34,7 +34,7 @@ describe("Narrative Goal production routes", () => {
 
   it("promotes the phase-aware Build Lean Mass goal through the shared read-only screen", () => {
     expect(buildLeanMassRoute).toContain("PhaseAwareActiveGoalPreviewScreen");
-    expect(buildLeanMassRoute).toContain("getPhaseAwareActiveGoalPreview");
+    expect(buildLeanMassRoute).toContain("getProductionActiveGoalReadService");
     expect(buildLeanMassRoute).not.toContain("NarrativeGoalPreviewScreen");
     expect(buildLeanMassRoute).not.toMatch(/redirect|action|save|update|persist/i);
     expect(buildLeanMassPresentation).toContain('goal.type !== "build_lean_mass"');

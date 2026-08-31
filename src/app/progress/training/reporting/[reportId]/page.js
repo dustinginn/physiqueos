@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import TrainingTimelineSelector from "../../../../../components/training/TrainingTimelineSelector";
-import { getTrainingTimelineReport } from "../../../../../domain/services/TrainingEvidenceContextService";
+import { getProductionTrainingNavigationReadService } from "../../../../../application/composition/productionApplicationComposition";
 import { withTrainingTimelineContext } from "../../../../../navigation/trainingTimelineNavigation";
 import TrainingKnowledgeScreen from "../../../../../screens/TrainingKnowledgeScreen";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function TrainingReportingPage({ params, searchParams }) {
   const { reportId } = await params;
   const query = await searchParams;
-  const { report, timeline } = await getTrainingTimelineReport({
+  const { report, timeline } = await getProductionTrainingNavigationReadService().getReporting({
     context: query?.context,
   });
   const currentPath = `/progress/training/reporting/${reportId}`;

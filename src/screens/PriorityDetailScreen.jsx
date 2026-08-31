@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import Card from "../components/ui/Card";
 import ActionButton from "../components/ui/ActionButton";
 import IconBadge from "../components/ui/IconBadge";
+import PriorityCompletionButton from "./PriorityCompletionButton";
 
 export default function PriorityDetailScreen({ completeAction, priority }) {
   return (
@@ -42,7 +43,7 @@ export default function PriorityDetailScreen({ completeAction, priority }) {
               <input name="occurrenceDate" type="hidden" value={priority.completionContext?.occurrenceDate ?? ""} />
               <input name="dose" type="hidden" value={priority.completionContext?.dose ?? ""} />
               <input name="protocolId" type="hidden" value={priority.completionContext?.protocolId ?? ""} />
-              <ActionButton type="submit">Mark Complete</ActionButton>
+              <PriorityCompletionButton />
             </form>
           ) : (
             <ActionButton href={priority.action?.href ?? "/"}>

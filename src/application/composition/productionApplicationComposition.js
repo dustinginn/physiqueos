@@ -64,6 +64,21 @@ import {
   createRepositoryCompletedGoalReadStore,
 } from "../../platform/database/PostgresCompletedGoalReadStore.js";
 import { createCompletedGoalReadService } from "../goals/CompletedGoalReadService.js";
+import {
+  createPostgresActiveGoalReadStore,
+  createRepositoryActiveGoalReadStore,
+} from "../../platform/database/PostgresActiveGoalReadStore.js";
+import { createActiveGoalReadService } from "../goals/ActiveGoalReadService.js";
+import {
+  createPostgresPriorityNavigationReadStore,
+  createRepositoryPriorityNavigationReadStore,
+} from "../../platform/database/PostgresPriorityNavigationReadStore.js";
+import { createPriorityNavigationReadService } from "../priorities/PriorityNavigationReadService.js";
+import {
+  createPostgresBriefingNavigationReadStore,
+  createRepositoryBriefingNavigationReadStore,
+} from "../../platform/database/PostgresBriefingNavigationReadStore.js";
+import { createBriefingNavigationReadService } from "../briefings/BriefingNavigationReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -207,6 +222,27 @@ export function getProductionCompletedGoalReadService(env = process.env) {
     ? createProviderCompletedGoalReadStore(env)
     : createRepositoryCompletedGoalReadStore({ repositories: LegacyFounderRepositories });
   return createCompletedGoalReadService({ store });
+}
+
+export function getProductionActiveGoalReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderActiveGoalReadStore(env)
+    : createRepositoryActiveGoalReadStore({ repositories: LegacyFounderRepositories, loadRuntime: getFounderRuntimeStore });
+  return createActiveGoalReadService({ store });
+}
+
+export function getProductionPriorityNavigationReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderPriorityNavigationReadStore(env)
+    : createRepositoryPriorityNavigationReadStore({ repositories: LegacyFounderRepositories });
+  return createPriorityNavigationReadService({ store });
+}
+
+export function getProductionBriefingNavigationReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderBriefingNavigationReadStore(env)
+    : createRepositoryBriefingNavigationReadStore({ repositories: LegacyFounderRepositories, loadRuntime: getFounderRuntimeStore });
+  return createBriefingNavigationReadService({ store });
 }
 
 export function getProductionPhotoEventBriefingReadService(env = process.env) {
@@ -493,6 +529,39 @@ function createProviderCompletedGoalReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.completed_goal_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderActiveGoalReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresActiveGoalReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.active_goal_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderPriorityNavigationReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresPriorityNavigationReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.priority_navigation_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderBriefingNavigationReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresBriefingNavigationReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.briefing_navigation_read.complete", event)
       : null,
   });
 }

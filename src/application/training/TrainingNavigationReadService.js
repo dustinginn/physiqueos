@@ -3,6 +3,7 @@ import {
   createTrainingLandingReports,
   createTrainingLibraryReports,
   createTrainingNavigationReport,
+  createTrainingReportingReports,
 } from "../../domain/services/ProgressReportingService.js";
 import {
   createTrainingEvidenceContext,
@@ -15,6 +16,41 @@ export function createTrainingNavigationReadService({ store } = {}) {
   if (!store?.run) throw new Error("Training navigation requires a read store.");
 
   return Object.freeze({
+    getReporting({ context, currentDate = new Date() } = {}) {
+      return store.run("training.reporting", async () => {
+        const [user, goals, canonicalEvidenceObjects] = await Promise.all([
+          store.getUser(),
+          store.listGoals(),
+          store.listCanonicalTrainingAndActivityEvidenceObjects(),
+        ]);
+        const timeline = createTrainingEvidenceContext({ context, currentDate, goals, user });
+        const hasCanonicalTraining = canonicalEvidenceObjects.some((record) =>
+          (record.payload ?? record).evidence_type === "training"
+        );
+        const evidencePackages = hasCanonicalTraining ? [] : await store.listEvidencePackages();
+        const { globalReport, scopedReport } = createTrainingReportingReports({
+          canonicalEvidenceObjects,
+          dateWindow: timeline.goalScoped
+            ? { startDate: timeline.startDate, endDate: timeline.endDate }
+            : null,
+          evidencePackages,
+          goals,
+        });
+        return Object.freeze({
+          timeline,
+          report: timeline.goalScoped
+            ? Object.freeze({
+                ...scopedReport,
+                trainingBreakdowns: mergeTrainingBreakdowns({
+                  globalBreakdowns: globalReport.trainingBreakdowns,
+                  scopedBreakdowns: scopedReport.trainingBreakdowns,
+                }),
+                trainingLibrary: globalReport.trainingLibrary,
+              })
+            : globalReport,
+        });
+      });
+    },
     getLanding({ context, currentDate = new Date() } = {}) {
       return store.run("training.landing", async () => {
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([

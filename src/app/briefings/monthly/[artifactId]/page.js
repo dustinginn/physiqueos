@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
+import { getProductionBriefingNavigationReadService } from "../../../../application/composition/productionApplicationComposition";
 import { projectPersistedMonthlyPresentationForRendering } from "../../../../domain/services/MonthlyPersistedArtifactCompatibilityService";
 import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
 import { createBriefingReconciliationPresentation } from "../../../../domain/services/BriefingReconciliationPresentationService";
@@ -8,15 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MonthlyBriefingArtifactPage({ params }) {
   const { artifactId } = await params;
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
-  const [artifacts, workItems] = user?.id
-    ? await Promise.all([
-        FounderRepositories.dailyBriefings.listDailyBriefings(user.id),
-        FounderRepositories.briefingReconciliationWorkItems.listWorkItems(user.id),
-      ])
-    : [[], []];
-  const artifact = artifacts.find((item) => item.id === artifactId);
+  const { artifact, user, workItems } = await getProductionBriefingNavigationReadService().getArtifact({ artifactId });
   if (!isReadableMonthlyArtifact(artifact, user?.id)) {
     return <MonthlyUnavailableState />;
   }
@@ -31,7 +23,6 @@ export default async function MonthlyBriefingArtifactPage({ params }) {
     presentation={presentation}
     reconciliation={reconciliation}
   />;
-  }, { readModel: "route.monthly-briefing" });
 }
 
 function isReadableMonthlyArtifact(artifact, userId) {

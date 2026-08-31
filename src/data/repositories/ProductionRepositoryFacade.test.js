@@ -61,9 +61,6 @@ describe("production repository facade", () => {
   });
 
   it.each([
-    "../../app/briefings/monthly/[artifactId]/page.js",
-    "../../app/briefings/review/[artifactId]/page.js",
-    "../../app/briefings/review/page.js",
     "../../app/briefings/weekly/page.js",
     "../../app/check-in/morning/page.js",
     "../../app/goals/[goalId]/edit/page.js",
@@ -81,6 +78,16 @@ describe("production repository facade", () => {
   ])("enters the common read scope for audited direct composite page %s", (relativePath) => {
     const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
     expect(source).toContain("FounderRepositories.runInReadScope");
+  });
+
+  it.each([
+    "../../app/briefings/monthly/[artifactId]/page.js",
+    "../../app/briefings/review/[artifactId]/page.js",
+    "../../app/briefings/review/page.js",
+  ])("routes audited Briefing page %s through the provider-native navigation read model", (relativePath) => {
+    const source = fs.readFileSync(new URL(relativePath, import.meta.url), "utf8");
+    expect(source).toContain("getProductionBriefingNavigationReadService");
+    expect(source).not.toMatch(/FounderRepositories\.runInReadScope|loadCanonicalRuntime/);
   });
 
   it("routes Photo Event Briefing detail through its narrow provider-native read model", () => {

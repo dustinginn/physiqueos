@@ -4,11 +4,23 @@ import { createSeedRepositories } from "../../data/repositories/createSeedReposi
 import { getActivityTimelineReport } from "../../domain/services/ActivityEvidenceContextService.js";
 import { getNutritionTimelineReport } from "../../domain/services/NutritionEvidenceContextService.js";
 import { getWeightTimelineReport } from "../../domain/services/WeightEvidenceContextService.js";
+import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContextService.js";
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
 import { createRepositoryProgressEvidenceReadStore } from "../../platform/database/PostgresProgressEvidenceReadStore.js";
 import { createProgressEvidenceReadService } from "./ProgressEvidenceReadService.js";
 
 describe("provider-native Progress evidence reads", () => {
+  it.each(["all", "build-lean-mass", "visible-abs"])(
+    "keeps DEXA output equivalent for %s",
+    async (context) => {
+      const currentDate = new Date("2026-08-29T12:00:00-07:00");
+      const { narrow, legacy } = services();
+      expect(await narrow.getDEXA({ context, currentDate })).toEqual(
+        await getDEXATimelineReport({ context, currentDate, repositories: legacy })
+      );
+    }
+  );
+
   it.each(["all", "build-lean-mass", "visible-abs"])(
     "keeps Weight output equivalent for %s",
     async (context) => {
@@ -59,15 +71,16 @@ describe("provider-native Progress evidence reads", () => {
     expect(JSON.stringify(first).length).toBeLessThan(250_000);
   });
 
-  it("routes all three production pages through the narrow composition", () => {
+  it("routes all four production pages through the narrow composition", () => {
     for (const route of [
+      "src/app/progress/dexa/page.js",
       "src/app/progress/weight/page.js",
       "src/app/progress/nutrition/page.js",
       "src/app/progress/activity/page.js",
     ]) {
       const source = fs.readFileSync(route, "utf8");
       expect(source).toContain("getProductionProgressEvidenceReadService");
-      expect(source).not.toMatch(/getWeightTimelineReport|getNutritionTimelineReport|getActivityTimelineReport|createProgressReportingService|FounderRepositories/);
+      expect(source).not.toMatch(/getDEXATimelineReport|getWeightTimelineReport|getNutritionTimelineReport|getActivityTimelineReport|createProgressReportingService|FounderRepositories/);
     }
   });
 });

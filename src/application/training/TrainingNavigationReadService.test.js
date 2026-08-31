@@ -17,6 +17,27 @@ const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId:
 
 describe("provider-native Training navigation", () => {
   it.each(["all", "build-lean-mass"])(
+    "keeps Training reporting output equivalent for %s without runtime reconstruction",
+    async (context) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-31T14:00:00.000Z"));
+      const runtime = createPhase5SyntheticRuntime();
+      const narrowRepositories = createSeedRepositories(structuredClone(runtime), { allowStagedMutations: false });
+      const legacyRepositories = createSeedRepositories(structuredClone(runtime), { allowStagedMutations: false });
+      const narrow = await createTrainingNavigationReadService({
+        store: createRepositoryTrainingNavigationReadStore({ repositories: narrowRepositories }),
+      }).getReporting({ context });
+      const legacy = await getTrainingTimelineReport({ context, repositories: legacyRepositories });
+      expect(narrow).toEqual(legacy);
+      expect(narrow.report.resistancePerformance).toBeDefined();
+      const route = fs.readFileSync("src/app/progress/training/reporting/[reportId]/page.js", "utf8");
+      expect(route).toContain("getProductionTrainingNavigationReadService().getReporting");
+      expect(route).not.toContain("getTrainingTimelineReport");
+      vi.useRealTimers();
+    }
+  );
+
+  it.each(["all", "build-lean-mass"])(
     "keeps the Training landing output equivalent for %s without broad report fields",
     async (context) => {
       const runtime = createPhase5SyntheticRuntime();

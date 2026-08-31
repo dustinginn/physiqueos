@@ -1,17 +1,12 @@
 import Link from "next/link";
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
+import { getProductionBriefingNavigationReadService } from "../../../application/composition/productionApplicationComposition";
 import { createBriefingReconciliationPresentation } from "../../../domain/services/BriefingReconciliationPresentationService";
 
 export const dynamic = "force-dynamic";
 
 export default async function BriefingHistoryPage() {
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
-  const [briefings, workItems] = await Promise.all([
-    FounderRepositories.dailyBriefings.listDailyBriefings(user?.id),
-    FounderRepositories.briefingReconciliationWorkItems.listWorkItems(user?.id),
-  ]);
-  const artifacts = briefings
+  const { artifacts: briefingArtifacts, workItems } = await getProductionBriefingNavigationReadService().listHistory();
+  const artifacts = briefingArtifacts
     .sort((left, right) => String(right.generatedAt).localeCompare(String(left.generatedAt)));
   const founderPhotoArtifact = artifacts.find((item) => item.id === "daily_briefing_20260710")
     ?? artifacts.find((item) => String(item.generatedAt).startsWith("2026-07-11"));
@@ -38,7 +33,6 @@ export default async function BriefingHistoryPage() {
       </Link>;
     })}</div>
   </div></main>;
-  }, { readModel: "route.briefing-history" });
 }
 
 function artifactHref(item) {
