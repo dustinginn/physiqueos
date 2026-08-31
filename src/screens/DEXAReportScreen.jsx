@@ -229,13 +229,13 @@ export default function DEXAReportScreen({ evidenceContext, from, report }) {
                     {formatDate(scan.date)}
                   </p>
                   <p className="text-sm font-extrabold text-emerald-600">
-                    {scan.bodyFatPercentage.toFixed(1)}%
+                    {formatHistoryMetric(scan.bodyFatPercentage, "%")}
                   </p>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-bold text-slate-500">
-                  <span>{scan.fatMass.toFixed(1)} lb fat</span>
-                  <span>{scan.leanMass.toFixed(1)} lb lean</span>
-                  <span>{scan.rmr} RMR</span>
+                  <span>{formatHistoryMetric(scan.fatMass, " lb fat")}</span>
+                  <span>{formatHistoryMetric(scan.leanMass, " lb lean")}</span>
+                  <span>{Number.isFinite(scan.rmr) ? `${scan.rmr} RMR` : "RMR unavailable"}</span>
                 </div>
                 {scan.sourceHref ? (
                   <a
@@ -350,4 +350,8 @@ function formatDate(value) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatHistoryMetric(value, suffix) {
+  return Number.isFinite(value) ? `${value.toFixed(1)}${suffix}` : "Unavailable";
 }
