@@ -46,6 +46,11 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
         : capture(filePath, readText);
     },
     async publish(command = {}) {
+      if (command.confidenceMode === "matched-only") {
+        return publishMatchedArtifact({ command, filePath, liveStore, readText,
+          unitOfWorkFactory, mutateCanonicalRuntime, registry, now,
+          unitOfWorkOptions: options.unitOfWorkOptions });
+      }
       try {
         registry.assertAuthorization(command.authorization);
         validateCommand(command);
@@ -180,6 +185,99 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
       }
     },
   });
+}
+
+async function publishMatchedArtifact({ command, filePath, liveStore, readText,
+  unitOfWorkFactory, mutateCanonicalRuntime, registry, now,
+  unitOfWorkOptions } = {}) {
+  try {
+    registry.assertAuthorization(command.authorization);
+    validateMatchedCommand(command);
+  } catch (error) {
+    return failure(error.code ?? "semantic_conflict", error);
+  }
+  if (typeof mutateCanonicalRuntime === "function") {
+    return publishMatchedBounded({ command, mutateCanonicalRuntime });
+  }
+  const baseline = capture(filePath, readText);
+  const relation = findHistoricalAssessment(
+    baseline.store, command.matchedAssessmentId);
+  if (!relation) return failure("matched_assessment_missing",
+    "Historical Confidence relationship is unavailable.");
+  const existing = findArtifact(baseline.store, command.artifact);
+  if (existing) return sameMatchedArtifact(existing, command)
+    ? { status: "matched", committed: false, artifact: existing }
+    : failure("publication_identity_conflict",
+      "Historical briefing identity already has different semantics.");
+  const unit = unitOfWorkFactory({ filePath, liveStore, stageFrom: baseline.store,
+    now, validatePersistedBaseline: (candidate) => ({ valid:
+      getFounderStoreRevision(candidate) === baseline.revision &&
+      createFounderRuntimeSemanticDigest(candidate) === baseline.semanticDigest }),
+    ...(unitOfWorkOptions ?? {}) });
+  try {
+    const transaction = unit.begin();
+    await transaction.mutate(async (candidate) => {
+      if (!findHistoricalAssessment(candidate, command.matchedAssessmentId)) {
+        throw semanticFailure("matched_assessment_missing",
+          "Historical Confidence relationship changed before publication.");
+      }
+      await createDailyBriefingRepository(candidate.dailyBriefings)
+        .createDailyBriefing(structuredClone(command.artifact));
+    });
+    const committed = await transaction.commit({
+      validate: (candidate) => ({ valid: sameMatchedArtifact(
+        findArtifact(candidate, command.artifact), command) }),
+    });
+    return { status: "published_historical_matched", committed: true,
+      assessmentId: command.matchedAssessmentId,
+      artifact: structuredClone(command.artifact), revision: committed.revision,
+      commitId: committed.commitId };
+  } catch (error) {
+    if (error?.publicationStatus) return failure(error.publicationStatus, error);
+    if (error.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT) {
+      return failure("baseline_conflict", error);
+    }
+    return failure("persistence_failure", error);
+  }
+}
+
+async function publishMatchedBounded({ command, mutateCanonicalRuntime }) {
+  try {
+    const committed = await mutateCanonicalRuntime({
+      operation: "briefing-historical-matched-publication",
+      allowedCollections: ["dailyBriefings"],
+      readCollections: ["dailyBriefings", "goalConfidenceHistory"],
+      readApplicationContext: false,
+      readImportMetadata: false,
+      allowApplicationContextMutation: false,
+      async mutate(candidate) {
+        if (!findHistoricalAssessment(candidate, command.matchedAssessmentId)) {
+          throw semanticFailure("matched_assessment_missing",
+            "Historical Confidence relationship changed before publication.");
+        }
+        const existing = findArtifact(candidate, command.artifact);
+        if (existing) {
+          if (!sameMatchedArtifact(existing, command)) {
+            throw semanticFailure("publication_identity_conflict",
+              "Historical briefing identity already has different semantics.");
+          }
+          return { matched: true, artifact: structuredClone(existing) };
+        }
+        await createDailyBriefingRepository(candidate.dailyBriefings)
+          .createDailyBriefing(structuredClone(command.artifact));
+        return { matched: false, artifact: structuredClone(command.artifact) };
+      },
+    });
+    return { status: committed.result.matched ? "matched" :
+      "published_historical_matched", committed: !committed.result.matched,
+      assessmentId: command.matchedAssessmentId,
+      artifact: committed.result.artifact, revision: committed.revision,
+      commitId: committed.commitId, memoryProfile: committed.memoryProfile };
+  } catch (error) {
+    if (error?.publicationStatus) return failure(error.publicationStatus, error);
+    return failure(error.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT
+      ? "baseline_conflict" : "persistence_failure", error);
+  }
 }
 
 async function publishBounded({ command, mutateCanonicalRuntime, now }) {
@@ -323,6 +421,18 @@ function validateCommand(command) {
     throw new Error("Artifact, assessment, and publisher lineage disagree.");
   }
 }
+function validateMatchedCommand(command) {
+  if (command.confidenceMode !== "matched-only" ||
+      !command.matchedAssessmentId || !command.artifact?.id ||
+      command.artifact.confidencePublication?.assessmentId !==
+        command.matchedAssessmentId ||
+      command.artifact.confidencePublication?.confidenceMode !== "matched-only" ||
+      command.authorization?.artifactId !== command.artifact.id ||
+      command.authorization?.publisherType !==
+        command.artifact.confidencePublication?.publisherType) {
+    throw new Error("Historical matched briefing publication is invalid.");
+  }
+}
 function ensureCollections(store) {
   store.goalConfidenceSnapshots ??= [];
   store.goalConfidenceHistory ??= [];
@@ -421,6 +531,18 @@ function currentSnapshot(store, assessment) {
 function findAssessment(store, assessmentId) {
   return (store.goalConfidenceHistory ?? []).find((item) =>
     item.assessmentId === assessmentId)?.assessment ?? null;
+}
+function findHistoricalAssessment(store, assessmentId) {
+  const matches = (store.goalConfidenceHistory ?? []).filter((item) =>
+    item.assessmentId === assessmentId && item.assessment?.id === assessmentId);
+  return matches.length === 1 ? matches[0] : null;
+}
+function sameMatchedArtifact(artifact, command) {
+  return Boolean(artifact && artifact.id === command.artifact.id &&
+    artifact.trigger?.evidenceType === command.artifact.trigger?.evidenceType &&
+    artifact.trigger?.evidenceId === command.artifact.trigger?.evidenceId &&
+    artifact.confidencePublication?.assessmentId === command.matchedAssessmentId &&
+    artifact.confidencePublication?.confidenceMode === "matched-only");
 }
 function capture(filePath, readText) {
   const store = JSON.parse(readText(filePath));

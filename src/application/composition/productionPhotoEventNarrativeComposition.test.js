@@ -5,6 +5,8 @@ import {
   createProductionPhotoEventNarrativeService,
   createProviderPhotoEventNarrativeService,
 } from "./productionPhotoEventNarrativeComposition";
+import { createCanonicalConfidenceAssessment } from
+  "../../domain/confidence/CanonicalConfidenceAssessmentModel";
 
 vi.mock("./productionApplicationComposition", () => ({
   getProductionPhotoEventReadStore: vi.fn(() => {
@@ -26,7 +28,7 @@ vi.mock("../../data/repositories/founderRuntimeStore", () => ({
 }));
 
 describe("provider Photo Event narrative composition", () => {
-  it("publishes an Aug 22 event and Confidence without changing the current Weekly", async () => {
+  it("publishes an Aug 22 event against historical Confidence without changing the current Weekly", async () => {
     const fixture = providerFixture();
     const service = await fixture.createService();
 
@@ -45,26 +47,31 @@ describe("provider Photo Event narrative composition", () => {
       .toBe("2026-08-22");
     expect(result.artifact.confidencePublication.publisherType)
       .toBe("photo_event_briefing");
+    expect(result.artifact.confidencePublication).toMatchObject({
+      assessmentId: fixture.historicalAssessmentId,
+      confidenceMode: "matched-only",
+      authoritativeSnapshotChanged: false,
+      matchedAssessmentPublisherType: "weekly_briefing",
+    });
     expect(fixture.liveStore.dailyBriefings).toHaveLength(2);
     expect(fixture.liveStore.dailyBriefings.find((item) =>
       item.id === fixture.eventId)).toBeTruthy();
     expect(fixture.liveStore.dailyBriefings.find((item) =>
       item.id === "weekly_briefing_2026-08-23_2026-08-29")?.version).toBe(1);
     expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(
-      fixture.initialHistoryCount + 1
+      fixture.initialHistoryCount
     );
     expect(fixture.liveStore.goalConfidenceSnapshots.find((item) =>
       item.goalId === fixture.goalId && item.phaseId === fixture.phaseId
-    )?.originatingArtifactId).toBe(fixture.eventId);
+    )).toMatchObject({
+      currentAssessmentId: fixture.currentAssessmentId,
+      originatingArtifactId: "weekly_briefing_2026-08-23_2026-08-29",
+    });
     expect(fixture.boundedCalls).toHaveLength(1);
     expect(fixture.boundedCalls[0]).toMatchObject({
-      operation: "briefing-confidence-publication",
-      allowedCollections: [
-        "dailyBriefings",
-        "goalConfidenceSnapshots",
-        "goalConfidenceHistory",
-        "confidenceInitializationArtifacts",
-      ],
+      operation: "briefing-historical-matched-publication",
+      allowedCollections: ["dailyBriefings"],
+      readCollections: ["dailyBriefings", "goalConfidenceHistory"],
       readApplicationContext: false,
       readImportMetadata: false,
     });
@@ -81,7 +88,7 @@ describe("provider Photo Event narrative composition", () => {
     });
     expect(fixture.liveStore.dailyBriefings).toHaveLength(2);
     expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(
-      fixture.initialHistoryCount + 1
+      fixture.initialHistoryCount
     );
     expect(fixture.boundedCalls).toHaveLength(1);
   });
@@ -99,25 +106,40 @@ describe("provider Photo Event narrative composition", () => {
 function providerFixture() {
   const goal = productionGoal();
   const phase = goal.phases.find((item) => item.status === "active");
-  const prior = priorAssessment(goal.id, phase.id);
+  const historical = canonicalAssessment({ goalId: goal.id, phaseId: phase.id,
+    cutoff: "2026-08-22T23:59:59.999Z",
+    artifactId: "weekly_briefing_2026-08-16_2026-08-22", percentage: 62 });
+  const current = canonicalAssessment({ goalId: goal.id, phaseId: phase.id,
+    cutoff: "2026-08-29T23:59:59.999Z",
+    artifactId: "weekly_briefing_2026-08-23_2026-08-29", percentage: 64,
+    priorAssessmentId: historical.id });
   const snapshot = {
     id: `goal_confidence_snapshot_v2|${goal.id}|${phase.id}`,
     goalId: goal.id,
     phaseId: phase.id,
-    currentAssessmentId: prior.id,
-    currentScore: prior.score.current,
-    scoreBand: prior.score.band,
-    historyRecordId: "prior-history",
-    originatingArtifactId: prior.briefingArtifactId,
+    currentAssessmentId: current.id,
+    currentScore: current.currentPercentage,
+    scoreBand: current.confidenceBand,
+    historyRecordId: "current-history",
+    originatingArtifactId: current.briefingArtifactId,
   };
-  const history = {
-    id: "prior-history",
-    assessmentId: prior.id,
+  const historicalRecord = {
+    id: "historical-history",
+    assessmentId: historical.id,
     goalId: goal.id,
     phaseId: phase.id,
-    publisherType: prior.publisherType,
-    persistedAt: prior.provenance.generatedAt,
-    assessment: prior,
+    publisherType: historical.publisherType,
+    persistedAt: "2026-08-23T07:00:00.000Z",
+    assessment: historical,
+  };
+  const currentRecord = {
+    id: "current-history",
+    assessmentId: current.id,
+    goalId: goal.id,
+    phaseId: phase.id,
+    publisherType: current.publisherType,
+    persistedAt: "2026-08-30T07:00:00.000Z",
+    assessment: current,
   };
   const sessionId = "photo_session_user_founder_001_2026-08-22";
   const eventId = `event_briefing_progress_photo_${sessionId}`;
@@ -202,7 +224,8 @@ function providerFixture() {
       generatedAt: "2026-08-30T17:29:58.135Z",
     }],
     goalConfidenceSnapshots: [structuredClone(snapshot)],
-    goalConfidenceHistory: [structuredClone(history)],
+    goalConfidenceHistory: [structuredClone(historicalRecord),
+      structuredClone(currentRecord)],
     goalConfidenceContinuitySeeds: [],
     confidenceInitializationArtifacts: [],
     phaseReviewDecisions: [],
@@ -244,6 +267,8 @@ function providerFixture() {
     goalId: goal.id,
     phaseId: phase.id,
     sessionId,
+    historicalAssessmentId: historical.id,
+    currentAssessmentId: current.id,
     initialHistoryCount,
     async createService() {
       const runtime = structuredClone(liveStore);
@@ -338,26 +363,35 @@ function productionGoal() {
   };
 }
 
-function priorAssessment(goalId, phaseId) {
-  return {
-    schemaVersion: "pi_goal_confidence_assessment_v1",
-    id: "prior-assessment",
-    goalId,
-    phaseId,
-    operatingState: "lean_mass_build",
-    evidenceCutoff: "2026-08-22T23:59:59.999Z",
-    sourceCutoff: "2026-08-22T23:59:59.999Z",
-    publisherType: "weekly_briefing",
-    briefingArtifactId: "weekly_briefing_2026-08-16_2026-08-22",
-    score: {
-      current: 62,
-      prior: 62,
-      band: "moderate",
-      movement: { direction: "held", magnitude: "none" },
-    },
-    contributors: [],
-    unresolvedUncertainty: [],
-    primaryReason: "Prior canonical Weekly context.",
-    provenance: { generatedAt: "2026-08-23T07:00:00.000Z" },
-  };
+function canonicalAssessment({ goalId, phaseId, cutoff, artifactId, percentage,
+  priorAssessmentId = null }) {
+  const suffix = artifactId.split("_").slice(-3).join("-");
+  return createCanonicalConfidenceAssessment({
+    goalId, phaseId, goalContractId: goalId, goalContractVersion: "goal-v1",
+    publisherType: "weekly_briefing", originatingBriefingId: artifactId,
+    briefingArtifactId: artifactId, evidenceWindowId: `${artifactId}|window`,
+    priorAssessmentId, publicationTimestamp: new Date(Date.parse(cutoff) +
+      7 * 60 * 60 * 1000).toISOString(), sourceCutoff: cutoff,
+    idempotencyKey: `${artifactId}|confidence`,
+    projection: { id: `projection-${suffix}`, schemaVersion: "projection-v1",
+      priorPercentage: priorAssessmentId ? percentage - 2 : percentage,
+      currentPercentage: percentage, movement: priorAssessmentId
+        ? "increase" : "no_meaningful_change", movementMagnitude: "small" },
+    forecastAssessment: { id: `forecast-${suffix}`, confidenceBand: "moderate",
+      goalForecastStatus: "on_track", forecastDirection: "improving",
+      forecastExplanation: ["Canonical weekly evidence."], remainingUncertainty: [],
+      nextDecisiveEvidence: ["Next weekly window."], forecastMetadata: {
+        interpretationSemanticFingerprint: `semantic-${suffix}`,
+        goalContractFingerprint: `goal-${suffix}`,
+        inputFingerprint: `forecast-input-${suffix}`, engineVersion: "test-v1",
+      } },
+    narrativeAssessment: { id: `narrative-${suffix}`,
+      confidenceExplanation: ["Canonical weekly Confidence."], provenance: {
+        inputFingerprint: `narrative-input-${suffix}`, engineVersion: "test-v1",
+      } },
+    structuredInterpretation: { id: `interpretation-${suffix}`, provenance: {
+      inputFingerprint: `interpretation-input-${suffix}`, engineVersion: "test-v1",
+    } },
+    sourceLineage: { artifactId },
+  });
 }

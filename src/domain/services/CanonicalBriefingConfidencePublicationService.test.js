@@ -146,6 +146,25 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
     expect(persisted.goalConfidenceHistory).toHaveLength(1);
   });
 
+  it("continues to reject a true successor whose evidence cutoff moves backward", async () => {
+    const fixture = setup({ bounded: true });
+    const result = await fixture.finalizer.finalize(fixture.request({
+      evidenceWindow: { id: "older-window",
+        start: "2026-05-25T00:00:00.000Z",
+        cutoff: "2026-06-01T23:59:59.999Z", closed: true },
+      publicationCutoff: "2026-06-01T23:59:59.999Z",
+    }));
+
+    expect(result.commitResult).toMatchObject({
+      status: "temporal_cutoff_conflict",
+      committed: false,
+    });
+    expect(fixture.liveStore.dailyBriefings).toEqual([]);
+    expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(1);
+    expect(fixture.liveStore.goalConfidenceSnapshots[0].currentAssessmentId)
+      .toBe(fixture.prior.id);
+  });
+
   it("rejects a forged publisher capability before persistence", async () => {
     const fixture = setup();
     const result = await fixture.publication.publish({ authorization: {
@@ -210,6 +229,60 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
     expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
     expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(2);
     expect(fixture.boundedCalls).toHaveLength(2);
+  });
+
+  it("atomically publishes a historical matched artifact without moving Confidence", async () => {
+    const fixture = setup({ bounded: true });
+    const snapshotBefore = structuredClone(fixture.liveStore.goalConfidenceSnapshots);
+    const historyBefore = structuredClone(fixture.liveStore.goalConfidenceHistory);
+    const command = fixture.historicalMatchedCommand();
+
+    const result = await fixture.publication.publish(command);
+
+    expect(result).toMatchObject({
+      status: "published_historical_matched",
+      committed: true,
+      assessmentId: fixture.prior.id,
+    });
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
+    expect(fixture.liveStore.goalConfidenceSnapshots).toEqual(snapshotBefore);
+    expect(fixture.liveStore.goalConfidenceHistory).toEqual(historyBefore);
+    expect(fixture.boundedCalls[0]).toMatchObject({
+      operation: "briefing-historical-matched-publication",
+      allowedCollections: ["dailyBriefings"],
+      readCollections: ["dailyBriefings", "goalConfidenceHistory"],
+      readApplicationContext: false,
+      readImportMetadata: false,
+    });
+
+    const replay = await fixture.publication.publish(command);
+    expect(replay).toMatchObject({ status: "matched", committed: false });
+    expect(fixture.liveStore.dailyBriefings).toHaveLength(1);
+    expect(fixture.liveStore.goalConfidenceSnapshots).toEqual(snapshotBefore);
+    expect(fixture.liveStore.goalConfidenceHistory).toEqual(historyBefore);
+  });
+
+  it("fails historical matched publication atomically when its assessment is absent", async () => {
+    const fixture = setup({ bounded: true });
+    const command = fixture.historicalMatchedCommand({
+      matchedAssessmentId: "missing-assessment",
+      artifact: {
+        ...fixture.historicalMatchedCommand().artifact,
+        confidencePublication: {
+          ...fixture.historicalMatchedCommand().artifact.confidencePublication,
+          assessmentId: "missing-assessment",
+        },
+      },
+    });
+
+    const result = await fixture.publication.publish(command);
+
+    expect(result).toMatchObject({
+      status: "matched_assessment_missing",
+      committed: false,
+    });
+    expect(fixture.liveStore.dailyBriefings).toEqual([]);
+    expect(fixture.liveStore.goalConfidenceHistory).toHaveLength(1);
   });
 });
 
@@ -296,7 +369,31 @@ function setup({ bounded = false } = {}) {
   });
   return {
     filePath, publication, finalizer, liveStore, boundedCalls,
-    unitOfWorkFactory,
+    unitOfWorkFactory, prior,
+    historicalMatchedCommand: (overrides = {}) => {
+      const artifact = {
+        id: "event_briefing_progress_photo_session_historical",
+        userId: "user-one", artifactType: "event", cadence: "event",
+        trigger: { evidenceType: "photo_session",
+          evidenceId: "session_historical" },
+        briefing: { photoEventNarrative: { goalConfidence: {
+          assessmentId: prior.id, score: prior.score.current,
+        } } },
+        confidencePublication: {
+          assessmentId: prior.id, publisherType: "photo_event_briefing",
+          confidenceMode: "matched-only", authoritativeSnapshotChanged: false,
+        },
+      };
+      const authorization = ConfidencePublisherRegistry.authorize({
+        publisherType: "photo_event_briefing", userId: "user-one",
+        goalId: prior.goalId, occurrenceId: artifact.id, artifactId: artifact.id,
+        cadenceOrEventType: "photo", idempotencyKey: `${artifact.id}|matched`,
+        qualifyingPhotoEvent: true, hasPriorAssessment: true,
+        evidenceWindowClosed: true,
+      });
+      return { confidenceMode: "matched-only", authorization, artifact,
+        matchedAssessmentId: prior.id, ...overrides };
+    },
     request: (overrides = {}) => ({
       publisherType: "weekly_briefing", userId: "user-one",
       occurrenceId: "weekly-one", artifactId: "weekly-one",
