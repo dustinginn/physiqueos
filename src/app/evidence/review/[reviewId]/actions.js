@@ -82,6 +82,7 @@ import {
   createEvidenceReviewContinuationKey,
   isEvidenceReviewCanonicalSaveComplete,
 } from "../../../../domain/services/EvidenceReviewBackgroundContinuation";
+import { getProductionEvidenceReviewReadService } from "../../../../application/composition/productionApplicationComposition";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -473,9 +474,9 @@ export async function updateEvidenceReviewDexaMeasurements(formData) {
 
 export async function updateEvidenceReviewPhotoPose(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
-  const user = await FounderRepositories.users.getCurrentUser();
-  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
-  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const editContext = await getProductionEvidenceReviewReadService().getEditContext(reviewId);
+  if (!editContext) throw new Error("Evidence review is unavailable.");
+  const { review, userId } = editContext;
   const recoveryContext = resolveRecoveryContext(review, formData);
   try {
     await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoPose(reviewId, {
@@ -483,7 +484,7 @@ export async function updateEvidenceReviewPhotoPose(formData) {
       photoId: String(formData.get("photoId") ?? ""),
       poseId: String(formData.get("poseId") ?? ""),
       sourceArtifactRef: String(formData.get("sourceArtifactRef") ?? ""),
-      updatedBy: user.id,
+      updatedBy: userId,
     });
   } catch (error) {
     if (error?.code === "REVIEW_STALE") {
@@ -504,9 +505,9 @@ export async function updateEvidenceReviewPhotoPose(formData) {
 
 export async function updateEvidenceReviewPhotoSessionMetadata(formData) {
   const reviewId = String(formData.get("reviewId") ?? "");
-  const user = await FounderRepositories.users.getCurrentUser();
-  const review = await FounderRepositories.evidenceReviews.getReviewById(reviewId);
-  if (!user || !review || review.userId !== user.id) throw new Error("Evidence review is unavailable.");
+  const editContext = await getProductionEvidenceReviewReadService().getEditContext(reviewId);
+  if (!editContext) throw new Error("Evidence review is unavailable.");
+  const { review, userId } = editContext;
   const recoveryContext = resolveRecoveryContext(review, formData);
   try {
     await createEvidenceReviewService({ repositories: FounderRepositories }).setPhotoSessionMetadata(reviewId, {
@@ -514,7 +515,7 @@ export async function updateEvidenceReviewPhotoSessionMetadata(formData) {
       expectedUpdatedAt: String(formData.get("expectedUpdatedAt") ?? ""),
       goalId: String(formData.get("goalId") ?? ""),
       timeOfDay: String(formData.get("timeOfDay") ?? ""),
-      updatedBy: user.id,
+      updatedBy: userId,
     });
   } catch (error) {
     if (error?.code === "REVIEW_STALE") {

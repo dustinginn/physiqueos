@@ -2,6 +2,16 @@ export function createEvidenceReviewReadService({ store } = {}) {
   if (!store?.run) throw new Error("Evidence Review reads require a read store.");
 
   return Object.freeze({
+    getEditContext(reviewId) {
+      return store.run("evidence.review.edit-context", async () => {
+        const [review, ownerUserId] = await Promise.all([
+          store.getReview(reviewId),
+          store.getOwnerUserId(),
+        ]);
+        if (!review || !ownerUserId || review.userId !== ownerUserId) return null;
+        return Object.freeze({ review, userId: ownerUserId });
+      });
+    },
     getReview(reviewId) {
       return store.run("evidence.review.detail", async () => {
         const review = await store.getReview(reviewId);

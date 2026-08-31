@@ -19,5 +19,7 @@ describe("photo priority satisfaction",()=>{
     const first=await satisfyPhotoPriorityFromCanonicalSession({repositories,userId:"u",canonicalSession:canonical(),evidenceDate:"2026-07-18",confirmedAt:"2026-07-18T20:00:00Z"});
     const second=await satisfyPhotoPriorityFromCanonicalSession({repositories,userId:"u",canonicalSession:canonical(),evidenceDate:"2026-07-18",confirmedAt:"later"});
     expect(first.persisted).toBe(true);expect(second.idempotent).toBe(true);expect(completeReminderFromEvidence).toHaveBeenCalledTimes(1);
+    expect(history[0]).toMatchObject({ canonicalEvidenceId: "session-2026-07-18", canonicalPhotoSessionId: "session-2026-07-18" });
+    expect(JSON.stringify(history[0])).toContain('"canonicalEvidenceId":"session-2026-07-18"');
   });
 });

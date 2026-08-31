@@ -50,6 +50,7 @@ export async function satisfyPhotoPriorityFromCanonicalSession({
   const record = await repositories.reminders.completeReminderFromEvidence(reminder.id, {
     id: result.idempotencyKey,
     ...result,
+    canonicalEvidenceId: result.canonicalPhotoSessionId,
     completedAt: confirmedAt,
     confirmationTimestamp: confirmedAt,
   });

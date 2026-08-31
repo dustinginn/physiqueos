@@ -36,6 +36,11 @@ import {
 } from "../../platform/database/PostgresProgressEvidenceReadStore.js";
 import { createProgressEvidenceReadService } from "../progress/ProgressEvidenceReadService.js";
 import {
+  createPostgresProgressPhotosReadStore,
+  createRepositoryProgressPhotosReadStore,
+} from "../../platform/database/PostgresProgressPhotosReadStore.js";
+import { createProgressPhotosReadService } from "../progress/ProgressPhotosReadService.js";
+import {
   createPostgresCoreNavigationReadStore,
   createRepositoryCoreNavigationReadStore,
 } from "../../platform/database/PostgresCoreNavigationReadStore.js";
@@ -174,6 +179,13 @@ export function getProductionCoreNavigationReadService(env = process.env) {
     ? createProviderCoreNavigationReadStore(env)
     : createRepositoryCoreNavigationReadStore({ readRuntimeStore: getFounderRuntimeStore });
   return createCoreNavigationReadService({ store });
+}
+
+export function getProductionProgressPhotosReadService(env = process.env) {
+  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+    ? createProviderProgressPhotosReadStore(env)
+    : createRepositoryProgressPhotosReadStore({ repositories: LegacyFounderRepositories });
+  return createProgressPhotosReadService({ store });
 }
 
 export function getProductionEvidenceReviewReadService(env = process.env) {
@@ -362,6 +374,17 @@ function createProviderProgressEvidenceReadStore(env) {
     ownerUserId: runtime.ownerUserId,
     onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.progress_evidence_read.complete", event)
+      : null,
+  });
+}
+
+function createProviderProgressPhotosReadStore(env) {
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPostgresProgressPhotosReadStore({
+    pool: runtime.pool,
+    ownerUserId: runtime.ownerUserId,
+    onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.progress_photos_read.complete", event)
       : null,
   });
 }

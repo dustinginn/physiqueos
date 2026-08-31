@@ -45,6 +45,7 @@ export function createPostgresEvidenceReviewReadStore({
         });
       }
     },
+    getOwnerUserId: async () => ownerUserId,
     async getReview(reviewId) {
       const rows = await queryPayloads(
         `SELECT payload,version FROM physiqueos.canonical_evidence_records
@@ -85,8 +86,14 @@ export function createPostgresEvidenceReviewReadStore({
 }
 
 export function createRepositoryEvidenceReviewReadStore({ repositories } = {}) {
+  let user;
+  const getUser = async () => {
+    user ??= await repositories.users.getCurrentUser();
+    return user;
+  };
   return Object.freeze({
     run: (_readModel, callback) => callback(),
+    getOwnerUserId: async () => (await getUser())?.id ?? null,
     getReview: (reviewId) => repositories.evidenceReviews.getReviewById(reviewId),
     getPackage: (packageId) => packageId
       ? repositories.evidencePackages.getEvidencePackageById(packageId)

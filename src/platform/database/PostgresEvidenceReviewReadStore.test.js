@@ -6,6 +6,29 @@ import {
 } from "./PostgresEvidenceReviewReadStore.js";
 
 describe("provider-native Evidence Review reads", () => {
+  it("loads one review row for an owner-authorized edit context", async () => {
+    const query = vi.fn(async () => ({ rows: [{ version: 4, payload: review() }] }));
+    const diagnostics = [];
+    const service = createEvidenceReviewReadService({
+      store: createPostgresEvidenceReviewReadStore({
+        pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+        ownerUserId: "founder",
+        onComplete: (event) => diagnostics.push(event),
+      }),
+    });
+    await expect(service.getEditContext("review-photo")).resolves.toEqual({
+      review: expect.objectContaining({ id: "review-photo", version: 4 }),
+      userId: "founder",
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(diagnostics).toEqual([expect.objectContaining({
+      readModel: "evidence.review.edit-context",
+      queryCount: 1,
+      rowCount: 1,
+      compatibilityRuntimeLoadCount: 0,
+    })]);
+  });
+
   it("loads only the review, its package, and relevant canonical evidence", async () => {
     const diagnostics = [];
     const query = vi.fn(async (sql, values) => {

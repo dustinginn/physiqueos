@@ -369,6 +369,21 @@ vi.mock("../../../../domain/services/TrainingPerformanceIntelligenceService", ()
   createTrainingPerformanceIntelligenceReport: () => ({ summary: "ok", exerciseObservations: [] }),
 }));
 
+vi.mock("../../../../application/composition/productionApplicationComposition", () => ({
+  getProductionEvidenceReviewReadService() {
+    return {
+      async getEditContext(reviewId) {
+        const state = mockState.value;
+        state.editContextReadCount = (state.editContextReadCount ?? 0) + 1;
+        const review = state.evidenceReviews.find((item) => item.id === reviewId) ?? null;
+        return review && review.userId === state.user.id
+          ? { review: structuredClone(review), userId: state.user.id }
+          : null;
+      },
+    };
+  },
+}));
+
 const {
   confirmEvidenceReview,
   continueEvidenceReviewInBackground,
@@ -696,6 +711,16 @@ describe("photo review edit actions", () => {
     revalidatePath.mockClear();
     redirect.mockClear();
     mockState.value = createPendingPhotoEditState(runtimeStore);
+  });
+
+  it("authorizes pose and session edits through one narrow review context", () => {
+    const source = fs.readFileSync("src/app/evidence/review/[reviewId]/actions.js", "utf8");
+    const start = source.indexOf("export async function updateEvidenceReviewPhotoPose");
+    const end = source.indexOf("function applyPersistedItemDecisions", start);
+    const photoActions = source.slice(start, end);
+    expect(photoActions).toContain("getProductionEvidenceReviewReadService().getEditContext(reviewId)");
+    expect(photoActions).not.toContain("users.getCurrentUser");
+    expect(photoActions).not.toContain("evidenceReviews.getReviewById");
   });
 
   it("refreshes a stale pose edit without entering the generic failure boundary", async () => {

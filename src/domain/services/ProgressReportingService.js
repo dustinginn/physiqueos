@@ -900,6 +900,45 @@ export function createProviderActivityEvidenceReport({
   });
 }
 
+export function createProviderPhotosEvidenceReport({
+  analyses = [],
+  canonicalEvidenceObjects = [],
+  goals = [],
+  photoSessionWindow = null,
+  progressPhotos = [],
+  user = null,
+  weights = [],
+} = {}) {
+  const photoSessions = createPhotoSessionReadModels({
+    analyses,
+    canonicalObjects: canonicalEvidenceObjects,
+    legacyPhotos: progressPhotos,
+    weights,
+  });
+  return buildPlaceholderReportFromContext({
+    context: {
+      user,
+      goals,
+      weights,
+      dexaScans: [],
+      progressPhotos,
+      protocols: [],
+      checkIns: [],
+      evidencePackages: [],
+      canonicalEvidenceObjects,
+      analyses,
+      photoSessions,
+      canonicalPayloads: [],
+      activityDays: [],
+      nutritionDays: [],
+      trainingSessions: [],
+      nutritionContext: null,
+    },
+    options: { photoSessionWindow },
+    streamId: "photos",
+  });
+}
+
 export function getPlaceholderEntries(streamId, context) {
   if (streamId === "photos") {
     return getPhotoRecords(context).slice().reverse();
