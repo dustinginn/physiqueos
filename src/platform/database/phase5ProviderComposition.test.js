@@ -25,6 +25,31 @@ describe("Phase 5 provider media catalog", () => {
     await expect(createPhase5ProviderMediaCatalog({ query }).getObject({ objectId: "object-one", ownerUserId: "wrong-owner" })).resolves.toBeNull();
   });
 
+  it("resolves an owner-scoped legacy path only when its verified catalog mapping is unambiguous", async () => {
+    const query = vi.fn(async (_text, values) => ({ rows: values[0] === "owner-one" ? [
+      { id: "front", provenance: { sourceRelativePath: "photos/uploads/2026-08-08/front.jpg" } },
+      { id: "side", provenance: { sourceRelativePath: "photos/uploads/2026-08-08/side.jpg" } },
+    ] : [] }));
+    const catalog = createPhase5ProviderMediaCatalog({ query });
+
+    await expect(catalog.resolveLegacyReference({
+      reference: "private/founder/photos/uploads/2026-08-08/front.jpg",
+      ownerUserId: "owner-one",
+    })).resolves.toBe("front");
+    await expect(catalog.resolveLegacyReference({ reference: "missing.jpg", ownerUserId: "owner-one" }))
+      .resolves.toBeNull();
+    expect(query.mock.calls[0][0]).toContain("owner_user_id=$1 AND state='verified'");
+  });
+
+  it("fails closed when a legacy basename maps to more than one verified object", async () => {
+    const catalog = createPhase5ProviderMediaCatalog({ query: async () => ({ rows: [
+      { id: "one", provenance: { sourceRelativePath: "photos/one/front.jpg" } },
+      { id: "two", provenance: { sourceRelativePath: "photos/two/front.jpg" } },
+    ] }) });
+    await expect(catalog.resolveLegacyReference({ reference: "front.jpg", ownerUserId: "owner-one" }))
+      .resolves.toBeNull();
+  });
+
   it("resolves a migrated canonical ID through PostgreSQL ownership and an opaque private Spaces descriptor", async () => {
     const storageKey = `private/synthetic-owner/${canonicalId}/original`;
     const query = vi.fn(async (_text, values) => ({ rows: values[1] === "synthetic-owner" ? [{

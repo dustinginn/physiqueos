@@ -100,13 +100,6 @@ export function createApplicationStoredArtifactLoader({
 }
 
 async function loadProviderArtifact({ artifact, fetchImpl, reference, userId, env }) {
-  const objectId = parsePrivateMediaReference(reference);
-  if (!objectId) {
-    throw storedArtifactError(
-      "PROVIDER_MEDIA_REFERENCE_INVALID",
-      "Stored evidence has an invalid provider media reference."
-    );
-  }
   if (typeof fetchImpl !== "function") {
     throw storedArtifactError(
       "PROVIDER_MEDIA_BINDING_UNAVAILABLE",
@@ -118,6 +111,21 @@ async function loadProviderArtifact({ artifact, fetchImpl, reference, userId, en
     throw storedArtifactError(
       "PROVIDER_MEDIA_BINDING_UNAVAILABLE",
       "Provider media composition is unavailable."
+    );
+  }
+  const directObjectId = parsePrivateMediaReference(reference);
+  if (!directObjectId && !composition?.mediaCatalog?.resolveLegacyReference) {
+    throw storedArtifactError(
+      "PROVIDER_MEDIA_BINDING_UNAVAILABLE",
+      "Provider media catalog resolution is unavailable."
+    );
+  }
+  const objectId = directObjectId ??
+    await composition.mediaCatalog.resolveLegacyReference({ reference, ownerUserId: userId });
+  if (!objectId) {
+    throw storedArtifactError(
+      "PROVIDER_MEDIA_REFERENCE_INVALID",
+      "Stored evidence has an invalid provider media reference."
     );
   }
   const principal = createAuthenticationPrincipal({

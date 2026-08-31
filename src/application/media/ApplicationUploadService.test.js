@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getComposition: vi.fn(),
   authorizeRead: vi.fn(),
   redeemRead: vi.fn(),
+  resolveLegacyReference: vi.fn(),
   providerStore: vi.fn(),
 }));
 
@@ -25,6 +26,7 @@ const {
 describe("application upload provider boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolveLegacyReference.mockResolvedValue(null);
     mocks.getComposition.mockResolvedValue({ uploads: { store: mocks.providerStore } });
     mocks.providerStore.mockResolvedValue({ reference: "media://private-object" });
   });
@@ -102,6 +104,54 @@ describe("application upload provider boundary", () => {
     await expect(loadArtifact({
       artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101" },
     })).rejects.toMatchObject({ code: "PROVIDER_MEDIA_BINDING_UNAVAILABLE" });
+  });
+
+  it("resolves a retained legacy path to its verified provider object before loading bytes", async () => {
+    const bytes = Buffer.from([1, 2, 3]);
+    const objectId = "01a049eb-ea13-75e8-948d-6b82752ae101";
+    mocks.getComposition.mockResolvedValue({
+      media: { authorizeRead: mocks.authorizeRead },
+      mediaCatalog: { resolveLegacyReference: mocks.resolveLegacyReference },
+      mediaGateway: { redeemRead: mocks.redeemRead },
+    });
+    mocks.resolveLegacyReference.mockResolvedValue(objectId);
+    mocks.authorizeRead.mockResolvedValue({
+      accessHandle: "opaque",
+      contentType: "image/jpeg",
+      size: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+    mocks.redeemRead.mockResolvedValue({ url: "https://private-storage.invalid/legacy" });
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl: vi.fn(async () => new Response(bytes, { status: 200 })),
+    });
+
+    await expect(loadArtifact({
+      artifact: { storage_path: "private/founder/photos/uploads/front.jpg", mime_type: "image/jpeg" },
+    })).resolves.toEqual({ buffer: bytes, contentType: "image/jpeg" });
+    expect(mocks.resolveLegacyReference).toHaveBeenCalledWith({
+      reference: "private/founder/photos/uploads/front.jpg",
+      ownerUserId: "founder",
+    });
+    expect(mocks.authorizeRead).toHaveBeenCalledWith(expect.objectContaining({ objectId }));
+  });
+
+  it("fails closed when a retained legacy path has no verified provider catalog mapping", async () => {
+    mocks.getComposition.mockResolvedValue({
+      media: { authorizeRead: mocks.authorizeRead },
+      mediaCatalog: { resolveLegacyReference: mocks.resolveLegacyReference },
+      mediaGateway: { redeemRead: mocks.redeemRead },
+    });
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl: vi.fn(),
+    });
+    await expect(loadArtifact({ artifact: { storage_path: "private/founder/photos/missing.jpg" } }))
+      .rejects.toMatchObject({ code: "PROVIDER_MEDIA_REFERENCE_INVALID" });
+    expect(mocks.authorizeRead).not.toHaveBeenCalled();
   });
 
   it("fails clearly when the authorized provider object cannot be read", async () => {
