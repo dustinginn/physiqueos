@@ -14,6 +14,12 @@ struct AppDestinationRouterView: View {
 
     var body: some View {
         switch destination {
+        case .goalDetail(let goalId):
+            GoalDetailView(goalId: goalId, onNavigate: onNavigate)
+        case .goalPhase(let goalId, let phaseId):
+            GoalPhaseDetailView(goalId: goalId, phaseId: phaseId)
+        case .goalPlan(let goalId, let focus):
+            GoalStrategyView(goalId: goalId, focus: focus)
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
             MorningCheckInView()
         case .manualWeighIn:

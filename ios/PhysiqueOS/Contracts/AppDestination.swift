@@ -10,6 +10,11 @@ import Foundation
 /// this type without the screen changing.
 enum AppDestination: Hashable, Codable {
     case goalDetail(goalId: String)
+    /// Native Goals browse destinations derived from the current web goal
+    /// phase and Operating Plan links. These are presentation-only routes;
+    /// they do not claim a production mutation contract.
+    case goalPhase(goalId: String, phaseId: String)
+    case goalPlan(goalId: String, focus: GoalPlanFocus)
     case checkIn(checkInType: String)
     case photoUpload
     case dexaUpload
@@ -60,6 +65,8 @@ enum AppDestination: Hashable, Codable {
     var serverDestinationId: String {
         switch self {
         case .goalDetail: "goal.detail"
+        case .goalPhase: "native.goal.phase"
+        case .goalPlan: "native.goal.plan"
         case .checkIn: "check-in"
         case .photoUpload: "photo.upload"
         case .dexaUpload: "dexa.upload"

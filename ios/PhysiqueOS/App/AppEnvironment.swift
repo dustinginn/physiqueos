@@ -9,6 +9,7 @@ import Foundation
 @Observable
 final class AppEnvironment {
     let homeAPI: HomeAPI
+    let goalsAPI: GoalsAPI
     let logAPI: LogAPI
     let evidenceAPI: EvidenceAPI
     let trainingAPI: TrainingAPI
@@ -18,6 +19,7 @@ final class AppEnvironment {
 
     init(
         homeAPI: HomeAPI = FixtureHomeAPI(),
+        goalsAPI: GoalsAPI = FixtureGoalsAPI(),
         logAPI: LogAPI = FixtureLogAPI(),
         evidenceAPI: EvidenceAPI = FixtureEvidenceAPI(),
         trainingAPI: TrainingAPI = FixtureTrainingAPI(),
@@ -26,6 +28,7 @@ final class AppEnvironment {
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore()
     ) {
         self.homeAPI = homeAPI
+        self.goalsAPI = goalsAPI
         self.logAPI = logAPI
         self.evidenceAPI = evidenceAPI
         self.trainingAPI = trainingAPI

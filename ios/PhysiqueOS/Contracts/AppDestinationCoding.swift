@@ -9,7 +9,7 @@ import Foundation
 extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
-        case goalId, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
+        case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
     }
 
     init(from decoder: Decoder) throws {
@@ -19,6 +19,18 @@ extension AppDestination {
         case "goal.detail":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .goalDetail(goalId: try parameters.decode(String.self, forKey: .goalId))
+        case "native.goal.phase":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .goalPhase(
+                goalId: try parameters.decode(String.self, forKey: .goalId),
+                phaseId: try parameters.decode(String.self, forKey: .phaseId)
+            )
+        case "native.goal.plan":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .goalPlan(
+                goalId: try parameters.decode(String.self, forKey: .goalId),
+                focus: try parameters.decode(GoalPlanFocus.self, forKey: .focus)
+            )
         case "check-in":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .checkIn(checkInType: try parameters.decode(String.self, forKey: .checkInType))
@@ -74,6 +86,12 @@ extension AppDestination {
         var parameters = container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
         switch self {
         case .goalDetail(let goalId): try parameters.encode(goalId, forKey: .goalId)
+        case .goalPhase(let goalId, let phaseId):
+            try parameters.encode(goalId, forKey: .goalId)
+            try parameters.encode(phaseId, forKey: .phaseId)
+        case .goalPlan(let goalId, let focus):
+            try parameters.encode(goalId, forKey: .goalId)
+            try parameters.encode(focus, forKey: .focus)
         case .checkIn(let checkInType): try parameters.encode(checkInType, forKey: .checkInType)
         case .briefingDetail(let briefingId): try parameters.encode(briefingId, forKey: .briefingId)
         case .priorityDetail(let priorityId): try parameters.encode(priorityId, forKey: .priorityId)

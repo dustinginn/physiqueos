@@ -2095,3 +2095,74 @@ worker/outbox, deployment, canonical data, or TestFlight state was touched. No
 paid service, entitlement, dependency, or incremental infrastructure cost was
 added. Version 1.0/build 6 metadata is unchanged; build 7 is the next available
 TestFlight candidate and has not been prepared, pushed, or uploaded.
+
+## 66. Native Goals read/browse/strategy/phase reconciliation (2026-08-30)
+
+The Native Goals placeholder is replaced by the current reachable web Goals
+vertical. The source audit covered `GoalsHubScreen.jsx`, the Goals route pages,
+`PhaseAwareActiveGoalPreviewScreen` and service, `CompletedGoalPreviewScreen`
+and service, `GoalNavigationRouteResolver`, `FounderPhaseCorrectionService`,
+`HomeGoalTrajectoryService`, the active Confidence read service, Training
+progress service, production transition entry-point service, goal edit route,
+and their focused tests. Storybook, preview/lab, Briefings-only, and legacy
+supporting-goal routes that are not linked from the current Goals tab were not
+ported as Goals-tab product surfaces.
+
+### Reachable web inventory and Native disposition
+
+| Goals surface | Current product content | Native disposition |
+|---|---|---|
+| Goals landing | Your Goals introduction; one Primary Goal; completed Visible Abs history; Add Goal unavailable while the active primary journey exists | Implemented as the Goals tab root. Active and completed cards are full-row typed navigation. Add Goal remains informational and unavailable; no creation flow was invented. |
+| Active Build Lean Mass | Active status, objective and time window, source-provided Confidence, overall journey, phase timeline, current phase, readiness, shared guardrail, DEXA/weight-energy anchors, Training Progress, turning points, strategy, and Operating Plan actions | Implemented without deriving goal state in Swift. The fixture exercises completed Phase 1 and active Phase 2; Phase 2 dominates current context while Phase 1 remains gold historical context. |
+| Phase browse/detail | Ordered phase identity, status, dates, purpose, progress, evidence, strategy, success criteria, and guardrails | The complete phase summary remains inline. Tapping a phase opens a compact Native detail that repeats—not replaces—the same product facts and keeps goal progress, phase progress, Confidence, and guardrail state distinct. |
+| Strategy and protocols | Energy, Nutrition, Activity, Training, Coaching Updates, Peptide, and Supplement goal-support categories; the web actions route to Operating Plan | Native preserves both actions through typed strategy/protocol destinations and one shared read model. This is read-only fixture presentation, not a second Operating Plan or mutation owner. |
+| Completed Visible Abs | Completed status/window/achievement, journey recap, highlights, beginning/completion photo frames and photo-history link, final DEXA composition and briefing link, achievement factors, and what the goal unlocked | Implemented as a permanent completed-goal detail. Synthetic photo frames exercise the presentation without embedding Founder media. External photo-history and briefing destinations remain typed and resolve through the shared router. |
+| Edit Goal | The active web detail links to the production goal-edit wizard | Not exposed as a false local write. Authenticated versioned edit capability remains a live integration requirement. |
+| Goal transition/Add Goal | The production entry service fails closed when a current Build Lean Mass goal already exists | Native shows the same unavailable Add Goal state. No transition draft, phase transition, or activation write exists in Swift. |
+
+### Architecture and presentation
+
+`GoalsReadModel.swift` contains Goals-specific transport/presentation facts;
+`GoalsAPI` is the replaceable read boundary; `GoalsFixture.json` is synthetic;
+and Goals views/view models contain presentation and navigation only. The
+fixture API derives hub summaries from goal details so there is one fixture
+source of truth. It does not calculate Confidence, evaluate progress, advance a
+phase, or infer guardrail status.
+
+Native preserves Plus Jakarta Sans, the dark PhysiqueOS palette, compact card
+hierarchy, standard NavigationStack behavior, and comfortable touch targets.
+Completed Phase 1 uses the gold/amber completed identity with a subtle tinted
+surface; active Phase 2 uses the green active identity; the cross-phase
+guardrail remains violet. Phase cards are tappable Native drill-downs while all
+meaningful summary content remains visible on the active-goal page.
+
+Shared-file reconciliation is additive: `RootTabView` replaces only the Goals
+placeholder with a Goals-owned path; `AppDestination`/router add typed goal
+phase and plan destinations; `AppEnvironment` adds one `GoalsAPI`; and the
+project generator registers Goals sources, fixture, and tests. Existing Home,
+Log, Evidence, Training, and upload/evidence routes remain unchanged.
+
+The separate cloud Goals candidate was not accepted as verified Native work.
+Its reported commit object was unavailable in the Mac repository and was not
+advertised by origin, so no code was cherry-picked blindly. The reconciled
+implementation was rebuilt from current web source and receives Mac/Xcode
+build and unit verification before Founder review. Missing Mac/Xcode
+verification is Native acceptance work, not a post-stabilization dependency.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Expose one authenticated, versioned Goals hub/detail/phase read model whose
+  server-owned values replace `FixtureGoalsAPI` without changing views.
+- Connect Edit Goal, phase review/transition, and final activation only through
+  the existing server-owned optimistic-concurrency and idempotent command
+  boundaries. Native must not independently transition a phase.
+- Route Review Strategy/Protocols to the shared live Operating Plan read model
+  when that Native vertical is implemented; do not duplicate strategy or
+  protocol ownership in Goals.
+- Deliver authorized completed-goal photo media, photo history, and final DEXA
+  briefing through their existing typed destinations.
+
+No production worktree, backend/API, authentication, DigitalOcean, PostgreSQL,
+worker/outbox, deployment, canonical data, or TestFlight state changed. No paid
+dependency or incremental infrastructure cost was added. Version 1.0/build 6
+metadata remains unchanged; build 7 remains the next available candidate.
