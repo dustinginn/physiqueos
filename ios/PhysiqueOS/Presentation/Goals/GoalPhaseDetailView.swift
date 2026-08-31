@@ -54,9 +54,13 @@ struct GoalPhaseDetailView: View {
     private func phaseContent(_ detail: GoalPhaseDetailReadModel) -> some View {
         let phase = detail.phase
         let tint = phase.status == .completed ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.chartSuccess
-        return VStack(alignment: .leading, spacing: 22) {
-            CardContainer(background: tint.opacity(0.10)) {
-                VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 16) {
+            GoalAtmosphericCard(
+                tone: phase.status == .completed ? .completed : .activePhase,
+                padding: 16,
+                cornerRadius: 22
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Phase \(phase.order) · \(phase.status.label)")
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                         .foregroundStyle(tint)
@@ -74,7 +78,7 @@ struct GoalPhaseDetailView: View {
             }
 
             GoalSection(eyebrow: "Phase evidence", title: "Evidence in View") {
-                CardContainer { GoalLabeledBody(label: detail.goalTitle, text: phase.evidence) }
+                CardContainer(padding: .sm) { GoalLabeledBody(label: detail.goalTitle, text: phase.evidence) }
             }
 
             checklist(title: "Phase Strategy", eyebrow: "How this phase works", items: phase.strategy, tint: tint)
@@ -82,8 +86,8 @@ struct GoalPhaseDetailView: View {
             checklist(title: "Guardrails", eyebrow: "What stays protected", items: phase.guardrails, tint: PhysiqueOSTheme.accent)
 
             GoalSection(eyebrow: "Distinct measures", title: "Goal Context") {
-                CardContainer {
-                    VStack(alignment: .leading, spacing: 16) {
+                CardContainer(padding: .sm) {
+                    VStack(alignment: .leading, spacing: 12) {
                         GoalProgressBlock(progress: detail.goalProgress, color: PhysiqueOSTheme.accent, label: "Goal progress")
                         Divider().overlay(PhysiqueOSTheme.divider)
                         HStack {
@@ -98,7 +102,7 @@ struct GoalPhaseDetailView: View {
 
     private func checklist(title: String, eyebrow: String, items: [String], tint: Color) -> some View {
         GoalSection(eyebrow: eyebrow, title: title) {
-            VStack(spacing: 9) {
+            VStack(spacing: 7) {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(tint)

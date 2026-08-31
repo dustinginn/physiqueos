@@ -52,8 +52,8 @@ struct GoalStrategyView: View {
     }
 
     private func strategyContent(_ model: GoalStrategyReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(model.focus == .strategy ? "Goal Strategy" : "Goal Protocols")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -69,10 +69,10 @@ struct GoalStrategyView: View {
                 eyebrow: model.focus == .strategy ? "How the goal is supported" : "Current protocol support",
                 title: model.focus == .strategy ? "Current Strategy" : "Active Protocol Categories"
             ) {
-                VStack(spacing: 9) {
+                VStack(spacing: 7) {
                     ForEach(model.items) { item in
-                        CardContainer {
-                            HStack(spacing: 12) {
+                        CardContainer(padding: .sm) {
+                            HStack(spacing: 10) {
                                 Image(systemName: strategySymbol(item.label))
                                     .foregroundStyle(item.active ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
                                     .frame(width: 26)
@@ -94,7 +94,7 @@ struct GoalStrategyView: View {
                 }
             }
 
-            GoalAccentCard(tint: PhysiqueOSTheme.accent, eyebrow: "Non-negotiable", title: "Goal Guardrail") {
+            GoalAccentCard(tint: PhysiqueOSTheme.accent, tone: .guardrail, eyebrow: "Non-negotiable", title: "Goal Guardrail") {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(model.guardrail.title)
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)

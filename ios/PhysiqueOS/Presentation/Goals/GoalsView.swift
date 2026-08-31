@@ -13,7 +13,7 @@ struct GoalsView: View {
         ScrollView {
             content
                 .padding(.horizontal, 16)
-                .padding(.top, 20)
+                .padding(.top, 14)
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
@@ -36,7 +36,7 @@ struct GoalsView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let hub):
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 header
                 goalSection(title: "Primary Goal") {
                     activeGoalCard(hub.activeGoal)
@@ -54,7 +54,7 @@ struct GoalsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             Text("Your Goals")
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -66,7 +66,7 @@ struct GoalsView: View {
     }
 
     private func goalSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -76,10 +76,10 @@ struct GoalsView: View {
 
     private func activeGoalCard(_ goal: GoalSummaryReadModel) -> some View {
         Button { onNavigate(goal.destination) } label: {
-            CardContainer(background: PhysiqueOSTheme.surfaceAccent) {
-                HStack(alignment: .top, spacing: 14) {
+            GoalAtmosphericCard(tone: .activeGoal, padding: 14, cornerRadius: 20) {
+                HStack(alignment: .top, spacing: 11) {
                     IconBadge(systemImage: "dumbbell.fill", color: .primary, size: .md, isCircular: true)
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Primary Goal")
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                             .foregroundStyle(PhysiqueOSTheme.accent)
@@ -102,7 +102,7 @@ struct GoalsView: View {
                     Spacer(minLength: 6)
                     Image(systemName: "chevron.right")
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .padding(.top, 26)
+                        .padding(.top, 21)
                 }
             }
         }
@@ -112,10 +112,10 @@ struct GoalsView: View {
 
     private func completedGoalCard(_ goal: GoalSummaryReadModel) -> some View {
         Button { onNavigate(goal.destination) } label: {
-            CardContainer(background: PhysiqueOSTheme.chartEffort.opacity(0.08)) {
-                HStack(alignment: .top, spacing: 14) {
+            GoalAtmosphericCard(tone: .completed, padding: 14, cornerRadius: 20) {
+                HStack(alignment: .top, spacing: 11) {
                     IconBadge(systemImage: "trophy.fill", color: .effort, size: .md, isCircular: true)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Completed Goal")
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                             .foregroundStyle(PhysiqueOSTheme.chartEffort)
@@ -134,7 +134,7 @@ struct GoalsView: View {
                     Spacer(minLength: 6)
                     Image(systemName: "chevron.right")
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .padding(.top, 26)
+                        .padding(.top, 21)
                 }
             }
         }
@@ -143,10 +143,10 @@ struct GoalsView: View {
     }
 
     private func addGoalCard(_ hub: GoalsHubReadModel) -> some View {
-        CardContainer(background: PhysiqueOSTheme.surfaceMuted) {
-            HStack(alignment: .top, spacing: 14) {
-                IconBadge(systemImage: "plus", color: .primary, size: .md, isCircular: true)
-                VStack(alignment: .leading, spacing: 5) {
+        GoalAtmosphericCard(tone: .neutral, padding: 12, cornerRadius: 18) {
+            HStack(alignment: .center, spacing: 11) {
+                IconBadge(systemImage: "plus", color: .primary, size: .sm, isCircular: true)
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Add Goal")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)

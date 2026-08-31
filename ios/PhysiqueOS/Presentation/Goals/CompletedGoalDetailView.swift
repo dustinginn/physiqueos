@@ -5,7 +5,7 @@ struct CompletedGoalDetailContent: View {
     let onNavigate: (AppDestination) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 18) {
             hero
             recap
             highlights
@@ -17,8 +17,8 @@ struct CompletedGoalDetailContent: View {
     }
 
     private var hero: some View {
-        CardContainer(background: PhysiqueOSTheme.chartEffort.opacity(0.10)) {
-            VStack(alignment: .leading, spacing: 16) {
+        GoalAtmosphericCard(tone: .completed, padding: 16, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Completed Goal")
@@ -35,9 +35,9 @@ struct CompletedGoalDetailContent: View {
                     Image(systemName: "trophy.fill")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(PhysiqueOSTheme.chartEffort)
-                        .frame(width: 48, height: 48)
+                        .frame(width: 42, height: 42)
                         .background(PhysiqueOSTheme.chartEffort.opacity(0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 HStack {
@@ -53,13 +53,13 @@ struct CompletedGoalDetailContent: View {
             Text(goal.recap)
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .lineSpacing(4)
+                .lineSpacing(2)
         }
     }
 
     private var highlights: some View {
         GoalSection(eyebrow: "The moments that mattered", title: "Journey Highlights") {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 ForEach(Array(goal.highlights.enumerated()), id: \.element.id) { index, highlight in
                     HStack(alignment: .top, spacing: 12) {
                         Text("\(index + 1)")
@@ -88,9 +88,9 @@ struct CompletedGoalDetailContent: View {
 
     private var photos: some View {
         GoalSection(eyebrow: "The transformation", title: "Beginning → Completion") {
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 ForEach(goal.photos) { photo in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         ZStack {
                             LinearGradient(
                                 colors: [PhysiqueOSTheme.surfaceAccent, PhysiqueOSTheme.surfaceMuted],
@@ -120,8 +120,8 @@ struct CompletedGoalDetailContent: View {
     }
 
     private var finalComposition: some View {
-        CardContainer(background: Color.black.opacity(0.34)) {
-            VStack(alignment: .leading, spacing: 16) {
+        CardContainer(padding: .sm, background: Color.black.opacity(0.34)) {
+            VStack(alignment: .leading, spacing: 11) {
                 Label("Final Body Composition", systemImage: "viewfinder")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.chartSuccess)
@@ -131,7 +131,7 @@ struct CompletedGoalDetailContent: View {
                 Text("\(goal.finalComposition.date) DEXA")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 11) {
                     GoalMetric(label: "Body Fat", value: goal.finalComposition.bodyFat)
                     GoalMetric(label: "Lean Mass", value: goal.finalComposition.leanMass)
                     GoalMetric(label: "Fat Mass", value: goal.finalComposition.fatMass)
@@ -151,7 +151,7 @@ struct CompletedGoalDetailContent: View {
 
     private var achievedBy: some View {
         GoalSection(eyebrow: "The foundation", title: "How This Goal Was Achieved") {
-            VStack(spacing: 9) {
+            VStack(spacing: 7) {
                 ForEach(goal.achievedBy, id: \.self) { item in
                     HStack(alignment: .top, spacing: 11) {
                         Image(systemName: "checkmark.circle.fill")
@@ -161,7 +161,7 @@ struct CompletedGoalDetailContent: View {
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(13)
+                    .padding(10)
                     .background(PhysiqueOSTheme.surfaceMuted)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
@@ -170,8 +170,8 @@ struct CompletedGoalDetailContent: View {
     }
 
     private func unlockedCard(_ unlocked: CompletedGoalUnlockReadModel) -> some View {
-        CardContainer(background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .center, spacing: 12) {
+        GoalAtmosphericCard(tone: .guardrail, padding: 15, cornerRadius: 20) {
+            VStack(alignment: .center, spacing: 9) {
                 Label("What This Unlocked", systemImage: "sparkles")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
