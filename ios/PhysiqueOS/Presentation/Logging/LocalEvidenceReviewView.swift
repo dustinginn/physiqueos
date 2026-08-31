@@ -103,9 +103,26 @@ struct LocalEvidenceReviewView: View {
             Text("Exercises").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.exercises) { exercise in
                 VStack(alignment: .leading, spacing: 5) {
-                    HStack { Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy); Spacer(); Menu(exercise.variant ?? "Standard") { variant("Standard", exercise, item); variant("3-Second Pause", exercise, item); variant("Static Hold", exercise, item) }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold) }
+                    HStack {
+                        TextField("Exercise", text: exerciseNameBinding(item, exercise)).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        Menu(exercise.variant ?? "Standard") { variant("Standard", exercise, item); variant("3-Second Pause", exercise, item); variant("Static Hold", exercise, item) }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    }
                     if let relationship = exercise.relationship { Text(relationship).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent) }
-                    ForEach(exercise.sets) { set in Text("• \(set.summary)").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary) }
+                    ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
+                        if set.reps != nil || set.load != nil {
+                            HStack(spacing: 8) {
+                                Text("\(index + 1)").frame(width: 18, alignment: .leading)
+                                TextField("Reps", text: setValueBinding(item, exercise, set, keyPath: \.reps)).keyboardType(.decimalPad)
+                                Text("reps").foregroundStyle(PhysiqueOSTheme.textMuted)
+                                TextField("Load", text: setValueBinding(item, exercise, set, keyPath: \.load)).keyboardType(.decimalPad)
+                                Text(set.unit ?? "lb").foregroundStyle(PhysiqueOSTheme.textMuted)
+                            }
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .padding(.vertical, 4)
+                        } else {
+                            Text("• \(set.summary)").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
                 }.padding(.vertical, 6)
             }
         }
@@ -182,6 +199,14 @@ struct LocalEvidenceReviewView: View {
 
     private func reread() { isRereading = true; rereadMessage = nil; Task { @MainActor in switch await store.reprocessReview(id: reviewId) { case .success: rereadMessage = "The selected upload was read again. Review the refreshed values."; case .failure(let error): errorMessage = error.message }; isRereading = false } }
     private func fieldBinding(_ item: EvidenceReviewItem, _ field: EvidenceReviewField) -> Binding<String> { .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.fields.first(where: { $0.id == field.id })?.value ?? "" }, set: { updateField(item, field.id, $0) }) }
+    private func exerciseNameBinding(_ item: EvidenceReviewItem, _ exercise: EvidenceReviewExercise) -> Binding<String> { .init(
+        get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.exercises.first(where: { $0.id == exercise.id })?.name ?? "" },
+        set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) { updated.exercises[index].name = value } } }
+    ) }
+    private func setValueBinding(_ item: EvidenceReviewItem, _ exercise: EvidenceReviewExercise, _ set: EvidenceReviewSet, keyPath: WritableKeyPath<EvidenceReviewSet, String?>) -> Binding<String> { .init(
+        get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.exercises.first(where: { $0.id == exercise.id })?.sets.first(where: { $0.id == set.id })?[keyPath: keyPath] ?? "" },
+        set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let exerciseIndex = updated.exercises.firstIndex(where: { $0.id == exercise.id }), let setIndex = updated.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == set.id }) else { return }; updated.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = value; updated.exercises[exerciseIndex].sets[setIndex].refreshSummary() } }
+    ) }
     private func updateField(_ item: EvidenceReviewItem, _ id: String, _ value: String) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.fields.firstIndex(where: { $0.id == id }) { updated.fields[index].value = value } } }
     private func updatePhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, orientation: ProgressPhotoOrientation? = nil, contraction: ProgressPhotoContraction? = nil) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; if let orientation { updated.photoIdentities[index].orientation = orientation }; if let contraction { updated.photoIdentities[index].contraction = contraction }; updated.photoIdentities[index].confirmed = false } }
     private func confirmPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; updated.photoIdentities[index].confirmed = updated.photoIdentities[index].orientation != .unconfirmed && updated.photoIdentities[index].contraction != .unconfirmed } }

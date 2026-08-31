@@ -89,7 +89,18 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(items.count, 3)
         XCTAssertEqual(items[0].exercises.map(\.name), ["Shoulder Press Machine", "Lateral Raises Machine"])
         XCTAssertEqual(items[0].exercises.map { $0.sets.count }, [4, 4])
+        XCTAssertEqual(items[0].exercises[0].sets[0].reps, "10")
+        XCTAssertEqual(items[0].exercises[0].sets[0].load, "150")
         XCTAssertEqual(items.dropFirst().map(\.title), ["Outdoor Walk", "Indoor Cycling"])
+
+        store.updateReviewItem(reviewId: id, itemId: items[0].id) { item in
+            item.exercises[0].sets[0].reps = "12"
+            item.exercises[0].sets[0].load = "155"
+            item.exercises[0].sets[0].refreshSummary()
+        }
+        let corrected = try XCTUnwrap(store.review(id: id)?.items[0].exercises[0].sets[0])
+        XCTAssertEqual(corrected.summary, "12 reps @ 155 lb")
+        XCTAssertTrue(try XCTUnwrap(store.review(id: id)).canConfirm)
     }
 
     func testTypeSpecificReviewsUseSubmittedValuesAndNeverCannedValues() async throws {

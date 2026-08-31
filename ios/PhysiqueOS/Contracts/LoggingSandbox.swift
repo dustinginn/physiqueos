@@ -373,6 +373,23 @@ struct EvidenceReviewField: Codable, Equatable, Identifiable {
 struct EvidenceReviewSet: Codable, Equatable, Identifiable {
     var id: String
     var summary: String
+    var reps: String? = nil
+    var load: String? = nil
+    var unit: String? = nil
+
+    var isValid: Bool {
+        guard reps != nil || load != nil else { return !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard let reps, let repValue = Double(reps), repValue.isFinite, repValue > 0 else { return false }
+        guard let load else { return true }
+        guard let loadValue = Double(load), loadValue.isFinite, loadValue >= 0 else { return false }
+        return true
+    }
+
+    mutating func refreshSummary() {
+        guard let reps else { return }
+        if let load { summary = "\(reps) reps @ \(load) \(unit ?? "lb")" }
+        else { summary = "\(reps) reps" }
+    }
 }
 
 struct EvidenceReviewExercise: Codable, Equatable, Identifiable {
@@ -421,7 +438,10 @@ struct EvidenceReviewItem: Codable, Equatable, Identifiable {
         guard fields.allSatisfy(\.isValid) else { return false }
         let populated = Set(fields.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.id))
         return switch category {
-        case .training: !exercises.isEmpty || !populated.isEmpty
+        case .training: (!exercises.isEmpty && exercises.allSatisfy { exercise in
+            !exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isValid)
+        }) || !populated.isEmpty
         case .nutrition: !populated.intersection(["calories", "protein", "carbs", "fat"]).isEmpty
         case .weight: populated.contains("weight")
         case .activity: !populated.intersection(["activeCalories", "exerciseMinutes", "steps", "duration", "distance", "heartRate"]).isEmpty

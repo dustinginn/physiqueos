@@ -209,7 +209,15 @@ enum EvidenceLocalInterpretation {
         let setCount = min(max(Int(count) ?? 1, 1), 20)
         for _ in 0..<setCount {
             let index = sets[key, default: []].count + 1
-            sets[key, default: []].append(.init(id: "\(key)-set-\(index)", summary: "\(cleanNumber(reps)) reps @ \(cleanNumber(load)) lb"))
+            let cleanReps = cleanNumber(reps)
+            let cleanLoad = cleanNumber(load)
+            sets[key, default: []].append(.init(
+                id: "\(key)-set-\(index)",
+                summary: "\(cleanReps) reps @ \(cleanLoad) lb",
+                reps: cleanReps,
+                load: cleanLoad,
+                unit: "lb"
+            ))
         }
     }
 
