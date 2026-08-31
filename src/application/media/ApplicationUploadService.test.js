@@ -103,4 +103,46 @@ describe("application upload provider boundary", () => {
       artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101" },
     })).rejects.toMatchObject({ code: "PROVIDER_MEDIA_BINDING_UNAVAILABLE" });
   });
+
+  it("fails clearly when the authorized provider object cannot be read", async () => {
+    mocks.getComposition.mockResolvedValue({
+      media: { authorizeRead: mocks.authorizeRead },
+      mediaGateway: { redeemRead: mocks.redeemRead },
+    });
+    mocks.authorizeRead.mockResolvedValue({
+      accessHandle: "opaque",
+      contentType: "image/jpeg",
+      size: 4,
+      sha256: createHash("sha256").update(Buffer.from("safe")).digest("hex"),
+    });
+    mocks.redeemRead.mockResolvedValue({ url: "https://private-storage.invalid/missing" });
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl: vi.fn(async () => new Response(null, { status: 404 })),
+    });
+    await expect(loadArtifact({ artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101" } }))
+      .rejects.toMatchObject({ code: "PROVIDER_MEDIA_READ_FAILED" });
+  });
+
+  it("fails closed when provider bytes do not match the authorized size and hash", async () => {
+    mocks.getComposition.mockResolvedValue({
+      media: { authorizeRead: mocks.authorizeRead },
+      mediaGateway: { redeemRead: mocks.redeemRead },
+    });
+    mocks.authorizeRead.mockResolvedValue({
+      accessHandle: "opaque",
+      contentType: "image/png",
+      size: 4,
+      sha256: createHash("sha256").update(Buffer.from("safe")).digest("hex"),
+    });
+    mocks.redeemRead.mockResolvedValue({ url: "https://private-storage.invalid/corrupt" });
+    const loadArtifact = createApplicationStoredArtifactLoader({
+      userId: "founder",
+      env: { PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1" },
+      fetchImpl: vi.fn(async () => new Response(Buffer.from("unsafe"), { status: 200 })),
+    });
+    await expect(loadArtifact({ artifact: { storage_path: "media://01a049eb-ea13-75e8-948d-6b82752ae101" } }))
+      .rejects.toMatchObject({ code: "PROVIDER_MEDIA_INTEGRITY_FAILED" });
+  });
 });

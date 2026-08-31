@@ -1,8 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { revalidatePath } from "next/cache.js";
 import { redirect } from "next/navigation.js";
 import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
@@ -39,6 +37,7 @@ import {
 } from "../../../../domain/services/PhotoEventContextService";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
 import { createApplicationStoredArtifactLoader } from "../../../../application/media/ApplicationUploadService";
+import { createPhotoAnalysisMediaLoader } from "../../../../application/media/PhotoAnalysisMediaLoader";
 import { produceTrainingPerformanceEvents } from "../../../../domain/services/TrainingPerformanceEventProducer";
 import {
   createTrainingPerformanceEventPersistenceService,
@@ -641,6 +640,7 @@ function assertIncludedPhotoSessionsReady(evidencePackage) {
 function createHandlers({ evidencePackage, reviewId, user,
   canonicalCommitRecovery = null }) {
   const confirmationReads = createEvidenceConfirmationReadService({ repositories: FounderRepositories });
+  const loadPhotoAnalysisMedia = createPhotoAnalysisMediaLoader({ userId: user.id });
   let canonical = null;
   let analyses = [];
   let trainingAnalysis = null;
@@ -763,7 +763,7 @@ function createHandlers({ evidencePackage, reviewId, user,
     },
     analysis: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      analyses = await runDomainAnalysis({ canonical, evidencePackage, user });
+      analyses = await runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAnalysisMedia });
       trainingAnalysis =
         analyses.find((analysis) => analysis.id === `analysis_training_${evidencePackage.package_id}`) ??
         null;
@@ -1167,7 +1167,7 @@ function preserveCanonicalTimestamps(existing, candidate) {
   return { ...candidate, createdAt: existing.createdAt ?? candidate.createdAt };
 }
 
-async function runDomainAnalysis({ canonical, evidencePackage, user }) {
+async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAnalysisMedia }) {
   const created = [];
   const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
@@ -1183,8 +1183,8 @@ async function runDomainAnalysis({ canonical, evidencePackage, user }) {
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
         const canonicalPhotoId = photo.canonicalPhotoId ?? `canonical_photo_${user.id}_${String(object.observed_at).slice(0, 10)}_${stablePhotoIdentity(photo.id ?? photo.source_hash)}`;
         const prior = findPriorCanonicalPhoto(canonical, photo, object.observed_at);
-        const currentInput = await photoInterpreterInput(photo, object);
-        const priorInput = prior ? await canonicalPhotoInterpreterInput(prior) : null;
+        const currentInput = await photoInterpreterInput(photo, object, loadPhotoAnalysisMedia);
+        const priorInput = prior ? await canonicalPhotoInterpreterInput(prior, loadPhotoAnalysisMedia) : null;
         const interpretationResult = await interpretPhotoSetWithVision({ captureDate: object.observed_at, goalContext: photoGoalContext, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
         if (interpretationResult.provider !== "openai") throw new Error(`Photo Interpreter provider did not complete canonical analysis for ${canonicalPhotoId}: ${interpretationResult.warning ?? "provider unavailable"}`);
         const interpretation = interpretationResult.interpretation;
@@ -1301,32 +1301,23 @@ function findPriorCanonicalPhoto(canonical, photo, observedAt) {
     .sort((left, right) => String(right.lastObservedAt).localeCompare(String(left.lastObservedAt)))[0] ?? null;
 }
 
-async function photoInterpreterInput(photo, session) {
-  return { fileName: path.basename(photo.storage_path ?? photo.imagePath ?? "photo.jpg"), dataUrl: await privateImagePathToDataUrl(photo.storage_path ?? photo.imagePath), mimeType: mimeType(photo.storage_path ?? photo.imagePath), view: photo.view, pose: photo.pose, capturedAt: session.observed_at, conditions: session.conditions ?? {} };
+async function photoInterpreterInput(photo, session, loadPhotoAnalysisMedia) {
+  const media = await loadPhotoAnalysisMedia({
+    reference: photo.storage_path ?? photo.imagePath,
+    contentType: photo.mime_type ?? photo.mimeType ?? null,
+  });
+  return { ...media, view: photo.view, pose: photo.pose, capturedAt: session.observed_at, conditions: session.conditions ?? {} };
 }
 
-async function canonicalPhotoInterpreterInput(canonical) {
+async function canonicalPhotoInterpreterInput(canonical, loadPhotoAnalysisMedia) {
   const photo = canonical.payload ?? {};
   const sourcePath = photo.storage_path ?? photo.imagePath ?? photo.sourcePath;
   if (!sourcePath) return null;
-  return { fileName: path.basename(sourcePath), dataUrl: await privateImagePathToDataUrl(sourcePath), mimeType: mimeType(sourcePath), view: photo.view, pose: photo.pose, capturedAt: canonical.lastObservedAt, conditions: photo.conditions ?? {} };
-}
-
-async function privateImagePathToDataUrl(filePath) {
-  if (!filePath) throw new Error("Confirmed photo storage path is missing.");
-  const root = path.resolve(process.cwd(), "private", "founder");
-  const relative = String(filePath).replace(/^private[\\/]founder[\\/]/i, "");
-  const absolute = path.resolve(root, relative);
-  if (!absolute.startsWith(root)) throw new Error("Confirmed photo path is outside private evidence storage.");
-  const buffer = await fs.readFile(absolute);
-  return `data:${mimeType(filePath)};base64,${buffer.toString("base64")}`;
-}
-
-function mimeType(filePath) {
-  const extension = path.extname(String(filePath)).toLowerCase();
-  if (extension === ".png") return "image/png";
-  if (extension === ".webp") return "image/webp";
-  return "image/jpeg";
+  const media = await loadPhotoAnalysisMedia({
+    reference: sourcePath,
+    contentType: photo.mime_type ?? photo.mimeType ?? null,
+  });
+  return { ...media, view: photo.view, pose: photo.pose, capturedAt: canonical.lastObservedAt, conditions: photo.conditions ?? {} };
 }
 
 function stableAnalysisId(parts) {
