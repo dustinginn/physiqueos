@@ -20,6 +20,8 @@ export default function EvidenceImage({ alt, className = "", diagnostic = null, 
     <img
       alt={alt}
       className={className}
+      decoding="async"
+      loading="lazy"
       onError={() => setFailed(true)}
       src={src}
     />

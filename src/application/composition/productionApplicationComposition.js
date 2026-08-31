@@ -4,7 +4,12 @@ import { LegacyFounderRepositories } from "../../data/repositories/founderReposi
 import { getFounderRuntimeStore } from "../../data/repositories/founderRuntimeStore.js";
 import { createDurableMigrationControlStore, resolveMigrationControlPath } from "../../platform/cutover/DurableMigrationControlStore.js";
 import { createProductionApplicationCompositionRuntime } from "../../platform/cutover/ProductionApplicationCompositionRuntime.js";
-import { createPhase5ProviderApplicationComposition } from "../../platform/database/phase5ProviderComposition.js";
+import {
+  createPhase5ProviderApplicationComposition,
+  createPhase5ProviderMediaCatalog,
+} from "../../platform/database/phase5ProviderComposition.js";
+import { createAuthorizedMediaService } from "../media/AuthorizedMediaService.js";
+import { createOpaqueSpacesMediaGateway } from "../../platform/object-storage/OpaqueSpacesMediaGateway.js";
 import {
   createPostgresFounderReadScope,
   executePostgresFounderRuntimeMutation,
@@ -40,6 +45,8 @@ import {
   createRepositoryProgressPhotosReadStore,
 } from "../../platform/database/PostgresProgressPhotosReadStore.js";
 import { createProgressPhotosReadService } from "../progress/ProgressPhotosReadService.js";
+import { createPhotoEventBriefingReadService } from "../briefings/PhotoEventBriefingReadService.js";
+import { createPostgresPhotoEventBriefingReadStore } from "../../platform/database/PostgresPhotoEventBriefingReadStore.js";
 import {
   createPostgresCoreNavigationReadStore,
   createRepositoryCoreNavigationReadStore,
@@ -188,6 +195,45 @@ export function getProductionProgressPhotosReadService(env = process.env) {
     ? createProviderProgressPhotosReadStore(env)
     : createRepositoryProgressPhotosReadStore({ repositories: LegacyFounderRepositories });
   return createProgressPhotosReadService({ store });
+}
+
+export function getProductionPhotoEventBriefingReadService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createPhotoEventBriefingReadService({
+    store: createPostgresPhotoEventBriefingReadStore({
+      pool: runtime.pool,
+      ownerUserId: runtime.ownerUserId,
+      onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+        ? (event) => console.info("provider.photo_event_briefing_read.complete", event)
+        : null,
+    }),
+  });
+}
+
+export function getProductionProviderMediaDelivery(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  const catalog = createPhase5ProviderMediaCatalog({
+    query: (text, values) => runtime.pool.query(text, values),
+  });
+  const gateway = createOpaqueSpacesMediaGateway({
+    provider: runtime.objectProvider,
+    catalog,
+    secret: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
+  });
+  const media = createAuthorizedMediaService({ catalog, delivery: gateway });
+  return Object.freeze({
+    ownerUserId: runtime.ownerUserId,
+    async openRead({ principal, objectId, lifetimeSeconds = 60 }) {
+      const descriptor = await media.authorizeRead({ principal, objectId, lifetimeSeconds });
+      return gateway.redeemRead({ accessHandle: descriptor.accessHandle, principal });
+    },
+  });
 }
 
 export function getProductionEvidenceReviewReadService(env = process.env) {

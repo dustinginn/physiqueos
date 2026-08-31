@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { isPrivateMediaObjectId } from "../../../../contracts/v1/mediaIdentifiers.js";
-import { resolveTrustedMediaRedirect } from "../../../../platform/http/trustedApplicationOrigin.js";
 
 const MIME_TYPES = {
   ".jpeg": "image/jpeg",
@@ -46,21 +45,30 @@ async function providerMediaResponse(pathParts) {
     return new NextResponse("Not found", { status: 404 });
   }
   try {
-    const [{ getProductionApplicationComposition }, { createAuthenticationPrincipal }] = await Promise.all([
+    const [{ getProductionProviderMediaDelivery }, { createAuthenticationPrincipal }] = await Promise.all([
       import("../../../../application/composition/productionApplicationComposition.js"),
       import("../../../../application/auth/principal.js"),
     ]);
-    const composition = await getProductionApplicationComposition();
+    const delivery = getProductionProviderMediaDelivery();
     const principal = createAuthenticationPrincipal({
-      userId: composition.ownerUserId,
+      userId: delivery.ownerUserId,
       deviceId: "provider-web-compatibility",
       sessionId: "provider-web-compatibility",
       scopes: ["media:read"],
       authenticationMethod: "pre-auth-single-founder-compatibility",
       transport: "server-only",
     });
-    const descriptor = await composition.media.authorizeRead({ principal, objectId, lifetimeSeconds: 60 });
-    return NextResponse.redirect(resolveTrustedMediaRedirect(descriptor.accessHandle), 307);
+    const access = await delivery.openRead({ principal, objectId, lifetimeSeconds: 60 });
+    const upstream = await fetch(access.url, { redirect: "error", cache: "no-store" });
+    if (!upstream.ok || !upstream.body) return new NextResponse("Not found", { status: 404 });
+    return new NextResponse(upstream.body, {
+      headers: {
+        "Cache-Control": "private, max-age=86400, immutable",
+        "Content-Type": upstream.headers.get("content-type") ?? "application/octet-stream",
+        ...(upstream.headers.get("content-length") ? { "Content-Length": upstream.headers.get("content-length") } : {}),
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }

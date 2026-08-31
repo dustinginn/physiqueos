@@ -98,7 +98,7 @@ export function createPostgresProgressPhotosReadStore({ pool, ownerUserId, onCom
     ),
     async listMediaObjects() {
       return (await query(
-        `SELECT id,evidence_record_id,sha256,provenance,state
+        `SELECT id,evidence_record_id,original_filename,sha256,provenance,state
            FROM physiqueos.canonical_media_objects
           WHERE owner_user_id=$1 AND state='verified'
           ORDER BY id`,

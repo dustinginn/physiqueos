@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../data/repositories/founderRepositories";
-import { createPhotoEventNarrativeService } from "../../../../domain/services/PhotoEventNarrativeService";
+import { getProductionPhotoEventBriefingReadService } from "../../../../application/composition/productionApplicationComposition";
 import PhotoEventBriefingScreen from "../../../../screens/PhotoEventBriefingScreen";
 import { completeVisibleAbsGoal } from "./actions";
 
 export const dynamic="force-dynamic";
-export default async function PhotoEventPage({params}){const {sessionId}=await params;return FounderRepositories.runInReadScope(async()=>{const user=await FounderRepositories.users.getCurrentUser();const [artifact,goal]=await Promise.all([createPhotoEventNarrativeService({repositories:FounderRepositories}).getLatest({userId:user.id,sessionId}),FounderRepositories.goals.getGoalById("goal_visible_abs_at_rest")]);if(!artifact)notFound();return <PhotoEventBriefingScreen artifactId={artifact.id} completion={goal?.completion??null} completeAction={completeVisibleAbsGoal} narrative={artifact.briefing.photoEventNarrative}/>;},{readModel:"route.photo-briefing"});}
+export default async function PhotoEventPage({params}){const {sessionId}=await params;const result=await getProductionPhotoEventBriefingReadService().getPhotoEvent({sessionId});if(!result)notFound();return <PhotoEventBriefingScreen artifactId={result.artifactId} completion={result.completion} completeAction={completeVisibleAbsGoal} narrative={result.narrative}/>;}
