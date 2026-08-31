@@ -224,8 +224,40 @@ final class TrainingLoggerTests: XCTestCase {
         let file = TrainingLoggerSupportingEvidence(id: "f", displayName: "Health 2.pdf", source: .files)
         draft.addSupportingEvidence([photo, file, photo])
         XCTAssertEqual(draft.supportingEvidenceAssets, [photo, file])
+        XCTAssertEqual(draft.supportingWorkoutObservations.first?.sourceEvidenceIds, ["p", "f"])
         draft.removeSupportingEvidence(id: photo.id)
         XCTAssertEqual(draft.supportingEvidenceAssets, [file])
+        XCTAssertEqual(draft.supportingWorkoutObservations.first?.sourceEvidenceIds, ["f"])
+    }
+
+    func testMixedGymVisitPreservesStrengthDetailAndSeparateCardioOwnership() async throws {
+        let config = try await configuration()
+        var draft = draft()
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        draft.addExercise(bench)
+        draft.addExercise(fly)
+        let benchID = draft.exercises[0].id
+        draft.applyVariant(config.variants[1], to: benchID, catalog: config.exercises)
+        draft.setSuperset(firstId: benchID, secondId: draft.exercises[1].id, catalog: config.exercises)
+        draft.exercises[0].sets[0].reps = 8
+        draft.exercises[0].sets[0].load = 145
+        draft.exercises[0].sets[0].isCompleted = true
+        draft.addSupportingEvidence([.init(id: "health", displayName: "Apple Health.png", source: .photos)])
+
+        XCTAssertEqual(draft.exercises.map(\.name), ["Bench Press", "Cable Fly"])
+        XCTAssertEqual(draft.exercises[0].sets[0].reps, 8)
+        XCTAssertEqual(draft.exercises[0].sets[0].load, 145)
+        XCTAssertNotNil(draft.exercises[0].executionVariant)
+        XCTAssertEqual(draft.relationshipContext(for: benchID)?.relationshipType, "superset")
+
+        let cardio = try XCTUnwrap(draft.supportingWorkoutObservations.first)
+        XCTAssertEqual(cardio.activityName, "Stair Stepper")
+        XCTAssertEqual(cardio.durationMinutes, 42)
+        XCTAssertEqual(cardio.activeCalories, 386)
+        XCTAssertEqual(cardio.averageHeartRate, 128)
+        XCTAssertEqual(cardio.recordOwner, .activity)
+        XCTAssertNotEqual(cardio.recordOwner, .trainingSession)
     }
 
     func testBodyweightAndTimedSetsPreserveTheirMeasurementSemantics() async throws {

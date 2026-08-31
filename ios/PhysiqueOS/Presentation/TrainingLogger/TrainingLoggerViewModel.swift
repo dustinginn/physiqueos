@@ -45,6 +45,10 @@ final class TrainingLoggerViewModel {
 
     func resume() {
         draft = savedDraft
+        if draft?.supportingEvidenceAssets.isEmpty == false,
+           draft?.supportingWorkouts == nil {
+            update { $0.addSupportingEvidence([]) }
+        }
         validationMessage = nil
     }
 

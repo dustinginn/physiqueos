@@ -113,6 +113,29 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(store.weighIn(on: now)?.value, 166.4)
     }
 
+    func testDirectTypedWeightAndCorrectionCompleteWithoutCreatingEvidenceReview() throws {
+        let now = date(2026, 8, 30)
+        let store = LoggingSandboxStore(now: now)
+        store.morningPriorities.forEach { store.updateMorningPriority(id: $0.id, disposition: .completed) }
+
+        _ = try value(store.saveMorningCheckIn(weightText: "166.4", now: now))
+        XCTAssertTrue(store.reviews.isEmpty)
+        let corrected = try value(store.saveMorningCheckIn(weightText: "166.1", now: now))
+        XCTAssertEqual(corrected.weight.value, 166.1)
+        XCTAssertEqual(corrected.weight.correctionCount, 1)
+        XCTAssertTrue(store.reviews.isEmpty)
+    }
+
+    func testUploadedWeightStillRequiresTypeSpecificEvidenceReview() throws {
+        let store = preparedStore(scenario: .weight)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try XCTUnwrap(try value(store.finishInterpretation(now: date(2026, 8, 30))))
+        let review = try XCTUnwrap(store.review(id: id))
+        XCTAssertEqual(review.category, .weight)
+        XCTAssertEqual(review.status, .awaitingConfirmation)
+        XCTAssertTrue(review.fields.contains { $0.id == "weight" })
+    }
+
     func testCategorySpecificReviewFieldsMatchCurrentWebPresentationSemantics() {
         let draft = preparedStore(scenario: .training).evidenceDraft
         let training = LoggingSandboxFixtureFactory.review(category: .training, scenario: .training, draft: draft)

@@ -99,6 +99,9 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Manual Apple Health screenshots are supporting workout evidence today.
     /// A future HealthKit adapter can populate this same boundary.
     var supportingEvidence: [TrainingLoggerSupportingEvidence]?
+    /// Qualifying non-strength workouts remain separate observations even
+    /// when this review reconciles the same gym visit.
+    var supportingWorkouts: [TrainingLoggerSupportingWorkout]?
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String) -> Self {
         .init(
@@ -111,7 +114,8 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             step: .areas,
             exercisePickerReturnStep: nil,
             exercisePickerExistingExerciseIds: nil,
-            supportingEvidence: nil
+            supportingEvidence: nil,
+            supportingWorkouts: nil
         )
     }
 
@@ -127,6 +131,7 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var supersetCount: Int { relationships.count }
     var isAddingExercises: Bool { exercisePickerReturnStep == .workout }
     var supportingEvidenceAssets: [TrainingLoggerSupportingEvidence] { supportingEvidence ?? [] }
+    var supportingWorkoutObservations: [TrainingLoggerSupportingWorkout] { supportingWorkouts ?? [] }
     var addedExerciseCount: Int {
         guard isAddingExercises else { return exercises.count }
         let existing = Set(exercisePickerExistingExerciseIds ?? [])
@@ -143,6 +148,35 @@ struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var source: Source
+}
+
+enum TrainingLoggerWorkoutRecordOwner: String, Codable, Equatable {
+    case trainingSession
+    case activity
+}
+
+struct TrainingLoggerSupportingWorkout: Codable, Equatable, Identifiable {
+    var id: String
+    var activityName: String
+    var category: String
+    var durationMinutes: Double
+    var activeCalories: Double?
+    var averageHeartRate: Double?
+    var sourceEvidenceIds: [String]
+    var recordOwner: TrainingLoggerWorkoutRecordOwner
+
+    static func stairStepper(sourceEvidenceIds: [String]) -> Self {
+        .init(
+            id: "supporting-cardio-stair-stepper",
+            activityName: "Stair Stepper",
+            category: "Cardio",
+            durationMinutes: 42,
+            activeCalories: 386,
+            averageHeartRate: 128,
+            sourceEvidenceIds: sourceEvidenceIds,
+            recordOwner: .activity
+        )
+    }
 }
 
 struct TrainingLoggerDraftExercise: Codable, Equatable, Identifiable {
@@ -337,10 +371,28 @@ extension TrainingLoggerDraft {
             current.append(asset)
         }
         supportingEvidence = current
+        if supportingWorkoutObservations.isEmpty, !current.isEmpty {
+            supportingWorkouts = [.stairStepper(sourceEvidenceIds: current.map(\.id))]
+        } else {
+            supportingWorkouts = supportingWorkoutObservations.map { observation in
+                var updated = observation
+                updated.sourceEvidenceIds = current.map(\.id)
+                return updated
+            }
+        }
     }
 
     mutating func removeSupportingEvidence(id: String) {
         supportingEvidence = supportingEvidenceAssets.filter { $0.id != id }
+        if supportingEvidenceAssets.isEmpty {
+            supportingWorkouts = []
+        } else {
+            supportingWorkouts = supportingWorkoutObservations.map { observation in
+                var updated = observation
+                updated.sourceEvidenceIds = supportingEvidenceAssets.map(\.id)
+                return updated
+            }
+        }
     }
 
     mutating func addProvisionalExercise(name: String, areaId: String) {

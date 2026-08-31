@@ -732,6 +732,25 @@ struct TrainingLoggerView: View {
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
+
+                        ForEach(draft.supportingWorkoutObservations) { workout in
+                            Divider().overlay(PhysiqueOSTheme.divider)
+                            HStack(alignment: .top, spacing: 10) {
+                                IconBadge(systemImage: "figure.stair.stepper", color: .evidence, size: .sm)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.activityName)
+                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text(supportingWorkoutMetrics(workout))
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    Text("\(workout.category) · Apple Health screenshot")
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                            }
+                            .accessibilityIdentifier("trainingLogger.supportingWorkout.\(workout.id)")
+                        }
                     }
                 }
             }
@@ -756,6 +775,9 @@ struct TrainingLoggerView: View {
                     if let draft = viewModel.draft {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(draft.exercises.count) exercises · \(draft.completedSetCount) completed sets")
+                            if !draft.supportingWorkoutObservations.isEmpty {
+                                Text("\(draft.supportingWorkoutObservations.count) supporting cardio workout\(draft.supportingWorkoutObservations.count == 1 ? "" : "s")")
+                            }
                             Text(draft.supportingEvidenceAssets.isEmpty ? "No supporting screenshots attached" : "\(draft.supportingEvidenceAssets.count) supporting screenshot\(draft.supportingEvidenceAssets.count == 1 ? "" : "s") attached")
                         }
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -908,6 +930,13 @@ struct TrainingLoggerView: View {
     private func formatNumber(_ value: Double?) -> String {
         guard let value else { return "—" }
         return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    private func supportingWorkoutMetrics(_ workout: TrainingLoggerSupportingWorkout) -> String {
+        var parts = ["\(formatNumber(workout.durationMinutes)) min"]
+        if let calories = workout.activeCalories { parts.append("\(formatNumber(calories)) active cal") }
+        if let heartRate = workout.averageHeartRate { parts.append("\(formatNumber(heartRate)) bpm avg") }
+        return parts.joined(separator: " · ")
     }
 
     private func numericEditingChanged(_ editing: Bool) {
