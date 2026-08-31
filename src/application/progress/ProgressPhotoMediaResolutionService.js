@@ -18,6 +18,7 @@ export function resolveProgressPhotoMedia({
           ...record,
           payload: Object.freeze({
             ...payload,
+            captureDate: payload.captureDate ?? payload.observed_at ?? record.lastObservedAt ?? null,
             photos: Object.freeze((payload.photos ?? []).map((photo) => resolvePhoto(photo, index))),
           }),
         });

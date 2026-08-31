@@ -16,8 +16,10 @@ describe("provider Progress Photo media resolution", () => {
     const result = resolveProgressPhotoMedia({
       canonicalEvidenceObjects: [{
         canonicalId: "session",
+        lastObservedAt: "2026-08-08",
         payload: {
           evidence_type: "photo_session",
+          observed_at: "2026-08-08",
           photos: [{ storage_path: "private/founder/photos/uploads/2026-08-08/front.jpg" }],
         },
       }],
@@ -25,6 +27,7 @@ describe("provider Progress Photo media resolution", () => {
       progressPhotos: [{ id: "legacy-front", imagePath: "private/founder/photos/uploads/2026-08-08/front.jpg" }],
     });
     expect(result.canonicalEvidenceObjects[0].payload.photos[0].storage_path).toBe("media://01a049eb-ea13-75e8-948d-6b82752ae101");
+    expect(result.canonicalEvidenceObjects[0].payload.captureDate).toBe("2026-08-08");
     expect(result.progressPhotos[0].imagePath).toBe("media://01a049eb-ea13-75e8-948d-6b82752ae101");
   });
 
