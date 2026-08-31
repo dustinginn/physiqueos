@@ -8,6 +8,7 @@ import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContext
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
 import { createRepositoryProgressEvidenceReadStore } from "../../platform/database/PostgresProgressEvidenceReadStore.js";
 import { createProgressEvidenceReadService } from "./ProgressEvidenceReadService.js";
+import { buildDEXAReport } from "../../domain/services/ProgressReportingService.js";
 
 describe("provider-native Progress evidence reads", () => {
   it.each(["all", "build-lean-mass", "visible-abs"])(
@@ -82,6 +83,19 @@ describe("provider-native Progress evidence reads", () => {
       expect(source).toContain("getProductionProgressEvidenceReadService");
       expect(source).not.toMatch(/getDEXATimelineReport|getWeightTimelineReport|getNutritionTimelineReport|getActivityTimelineReport|createProgressReportingService|FounderRepositories/);
     }
+  });
+
+  it("does not present a false DEXA delta against a partial historical scan", () => {
+    const partial = { id: "partial", measuredAt: "2026-06-10", bodyFatPercentage: null, fatMass: null, leanMass: null };
+    const complete = {
+      id: "complete",
+      measuredAt: "2026-07-18",
+      bodyFatPercentage: 7.7,
+      fatMass: { value: 12.8 },
+      leanMass: { value: 147.5 },
+    };
+
+    expect(buildDEXAReport({ dexaScans: [partial, complete], goals: [] }).delta).toBeNull();
   });
 });
 

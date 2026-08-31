@@ -769,7 +769,7 @@ export function buildDEXAReport({ dexaScans, goals }) {
       },
     ],
     delta:
-      latest && previous
+      hasComparableDEXACoreMetrics(latest) && hasComparableDEXACoreMetrics(previous)
         ? {
             bodyFat: formatSignedPercent(
               latest.bodyFatPercentage - previous.bodyFatPercentage
@@ -819,6 +819,14 @@ export function buildDEXAReport({ dexaScans, goals }) {
       .slice()
       .reverse(),
   };
+}
+
+function hasComparableDEXACoreMetrics(scan) {
+  return [
+    scan?.bodyFatPercentage,
+    scan?.fatMass?.value,
+    scan?.leanMass?.value,
+  ].every(Number.isFinite);
 }
 
 function buildActivityReport(context) {
