@@ -59,6 +59,38 @@ enum AppDestination: Hashable, Codable {
     case manualWeighIn
     case evidenceIntake
     case localEvidenceReview(reviewId: String)
+    /// Native-only typed routes for the fixture-backed Operating Plan
+    /// browse/sandbox vertical (`src/app/profile/operating-plan/**`,
+    /// `src/app/profile/protocols/**`). Like the logging-sandbox cases
+    /// above, these do not claim a server destination contract — the web's
+    /// `OperatingPlanReadService`/`OperatingPlanStrategyDetailService`
+    /// return raw `href` strings, not typed destination objects, so there
+    /// is no existing `DestinationId` to mirror.
+    case operatingPlan
+    /// `strategy/[strategyType]/[strategyId]` — `strategyType` is one of
+    /// `energy`, `nutrition`, `training`, `briefings`
+    /// (`OperatingPlanStrategyType`'s exact allowlist).
+    case operatingPlanStrategy(strategyType: String, strategyId: String)
+    /// `strategy/[strategyType]/[strategyId]/edit` — reachable only for
+    /// `nutrition`, `training`, `briefings` (Energy has no editor route in
+    /// web today).
+    case operatingPlanStrategyEdit(strategyType: String, strategyId: String)
+    /// `/profile/protocols/[protocolId]` when the resolved protocol's
+    /// category is Recovery, Peptide, or Supplement and it is active —
+    /// `StrategyDomainScreen`'s roll-up of every active protocol sharing
+    /// that category, keyed by one representative protocol id exactly as
+    /// the web's `protocolItem()` href does.
+    case operatingPlanProtocolDomain(protocolId: String)
+    /// `execution/peptides/[protocolId]` — dosing detail, with an in-place
+    /// edit mode mirroring the web's own `?edit=1` toggle on the same
+    /// route rather than a second destination.
+    case operatingPlanPeptideExecution(protocolId: String)
+    /// `execution/[executionId]` for the Recovery (foam-rolling) support
+    /// method — same in-place `?edit=1` toggle pattern as peptide
+    /// execution above.
+    case operatingPlanRecoverySupport(executionId: String)
+    case operatingPlanSupplementNew
+    case operatingPlanSupplementEdit(protocolId: String)
 
     /// The server's destination id string, for parity with
     /// `DestinationId` values and for the placeholder screen's display.
@@ -82,6 +114,14 @@ enum AppDestination: Hashable, Codable {
         case .manualWeighIn: "native.manual-weigh-in"
         case .evidenceIntake: "native.evidence-intake"
         case .localEvidenceReview: "native.evidence-review"
+        case .operatingPlan: "native.operating-plan"
+        case .operatingPlanStrategy: "native.operating-plan.strategy"
+        case .operatingPlanStrategyEdit: "native.operating-plan.strategy.edit"
+        case .operatingPlanProtocolDomain: "native.operating-plan.protocol"
+        case .operatingPlanPeptideExecution: "native.operating-plan.protocol.peptide"
+        case .operatingPlanRecoverySupport: "native.operating-plan.protocol.recovery"
+        case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
+        case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
         }
     }
 }

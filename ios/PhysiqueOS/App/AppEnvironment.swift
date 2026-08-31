@@ -16,6 +16,7 @@ final class AppEnvironment {
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
+    let operatingPlanStore: OperatingPlanSandboxStore
 
     init(
         homeAPI: HomeAPI = FixtureHomeAPI(),
@@ -25,7 +26,8 @@ final class AppEnvironment {
         trainingAPI: TrainingAPI = FixtureTrainingAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
-        loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore()
+        loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
+        operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore()
     ) {
         self.homeAPI = homeAPI
         self.goalsAPI = goalsAPI
@@ -35,5 +37,6 @@ final class AppEnvironment {
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
+        self.operatingPlanStore = operatingPlanStore
     }
 }

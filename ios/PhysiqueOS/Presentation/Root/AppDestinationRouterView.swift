@@ -69,6 +69,22 @@ struct AppDestinationRouterView: View {
             TrainingAreaView(areaId: exerciseId)
         case .trainingExercise(let exerciseId):
             TrainingExerciseDetailView(exerciseId: exerciseId)
+        case .operatingPlan:
+            OperatingPlanLandingView(onNavigate: onNavigate)
+        case .operatingPlanStrategy(let strategyType, let strategyId):
+            OperatingPlanStrategyDetailView(strategyType: strategyType, strategyId: strategyId, onNavigate: onNavigate)
+        case .operatingPlanStrategyEdit(let strategyType, let strategyId):
+            OperatingPlanStrategyEditorView(strategyType: strategyType, strategyId: strategyId)
+        case .operatingPlanProtocolDomain(let protocolId):
+            OperatingPlanProtocolDomainView(protocolId: protocolId, onNavigate: onNavigate)
+        case .operatingPlanPeptideExecution(let protocolId):
+            OperatingPlanPeptideExecutionView(protocolId: protocolId)
+        case .operatingPlanRecoverySupport(let executionId):
+            OperatingPlanRecoverySupportView(executionId: executionId)
+        case .operatingPlanSupplementNew:
+            OperatingPlanSupplementEditorView(protocolId: nil)
+        case .operatingPlanSupplementEdit(let protocolId):
+            OperatingPlanSupplementEditorView(protocolId: protocolId)
         default:
             DestinationPlaceholderView(destination: destination)
         }

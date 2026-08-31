@@ -5,8 +5,11 @@ import SwiftUI
 /// Establishes the corrected five-tab information architecture — Home,
 /// Goals, Log, Evidence, You, matching `src/fixtures/bottomNavigation.js`
 /// exactly, with Log as the center tab. Home, Log, and Evidence are real
-/// screens; Goals now owns its source-grounded read/browse vertical while
-/// You remains an honest placeholder until its own slice.
+/// screens; Goals owns its source-grounded read/browse vertical. You
+/// remains an honest placeholder for the rest of the web's Profile/"You"
+/// screen, but now carries one real doorway — Operating Plan — matching
+/// `YouScreen.jsx`'s own entry point into `/profile/operating-plan`, since
+/// that is the current web's actual navigation path into this slice.
 ///
 /// Every `NavigationStack` here resolves `AppDestination` pushes through
 /// the same `AppDestinationRouterView`, so a destination that has a real
@@ -21,6 +24,7 @@ struct RootTabView: View {
     @State private var goalsPath = NavigationPath()
     @State private var logPath = NavigationPath()
     @State private var evidencePath = NavigationPath()
+    @State private var youPath = NavigationPath()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -60,8 +64,11 @@ struct RootTabView: View {
             .tabItem { Label(AppTab.evidence.title, systemImage: AppTab.evidence.systemImageName) }
             .tag(AppTab.evidence)
 
-            NavigationStack {
-                YouPlaceholderView()
+            NavigationStack(path: $youPath) {
+                YouPlaceholderView(onNavigate: { youPath.append($0) })
+                    .navigationDestination(for: AppDestination.self) {
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { youPath.append($0) })
+                    }
             }
             .tabItem { Label(AppTab.you.title, systemImage: AppTab.you.systemImageName) }
             .tag(AppTab.you)

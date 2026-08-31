@@ -10,6 +10,7 @@ extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
+        case strategyType, strategyId, protocolId, executionId
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +73,34 @@ extension AppDestination {
         case "native.evidence-review":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .localEvidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
+        case "native.operating-plan":
+            self = .operatingPlan
+        case "native.operating-plan.strategy":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanStrategy(
+                strategyType: try parameters.decode(String.self, forKey: .strategyType),
+                strategyId: try parameters.decode(String.self, forKey: .strategyId)
+            )
+        case "native.operating-plan.strategy.edit":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanStrategyEdit(
+                strategyType: try parameters.decode(String.self, forKey: .strategyType),
+                strategyId: try parameters.decode(String.self, forKey: .strategyId)
+            )
+        case "native.operating-plan.protocol":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanProtocolDomain(protocolId: try parameters.decode(String.self, forKey: .protocolId))
+        case "native.operating-plan.protocol.peptide":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanPeptideExecution(protocolId: try parameters.decode(String.self, forKey: .protocolId))
+        case "native.operating-plan.protocol.recovery":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanRecoverySupport(executionId: try parameters.decode(String.self, forKey: .executionId))
+        case "native.operating-plan.supplement.new":
+            self = .operatingPlanSupplementNew
+        case "native.operating-plan.supplement.edit":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .operatingPlanSupplementEdit(protocolId: try parameters.decode(String.self, forKey: .protocolId))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .id, in: container,
@@ -101,7 +130,19 @@ extension AppDestination {
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
         case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
         case .localEvidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
-        case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake: break
+        case .operatingPlanStrategy(let strategyType, let strategyId):
+            try parameters.encode(strategyType, forKey: .strategyType)
+            try parameters.encode(strategyId, forKey: .strategyId)
+        case .operatingPlanStrategyEdit(let strategyType, let strategyId):
+            try parameters.encode(strategyType, forKey: .strategyType)
+            try parameters.encode(strategyId, forKey: .strategyId)
+        case .operatingPlanProtocolDomain(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
+        case .operatingPlanPeptideExecution(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
+        case .operatingPlanRecoverySupport(let executionId): try parameters.encode(executionId, forKey: .executionId)
+        case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
+        case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
+             .operatingPlan, .operatingPlanSupplementNew:
+            break
         }
     }
 
