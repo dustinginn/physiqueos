@@ -189,6 +189,72 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertFalse(items.contains { $0.category == .nutrition })
     }
 
+    func testRealFounderWorkoutSignalsPreserveRepsFirstStrengthAndTwoWalks() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 31))
+        store.evidenceDraft.details = "Bicep curls\n12r 50p x4\n\nSpider curls\n12r 40p x4"
+        store.addAttachments([
+            .init(
+                id: "strength",
+                displayName: "IMG_2165.PNG",
+                source: .photos,
+                contentType: "image/png",
+                extractedText: "Traditional Strength Training\nWorkout Time\n1:10:13\nActive Calories\n381CAL\nTotal Calories\n490CAL\nAvg. Heart Rate\n111BPM"
+            ),
+            .init(
+                id: "walk-one",
+                displayName: "IMG_2164.PNG",
+                source: .photos,
+                contentType: "image/png",
+                extractedText: "Outdoor Walk\nWorkout Time\n0:15:23\nDistance\n0.96MI\nActive Calories\n106CAL\nTotal Calories\n131CAL\nAvg. Heart Rate\n121BPM"
+            ),
+            .init(
+                id: "walk-two",
+                displayName: "IMG_2166.PNG",
+                source: .photos,
+                contentType: "image/png",
+                extractedText: "Outdoor Walk\nWorkout Time\n0:17:32\nDistance\n1.01MI\nActive Calories\n89CAL\nTotal Calories\n117CAL\nAvg. Heart Rate\n97BPM"
+            ),
+        ])
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft), [.training])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: store.evidenceDraft), .workout)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 31)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(items.map(\.title), ["Traditional Strength Training", "Outdoor Walk", "Outdoor Walk"])
+        XCTAssertTrue(items.allSatisfy { $0.category == .training })
+        XCTAssertEqual(items[0].exercises.map(\.name), ["Bicep Curls", "Spider Curls"])
+        XCTAssertEqual(items[0].exercises.map { $0.sets.count }, [4, 4])
+        XCTAssertEqual(items[0].exercises[0].sets[0].reps, "12")
+        XCTAssertEqual(items[0].exercises[0].sets[0].load, "50")
+        XCTAssertEqual(items[0].fields.first(where: { $0.id == "duration" })?.value, "1:10:13")
+        XCTAssertEqual(items[0].fields.first(where: { $0.id == "activeCalories" })?.value, "381")
+        XCTAssertEqual(items[1].fields.first(where: { $0.id == "distance" })?.value, "0.96")
+        XCTAssertEqual(items[2].fields.first(where: { $0.id == "distance" })?.value, "1.01")
+        XCTAssertFalse(items.contains { $0.category == .nutrition })
+    }
+
+    func testNumericToolbarIsNotRebuiltWhenFocusNeighborsAreUnchanged() {
+        let field = NumericEditField(
+            text: .constant("12"),
+            accessibilityLabel: "Reps",
+            fieldID: "set-1-reps",
+            focusedFieldID: .constant(nil),
+            nextFieldID: "set-1-load"
+        )
+        let coordinator = field.makeCoordinator()
+        let toolbar = UIToolbar()
+
+        coordinator.refreshToolbar(toolbar)
+        let initialItems = toolbar.items ?? []
+        coordinator.refreshToolbar(toolbar)
+        let unchangedItems = toolbar.items ?? []
+
+        XCTAssertEqual(initialItems.count, unchangedItems.count)
+        XCTAssertTrue(zip(initialItems, unchangedItems).allSatisfy { $0 === $1 })
+    }
+
     func testCaloriesAloneNeverCreateNutritionInsideWorkoutEvidence() {
         var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
         draft.attachments = [

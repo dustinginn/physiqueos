@@ -119,12 +119,13 @@ enum EvidenceLocalInterpretation {
         var items: [EvidenceReviewItem] = []
         let exercises = parseExercises(draft.submittedText)
         if !exercises.isEmpty {
+            let strengthText = draft.attachments.compactMap(\.extractedText).first(where: isStrengthText)
             items.append(.init(
                 id: "strength-\(UUID().uuidString)",
                 category: .training,
-                title: "Traditional Strength Training",
+                title: strengthText.map(strengthTitle) ?? "Traditional Strength Training",
                 occurrenceDate: draft.occurrenceDate,
-                fields: [],
+                fields: strengthText.map { workoutMetricFields($0, includeDistance: false) } ?? [],
                 exercises: exercises
             ))
         }
@@ -169,6 +170,10 @@ enum EvidenceLocalInterpretation {
             }
             if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
                 appendSets(load: metric[1], reps: metric[2], count: metric[3], to: current, sets: &setsByExercise)
+                continue
+            }
+            if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
+                appendSets(load: metric[2], reps: metric[1], count: metric[3], to: current, sets: &setsByExercise)
                 continue
             }
             if let metric = capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line), metric.count >= 4, let current {
@@ -223,12 +228,27 @@ enum EvidenceLocalInterpretation {
 
     private static func cardioItem(id: String, text: String, date: Date) -> EvidenceReviewItem {
         let title = cardioTitle(text)
-        return .init(id: id, category: .training, title: title, occurrenceDate: date, fields: compact([
-            numericField("duration", "Duration", text, labels: ["duration"], unit: "min"),
-            numericField("activeCalories", "Active calories", text, labels: ["active calories", "active energy"], unit: "cal"),
-            numericField("heartRate", "Average heart rate", text, labels: ["average heart rate", "avg heart rate"], unit: "bpm"),
-            numericField("distance", "Distance", text, labels: ["distance"], unit: distanceUnit(text)),
+        return .init(
+            id: id,
+            category: .training,
+            title: title,
+            occurrenceDate: date,
+            fields: workoutMetricFields(text, includeDistance: true)
+        )
+    }
+
+    private static func workoutMetricFields(_ text: String, includeDistance: Bool) -> [EvidenceReviewField] {
+        var fields: [EvidenceReviewField] = []
+        if let duration = firstDuration(in: text, labels: ["workout time", "duration"]) {
+            fields.append(field("duration", "Workout time", duration, required: false))
+        }
+        fields.append(contentsOf: compact([
+            numericField("activeCalories", "Active calories", text, labels: ["active calories", "active energy"], unit: "cal", required: false),
+            numericField("totalCalories", "Total calories", text, labels: ["total calories"], unit: "cal", required: false),
+            numericField("heartRate", "Average heart rate", text, labels: ["average heart rate", "avg heart rate", "avg. heart rate"], unit: "bpm", required: false),
+            includeDistance ? numericField("distance", "Distance", text, labels: ["distance"], unit: distanceUnit(text), required: false) : nil,
         ]))
+        return fields
     }
 
     private static func nutritionItem(_ draft: EvidenceIntakeDraft) -> EvidenceReviewItem {
@@ -370,6 +390,16 @@ enum EvidenceLocalInterpretation {
         return nil
     }
 
+    private static func firstDuration(in text: String, labels: [String]) -> String? {
+        for label in labels {
+            let escaped = NSRegularExpression.escapedPattern(for: label)
+            if let match = capture("\\b\(escaped)\\b\\s*[:–—-]?\\s*(\\d{1,2}:\\d{2}(?::\\d{2})?)", in: text), match.count > 1 {
+                return match[1]
+            }
+        }
+        return nil
+    }
+
     private static func fill(_ target: inout String, from text: String, labels: [String]) {
         guard target.isEmpty, let value = firstNumber(in: text, labels: labels) else { return }
         target = cleanNumber(value)
@@ -395,10 +425,14 @@ enum EvidenceLocalInterpretation {
     private static func normalizeExercise(_ value: String) -> String { value.lowercased().replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces) }
     private static func displayExerciseName(_ value: String) -> String { normalizeExercise(value).split(separator: " ").map { word in ["ez", "rdl"].contains(word) ? word.uppercased() : word.capitalized }.joined(separator: " ") }
     private static func looksLikeExerciseName(_ line: String) -> Bool {
-        line.range(of: #"\b(press|raise|curl|fly|row|squat|deadlift|extension|pulldown|pullup|pushup|lunge|crunch|plank|machine)\b"#, options: [.regularExpression, .caseInsensitive]) != nil &&
+        line.range(of: #"\b(press(?:es)?|raises?|curls?|flies?|rows?|squats?|deadlifts?|extensions?|pulldowns?|pullups?|pushups?|lunges?|crunches?|planks?|machines?)\b"#, options: [.regularExpression, .caseInsensitive]) != nil &&
         line.range(of: #"\b(calories|heart rate|duration|workout time)\b"#, options: [.regularExpression, .caseInsensitive]) == nil
     }
     private static func isCardioText(_ text: String) -> Bool { text.range(of: #"\b(outdoor walk|indoor walk|run|running|cycling|treadmill|stair stepper|elliptical|rowing|hiking)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
+    private static func isStrengthText(_ text: String) -> Bool { text.range(of: #"\b(traditional strength training|functional strength training|strength workout)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }
+    private static func strengthTitle(_ text: String) -> String {
+        text.localizedCaseInsensitiveContains("functional strength training") ? "Functional Strength Training" : "Traditional Strength Training"
+    }
     private static func cardioTitle(_ text: String) -> String {
         let titles = ["Outdoor Walk", "Indoor Walk", "Outdoor Run", "Indoor Run", "Stair Stepper", "Indoor Cycling", "Outdoor Cycling", "Elliptical", "Rowing", "Hiking"]
         return titles.first { text.localizedCaseInsensitiveContains($0) } ?? "Cardio Workout"

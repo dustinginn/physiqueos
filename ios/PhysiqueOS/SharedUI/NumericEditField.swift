@@ -31,7 +31,7 @@ struct NumericEditField: UIViewRepresentable {
 
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
-        toolbar.items = context.coordinator.toolbarItems()
+        context.coordinator.refreshToolbar(toolbar)
         field.inputAccessoryView = toolbar
         return field
     }
@@ -49,13 +49,16 @@ struct NumericEditField: UIViewRepresentable {
             }
         }
         if let toolbar = field.inputAccessoryView as? UIToolbar {
-            toolbar.items = context.coordinator.toolbarItems()
+            context.coordinator.refreshToolbar(toolbar)
         }
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: NumericEditField
         private weak var activeField: UITextField?
+        private var configuredPreviousFieldID: String?
+        private var configuredNextFieldID: String?
+        private var hasConfiguredToolbar = false
 
         init(_ parent: NumericEditField) { self.parent = parent }
 
@@ -87,6 +90,16 @@ struct NumericEditField: UIViewRepresentable {
                 action: #selector(done)
             )
             return [previous, next, UIBarButtonItem(systemItem: .flexibleSpace), done]
+        }
+
+        func refreshToolbar(_ toolbar: UIToolbar) {
+            guard !hasConfiguredToolbar ||
+                    configuredPreviousFieldID != parent.previousFieldID ||
+                    configuredNextFieldID != parent.nextFieldID else { return }
+            toolbar.items = toolbarItems()
+            configuredPreviousFieldID = parent.previousFieldID
+            configuredNextFieldID = parent.nextFieldID
+            hasConfiguredToolbar = true
         }
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
