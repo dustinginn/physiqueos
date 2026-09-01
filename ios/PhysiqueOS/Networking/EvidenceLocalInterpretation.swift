@@ -254,11 +254,15 @@ enum EvidenceLocalInterpretation {
     private static func nutritionItem(_ draft: EvidenceIntakeDraft) -> EvidenceReviewItem {
         let text = draft.submittedText
         let meals = parseMeals(text)
+        let scope = nutritionScope(text: text, meals: meals)
+        let totals = scope == .meal
+            ? labeledNutritionTotals(in: text)
+            : resolvedDailyNutritionTotals(from: draft)
         let fields = [
-            nutritionNumericField("calories", "Calories", text, labels: ["calories", "total calories", "daily calories", "calories consumed"], unit: "cal") ?? field("calories", "Calories", "", "cal", required: false),
-            nutritionNumericField("protein", "Protein", text, labels: ["protein"], unit: "g") ?? field("protein", "Protein", "", "g", required: false),
-            nutritionNumericField("carbs", "Carbohydrates", text, labels: ["carbohydrates", "carbs"], unit: "g") ?? field("carbs", "Carbohydrates", "", "g", required: false),
-            nutritionNumericField("fat", "Fat", text, labels: ["total fat", "fat"], unit: "g") ?? field("fat", "Fat", "", "g", required: false),
+            field("calories", "Calories", totals.calories.map(formatNutritionNumber) ?? "", "cal", required: false),
+            field("protein", "Protein", totals.protein.map(formatNutritionNumber) ?? "", "g", required: false),
+            field("carbs", "Carbohydrates", totals.carbohydrates.map(formatNutritionNumber) ?? "", "g", required: false),
+            field("fat", "Fat", totals.fat.map(formatNutritionNumber) ?? "", "g", required: false),
         ]
         return .init(
             id: "nutrition-\(UUID().uuidString)",
@@ -267,7 +271,7 @@ enum EvidenceLocalInterpretation {
             occurrenceDate: draft.occurrenceDate,
             fields: fields,
             meals: meals,
-            nutritionScope: nutritionScope(text: text, meals: meals)
+            nutritionScope: scope
         )
     }
 
@@ -283,7 +287,7 @@ enum EvidenceLocalInterpretation {
         return .init(id: "activity-\(UUID().uuidString)", category: .activity, title: "Activity", occurrenceDate: draft.occurrenceDate, fields: [
             numericField("activeCalories", "Active calories", text, labels: ["active calories", "move"], unit: "cal", required: false) ?? field("activeCalories", "Active calories", "", "cal", required: false),
             numericField("exerciseMinutes", "Exercise", text, labels: ["exercise minutes", "exercise"], unit: "min", required: false) ?? field("exerciseMinutes", "Exercise", "", "min", required: false),
-            numericField("steps", "Steps", text, labels: ["steps"], unit: "steps", required: false) ?? field("steps", "Steps", "", "steps", required: false),
+            activityStepsField(text) ?? field("steps", "Steps", "", "steps", required: false),
             numericField("duration", "Stand", text, labels: ["stand hours", "stand"], unit: "hr", required: false) ?? field("duration", "Stand", "", "hr", required: false),
         ])
     }
@@ -345,8 +349,9 @@ enum EvidenceLocalInterpretation {
             var foods: [EvidenceReviewFood] = []
             for candidate in lines.dropFirst(index + 1) {
                 if mealNames.contains(candidate.lowercased()) { break }
-                if candidate.isEmpty || candidate.range(of: #"\b(calories|protein|carbs|carbohydrates|fat|total)\b"#, options: [.regularExpression, .caseInsensitive]) != nil { continue }
+                if candidate.isEmpty || isNutritionSummaryHeader(candidate) { continue }
                 if isNutritionInterfaceChrome(candidate) { continue }
+                if isMealSummaryLine(candidate) { continue }
                 guard candidate.count >= 3, candidate.count <= 80, candidate.rangeOfCharacter(from: .letters) != nil else { continue }
                 foods.append(.init(id: "food-\(index)-\(foods.count)", name: candidate, detail: "From submitted evidence", calories: nil))
                 if foods.count == 8 { break }
@@ -377,18 +382,63 @@ enum EvidenceLocalInterpretation {
         return field(id, label, cleanNumber(value), unit, required: required)
     }
 
-    /// MyFitnessPal's Nutrition view often places the metric label and value
-    /// on consecutive OCR lines (for example `Calories\n1,842`) while other
-    /// macros remain on one line. The general parser deliberately requires
-    /// close label/value adjacency; Nutrition opts into this bounded,
-    /// label-exact fallback so a neighboring unrelated number cannot be
-    /// silently claimed as the daily total.
-    private static func nutritionNumericField(_ id: String, _ label: String, _ text: String, labels: [String], unit: String) -> EvidenceReviewField? {
+    private struct NutritionTotals {
+        var calories: Double?
+        var carbohydrates: Double?
+        var fat: Double?
+        var protein: Double?
+
+        var populatedCount: Int {
+            [calories, carbohydrates, fat, protein].compactMap { $0 }.count
+        }
+    }
+
+    /// Resolve each daily metric from a recognized recap first. Only when no
+    /// recap supplies that metric may a complete set of Breakfast/Lunch/
+    /// Dinner/Snacks summaries provide the fallback. Food rows never
+    /// participate in daily arithmetic.
+    private static func resolvedDailyNutritionTotals(from draft: EvidenceIntakeDraft) -> NutritionTotals {
+        let sources = ([draft.details] + draft.attachments.compactMap(\.extractedText))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let recap = sources.compactMap(explicitDailyRecapTotals)
+            .max { $0.populatedCount < $1.populatedCount } ?? .init()
+        let meals = mealDerivedDailyTotals(from: sources)
+        return .init(
+            calories: recap.calories ?? meals.calories,
+            carbohydrates: recap.carbohydrates ?? meals.carbohydrates,
+            fat: recap.fat ?? meals.fat,
+            protein: recap.protein ?? meals.protein
+        )
+    }
+
+    private static func explicitDailyRecapTotals(in text: String) -> NutritionTotals? {
+        if let table = myFitnessPalTableTotals(in: text) { return table }
+        let normalized = normalizedNutritionText(text)
+        let hasMealHeading = text.components(separatedBy: .newlines).contains {
+            ["breakfast", "lunch", "dinner", "snack", "snacks"].contains(normalizedNutritionText($0))
+        }
+        let hasDailyContext = normalized.range(
+            of: #"\b(daily (?:recap|summary|totals?|nutrition)|nutrition day|food diary|day view)\b"#,
+            options: .regularExpression
+        ) != nil
+        let totals = labeledNutritionTotals(in: text)
+        guard hasDailyContext || (!hasMealHeading && totals.populatedCount == 4) else { return nil }
+        return totals.populatedCount > 0 ? totals : nil
+    }
+
+    private static func labeledNutritionTotals(in text: String) -> NutritionTotals {
+        .init(
+            calories: nutritionNumber(in: text, labels: ["calories", "total calories", "daily calories", "calories consumed"]),
+            carbohydrates: nutritionNumber(in: text, labels: ["carbohydrates", "carbs"]),
+            fat: nutritionNumber(in: text, labels: ["total fat", "fat"]),
+            protein: nutritionNumber(in: text, labels: ["protein"])
+        )
+    }
+
+    private static func nutritionNumber(in text: String, labels: [String]) -> Double? {
         let value = firstNumber(in: text, labels: labels)
             ?? firstNumberFollowingNutritionLabel(in: text, labels: labels)
-            ?? (id == "calories" ? firstMyFitnessPalDailyTotal(in: text) : nil)
-        guard let value else { return nil }
-        return field(id, label, cleanNumber(value), unit, required: false)
+        return value.flatMap(groupedNumber)
     }
 
     private static func firstNumberFollowingNutritionLabel(in text: String, labels: [String]) -> String? {
@@ -406,13 +456,102 @@ enum EvidenceLocalInterpretation {
         return nil
     }
 
-    /// MyFitnessPal diary OCR can preserve the row as
-    /// `Totals 1,234 26 31 189` while separately recognizing the macro labels.
-    /// The first number in that explicitly named row is the calories column.
-    private static func firstMyFitnessPalDailyTotal(in text: String) -> String? {
-        let pattern = #"(?m)^\s*(?:totals?|daily total)\s*[:–—-]?\s*(\d[\d,]*(?:\.\d+)?)\b"#
+    /// Vision can preserve the MyFitnessPal recap as four column labels
+    /// followed by a `Totals` row, or split the header and values across OCR
+    /// lines. Parse only a totals marker or a meal-free four-column recap and
+    /// retain the product's Calories/Carbohydrates/Fat/Protein order.
+    private static func myFitnessPalTableTotals(in text: String) -> NutritionTotals? {
+        let normalized = normalizedNutritionText(text)
+        guard normalized.contains("calories"), normalized.contains("carbohydrates"),
+              normalized.contains("fat"), normalized.contains("protein")
+        else { return nil }
+        let lines = text.components(separatedBy: .newlines)
+        let mealNames = Set(["breakfast", "lunch", "dinner", "snack", "snacks"])
+        let containsMeal = lines.contains { mealNames.contains(normalizedNutritionText($0)) }
+        let suffix: String
+        if let marker = text.range(of: #"\b(?:totals?|daily total)\b"#, options: [.regularExpression, .caseInsensitive]) {
+            suffix = String(text[marker.upperBound...])
+        } else {
+            guard !containsMeal else { return nil }
+            let labels = ["calories", "carbohydrates", "fat", "protein"]
+            let lastHeaderIndex = labels.compactMap { label in
+                lines.lastIndex { normalizedNutritionText($0).split(separator: " ").contains(Substring(label)) }
+            }.max()
+            guard let lastHeaderIndex, lastHeaderIndex + 1 < lines.count else { return nil }
+            suffix = lines[(lastHeaderIndex + 1)...].joined(separator: "\n")
+        }
+        let values = groupedNumbers(in: suffix, limit: 4)
+        guard values.count == 4 else { return nil }
+        return .init(calories: values[0], carbohydrates: values[1], fat: values[2], protein: values[3])
+    }
+
+    private static func mealDerivedDailyTotals(from sources: [String]) -> NutritionTotals {
+        let expectedMeals = ["breakfast", "lunch", "dinner", "snacks"]
+        var summaries: [String: NutritionTotals] = [:]
+        for source in sources {
+            for (name, block) in mealBlocks(in: source) {
+                let totals = mealSummaryTotals(in: block)
+                if totals.populatedCount > (summaries[name]?.populatedCount ?? -1) { summaries[name] = totals }
+            }
+        }
+        guard expectedMeals.allSatisfy({ summaries[$0] != nil }) else { return .init() }
+        func sum(_ keyPath: KeyPath<NutritionTotals, Double?>) -> Double? {
+            let values = expectedMeals.compactMap { summaries[$0]?[keyPath: keyPath] }
+            return values.count == expectedMeals.count ? values.reduce(0, +) : nil
+        }
+        return .init(
+            calories: sum(\.calories),
+            carbohydrates: sum(\.carbohydrates),
+            fat: sum(\.fat),
+            protein: sum(\.protein)
+        )
+    }
+
+    private static func mealBlocks(in text: String) -> [(String, String)] {
+        let lines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let aliases = ["breakfast": "breakfast", "lunch": "lunch", "dinner": "dinner", "snack": "snacks", "snacks": "snacks"]
+        var result: [(String, String)] = []
+        for (index, line) in lines.enumerated() {
+            guard let name = aliases[normalizedNutritionText(line)] else { continue }
+            let end = lines[(index + 1)...].firstIndex { aliases[normalizedNutritionText($0)] != nil } ?? lines.endIndex
+            result.append((name, lines[index..<end].joined(separator: "\n")))
+        }
+        return result
+    }
+
+    private static func mealSummaryTotals(in text: String) -> NutritionTotals {
+        .init(
+            calories: capturedNutritionValue(#"\b(\d[\d,]*(?:\.\d+)?)\s*(?:cal|kcal|calories)\b"#, in: text),
+            carbohydrates: capturedNutritionValue(#"\b(?:c|carbs?|carbohydrates)\b\s*[:–—-]?\s*(\d[\d,]*(?:\.\d+)?)\s*g\b"#, in: text),
+            fat: capturedNutritionValue(#"\b(?:f|fat)\b\s*[:–—-]?\s*(\d[\d,]*(?:\.\d+)?)\s*g\b"#, in: text),
+            protein: capturedNutritionValue(#"\b(?:p|protein)\b\s*[:–—-]?\s*(\d[\d,]*(?:\.\d+)?)\s*g\b"#, in: text)
+        )
+    }
+
+    private static func capturedNutritionValue(_ pattern: String, in text: String) -> Double? {
         guard let match = capture(pattern, in: text), match.count > 1 else { return nil }
-        return match[1]
+        return groupedNumber(match[1])
+    }
+
+    private static func isMealSummaryLine(_ line: String) -> Bool {
+        if mealSummaryTotals(in: line).populatedCount >= 2 { return true }
+        let number = #"\d[\d,]*(?:\.\d+)?"#
+        let patterns = [
+            #"^\s*"# + number + #"\s*(?:cal|kcal|calories)\s*$"#,
+            #"^\s*(?:c|carbs?|carbohydrates|f|fat|p|protein)\s*[:–—-]?\s*"# + number + #"\s*g\s*$"#,
+        ]
+        return patterns.contains { capture($0, in: line) != nil }
+    }
+
+    private static func isNutritionSummaryHeader(_ line: String) -> Bool {
+        let normalized = normalizedNutritionText(line)
+        let exactHeaders: Set<String> = ["calories", "protein", "carbs", "carbohydrates", "fat", "total", "totals", "daily total"]
+        if exactHeaders.contains(normalized) { return true }
+        if normalized.hasPrefix("totals ") || normalized.hasPrefix("daily total ") { return true }
+        return normalized.contains("calories") && normalized.contains("protein") &&
+            (normalized.contains("carbohydrates") || normalized.contains("carbs")) && normalized.contains("fat")
     }
 
     private static func isNutritionInterfaceChrome(_ line: String) -> Bool {
@@ -427,6 +566,54 @@ enum EvidenceLocalInterpretation {
         value.lowercased()
             .replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func activityStepsField(_ text: String) -> EvidenceReviewField? {
+        guard let value = activityStepsNumber(in: text) else { return nil }
+        return field("steps", "Steps", formatNutritionNumber(value), "steps", required: false)
+    }
+
+    private static func activityStepsNumber(in text: String) -> Double? {
+        let token = #"(\d{1,3}(?:[ \t]*,[ \t]*\d{3})+|\d{1,6})"#
+        let inlinePatterns = [
+            #"(?m)^[ \t]*steps?[ \t]*[:–—-]?[ \t]*"# + token + #"[ \t]*$"#,
+            #"(?m)^[ \t]*"# + token + #"[ \t]*steps?[ \t]*$"#,
+        ]
+        for pattern in inlinePatterns {
+            if let match = capture(pattern, in: text), match.count > 1, let value = groupedNumber(match[1]) { return value }
+        }
+
+        let lines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        for (index, line) in lines.enumerated() where normalizedNutritionText(line) == "steps" {
+            for candidateIndex in [index + 1, index - 1] where lines.indices.contains(candidateIndex) {
+                if let match = capture(#"^[ \t]*"# + token + #"[ \t]*(?:steps?)?[ \t]*$"#, in: lines[candidateIndex]),
+                   match.count > 1,
+                   let value = groupedNumber(match[1]) {
+                    return value
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func groupedNumbers(in text: String, limit: Int) -> [Double] {
+        let pattern = #"(?<![A-Za-z0-9])(\d{1,3}(?:[ \t]*,[ \t]*\d{3})+|\d+(?:\.\d+)?)(?![A-Za-z0-9])"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return expression.matches(in: text, range: range).prefix(limit).compactMap { match in
+            guard match.numberOfRanges > 1, let valueRange = Range(match.range(at: 1), in: text) else { return nil }
+            return groupedNumber(String(text[valueRange]))
+        }
+    }
+
+    private static func groupedNumber(_ value: String) -> Double? {
+        Double(value.replacingOccurrences(of: #"[,\s]"#, with: "", options: .regularExpression))
+    }
+
+    private static func formatNutritionNumber(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(value)
     }
 
     private static func firstNumber(in text: String, labels: [String]) -> String? {

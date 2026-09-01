@@ -315,6 +315,112 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertFalse(item.meals.flatMap(\.foods).contains { $0.name.localizedCaseInsensitiveContains("log more") })
     }
 
+    func testNutritionDailyRecapOverridesRoundedMealSummaryProtein() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .nutrition
+        store.addAttachments([
+            nutritionAttachment("recap", """
+                MyFitnessPal Nutrition
+                Calories
+                Carbohydrates
+                Fat
+                Protein
+                2,460
+                186
+                112
+                175
+                """),
+            nutritionAttachment("breakfast", """
+                Breakfast
+                440 cal
+                C 37 g
+                F 6 g
+                P 62 g
+                Greek Yogurt
+                Log more
+                """),
+            nutritionAttachment("lunch", """
+                Lunch
+                588 cal
+                C 24 g
+                F 23 g
+                P 61 g
+                Chicken Breast
+                Add food
+                """),
+            nutritionAttachment("dinner", """
+                Dinner
+                719 cal
+                C 24 g
+                F 51 g
+                P 42 g
+                Salmon
+                Quick add
+                """),
+            nutritionAttachment("snacks", """
+                Snacks
+                713 cal
+                C 101 g
+                F 32 g
+                P 11 g
+                Protein Bar
+                Scan meal
+                """),
+        ])
+
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewID = try await reviewID(store)
+        let item = try XCTUnwrap(store.review(id: reviewID)?.items.first)
+
+        XCTAssertEqual(nutritionValues(item), ["calories": "2460", "carbs": "186", "fat": "112", "protein": "175"])
+        XCTAssertEqual(item.meals.map(\.name), ["Breakfast", "Lunch", "Dinner", "Snacks"])
+        XCTAssertEqual(item.meals.flatMap(\.foods).map(\.name), ["Greek Yogurt", "Chicken Breast", "Salmon", "Protein Bar"])
+    }
+
+    func testCompleteMealSummariesProvideDailyTotalsWhenRecapIsAbsent() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .nutrition
+        store.addAttachments([
+            nutritionAttachment("breakfast", "Breakfast\n440 cal\nC 37 g\nF 6 g\nP 62 g"),
+            nutritionAttachment("lunch", "Lunch\n588 cal\nC 24 g\nF 23 g\nP 61 g"),
+            nutritionAttachment("dinner", "Dinner\n719 cal\nC 24 g\nF 51 g\nP 42 g"),
+            nutritionAttachment("snacks", "Snacks\n713 cal\nC 101 g\nF 32 g\nP 11 g"),
+        ])
+
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewID = try await reviewID(store)
+        let item = try XCTUnwrap(store.review(id: reviewID)?.items.first)
+
+        XCTAssertEqual(nutritionValues(item), ["calories": "2460", "carbs": "186", "fat": "112", "protein": "176"])
+    }
+
+    func testActivityStepsRequireExactLabelAssociationAndPreserveGroupedIntegers() async throws {
+        let samples = [
+            "9:47\nActivity\nMove 923 cal\nExercise 114 min\nStand 15 hr\nSteps 8,473\n47 bpm",
+            "9\nSteps\n8473\nMove 923 cal\nExercise 114 min\nStand 15 hr\n47 bpm",
+            "9\nSteps\n8, 473\nMove 923 cal\nExercise 114 min\nStand 15 hr\n47 bpm",
+        ]
+        for (index, text) in samples.enumerated() {
+            let store = LoggingSandboxStore(now: date(2026, 8, 30))
+            store.evidenceDraft.scenario = .activity
+            store.addAttachments([.init(
+                id: "activity-\(index)",
+                displayName: "Activity.png",
+                source: .photos,
+                contentType: "image/png",
+                extractedText: text
+            )])
+
+            _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+            let reviewID = try await reviewID(store)
+            let item = try XCTUnwrap(store.review(id: reviewID)?.items.first)
+            XCTAssertEqual(item.fields.first(where: { $0.id == "steps" })?.value, "8473")
+            XCTAssertEqual(item.fields.first(where: { $0.id == "activeCalories" })?.value, "923")
+            XCTAssertEqual(item.fields.first(where: { $0.id == "exerciseMinutes" })?.value, "114")
+            XCTAssertEqual(item.fields.first(where: { $0.id == "duration" })?.value, "15")
+        }
+    }
+
     func testEvidenceReviewPresentationKeepsSourceFactsReadOnlyAndStrengthEditingCompact() {
         for category in EvidenceCategory.allCases where category != .progressPhotos {
             XCTAssertTrue(EvidenceReviewPresentationPolicy.sourceValuesAreReadOnly(for: category))
@@ -526,6 +632,12 @@ final class LoggingSandboxTests: XCTestCase {
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Los_Angeles")!; return c.date(from: .init(year: year, month: month, day: day, hour: 12))! }
+    private func nutritionAttachment(_ id: String, _ text: String) -> SandboxAttachment {
+        .init(id: id, displayName: "\(id).png", source: .photos, contentType: "image/png", extractedText: text)
+    }
+    private func nutritionValues(_ item: EvidenceReviewItem) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: item.fields.map { ($0.id, $0.value) })
+    }
     private func value<T>(_ result: Result<T, LoggingSandboxError>) throws -> T { switch result { case .success(let value): value; case .failure(let error): throw error } }
     private func reviewID(_ store: LoggingSandboxStore) async throws -> String { let result = await store.finishInterpretation(now: date(2026, 8, 30)); return try XCTUnwrap(try value(result)) }
     private func XCTAssertFailure<T>(_ result: Result<T, LoggingSandboxError>, _ message: String, file: StaticString = #filePath, line: UInt = #line) { switch result { case .success: XCTFail("Expected failure", file: file, line: line); case .failure(let error): XCTAssertEqual(error.message, message, file: file, line: line) } }
