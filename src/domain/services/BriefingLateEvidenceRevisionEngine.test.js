@@ -336,6 +336,54 @@ describe("late-evidence briefing revision engine", () => {
       reason: "late_evidence_reconciliation",
     }));
   });
+
+  it("prepares a Monthly Confidence correction through the same publisher in dry-run mode", async () => {
+    const existing = cadencePublication(
+      "monthly", "2026-08-01", "2026-08-31",
+      { generatedAt: "2026-09-01T07:01:00Z" }
+    );
+    existing.evidenceWindow = {
+      ...existing.evidenceWindow,
+      briefingMonth: "2026-08",
+      deliveryDate: "2026-09-01",
+      cutoff: "2026-09-01T06:59:59.999Z",
+    };
+    existing.briefing.monthlyPresentation = { hero: {} };
+    const preparedOccurrence = { artifact: existing, existing };
+    const occurrencePublisher = vi.fn(async () => ({
+      state: "prepared", artifact: existing, idempotent: false,
+    }));
+    const publicationService = { captureBaseline: vi.fn() };
+    const service = createMonthlyBriefingService({
+      repositories: {
+        users: { getUserById: async () => ({ id: "u", timeZone: zone }) },
+        dailyBriefings: { listDailyBriefings: async () => [existing] },
+      },
+      publicationService,
+      occurrencePreparer: vi.fn(async () => preparedOccurrence),
+      occurrencePublisher,
+      now: () => new Date("2026-09-01T18:00:00Z"),
+    });
+
+    const result = await service.prepareConfidenceCorrection({
+      userId: "u",
+      reason: "correct_monthly_confidence_evidence_normalization",
+      targetArtifactId: existing.id,
+    });
+
+    expect(result).toMatchObject({
+      status: "prepared",
+      recomputation: { state: "prepared", idempotent: false },
+    });
+    expect(occurrencePublisher).toHaveBeenCalledOnce();
+    expect(occurrencePublisher).toHaveBeenCalledWith(expect.objectContaining({
+      prepared: preparedOccurrence,
+      publicationService,
+      operation: "regenerate",
+      reason: "correct_monthly_confidence_evidence_normalization",
+      dryRun: true,
+    }));
+  });
 });
 
 function nutrition(fingerprint, revision, changedAt) {

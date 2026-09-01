@@ -203,6 +203,41 @@ export function adaptBriefingArtifactToEvidenceDescriptors({
   return freeze(descriptors);
 }
 
+export function assertCanonicalEvidenceDescriptorCoverage({
+  artifact,
+  evidenceDescriptors = [],
+  goalContract,
+} = {}) {
+  const relevantCapabilities = new Set((goalContract?.relevantEvidence?.entries ?? [])
+    .filter((entry) => entry.role !== "not_relevant")
+    .map((entry) => entry.evidenceCapability)
+    .filter(Boolean));
+  const dependencyCapabilities = new Set(
+    (artifact?.dependencyManifest?.canonicalDependencies ?? [])
+      .map((dependency) => capabilityForDependency(dependency.evidenceType))
+      .filter((capability) => capability && relevantCapabilities.has(capability))
+  );
+  if (!dependencyCapabilities.size) return true;
+  const represented = evidenceDescriptors.filter((descriptor) =>
+    descriptor.capability !== "execution_context" &&
+    dependencyCapabilities.has(descriptor.capability) &&
+    relevantCapabilities.has(descriptor.capability) &&
+    ((descriptor.sourceEvidenceIds?.length ?? 0) > 0 ||
+      (descriptor.sourceObservationIds?.length ?? 0) > 0)
+  );
+  if (represented.length) return true;
+  const error = new Error(
+    "Canonical briefing evidence was not represented by mapped Confidence descriptors."
+  );
+  error.code = "confidence_evidence_normalization_coverage_failure";
+  error.details = {
+    artifactId: artifact?.id ?? null,
+    dependencyCapabilities: [...dependencyCapabilities].sort(),
+    descriptorCapabilities: evidenceDescriptors.map((item) => item.capability).sort(),
+  };
+  throw error;
+}
+
 export function adaptBriefingArtifactToExecutionContext({
   artifact, piEnvelope = null, cadence, operatingState = null,
 } = {}) {
@@ -290,6 +325,12 @@ function adaptCadencePIObservations({ artifact, piEnvelope, cutoff }) {
       (item) => item.kind === "recovery_state",
       (item) => item.kind === "recovery_insufficient_evidence",
     ]),
+    ...(artifact?.cadence === "monthly" ? [
+      selectObservation(observations, "dexa", [
+        (item) => item.kind === "dexa_measurement_snapshot" &&
+          item.status !== "insufficient_data",
+      ]),
+    ] : []),
   ].filter(Boolean);
   const claims = selectedCadenceClaims({ artifact, piEnvelope });
   const descriptors = selected.map((item) => cadenceDescriptor({
@@ -438,7 +479,8 @@ function cadenceTemporalIdentity(artifact) {
 
 function cadenceCapability(domain) {
   return ({ training: "training_progression", energy: "energy_availability",
-    weight: "body_weight_trend", recovery: "recovery_capacity" })[domain];
+    weight: "body_weight_trend", recovery: "recovery_capacity",
+    dexa: "dexa_body_composition" })[domain];
 }
 
 function cadenceStrength(value) {
@@ -455,6 +497,20 @@ function cadenceAgreement(item) {
     return "contradicts";
   }
   return "neutral";
+}
+
+function capabilityForDependency(value) {
+  return ({
+    activity_day: "energy_availability",
+    nutrition: "energy_availability",
+    training: "training_progression",
+    weight: "body_weight_trend",
+    recovery_day: "recovery_capacity",
+    photo_session: "progress_photos",
+    body_composition: "dexa_body_composition",
+    dexa: "dexa_body_composition",
+    dexa_scan: "dexa_body_composition",
+  })[value] ?? null;
 }
 
 function cadencePhotoAgreement(values) {

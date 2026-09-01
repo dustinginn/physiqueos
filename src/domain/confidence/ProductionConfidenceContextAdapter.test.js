@@ -4,10 +4,69 @@ import {
   adaptBriefingArtifactToExecutionContext,
   adaptDEXAEventToEvidenceDescriptors,
   adaptProductionGoalToCanonicalContract,
+  assertCanonicalEvidenceDescriptorCoverage,
   isQualifyingPhotoEventInterpretation,
 } from "./ProductionConfidenceContextAdapter";
 
 describe("production Confidence V2 context adapters", () => {
+  it("fails closed when mapped canonical dependencies collapse to fallback context", () => {
+    const artifact = { id: "monthly-august", dependencyManifest: {
+      canonicalDependencies: [{ evidenceType: "training" },
+        { evidenceType: "nutrition" }],
+    } };
+    const goalContract = { relevantEvidence: { entries: [
+      { evidenceMapId: "training", evidenceCapability: "training_progression",
+        role: "primary" },
+      { evidenceMapId: "energy", evidenceCapability: "energy_availability",
+        role: "supporting" },
+    ] } };
+    expect(() => assertCanonicalEvidenceDescriptorCoverage({
+      artifact, goalContract,
+      evidenceDescriptors: [{ capability: "execution_context",
+        sourceEvidenceIds: [], sourceObservationIds: [] }],
+    })).toThrow(expect.objectContaining({
+      code: "confidence_evidence_normalization_coverage_failure",
+    }));
+    expect(assertCanonicalEvidenceDescriptorCoverage({
+      artifact, goalContract,
+      evidenceDescriptors: [{ capability: "training_progression",
+        sourceEvidenceIds: ["training-1"], sourceObservationIds: ["obs-1"] }],
+    })).toBe(true);
+    expect(assertCanonicalEvidenceDescriptorCoverage({
+      artifact: { id: "empty", dependencyManifest: { canonicalDependencies: [] } },
+      goalContract,
+      evidenceDescriptors: [{ capability: "execution_context" }],
+    })).toBe(true);
+  });
+
+  it("maps a Monthly DEXA snapshot as baseline context without claiming progress", () => {
+    const descriptors = adaptBriefingArtifactToEvidenceDescriptors({
+      artifact: {
+        id: "monthly-august",
+        cadence: "monthly",
+        evidenceCutoff: "2026-09-01T06:59:59.999Z",
+        evidenceWindow: { id: "monthly:august", startDate: "2026-08-01",
+          endDate: "2026-08-31", closed: true },
+        briefing: { provenance: { evidenceRefs: [] } },
+      },
+      piEnvelope: { observations: [{
+        id: "dexa-snapshot", domain: "dexa",
+        kind: "dexa_measurement_snapshot", status: "observed",
+        direction: "neutral",
+        evidenceWindow: { startDate: "2026-08-15", endDate: "2026-08-15" },
+        supportingEvidenceIds: ["dexa-aug-15"],
+        confidence: { level: "high", limitations: [] },
+        explanationData: { measurements: {} },
+        provenance: { producer: "dexa_pi_observation_service",
+          sourceEvidenceIds: ["dexa-aug-15"] },
+      }] },
+    });
+    expect(descriptors).toContainEqual(expect.objectContaining({
+      capability: "dexa_body_composition", agreement: "indeterminate",
+      strength: "high", sourceEvidenceIds: ["dexa-aug-15"],
+    }));
+  });
+
   it("materializes a Goal Contract from accepted production Goal semantics", () => {
     const contract = adaptProductionGoalToCanonicalContract(goal(), {
       activePhase: goal().phases[0],

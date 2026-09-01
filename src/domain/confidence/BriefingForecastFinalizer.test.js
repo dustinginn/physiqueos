@@ -22,6 +22,14 @@ describe("shared production briefing forecast finalizer", () => {
       schemaVersion: "canonical_confidence_assessment_v2",
       publisherType: "goal_initialization",
       currentPercentage: result.numericConfidenceProjection.currentPercentage,
+      sourceLineage: {
+        confidenceExplanationDrivers: {
+          schemaVersion: "confidence_explanation_drivers_v1",
+          materiallyChanged: {
+            movement: result.numericConfidenceProjection.movement,
+          },
+        },
+      },
     });
     expect(result.briefingArtifact.confidencePublication.assessmentId)
       .toBe(result.confidenceAssessment.id);

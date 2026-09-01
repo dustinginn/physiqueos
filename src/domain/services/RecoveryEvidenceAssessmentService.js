@@ -207,7 +207,7 @@ function sourceCoverage(records) {
   ));
 }
 function requiredCadence(value) {
-  if (!["daily", "midweek", "weekly"].includes(value)) throw new Error("Unsupported Recovery cadence.");
+  if (!["daily", "midweek", "weekly", "monthly"].includes(value)) throw new Error("Unsupported Recovery cadence.");
   return value;
 }
 function requiredWindow(value, field) {

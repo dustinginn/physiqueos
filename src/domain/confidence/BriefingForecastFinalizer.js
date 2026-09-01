@@ -107,7 +107,14 @@ export function createBriefingForecastFinalizer({
         replacesArtifactId: normalized.replacesArtifactId,
         replacesAssessmentId: normalized.replacesAssessmentId,
         idempotencyKey: normalized.idempotencyKey,
-        sourceLineage: normalized.sourceLineage,
+        sourceLineage: {
+          ...normalized.sourceLineage,
+          confidenceExplanationDrivers: confidenceExplanationDrivers({
+            forecastAssessment,
+            narrativeAssessment,
+            projection,
+          }),
+        },
       });
       const phaseReview = normalized.phaseReviewContext
         ? createPhaseReviewArtifactPackage({ context: normalized.phaseReviewContext,
@@ -309,6 +316,42 @@ function boundedDiagnostics(value) {
     movement: value.projection.movement,
     percentage: value.projection.currentPercentage,
   });
+}
+function confidenceExplanationDrivers({
+  forecastAssessment,
+  narrativeAssessment,
+  projection,
+}) {
+  return {
+    schemaVersion: "confidence_explanation_drivers_v1",
+    strengthenedBy: (narrativeAssessment?.primarySupportingFactors ?? [])
+      .map(driver).filter(Boolean),
+    limitedBy: (narrativeAssessment?.primaryLimitingFactors ?? [])
+      .map(driver).filter(Boolean),
+    materiallyChanged: {
+      movement: projection?.movement ?? null,
+      magnitude: projection?.movementMagnitude ?? null,
+      rationale: projection?.rationale ?? null,
+    },
+    needsNext: forecastAssessment?.nextDecisiveEvidence
+      ? [{
+          key: forecastAssessment.nextDecisiveEvidence.evidenceCapability ??
+            forecastAssessment.nextDecisiveEvidence.status ?? null,
+          text: narrativeAssessment?.nextDecisiveEvidenceExplanation?.text ?? null,
+          decisionBoundary:
+            forecastAssessment.nextDecisiveEvidence.decisionBoundary ?? null,
+        }]
+      : [],
+  };
+}
+function driver(item) {
+  if (!item || typeof item !== "object") return null;
+  return {
+    key: item.key ?? item.id ?? item.factorRef ?? null,
+    text: item.text ?? item.description ?? null,
+    sourceRefs: [...new Set((item.sourceRefs ?? item.evidenceRefs ?? [])
+      .filter(Boolean).map(String))].sort(),
+  };
 }
 function text(value, field) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${field} is required.`);

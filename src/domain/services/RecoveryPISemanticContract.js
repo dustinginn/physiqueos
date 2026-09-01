@@ -4,6 +4,7 @@ export const RECOVERY_PI_THRESHOLDS = Object.freeze({
   daily: Object.freeze({ minimumCurrentDates: 1, normalConfidenceDates: 1 }),
   midweek: Object.freeze({ minimumCurrentDates: 2, normalConfidenceDates: 2 }),
   weekly: Object.freeze({ minimumCurrentDates: 2, normalConfidenceDates: 3 }),
+  monthly: Object.freeze({ minimumCurrentDates: 2, normalConfidenceDates: 3 }),
 });
 
 export const RECOVERY_PI_METRICS = Object.freeze({

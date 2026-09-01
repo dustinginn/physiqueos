@@ -219,6 +219,28 @@ describe("Monthly production cadence", () => {
       idempotent: true,
     });
     expect(publish).toHaveBeenCalledOnce();
+    const publicationCommand = publish.mock.calls[0][0];
+    expect(publicationCommand.assessment.sourceLineage).toMatchObject({
+      evidenceNormalization: {
+        schemaVersion: "confidence_evidence_normalization_lineage_v1",
+        descriptorCount: expect.any(Number),
+        descriptorCapabilities: expect.arrayContaining([
+          "training_progression",
+          "energy_availability",
+          "body_weight_trend",
+          "recovery_capacity",
+        ]),
+      },
+      confidenceExplanationDrivers: {
+        schemaVersion: "confidence_explanation_drivers_v1",
+      },
+    });
+    expect(publicationCommand.assessment.sourceLineage.evidenceNormalization
+      .descriptors.some((descriptor) =>
+        descriptor.capability !== "execution_context" &&
+        (descriptor.sourceEvidenceCount > 0 ||
+          descriptor.sourceObservationCount > 0)))
+      .toBe(true);
     expect(durationMs).toBeLessThan(15_000);
     expect(first.artifact.briefing.monthlyPresentation).not.toHaveProperty("preview");
     expect(String(first.artifact.briefing.monthlyPresentation.milestone?.href ?? ""))

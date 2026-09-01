@@ -9,6 +9,7 @@ import { createCadenceEvidenceDurabilityContext } from
 import {
   adaptBriefingArtifactToEvidenceDescriptors,
   adaptProductionGoalToCanonicalContract,
+  assertCanonicalEvidenceDescriptorCoverage,
 } from "../confidence/ProductionConfidenceContextAdapter";
 import { createBriefingGoalConfidenceBlockFromV2 } from
   "./BriefingGoalConfidencePresentationService";
@@ -22,6 +23,8 @@ import {
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { attachBriefingDependencyManifest } from
   "./BriefingDependencyManifestService";
+import { createCadencePIEvidenceEnvelope } from
+  "./CadencePIEvidenceEnvelopeService";
 
 export const MONTHLY_BRIEFING_VERSION = "monthly_briefing_v1";
 export const MONTHLY_ARTIFACT_ID_VERSION = "monthly_artifact_id_v1";
@@ -158,6 +161,22 @@ export function createMonthlyBriefingService({
       }
       return result;
     },
+    async prepareConfidenceCorrection({
+      userId, reason, targetArtifactId,
+    } = {}) {
+      const prepared = await service.prepareRegeneration({
+        userId, reason, targetArtifactId,
+      });
+      const recomputation = await occurrencePublisher({
+        prepared: prepared.prepared,
+        publicationService,
+        now,
+        operation: "regenerate",
+        reason,
+        dryRun: true,
+      });
+      return { status: "prepared", prepared, recomputation };
+    },
     async regenerate({
       userId, reason, targetArtifactId, reconciliationContext = null,
     } = {}) {
@@ -218,6 +237,26 @@ async function prepareMonthlyOccurrence({
   const activePhase = resolveCommittedPhaseContext(goal, {
     asOf: window.endDate,
   }).activePhase;
+  const goalContract = adaptProductionGoalToCanonicalContract(goal, { activePhase,
+    canonicalStore: baseline.store, asOf: window.cutoff });
+  const confidenceEvidence = narrative.evidenceFixture.confidenceEvidence ?? {};
+  const piEnvelope = createCadencePIEvidenceEnvelope({
+    cadence: "monthly",
+    evidenceWindow: { ...window, ...confidenceEvidence.evidenceWindow },
+    comparisonWindow: confidenceEvidence.comparisonWindow ?? null,
+    evaluationDate: window.endDate,
+    timeZone,
+    activeGoal: goal,
+    activePhase,
+    canonicalTrainingEvidence:
+      confidenceEvidence.canonicalTrainingEvidence ?? [],
+    weights: narrative.evidenceFixture.weights ?? [],
+    energyDays: confidenceEvidence.energyDays ?? [],
+    recoveryEvidenceRecords:
+      confidenceEvidence.recoveryEvidenceRecords ?? [],
+    dexaScans: narrative.evidenceFixture.dexaScans ?? [],
+    photoSessions: confidenceEvidence.photoSessions ?? [],
+  });
   const current = createCanonicalConfidenceReadService({ store: baseline.store })
     .getCurrent({ goalId: goal.id, phaseId: activePhase?.id });
   if (!current.assessment) {
@@ -227,20 +266,34 @@ async function prepareMonthlyOccurrence({
   }
   return {
     artifact, activePhase, baseline, current, existing, generatedAt, goal,
-    goalContract: adaptProductionGoalToCanonicalContract(goal, { activePhase,
-      canonicalStore: baseline.store, asOf: window.cutoff }),
+    goalContract,
+    piEnvelope,
     userId, window,
   };
 }
 
 async function publishMonthlyOccurrence({
-  prepared, publicationService, now, operation, reason,
+  prepared, publicationService, now, operation, reason, dryRun = false,
 }) {
   const { artifact, activePhase, baseline, current, existing, generatedAt,
-    goal, goalContract, userId, window } = prepared;
+    goal, goalContract, piEnvelope, userId, window } = prepared;
   const replacement = operation === "regenerate";
   const replacedAssessmentId = replacement
     ? existing?.confidencePublication?.assessmentId ?? null : null;
+  const correctionIdentity = replacement ? monthlyCorrectionIdentity({
+    artifact,
+    reason,
+  }) : null;
+  if (replacement &&
+      current.assessment.sourceLineage?.correctionIdentity === correctionIdentity &&
+      existing?.confidencePublication?.assessmentId === current.assessment.id) {
+    return {
+      state: "completed",
+      artifact: existing,
+      idempotent: true,
+      publicationStatus: "matched",
+    };
+  }
   if (replacement && current.assessment.id !== replacedAssessmentId) {
     const error = new Error(
       "Monthly correction target is not the current canonical Confidence publication."
@@ -261,7 +314,15 @@ async function publishMonthlyOccurrence({
     error.code = "monthly_replacement_predecessor_unavailable";
     throw error;
   }
-  const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({ artifact });
+  const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({
+    artifact,
+    piEnvelope,
+  });
+  assertCanonicalEvidenceDescriptorCoverage({
+    artifact,
+    evidenceDescriptors,
+    goalContract,
+  });
   const durabilityContext = createCadenceEvidenceDurabilityContext({
     store: baseline.store,
     artifact,
@@ -270,7 +331,7 @@ async function publishMonthlyOccurrence({
     previousCanonicalAssessment: confidencePredecessor,
   });
   const finalized = await createBriefingForecastFinalizer({
-    publicationService, now,
+    publicationService: dryRun ? null : publicationService, now,
   }).finalize({
     publisherType: "monthly_briefing", userId,
     occurrenceId: artifact.id, artifactId: artifact.id,
@@ -286,8 +347,7 @@ async function publishMonthlyOccurrence({
     previousCanonicalAssessment: confidencePredecessor,
     publicationCutoff: window.cutoff, finalizedAt: generatedAt,
     idempotencyKey: replacement
-      ? `confidence_v2|monthly|${artifact.id}|replacement|${replacedAssessmentId}|${
-        artifact.dependencyManifest.fingerprint}`
+      ? `confidence_v2|monthly|${artifact.id}|correction|${correctionIdentity}`
       : `confidence_v2|monthly|${artifact.id}`,
     expectedPriorAssessmentId: current.assessment.id,
     expectedPriorArtifactId: confidencePredecessor.briefingArtifactId,
@@ -298,7 +358,11 @@ async function publishMonthlyOccurrence({
     replacesArtifactId: replacement ? existing?.id ?? null : null,
     replacesAssessmentId: replacedAssessmentId,
     sourceLineage: { reason, evidenceWindowId: window.id,
-      dependencyManifestFingerprint: artifact.dependencyManifest.fingerprint },
+      dependencyManifestFingerprint: artifact.dependencyManifest.fingerprint,
+      correctionIdentity,
+      evidenceNormalization: summarizeEvidenceNormalization({
+        artifact, evidenceDescriptors, piEnvelope,
+      }) },
     elapsedTimeAdequacy: "adequate",
     phaseReviewContext: {
       activeGoal: goal, activePhase,
@@ -328,6 +392,15 @@ async function publishMonthlyOccurrence({
       return { artifact: candidate };
     },
   });
+  if (dryRun) {
+    return {
+      state: "prepared",
+      artifact: finalized.briefingArtifact,
+      evidenceDescriptors,
+      finalized,
+      idempotent: false,
+    };
+  }
   const publication = finalized.commitResult;
   if (publication.committed || publication.status === "matched") {
     return {
@@ -344,8 +417,44 @@ async function publishMonthlyOccurrence({
   throw error;
 }
 
+function monthlyCorrectionIdentity({ artifact, reason }) {
+  return [
+    "monthly_confidence_correction_v1",
+    artifact.id,
+    reason,
+    artifact.dependencyManifest.fingerprint,
+  ].map((value) => encodeURIComponent(String(value))).join("|");
+}
+
 function evidenceRefs(artifact) {
   return artifact?.briefing?.provenance?.evidenceRefs ?? [];
+}
+
+function summarizeEvidenceNormalization({
+  artifact,
+  evidenceDescriptors,
+  piEnvelope,
+}) {
+  const descriptors = evidenceDescriptors.map((descriptor) => ({
+    capability: descriptor.capability,
+    agreement: descriptor.agreement,
+    strength: descriptor.strength,
+    sourceEvidenceCount: descriptor.sourceEvidenceIds?.length ?? 0,
+    sourceObservationCount: descriptor.sourceObservationIds?.length ?? 0,
+    limitations: descriptor.limitations ?? descriptor.quality?.limitations ?? [],
+  }));
+  return {
+    schemaVersion: "confidence_evidence_normalization_lineage_v1",
+    dependencyCount:
+      artifact.dependencyManifest?.canonicalDependencies?.length ?? 0,
+    descriptorCount: descriptors.length,
+    descriptorCapabilities: [...new Set(descriptors.map((item) => item.capability))]
+      .sort(),
+    descriptors,
+    envelopeVersion: piEnvelope?.schemaVersion ?? null,
+    sourceEvidenceCount:
+      piEnvelope?.provenance?.sourceEvidenceIds?.length ?? 0,
+  };
 }
 
 export function createMonthlyArtifact({
