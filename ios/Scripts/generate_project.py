@@ -194,7 +194,7 @@ DEPLOYMENT_TARGET = "18.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 9
+APP_BUILD_NUMBER = 10
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
