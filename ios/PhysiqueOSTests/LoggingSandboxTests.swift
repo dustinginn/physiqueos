@@ -276,6 +276,79 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(EvidenceSandboxRouter.scenario(for: nutrition), .mixed)
     }
 
+    func testMyFitnessPalDailyTotalAndMacrosSurviveWhileInterfaceChromeIsExcluded() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .nutrition
+        store.addAttachments([
+            .init(
+                id: "mfp",
+                displayName: "MyFitnessPal.png",
+                source: .photos,
+                contentType: "image/png",
+                extractedText: """
+                MyFitnessPal
+                Calories Carbohydrates Fat Protein
+                Totals 1,234 26 31 189
+                Carbohydrates 26 g
+                Fat 31 g
+                Protein 189 g
+                Breakfast
+                Greek Yogurt
+                Log more
+                Lunch
+                Chicken Breast
+                Add food
+                """
+            ),
+        ])
+
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewId = try await reviewID(store)
+        let item = try XCTUnwrap(store.review(id: reviewId)?.items.first)
+
+        XCTAssertEqual(item.fields.first(where: { $0.id == "calories" })?.value, "1234")
+        XCTAssertEqual(item.fields.first(where: { $0.id == "protein" })?.value, "189")
+        XCTAssertEqual(item.fields.first(where: { $0.id == "carbs" })?.value, "26")
+        XCTAssertEqual(item.fields.first(where: { $0.id == "fat" })?.value, "31")
+        XCTAssertEqual(item.meals.map(\.name), ["Breakfast", "Lunch"])
+        XCTAssertEqual(item.meals.flatMap(\.foods).map(\.name), ["Greek Yogurt", "Chicken Breast"])
+        XCTAssertFalse(item.meals.flatMap(\.foods).contains { $0.name.localizedCaseInsensitiveContains("log more") })
+    }
+
+    func testEvidenceReviewPresentationKeepsSourceFactsReadOnlyAndStrengthEditingCompact() {
+        for category in EvidenceCategory.allCases where category != .progressPhotos {
+            XCTAssertTrue(EvidenceReviewPresentationPolicy.sourceValuesAreReadOnly(for: category))
+        }
+        XCTAssertFalse(EvidenceReviewPresentationPolicy.sourceValuesAreReadOnly(for: .progressPhotos))
+
+        let exercise = EvidenceReviewExercise(
+            id: "curls",
+            name: "Spider Curls",
+            variant: nil,
+            relationship: nil,
+            sets: (1...4).map {
+                .init(id: "set-\($0)", summary: "14 reps @ 50 lb", reps: "14", load: "50", unit: "lb")
+            }
+        )
+        XCTAssertEqual(EvidenceReviewPresentationPolicy.compactSummary(for: exercise), "4 × 14 @ 50 lb")
+
+        let nutrition = EvidenceReviewItem(
+            id: "nutrition",
+            category: .nutrition,
+            title: "Nutrition",
+            occurrenceDate: date(2026, 8, 30),
+            fields: [
+                .init(id: "calories", label: "Calories", value: "1234", unit: "cal", required: false),
+                .init(id: "protein", label: "Protein", value: "189", unit: "g", required: false),
+                .init(id: "carbs", label: "Carbohydrates", value: "26", unit: "g", required: false),
+                .init(id: "fat", label: "Fat", value: "31", unit: "g", required: false),
+            ]
+        )
+        let metrics = EvidenceReviewPresentationPolicy.metrics(for: nutrition)
+        XCTAssertEqual(metrics.map(\.tone), [.calories, .protein, .carbohydrates, .fat])
+        XCTAssertEqual(metrics.map(\.displayValue), ["1234 cal", "189 g", "26 g", "31 g"])
+    }
+
     func testAutomaticImageOnlyPackageRoutesToUnconfirmedProgressPhotoReview() async throws {
         let store = LoggingSandboxStore(now: date(2026, 8, 30))
         store.addAttachments([

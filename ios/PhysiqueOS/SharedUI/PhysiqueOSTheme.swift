@@ -32,6 +32,17 @@ enum PhysiqueOSTheme {
     static let chartEvidence = Color(hex: 0x60A5FA)
     /// `--chart-3` (effort/amber).
     static let chartEffort = Color(hex: 0xFBBF24)
+
+    /// Nutrition semantics mirror the current web dark-theme tokens in
+    /// `src/app/globals.css`. Keeping these centralized preserves visual
+    /// continuity across future Native Nutrition surfaces.
+    static let macroProtein = Color(hex: 0xFB7185)
+    static let macroCarbohydrates = Color(hex: 0xFBBF24)
+    static let macroFat = Color(hex: 0x38BDF8)
+    static let mealBreakfast = Color(hex: 0xFB923C)
+    static let mealLunch = Color(hex: 0x34D399)
+    static let mealDinner = Color(hex: 0xA78BFA)
+    static let mealSnacks = Color(hex: 0xF472B6)
 }
 
 /// Semantic color slots mirroring `IconBadge.jsx`'s `colors` map, so icon

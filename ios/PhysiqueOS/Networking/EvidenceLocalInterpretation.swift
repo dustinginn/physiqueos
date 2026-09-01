@@ -255,10 +255,10 @@ enum EvidenceLocalInterpretation {
         let text = draft.submittedText
         let meals = parseMeals(text)
         let fields = [
-            numericField("calories", "Calories", text, labels: ["calories", "total calories"], unit: "cal", required: false) ?? field("calories", "Calories", "", "cal", required: false),
-            numericField("protein", "Protein", text, labels: ["protein"], unit: "g", required: false) ?? field("protein", "Protein", "", "g", required: false),
-            numericField("carbs", "Carbohydrates", text, labels: ["carbohydrates", "carbs"], unit: "g", required: false) ?? field("carbs", "Carbohydrates", "", "g", required: false),
-            numericField("fat", "Fat", text, labels: ["total fat", "fat"], unit: "g", required: false) ?? field("fat", "Fat", "", "g", required: false),
+            nutritionNumericField("calories", "Calories", text, labels: ["calories", "total calories", "daily calories", "calories consumed"], unit: "cal") ?? field("calories", "Calories", "", "cal", required: false),
+            nutritionNumericField("protein", "Protein", text, labels: ["protein"], unit: "g") ?? field("protein", "Protein", "", "g", required: false),
+            nutritionNumericField("carbs", "Carbohydrates", text, labels: ["carbohydrates", "carbs"], unit: "g") ?? field("carbs", "Carbohydrates", "", "g", required: false),
+            nutritionNumericField("fat", "Fat", text, labels: ["total fat", "fat"], unit: "g") ?? field("fat", "Fat", "", "g", required: false),
         ]
         return .init(
             id: "nutrition-\(UUID().uuidString)",
@@ -346,6 +346,7 @@ enum EvidenceLocalInterpretation {
             for candidate in lines.dropFirst(index + 1) {
                 if mealNames.contains(candidate.lowercased()) { break }
                 if candidate.isEmpty || candidate.range(of: #"\b(calories|protein|carbs|carbohydrates|fat|total)\b"#, options: [.regularExpression, .caseInsensitive]) != nil { continue }
+                if isNutritionInterfaceChrome(candidate) { continue }
                 guard candidate.count >= 3, candidate.count <= 80, candidate.rangeOfCharacter(from: .letters) != nil else { continue }
                 foods.append(.init(id: "food-\(index)-\(foods.count)", name: candidate, detail: "From submitted evidence", calories: nil))
                 if foods.count == 8 { break }
@@ -374,6 +375,58 @@ enum EvidenceLocalInterpretation {
     private static func numericField(_ id: String, _ label: String, _ text: String, labels: [String], unit: String?, required: Bool = true) -> EvidenceReviewField? {
         guard let value = firstNumber(in: text, labels: labels) else { return nil }
         return field(id, label, cleanNumber(value), unit, required: required)
+    }
+
+    /// MyFitnessPal's Nutrition view often places the metric label and value
+    /// on consecutive OCR lines (for example `Calories\n1,842`) while other
+    /// macros remain on one line. The general parser deliberately requires
+    /// close label/value adjacency; Nutrition opts into this bounded,
+    /// label-exact fallback so a neighboring unrelated number cannot be
+    /// silently claimed as the daily total.
+    private static func nutritionNumericField(_ id: String, _ label: String, _ text: String, labels: [String], unit: String) -> EvidenceReviewField? {
+        let value = firstNumber(in: text, labels: labels)
+            ?? firstNumberFollowingNutritionLabel(in: text, labels: labels)
+            ?? (id == "calories" ? firstMyFitnessPalDailyTotal(in: text) : nil)
+        guard let value else { return nil }
+        return field(id, label, cleanNumber(value), unit, required: false)
+    }
+
+    private static func firstNumberFollowingNutritionLabel(in text: String, labels: [String]) -> String? {
+        let lines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let normalizedLabels = Set(labels.map(normalizedNutritionText))
+        for (index, line) in lines.enumerated() where normalizedLabels.contains(normalizedNutritionText(line)) {
+            guard lines.indices.contains(index + 1) else { continue }
+            let next = lines[index + 1]
+            if let match = capture(#"^\s*(\d[\d,]*(?:\.\d+)?)\s*(?:g|cal|kcal)?\s*$"#, in: next), match.count > 1 {
+                return match[1]
+            }
+        }
+        return nil
+    }
+
+    /// MyFitnessPal diary OCR can preserve the row as
+    /// `Totals 1,234 26 31 189` while separately recognizing the macro labels.
+    /// The first number in that explicitly named row is the calories column.
+    private static func firstMyFitnessPalDailyTotal(in text: String) -> String? {
+        let pattern = #"(?m)^\s*(?:totals?|daily total)\s*[:–—-]?\s*(\d[\d,]*(?:\.\d+)?)\b"#
+        guard let match = capture(pattern, in: text), match.count > 1 else { return nil }
+        return match[1]
+    }
+
+    private static func isNutritionInterfaceChrome(_ line: String) -> Bool {
+        let controls: Set<String> = [
+            "log more", "add food", "quick add", "scan meal", "complete diary",
+            "view diary", "edit meal", "add meal", "show more", "see more",
+        ]
+        return controls.contains(normalizedNutritionText(line))
+    }
+
+    private static func normalizedNutritionText(_ value: String) -> String {
+        value.lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
     }
 
     private static func firstNumber(in text: String, labels: [String]) -> String? {

@@ -9,6 +9,7 @@ struct LocalEvidenceReviewView: View {
     @State private var isRereading = false
     @State private var showingDiscard = false
     @State private var focusedNumericFieldID: String?
+    @State private var editingExerciseID: String?
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
     var body: some View {
@@ -44,7 +45,7 @@ struct LocalEvidenceReviewView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(reviewEyebrow(review)).physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
                 Text("Does this look right?").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                Text("Review what PhysiqueOS found. Correct anything that was not read accurately, or exclude it from this upload.")
+                Text("Review what PhysiqueOS found. Re-read or exclude anything that was not captured accurately.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             if let message = review.interpretationMessage { banner(message, destructive: false) }
@@ -82,7 +83,7 @@ struct LocalEvidenceReviewView: View {
                     Text(item.included ? "Included" : "Excluded").physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
                 }
-                fields(item)
+                readOnlyMetrics(item)
                 if !item.exercises.isEmpty { exercises(item) }
                 if !item.meals.isEmpty { meals(item) }
                 if item.nutritionReplacementRequired { nutritionReplacement(item) }
@@ -93,32 +94,25 @@ struct LocalEvidenceReviewView: View {
         }
     }
 
-    private func fields(_ item: EvidenceReviewItem) -> some View {
-        VStack(spacing: 0) {
-            ForEach(item.fields.filter {
-                !["source", "goalRelationship", "linkedGoal"].contains($0.id) && item.category != .progressPhotos
-            }) { field in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(field.label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    Spacer()
-                    if field.unit != nil {
-                        let focusID = fieldFocusID(item: item, field: field)
-                        NumericEditField(
-                            text: fieldBinding(item, field),
-                            accessibilityLabel: field.label,
-                            fieldID: focusID,
-                            focusedFieldID: $focusedNumericFieldID,
-                            previousFieldID: KeyboardFocusOrder.previous(before: focusID, in: numericFocusOrder),
-                            nextFieldID: KeyboardFocusOrder.next(after: focusID, in: numericFocusOrder)
-                        )
-                        .frame(height: 36)
-                    } else {
-                        TextField(field.required ? "Required" : "Optional", text: fieldBinding(item, field)).multilineTextAlignment(.trailing)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    if let unit = field.unit { Text(unit).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.textMuted) }
-                }.padding(.vertical, 9)
-                Divider().overlay(PhysiqueOSTheme.divider)
+    private func readOnlyMetrics(_ item: EvidenceReviewItem) -> some View {
+        let metrics = EvidenceReviewPresentationPolicy.metrics(for: item)
+        return LazyVGrid(columns: Self.metricColumns, spacing: 10) {
+            ForEach(metrics) { metric in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(metric.label.uppercased())
+                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                        .foregroundStyle(metric.tintColor)
+                    Text(metric.displayValue)
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(metric.value.isEmpty ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                .padding(10)
+                .background(metric.tintColor.opacity(metric.tone == .standard ? 0.06 : 0.11))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(metric.label), \(metric.displayValue)")
             }
         }
     }
@@ -127,51 +121,87 @@ struct LocalEvidenceReviewView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Exercises").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.exercises) { exercise in
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        TextField("Exercise", text: exerciseNameBinding(item, exercise)).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        Menu(exercise.variant ?? "Standard") { variant("Standard", exercise, item); variant("3-Second Pause", exercise, item); variant("Static Hold", exercise, item) }.physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    }
-                    if let relationship = exercise.relationship { Text(relationship).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent) }
-                    ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
-                        if set.reps != nil || set.load != nil {
-                            HStack(spacing: 8) {
-                                Text("\(index + 1)").frame(width: 18, alignment: .leading)
-                                let repsID = setFocusID(item: item, exercise: exercise, set: set, field: "reps")
-                                NumericEditField(
-                                    text: setValueBinding(item, exercise, set, keyPath: \.reps),
-                                    accessibilityLabel: "\(exercise.name), set \(index + 1) reps",
-                                    fieldID: repsID,
-                                    focusedFieldID: $focusedNumericFieldID,
-                                    previousFieldID: KeyboardFocusOrder.previous(before: repsID, in: numericFocusOrder),
-                                    nextFieldID: KeyboardFocusOrder.next(after: repsID, in: numericFocusOrder)
-                                ).frame(height: 34)
-                                Text("reps").foregroundStyle(PhysiqueOSTheme.textMuted)
-                                let loadID = setFocusID(item: item, exercise: exercise, set: set, field: "load")
-                                NumericEditField(
-                                    text: setValueBinding(item, exercise, set, keyPath: \.load),
-                                    accessibilityLabel: "\(exercise.name), set \(index + 1) load",
-                                    fieldID: loadID,
-                                    focusedFieldID: $focusedNumericFieldID,
-                                    previousFieldID: KeyboardFocusOrder.previous(before: loadID, in: numericFocusOrder),
-                                    nextFieldID: KeyboardFocusOrder.next(after: loadID, in: numericFocusOrder)
-                                ).frame(height: 34)
-                                Text(set.unit ?? "lb").foregroundStyle(PhysiqueOSTheme.textMuted)
+                let isEditing = editingExerciseID == exercise.id
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(exercise.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            Text(EvidenceReviewPresentationPolicy.compactSummary(for: exercise))
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            if let variant = exercise.variant {
+                                Text("Variant: \(variant)").physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.accent)
                             }
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .padding(.vertical, 4)
-                        } else {
-                            Text("• \(set.summary)").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            if let relationship = exercise.relationship {
+                                Text(relationship).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.accent)
+                            }
                         }
+                        Spacer(minLength: 8)
+                        Button(isEditing ? "Done" : "Edit") {
+                            focusedNumericFieldID = nil
+                            PhysiqueOSKeyboard.dismiss()
+                            editingExerciseID = isEditing ? nil : exercise.id
+                        }
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
                     }
-                }.padding(.vertical, 6)
+                    if isEditing { compactSetEditor(item: item, exercise: exercise) }
+                }
+                .padding(.vertical, 9)
+                Divider().overlay(PhysiqueOSTheme.divider)
             }
         }
     }
 
+    private func compactSetEditor(item: EvidenceReviewItem, exercise: EvidenceReviewExercise) -> some View {
+        VStack(spacing: 6) {
+            ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
+                if set.reps != nil || set.load != nil {
+                    HStack(spacing: 7) {
+                        Text("\(index + 1)").frame(width: 18, alignment: .leading)
+                        if set.reps != nil {
+                            let repsID = setFocusID(item: item, exercise: exercise, set: set, field: "reps")
+                            NumericEditField(
+                                text: setValueBinding(item, exercise, set, keyPath: \.reps),
+                                accessibilityLabel: "\(exercise.name), set \(index + 1) reps",
+                                fieldID: repsID,
+                                focusedFieldID: $focusedNumericFieldID,
+                                previousFieldID: KeyboardFocusOrder.previous(before: repsID, in: numericFocusOrder),
+                                nextFieldID: KeyboardFocusOrder.next(after: repsID, in: numericFocusOrder)
+                            ).frame(width: 74, height: 34)
+                            Text("reps").foregroundStyle(PhysiqueOSTheme.textMuted)
+                        }
+                        if set.load != nil {
+                            let loadID = setFocusID(item: item, exercise: exercise, set: set, field: "load")
+                            NumericEditField(
+                                text: setValueBinding(item, exercise, set, keyPath: \.load),
+                                accessibilityLabel: "\(exercise.name), set \(index + 1) load",
+                                fieldID: loadID,
+                                focusedFieldID: $focusedNumericFieldID,
+                                previousFieldID: KeyboardFocusOrder.previous(before: loadID, in: numericFocusOrder),
+                                nextFieldID: KeyboardFocusOrder.next(after: loadID, in: numericFocusOrder)
+                            ).frame(width: 74, height: 34)
+                            Text(set.unit ?? "lb").foregroundStyle(PhysiqueOSTheme.textMuted)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                } else {
+                    Text("\(index + 1)  \(set.summary)")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+        }
+        .padding(9)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
     private func meals(_ item: EvidenceReviewItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Meals read from this upload").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+            Text("Meals").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.meals) { meal in
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 0) {
@@ -200,12 +230,17 @@ struct LocalEvidenceReviewView: View {
                         }
                     }
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(meal.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        Text(meal.summary).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    HStack(spacing: 9) {
+                        Circle().fill(EvidenceReviewPresentationPolicy.mealTint(for: meal.name)).frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(meal.name).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            Text(meal.summary).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .tint(EvidenceReviewPresentationPolicy.mealTint(for: meal.name))
+                Divider().overlay(PhysiqueOSTheme.divider)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -392,8 +427,7 @@ struct LocalEvidenceReviewView: View {
     private var numericFocusOrder: [String] {
         guard let review = store.review(id: reviewId) else { return [] }
         return review.items.flatMap { item in
-            let fields = item.fields.filter { $0.unit != nil }.map { fieldFocusID(item: item, field: $0) }
-            let sets = item.exercises.flatMap { exercise in
+            item.exercises.filter { $0.id == editingExerciseID }.flatMap { exercise in
                 exercise.sets.flatMap { set -> [String] in
                     var ids: [String] = []
                     if set.reps != nil { ids.append(setFocusID(item: item, exercise: exercise, set: set, field: "reps")) }
@@ -401,12 +435,7 @@ struct LocalEvidenceReviewView: View {
                     return ids
                 }
             }
-            return fields + sets
         }
-    }
-
-    private func fieldFocusID(item: EvidenceReviewItem, field: EvidenceReviewField) -> String {
-        "field|\(item.id)|\(field.id)"
     }
 
     private func setFocusID(item: EvidenceReviewItem, exercise: EvidenceReviewExercise, set: EvidenceReviewSet, field: String) -> String {
@@ -414,11 +443,6 @@ struct LocalEvidenceReviewView: View {
     }
 
     private func reread() { isRereading = true; rereadMessage = nil; Task { @MainActor in switch await store.reprocessReview(id: reviewId) { case .success: rereadMessage = "The selected upload was read again. Review the refreshed values."; case .failure(let error): errorMessage = error.message }; isRereading = false } }
-    private func fieldBinding(_ item: EvidenceReviewItem, _ field: EvidenceReviewField) -> Binding<String> { .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.fields.first(where: { $0.id == field.id })?.value ?? "" }, set: { updateField(item, field.id, $0) }) }
-    private func exerciseNameBinding(_ item: EvidenceReviewItem, _ exercise: EvidenceReviewExercise) -> Binding<String> { .init(
-        get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.exercises.first(where: { $0.id == exercise.id })?.name ?? "" },
-        set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) { updated.exercises[index].name = value } } }
-    ) }
     private func setValueBinding(_ item: EvidenceReviewItem, _ exercise: EvidenceReviewExercise, _ set: EvidenceReviewSet, keyPath: WritableKeyPath<EvidenceReviewSet, String?>) -> Binding<String> { .init(
         get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.exercises.first(where: { $0.id == exercise.id })?.sets.first(where: { $0.id == set.id })?[keyPath: keyPath] ?? "" },
         set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let exerciseIndex = updated.exercises.firstIndex(where: { $0.id == exercise.id }), let setIndex = updated.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == set.id }) else { return }; updated.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = value; updated.exercises[exerciseIndex].sets[setIndex].refreshSummary() } }
@@ -426,11 +450,90 @@ struct LocalEvidenceReviewView: View {
     private func updateField(_ item: EvidenceReviewItem, _ id: String, _ value: String) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.fields.firstIndex(where: { $0.id == id }) { updated.fields[index].value = value } } }
     private func updatePhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, orientation: ProgressPhotoOrientation? = nil, contraction: ProgressPhotoContraction? = nil, poseVariant: ProgressPhotoPoseVariant? = nil) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; if let orientation { updated.photoIdentities[index].orientation = orientation }; if let contraction { updated.photoIdentities[index].contraction = contraction }; if let poseVariant { updated.photoIdentities[index].poseVariant = poseVariant }; updated.photoIdentities[index].confirmed = false } }
     private func confirmPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; updated.photoIdentities[index].confirmed = updated.photoIdentities[index].orientation != .unconfirmed && updated.photoIdentities[index].contraction != .unconfirmed } }
-    private func variant(_ label: String, _ exercise: EvidenceReviewExercise, _ item: EvidenceReviewItem) -> some View { Button(label) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) { updated.exercises[index].variant = label == "Standard" ? nil : label } } } }
-    private func nutritionBinding(_ item: EvidenceReviewItem) -> Binding<NutritionReviewDisposition?> { .init(get: { store.review(id: reviewId)?.items.first(where: { $0.id == item.id })?.nutritionDisposition }, set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { $0.nutritionDisposition = value } }) }
     private func banner(_ text: String, destructive: Bool) -> some View { Text(text).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background((destructive ? PhysiqueOSTheme.destructive : Color.yellow).opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 12)) }
     private func reviewEyebrow(_ review: LocalEvidenceReview) -> String { Set(review.items.map(\.category)).count > 1 ? "UPLOAD FOUND" : (review.category == .training ? "WORKOUT FOUND" : "\(review.category.title.uppercased()) FOUND") }
+    private static let metricColumns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
     private static let dateFormatter: DateFormatter = { let f = DateFormatter(); f.dateStyle = .medium; return f }()
 }
 
 private extension View { func secondaryReviewButton() -> some View { frame(maxWidth: .infinity, minHeight: 48).background(PhysiqueOSTheme.surfaceElevated).clipShape(RoundedRectangle(cornerRadius: 12)).physiqueOSFont(PhysiqueOSTypography.label14Heavy) } }
+
+enum EvidenceReviewMetricTone: Equatable {
+    case standard, calories, protein, carbohydrates, fat
+}
+
+struct EvidenceReviewMetricPresentation: Identifiable, Equatable {
+    var id: String
+    var label: String
+    var value: String
+    var unit: String?
+    var tone: EvidenceReviewMetricTone
+
+    var displayValue: String {
+        guard !value.isEmpty else { return "Not read" }
+        guard let unit, !unit.isEmpty else { return value }
+        return "\(value) \(unit)"
+    }
+
+    var tintColor: Color {
+        switch tone {
+        case .standard: PhysiqueOSTheme.accent
+        case .calories: PhysiqueOSTheme.chartSuccess
+        case .protein: PhysiqueOSTheme.macroProtein
+        case .carbohydrates: PhysiqueOSTheme.macroCarbohydrates
+        case .fat: PhysiqueOSTheme.macroFat
+        }
+    }
+}
+
+enum EvidenceReviewPresentationPolicy {
+    /// Uploaded source facts are verification-only. Progress Photos retain
+    /// their established pose/session controls, while strength set structure
+    /// is edited through its explicit compact editor rather than these facts.
+    static func sourceValuesAreReadOnly(for category: EvidenceCategory) -> Bool {
+        category != .progressPhotos
+    }
+
+    static func metrics(for item: EvidenceReviewItem) -> [EvidenceReviewMetricPresentation] {
+        guard sourceValuesAreReadOnly(for: item.category) else { return [] }
+        return item.fields.compactMap { field in
+            guard !["source", "goalRelationship", "linkedGoal"].contains(field.id) else { return nil }
+            let tone: EvidenceReviewMetricTone = switch field.id {
+            case "calories": .calories
+            case "protein": .protein
+            case "carbs": .carbohydrates
+            case "fat": .fat
+            default: .standard
+            }
+            let label = field.id == "duration" && item.category == .training ? "Duration" : field.label
+            return .init(id: field.id, label: label, value: field.value, unit: field.unit, tone: tone)
+        }
+    }
+
+    static func compactSummary(for exercise: EvidenceReviewExercise) -> String {
+        guard !exercise.sets.isEmpty else { return "Set details unavailable" }
+        var ordered: [(key: String, count: Int)] = []
+        for set in exercise.sets {
+            let key: String
+            if let reps = set.reps, let load = set.load {
+                key = "\(reps) @ \(load) \(set.unit ?? "lb")"
+            } else if let reps = set.reps {
+                key = "\(reps) reps"
+            } else {
+                key = set.summary
+            }
+            if let index = ordered.firstIndex(where: { $0.key == key }) { ordered[index].count += 1 }
+            else { ordered.append((key, 1)) }
+        }
+        return ordered.map { "\($0.count) × \($0.key)" }.joined(separator: " · ")
+    }
+
+    static func mealTint(for name: String) -> Color {
+        switch name.lowercased() {
+        case "breakfast": PhysiqueOSTheme.mealBreakfast
+        case "lunch": PhysiqueOSTheme.mealLunch
+        case "snack", "snacks": PhysiqueOSTheme.mealSnacks
+        default: PhysiqueOSTheme.mealDinner
+        }
+    }
+}
