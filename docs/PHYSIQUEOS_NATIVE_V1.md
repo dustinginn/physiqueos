@@ -2381,3 +2381,90 @@ Operating Plan behavior was unchanged.
   including schedules/times, cadences, enabled states, phase history/strategy,
   every protocol, Tracking, Progress Photos/DEXA schedules, reminders, and
   support schedules. Never reconstruct Founder preferences from fixture defaults.
+
+## 2026-09-01 — Direct-upload Training exercise-boundary fix (branch `claude/native-v1-training-direct-upload`, not yet merged to `native-v1`)
+
+A real Build 11 physical-device failure was root-caused and fixed: typing
+"Bicep curls" then "Pull ups" as two separate exercises in a direct upload's
+typed workout details silently merged Pull Ups' four sets into Bicep Curls
+(a false 8-set Bicep Curls summary), while "Spider curls" typed the same way
+never exhibited the bug. Both behaviors trace to one function,
+`EvidenceLocalInterpretation.parseExercises` (`ios/PhysiqueOS/Networking/
+EvidenceLocalInterpretation.swift`): a line was only recognized as starting a
+new exercise *if its text contained one of a dozen hardcoded keyword
+substrings* (`curls?`, `presses?`, `pullups?`, …). "Spider curls" matched
+`curls?` and was recognized; "Pull ups" — two words, no substring in the
+list matches "pull ups" the way it matches "pullups" — matched nothing, so
+the line was silently skipped and its following set lines kept appending to
+whichever exercise was still active. This was never a Pull-Ups-specific gap:
+any real exercise name outside the keyword list (confirmed by inspection —
+"Bicep Curls" itself is not in the current Training Logger catalog either)
+carried the identical latent defect.
+
+**Root cause, proven from source, not assumed:** boundary detection was
+gated on keyword content instead of structural position. The fix inverts
+that order per the task's own required invariant — parse exercise-block
+boundaries first, resolve identity independently and second. `looksLikeExerciseHeading(_:nextLine:)`
+now primarily recognizes a heading structurally (a line with no digits
+whose next content line reads as a set — reusing the exact continuation
+regexes `parseExercises` already parses sets with), falling back to the
+keyword list only when no following set line is available to check. Every
+recognized heading becomes its own occurrence *before* any canonical
+lookup, so an exercise name the app has never seen can no longer lose its
+sets to the previous exercise.
+
+**Canonical resolution was added, reusing Workout Logger's exact catalog —
+not a second exercise domain.** `EvidenceReviewExercise` gained
+`canonicalExerciseId: String?` and `isProvisional: Bool`, mirroring
+`TrainingLoggerDraftExercise`'s own fields and its `addProvisionalExercise`
+philosophy exactly: an unresolved exercise remains a fully distinct,
+immediately includable occurrence, never dropped, merged, silently renamed,
+or given a fabricated identity. `TrainingExerciseCatalogLoader` (new, small)
+reads the same bundled `TrainingLoggerFixture.json` `FixtureTrainingLoggerAPI`
+already decodes — a second synchronous read path for a call site that
+cannot `await`, not a second canonical store. Resolution is case-insensitive
+exact name matching, the only strategy the native catalog itself supports
+today (it carries no alias map); "Spider Curls" resolves to its real
+`spider-curls` identity, "Bicep Curls" and "Pull Ups" both remain
+provisional because neither is in the current (small, real) catalog.
+Execution variants (a trailing parenthetical, e.g. "Spider Curls (Slow
+Eccentric)") are split from the base name before resolution and preserved
+verbatim in `EvidenceReviewExercise.variant` — matching
+`TrainingExecutionVariant`'s own documented model, freeform text is never a
+"resolution failure" requiring a gate, since the architecture does not
+treat variants as a closed set.
+
+**Evidence Review gained the minimum UI for this, not a redesign.** A
+provisional exercise now shows "New exercise · not yet in your Training
+library" and a "Match Exercise" menu (`LocalEvidenceReviewView`) listing
+the real Training Logger catalog, loaded through the existing
+`environment.trainingLoggerAPI`; selecting a candidate sets
+`canonicalExerciseId`/`name` and clears `isProvisional`, entirely as
+`LoggingSandboxStore` local state — no server write exists or is claimed.
+Everything already accepted (read-only Apple Health metric boxes, compact
+per-exercise summaries/editor, Included/Exclude) is unchanged.
+
+Verified against the exact Founder reproduction text
+(`"Bicep curls\n12r 50p x4\n\nPull ups\n12r 60p x4"`), the Spider Curls
+comparison, three-exercise (known + two different unresolved) boundary
+integrity with typed order preserved, a five-case variant matrix (known
+base with no/known/new variant; unknown exercise with no/new variant text),
+and Match Exercise reconciliation preserving an occurrence's sets exactly —
+six new tests in `LoggingSandboxTests.swift`, plus the full existing
+Workout Logger suite (`TrainingLoggerTests`, `TrainingReadModelTests`)
+confirmed unaffected.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Route "Match Exercise" and any future direct-upload "Create new exercise"
+  confirmation through the same server-owned canonicalization/versioning
+  commands Workout Logger's own Create-new-exercise flow will use once
+  Native authentication/server APIs are connected — this patch intentionally
+  stops at the correct local/domain boundary and does not fabricate
+  persistence.
+- If the canonical exercise registry gains a real alias map, resolve direct
+  upload against it the same way Workout Logger does, rather than
+  re-deriving a second alias strategy here.
+- Extend `resolveCanonicalExercise` beyond exact-name matching only if
+  Workout Logger's own resolution strategy is extended first, so the two
+  surfaces do not silently diverge in what "the same exercise" means.
