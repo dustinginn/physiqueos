@@ -36,7 +36,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.summary.currentWeight?.unit, "lb")
         XCTAssertEqual(try store.loadRefreshCredential(), String(repeating: "s", count: 43))
         let requests = await transport.requests
-        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/v1/native/auth/refresh", "/api/v1/native/weight/summary"])
+        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/v1/native/sandbox/auth/refresh", "/api/v1/native/sandbox/weight/summary"])
         let refreshBody = try XCTUnwrap(requests[0].httpBody)
         XCTAssertEqual(try JSONSerialization.jsonObject(with: refreshBody) as? [String: String], ["refreshCredential": String(repeating: "r", count: 43)])
     }
@@ -57,8 +57,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.summary.currentWeight?.id, "weight-1")
         let requests = await transport.requests
         XCTAssertEqual(requests.map { $0.url?.path }, [
-            "/api/v1/native/auth/pair", "/api/v1/native/weight/summary",
-            "/api/v1/native/auth/refresh", "/api/v1/native/weight/summary",
+            "/api/v1/native/sandbox/auth/pair", "/api/v1/native/sandbox/weight/summary",
+            "/api/v1/native/sandbox/auth/refresh", "/api/v1/native/sandbox/weight/summary",
         ])
         XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "b", count: 43))")
     }
@@ -129,6 +129,42 @@ final class FounderServerAPITests: XCTestCase {
         _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
         let result = try await api.readCurrentWeight()
         XCTAssertEqual(result.summary.currentWeight?.measurementDate, "2026-08-31")
+    }
+
+    func testWeightFastPathSendsOriginalBytesAndLocalCandidateToSandboxOnly() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, #"{"id":"review-1","status":"pending","version":1,"occurrenceDate":"2026-08-31","candidate":{"value":168.4,"unit":"lb","confidence":0.97,"disposition":"deterministic_review_ready"}}"#),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let candidate = NativeSandboxWeightCandidate(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-acceptance-1",
+            candidateType: "weight",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb",
+            confidence: 0.97,
+            localParserVersion: "ios-vision-weight-v1",
+            assetSha256: String(repeating: "a", count: 64),
+            founderContext: nil,
+            fieldProvenance: .init(value: .init(source: "native_local_extraction", regions: [.init(page: 1, text: "168.4 lb")]))
+        )
+        let asset = Data("actual screenshot bytes".utf8)
+
+        let review = try await api.submitWeightCandidate(candidate, asset: asset, filename: "weight.png", contentType: "image/png")
+
+        XCTAssertEqual(review.candidate.value, 168.4)
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.last)
+        XCTAssertEqual(request.url?.path, "/api/v1/native/sandbox/weight/candidates")
+        XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+        let body = try XCTUnwrap(request.httpBody)
+        XCTAssertNotNil(body.range(of: asset))
+        XCTAssertNotNil(body.range(of: Data("\"measurementDate\":\"2026-08-31\"".utf8)))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
     }
 }
 

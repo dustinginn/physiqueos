@@ -31,6 +31,52 @@ struct FounderWeightReadResult: Sendable, Equatable {
     let requestDurationMilliseconds: Int
 }
 
+/// Candidate-only transport for the server sandbox. Native's Vision/OCR
+/// result remains noncanonical until the server validates the original asset
+/// and stages a server-owned Evidence Review.
+struct NativeSandboxWeightCandidate: Encodable, Sendable, Equatable {
+    let submissionIdentity: String
+    let idempotencyKey: String
+    let candidateType: String
+    let measurementDate: String
+    let value: Double
+    let unit: String
+    let confidence: Double
+    let localParserVersion: String
+    let assetSha256: String
+    let founderContext: String?
+    let fieldProvenance: FieldProvenance
+
+    struct FieldProvenance: Encodable, Sendable, Equatable {
+        let value: ValueProvenance
+    }
+
+    struct ValueProvenance: Encodable, Sendable, Equatable {
+        let source: String
+        let regions: [Region]
+    }
+
+    struct Region: Encodable, Sendable, Equatable {
+        let page: Int
+        let text: String
+    }
+}
+
+struct NativeSandboxWeightReview: Decodable, Sendable, Equatable {
+    let id: String
+    let status: String
+    let version: Int
+    let occurrenceDate: String
+    let candidate: Candidate
+
+    struct Candidate: Decodable, Sendable, Equatable {
+        let value: Double
+        let unit: String
+        let confidence: Double
+        let disposition: String
+    }
+}
+
 struct FounderServerProblem: Decodable, Sendable, Equatable {
     let status: Int
     let code: String

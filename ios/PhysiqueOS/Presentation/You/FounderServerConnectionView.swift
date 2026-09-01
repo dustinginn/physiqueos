@@ -16,9 +16,9 @@ struct FounderServerConnectionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 OperatingPlanScreenHeader(
-                    eyebrow: "LIVE SERVER",
-                    title: "Founder device connection",
-                    subtitle: "Securely connect this iPhone, then verify one read-only Weight summary from PhysiqueOS."
+                    eyebrow: "SERVER SANDBOX",
+                    title: "Sandbox server connection",
+                    subtitle: "Securely connect this iPhone to the isolated acceptance environment, then verify one read-only Weight summary."
                 )
 
                 StatusChip(text: isConnected ? "Device session available" : "Not connected", color: isConnected ? .success : .warning)
@@ -50,7 +50,7 @@ struct FounderServerConnectionView: View {
                 if let result {
                     CardContainer(padding: .md) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Live Weight summary")
+                            Text("Sandbox Weight summary")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             if let weight = result.summary.currentWeight {
@@ -85,7 +85,7 @@ struct FounderServerConnectionView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
-        .navigationTitle("Server connection")
+        .navigationTitle("Sandbox connection")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             isConnected = (try? await environment.founderServerAPI.hasStoredSession()) == true

@@ -22,7 +22,8 @@ struct URLSessionFounderHTTPTransport: FounderHTTPTransport {
 /// every successful pairing/refresh atomically replaces the rotating refresh
 /// credential in the injected Keychain-backed store.
 actor FounderServerAPI {
-    static let productionOrigin = URL(string: "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app")!
+    static let sandboxOrigin = URL(string: "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app")!
+    private static let sandboxRoutePrefix = "/api/v1/native/sandbox"
 
     private let baseURL: URL
     private let credentialStore: FounderRefreshCredentialStore
@@ -32,7 +33,7 @@ actor FounderServerAPI {
     private var accessToken: String?
 
     init(
-        baseURL: URL = FounderServerAPI.productionOrigin,
+        baseURL: URL = FounderServerAPI.sandboxOrigin,
         credentialStore: FounderRefreshCredentialStore = KeychainFounderCredentialStore(),
         transport: FounderHTTPTransport = URLSessionFounderHTTPTransport()
     ) {
@@ -50,7 +51,7 @@ actor FounderServerAPI {
     @discardableResult
     func pair(pairingCredential: String, displayName: String) async throws -> FounderServerSession {
         let payload = PairRequest(pairingCredential: pairingCredential, platform: "ios", displayName: displayName)
-        let session: FounderServerSession = try await sendJSON(path: "/api/v1/native/auth/pair", method: "POST", body: payload)
+        let session: FounderServerSession = try await sendJSON(path: "\(Self.sandboxRoutePrefix)/auth/pair", method: "POST", body: payload)
         try persist(session)
         return session
     }
@@ -59,18 +60,40 @@ actor FounderServerAPI {
         let startedAt = ContinuousClock.now
         let token = try await validAccessToken()
         do {
-            let summary: FounderWeightSummary = try await send(path: "/api/v1/native/weight/summary", method: "GET", bearer: token)
+            let summary: FounderWeightSummary = try await send(path: "\(Self.sandboxRoutePrefix)/weight/summary", method: "GET", bearer: token)
             return FounderWeightReadResult(summary: summary, requestDurationMilliseconds: elapsedMilliseconds(since: startedAt))
         } catch FounderServerError.accessTokenExpired {
             let refreshedToken = try await refreshAccessToken()
-            let summary: FounderWeightSummary = try await send(path: "/api/v1/native/weight/summary", method: "GET", bearer: refreshedToken)
+            let summary: FounderWeightSummary = try await send(path: "\(Self.sandboxRoutePrefix)/weight/summary", method: "GET", bearer: refreshedToken)
             return FounderWeightReadResult(summary: summary, requestDurationMilliseconds: elapsedMilliseconds(since: startedAt))
+        }
+    }
+
+    /// Prepares the real-asset Weight acceptance path without committing a
+    /// canonical Weight record. The server receives both the original bytes
+    /// and Native's local candidate and remains responsible for validation.
+    func submitWeightCandidate(
+        _ candidate: NativeSandboxWeightCandidate,
+        asset: Data,
+        filename: String,
+        contentType: String
+    ) async throws -> NativeSandboxWeightReview {
+        let token = try await validAccessToken()
+        do {
+            return try await sendMultipartWeightCandidate(
+                candidate, asset: asset, filename: filename, contentType: contentType, bearer: token
+            )
+        } catch FounderServerError.accessTokenExpired {
+            let refreshedToken = try await refreshAccessToken()
+            return try await sendMultipartWeightCandidate(
+                candidate, asset: asset, filename: filename, contentType: contentType, bearer: refreshedToken
+            )
         }
     }
 
     func revokeCurrentSession() async throws {
         let token = try await validAccessToken()
-        let _: RevocationResponse = try await send(path: "/api/v1/native/auth/session", method: "DELETE", bearer: token)
+        let _: RevocationResponse = try await send(path: "\(Self.sandboxRoutePrefix)/auth/session", method: "DELETE", bearer: token)
         accessToken = nil
         try credentialStore.deleteRefreshCredential()
     }
@@ -93,7 +116,7 @@ actor FounderServerAPI {
 
         do {
             let session: FounderServerSession = try await sendJSON(
-                path: "/api/v1/native/auth/refresh",
+                path: "\(Self.sandboxRoutePrefix)/auth/refresh",
                 method: "POST",
                 body: RefreshRequest(refreshCredential: refreshCredential)
             )
@@ -134,6 +157,25 @@ actor FounderServerAPI {
     private func send<Response: Decodable>(path: String, method: String, bearer: String) async throws -> Response {
         var request = request(path: path, method: method)
         request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        return try await execute(request)
+    }
+
+    private func sendMultipartWeightCandidate(
+        _ candidate: NativeSandboxWeightCandidate,
+        asset: Data,
+        filename: String,
+        contentType: String,
+        bearer: String
+    ) async throws -> NativeSandboxWeightReview {
+        let boundary = "PhysiqueOSNativeWeight\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        var request = request(path: "\(Self.sandboxRoutePrefix)/weight/candidates", method: "POST")
+        request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.appendMultipartField(name: "candidate", value: try encoder.encode(candidate), boundary: boundary, contentType: "application/json")
+        body.appendMultipartFile(name: "asset", filename: filename, contentType: contentType, data: asset, boundary: boundary)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
         return try await execute(request)
     }
 
@@ -191,6 +233,24 @@ actor FounderServerAPI {
     private func elapsedMilliseconds(since instant: ContinuousClock.Instant) -> Int {
         let components = instant.duration(to: .now).components
         return max(0, Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000))
+    }
+}
+
+private extension Data {
+    mutating func appendMultipartField(name: String, value: Data, boundary: String, contentType: String) {
+        append("--\(boundary)\r\n".data(using: .utf8)!)
+        append("Content-Disposition: form-data; name=\"\(name)\"\r\n".data(using: .utf8)!)
+        append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
+        append(value)
+        append("\r\n".data(using: .utf8)!)
+    }
+
+    mutating func appendMultipartFile(name: String, filename: String, contentType: String, data: Data, boundary: String) {
+        append("--\(boundary)\r\n".data(using: .utf8)!)
+        append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
+        append(data)
+        append("\r\n".data(using: .utf8)!)
     }
 }
 
