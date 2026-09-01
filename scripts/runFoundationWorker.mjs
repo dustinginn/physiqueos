@@ -21,6 +21,12 @@ import {
 import {
   createEvidenceReviewContinuationWorkerHandler,
 } from "../src/platform/jobs/EvidenceReviewContinuationWorker.js";
+import {
+  createNativeSandboxWorkerComposition,
+  inspectNativeSandboxIntelligenceIsolation,
+} from "../src/platform/sandbox/NativeSandboxWorkerComposition.js";
+import { getNativeSandboxApplicationComposition } from
+  "../src/application/composition/nativeSandboxApplicationComposition.js";
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
@@ -43,7 +49,9 @@ const buildIdentity = readBuildIdentity();
 const logger = createStructuredLogger({ buildIdentity });
 const adapters = createFoundationPostgresAdapters({ query: (text, values) => pool.query(text, values) });
 const controller = new AbortController();
+const providerWorkerId = process.env.PHYSIQUEOS_WORKER_ID || createUuidV7();
 const workerBootProbe = process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1";
+const nativeSandboxEnabled = process.env.PHYSIQUEOS_NATIVE_SANDBOX_ENABLED === "1";
 const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
 const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT")
@@ -76,6 +84,28 @@ const evidenceIntakeStore = ownerUserId && !compatibilityMode && !workerBootProb
       migrationOperationId: process.env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
     })
   : null;
+const nativeSandboxComposition = nativeSandboxEnabled
+  ? getNativeSandboxApplicationComposition(process.env)
+  : null;
+const nativeSandboxWorker = nativeSandboxComposition
+  ? createNativeSandboxWorkerComposition({
+      composition: nativeSandboxComposition,
+      buildId: buildIdentity.buildId,
+      workerId: `${providerWorkerId}-native-sandbox`,
+      logger,
+      maximumAttempts: readMaximumAttempts(process.env.PHYSIQUEOS_WORKER_MAX_ATTEMPTS),
+    })
+  : null;
+if (nativeSandboxComposition) {
+  const inspection = await inspectNativeSandboxIntelligenceIsolation(
+    nativeSandboxComposition
+  );
+  logger.info("native.sandbox.worker.ready", {
+    authorityId: nativeSandboxComposition.authority.descriptor.authorityId,
+    databaseName: inspection.databaseName,
+    cadenceScheduled: inspection.cadenceScheduled,
+  });
+}
 
 const simplifiedOperationStore = simplifiedMigration
   ? simplifiedMigration.createPostgresSimplifiedProviderMigrationOperationStore({
@@ -168,7 +198,7 @@ const handlers = Object.freeze({
 const worker = createDurableOutboxWorker({
   store: adapters.outbox,
   handlers,
-  workerId: process.env.PHYSIQUEOS_WORKER_ID || createUuidV7(),
+  workerId: providerWorkerId,
   buildId: buildIdentity.buildId,
   logger,
   maximumAttempts: readMaximumAttempts(process.env.PHYSIQUEOS_WORKER_MAX_ATTEMPTS),
@@ -195,7 +225,9 @@ if (workerBootProbe) {
       process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1",
     simplifiedMigrationHandlerRegistered: Boolean(simplifiedOperationStore),
     migrationCoordinatorProcessModel: "in-process-existing-worker",
+    nativeSandboxWorkerRegistered: Boolean(nativeSandboxWorker),
   })}\n`);
+  await nativeSandboxComposition?.pool?.end?.();
   await pool.end();
 } else {
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
@@ -203,6 +235,12 @@ if (workerBootProbe) {
     const loops = [
       runWorkerLoop({ worker: effectiveWorker, signal: controller.signal }),
     ];
+    if (nativeSandboxWorker) {
+      loops.push(runWorkerLoop({
+        worker: nativeSandboxWorker,
+        signal: controller.signal,
+      }));
+    }
     if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {
       const [{ createProviderBriefingCadenceRunner }, {
         loadApplicationCanonicalCommitBindings,
@@ -240,6 +278,8 @@ if (workerBootProbe) {
     process.exitCode = 1;
   } finally {
     evidenceIntakeObjectProvider?.close?.();
+    nativeSandboxComposition?.objectProvider?.close?.();
+    await nativeSandboxComposition?.pool?.end?.();
     await pool.end();
   }
 }

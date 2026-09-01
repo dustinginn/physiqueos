@@ -50,6 +50,6 @@ Prepared versioned routes are under `/api/v1/native/sandbox/**` for pairing/sess
 
 ## Worker, PI, Briefing, and Event boundary
 
-Future sandbox processing reuses the existing handler/service factories with a separate sandbox database pool. Every message is authority-tagged and verified before delegation. PI, Confidence, Briefing, Event, and Home projections publish only through an owner/database guard. No additional worker instance is required: the existing worker process can later host a second explicitly configured loop without increasing App Platform capacity.
+Sandbox processing reuses the existing durable worker in the existing worker process with a separate sandbox database pool. The sandbox loop claims only `native.sandbox.weight.confirmed`, and every message is authority-tagged and database-verified before delegation. The confirmed Weight must exist under the sandbox owner before the continuation is acknowledged. PI, Confidence, Briefing, Event, Goal, and Home inputs are inspected through the same sandbox database boundary. Cadence remains unscheduled until a later explicitly authorized PI/Briefing/Event acceptance task.
 
-This candidate does not activate the loop, call OpenAI, trigger PI, publish Briefings/Events, or create provider resources. The next acceptance task is expected to provision and migrate the isolated database under explicit Founder authorization, bootstrap the first sandbox device, and execute the Weight ladder end to end.
+Activation enables only this narrow continuation loop. It does not call OpenAI, trigger PI, publish Briefings/Events, or pair a device. A later Founder-authorized acceptance task will bootstrap the first sandbox device and execute the Weight ladder end to end.

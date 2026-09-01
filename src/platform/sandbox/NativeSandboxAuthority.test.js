@@ -12,6 +12,10 @@ import {
   createNativeSandboxContinuationHandler,
   createNativeSandboxProjectionPublisher,
 } from "./NativeSandboxContinuationBoundary.js";
+import {
+  createNativeSandboxWorkerComposition,
+  inspectNativeSandboxIntelligenceIsolation,
+} from "./NativeSandboxWorkerComposition.js";
 
 describe("Native sandbox authority", () => {
   it("requires a physically separate database, owner, and credential pepper", () => {
@@ -69,6 +73,44 @@ describe("Native sandbox authority", () => {
     await expect(publisher.publish({ record: result, projectionType: "briefing" })).resolves.toEqual(result);
     await expect(publisher.publish({ record: { ...result, userId: "user_founder_001" }, projectionType: "confidence" }))
       .rejects.toMatchObject({ code: "NATIVE_SANDBOX_AUTHORITY_VIOLATION" });
+  });
+
+  it("binds the existing worker capacity to only sandbox Weight continuations", async () => {
+    const config = readNativeSandboxAuthorityConfig(environment());
+    const authority = createNativeSandboxAuthorityBoundary(config);
+    const queries = [];
+    const pool = workerPool(config, queries);
+    const databaseAuthority = { assertDatabase: vi.fn(async () => ({ databaseName: config.databaseName })) };
+    const worker = createNativeSandboxWorkerComposition({
+      composition: { pool, authority, databaseAuthority },
+      buildId: "sandbox-build",
+      workerId: "provider-worker-native-sandbox",
+    });
+    expect(worker.allowedTopics).toEqual(["native.sandbox.weight.confirmed"]);
+    await expect(worker.runOnce()).resolves.toMatchObject({ outcome: "idle" });
+    expect(queries.some(({ sql, values }) => sql.includes("topic = ANY") &&
+      values?.[3]?.[0] === "native.sandbox.weight.confirmed")).toBe(true);
+  });
+
+  it("proves PI, Confidence, Briefing, Event, Goal, and Home inputs resolve in the sandbox database", async () => {
+    const config = readNativeSandboxAuthorityConfig(environment());
+    const authority = createNativeSandboxAuthorityBoundary(config);
+    const pool = { query: vi.fn(async () => ({ rows: [{
+      confidence_count: 0, briefing_count: 0, event_count: 0,
+      goal_count: 0, checkin_count: 0,
+    }] })) };
+    const result = await inspectNativeSandboxIntelligenceIsolation({
+      pool,
+      authority,
+      databaseAuthority: { assertDatabase: vi.fn(async () => ({ databaseName: config.databaseName })) },
+    });
+    expect(result).toMatchObject({
+      outcome: "sandbox-intelligence-stores-isolated",
+      databaseName: config.databaseName,
+      ownerUserId: config.ownerUserId,
+      cadenceScheduled: false,
+    });
+    expect(pool.query.mock.calls[0][1]).toEqual([config.ownerUserId]);
   });
 });
 
@@ -216,4 +258,16 @@ function objectProvider(ownerUserId) {
     deleteObject: vi.fn(), inspectObject: vi.fn(), downloadObjectToFile: vi.fn(),
     authorizeRead: vi.fn(async () => ({})), healthCheck: vi.fn(), close: vi.fn(),
   };
+}
+
+function workerPool(config, queries) {
+  const rows = [];
+  const query = vi.fn(async (sql, values) => {
+    queries.push({ sql, values });
+    if (sql.includes("INSERT INTO physiqueos.worker_heartbeats")) return { rows: [{ worker_id: values[0] }], rowCount: 1 };
+    if (sql.includes("WITH candidate")) return { rows, rowCount: rows.length };
+    if (sql.includes("SELECT current_database")) return { rows: [{ database: config.databaseName }], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  });
+  return { query, connect: vi.fn(async () => ({ query, release: vi.fn() })) };
 }
