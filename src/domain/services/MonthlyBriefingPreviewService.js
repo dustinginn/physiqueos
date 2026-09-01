@@ -1969,15 +1969,6 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         endDate: toDateKey(previewWindow.endDate),
         timeZone: orchestration.timeZone ?? "America/Los_Angeles",
       };
-      const confidenceComparisonWindow = previousCalendarMonthWindow(
-        confidenceWindow
-      );
-      const confidenceComparison = composeCanonicalMonthlyEvidence({
-        canonicalEvidenceObjects,
-        dexaScans: resolvedDexaScans,
-        evidenceWindow: confidenceComparisonWindow,
-        trainingPerformanceEvents,
-      });
       const observedCutoff = resolveRealObservedCutoff({
         evidenceWindow,
         records: [
@@ -2019,15 +2010,9 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         confidenceEvidence: {
           schemaVersion: "monthly_confidence_evidence_context_v1",
           evidenceWindow: confidenceWindow,
-          comparisonWindow: confidenceComparisonWindow,
-          canonicalTrainingEvidence: [
-            ...confidenceComparison.trainingRecords,
-            ...canonical.trainingRecords,
-          ],
-          energyDays: [
-            ...confidenceComparison.energyContinuations,
-            ...canonical.energyContinuations,
-          ],
+          comparisonWindow: null,
+          canonicalTrainingEvidence: canonical.trainingRecords,
+          energyDays: canonical.energyContinuations,
           recoveryEvidenceRecords: canonical.recoveryRecords,
           photoSessions: [],
         },
@@ -2284,18 +2269,6 @@ function composeCanonicalMonthlyEvidence({
         isSynthetic: false,
       }));
     }),
-  };
-}
-
-function previousCalendarMonthWindow(window) {
-  const first = new Date(`${window.startDate.slice(0, 7)}-01T12:00:00Z`);
-  const end = new Date(first);
-  end.setUTCDate(0);
-  const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1, 12));
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-    timeZone: window.timeZone,
   };
 }
 

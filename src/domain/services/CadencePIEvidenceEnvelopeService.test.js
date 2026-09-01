@@ -66,6 +66,30 @@ describe("Cadence PI evidence envelope", () => {
     expect(envelope.observations.some((item) => item.domain === "photos"))
       .toBe(false);
   });
+
+  it("limits a non-comparative Monthly envelope to the declared evidence window", () => {
+    const envelope = createCadencePIEvidenceEnvelope({
+      cadence: "monthly", evidenceWindow: window,
+      evaluationDate: window.endDate, activeGoal: goal,
+      activePhase: goal.phases[0],
+      canonicalTrainingEvidence: [
+        training("training-jul", "2026-07-28", 8),
+        training("training-aug", "2026-08-26", 12),
+      ],
+      weights: [weight("weight-jul", "2026-07-31", 167),
+        weight("weight-aug-1", "2026-08-01", 167.2),
+        weight("weight-aug-2", "2026-08-31", 167.4)],
+      energyDays: [energy("2026-07-31", 2400, 2500),
+        energy("2026-08-31", 2300, 2550)],
+    });
+    expect(envelope.provenance.sourceEvidenceIds).not.toContain("training-jul");
+    expect(envelope.provenance.sourceEvidenceIds).not.toContain("weight-jul");
+    expect(envelope.provenance.sourceEvidenceIds).not.toContain("nutrition-2026-07-31");
+    expect(envelope.provenance.sourceEvidenceIds).toEqual(expect.arrayContaining([
+      "training-aug", "weight-aug-1", "weight-aug-2",
+      "nutrition-2026-08-31", "activity-2026-08-31",
+    ]));
+  });
 });
 
 function training(id, date, reps) {

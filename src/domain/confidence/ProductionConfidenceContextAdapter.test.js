@@ -67,6 +67,30 @@ describe("production Confidence V2 context adapters", () => {
     }));
   });
 
+  it("uses the within-window weight trend when Monthly has no declared comparator", () => {
+    const artifact = cadenceArtifact();
+    artifact.cadence = "monthly";
+    const observations = artifact.briefing.weeklyNarrative.context.pi.observations;
+    observations.find((item) => item.kind === "weight_average_change").status =
+      "insufficient_data";
+    observations.push({
+      id: "weight-short", domain: "weight", kind: "weight_short_window_change",
+      status: "observed", direction: "stable",
+      evidenceWindow: { startDate: "2026-08-01", endDate: "2026-08-31" },
+      confidence: { level: "moderate", limitations: [] },
+      supportingEvidenceIds: ["weight-aug-1", "weight-aug-31"],
+      explanationData: { absoluteChange: 0.2, unit: "lb" },
+      provenance: { producer: "weight_pi_observation_service" },
+    });
+    const descriptor = adaptBriefingArtifactToEvidenceDescriptors({
+      artifact, piEnvelope: artifact.briefing.weeklyNarrative.context.pi,
+    }).find((item) => item.capability === "body_weight_trend");
+    expect(descriptor).toMatchObject({
+      sourceObservationIds: ["weight-short"],
+      sourceEvidenceIds: ["weight-aug-1", "weight-aug-31"],
+    });
+  });
+
   it("materializes a Goal Contract from accepted production Goal semantics", () => {
     const contract = adaptProductionGoalToCanonicalContract(goal(), {
       activePhase: goal().phases[0],

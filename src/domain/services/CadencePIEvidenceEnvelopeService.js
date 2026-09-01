@@ -38,8 +38,20 @@ export function createCadencePIEvidenceEnvelope({
   });
   requireCadence(cadence);
   requireWindow(evidenceWindow);
+  const trainingEvidence = selectWindowRecords(canonicalTrainingEvidence, {
+    evidenceWindow, comparisonWindow, dateOf: (item) =>
+      String(unwrap(item)?.observed_at ?? unwrap(item)?.date ?? "").slice(0, 10),
+  });
+  const weightEvidence = selectWindowRecords(weights, {
+    evidenceWindow, comparisonWindow, dateOf: (item) =>
+      String(item?.measuredAt ?? item?.date ?? "").slice(0, 10),
+  });
+  const energyEvidence = selectWindowRecords(energyDays, {
+    evidenceWindow, comparisonWindow, dateOf: (item) =>
+      String(item?.date ?? "").slice(0, 10),
+  });
   const report = trainingReport ?? createTrainingPerformanceIntelligenceReport({
-    canonicalObjects: canonicalTrainingEvidence,
+    canonicalObjects: trainingEvidence,
     generatedAt: `${evaluationDate}T12:00:00.000Z`,
     now: `${evaluationDate}T12:00:00.000Z`,
   });
@@ -52,14 +64,14 @@ export function createCadencePIEvidenceEnvelope({
   const raw = [
     ...createCadenceTrainingPIObservations({
       report,
-      canonicalTrainingEvidence,
+      canonicalTrainingEvidence: trainingEvidence,
       cadence,
       evidenceWindow,
       comparisonWindow,
       windowTimeZone: timeZone,
     }),
     ...createWeightPIObservations({
-      weights,
+      weights: weightEvidence,
       observationWindow: evidenceWindow,
       comparisonWindow,
       requestedScopes: ["short_window", "average_comparison"],
@@ -67,7 +79,7 @@ export function createCadencePIEvidenceEnvelope({
       includeInsufficientData: true,
     }),
     ...createEnergyPIObservations({
-      days: normalizeEnergyDays(energyDays),
+      days: normalizeEnergyDays(energyEvidence),
       observationWindow: evidenceWindow,
       comparisonWindow,
       semanticHorizon: cadence,
@@ -144,6 +156,18 @@ function selectDexaThroughCutoff(scans, cutoff) {
     const date = String(scan?.measuredAt ?? scan?.date ?? "").slice(0, 10);
     return date && date <= cutoff;
   });
+}
+
+function selectWindowRecords(values, { evidenceWindow, comparisonWindow, dateOf }) {
+  return (Array.isArray(values) ? values : []).filter((item) => {
+    const date = dateOf(item);
+    return inside(date, evidenceWindow) ||
+      Boolean(comparisonWindow && inside(date, comparisonWindow));
+  });
+}
+
+function unwrap(value) {
+  return value?.payload ?? value;
 }
 
 function eventCandidates(observations) {

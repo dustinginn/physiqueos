@@ -319,6 +319,12 @@ function adaptCadencePIObservations({ artifact, piEnvelope, cutoff }) {
       (item) => item.kind === "energy_balance",
     ]),
     selectObservation(observations, "weight", [
+      ...(artifact?.cadence === "monthly" ? [
+        (item) => item.kind === "weight_average_change" &&
+          item.status !== "insufficient_data",
+        (item) => item.kind === "weight_short_window_change" &&
+          item.status !== "insufficient_data",
+      ] : []),
       (item) => item.kind === "weight_average_change",
     ]),
     selectObservation(observations, "recovery", [
