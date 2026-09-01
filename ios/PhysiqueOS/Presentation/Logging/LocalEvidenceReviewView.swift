@@ -147,7 +147,7 @@ struct LocalEvidenceReviewView: View {
             Text("Confirm each pose").physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             ForEach(item.photoIdentities) { identity in
                 VStack(alignment: .leading, spacing: 8) {
-                    if let asset = review.sourceAssets.first(where: { $0.id == identity.attachmentId }), let data = asset.data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 10)) }
+                    if let asset = review.sourceAssets.first(where: { $0.id == identity.attachmentId }), let data = asset.data, let image = EvidenceAttachmentLoader.previewImage(data: data) { Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 10)) }
                     HStack { Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.caption12Semibold); Spacer(); Text(identity.confirmed ? "Confirmed" : "Needs review").physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange) }
                     HStack {
                         Menu("Orientation") { ForEach(ProgressPhotoOrientation.allCases.filter { $0 != .unconfirmed }) { value in Button(value.label) { updatePhoto(item, identity, orientation: value) } } }

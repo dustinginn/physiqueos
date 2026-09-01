@@ -9,13 +9,10 @@ import Vision
 enum EvidenceLocalInterpretation {
     static func prepare(_ draft: EvidenceIntakeDraft) async -> EvidenceIntakeDraft {
         var prepared = draft
-        prepared.attachments = await withTaskGroup(of: (Int, SandboxAttachment).self) { group in
-            for (index, attachment) in draft.attachments.enumerated() {
-                group.addTask { (index, await prepare(attachment)) }
-            }
-            var indexed: [(Int, SandboxAttachment)] = []
-            for await value in group { indexed.append(value) }
-            return indexed.sorted { $0.0 < $1.0 }.map(\.1)
+        prepared.attachments = []
+        prepared.attachments.reserveCapacity(draft.attachments.count)
+        for attachment in draft.attachments {
+            prepared.attachments.append(await prepare(attachment))
         }
         applyExtractedDEXAValues(to: &prepared)
         return prepared
@@ -382,17 +379,23 @@ enum EvidenceLocalInterpretation {
 
     private static func recognizeText(in data: Data) async -> String? {
         await Task.detached(priority: .userInitiated) {
-            let request = VNRecognizeTextRequest()
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            let handler = VNImageRequestHandler(data: data)
-            do {
-                try handler.perform([request])
-                let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
-                let value = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-                return value.isEmpty ? nil : value
-            } catch {
-                return nil
+            autoreleasepool {
+                guard let image = EvidenceAttachmentLoader.downsampledCGImage(
+                    data: data,
+                    maximumPixelSize: 3_000
+                ) else { return nil }
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.usesLanguageCorrection = true
+                let handler = VNImageRequestHandler(cgImage: image)
+                do {
+                    try handler.perform([request])
+                    let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                    let value = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                    return value.isEmpty ? nil : value
+                } catch {
+                    return nil
+                }
             }
         }.value
     }

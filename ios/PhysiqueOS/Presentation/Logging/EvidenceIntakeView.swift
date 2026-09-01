@@ -11,6 +11,7 @@ struct EvidenceIntakeView: View {
     @State private var errorMessage: String?
     @State private var showingDiscard = false
     @State private var isPreparing = false
+    @State private var isLoadingPhotos = false
     var initialScenario: EvidenceFixtureScenario? = nil
     var onNavigate: (AppDestination) -> Void = { _ in }
 
@@ -49,8 +50,10 @@ struct EvidenceIntakeView: View {
         }
         .photosPicker(isPresented: $isPhotosPickerPresented, selection: $photoItems, matching: .images)
         .onChange(of: photoItems) {
+            guard !photoItems.isEmpty else { return }
             let items = photoItems
             photoItems = []
+            isLoadingPhotos = true
             Task { @MainActor in
                 let clock = ContinuousClock.now
                 let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
@@ -58,6 +61,7 @@ struct EvidenceIntakeView: View {
                 store.addAttachments(loaded)
                 store.recordAssetLoading(duration: elapsed(since: clock))
                 reportLoadingFailures(in: loaded)
+                isLoadingPhotos = false
             }
         }
         .fileImporter(isPresented: $isFilePickerPresented, allowedContentTypes: [.image, .pdf, .plainText], allowsMultipleSelection: true) { result in
@@ -117,6 +121,14 @@ struct EvidenceIntakeView: View {
                     HStack(spacing: 10) {
                         sourceButton("Choose Photos", icon: "photo.on.rectangle") { isPhotosPickerPresented = true }
                         sourceButton("Choose Files", icon: "folder") { isFilePickerPresented = true }
+                    }
+                    if isLoadingPhotos {
+                        HStack(spacing: 8) {
+                            ProgressView().tint(PhysiqueOSTheme.accent)
+                            Text("Loading selected photos…")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
                     }
                     if store.evidenceDraft.attachments.isEmpty {
                         Text("No files selected")
@@ -209,7 +221,7 @@ struct EvidenceIntakeView: View {
             }
 
             if let errorMessage { errorBanner(errorMessage) }
-            PrimaryActionButton(title: "Submit evidence", tone: .dark, isEnabled: store.evidenceDraft.hasContent) {
+            PrimaryActionButton(title: "Submit evidence", tone: .dark, isEnabled: store.evidenceDraft.hasContent && !isLoadingPhotos) {
                 submit()
             }
             .accessibilityIdentifier("evidenceIntake.continue")
@@ -226,6 +238,7 @@ struct EvidenceIntakeView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(PhysiqueOSTheme.accent)
+        .disabled(isLoadingPhotos)
     }
 
     private func errorBanner(_ text: String) -> some View {
@@ -285,7 +298,7 @@ struct EvidenceIntakeView: View {
                     CardContainer {
                         VStack(alignment: .leading, spacing: 10) {
                             if let attachment = store.evidenceDraft.attachments.first(where: { $0.id == identity.attachmentId }),
-                               let data = attachment.data, let image = UIImage(data: data) {
+                               let data = attachment.data, let image = EvidenceAttachmentLoader.previewImage(data: data) {
                                 Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             HStack {

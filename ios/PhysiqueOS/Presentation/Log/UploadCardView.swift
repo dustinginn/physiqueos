@@ -14,6 +14,7 @@ struct UploadCardView: View {
     @State private var isFilePickerPresented = false
     @State private var isPhotosPickerPresented = false
     @State private var photosSelection: [PhotosPickerItem] = []
+    @State private var isLoadingPhotos = false
 
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
@@ -57,6 +58,16 @@ struct UploadCardView: View {
                             .contentShape(Rectangle())
                     }
                     .accessibilityIdentifier("log.addEvidence")
+                    .disabled(isLoadingPhotos)
+
+                    if isLoadingPhotos {
+                        HStack(spacing: 8) {
+                            ProgressView().tint(PhysiqueOSTheme.accent)
+                            Text("Loading selected photos…")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
 
                     Button {
                         prepareDraftDateIfNeeded()
@@ -95,9 +106,11 @@ struct UploadCardView: View {
             guard !photosSelection.isEmpty else { return }
             let items = photosSelection
             photosSelection = []
+            isLoadingPhotos = true
             Task { @MainActor in
                 let start = store.evidenceDraft.attachments.filter { $0.source == .photos }.count
                 store.addAttachments(await EvidenceAttachmentLoader.photos(items, startingAt: start))
+                isLoadingPhotos = false
                 onNavigate(.evidenceIntake)
             }
         }

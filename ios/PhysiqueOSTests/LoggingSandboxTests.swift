@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import PhysiqueOS
 
 @MainActor
@@ -30,6 +31,96 @@ final class LoggingSandboxTests: XCTestCase {
             XCTAssertEqual(store.evidenceDraft.attachments.count, count)
             if count > 1 { store.removeAttachment(id: "id-0"); store.addAttachments([assets[0]]); XCTAssertEqual(store.evidenceDraft.attachments.count, count) }
         }
+    }
+
+    func testPhotoLoaderRetainsOneThreeAndSixInSourceOrderWithStableIDs() async {
+        for count in [1, 3, 6] {
+            var activeLoads = 0
+            var maximumActiveLoads = 0
+            var completionOrder: [Int] = []
+            let requests = (0..<count).map { index in
+                EvidenceAttachmentLoader.PhotoLoadRequest(
+                    stableIdentifier: "library-asset-\(index)",
+                    contentTypeIdentifier: "public.jpeg",
+                    loadData: {
+                        activeLoads += 1
+                        maximumActiveLoads = max(maximumActiveLoads, activeLoads)
+                        await Task.yield()
+                        completionOrder.append(index)
+                        activeLoads -= 1
+                        return Data(repeating: UInt8(index), count: 1_024)
+                    }
+                )
+            }
+
+            let attachments = await EvidenceAttachmentLoader.photos(requests, startingAt: 0)
+
+            XCTAssertEqual(attachments.count, count)
+            XCTAssertEqual(attachments.map(\.id), (0..<count).map { "photo-library-asset-\($0)" })
+            XCTAssertEqual(attachments.map(\.displayName), (1...count).map { "Photo \($0)" })
+            XCTAssertEqual(attachments.map(\.contentType), Array(repeating: "image/jpeg", count: count))
+            XCTAssertEqual(completionOrder, Array(0..<count))
+            XCTAssertEqual(maximumActiveLoads, 1, "Photo bytes must load serially to bound peak memory.")
+        }
+    }
+
+    func testPhotoLoaderRetainsFailuresBesideSuccessfulSelections() async {
+        enum ExpectedFailure: Error { case unavailable }
+        let requests = [
+            EvidenceAttachmentLoader.PhotoLoadRequest(stableIdentifier: "one", contentTypeIdentifier: "public.jpeg", loadData: { Data([1]) }),
+            EvidenceAttachmentLoader.PhotoLoadRequest(stableIdentifier: "two", contentTypeIdentifier: "public.heic", loadData: { throw ExpectedFailure.unavailable }),
+            EvidenceAttachmentLoader.PhotoLoadRequest(stableIdentifier: "three", contentTypeIdentifier: "public.png", loadData: { nil }),
+        ]
+
+        let attachments = await EvidenceAttachmentLoader.photos(requests, startingAt: 4)
+
+        XCTAssertEqual(attachments.count, 3)
+        XCTAssertEqual(attachments.map(\.displayName), ["Photo 5", "Photo 6", "Photo 7"])
+        XCTAssertEqual(attachments.map(\.id), ["photo-one", "photo-two", "photo-three"])
+        XCTAssertEqual(attachments.compactMap(\.data), [Data([1])])
+        XCTAssertNil(attachments[0].loadError)
+        XCTAssertNotNil(attachments[1].loadError)
+        XCTAssertEqual(attachments[2].loadError, "The photo could not be loaded.")
+    }
+
+    func testPhotoPreviewDownsamplesWithoutReplacingOriginalBytes() throws {
+        let source = UIGraphicsImageRenderer(size: CGSize(width: 2_000, height: 1_000)).image { context in
+            UIColor.purple.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2_000, height: 1_000))
+        }
+        let data = try XCTUnwrap(source.jpegData(compressionQuality: 0.9))
+        let preview = try XCTUnwrap(EvidenceAttachmentLoader.previewImage(data: data, maximumPixelSize: 200))
+
+        XCTAssertLessThanOrEqual(max(preview.cgImage?.width ?? 0, preview.cgImage?.height ?? 0), 200)
+        XCTAssertFalse(data.isEmpty, "The original compressed bytes remain available for upload and review.")
+    }
+
+    func testFilesLoaderStillRetainsRealFileBytes() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("physiqueos-photo-fix-test.txt")
+        let expected = Data("file evidence".utf8)
+        try expected.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let attachment = try XCTUnwrap(EvidenceAttachmentLoader.files([url]).first)
+        XCTAssertEqual(attachment.source, .files)
+        XCTAssertEqual(attachment.data, expected)
+        XCTAssertNil(attachment.loadError)
+    }
+
+    func testInterpretationPreservesOrderAndSkipsFailedAttachments() async {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.attachments = [
+            .init(id: "failed", displayName: "Photo 1", source: .photos, contentType: "image/jpeg", loadError: "Unavailable"),
+            .init(id: "text", displayName: "notes.txt", source: .files, contentType: "text/plain", data: Data("Weight 164.7 lb".utf8)),
+            .init(id: "invalid-image", displayName: "Photo 2", source: .photos, contentType: "image/jpeg", data: Data([0, 1, 2])),
+        ]
+
+        let prepared = await EvidenceLocalInterpretation.prepare(draft)
+
+        XCTAssertEqual(prepared.attachments.map(\.id), ["failed", "text", "invalid-image"])
+        XCTAssertNil(prepared.attachments[0].extractedText)
+        XCTAssertEqual(prepared.attachments[1].extractedText, "Weight 164.7 lb")
+        XCTAssertNil(prepared.attachments[2].extractedText)
     }
 
     func testDiscardClearsDraftAndNeverContaminatesNextUpload() async throws {
