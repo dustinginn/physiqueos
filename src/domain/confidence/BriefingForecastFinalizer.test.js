@@ -33,6 +33,11 @@ describe("shared production briefing forecast finalizer", () => {
     });
     expect(result.briefingArtifact.confidencePublication.assessmentId)
       .toBe(result.confidenceAssessment.id);
+    const drivers = result.confidenceAssessment.sourceLineage
+      .confidenceExplanationDrivers;
+    expect([...drivers.strengthenedBy, ...drivers.limitedBy]
+      .every((driver) => typeof driver.key === "string" && driver.key.length > 0))
+      .toBe(true);
   });
 
   it("fails unauthorized publishers before artifact composition", async () => {

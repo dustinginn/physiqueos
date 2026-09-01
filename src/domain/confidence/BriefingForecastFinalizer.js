@@ -347,7 +347,7 @@ function confidenceExplanationDrivers({
 function driver(item) {
   if (!item || typeof item !== "object") return null;
   return {
-    key: item.key ?? item.id ?? item.factorRef ?? null,
+    key: item.key ?? item.code ?? item.id ?? item.factorRef ?? null,
     text: item.text ?? item.description ?? null,
     sourceRefs: [...new Set((item.sourceRefs ?? item.evidenceRefs ?? [])
       .filter(Boolean).map(String))].sort(),
