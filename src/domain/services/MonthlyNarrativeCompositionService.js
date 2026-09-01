@@ -60,6 +60,59 @@ function sentence(parts) {
   return composePIEditorialParagraph(parts);
 }
 
+export function createMonthlyChronologyContext({ evidence = {}, baseline = null } = {}) {
+  const windowStart = String(evidence.previewWindow?.startDate ?? "").slice(0, 10);
+  const windowEnd = String(evidence.previewWindow?.endDate ?? "").slice(0, 10);
+  const deliveryDate = String(
+    evidence.previewWindow?.deliveryDate ?? addCalendarDays(windowEnd, 1)
+  ).slice(0, 10);
+  const reportingMonth = windowStart.slice(0, 7);
+  const priorMonth = shiftCalendarMonth(reportingMonth, -1);
+  const nextMonth = shiftCalendarMonth(reportingMonth, 1);
+  const phase = evidence.goal
+    ? resolveCommittedPhaseContext(evidence.goal, { asOf: windowEnd }).activePhase
+    : null;
+  return Object.freeze({
+    reportingMonth,
+    reportingMonthLabel: formatMonthLabel(reportingMonth),
+    priorMonth,
+    priorMonthLabel: formatMonthLabel(priorMonth),
+    nextMonth,
+    nextMonthLabel: formatMonthLabel(nextMonth),
+    windowStart,
+    windowEnd,
+    deliveryDate,
+    deliveryMonth: deliveryDate.slice(0, 7),
+    deliveryMonthLabel: formatMonthLabel(deliveryDate.slice(0, 7)),
+    goalIdentity: evidence.goal?.id ?? null,
+    phaseIdentity: phase?.id ?? null,
+    phaseStart: String(phase?.startedAt ?? phase?.startDate ?? "").slice(0, 10) || null,
+    selectedDexaDate: baseline?.provenance?.scanDate ?? null,
+  });
+}
+
+function formatMonthLabel(month) {
+  if (!/^\d{4}-\d{2}$/.test(String(month))) return "the month";
+  return new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" })
+    .format(new Date(`${month}-01T12:00:00Z`));
+}
+
+function shiftCalendarMonth(month, offset) {
+  if (!/^\d{4}-\d{2}$/.test(String(month))) return "";
+  const date = new Date(`${month}-01T12:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + offset);
+  return date.toISOString().slice(0, 7);
+}
+
+function formatMonthDay(value) {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(value))) return "current";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${String(value).slice(0, 10)}T12:00:00Z`));
+}
+
 function realRecords(records = []) {
   return records.filter((record) => !record?.isSynthetic && record?.source !== "preview_fixture");
 }
@@ -218,25 +271,26 @@ function performanceStat(story) {
   };
 }
 
-function buildHero({ baseline, energy, training }) {
+function buildHero({ baseline, energy, training }, chronology) {
+  const { reportingMonthLabel, nextMonthLabel } = chronology;
   return {
     title: baseline
-      ? sentence({ observation: "July established the starting line for building muscle" })
-      : sentence({ observation: "July clarified what should carry forward" }),
+      ? sentence({ observation: `${reportingMonthLabel} established the starting line for building muscle` })
+      : sentence({ observation: `${reportingMonthLabel} clarified what should carry forward` }),
     thesis: baseline && energy && training
       ? sentence({
           observation: "You finished the cut, established a DEXA baseline, and created early training momentum",
           interpretation: "Those are encouraging first steps toward building muscle, but they are too early to confirm a body-composition change",
           whyItMatters: "Your calorie intake is also moving closer to supporting stronger training",
-          forwardImplication: "August needs to show that performance and calorie consistency can hold across a full month",
+          forwardImplication: `${nextMonthLabel} needs to show that performance and calorie consistency can hold across a full month`,
         })
       : sentence({
-          observation: "July produced enough useful evidence to keep the current plan steady",
-          interpretation: "The early response is encouraging, but another month will make the conclusion more reliable",
+          observation: `${reportingMonthLabel} produced enough useful evidence to keep the current plan steady`,
+          interpretation: `The early response is encouraging, but ${nextMonthLabel} will make the conclusion more reliable`,
         }),
     confidenceExplanation: baseline
       ? sentence({
-          observation: "July established a measured starting point",
+          observation: `${reportingMonthLabel} established a measured starting point`,
           interpretation: "We know where this muscle-building phase began, but it is too early to claim new muscle",
           forwardImplication: "A later DEXA will show whether the plan is producing the result we want",
         })
@@ -253,18 +307,19 @@ function buildHero({ baseline, energy, training }) {
       baseline && {
         label: "New baseline",
         value: `${baseline.provenance.bodyFat}% body fat`,
-        detail: "Future DEXA scans can now be compared with the July 18 baseline",
+        detail: `Future DEXA scans can now be compared with the ${formatMonthDay(baseline.provenance.scanDate)} baseline`,
       },
       energy && {
         label: "Calories",
         value: "Closer to target",
-        detail: "August must show that intake can consistently support training",
+        detail: `${nextMonthLabel} must show that intake can consistently support training`,
       },
     ].filter(Boolean),
   };
 }
 
-function buildTraining(training, stories) {
+function buildTraining(training, stories, chronology) {
+  const { reportingMonthLabel, nextMonthLabel } = chronology;
   if (!training) return null;
   if (stories.length) {
     const stats = stories.map(performanceStat);
@@ -284,17 +339,17 @@ function buildTraining(training, stories) {
         observation: "Progress appeared across the training program rather than in one isolated session",
         interpretation: "The three standout lifts provide the clearest proof of that broader pattern",
         whyItMatters: "Broad progression is encouraging for the muscle-building goal, but it does not yet prove muscle gain",
-        forwardImplication: "August should show whether the pattern can continue across the program",
+        forwardImplication: `${nextMonthLabel} should show whether the pattern can continue across the program`,
       }),
       stats,
       next: sentence({
-        forwardImplication: "August should keep progressive overload moving across the program while the standout lifts remain strong across multiple sessions",
+        forwardImplication: `${nextMonthLabel} should keep progressive overload moving across the program while the standout lifts remain strong across multiple sessions`,
       }),
       selectedPerformanceStories: stories,
     };
   }
   return {
-    title: sentence({ observation: "July established the first performance markers for the new phase" }),
+    title: sentence({ observation: `${reportingMonthLabel} established the first performance markers for the new phase` }),
     summary: sentence({
       observation: "The available sessions show forward movement, but no canonical movement record was available for a more specific summary",
       interpretation: "Use the next complete performance record to establish a movement-level comparison",
@@ -307,16 +362,17 @@ function buildTraining(training, stories) {
     stats: [
       { label: "Signal", value: "Performance", detail: "the first phase indicator" },
       { label: "Limit", value: "No selected record", detail: "movement detail is not yet canonical" },
-      { label: "Next test", value: "Repeatable records", detail: "specific progress in August" },
+      { label: "Next test", value: "Repeatable records", detail: `specific progress in ${nextMonthLabel}` },
     ],
     next: sentence({
-      forwardImplication: "August should produce specific records that can be repeated across a full month",
+      forwardImplication: `${nextMonthLabel} should produce specific records that can be repeated across a full month`,
     }),
   };
 }
 
-function buildEnergy(energy, context) {
+function buildEnergy(energy, context, chronology) {
   if (!energy) return null;
+  const { nextMonthLabel } = chronology;
   const balance = context.averageBalance;
   const trend = balance == null
     ? "Your intake is moving closer to a repeatable level for the current workload"
@@ -328,12 +384,12 @@ function buildEnergy(energy, context) {
           known: trend,
           missing: "Nutrition logs are still too incomplete to judge that pattern with confidence",
           consequence: "The direction is appropriate, but sustainability cannot be judged from an incomplete record",
-          nextStep: "Keep intake and nutrition logging consistent through August so the next recommendation rests on a full month",
+          nextStep: `Keep intake and nutrition logging consistent through ${nextMonthLabel} so the next recommendation rests on a full month`,
         })
       : sentence({
           observation: trend,
           interpretation: "That balance leaves room to support repeated high-quality sessions without forcing a conclusion from scale weight",
-          forwardImplication: "August should confirm that the same calorie pattern is consistent enough to sustain the workload",
+          forwardImplication: `${nextMonthLabel} should confirm that the same calorie pattern is consistent enough to sustain the workload`,
         }),
     whyItMatters: sentence({
       observation: "Calories are moving closer to matching the month's workload",
@@ -343,12 +399,13 @@ function buildEnergy(energy, context) {
   };
 }
 
-function buildBaseline(baseline) {
+function buildBaseline(baseline, chronology) {
   if (!baseline) return null;
+  const scanDate = formatMonthDay(baseline.provenance.scanDate);
   return {
-    title: sentence({ observation: "July established the baseline for building muscle" }),
+    title: sentence({ observation: `${chronology.reportingMonthLabel} established the baseline for building muscle` }),
     summary: sentence({
-      observation: "The July 18 DEXA recorded where you started",
+      observation: `The ${scanDate} DEXA recorded where you started`,
       interpretation: "It established a baseline; it did not prove that you gained muscle",
       whyItMatters: "Future scans can now be compared directly with that measurement",
     }),
@@ -358,7 +415,7 @@ function buildBaseline(baseline) {
   };
 }
 
-function buildChanges({ training, energy, weight, energyContextValue }) {
+function buildChanges({ training, energy, weight, energyContextValue }, chronology) {
   const themes = [
     training && {
       tone: "training",
@@ -380,12 +437,12 @@ function buildChanges({ training, energy, weight, energyContextValue }) {
             known: "The available calorie data is moving closer to the intended range",
             missing: "Several nutrition logs are still missing",
             consequence: "That limits how confidently we can judge whether the calorie level is repeatable",
-            nextStep: "Keep intake and logging consistent through August before changing the target",
+            nextStep: `Keep intake and logging consistent through ${chronology.nextMonthLabel} before changing the target`,
           })
         : sentence({
             observation: `Logged days averaged a ${Math.abs(energyContextValue.averageBalance)} calorie deficit`,
             interpretation: "Use that balance to judge whether the workload can be repeated",
-            forwardImplication: "Keep that pattern consistent through August before deciding whether calories should change",
+            forwardImplication: `Keep that pattern consistent through ${chronology.nextMonthLabel} before deciding whether calories should change`,
           }),
     },
     weight && {
@@ -400,12 +457,12 @@ function buildChanges({ training, energy, weight, energyContextValue }) {
     },
   ].filter(Boolean);
   return themes.length ? {
-    title: sentence({ observation: "July changed how progress should be judged" }),
+    title: sentence({ observation: `${chronology.reportingMonthLabel} changed how progress should be judged` }),
     themes,
   } : null;
 }
 
-function buildMoments({ completion, baseline, training, energy, photos }, trainingStories) {
+function buildMoments({ completion, baseline, training, energy, photos }, trainingStories, chronology) {
   const moments = [
     completion && {
       tone: "completion",
@@ -421,7 +478,7 @@ function buildMoments({ completion, baseline, training, energy, photos }, traini
       date: baseline.provenance.scanDate,
       label: "The next phase gained a clear baseline",
       body: sentence({
-        observation: "The July 18 DEXA established the starting point for building muscle",
+        observation: `The ${formatMonthDay(baseline.provenance.scanDate)} DEXA established the starting point for building muscle`,
         forwardImplication: "Every future scan can now be compared with that measurement",
       }),
     },
@@ -431,10 +488,10 @@ function buildMoments({ completion, baseline, training, energy, photos }, traini
       label: trainingStories.length ? "Broad progression created useful benchmarks" : "Performance gained a concrete reference point",
       body: trainingStories.length ? sentence({
         observation: "Progressive overload became visible across the program, with a few lifts standing out",
-        whyItMatters: "Those standout results created concrete benchmarks that will make August's progress easier to compare",
+        whyItMatters: `Those standout results created concrete benchmarks that will make ${chronology.nextMonthLabel}'s progress easier to compare`,
       }) : sentence({
-        observation: "July established an early performance reference",
-        forwardImplication: "August should replace it with specific repeatable movement records",
+        observation: `${chronology.reportingMonthLabel} established an early performance reference`,
+        forwardImplication: `${chronology.nextMonthLabel} should replace it with specific repeatable movement records`,
       }),
     },
     energy && {
@@ -443,7 +500,7 @@ function buildMoments({ completion, baseline, training, energy, photos }, traini
       label: "The calorie pattern became sustainable enough to test",
       body: sentence({
         observation: "Intake moved closer to a repeatable level for the current workload",
-        forwardImplication: "August should show whether that calorie level can stay consistent across a full month",
+        forwardImplication: `${chronology.nextMonthLabel} should show whether that calorie level can stay consistent across a full month`,
       }),
     },
     photos && {
@@ -458,19 +515,21 @@ function buildMoments({ completion, baseline, training, energy, photos }, traini
     },
   ].filter(Boolean);
   return moments.length ? {
-    title: sentence({ observation: moments.length === 5 ? "Five moments defined July" : `${moments.length} moments defined July` }),
+    title: sentence({ observation: moments.length === 5
+      ? `Five moments defined ${chronology.reportingMonthLabel}`
+      : `${moments.length} moments defined ${chronology.reportingMonthLabel}` }),
     moments,
   } : null;
 }
 
-function buildStrategy({ training, energy }) {
+function buildStrategy({ training, energy, baseline }, chronology) {
   if (!training && !energy) return null;
   return {
     title: sentence({ observation: "Nothing currently warrants changing course" }),
     thesis: sentence({
       observation: "Training is responding well enough to keep the plan steady, and calories are moving closer to supporting that work",
       interpretation: "Body-composition change needs more time and another objective measurement",
-      forwardImplication: "Use August for consistent execution so the next decision can be made with confidence",
+      forwardImplication: `Use ${chronology.nextMonthLabel} for consistent execution so the next decision can be made with confidence`,
     }),
     items: [
       training && {
@@ -489,24 +548,26 @@ function buildStrategy({ training, energy }) {
         tone: "information",
         label: "Body composition",
         value: "Give it time",
-        detail: sentence({ interpretation: "The July DEXA is a starting point, so another scan is needed before judging muscle gain" }),
+        detail: sentence({ interpretation: baseline
+          ? `The ${formatMonthDay(baseline.provenance.scanDate)} DEXA is a starting point, so another scan is needed before judging muscle gain`
+          : "The current body-composition evidence is a starting point, so another scan is needed before judging muscle gain" }),
       },
       {
         tone: "decision",
         label: "Plan",
         value: "Stay with the plan",
-        detail: sentence({ forwardImplication: "Keep the current approach steady through August" }),
+        detail: sentence({ forwardImplication: `Keep the current approach steady through ${chronology.nextMonthLabel}` }),
       },
     ].filter(Boolean),
   };
 }
 
-function buildMonthAhead({ training, energy, weight, photos, baseline }, trainingStories) {
+function buildMonthAhead({ training, energy, weight, photos, baseline }, trainingStories, chronology) {
   return {
-    title: sentence({ observation: "Turn July's signals into repeatable evidence" }),
+    title: sentence({ observation: `Turn ${chronology.reportingMonthLabel}'s signals into repeatable evidence` }),
     thesis: sentence({
-      observation: "July established the baseline",
-      forwardImplication: "August must turn July's movement records and calorie pattern into results that repeat across the month",
+      observation: `${chronology.reportingMonthLabel} established the baseline`,
+      forwardImplication: `${chronology.nextMonthLabel} must turn ${chronology.reportingMonthLabel}'s movement records and calorie pattern into results that repeat across the month`,
     }),
     guidance: [
       training && {
@@ -515,7 +576,7 @@ function buildMonthAhead({ training, energy, weight, photos, baseline }, trainin
         value: "Make progression repeatable",
         detail: sentence({ forwardImplication: trainingStories.length
           ? "Keep progressive overload moving across the program, maintain the standout lifts, and judge the pattern across the month rather than one session"
-          : "Establish specific movement records across more than one August session" }),
+          : `Establish specific movement records across more than one ${chronology.nextMonthLabel} session` }),
       },
       energy && {
         tone: "energy",
@@ -545,17 +606,21 @@ function buildMonthAhead({ training, energy, weight, photos, baseline }, trainin
   };
 }
 
-const MONTHLY_SECTION_PURPOSES = Object.freeze([
-  { role: "hero", question: "What did this month establish?", uniqueUnderstanding: "The month established a measured starting line and early operating momentum." },
-  { role: "training", question: "What specifically improved?", uniqueUnderstanding: "Program-wide progression is the conclusion, and the standout lifts are its clearest examples." },
-  { role: "energy", question: "Why can those improvements continue?", uniqueUnderstanding: "Calorie consistency determines whether the workload is sustainable." },
-  { role: "newBaseline", question: "How will future success be judged?", uniqueUnderstanding: "Future DEXAs can be compared with the July 18 reference point." },
-  { role: "changes", question: "How should progress now be interpreted differently?", uniqueUnderstanding: "Movement, calorie, weight, and DEXA signals now have separate jobs." },
-  { role: "moments", question: "Which events will still matter months from now?", uniqueUnderstanding: "Broad progression created durable performance benchmarks for comparison." },
-  { role: "monthAhead", question: "What specifically needs to happen next?", uniqueUnderstanding: "Program-wide progression and the calorie pattern must become repeatable in August." },
-]);
+function monthlySectionPurposes(chronology) {
+  return Object.freeze([
+    { role: "hero", question: "What did this month establish?", uniqueUnderstanding: `${chronology.reportingMonthLabel} established a measured starting line and early operating momentum.` },
+    { role: "training", question: "What specifically improved?", uniqueUnderstanding: "Program-wide progression is the conclusion, and the standout lifts are its clearest examples." },
+    { role: "energy", question: "Why can those improvements continue?", uniqueUnderstanding: "Calorie consistency determines whether the workload is sustainable." },
+    { role: "newBaseline", question: "How will future success be judged?", uniqueUnderstanding: chronology.selectedDexaDate
+      ? `Future DEXAs can be compared with the ${formatMonthDay(chronology.selectedDexaDate)} reference point.`
+      : "Future DEXAs can be compared with the current reference point." },
+    { role: "changes", question: "How should progress now be interpreted differently?", uniqueUnderstanding: "Movement, calorie, weight, and DEXA signals now have separate jobs." },
+    { role: "moments", question: "Which events will still matter months from now?", uniqueUnderstanding: "Broad progression created durable performance benchmarks for comparison." },
+    { role: "monthAhead", question: "What specifically needs to happen next?", uniqueUnderstanding: `Program-wide progression and the calorie pattern must become repeatable in ${chronology.nextMonthLabel}.` },
+  ]);
+}
 
-export function auditMonthlyEditorialUniqueness(model, trainingStories = []) {
+export function auditMonthlyEditorialUniqueness(model, trainingStories = [], chronology = model.chronology) {
   const heroText = JSON.stringify(model.hero ?? {});
   const energyText = JSON.stringify(model.energy ?? {});
   const changesText = JSON.stringify(model.changes ?? {});
@@ -588,7 +653,7 @@ export function auditMonthlyEditorialUniqueness(model, trainingStories = []) {
   return Object.freeze({
     passes: issues.length === 0,
     issues,
-    sections: MONTHLY_SECTION_PURPOSES,
+    sections: monthlySectionPurposes(chronology),
     selectedTrainingStoryIds: trainingStories.map((story) => story.id),
   });
 }
@@ -600,7 +665,7 @@ export function composeMonthlyNarrativeModel({
 }) {
   const candidates = {
     completion: roleCandidate(decision, "goal_completion"),
-    baseline: roleCandidate(decision, "new_baseline"),
+    baseline: roleCandidate(decision, "new_baseline") ?? roleCandidate(decision, "dexa_baseline"),
     energy: roleCandidate(decision, "energy_trend"),
     training: roleCandidate(decision, "training_evolution"),
     weight: roleCandidate(decision, "weight_context"),
@@ -614,19 +679,24 @@ export function composeMonthlyNarrativeModel({
   const trainingStories = selectMonthlyTrainingPerformanceStories(
     evidence.trainingPerformanceEvents,
   );
+  const chronology = createMonthlyChronologyContext({
+    evidence,
+    baseline: candidates.baseline,
+  });
   const model = {
     translationVersion: PI_EDITORIAL_TRANSLATION_VERSION,
+    chronology,
     confidence,
-    hero: buildHero(candidates),
-    training: buildTraining(candidates.training, trainingStories),
-    energy: buildEnergy(candidates.energy, energyContextValue),
-    newBaseline: buildBaseline(candidates.baseline),
-    changes: buildChanges({ ...candidates, energyContextValue }),
-    moments: buildMoments(candidates, trainingStories),
-    strategy: buildStrategy(candidates),
-    monthAhead: buildMonthAhead(candidates, trainingStories),
+    hero: buildHero(candidates, chronology),
+    training: buildTraining(candidates.training, trainingStories, chronology),
+    energy: buildEnergy(candidates.energy, energyContextValue, chronology),
+    newBaseline: buildBaseline(candidates.baseline, chronology),
+    changes: buildChanges({ ...candidates, energyContextValue }, chronology),
+    moments: buildMoments(candidates, trainingStories, chronology),
+    strategy: buildStrategy(candidates, chronology),
+    monthAhead: buildMonthAhead(candidates, trainingStories, chronology),
   };
-  const uniquenessAudit = auditMonthlyEditorialUniqueness(model, trainingStories);
+  const uniquenessAudit = auditMonthlyEditorialUniqueness(model, trainingStories, chronology);
   if (!uniquenessAudit.passes) {
     throw new Error(`Monthly narrative rejected by uniqueness audit: ${uniquenessAudit.issues.join(" | ")}`);
   }

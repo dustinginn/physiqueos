@@ -19,6 +19,32 @@ function formatShortDate(value) {
   }).format(new Date(`${value}T12:00:00Z`));
 }
 
+function formatLongDate(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function formatLongMonthDay(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function formatMonthlyPeriod(fixture) {
+  const start = fixture.previewWindow.startDate;
+  const end = fixture.previewWindow.endDate;
+  const delivery = fixture.previewWindow.deliveryDate;
+  const startMonth = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" })
+    .format(new Date(`${start}T12:00:00Z`));
+  return `${startMonth} ${Number(start.slice(-2))}–${Number(end.slice(-2))} · Delivered ${formatLongMonthDay(delivery)}`;
+}
+
 function activeGoalWindow(fixture) {
   const completionDate = fixture.goal?.completionEvent?.completedAt;
   const activePhase = fixture.goal ? resolveCommittedPhaseContext(fixture.goal, { asOf: fixture.previewWindow.endDate }).activePhase : null;
@@ -172,7 +198,7 @@ function buildHero(fixture, coaching, confidence) {
   };
   return {
     eyebrow: "Monthly Briefing",
-    period: "July 1–31 · Delivered August 1",
+    period: formatMonthlyPeriod(fixture),
     goal: fixture.goal ? resolveCommittedPhaseContext(fixture.goal, { asOf: fixture.previewWindow.endDate }).activePhase?.name ?? "Build Lean Mass" : "Build Lean Mass",
     title: coaching.title,
     thesis: coaching.thesis,
@@ -189,9 +215,9 @@ export function composeMonthlyBriefingPresentation({ narrative, decision, fixtur
   if (!coaching) {
     throw new Error("Monthly presentation requires a canonical Monthly narrative model.");
   }
-  const types = ["goal_completion", "new_baseline", "phase_transition", "energy_trend", "training_evolution", "weight_context", "photo_progression"];
+  const types = ["goal_completion", "new_baseline", "dexa_baseline", "phase_transition", "energy_trend", "training_evolution", "weight_context", "photo_progression"];
   const candidates = Object.fromEntries(types.map((type) => [type, roleCandidate(decision, type)]));
-  const baseline = candidates.new_baseline;
+  const baseline = candidates.new_baseline ?? candidates.dexa_baseline;
   const completion = candidates.goal_completion;
   const energy = candidates.energy_trend;
   const training = candidates.training_evolution;
@@ -213,8 +239,8 @@ export function composeMonthlyBriefingPresentation({ narrative, decision, fixtur
       { label: "Body fat", value: `${baseline.provenance.bodyFat}%` },
       { label: "Lean mass", value: `${baseline.provenance.leanMass} lb` },
       { label: "Fat mass", value: `${baseline.provenance.fatMass} lb` },
-      { label: "Reference date", value: "July 18, 2026" },
-    ],
+      { label: "Reference date", value: formatLongDate(baseline.provenance.scanDate) },
+    ].filter((fact) => !String(fact.value).startsWith("null") && !String(fact.value).startsWith("undefined")),
   } : null;
 
   return {

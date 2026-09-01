@@ -844,6 +844,11 @@ function makeDexaBaselineCandidate(dexaScans, monthWindow) {
   if (date < monthWindow.startDate || date > monthWindow.endDate) return null;
   const baselineWindow = getCarryInAwareWindow([latest], monthWindow, "measuredAt", "DEXA baseline", { requireStoryWindow: false });
   if (!baselineWindow) return null;
+  const bodyFat = normalizeNumericBodyMass(latest.bodyFatPercentage);
+  const leanMass = normalizeNumericBodyMass(latest.leanMass);
+  const fatMass = normalizeNumericBodyMass(latest.fatMass);
+  const totalMass = normalizeNumericBodyMass(latest.totalMass ?? latest.weight);
+  const restingMetabolicRate = normalizeNumericBodyMass(latest.restingMetabolicRate);
   return createCandidate({
     monthlyWindow: monthWindow,
     storyType: "dexa_baseline",
@@ -872,6 +877,11 @@ function makeDexaBaselineCandidate(dexaScans, monthWindow) {
       source: "monthly_dexa_baseline_candidate",
       scanId: latest.id || "dexa_baseline",
       scanDate: date,
+      bodyFat,
+      leanMass,
+      fatMass,
+      totalMass,
+      restingMetabolicRate,
     },
   });
 }

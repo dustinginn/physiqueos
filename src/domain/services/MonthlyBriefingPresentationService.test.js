@@ -111,6 +111,34 @@ describe("Monthly briefing presentation composition", () => {
     });
   });
 
+  it("presents a canonical dexa_baseline candidate with its actual scan date", () => {
+    const fixture = monthlyPreviewFixtures.julyContinuation;
+    const narrative = composeMonthlyBriefingPreview({
+      ...fixture,
+      generatedAt: "2026-07-30T20:00:00.000Z",
+      goalConfidence: canonicalConfidence,
+    });
+    const baseline = narrative.editorialDecision.candidates
+      .find((candidate) => candidate.storyType === "new_baseline");
+    const decision = {
+      ...narrative.editorialDecision,
+      candidates: narrative.editorialDecision.candidates
+        .filter((candidate) => candidate.storyType !== "new_baseline")
+        .concat({ ...baseline, storyType: "dexa_baseline" }),
+    };
+    const presentation = composeMonthlyBriefingPresentation({
+      narrative,
+      decision,
+      fixture,
+    });
+
+    expect(presentation.newBaseline).toMatchObject({
+      facts: expect.arrayContaining([
+        { label: "Reference date", value: "July 18, 2026" },
+      ]),
+    });
+  });
+
   it("selects translated prose instead of authoring interpretation in presentation", () => {
     const { narrative, presentation } = compose("julyContinuation");
     expect(presentation.hero.title).toBe(narrative.monthlyNarrative.hero.title);
