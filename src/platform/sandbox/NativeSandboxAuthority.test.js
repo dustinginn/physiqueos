@@ -73,6 +73,26 @@ describe("Native sandbox authority", () => {
 });
 
 describe("Native sandbox Weight fast path", () => {
+  it("records secret-free validation, media, review-ready, and confirmation stage timing", async () => {
+    const logger = { info: vi.fn() };
+    const fixture = serviceFixture({ logger });
+    const review = await fixture.service.submit({
+      principal: fixture.principal, submission: fixture.submission, asset: fixture.asset, requestId: "request-one",
+    });
+    await fixture.service.confirm({
+      principal: fixture.principal, reviewId: review.id, expectedVersion: 1, requestId: "request-one",
+    });
+    expect(logger.info.mock.calls.map(([event]) => event)).toEqual([
+      "native.sandbox.weight_candidate.validated",
+      "native.sandbox.weight_candidate.media_stored",
+      "native.sandbox.weight_candidate.evidence_review_ready",
+      "native.sandbox.weight_review.canonical_commit_and_outbox_enqueued",
+    ]);
+    const serialized = JSON.stringify(logger.info.mock.calls);
+    expect(serialized).not.toContain(fixture.submission.assetSha256);
+    expect(serialized).not.toContain("real submitted screenshot bytes");
+  });
+
   it("stages real asset-backed candidate data, confirms sandbox-only, and enqueues authority context", async () => {
     const fixture = serviceFixture();
     const review = await fixture.service.submit({ principal: fixture.principal, submission: fixture.submission, asset: fixture.asset });
@@ -159,7 +179,14 @@ function serviceFixture(overrides = {}) {
     principal: authPrincipal(config.ownerUserId),
     submission,
     asset: { bytes, contentType: "image/png", filename: "weight.png" },
-    service: createNativeSandboxWeightCandidateService({ authority, store, media, clock: () => new Date("2026-09-01T15:00:00.000Z") }),
+    service: createNativeSandboxWeightCandidateService({
+      authority,
+      store,
+      media,
+      clock: () => new Date("2026-09-01T15:00:00.000Z"),
+      performanceClock: (() => { let value = 0; return () => ++value; })(),
+      logger: overrides.logger ?? null,
+    }),
   };
 }
 

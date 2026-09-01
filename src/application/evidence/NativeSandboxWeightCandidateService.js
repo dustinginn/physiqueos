@@ -9,6 +9,8 @@ export function createNativeSandboxWeightCandidateService({
   store,
   media,
   clock = () => new Date(),
+  performanceClock = () => performance.now(),
+  logger = null,
 } = {}) {
   if (!authority?.requirePrincipal || !store?.begin || !store?.stage ||
       !store?.getReview || !store?.confirm || !store?.discard || !media?.store) {
@@ -16,10 +18,17 @@ export function createNativeSandboxWeightCandidateService({
   }
 
   return Object.freeze({
-    async submit({ principal, submission, asset }) {
+    async submit({ principal, submission, asset, requestId = null }) {
       const actor = authority.requirePrincipal(principal, "founder:write");
+      const validationStartedAt = performanceClock();
       const candidate = validateSubmission(submission);
       const file = validateAsset(asset, candidate.assetSha256);
+      observe(logger, "native.sandbox.weight_candidate.validated", {
+        requestId,
+        authorityId: authority.descriptor.authorityId,
+        disposition: candidate.disposition,
+        durationMs: elapsed(performanceClock, validationStartedAt),
+      });
       const begun = await store.begin({
         authority: authority.descriptor,
         ownerUserId: actor.userId,
@@ -29,6 +38,7 @@ export function createNativeSandboxWeightCandidateService({
       });
       if (begun.outcome === "existing") return begun.review;
 
+      const mediaStartedAt = performanceClock();
       const stored = await media.store({
         ownerUserId: actor.userId,
         bytes: file.bytes,
@@ -38,6 +48,11 @@ export function createNativeSandboxWeightCandidateService({
         relationshipId: begun.intakeId,
         artifactId: `artifact_${candidate.submissionIdentity.replaceAll("-", "")}_1`,
       });
+      observe(logger, "native.sandbox.weight_candidate.media_stored", {
+        requestId,
+        authorityId: authority.descriptor.authorityId,
+        durationMs: elapsed(performanceClock, mediaStartedAt),
+      });
       const review = createPendingWeightReview({
         authority: authority.descriptor,
         ownerUserId: actor.userId,
@@ -46,7 +61,8 @@ export function createNativeSandboxWeightCandidateService({
         stored,
         at: clock().toISOString(),
       });
-      return store.stage({
+      const persistenceStartedAt = performanceClock();
+      const staged = await store.stage({
         authority: authority.descriptor,
         ownerUserId: actor.userId,
         intakeId: begun.intakeId,
@@ -54,6 +70,13 @@ export function createNativeSandboxWeightCandidateService({
         candidate,
         review,
       });
+      observe(logger, "native.sandbox.weight_candidate.evidence_review_ready", {
+        requestId,
+        authorityId: authority.descriptor.authorityId,
+        status: staged.status,
+        durationMs: elapsed(performanceClock, persistenceStartedAt),
+      });
+      return staged;
     },
 
     async getReview({ principal, reviewId }) {
@@ -61,7 +84,7 @@ export function createNativeSandboxWeightCandidateService({
       return authority.assertOwnedRecord(await store.getReview({ ownerUserId: actor.userId, reviewId }));
     },
 
-    async confirm({ principal, reviewId, expectedVersion, correctedValue = null, correctedUnit = null }) {
+    async confirm({ principal, reviewId, expectedVersion, correctedValue = null, correctedUnit = null, requestId = null }) {
       const actor = authority.requirePrincipal(principal, "founder:write");
       const review = await store.getReview({ ownerUserId: actor.userId, reviewId });
       if (!review) throw unavailable();
@@ -86,7 +109,8 @@ export function createNativeSandboxWeightCandidateService({
         dedupeKey: `weight:${review.id}:v${expectedVersion}`,
         payload: { reviewId: review.id, weightEntryId: weightEntry.id, measurementDate: measuredAt },
       });
-      return store.confirm({
+      const commitStartedAt = performanceClock();
+      const result = await store.confirm({
         authority: authority.descriptor,
         ownerUserId: actor.userId,
         reviewId,
@@ -95,6 +119,12 @@ export function createNativeSandboxWeightCandidateService({
         continuation,
         confirmedAt: at,
       });
+      observe(logger, "native.sandbox.weight_review.canonical_commit_and_outbox_enqueued", {
+        requestId,
+        authorityId: authority.descriptor.authorityId,
+        durationMs: elapsed(performanceClock, commitStartedAt),
+      });
+      return result;
     },
 
     async discard({ principal, reviewId, expectedVersion }) {
@@ -235,3 +265,5 @@ function uuid(value) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][
 function invalid(title) { return new ApplicationProblem({ status: 400, code: "NATIVE_SANDBOX_WEIGHT_CANDIDATE_INVALID", title }); }
 function conflict(title) { return new ApplicationProblem({ status: 409, code: "NATIVE_SANDBOX_WEIGHT_REVIEW_CONFLICT", title }); }
 function unavailable() { return new ApplicationProblem({ status: 404, code: "RESOURCE_NOT_FOUND", title: "The requested resource is unavailable." }); }
+function elapsed(clock, startedAt) { return Math.max(0, Math.round((clock() - startedAt) * 100) / 100); }
+function observe(logger, event, details) { logger?.info(event, details); }

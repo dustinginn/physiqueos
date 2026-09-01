@@ -9,6 +9,7 @@ import { createPostgresNativeSandboxWeightStore } from "../../platform/database/
 import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
 import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
+import { foundationLogger } from "../../platform/foundation/runtime.js";
 import {
   createAuthorityScopedObjectProvider,
   createNativeSandboxAuthorityBoundary,
@@ -51,6 +52,7 @@ export function getNativeSandboxApplicationComposition(env = process.env) {
     authority: boundary,
     store: weightStore,
     media: uploads,
+    logger: foundationLogger,
   });
   const founderAuthService = createFounderAuthService({
     transactionRunner: createFoundationPostgresTransactionRunner({ pool }),

@@ -34,7 +34,7 @@ export function createNativeSandboxAuthRuntime({ composition, logger = null, clo
     async submitWeightCandidate({ request, submission, asset, requestId = null }) {
       return timed("native.sandbox.weight_candidate.review_ready", requestId, async () => {
         const principal = await authenticator.authenticate(request);
-        return composition.weightCandidateService.submit({ principal, submission, asset });
+        return composition.weightCandidateService.submit({ principal, submission, asset, requestId });
       });
     },
     async getWeightReview({ request, reviewId, requestId = null }) {
@@ -46,7 +46,9 @@ export function createNativeSandboxAuthRuntime({ composition, logger = null, clo
     async confirmWeightReview({ request, reviewId, expectedVersion, correctedValue, correctedUnit, requestId = null }) {
       return timed("native.sandbox.weight_review.confirmed", requestId, async () => {
         const principal = await authenticator.authenticate(request);
-        return composition.weightCandidateService.confirm({ principal, reviewId, expectedVersion, correctedValue, correctedUnit });
+        return composition.weightCandidateService.confirm({
+          principal, reviewId, expectedVersion, correctedValue, correctedUnit, requestId,
+        });
       });
     },
     async discardWeightReview({ request, reviewId, expectedVersion, requestId = null }) {
