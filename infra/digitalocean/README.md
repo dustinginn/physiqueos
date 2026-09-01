@@ -1,5 +1,15 @@
 # DigitalOcean Phase 2 staging
 
+> **Production source governance (2026-09-01).** The authoritative PhysiqueOS
+> web/server source is `origin/combined-app-platform-cutover`. Production is
+> currently running commit `7326b608003f2198977c94a4c6ebcd47b3913433` from
+> that branch. `main` is historical and is not a valid starting point for new
+> server work. Before every server patch, run `git fetch --prune origin`, verify
+> the active DigitalOcean branch and commit, and branch from
+> `origin/combined-app-platform-cutover`. App Platform deployments are manual;
+> pushing this branch does not deploy it. The remaining document preserves the
+> earlier staging and migration history.
+
 Status: **provider-backed synthetic staging accepted on 2026-08-11; production remains isolated and inactive.**
 
 ## Provisioned resources
