@@ -24,6 +24,7 @@ import {
   EvidenceUploadArtifactCompletenessError,
   parseEvidenceUploadArtifactManifest,
 } from "../../../domain/services/EvidenceUploadArtifactManifest";
+import { getProductionAsyncEvidenceIntakeService } from "../../../application/composition/productionApplicationComposition.js";
 
 export const runtime = "nodejs";
 
@@ -37,7 +38,12 @@ export async function POST(request) {
     assertApplicationUploadEntryAllowed({ operation: "universal-evidence-upload" });
     const formData = await request.formData();
     recoveryContext = parseEvidenceRecoveryFormData(formData);
-    const user = await FounderRepositories.users.getCurrentUser();
+    const providerIntake = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
+      ? getProductionAsyncEvidenceIntakeService()
+      : null;
+    const user = providerIntake
+      ? { id: providerIntake.ownerUserId }
+      : await FounderRepositories.users.getCurrentUser();
 
     if (!user) throw new Error("Founder user is not available.");
 
@@ -50,11 +56,25 @@ export async function POST(request) {
     assertEvidenceUploadReceiptMatchesManifest({ manifest: uploadManifest, receivedFiles: files });
     const evidenceDate = normalizeDateKey(formData.get("evidenceDate")) ?? getTodayKey();
     const typedEvidence = normalizeOptionalText(formData.get("evidenceNote"));
-    const isHistoricalEvidence = evidenceDate < getTodayKey();
-
     if (files.length === 0 && !typedEvidence) {
+      if (request.headers.get("accept")?.includes("application/json")) {
+        return NextResponse.json({ error: "Add a file or note before submitting." }, { status: 400 });
+      }
       return redirectToLog({ error: "empty-intake" }, recoveryContext);
     }
+    if (providerIntake) {
+      const result = await providerIntake.accept({
+        submissionIdentity: String(formData.get("evidenceSubmissionIdentity") ?? ""),
+        effectiveDate: evidenceDate,
+        expectedEvidenceType: recoveryContext?.expectedEvidenceType ?? "auto",
+        files,
+        artifactManifest: uploadManifest,
+        typedEvidence,
+        recoveryContext,
+      });
+      return NextResponse.json(result, { status: result.status === "ready" ? 200 : 202 });
+    }
+    const isHistoricalEvidence = evidenceDate < getTodayKey();
 
     const [goals, executionItems] = await Promise.all([
       FounderRepositories.goals.listGoals(user.id),

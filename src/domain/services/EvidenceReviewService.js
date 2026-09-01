@@ -26,9 +26,10 @@ const COMMIT_LEASE_MS = 10 * 60 * 1000;
 
 export function createEvidenceReviewService({ repositories, now = () => new Date() }) {
   return {
-    async stage({ userId, evidencePackage, source = "universal_intake" }) {
-      const timestamp = now().toISOString();
-      const id = `evidence_review_${timestamp.replace(/\D/g, "")}`;
+    async stage({ userId, evidencePackage, source = "universal_intake", reviewId = null,
+      intakeReceiptId = null, createdAt = null }) {
+      const timestamp = createdAt ?? now().toISOString();
+      const id = reviewId ?? `evidence_review_${timestamp.replace(/\D/g, "")}`;
       const evidenceObjects = evidencePackage?.evidence_objects ?? [];
       const evidenceTypes = unique(evidenceObjects.map((item) => item.evidence_type));
       const interpretedEvidence = {
@@ -50,6 +51,7 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       };
       const review = {
         id, userId, source, status: "pending", createdAt: timestamp, updatedAt: timestamp,
+        intakeReceiptId,
         interpretedEvidence,
         evidenceTypes,
         confirmation: null,

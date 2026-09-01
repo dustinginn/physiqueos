@@ -8,7 +8,7 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
     expect(source).toContain("if (submitting) return");
     expect(source.match(/fetch\(action/g)).toHaveLength(1);
     expect(source).toContain('method: "POST"');
-    expect(source).toContain("router.push(result.reviewUrl)");
+    expect(source).toContain("router.push(result.reviewUrl ?? result.processingUrl)");
   });
 
   it("sends a stable browser-selected artifact manifest with the multipart request", () => {
@@ -19,12 +19,28 @@ describe("UploadAnythingForm production lifecycle presentation", () => {
       .toBeLessThan(source.indexOf("fetch(action"));
   });
 
-  it("ties Uploading to the real request and preserves the selected evidence date", () => {
+  it("ties receipt progress to the real request and preserves the selected evidence date", () => {
     expect(source).toContain("setSubmitting(true)");
     expect(source).toContain("setSubmitting(false)");
     expect(source).toContain('formData.get("evidenceDate")');
-    expect(source).toContain("Uploading your evidence");
+    expect(source).toContain("Receiving your upload");
+    expect(source).toContain("PhysiqueOS will read them in the background");
     expect(source).not.toMatch(/setTimeout|percent|OCR|parsing|canonical/i);
+  });
+
+  it("creates a browser submission identity before POST and reuses it for the same draft", () => {
+    expect(source).toContain("globalThis.crypto.randomUUID()");
+    expect(source).toContain("physiqueos:evidence-intake:draft-v1");
+    expect(source).toContain('formData.set("evidenceSubmissionIdentity", submission.id)');
+    expect(source.indexOf('formData.set("evidenceSubmissionIdentity"'))
+      .toBeLessThan(source.indexOf("fetch(action"));
+    expect(source).toContain("current?.payloadKey === payloadKey");
+  });
+
+  it("does not expose raw fetch or response parsing exceptions", () => {
+    expect(source).toContain("Your upload could not be received. Your selected files are unchanged");
+    expect(source).not.toContain("setError(failure?.message");
+    expect(source).toContain('contentType.includes("application/json")');
   });
 
   it("does not show review or success after an upload failure", () => {

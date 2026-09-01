@@ -16,20 +16,40 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
     if (!message) return Object.freeze({ outcome: "idle" });
     const handler = handlers[message.topic];
     if (typeof handler !== "function") return failMessage(message, new WorkerMessageError("OUTBOX_TOPIC_UNSUPPORTED", "No handler is registered for this outbox topic."), true);
+    let leaseLost = false;
+    const renew = store.renewLease ? setInterval(async () => {
+      const renewedAt = clock();
+      const renewed = await store.renewLease({
+        id: message.id,
+        workerId,
+        at: renewedAt,
+        leaseExpiresAt: new Date(renewedAt.getTime() + leaseMs),
+      }).catch(() => null);
+      if (!renewed) leaseLost = true;
+    }, Math.max(1_000, Math.floor(leaseMs / 3))) : null;
+    renew?.unref?.();
+    const assertLease = () => {
+      if (leaseLost) throw new WorkerMessageError("OUTBOX_LEASE_LOST", "The worker lost durable ownership before completion.");
+    };
     try {
       await handler(Object.freeze({
         messageId: message.id,
+        workerId,
         topic: message.topic,
         payloadVersion: message.payload_version,
         payload: structuredClone(message.payload),
         correlation: Object.freeze({ commandId: message.payload?.commandId ?? null, operationId: message.operation_id ?? null }),
+        assertLease,
       }));
+      assertLease();
       const acknowledged = await store.acknowledge({ id: message.id, workerId, at: clock() });
       if (!acknowledged) throw new WorkerMessageError("OUTBOX_LEASE_LOST", "The worker lease expired before acknowledgement.");
       logger?.info?.("outbox.succeeded", { messageId: message.id, topic: message.topic, attemptCount: message.attempt_count });
       return Object.freeze({ outcome: "succeeded", messageId: message.id });
     } catch (error) {
       return failMessage(message, error, Number(message.attempt_count) >= maximumAttempts);
+    } finally {
+      if (renew) clearInterval(renew);
     }
   }
 

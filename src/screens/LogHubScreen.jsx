@@ -8,6 +8,7 @@ export default function LogHubScreen({
   defaultLogDate,
   directWeighInAction,
   error = null,
+  intakeState = null,
   loggedToday = { rows: [] },
   pendingEvidenceReviews = [],
   recoveryContext = null,
@@ -29,6 +30,24 @@ export default function LogHubScreen({
             Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.
           </p>
           {saved && <p className="rounded-full bg-[#ECFDF3] px-3 py-2 text-sm font-bold text-[#15803D]">Your upload was saved.</p>}
+          {intakeState === "received" && (
+            <div className="rounded-[16px] bg-[#ECFDF3] px-4 py-3 text-[#15803D]" role="status">
+              <p className="text-sm font-extrabold">Upload received</p>
+              <p className="mt-1 text-sm font-medium leading-6">PhysiqueOS is reading your evidence. You can leave this page; your review will appear here when it is ready.</p>
+            </div>
+          )}
+          {intakeState === "processing" && (
+            <div className="rounded-[16px] bg-[#ECFDF3] px-4 py-3 text-[#15803D]" role="status">
+              <p className="text-sm font-extrabold">Upload received</p>
+              <p className="mt-1 text-sm font-medium leading-6">PhysiqueOS is reading your evidence. You can leave this page; your review will appear here when it is ready.</p>
+            </div>
+          )}
+          {intakeState === "processing_failed" && (
+            <div className="rounded-[16px] bg-amber-50 px-4 py-3 text-amber-800" role="status">
+              <p className="text-sm font-extrabold">Upload received</p>
+              <p className="mt-1 text-sm font-medium leading-6">Your files are preserved, but PhysiqueOS still needs to finish reading them. Do not upload them again.</p>
+            </div>
+          )}
           {error && <p className="rounded-[16px] bg-[#FEF2F2] px-3 py-2 text-sm font-bold leading-6 text-[#B91C1C]">{formatLogError(error)}</p>}
         </header>
 

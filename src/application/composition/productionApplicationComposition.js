@@ -79,6 +79,9 @@ import {
   createRepositoryBriefingNavigationReadStore,
 } from "../../platform/database/PostgresBriefingNavigationReadStore.js";
 import { createBriefingNavigationReadService } from "../briefings/BriefingNavigationReadService.js";
+import { createAsyncEvidenceIntakeService } from "../evidence/AsyncEvidenceIntakeService.js";
+import { createPostgresEvidenceIntakeStore } from "../../platform/database/PostgresEvidenceIntakeStore.js";
+import { createProviderCanonicalUploadService } from "../media/ProviderCanonicalUploadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -109,6 +112,34 @@ export async function runProductionApplicationReadScope(callback, metadata = {},
   if (typeof callback !== "function") throw new Error("Production application read scope requires a callback.");
   if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") return callback();
   return getOrCreateProviderRuntime(env).readScope.run(callback, metadata);
+}
+
+export function getProductionAsyncEvidenceIntakeService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  const compatibilityMode = env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
+  if (compatibilityMode) throw providerBuildAccessError();
+  const authorityStore = createPostgresCombinedRuntimeAuthorityStore({
+    pool: runtime.pool,
+    environment: required(env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT"),
+  });
+  return createAsyncEvidenceIntakeService({
+    store: createPostgresEvidenceIntakeStore({
+      pool: runtime.pool,
+      ownerUserId: runtime.ownerUserId,
+      authorityStore,
+      migrationOperationId: env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+    }),
+    uploads: createProviderCanonicalUploadService({
+      pool: runtime.pool,
+      objectProvider: runtime.objectProvider,
+      authorityStore,
+      migrationOperationId: env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+      compatibilityMode: false,
+    }),
+  });
 }
 
 export async function getProductionApplicationCanonicalCommitComposition(

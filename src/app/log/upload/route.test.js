@@ -9,15 +9,23 @@ const mocks = vi.hoisted(() => ({
   saveEvidencePackage: vi.fn(),
   stage: vi.fn(),
   assertApplicationUploadEntryAllowed: vi.fn(),
+  acceptAsyncIntake: vi.fn(),
+  getCurrentUser: vi.fn(async () => ({ id: "founder" })),
 }));
 
 vi.mock("../../../data/repositories/founderRepositories", () => ({
   FounderRepositories: {
-    users: { getCurrentUser: vi.fn(async () => ({ id: "founder" })) },
+    users: { getCurrentUser: mocks.getCurrentUser },
     goals: { listGoals: vi.fn(async () => []) },
     executionItems: { listExecutionItems: vi.fn(async () => []) },
     evidencePackages: { saveEvidencePackage: mocks.saveEvidencePackage },
   },
+}));
+vi.mock("../../../application/composition/productionApplicationComposition.js", () => ({
+  getProductionAsyncEvidenceIntakeService: vi.fn(() => ({
+    ownerUserId: "founder",
+    accept: mocks.acceptAsyncIntake,
+  })),
 }));
 vi.mock("../../../domain/services/EvidenceIntakeService", () => ({
   createStoredEvidenceArtifactDescriptor: vi.fn((value) => value),
@@ -41,6 +49,7 @@ function uploadRequest({ selected, received = selected }) {
     EVIDENCE_UPLOAD_MANIFEST_FIELD,
     JSON.stringify(createEvidenceUploadArtifactManifest(selected))
   );
+  form.set("evidenceSubmissionIdentity", "01999999-9999-7999-8999-999999999999");
   return new Request("http://localhost/log/upload", {
     method: "POST",
     headers: { Accept: "application/json" },
@@ -60,6 +69,34 @@ describe("universal Evidence upload completeness boundary", () => {
       storedArtifacts: [],
     });
     mocks.stage.mockResolvedValue({ id: "evidence_review_complete" });
+    mocks.acceptAsyncIntake.mockResolvedValue({
+      intakeId: "evidence_intake_01999999-9999-7999-8999-999999999999",
+      status: "processing",
+      processingUrl: "/log?upload=received",
+    });
+  });
+
+  it("returns durable acceptance without interpretation, package staging, or broad principal resolution in provider mode", async () => {
+    const previous = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME;
+    process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME = "1";
+    try {
+      const selected = [new File([[1]], "meal.png", { type: "image/png" })];
+      const response = await POST(uploadRequest({ selected }));
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({ status: "processing" });
+      expect(mocks.acceptAsyncIntake).toHaveBeenCalledWith(expect.objectContaining({
+        submissionIdentity: "01999999-9999-7999-8999-999999999999",
+        effectiveDate: "2026-08-21",
+      }));
+      expect(mocks.acceptAsyncIntake.mock.calls[0][0].files.map((file) => file.name)).toEqual(["meal.png"]);
+      expect(mocks.getCurrentUser).not.toHaveBeenCalled();
+      expect(mocks.processEvidenceIntakeSubmission).not.toHaveBeenCalled();
+      expect(mocks.saveEvidencePackage).not.toHaveBeenCalled();
+      expect(mocks.stage).not.toHaveBeenCalled();
+    } finally {
+      if (previous == null) delete process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME;
+      else process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME = previous;
+    }
   });
 
   it("fails before interpretation or review staging when one selected file is absent", async () => {

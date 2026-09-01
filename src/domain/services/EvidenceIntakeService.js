@@ -389,6 +389,37 @@ async function createEvidencePackageFromStoredArtifacts({
   return evidencePackage;
 }
 
+export async function interpretEvidenceIntakeStoredArtifacts({
+  capturedAt,
+  evidenceDate,
+  expectedEvidenceType = "auto",
+  loadArtifact,
+  sourceArtifacts = [],
+  submissionId,
+  typedEvidence = null,
+  userId = "founder",
+  photoSessionContext = null,
+} = {}) {
+  if (typeof loadArtifact !== "function" || !submissionId) {
+    throw new Error("Stored Evidence intake requires a media loader and submission identity.");
+  }
+  const storedArtifacts = [];
+  for (const artifact of [...sourceArtifacts].sort((a, b) => a.ordinal - b.ordinal)) {
+    storedArtifacts.push(await loadArtifact({ artifact, userId }));
+  }
+  const evidencePackage = await createEvidencePackageFromStoredArtifacts({
+    capturedAt,
+    evidenceDate,
+    expectedEvidenceType,
+    storedArtifacts,
+    submissionId,
+    typedEvidence,
+    userId,
+    photoSessionContext,
+  });
+  return Object.freeze({ evidencePackage, provider: getPackageProvider(evidencePackage), storedArtifacts });
+}
+
 async function createImageEvidencePackage({
   artifacts,
   evidenceDate,

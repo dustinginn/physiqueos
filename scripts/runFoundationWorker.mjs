@@ -24,6 +24,16 @@ import {
 
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
+const [{ EVIDENCE_INTAKE_INTERPRETATION_TOPIC },
+  { createEvidenceIntakeInterpretationWorkerHandler },
+  { createPostgresEvidenceIntakeStore },
+  { createProviderEvidenceIntakeArtifactLoader }] = await Promise.all([
+  import("../src/domain/services/EvidenceIntakeBackgroundWork.js"),
+  import("../src/platform/jobs/EvidenceIntakeInterpretationWorker.js"),
+  import("../src/platform/database/PostgresEvidenceIntakeStore.js"),
+  import("../src/application/evidence/AsyncEvidenceIntakeService.js"),
+]);
+
 const simplifiedMigration = process.env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED === "1"
   ? await loadSimplifiedMigrationModules()
   : null;
@@ -33,6 +43,7 @@ const buildIdentity = readBuildIdentity();
 const logger = createStructuredLogger({ buildIdentity });
 const adapters = createFoundationPostgresAdapters({ query: (text, values) => pool.query(text, values) });
 const controller = new AbortController();
+const workerBootProbe = process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1";
 const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
 const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? required(process.env.PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT, "PHYSIQUEOS_RUNTIME_AUTHORITY_ENVIRONMENT")
@@ -51,6 +62,20 @@ if (compatibilityMode) {
     throw error;
   }
 }
+const runtimeAuthorityStore = authorityEnvironment
+  ? createPostgresCombinedRuntimeAuthorityStore({ pool, environment: authorityEnvironment })
+  : null;
+const evidenceIntakeObjectProvider = ownerUserId && !compatibilityMode && !workerBootProbe
+  ? createSpacesPrivateObjectProvider(readSpacesConfig(process.env))
+  : null;
+const evidenceIntakeStore = ownerUserId && !compatibilityMode && !workerBootProbe
+  ? createPostgresEvidenceIntakeStore({
+      pool,
+      ownerUserId,
+      authorityStore: runtimeAuthorityStore,
+      migrationOperationId: process.env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+    })
+  : null;
 
 const simplifiedOperationStore = simplifiedMigration
   ? simplifiedMigration.createPostgresSimplifiedProviderMigrationOperationStore({
@@ -70,6 +95,15 @@ const handlers = Object.freeze({
       return continueEvidenceReviewInBackground(input);
     },
   }),
+  ...(evidenceIntakeStore ? {
+    [EVIDENCE_INTAKE_INTERPRETATION_TOPIC]: createEvidenceIntakeInterpretationWorkerHandler({
+      store: evidenceIntakeStore,
+      loadArtifact: createProviderEvidenceIntakeArtifactLoader({
+        pool,
+        objectProvider: evidenceIntakeObjectProvider,
+      }),
+    }),
+  } : {}),
   ...(process.env.PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED === "1" ? {
     [PROVIDER_MIGRATION_DRY_RUN_TOPIC]: createProviderMigrationDryRunWorkerHandler({
       store: createPostgresProviderMigrationDryRunStore({
@@ -142,10 +176,7 @@ const worker = createDurableOutboxWorker({
 const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? createAuthorityGatedWorker({
       worker,
-      authorityStore: createPostgresCombinedRuntimeAuthorityStore({
-        pool,
-        environment: authorityEnvironment,
-      }),
+      authorityStore: runtimeAuthorityStore,
       heartbeat: adapters.outbox.heartbeat,
       workerId: worker.workerId,
       buildId: buildIdentity.buildId,
@@ -156,7 +187,7 @@ const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
     })
   : worker;
 
-if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
+if (workerBootProbe) {
   process.stdout.write(`${JSON.stringify({
     status: "PROVIDER_WORKER_APPLICATION_LOOP_READY",
     workerPid: process.pid,
@@ -208,6 +239,7 @@ if (process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1") {
     logger.error("worker.crashed", { code: error?.code ?? "WORKER_CRASHED" });
     process.exitCode = 1;
   } finally {
+    evidenceIntakeObjectProvider?.close?.();
     await pool.end();
   }
 }

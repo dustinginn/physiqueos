@@ -22,6 +22,32 @@ describe("durable outbox worker", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("renews durable ownership while a long-running handler is still active", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at(0));
+    try {
+      const store = durableStore([message()]);
+      const handler = vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1_100));
+      });
+      const worker = createDurableOutboxWorker({
+        store,
+        handlers: { "synthetic.test": handler },
+        workerId: "worker",
+        buildId: "build",
+        clock: () => new Date(Date.now()),
+        leaseMs: 3_000,
+      });
+      const result = worker.runOnce();
+      await vi.advanceTimersByTimeAsync(1_100);
+      await expect(result).resolves.toMatchObject({ outcome: "succeeded" });
+      expect(store.renewals).toHaveLength(1);
+      expect(store.state[0]).toMatchObject({ status: "succeeded", attempt_count: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("cannot acknowledge or reschedule after another worker acquires an expired lease", async () => {
     const store = durableStore([message()]);
     let now = at(0);
@@ -96,9 +122,11 @@ describe("durable outbox worker", () => {
 function durableStore(seed) {
   const state = structuredClone(seed);
   const heartbeats = [];
+  const renewals = [];
   return {
     state,
     heartbeats,
+    renewals,
     async heartbeat(value) { heartbeats.push(structuredClone(value)); },
     async claimNext({ workerId, now, leaseExpiresAt, allowedTopics = null }) {
       const item = state.find((entry) => (allowedTopics == null || allowedTopics.includes(entry.topic)) && entry.due_at <= now && (entry.status === "pending" || (entry.status === "processing" && entry.claim_expires_at <= now)));
@@ -110,6 +138,13 @@ function durableStore(seed) {
       const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing" && entry.claim_expires_at > observedAt);
       if (!item) return null;
       Object.assign(item, { status: "succeeded", claimed_by: null, claim_expires_at: null });
+      return structuredClone(item);
+    },
+    async renewLease({ id, workerId, at: observedAt, leaseExpiresAt }) {
+      const item = state.find((entry) => entry.id === id && entry.claimed_by === workerId && entry.status === "processing" && entry.claim_expires_at > observedAt);
+      if (!item) return null;
+      renewals.push({ id, workerId, at: observedAt, leaseExpiresAt });
+      Object.assign(item, { claim_expires_at: leaseExpiresAt });
       return structuredClone(item);
     },
     async fail({ id, workerId, at: observedAt, dueAt, errorCode, errorDetail, terminal }) {

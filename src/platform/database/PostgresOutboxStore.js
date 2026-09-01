@@ -29,6 +29,14 @@ export function createPostgresOutboxStore({ query }) {
         [id, workerId, at],
       ));
     },
+    async renewLease({ id, workerId, at, leaseExpiresAt }) {
+      return firstRow(await query(
+        `UPDATE physiqueos.outbox_messages SET claim_expires_at=$4,updated_at=$3
+          WHERE id=$1 AND claimed_by=$2 AND status='processing' AND claim_expires_at>$3
+          RETURNING *`,
+        [id, workerId, at, leaseExpiresAt],
+      ));
+    },
     async fail({ id, workerId, at, dueAt, errorCode, errorDetail, terminal }) {
       return firstRow(await query(
         `UPDATE physiqueos.outbox_messages

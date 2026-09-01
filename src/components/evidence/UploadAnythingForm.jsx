@@ -8,6 +8,8 @@ import {
   EVIDENCE_UPLOAD_MANIFEST_FIELD,
 } from "../../domain/services/EvidenceUploadArtifactManifest";
 
+const INTAKE_DRAFT_KEY = "physiqueos:evidence-intake:draft-v1";
+
 export default function UploadAnythingForm({
   action,
   children,
@@ -30,10 +32,14 @@ export default function UploadAnythingForm({
     if (submitting) return;
     const selectedFiles = event.currentTarget.elements.namedItem("evidenceFiles")?.files ?? [];
     const formData = new FormData(event.currentTarget);
-    formData.set(
-      EVIDENCE_UPLOAD_MANIFEST_FIELD,
-      JSON.stringify(createEvidenceUploadArtifactManifest(selectedFiles))
-    );
+    const manifest = createEvidenceUploadArtifactManifest(selectedFiles);
+    formData.set(EVIDENCE_UPLOAD_MANIFEST_FIELD, JSON.stringify(manifest));
+    const submission = getOrCreateSubmissionIdentity({
+      manifest,
+      effectiveDate: String(formData.get("evidenceDate") ?? ""),
+      typedEvidence: String(formData.get("evidenceNote") ?? ""),
+    });
+    formData.set("evidenceSubmissionIdentity", submission.id);
     setUploadingDate(String(formData.get("evidenceDate") ?? ""));
     setSubmitting(true);
     setError(null);
@@ -43,11 +49,14 @@ export default function UploadAnythingForm({
         body: formData,
         headers: { Accept: "application/json" },
       });
-      const result = await response.json();
-      if (!response.ok || !result.reviewUrl) throw new Error(result.error ?? "Your upload could not be prepared for review.");
-      router.push(result.reviewUrl);
+      const result = await readJsonResponse(response);
+      if (!response.ok || (!result.reviewUrl && !result.processingUrl)) {
+        throw new Error(result.error ?? "Your upload could not be received.");
+      }
+      clearSubmissionIdentity(submission);
+      router.push(result.reviewUrl ?? result.processingUrl);
     } catch (failure) {
-      setError(failure?.message ?? "Your upload could not be prepared for review.");
+      setError("Your upload could not be received. Your selected files are unchanged; try again when you are ready.");
       setSubmitting(false);
     }
   }
@@ -78,9 +87,9 @@ export default function UploadAnythingForm({
     {submitting ? (
       <section aria-busy="true" aria-live="polite" className="flex min-h-64 flex-col items-center justify-center px-4 text-center" role="status">
         <span aria-hidden="true" className="h-10 w-10 animate-pulse rounded-full bg-[var(--surface-accent)] ring-8 ring-[var(--surface-muted)] motion-reduce:animate-none" />
-        <h2 className="mt-7 text-2xl font-extrabold text-[var(--text-primary)]">Uploading your evidence&hellip;</h2>
+        <h2 className="mt-7 text-2xl font-extrabold text-[var(--text-primary)]">Receiving your upload&hellip;</h2>
         {uploadingDate && <p className="mt-3 text-sm font-bold text-[var(--text-secondary)]">{formatFriendlyDate(uploadingDate)}</p>}
-        <p className="mt-3 max-w-xs text-sm leading-6 text-[var(--text-secondary)]">Keep this page open while your upload is prepared for review.</p>
+        <p className="mt-3 max-w-xs text-sm leading-6 text-[var(--text-secondary)]">Keep this page open until your files are received. PhysiqueOS will read them in the background.</p>
       </section>
     ) : <>
       {children}
@@ -159,6 +168,30 @@ export default function UploadAnythingForm({
       </button>
     </>}
   </form>;
+}
+
+export function getOrCreateSubmissionIdentity({ manifest, effectiveDate, typedEvidence }, storage = globalThis.sessionStorage) {
+  const payloadKey = JSON.stringify({ manifest, effectiveDate, typedEvidence });
+  try {
+    const current = JSON.parse(storage?.getItem(INTAKE_DRAFT_KEY) ?? "null");
+    if (current?.payloadKey === payloadKey && current?.id) return current;
+  } catch { /* A corrupt browser draft must not block a new intake. */ }
+  const created = { id: globalThis.crypto.randomUUID(), payloadKey };
+  storage?.setItem(INTAKE_DRAFT_KEY, JSON.stringify(created));
+  return created;
+}
+
+function clearSubmissionIdentity(submission, storage = globalThis.sessionStorage) {
+  try {
+    const current = JSON.parse(storage?.getItem(INTAKE_DRAFT_KEY) ?? "null");
+    if (current?.id === submission.id) storage?.removeItem(INTAKE_DRAFT_KEY);
+  } catch { storage?.removeItem(INTAKE_DRAFT_KEY); }
+}
+
+async function readJsonResponse(response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) throw new Error("UPLOAD_RESPONSE_INVALID");
+  return response.json();
 }
 
 function formatFriendlyDate(value) {
