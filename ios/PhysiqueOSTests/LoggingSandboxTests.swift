@@ -501,6 +501,139 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(store.review(id: id)).canConfirm)
     }
 
+    // MARK: - Direct-upload Training exercise-boundary regressions
+
+    /// Reproduces the real Founder failure exactly: typing "Bicep curls"
+    /// then "Pull ups" previously merged Pull Ups' four sets into Bicep
+    /// Curls (8 sets total) because "Pull ups" matched no heading signal
+    /// at all and its sets silently bled into whatever exercise was still
+    /// active. Neither name is in the small demo Training Logger catalog
+    /// today, so both must be preserved as distinct, provisional
+    /// occurrences — never dropped, merged, silently renamed, or given a
+    /// fabricated canonical identity.
+    func testPullUpsMergeRegressionPreservesTwoDistinctFourSetExercises() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Bicep curls\n12r 50p x4\n\nPull ups\n12r 60p x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
+
+        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Pull Ups"])
+        XCTAssertEqual(exercises.map { $0.sets.count }, [4, 4])
+        XCTAssertEqual(exercises[0].sets[0].reps, "12")
+        XCTAssertEqual(exercises[0].sets[0].load, "50")
+        XCTAssertEqual(exercises[1].sets[0].reps, "12")
+        XCTAssertEqual(exercises[1].sets[0].load, "60")
+        XCTAssertTrue(exercises[0].isProvisional)
+        XCTAssertNil(exercises[0].canonicalExerciseId)
+        XCTAssertTrue(exercises[1].isProvisional)
+        XCTAssertNil(exercises[1].canonicalExerciseId)
+    }
+
+    /// Spider Curls is a genuinely catalogued Training Logger exercise
+    /// (`TrainingLoggerFixture.json`), which is why it never exhibited the
+    /// Pull Ups failure — its keyword matched the old heading heuristic.
+    /// This asserts it still resolves to its real canonical identity under
+    /// the new structural boundary detection, and that Bicep Curls (not
+    /// catalogued) still does not merge into it.
+    func testSpiderCurlsRegressionDoesNotMergeWithBicepCurlsAndResolvesCanonically() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Bicep curls\n12r 50p x4\n\nSpider curls\n12r 40p x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
+
+        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Spider Curls"])
+        XCTAssertEqual(exercises.map { $0.sets.count }, [4, 4])
+        XCTAssertTrue(exercises[0].isProvisional)
+        XCTAssertNil(exercises[0].canonicalExerciseId)
+        XCTAssertFalse(exercises[1].isProvisional)
+        XCTAssertEqual(exercises[1].canonicalExerciseId, "spider-curls")
+    }
+
+    /// A known exercise flanked by two different unrecognized exercises:
+    /// all three must remain distinct occurrences in typed source order
+    /// (not alphabetized, not reordered by resolution status), and neither
+    /// unresolved exercise may borrow sets from the known one or from each
+    /// other.
+    func testMultipleUnresolvedExercisesRemainDistinctInTypedOrderWithoutContaminatingAKnownExercise() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Lat pulldown\n10r 120p x3\n\nZercher squats\n8r 135p x3\n\nCopenhagen planks\n30r 10p x3"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
+
+        XCTAssertEqual(exercises.map(\.name), ["Lat Pulldown", "Zercher Squats", "Copenhagen Planks"])
+        XCTAssertEqual(exercises.map { $0.sets.count }, [3, 3, 3])
+        XCTAssertFalse(exercises[0].isProvisional)
+        XCTAssertEqual(exercises[0].canonicalExerciseId, "lat-pulldown")
+        XCTAssertTrue(exercises[1].isProvisional)
+        XCTAssertTrue(exercises[2].isProvisional)
+        XCTAssertEqual(exercises[0].sets[0].reps, "10")
+        XCTAssertEqual(exercises[1].sets[0].reps, "8")
+        XCTAssertEqual(exercises[2].sets[0].reps, "30")
+    }
+
+    /// Variants are freeform captured text on top of a resolved-or-not base
+    /// exercise identity (`TrainingExecutionVariant`'s own documented
+    /// model) — a new variant on a known base is not an error, and an
+    /// unknown exercise still preserves any variant text verbatim.
+    func testVariantMatrixPreservesOccurrenceIdentityAcrossKnownAndUnknownCombinations() async throws {
+        struct Case { let details: String; let name: String; let canonicalId: String?; let isProvisional: Bool; let variant: String? }
+        let cases: [Case] = [
+            .init(details: "Spider curls\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: nil),
+            .init(details: "Spider curls (Slow Eccentric)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: "Slow Eccentric"),
+            .init(details: "Spider curls (Paused)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: "Paused"),
+            .init(details: "Zercher squats\n8r 135p x3", name: "Zercher Squats", canonicalId: nil, isProvisional: true, variant: nil),
+            .init(details: "Zercher squats (Pause at Knee)\n8r 135p x3", name: "Zercher Squats", canonicalId: nil, isProvisional: true, variant: "Pause at Knee"),
+        ]
+        for testCase in cases {
+            let store = LoggingSandboxStore(now: date(2026, 8, 30))
+            store.evidenceDraft.scenario = .training
+            store.evidenceDraft.details = testCase.details
+            _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+            let id = try await reviewID(store)
+            let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+            XCTAssertEqual(exercise.name, testCase.name, testCase.details)
+            XCTAssertEqual(exercise.canonicalExerciseId, testCase.canonicalId, testCase.details)
+            XCTAssertEqual(exercise.isProvisional, testCase.isProvisional, testCase.details)
+            XCTAssertEqual(exercise.variant, testCase.variant, testCase.details)
+        }
+    }
+
+    /// Mirrors `LocalEvidenceReviewView.matchExercise`: reconciling a
+    /// provisional exercise to an existing catalog identity is a local,
+    /// Founder-confirmed action — never automatic — and must preserve the
+    /// exercise's own sets untouched.
+    func testMatchingAProvisionalExerciseToTheCatalogPreservesItsOccurrenceAndSets() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Bicep curls\n12r 50p x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let itemId = try XCTUnwrap(store.review(id: id)?.items.first?.id)
+        let exerciseId = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.id)
+        XCTAssertTrue(try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.isProvisional))
+
+        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "spider-curls" })
+        store.updateReviewItem(reviewId: id, itemId: itemId) { item in
+            guard let index = item.exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+            item.exercises[index].canonicalExerciseId = catalogExercise.canonicalExerciseId
+            item.exercises[index].name = catalogExercise.name
+            item.exercises[index].isProvisional = false
+        }
+        let matched = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+        XCTAssertEqual(matched.canonicalExerciseId, "spider-curls")
+        XCTAssertEqual(matched.name, "Spider Curls")
+        XCTAssertFalse(matched.isProvisional)
+        XCTAssertEqual(matched.sets.count, 4)
+        XCTAssertEqual(matched.sets[0].reps, "12")
+        XCTAssertEqual(matched.sets[0].load, "50")
+    }
+
     func testTypeSpecificReviewsUseSubmittedValuesAndNeverCannedValues() async throws {
         let cases: [(EvidenceFixtureScenario, String, String, String)] = [
             (.nutrition, "Calories 1987 Protein 176 Carbohydrates 204 Fat 61", "calories", "1987"),
