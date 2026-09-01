@@ -34,7 +34,8 @@ enum EvidenceLocalInterpretation {
     static func buildReview(
         id: String,
         draft: EvidenceIntakeDraft,
-        scenario: EvidenceFixtureScenario
+        scenario: EvidenceFixtureScenario,
+        trainingCatalog: [TrainingLoggerCatalogExercise] = TrainingExerciseCatalogLoader.loadExercises()
     ) -> Result<LocalEvidenceReview, LoggingSandboxError> {
         let categories: [EvidenceCategory]
         if scenario == .mixed {
@@ -50,7 +51,7 @@ enum EvidenceLocalInterpretation {
 
         var items: [EvidenceReviewItem] = []
         for category in categories {
-            items.append(contentsOf: reviewItems(for: category, draft: draft))
+            items.append(contentsOf: reviewItems(for: category, draft: draft, trainingCatalog: trainingCatalog))
         }
         guard !items.isEmpty else {
             return .failure(.init(message: "No reviewable information was found. Choose a type or add details, then try again."))
@@ -101,9 +102,13 @@ enum EvidenceLocalInterpretation {
         fill(&draft.dexa.vatVolume, from: text, labels: ["vat volume"])
     }
 
-    private static func reviewItems(for category: EvidenceCategory, draft: EvidenceIntakeDraft) -> [EvidenceReviewItem] {
+    private static func reviewItems(
+        for category: EvidenceCategory,
+        draft: EvidenceIntakeDraft,
+        trainingCatalog: [TrainingLoggerCatalogExercise]
+    ) -> [EvidenceReviewItem] {
         switch category {
-        case .training: trainingItems(draft)
+        case .training: trainingItems(draft, catalog: trainingCatalog)
         case .nutrition: [nutritionItem(draft)]
         case .weight: [weightItem(draft)]
         case .activity: [activityItem(draft)]
@@ -115,9 +120,12 @@ enum EvidenceLocalInterpretation {
         }
     }
 
-    private static func trainingItems(_ draft: EvidenceIntakeDraft) -> [EvidenceReviewItem] {
+    private static func trainingItems(
+        _ draft: EvidenceIntakeDraft,
+        catalog: [TrainingLoggerCatalogExercise] = TrainingExerciseCatalogLoader.loadExercises()
+    ) -> [EvidenceReviewItem] {
         var items: [EvidenceReviewItem] = []
-        let exercises = parseExercises(draft.submittedText)
+        let exercises = parseExercises(draft.submittedText, catalog: catalog)
         if !exercises.isEmpty {
             let strengthText = draft.attachments.compactMap(\.extractedText).first(where: isStrengthText)
             items.append(.init(
@@ -153,19 +161,37 @@ enum EvidenceLocalInterpretation {
         return items
     }
 
-    private static func parseExercises(_ text: String) -> [EvidenceReviewExercise] {
+    /// Preserves exercise-block boundaries before attempting canonical
+    /// resolution — each typed heading becomes its own occurrence the
+    /// instant it is recognized as a heading, independent of whether its
+    /// name later resolves against `catalog`. A heading is recognized
+    /// structurally (the next content line reads as a set) rather than by
+    /// a closed keyword list, so a real but uncatalogued exercise name
+    /// (e.g. "Pull ups", which contains no configured keyword substring)
+    /// still opens its own block instead of silently falling through and
+    /// letting its sets bleed into whatever exercise preceded it. This is
+    /// the fix for the real Founder-reported failure: "Pull ups" typed
+    /// after "Bicep curls" previously matched no heading signal at all, so
+    /// its four sets were appended to the still-active "Bicep curls"
+    /// block, producing a false 8-set Bicep Curls summary instead of two
+    /// distinct 4-set occurrences.
+    private static func parseExercises(
+        _ text: String,
+        catalog: [TrainingLoggerCatalogExercise] = TrainingExerciseCatalogLoader.loadExercises()
+    ) -> [EvidenceReviewExercise] {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         var order: [String] = []
         var setsByExercise: [String: [EvidenceReviewSet]] = [:]
         var displayNames: [String: String] = [:]
+        var variantsByExercise: [String: String] = [:]
         var current: String?
 
-        for line in lines {
+        for (index, line) in lines.enumerated() {
             if let inline = capture(#"^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), inline.count >= 5 {
-                appendExercise(inline[1], load: inline[2], reps: inline[3], count: inline[4], order: &order, sets: &setsByExercise, names: &displayNames)
-                current = normalizeExercise(inline[1])
+                appendExercise(inline[1], load: inline[2], reps: inline[3], count: inline[4], order: &order, sets: &setsByExercise, names: &displayNames, variants: &variantsByExercise)
+                current = normalizeExercise(splitVariant(inline[1]).base)
                 continue
             }
             if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
@@ -180,19 +206,69 @@ enum EvidenceLocalInterpretation {
                 appendSets(load: metric[3], reps: metric[2], count: metric[1], to: current, sets: &setsByExercise)
                 continue
             }
-            if looksLikeExerciseName(line) {
-                let key = normalizeExercise(line)
+            let nextLine = lines.indices.contains(index + 1) ? lines[index + 1] : nil
+            if looksLikeExerciseHeading(line, nextLine: nextLine) {
+                let (base, variant) = splitVariant(line)
+                let key = normalizeExercise(base)
                 current = key
                 if !order.contains(key) { order.append(key) }
-                displayNames[key] = displayExerciseName(line)
+                displayNames[key] = displayExerciseName(base)
+                if let variant { variantsByExercise[key] = variant }
                 setsByExercise[key, default: []] = setsByExercise[key, default: []]
             }
         }
 
         return order.compactMap { key in
             guard let sets = setsByExercise[key], !sets.isEmpty else { return nil }
-            return .init(id: "exercise-\(key.replacingOccurrences(of: " ", with: "-"))", name: displayNames[key] ?? key.capitalized, variant: nil, relationship: nil, sets: sets)
+            let name = displayNames[key] ?? key.capitalized
+            let resolution = resolveCanonicalExercise(name: name, catalog: catalog)
+            return .init(
+                id: "exercise-\(key.replacingOccurrences(of: " ", with: "-"))",
+                name: resolution?.name ?? name,
+                variant: variantsByExercise[key],
+                relationship: nil,
+                sets: sets,
+                canonicalExerciseId: resolution?.canonicalExerciseId,
+                isProvisional: resolution == nil
+            )
         }
+    }
+
+    /// Case-insensitive exact match against the same catalog Workout
+    /// Logger resolves exercises against — the only matching strategy the
+    /// native catalog itself supports today (it carries no alias map).
+    /// Returns `nil` (never a fabricated identity) when no catalog entry's
+    /// name matches.
+    private static func resolveCanonicalExercise(
+        name: String,
+        catalog: [TrainingLoggerCatalogExercise]
+    ) -> TrainingLoggerCatalogExercise? {
+        catalog.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Splits a trailing parenthetical off an exercise heading as its
+    /// execution variant — freeform captured text, matching
+    /// `TrainingExecutionVariant`'s own documented model ("Static Hold",
+    /// "3-Second Pause" are real examples; variants are not a closed set).
+    /// The base exercise name (before the parenthetical) is what gets
+    /// resolved against the catalog; the variant is preserved verbatim
+    /// regardless of whether it matches a previously seen variant label.
+    private static func splitVariant(_ line: String) -> (base: String, variant: String?) {
+        guard let match = capture(#"^(.+?)\s*\(([^()]+)\)\s*$"#, in: line), match.count >= 3 else {
+            return (line, nil)
+        }
+        return (match[1], match[2])
+    }
+
+    /// A line reads as a set-shorthand entry independent of any exercise
+    /// name preceding it — the load-first, reps-first, and "N sets of M
+    /// reps at W" continuation forms `parseExercises` already recognizes.
+    /// Used only for one-line lookahead when deciding whether the
+    /// *previous* line was an exercise heading.
+    private static func isSetShorthandLine(_ line: String) -> Bool {
+        capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line) != nil ||
+        capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s*[x×]\s*(\d+)\s*$"#, in: line) != nil ||
+        capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line) != nil
     }
 
     private static func appendExercise(
@@ -202,11 +278,14 @@ enum EvidenceLocalInterpretation {
         count: String,
         order: inout [String],
         sets: inout [String: [EvidenceReviewSet]],
-        names: inout [String: String]
+        names: inout [String: String],
+        variants: inout [String: String]
     ) {
-        let key = normalizeExercise(name)
+        let (base, variant) = splitVariant(name)
+        let key = normalizeExercise(base)
         if !order.contains(key) { order.append(key) }
-        names[key] = displayExerciseName(name)
+        names[key] = displayExerciseName(base)
+        if let variant { variants[key] = variant }
         appendSets(load: load, reps: reps, count: count, to: key, sets: &sets)
     }
 
@@ -664,8 +743,19 @@ enum EvidenceLocalInterpretation {
     private static func cleanNumber(_ value: String) -> String { value.replacingOccurrences(of: ",", with: "") }
     private static func normalizeExercise(_ value: String) -> String { value.lowercased().replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces) }
     private static func displayExerciseName(_ value: String) -> String { normalizeExercise(value).split(separator: " ").map { word in ["ez", "rdl"].contains(word) ? word.uppercased() : word.capitalized }.joined(separator: " ") }
-    private static func looksLikeExerciseName(_ line: String) -> Bool {
-        line.range(of: #"\b(press(?:es)?|raises?|curls?|flies?|rows?|squats?|deadlifts?|extensions?|pulldowns?|pullups?|pushups?|lunges?|crunches?|planks?|machines?)\b"#, options: [.regularExpression, .caseInsensitive]) != nil &&
+    /// Structural boundary detection first, keyword hint second — the
+    /// order the task's own domain invariant requires. A line with no
+    /// digits whose *next* content line reads as a set (`isSetShorthandLine`)
+    /// is recognized as a new exercise heading regardless of its wording,
+    /// so an uncatalogued name like "Pull ups" opens its own block exactly
+    /// like a catalogued one such as "Spider curls" does. The keyword list
+    /// remains only as a fallback for a heading with no immediately
+    /// following shorthand line (e.g. "Set details unavailable" follows
+    /// instead of a parseable set).
+    private static func looksLikeExerciseHeading(_ line: String, nextLine: String?) -> Bool {
+        guard !line.isEmpty, line.rangeOfCharacter(from: .decimalDigits) == nil else { return false }
+        if let nextLine, isSetShorthandLine(nextLine) { return true }
+        return line.range(of: #"\b(press(?:es)?|raises?|curls?|flies?|rows?|squats?|deadlifts?|extensions?|pulldowns?|pull[\s-]?ups?|push[\s-]?ups?|chin[\s-]?ups?|sit[\s-]?ups?|lunges?|crunches?|planks?|machines?)\b"#, options: [.regularExpression, .caseInsensitive]) != nil &&
         line.range(of: #"\b(calories|heart rate|duration|workout time)\b"#, options: [.regularExpression, .caseInsensitive]) == nil
     }
     private static func isCardioText(_ text: String) -> Bool { text.range(of: #"\b(outdoor walk|indoor walk|run|running|cycling|treadmill|stair stepper|elliptical|rowing|hiking)\b"#, options: [.regularExpression, .caseInsensitive]) != nil }

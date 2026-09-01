@@ -427,6 +427,20 @@ struct EvidenceReviewExercise: Codable, Equatable, Identifiable {
     var variant: String?
     var relationship: String?
     var sets: [EvidenceReviewSet]
+    /// Set only when this exercise name resolves, case-insensitively, to a
+    /// `TrainingLoggerCatalogExercise.canonicalExerciseId` — the same
+    /// catalog identity Workout Logger itself resolves against. `nil` when
+    /// unresolved; the occurrence is still preserved distinctly (see
+    /// `isProvisional`), never dropped or merged into another exercise.
+    var canonicalExerciseId: String? = nil
+    /// Mirrors `TrainingLoggerDraftExercise.isProvisional` — true when this
+    /// exercise could not be matched to the canonical catalog. A
+    /// provisional exercise remains a fully distinct, includable
+    /// occurrence; the Founder may match it to an existing catalog
+    /// exercise in Evidence Review, exactly as Workout Logger's own
+    /// "Create new exercise" flow leaves a provisional exercise usable
+    /// until it is later reconciled.
+    var isProvisional: Bool = false
 }
 
 struct EvidenceReviewFood: Codable, Equatable, Identifiable {
