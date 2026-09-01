@@ -38,6 +38,39 @@ describe("inactive Founder authentication lifecycle", () => {
     expect(identity.updateDeviceSeen).toHaveBeenCalledOnce();
   });
 
+  it("registers an iOS device from a single-use pairing credential and issues a rotating session", async () => {
+    const identity = baseIdentity({ consumePairingCredential: vi.fn().mockResolvedValue({ user_id: "user" }) });
+    const result = await serviceFor(identity).registerDeviceWithPairing({
+      pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder's iPhone",
+    });
+    expect(identity.consumePairingCredential).toHaveBeenCalledOnce();
+    expect(identity.createDevice).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", platform: "ios" }));
+    expect(identity.createSession).toHaveBeenCalledOnce();
+    expect(identity.createAccessCredential).toHaveBeenCalledOnce();
+    expect(identity.createRefreshCredential).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ sessionId: expect.any(String), accessToken: expect.any(String), refreshCredential: expect.any(String) });
+    expect(result.accessToken).toHaveLength(43);
+    expect(result.refreshCredential).toHaveLength(43);
+  });
+
+  it("rotates an unused refresh credential and replaces it atomically", async () => {
+    const identity = baseIdentity({
+      lockRefreshCredential: vi.fn().mockResolvedValue({
+        id: "refresh", user_id: "user", device_id: "device", session_id: "session", family_id: "family",
+        used_at: null, revoked_at: null, session_status: "active", device_status: "active",
+        idle_expires_at: "2026-09-01T00:00:00.000Z", absolute_expires_at: "2026-10-01T00:00:00.000Z",
+      }),
+    });
+    const result = await serviceFor(identity).rotateRefreshCredential("r".repeat(43));
+    expect(identity.createAccessCredential).toHaveBeenCalledOnce();
+    expect(identity.replaceRefreshCredential).toHaveBeenCalledWith(expect.objectContaining({
+      previousId: "refresh", next: expect.objectContaining({ familyId: "family", sessionId: "session" }),
+    }));
+    expect(result).toMatchObject({ sessionId: "session", accessToken: expect.any(String), refreshCredential: expect.any(String) });
+    expect(result.accessToken).toHaveLength(43);
+    expect(result.refreshCredential).toHaveLength(43);
+  });
+
   it("revokes a refresh family when a consumed refresh credential is replayed", async () => {
     const identity = baseIdentity({ lockRefreshCredential: vi.fn().mockResolvedValue({ id: "refresh", user_id: "user", family_id: "family", used_at: NOW, revoked_at: null }) });
     await expect(serviceFor(identity).rotateRefreshCredential("r".repeat(43))).rejects.toMatchObject({ code: "REFRESH_REUSE_DETECTED" });

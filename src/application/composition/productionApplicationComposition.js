@@ -82,6 +82,9 @@ import { createBriefingNavigationReadService } from "../briefings/BriefingNaviga
 import { createAsyncEvidenceIntakeService } from "../evidence/AsyncEvidenceIntakeService.js";
 import { createPostgresEvidenceIntakeStore } from "../../platform/database/PostgresEvidenceIntakeStore.js";
 import { createProviderCanonicalUploadService } from "../media/ProviderCanonicalUploadService.js";
+import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
+import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
+import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -106,6 +109,26 @@ export async function getProductionApplicationComposition(env = process.env) {
     return createPostgresComposition({ controlStore: null, env, providerFullRuntime: true });
   }
   return getProductionApplicationCompositionRuntime(env).resolve();
+}
+
+export function getProductionFounderAuthService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createFounderAuthService({
+    transactionRunner: createFoundationPostgresTransactionRunner({ pool: runtime.pool }),
+    credentialPepper: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
+  });
+}
+
+export function getProductionFounderWeightSummaryReadService(env = process.env) {
+  return createFounderWeightSummaryReadService({
+    readLatestWeight: (userId) => runProductionApplicationReadScope(async () => {
+      const composition = await getProductionApplicationComposition(env);
+      return composition.repositories.weights.getLatestWeightEntry(userId);
+    }, { readModel: "native.weight-summary.v1" }, env),
+  });
 }
 
 export async function runProductionApplicationReadScope(callback, metadata = {}, env = process.env) {

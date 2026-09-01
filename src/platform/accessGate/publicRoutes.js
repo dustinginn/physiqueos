@@ -27,6 +27,12 @@ export const COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX = "/api/v1/operation
 // its own separate, narrower machine credential (`combinedCutoverHandoffAuth.js`).
 export const COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX = "/api/v1/operations/combined-cutover/handoff/";
 
+// Native device routes intentionally bypass the temporary browser cookie gate because every
+// protected product request authenticates its own short-lived Founder bearer credential. The
+// pairing/refresh routes accept only their one-time or rotating high-entropy credentials. This is
+// additive: browser pages and all other product API routes remain Founder-cookie gated.
+export const NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX = "/api/v1/native/";
+
 // Production migration dry-runs are machine-to-provider operations authenticated by the existing
 // operations bearer token inside their routes. Exempt only the collection POST and one status GET
 // segment with the controller's exact operation-ID grammar; arbitrary descendants stay Founder-gated.
@@ -62,6 +68,7 @@ export function isPublicPath(pathname) {
   if (pathname.startsWith(COMBINED_CUTOVER_TRANSFER_ROUTE_PATH_PREFIX)) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_PREPARATION_ROUTE_PATH_PREFIX)) return true;
   if (pathname.startsWith(COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX)) return true;
+  if (pathname.startsWith(NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX)) return true;
   if (pathname === PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH) return true;
   if (pathname.startsWith(`${PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH}/`)) {
     return PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID.test(pathname.slice(PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH.length + 1));

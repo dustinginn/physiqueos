@@ -7,6 +7,7 @@ import {
   COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX,
   PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH,
   SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH,
+  NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX,
 } from "./publicRoutes.js";
 
 describe("publicRoutes.isPublicPath", () => {
@@ -42,6 +43,17 @@ describe("publicRoutes.isPublicPath", () => {
     expect(isPublicPath("/api/v1/goals")).toBe(false);
     expect(isPublicPath("/api/v1/platform")).toBe(false);
     expect(isPublicPath("/api/v1/capabilities")).toBe(false);
+  });
+
+  it("allows Native Founder routes to own bearer authentication without a browser cookie", () => {
+    expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}auth/pair`)).toBe(true);
+    expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}auth/refresh`)).toBe(true);
+    expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}weight/summary`)).toBe(true);
+  });
+
+  it("does NOT broaden the Native bearer exemption to a sibling path", () => {
+    expect(isPublicPath("/api/v1/native-evil/weight/summary")).toBe(false);
+    expect(isPublicPath("/api/v1/native")).toBe(false);
   });
 
   it("does NOT allow media/private-evidence routes", () => {
