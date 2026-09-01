@@ -1,6 +1,7 @@
 import { composeMonthlyNarrativeModel } from "./MonthlyNarrativeCompositionService";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
-import { createPIGoalConfidenceReadService } from "./PIGoalConfidenceReadService";
+import { createCanonicalConfidenceReadService } from
+  "../confidence/CanonicalConfidenceReadService";
 import {
   createMonthlyBriefingGoalConfidenceBlockFromAssessment,
 } from "./BriefingGoalConfidencePresentationService";
@@ -2035,15 +2036,15 @@ export function resolveMonthlyGoalConfidenceAssessment({
 } = {}) {
   const activePhase = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: cutoff }).activePhase : null;
   if (!repository || !activeGoal?.id || !activePhase?.id || !cutoff) return null;
-  const selected = createPIGoalConfidenceReadService({ repository })
-    .getGoalConfidenceAssessmentAtOrBefore({
+  const selected = createCanonicalConfidenceReadService({ repository })
+    .getAssessmentAtOrBefore({
       goalId: activeGoal.id,
       phaseId: activePhase.id,
       cutoff,
     });
   if (!selected) return null;
   const block = createMonthlyBriefingGoalConfidenceBlockFromAssessment(
-    selected.assessment,
+    selected.record.assessment,
     {
       capturedAt: generatedAt ?? null,
       captureSemantics: "canonical_assessment_at_monthly_cutoff",

@@ -4,8 +4,16 @@ import {
 import { adaptV1ConfidenceAssessment } from "./ConfidenceV1CompatibilityAdapter";
 import { publishesUserFacingConfidence } from "./ConfidencePublisherRegistry";
 
-export function createCanonicalConfidenceReadService({ store = {} } = {}) {
+export function createCanonicalConfidenceReadService({ store = {}, repository = null } = {}) {
   const sourceStore = store ?? {};
+
+  function listHistory(goalId, phaseId = null) {
+    if (repository?.listHistory && phaseId != null) {
+      return repository.listHistory(goalId, phaseId);
+    }
+    return (sourceStore.goalConfidenceHistory ?? []).filter((record) =>
+      record.goalId === goalId && (phaseId == null || record.phaseId === phaseId));
+  }
 
   function getCurrent({ goalId, phaseId = null } = {}) {
     const snapshots = (sourceStore.goalConfidenceSnapshots ?? []).filter((item) =>
@@ -85,9 +93,7 @@ export function createCanonicalConfidenceReadService({ store = {} } = {}) {
     getAssessmentAtOrBefore({ goalId, phaseId = null, cutoff } = {}) {
       const at = Date.parse(cutoff);
       if (!Number.isFinite(at)) return null;
-      return (sourceStore.goalConfidenceHistory ?? [])
-        .filter((record) => record.goalId === goalId &&
-          (phaseId == null || record.phaseId === phaseId))
+      const selected = listHistory(goalId, phaseId)
         .map((record) => ({ record, assessment: normalizeAssessment(
           record.assessment, record) }))
         .filter(({ assessment }) => assessment &&
@@ -95,6 +101,16 @@ export function createCanonicalConfidenceReadService({ store = {} } = {}) {
           Date.parse(assessment.publicationTimestamp ?? assessment.sourceCutoff) <= at)
         .sort((left, right) => Date.parse(right.assessment.sourceCutoff) -
           Date.parse(left.assessment.sourceCutoff))[0] ?? null;
+      if (!selected) return null;
+      return Object.freeze({
+        ...selected,
+        historyRecordId: selected.record.id,
+        selectedAtOrBefore: new Date(at).toISOString(),
+        source: selected.assessment.schemaVersion ===
+          "canonical_confidence_assessment_v2"
+          ? "canonical_confidence_v2_history_at_or_before"
+          : "canonical_pi_history_at_or_before",
+      });
     },
   });
 }

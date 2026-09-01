@@ -118,8 +118,42 @@ export function createMonthlyBriefingGoalConfidenceBlockFromAssessment(
   assessment,
   options = {}
 ) {
-  const block = createBriefingGoalConfidenceBlockFromAssessment(assessment, options);
-  return block;
+  const legacy = createBriefingGoalConfidenceBlockFromAssessment(assessment, options);
+  if (legacy) return legacy;
+  if (assessment?.schemaVersion !== "canonical_confidence_assessment_v2") return null;
+  const movementDirection = ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[assessment.movement];
+  if (!movementDirection || !assessment.id ||
+      !Number.isInteger(assessment.currentPercentage)) return null;
+  return {
+    score: assessment.currentPercentage,
+    band: assessment.confidenceBand,
+    priorScore: assessment.priorPercentage,
+    delta: assessment.priorPercentage == null ? null :
+      assessment.currentPercentage - assessment.priorPercentage,
+    movementDirection,
+    movementMagnitude: assessment.movementMagnitude,
+    primaryReason: assessment.narrativeExplanation?.text ?? null,
+    supportingReasons: [],
+    limitingReasons: [],
+    unresolvedUncertainty: (assessment.remainingUncertainty?.items ?? []).slice(0, 3),
+    assessmentId: assessment.id,
+    assessmentContext: {
+      goalId: assessment.goalId,
+      phaseId: assessment.phaseId,
+      goalContractId: assessment.goalContract?.id ?? null,
+    },
+    evidenceCutoff: assessment.sourceCutoff,
+    assessmentTimestamp: assessment.publicationTimestamp,
+    capturedAt: options.capturedAt ?? null,
+    captureSemantics: options.captureSemantics ??
+      "canonical_v2_assessment_at_monthly_cutoff",
+    source: "canonical_confidence_v2_snapshot",
+    modelVersion: assessment.schemaVersion,
+    piVersion: "confidence_v2",
+    originatingPublisher: assessment.publisherType,
+    originatingArtifactId: assessment.briefingArtifactId,
+  };
 }
 
 export function createMidweekConfidencePresentation(
