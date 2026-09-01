@@ -109,6 +109,8 @@ extension AppDestination {
         case "native.operating-plan.supplement.edit":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .operatingPlanSupplementEdit(protocolId: try parameters.decode(String.self, forKey: .protocolId))
+        case "native.founder-server-connection":
+            self = .founderServerConnection
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .id, in: container,
@@ -151,7 +153,7 @@ extension AppDestination {
         case .operatingPlanSupplementSupport(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
-             .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew:
+             .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew, .founderServerConnection:
             break
         }
     }

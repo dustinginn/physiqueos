@@ -17,6 +17,9 @@ final class AppEnvironment {
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
+    /// Deliberately isolated live transport proof. Existing product screens
+    /// remain fixture-backed and cannot silently mix this canonical read.
+    let founderServerAPI: FounderServerAPI
 
     init(
         homeAPI: HomeAPI = FixtureHomeAPI(),
@@ -27,7 +30,8 @@ final class AppEnvironment {
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
-        operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore()
+        operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
+        founderServerAPI: FounderServerAPI = FounderServerAPI()
     ) {
         self.homeAPI = homeAPI
         self.goalsAPI = goalsAPI
@@ -38,5 +42,6 @@ final class AppEnvironment {
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
+        self.founderServerAPI = founderServerAPI
     }
 }

@@ -91,6 +91,8 @@ struct AppDestinationRouterView: View {
             OperatingPlanSupplementEditorView(protocolId: nil)
         case .operatingPlanSupplementEdit(let protocolId):
             OperatingPlanSupplementEditorView(protocolId: protocolId)
+        case .founderServerConnection:
+            FounderServerConnectionView()
         default:
             DestinationPlaceholderView(destination: destination)
         }

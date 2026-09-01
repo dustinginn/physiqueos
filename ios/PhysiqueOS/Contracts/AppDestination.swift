@@ -95,6 +95,9 @@ enum AppDestination: Hashable, Codable {
     case operatingPlanSupplementSupport(protocolId: String)
     case operatingPlanSupplementNew
     case operatingPlanSupplementEdit(protocolId: String)
+    /// Native-only controlled proof of the live Founder bearer transport.
+    /// This does not claim a current web destination id.
+    case founderServerConnection
 
     /// The server's destination id string, for parity with
     /// `DestinationId` values and for the placeholder screen's display.
@@ -129,6 +132,7 @@ enum AppDestination: Hashable, Codable {
         case .operatingPlanSupplementSupport: "native.operating-plan.protocol.supplement.support"
         case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
         case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
+        case .founderServerConnection: "native.founder-server-connection"
         }
     }
 }

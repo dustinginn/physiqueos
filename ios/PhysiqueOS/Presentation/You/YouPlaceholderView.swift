@@ -28,6 +28,16 @@ struct YouPlaceholderView: View {
                 }
                 .buttonStyle(.plain)
 
+                Button { onNavigate(.founderServerConnection) } label: {
+                    OperatingPlanRow(
+                        iconKey: "tracking",
+                        color: .evidence,
+                        title: "Founder device connection",
+                        detail: "Verify the live, read-only server connection"
+                    )
+                }
+                .buttonStyle(.plain)
+
                 Text("Founder profile and settings arrive in a later slice.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)

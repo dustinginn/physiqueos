@@ -47,6 +47,7 @@ app_files = [
     ("Contracts", "TrainingReportingReadModel.swift"),
     ("Contracts", "TrainingLoggerReadModel.swift"),
     ("Contracts", "LoggingSandbox.swift"),
+    ("Contracts", "FounderServerModels.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "GoalsAPI.swift"),
     ("Networking", "OperatingPlanSandboxStore.swift"),
@@ -58,6 +59,8 @@ app_files = [
     ("Networking", "LoggingSandboxStore.swift"),
     ("Networking", "EvidenceAttachmentLoader.swift"),
     ("Networking", "EvidenceLocalInterpretation.swift"),
+    ("Networking", "FounderCredentialStore.swift"),
+    ("Networking", "FounderServerAPI.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "IconBadge.swift"),
     ("SharedUI", "CardContainer.swift"),
@@ -115,6 +118,7 @@ app_files = [
     ("Presentation/OperatingPlan", "OperatingPlanSupplementEditorView.swift"),
     ("Presentation/OperatingPlan", "OperatingPlanTrackingView.swift"),
     ("Presentation/You", "YouPlaceholderView.swift"),
+    ("Presentation/You", "FounderServerConnectionView.swift"),
     ("Presentation/Evidence", "EvidenceView.swift"),
     ("Presentation/Evidence", "EvidenceViewModel.swift"),
     ("Presentation/Evidence", "EvidenceHeaderView.swift"),
@@ -180,6 +184,7 @@ test_files = [
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingLoggerTests.swift"),
     ("PhysiqueOSTests", "LoggingSandboxTests.swift"),
+    ("PhysiqueOSTests", "FounderServerAPITests.swift"),
 ]
 
 ui_test_files = [
