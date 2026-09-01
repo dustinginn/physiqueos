@@ -10,6 +10,7 @@ struct LocalEvidenceReviewView: View {
     @State private var showingDiscard = false
     @State private var focusedNumericFieldID: String?
     @State private var editingExerciseID: String?
+    @State private var trainingCatalog: [TrainingLoggerCatalogExercise] = []
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
     var body: some View {
@@ -38,6 +39,10 @@ struct LocalEvidenceReviewView: View {
             Button("Cancel", role: .cancel) {}
             Button("Discard Review", role: .destructive) { store.discardReview(id: reviewId); onReturnToLog() }
         } message: { Text("This review and its selected assets will be permanently removed.") }
+        .task {
+            guard trainingCatalog.isEmpty else { return }
+            trainingCatalog = (try? await environment.trainingLoggerAPI.fetchConfiguration())?.exercises ?? []
+        }
     }
 
     private func reviewBody(_ review: LocalEvidenceReview) -> some View {
@@ -135,6 +140,11 @@ struct LocalEvidenceReviewView: View {
                             if let relationship = exercise.relationship {
                                 Text(relationship).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.accent)
                             }
+                            if exercise.isProvisional {
+                                Text("New exercise · not yet in your Training library")
+                                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                    .foregroundStyle(Color.orange)
+                            }
                         }
                         Spacer(minLength: 8)
                         Button(isEditing ? "Done" : "Edit") {
@@ -144,6 +154,18 @@ struct LocalEvidenceReviewView: View {
                         }
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.accent)
+                    }
+                    if exercise.isProvisional, !trainingCatalog.isEmpty {
+                        Menu {
+                            ForEach(trainingCatalog.sorted { $0.name < $1.name }) { candidate in
+                                Button(candidate.name) { matchExercise(item: item, exercise: exercise, to: candidate) }
+                            }
+                        } label: {
+                            Label("Match Exercise", systemImage: "link")
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                        }
+                        .accessibilityIdentifier("evidenceReview.exercise.matchExercise")
                     }
                     if isEditing { compactSetEditor(item: item, exercise: exercise) }
                 }
@@ -448,6 +470,18 @@ struct LocalEvidenceReviewView: View {
         set: { value in store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let exerciseIndex = updated.exercises.firstIndex(where: { $0.id == exercise.id }), let setIndex = updated.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == set.id }) else { return }; updated.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = value; updated.exercises[exerciseIndex].sets[setIndex].refreshSummary() } }
     ) }
     private func updateField(_ item: EvidenceReviewItem, _ id: String, _ value: String) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in if let index = updated.fields.firstIndex(where: { $0.id == id }) { updated.fields[index].value = value } } }
+    /// Reconciles a provisional (unresolved) exercise to an existing
+    /// canonical Training Logger exercise — the same catalog identity
+    /// Workout Logger itself uses. Local-only: the review's `items` array
+    /// is `LoggingSandboxStore` state, not a server write.
+    private func matchExercise(item: EvidenceReviewItem, exercise: EvidenceReviewExercise, to candidate: TrainingLoggerCatalogExercise) {
+        store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in
+            guard let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) else { return }
+            updated.exercises[index].canonicalExerciseId = candidate.canonicalExerciseId
+            updated.exercises[index].name = candidate.name
+            updated.exercises[index].isProvisional = false
+        }
+    }
     private func updatePhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, orientation: ProgressPhotoOrientation? = nil, contraction: ProgressPhotoContraction? = nil, poseVariant: ProgressPhotoPoseVariant? = nil) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; if let orientation { updated.photoIdentities[index].orientation = orientation }; if let contraction { updated.photoIdentities[index].contraction = contraction }; if let poseVariant { updated.photoIdentities[index].poseVariant = poseVariant }; updated.photoIdentities[index].confirmed = false } }
     private func confirmPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; updated.photoIdentities[index].confirmed = updated.photoIdentities[index].orientation != .unconfirmed && updated.photoIdentities[index].contraction != .unconfirmed } }
     private func banner(_ text: String, destructive: Bool) -> some View { Text(text).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background((destructive ? PhysiqueOSTheme.destructive : Color.yellow).opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 12)) }
