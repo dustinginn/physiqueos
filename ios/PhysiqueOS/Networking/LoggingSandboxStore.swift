@@ -262,13 +262,19 @@ final class LoggingSandboxStore {
             .filter { $0.category == .nutrition && $0.included }
             .map { Self.dateKey($0.occurrenceDate) })
         for index in review.items.indices where review.items[index].category == .nutrition {
-            review.items[index].nutritionReplacementRequired = confirmedNutritionDates.contains(Self.dateKey(review.items[index].occurrenceDate))
+            let hasExistingDay = confirmedNutritionDates.contains(Self.dateKey(review.items[index].occurrenceDate))
+            review.items[index].nutritionReplacementRequired = hasExistingDay
+            if hasExistingDay, review.items[index].nutritionScope == .fullDay {
+                // A full Nutrition Day cannot be added as though it were one
+                // extra meal. Match the web's automatic day-update semantics.
+                review.items[index].nutritionDisposition = .replaceExisting
+            }
         }
     }
 
     private func scenario(for category: EvidenceCategory) -> EvidenceFixtureScenario {
         switch category {
-        case .training: .training
+        case .training: .workout
         case .nutrition: .nutrition
         case .weight: .weight
         case .activity: .activity

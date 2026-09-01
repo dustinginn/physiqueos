@@ -10,6 +10,7 @@ struct NumericEditField: UIViewRepresentable {
     var placeholder: String? = nil
     var fieldID: String? = nil
     var focusedFieldID: Binding<String?>? = nil
+    var previousFieldID: String? = nil
     var nextFieldID: String? = nil
     var onEditingChanged: (Bool) -> Void = { _ in }
 
@@ -30,10 +31,7 @@ struct NumericEditField: UIViewRepresentable {
 
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
-        toolbar.items = [
-            UIBarButtonItem(systemItem: .flexibleSpace),
-            UIBarButtonItem(title: nextFieldID == nil ? "Done" : "Next", style: .done, target: context.coordinator, action: #selector(Coordinator.advance)),
-        ]
+        toolbar.items = context.coordinator.toolbarItems()
         field.inputAccessoryView = toolbar
         return field
     }
@@ -50,9 +48,8 @@ struct NumericEditField: UIViewRepresentable {
                 field.resignFirstResponder()
             }
         }
-        if let toolbar = field.inputAccessoryView as? UIToolbar,
-           let action = toolbar.items?.last {
-            action.title = nextFieldID == nil ? "Done" : "Next"
+        if let toolbar = field.inputAccessoryView as? UIToolbar {
+            toolbar.items = context.coordinator.toolbarItems()
         }
     }
 
@@ -64,6 +61,32 @@ struct NumericEditField: UIViewRepresentable {
 
         @objc func changed(_ sender: UITextField) {
             parent.text = sender.text ?? ""
+        }
+
+        func toolbarItems() -> [UIBarButtonItem] {
+            let previous = UIBarButtonItem(
+                title: "Previous",
+                style: .plain,
+                target: self,
+                action: #selector(retreat)
+            )
+            previous.isEnabled = parent.previousFieldID != nil
+            previous.accessibilityLabel = "Previous field"
+            let next = UIBarButtonItem(
+                title: "Next",
+                style: .plain,
+                target: self,
+                action: #selector(advance)
+            )
+            next.isEnabled = parent.nextFieldID != nil
+            next.accessibilityLabel = "Next field"
+            let done = UIBarButtonItem(
+                title: "Done",
+                style: .done,
+                target: self,
+                action: #selector(done)
+            )
+            return [previous, next, UIBarButtonItem(systemItem: .flexibleSpace), done]
         }
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
@@ -84,9 +107,42 @@ struct NumericEditField: UIViewRepresentable {
         @objc func advance() {
             if let next = parent.nextFieldID {
                 parent.focusedFieldID?.wrappedValue = next
-            } else {
-                activeField?.resignFirstResponder()
             }
         }
+
+        @objc func retreat() {
+            if let previous = parent.previousFieldID {
+                parent.focusedFieldID?.wrappedValue = previous
+            }
+        }
+
+        @objc func done() {
+            parent.focusedFieldID?.wrappedValue = nil
+            activeField?.resignFirstResponder()
+        }
+    }
+}
+
+enum KeyboardFocusOrder {
+    static func previous(before id: String, in ids: [String]) -> String? {
+        guard let index = ids.firstIndex(of: id), index > ids.startIndex else { return nil }
+        return ids[ids.index(before: index)]
+    }
+
+    static func next(after id: String, in ids: [String]) -> String? {
+        guard let index = ids.firstIndex(of: id), ids.index(after: index) < ids.endIndex else { return nil }
+        return ids[ids.index(after: index)]
+    }
+}
+
+@MainActor
+enum PhysiqueOSKeyboard {
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }

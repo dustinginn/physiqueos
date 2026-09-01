@@ -29,6 +29,7 @@ struct MorningCheckInView: View {
                 PrimaryActionButton(title: "Complete Morning Check-In") { save() }.accessibilityIdentifier("morningCheckIn.save")
             }
         }.padding(16) }
+        .scrollDismissesKeyboard(.interactively)
         .background(PhysiqueOSTheme.background).navigationTitle("Morning Check-In").navigationBarTitleDisplayMode(.inline)
         .onAppear { if let entry = store.weighIn(on: Date()) { weightText = formatWeight(entry.value) } }
     }
@@ -96,6 +97,7 @@ struct ManualWeighInView: View {
             PrimaryActionButton(title: "Save Weight") { save() }.accessibilityIdentifier("manualWeighIn.save")
             if message != nil && !isError { Button("Return to Log") { onReturnToLog(); dismiss() }.frame(maxWidth: .infinity) }
         }.padding(16) }
+        .scrollDismissesKeyboard(.interactively)
         .background(PhysiqueOSTheme.background).navigationTitle("Log Weight").navigationBarTitleDisplayMode(.inline)
         .onChange(of: date) { loadExisting() }.onAppear { loadExisting() }
     }

@@ -57,15 +57,18 @@ enum EvidenceLocalInterpretation {
         }
 
         let unresolved = items.contains { !$0.hasRequiredValues }
+        let imageOnlyProgressPhotoSuggestion = draft.scenario == .automatic && scenario == .progressPhotos
         return .success(.init(
             id: id,
             sourceAssets: draft.attachments,
             typedDetails: draft.details,
             items: items,
             status: .awaitingConfirmation,
-            interpretationMessage: unresolved
-                ? "Some values could not be read. Review and complete the highlighted fields before saving."
-                : nil
+            interpretationMessage: imageOnlyProgressPhotoSuggestion
+                ? "These image-only files may be Progress Photos. Confirm each pose and the shared session details before saving."
+                : unresolved
+                    ? "Some values could not be read. Review and complete the highlighted fields before saving."
+                    : nil
         ))
     }
 
@@ -230,13 +233,22 @@ enum EvidenceLocalInterpretation {
 
     private static func nutritionItem(_ draft: EvidenceIntakeDraft) -> EvidenceReviewItem {
         let text = draft.submittedText
+        let meals = parseMeals(text)
         let fields = [
             numericField("calories", "Calories", text, labels: ["calories", "total calories"], unit: "cal", required: false) ?? field("calories", "Calories", "", "cal", required: false),
             numericField("protein", "Protein", text, labels: ["protein"], unit: "g", required: false) ?? field("protein", "Protein", "", "g", required: false),
             numericField("carbs", "Carbohydrates", text, labels: ["carbohydrates", "carbs"], unit: "g", required: false) ?? field("carbs", "Carbohydrates", "", "g", required: false),
             numericField("fat", "Fat", text, labels: ["total fat", "fat"], unit: "g", required: false) ?? field("fat", "Fat", "", "g", required: false),
         ]
-        return .init(id: "nutrition-\(UUID().uuidString)", category: .nutrition, title: "Nutrition", occurrenceDate: draft.occurrenceDate, fields: fields, meals: parseMeals(text))
+        return .init(
+            id: "nutrition-\(UUID().uuidString)",
+            category: .nutrition,
+            title: "Nutrition",
+            occurrenceDate: draft.occurrenceDate,
+            fields: fields,
+            meals: meals,
+            nutritionScope: nutritionScope(text: text, meals: meals)
+        )
     }
 
     private static func weightItem(_ draft: EvidenceIntakeDraft) -> EvidenceReviewItem {
@@ -321,6 +333,22 @@ enum EvidenceLocalInterpretation {
             result.append(.init(id: "meal-\(index)", name: line.capitalized, summary: foods.isEmpty ? "No food details were read" : "\(foods.count) food\(foods.count == 1 ? "" : "s") read", foods: foods))
         }
         return result
+    }
+
+    private static func nutritionScope(text: String, meals: [EvidenceReviewMeal]) -> NutritionEvidenceScope {
+        if meals.count > 1 || text.range(
+            of: #"\b(daily (?:summary|totals?|nutrition)|nutrition day|food diary|day view|total macros?)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return .fullDay
+        }
+        if meals.count == 1 || text.range(
+            of: #"\b(breakfast|lunch|dinner|snacks?|meal)\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return .meal
+        }
+        return .unknown
     }
 
     private static func numericField(_ id: String, _ label: String, _ text: String, labels: [String], unit: String?, required: Bool = true) -> EvidenceReviewField? {

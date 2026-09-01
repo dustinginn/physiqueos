@@ -12,6 +12,8 @@ struct EvidenceIntakeView: View {
     @State private var showingDiscard = false
     @State private var isPreparing = false
     @State private var isLoadingPhotos = false
+    @State private var focusedNumericFieldID: String?
+    @FocusState private var isDetailsFocused: Bool
     var initialScenario: EvidenceFixtureScenario? = nil
     var onNavigate: (AppDestination) -> Void = { _ in }
 
@@ -30,21 +32,35 @@ struct EvidenceIntakeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationTitle("Add Evidence")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Discard", role: .destructive) { showingDiscard = true }
+                Button("Discard", role: .destructive) {
+                    PhysiqueOSKeyboard.dismiss()
+                    Task { @MainActor in showingDiscard = true }
+                }
+                    .foregroundStyle(PhysiqueOSTheme.destructive)
                     .disabled(!store.evidenceDraft.hasContent)
             }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    isDetailsFocused = false
+                    focusedNumericFieldID = nil
+                    PhysiqueOSKeyboard.dismiss()
+                }
+            }
         }
-        .confirmationDialog("Discard this upload?", isPresented: $showingDiscard, titleVisibility: .visible) {
+        .alert("Discard this upload?", isPresented: $showingDiscard) {
+            Button("Cancel", role: .cancel) {}
             Button("Discard Upload", role: .destructive) {
                 store.resetEvidenceDraft()
                 dismiss()
             }
-            Button("Keep Editing", role: .cancel) {}
         } message: {
             Text("Selected files, date, and details will be removed.")
         }
@@ -212,6 +228,7 @@ struct EvidenceIntakeView: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     TextEditor(text: draftDetails)
+                        .focused($isDetailsFocused)
                         .frame(minHeight: 96)
                         .padding(8)
                         .scrollContentBackground(.hidden)
@@ -258,14 +275,14 @@ struct EvidenceIntakeView: View {
                 Text("Choose the raw BodySpec PDF, then review the scan values. Blank optional fields remain unknown.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    dexaField("Total Mass", keyPath: \.totalMass, unit: "lb")
-                    dexaField("Body Fat", keyPath: \.bodyFatPercentage, unit: "%")
-                    dexaField("Fat Tissue", keyPath: \.fatMass, unit: "lb")
-                    dexaField("Lean Tissue", keyPath: \.leanMass, unit: "lb")
-                    dexaField("Bone Mineral", keyPath: \.boneMineralContent, unit: "lb")
-                    dexaField("RMR", keyPath: \.restingMetabolicRate, unit: "kcal")
-                    dexaField("VAT Mass", keyPath: \.vatMass, unit: "lb")
-                    dexaField("VAT Volume", keyPath: \.vatVolume, unit: "in³")
+                    dexaField("Total Mass", id: "totalMass", keyPath: \.totalMass, unit: "lb")
+                    dexaField("Body Fat", id: "bodyFat", keyPath: \.bodyFatPercentage, unit: "%")
+                    dexaField("Fat Tissue", id: "fatMass", keyPath: \.fatMass, unit: "lb")
+                    dexaField("Lean Tissue", id: "leanMass", keyPath: \.leanMass, unit: "lb")
+                    dexaField("Bone Mineral", id: "boneMineral", keyPath: \.boneMineralContent, unit: "lb")
+                    dexaField("RMR", id: "rmr", keyPath: \.restingMetabolicRate, unit: "kcal")
+                    dexaField("VAT Mass", id: "vatMass", keyPath: \.vatMass, unit: "lb")
+                    dexaField("VAT Volume", id: "vatVolume", keyPath: \.vatVolume, unit: "in³")
                 }
                 Toggle("I confirmed these extracted values.", isOn: Binding(
                     get: { store.evidenceDraft.dexa.valuesConfirmed },
@@ -276,30 +293,39 @@ struct EvidenceIntakeView: View {
         }
     }
 
-    private func dexaField(_ label: String, keyPath: WritableKeyPath<DEXAIntakeDraft, String>, unit: String) -> some View {
+    private func dexaField(_ label: String, id: String, keyPath: WritableKeyPath<DEXAIntakeDraft, String>, unit: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased()).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
             HStack(spacing: 5) {
-                TextField("", text: Binding(
+                NumericEditField(text: Binding(
                     get: { store.evidenceDraft.dexa[keyPath: keyPath] },
                     set: { store.evidenceDraft.dexa[keyPath: keyPath] = $0 }
-                )).keyboardType(.decimalPad)
+                ), accessibilityLabel: label, fieldID: id, focusedFieldID: $focusedNumericFieldID,
+                previousFieldID: KeyboardFocusOrder.previous(before: id, in: Self.dexaFocusOrder),
+                nextFieldID: KeyboardFocusOrder.next(after: id, in: Self.dexaFocusOrder))
                 Text(unit).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.textMuted)
             }
             .padding(.horizontal, 9).frame(minHeight: 44).background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
+    static let dexaFocusOrder = ["totalMass", "bodyFat", "fatMass", "leanMass", "boneMineral", "rmr", "vatMass", "vatVolume"]
+
     private var progressPhotoConfirmation: some View {
         VStack(alignment: .leading, spacing: 14) {
             if !store.evidenceDraft.photoIdentities.isEmpty {
                 Text("Identify each photo").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 ForEach(Array(store.evidenceDraft.photoIdentities.enumerated()), id: \.element.id) { index, identity in
-                    CardContainer {
+                    CardContainer(background: (identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.yellow).opacity(0.10)) {
                         VStack(alignment: .leading, spacing: 10) {
                             if let attachment = store.evidenceDraft.attachments.first(where: { $0.id == identity.attachmentId }),
                                let data = attachment.data, let image = EvidenceAttachmentLoader.previewImage(data: data) {
-                                Image(uiImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 180).clipped().clipShape(RoundedRectangle(cornerRadius: 12))
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity, maxHeight: 360)
+                                    .background(Color.black.opacity(0.14))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -322,16 +348,16 @@ struct EvidenceIntakeView: View {
                                 TextField("Custom pose label", text: photoTextBinding(identity, keyPath: \.customLabel))
                                     .textFieldStyle(.roundedBorder)
                             }
-                            HStack(spacing: 8) {
-                                Spacer()
-                                Button(identity.confirmed ? "Confirmed" : "Confirm") {
-                                    store.updatePhotoIdentity(id: identity.id) { value in
-                                        value.confirmed = value.orientation != .unconfirmed && value.contraction != .unconfirmed
-                                    }
+                            Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
+                                store.updatePhotoIdentity(id: identity.id) { value in
+                                    value.confirmed = value.orientation != .unconfirmed && value.contraction != .unconfirmed
                                 }
-                                .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
                             }
-                            .buttonStyle(.borderedProminent).controlSize(.small).tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.regular)
+                            .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : Color.orange)
+                            .frame(maxWidth: .infinity)
+                            .disabled(identity.orientation == .unconfirmed || identity.contraction == .unconfirmed)
                         }
                     }
                 }
@@ -339,27 +365,50 @@ struct EvidenceIntakeView: View {
             CardContainer {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    Picker("Time of day", selection: Binding(get: { store.evidenceDraft.photoSession.timeOfDay }, set: { store.evidenceDraft.photoSession.timeOfDay = $0 })) {
-                        Text("Choose").tag(ProgressPhotoTimeOfDay?.none)
-                        ForEach(ProgressPhotoTimeOfDay.allCases) { Text($0.label).tag(Optional($0)) }
-                    }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-                    triStatePicker("Fasted", keyPath: \.fasted)
-                    HStack(spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        timeOfDayPicker
+                        triStatePicker("Fasted", keyPath: \.fasted)
                         triStatePicker("Post-workout", keyPath: \.postWorkout)
-                        triStatePicker("Pump", keyPath: \.pump)
+                        triStatePicker("Pump", keyPath: \.pump, trueLabel: "Present", falseLabel: "None")
                     }
                     Toggle("These are original, unedited photos.", isOn: Binding(get: { store.evidenceDraft.photoSession.originalUnedited }, set: { store.evidenceDraft.photoSession.originalUnedited = $0 }))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold).tint(PhysiqueOSTheme.accent)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .tint(PhysiqueOSTheme.chartSuccess)
+                        .padding(10)
+                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
     }
 
     private func photoPicker<Value: Hashable & Identifiable & CaseIterable & EvidenceLabeledChoice>(_ label: String, selection: Binding<Value>, values: Value.AllCases) -> some View where Value.AllCases: RandomAccessCollection {
-        Picker(label, selection: selection) {
-            ForEach(values) { value in Text(value.label).tag(value) }
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Menu {
+                ForEach(values) { value in
+                    Button(value.label) { selection.wrappedValue = value }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selection.wrappedValue.label).lineLimit(1)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.accent)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(PhysiqueOSTheme.surfaceMuted)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+            }
+            .accessibilityLabel(label)
+            .accessibilityValue(selection.wrappedValue.label)
         }
-        .pickerStyle(.menu).frame(maxWidth: .infinity).tint(PhysiqueOSTheme.accent)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func photoOrientationBinding(_ identity: ProgressPhotoIdentityDraft) -> Binding<ProgressPhotoOrientation> {
@@ -374,16 +423,59 @@ struct EvidenceIntakeView: View {
     private func photoTextBinding(_ identity: ProgressPhotoIdentityDraft, keyPath: WritableKeyPath<ProgressPhotoIdentityDraft, String>) -> Binding<String> {
         .init(get: { store.evidenceDraft.photoIdentities.first(where: { $0.id == identity.id })?[keyPath: keyPath] ?? "" }, set: { value in store.updatePhotoIdentity(id: identity.id) { $0[keyPath: keyPath] = value; $0.confirmed = false } })
     }
-    private func triStatePicker(_ label: String, keyPath: WritableKeyPath<ProgressPhotoSessionDraft, Bool?>) -> some View {
-        Picker(label, selection: Binding(
-            get: { store.evidenceDraft.photoSession[keyPath: keyPath] },
-            set: { store.evidenceDraft.photoSession[keyPath: keyPath] = $0 }
-        )) {
-            Text("Unknown").tag(Bool?.none)
-            Text("Yes").tag(Optional(true))
-            Text("No").tag(Optional(false))
+    private var timeOfDayPicker: some View {
+        sessionConditionMenu(
+            label: "Time of day",
+            value: store.evidenceDraft.photoSession.timeOfDay?.label ?? "Choose",
+            choices: ProgressPhotoTimeOfDay.allCases.map { ($0.label, Optional($0)) }
+        ) { store.evidenceDraft.photoSession.timeOfDay = $0 }
+    }
+
+    private func triStatePicker(
+        _ label: String,
+        keyPath: WritableKeyPath<ProgressPhotoSessionDraft, Bool?>,
+        trueLabel: String = "Yes",
+        falseLabel: String = "No"
+    ) -> some View {
+        let value = store.evidenceDraft.photoSession[keyPath: keyPath]
+        return sessionConditionMenu(
+            label: label,
+            value: value.map { $0 ? trueLabel : falseLabel } ?? "Unknown",
+            choices: [("Unknown", nil), (trueLabel, Optional(true)), (falseLabel, Optional(false))]
+        ) { store.evidenceDraft.photoSession[keyPath: keyPath] = $0 }
+    }
+
+    private func sessionConditionMenu<Value>(
+        label: String,
+        value: String,
+        choices: [(String, Value)],
+        onSelect: @escaping (Value) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Menu {
+                ForEach(Array(choices.enumerated()), id: \.offset) { _, choice in
+                    Button(choice.0) { onSelect(choice.1) }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(value)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(value == "Choose" || value == "Unknown" ? Color.orange : PhysiqueOSTheme.textPrimary)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(PhysiqueOSTheme.surfaceMuted)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+            }
+            .accessibilityLabel(label)
+            .accessibilityValue(value)
         }
-        .pickerStyle(.menu).frame(maxWidth: .infinity).tint(PhysiqueOSTheme.accent)
     }
     private func submit() {
         switch store.submitEvidence() {

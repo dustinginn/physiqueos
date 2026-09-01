@@ -154,7 +154,7 @@ final class LoggingSandboxTests: XCTestCase {
     func testAutomaticUsesActualSignalsAndRemainsHonestWhenUnresolved() async throws {
         let training = LoggingSandboxStore(now: date(2026, 8, 30))
         training.evidenceDraft.details = "Shoulder press machine\n150p 10r x4"
-        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: training.evidenceDraft), .training)
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: training.evidenceDraft), .workout)
         _ = try value(training.submitEvidence(now: date(2026, 8, 30)))
         let id = try await reviewID(training)
         XCTAssertEqual(training.review(id: id)?.items.first?.exercises.first?.sets.count, 4)
@@ -164,6 +164,68 @@ final class LoggingSandboxTests: XCTestCase {
         _ = try value(unresolved.submitEvidence(now: date(2026, 8, 30)))
         let unresolvedResult = await unresolved.finishInterpretation(now: date(2026, 8, 30))
         XCTAssertFailure(unresolvedResult, "Choose an evidence type so this upload can be reviewed.")
+    }
+
+    func testAutomaticStrengthPackageWithCaloriesRemainsOneWorkoutDomain() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.details = "Bicep curl machine\n100p 10r x4\n\nTricep press machine\n130p 10r x4"
+        store.addAttachments([
+            .init(id: "strength", displayName: "strength.png", source: .photos, contentType: "image/png", extractedText: "Traditional Strength Training\nDuration 42 min\nActive Calories 188\nAverage Heart Rate 116"),
+            .init(id: "walk-one", displayName: "walk-one.png", source: .photos, contentType: "image/png", extractedText: "Outdoor Walk\nDuration 18 min\nActive Calories 91\nAverage Heart Rate 104"),
+            .init(id: "walk-two", displayName: "walk-two.png", source: .photos, contentType: "image/png", extractedText: "Outdoor Walk\nDuration 27 min\nActive Calories 137\nAverage Heart Rate 109"),
+        ])
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft), [.training])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: store.evidenceDraft), .workout)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(items.count, 3)
+        XCTAssertTrue(items.allSatisfy { $0.category == .training })
+        XCTAssertEqual(items[0].exercises.map(\.name), ["Bicep Curl Machine", "Tricep Press Machine"])
+        XCTAssertEqual(items[0].exercises.map { $0.sets.count }, [4, 4])
+        XCTAssertEqual(Array(items.dropFirst()).map(\.title), ["Outdoor Walk", "Outdoor Walk"])
+        XCTAssertFalse(items.contains { $0.category == .nutrition })
+    }
+
+    func testCaloriesAloneNeverCreateNutritionInsideWorkoutEvidence() {
+        var draft = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        draft.attachments = [
+            .init(id: "workout", displayName: "workout.png", source: .photos, contentType: "image/png", extractedText: "Traditional Strength Training\nDuration 35 min\nActive Calories 164"),
+        ]
+
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: draft), [.training])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: draft), .workout)
+    }
+
+    func testNutritionSignalsStillClassifyNutritionAndCrossDomainRemainsMixed() {
+        var nutrition = EvidenceIntakeDraft.fresh(now: date(2026, 8, 30))
+        nutrition.details = "Daily nutrition summary Calories 1987 Protein 176 Carbohydrates 204 Fat 61"
+        XCTAssertEqual(EvidenceSandboxRouter.detectedCategories(for: nutrition), [.nutrition])
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: nutrition), .nutrition)
+
+        nutrition.details += "\nActivity rings Exercise minutes 47 Steps 10234"
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: nutrition)), Set([.nutrition, .activity]))
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: nutrition), .mixed)
+    }
+
+    func testAutomaticImageOnlyPackageRoutesToUnconfirmedProgressPhotoReview() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            .init(id: "photo-one", displayName: "Photo 1", source: .photos, contentType: "image/jpeg", data: Data([1])),
+            .init(id: "photo-two", displayName: "Photo 2", source: .photos, contentType: "image/jpeg", data: Data([2])),
+        ])
+
+        XCTAssertEqual(EvidenceSandboxRouter.scenario(for: store.evidenceDraft), .progressPhotos)
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let review = try XCTUnwrap(store.review(id: id))
+
+        XCTAssertEqual(review.items.first?.category, .progressPhotos)
+        XCTAssertEqual(review.items.first?.photoIdentities.count, 2)
+        XCTAssertTrue(try XCTUnwrap(review.items.first?.photoIdentities).allSatisfy { !$0.confirmed && $0.orientation == .unconfirmed })
+        XCTAssertTrue(try XCTUnwrap(review.interpretationMessage).contains("may be Progress Photos"))
     }
 
     func testFounderTrainingShorthandAndSeparateCardioRecords() async throws {
@@ -234,6 +296,66 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertFalse(item.fields.contains { ["source", "goalRelationship", "linkedGoal", "tags"].contains($0.id) })
     }
 
+    func testProgressPhotoSessionLabelsAndPoseMutationAreExplicit() async throws {
+        XCTAssertEqual(ProgressPhotoSessionDraft.userFacingConditionLabels, ["Time of day", "Fasted", "Post-workout", "Pump"])
+
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.setEvidenceScenario(.progressPhotos)
+        store.addAttachments([.init(id: "photo", displayName: "photo.jpg", source: .photos, contentType: "image/jpeg", data: Data([1]))])
+        let identityID = try XCTUnwrap(store.evidenceDraft.photoIdentities.first?.id)
+        store.updatePhotoIdentity(id: identityID) {
+            $0.orientation = .front
+            $0.contraction = .relaxed
+            $0.poseVariant = .standard
+            $0.confirmed = true
+        }
+        store.evidenceDraft.photoSession.timeOfDay = .afternoon
+        store.evidenceDraft.photoSession.fasted = false
+        store.evidenceDraft.photoSession.postWorkout = true
+        store.evidenceDraft.photoSession.pump = true
+        store.evidenceDraft.photoSession.originalUnedited = true
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let reviewID = try await reviewID(store)
+        let item = try XCTUnwrap(store.review(id: reviewID)?.items.first)
+
+        XCTAssertEqual(item.photoIdentities.first?.poseVariant, .standard)
+        XCTAssertEqual(item.fields.first(where: { $0.id == "timeOfDay" })?.value, "Afternoon")
+        XCTAssertEqual(item.fields.first(where: { $0.id == "postWorkout" })?.value, "Yes")
+        XCTAssertEqual(item.fields.first(where: { $0.id == "pump" })?.value, "Present")
+    }
+
+    func testNutritionReplacementSemanticsDistinguishFullDayFromMeal() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .nutrition
+        store.evidenceDraft.details = "Daily nutrition summary Calories 2100 Protein 180 Carbohydrates 220 Fat 60"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let firstID = try await reviewID(store)
+        let firstItem = try XCTUnwrap(store.review(id: firstID)?.items.first)
+        XCTAssertEqual(firstItem.nutritionScope, .fullDay)
+        _ = try value(store.confirmReview(id: firstID))
+
+        store.evidenceDraft.occurrenceDate = date(2026, 8, 30)
+        store.evidenceDraft.scenario = .nutrition
+        store.evidenceDraft.details = "Daily nutrition summary Calories 2200 Protein 185 Carbohydrates 230 Fat 62"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let secondID = try await reviewID(store)
+        let fullDay = try XCTUnwrap(store.review(id: secondID)?.items.first)
+        XCTAssertTrue(fullDay.nutritionReplacementRequired)
+        XCTAssertEqual(fullDay.nutritionDisposition, .replaceExisting)
+
+        store.discardReview(id: secondID)
+        store.evidenceDraft.occurrenceDate = date(2026, 8, 30)
+        store.evidenceDraft.scenario = .nutrition
+        store.evidenceDraft.details = "Lunch meal Calories 620 Protein 42 Carbohydrates 58 Fat 19"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let mealID = try await reviewID(store)
+        let meal = try XCTUnwrap(store.review(id: mealID)?.items.first)
+        XCTAssertTrue(meal.nutritionReplacementRequired)
+        XCTAssertEqual(meal.nutritionScope, .meal)
+        XCTAssertNil(meal.nutritionDisposition)
+        XCTAssertEqual(NutritionReviewDisposition.addDistinctMeal.label, "Add to this day")
+    }
+
     func testRereadUsesPreservedSubmissionNotFixtureReplacement() async throws {
         let store = LoggingSandboxStore(now: date(2026, 8, 30)); store.evidenceDraft.scenario = .weight; store.evidenceDraft.details = "Weight 163.2 lb"
         _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
@@ -257,6 +379,11 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertTrue(NumericEditingContract.shouldSelectAllOnFocus("135")); XCTAssertFalse(NumericEditingContract.shouldSelectAllOnFocus(""))
         XCTAssertNil(NumericEditingContract.parsedValue("")); XCTAssertEqual(NumericEditingContract.parsedValue("145"), 145)
         XCTAssertFalse(NumericEditingContract.finishActionVisible(step: .workout, keyboardVisible: true))
+        XCTAssertEqual(KeyboardFocusOrder.previous(before: "load", in: ["reps", "load", "duration"]), "reps")
+        XCTAssertEqual(KeyboardFocusOrder.next(after: "load", in: ["reps", "load", "duration"]), "duration")
+        XCTAssertNil(KeyboardFocusOrder.previous(before: "reps", in: ["reps", "load"]))
+        XCTAssertNil(KeyboardFocusOrder.next(after: "load", in: ["reps", "load"]))
+        XCTAssertEqual(EvidenceIntakeView.dexaFocusOrder, ["totalMass", "bodyFat", "fatMass", "leanMass", "boneMineral", "rmr", "vatMass", "vatVolume"])
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Los_Angeles")!; return c.date(from: .init(year: year, month: month, day: day, hour: 12))! }

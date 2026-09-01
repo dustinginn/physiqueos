@@ -632,6 +632,7 @@ struct TrainingLoggerView: View {
                 accessibilityLabel: exercise.measurement == .duration ? "Set \(set.setNumber) seconds" : "Set \(set.setNumber) reps",
                 fieldID: primaryID,
                 focusedFieldID: $focusedNumericFieldID,
+                previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: primaryID, in: $0) },
                 nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: primaryID, in: $0) },
                 onEditingChanged: numericEditingChanged
             )
@@ -643,6 +644,7 @@ struct TrainingLoggerView: View {
                     accessibilityLabel: "Set \(set.setNumber) load",
                     fieldID: loadID,
                     focusedFieldID: $focusedNumericFieldID,
+                    previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: loadID, in: $0) },
                     nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: loadID, in: $0) },
                     onEditingChanged: numericEditingChanged
                 )

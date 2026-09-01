@@ -107,6 +107,7 @@ enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
 
 enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
     case automatic
+    case workout
     case training
     case cardio
     case nutrition
@@ -124,6 +125,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .automatic: "Automatic"
+        case .workout: "Workout"
         case .training: "Training · strength"
         case .cardio: "Training · cardio"
         case .nutrition: "Nutrition"
@@ -141,7 +143,7 @@ enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
     var category: EvidenceCategory? {
         switch self {
         case .automatic: nil
-        case .training, .cardio: .training
+        case .workout, .training, .cardio: .training
         case .nutrition: .nutrition
         case .weight: .weight
         case .activity: .activity
@@ -241,6 +243,8 @@ struct ProgressPhotoIdentityDraft: Codable, Equatable, Identifiable {
 }
 
 struct ProgressPhotoSessionDraft: Codable, Equatable {
+    static let userFacingConditionLabels = ["Time of day", "Fasted", "Post-workout", "Pump"]
+
     var timeOfDay: ProgressPhotoTimeOfDay? = nil
     var fasted: Bool?
     var postWorkout: Bool?
@@ -318,7 +322,7 @@ enum EvidenceSandboxRouter {
         let categories = detectedCategories(for: draft)
         if categories.count > 1 { return .mixed }
         return switch categories.first {
-        case .training: draft.submittedText.lowercased().range(of: #"\b(walk|run|cycling|treadmill|stair|elliptical|rowing)\b"#, options: .regularExpression) != nil ? .cardio : .training
+        case .training: .workout
         case .nutrition: .nutrition
         case .weight: .weight
         case .activity: .activity
@@ -340,12 +344,37 @@ enum EvidenceSandboxRouter {
         add(.labs, when: containsAny(text, ["lab panel", "bloodwork", "blood test", "hemoglobin", "cholesterol", "testosterone"]))
         add(.recovery, when: containsAny(text, ["sleep", "hrv", "readiness", "recovery score", "time asleep"]))
         add(.progressPhotos, when: containsAny(text, ["progress photo", "front relaxed", "rear relaxed", "side relaxed", "pose photo"]))
-        add(.nutrition, when: containsAny(text, ["nutrition", "calories", "protein", "carbohydrate", "carbs", "meal", "macros"]))
-        let trainingSignal = containsAny(text, ["workout", "training", "sets", "reps", "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl", "treadmill", "stair stepper", "outdoor walk", "indoor walk", "cycling", "elliptical", "rowing"])
+        // A calorie value appears on both Apple workout summaries and Nutrition
+        // screens. It is therefore deliberately not a Nutrition signal on its
+        // own. Nutrition requires domain-specific context such as macros, food,
+        // meals, or a daily diary/summary.
+        let nutritionSignal = containsAny(text, [
+            "nutrition", "protein", "carbohydrate", "carbs", "macros", "meal",
+            "breakfast", "lunch", "dinner", "snacks", "food diary", "daily nutrition",
+            "fiber", "sodium", "serving size", "myfitnesspal", "cronometer",
+        ])
+        add(.nutrition, when: nutritionSignal)
+        let trainingSignal = containsAny(text, [
+            "workout", "training", "traditional strength", "functional strength",
+            "sets", "reps", "active calories", "workout time", "duration", "average heart rate",
+            "shoulder press", "bench press", "lateral raise", "squat", "deadlift", "curl",
+            "treadmill", "stair stepper", "outdoor walk", "indoor walk", "outdoor run",
+            "indoor run", "cycling", "elliptical", "rowing", "hiking",
+        ]) || text.range(of: #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#, options: .regularExpression) != nil
         add(.training, when: trainingSignal)
         add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal)
         let weightSignal = containsAny(text, ["morning weight", "body weight", "weighed in", "scale weight"]) || text.range(of: #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#, options: .regularExpression) != nil
         add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
+        // Local Vision OCR cannot identify a physique. When a multi-image
+        // package has no recognized document/workout/nutrition signals, route
+        // it to an explicitly unconfirmed Progress Photo review rather than
+        // pretending high-confidence visual recognition occurred.
+        let imageAttachments = draft.attachments.filter(\.isImage)
+        if result.isEmpty,
+           imageAttachments.count >= 2,
+           imageAttachments.count == draft.attachments.count {
+            add(.progressPhotos, when: true)
+        }
         return result
     }
 
@@ -414,11 +443,17 @@ struct EvidenceReviewMeal: Codable, Equatable, Identifiable {
     var foods: [EvidenceReviewFood]
 }
 
+enum NutritionEvidenceScope: String, Codable, Equatable {
+    case fullDay = "full_day"
+    case meal
+    case unknown
+}
+
 enum NutritionReviewDisposition: String, Codable, CaseIterable, Identifiable {
     case replaceExisting = "replace_existing"
     case addDistinctMeal = "add_distinct_meal"
     var id: String { rawValue }
-    var label: String { self == .replaceExisting ? "Replace existing" : "Add as a distinct meal" }
+    var label: String { self == .replaceExisting ? "Replace existing" : "Add to this day" }
 }
 
 struct EvidenceReviewItem: Codable, Equatable, Identifiable {
@@ -429,6 +464,7 @@ struct EvidenceReviewItem: Codable, Equatable, Identifiable {
     var fields: [EvidenceReviewField]
     var exercises: [EvidenceReviewExercise] = []
     var meals: [EvidenceReviewMeal] = []
+    var nutritionScope: NutritionEvidenceScope = .unknown
     var photoIdentities: [ProgressPhotoIdentityDraft] = []
     var included = true
     var nutritionReplacementRequired = false

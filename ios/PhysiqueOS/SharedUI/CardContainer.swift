@@ -31,6 +31,7 @@ struct CardContainer<Content: View>: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
+                    .allowsHitTesting(false)
             )
     }
 }

@@ -629,4 +629,10 @@ enum TrainingLoggerNumericFocusOrder {
         guard let index = ids.firstIndex(of: id), ids.indices.contains(index + 1) else { return nil }
         return ids[index + 1]
     }
+
+    static func previous(before id: String, in draft: TrainingLoggerDraft) -> String? {
+        let ids = targets(for: draft).map(\.id)
+        guard let index = ids.firstIndex(of: id), index > ids.startIndex else { return nil }
+        return ids[index - 1]
+    }
 }
