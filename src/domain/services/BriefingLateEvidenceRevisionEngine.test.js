@@ -348,8 +348,10 @@ describe("late-evidence briefing revision engine", () => {
       deliveryDate: "2026-09-01",
       cutoff: "2026-09-01T06:59:59.999Z",
     };
-    existing.briefing.monthlyPresentation = { hero: {} };
-    const preparedOccurrence = { artifact: existing, existing };
+    existing.briefing.monthlyPresentation = { hero: { title: "Preserved August" } };
+    const recomposed = structuredClone(existing);
+    recomposed.briefing.monthlyPresentation.hero.title = "Diagnostic recomposition";
+    const preparedOccurrence = { artifact: recomposed, existing };
     const occurrencePublisher = vi.fn(async () => ({
       state: "prepared", artifact: existing, idempotent: false,
     }));
@@ -377,12 +379,14 @@ describe("late-evidence briefing revision engine", () => {
     });
     expect(occurrencePublisher).toHaveBeenCalledOnce();
     expect(occurrencePublisher).toHaveBeenCalledWith(expect.objectContaining({
-      prepared: preparedOccurrence,
+      prepared: expect.objectContaining({ artifact: existing, existing }),
       publicationService,
       operation: "regenerate",
       reason: "correct_monthly_confidence_evidence_normalization",
       dryRun: true,
     }));
+    expect(result.prepared.artifact.briefing.monthlyPresentation.hero.title)
+      .toBe("Preserved August");
   });
 });
 

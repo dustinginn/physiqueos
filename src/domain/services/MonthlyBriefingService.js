@@ -167,15 +167,24 @@ export function createMonthlyBriefingService({
       const prepared = await service.prepareRegeneration({
         userId, reason, targetArtifactId,
       });
+      const confidencePrepared = {
+        ...prepared.prepared,
+        artifact: structuredClone(prepared.existing),
+      };
+      const correctionPrepared = {
+        ...prepared,
+        artifact: confidencePrepared.artifact,
+        prepared: confidencePrepared,
+      };
       const recomputation = await occurrencePublisher({
-        prepared: prepared.prepared,
+        prepared: confidencePrepared,
         publicationService,
         now,
         operation: "regenerate",
         reason,
         dryRun: true,
       });
-      return { status: "prepared", prepared, recomputation };
+      return { status: "prepared", prepared: correctionPrepared, recomputation };
     },
     async regenerate({
       userId, reason, targetArtifactId, reconciliationContext = null,
