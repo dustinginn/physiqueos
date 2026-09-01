@@ -86,7 +86,12 @@ export function createCadencePIEvidenceEnvelope({
       includeInsufficientData: true,
     }),
     ...createDEXAPIObservations({
-      scans: selectDexaThroughCutoff(dexaScans, evidenceWindow.endDate),
+      scans: selectWindowRecords(dexaScans, {
+        evidenceWindow,
+        comparisonWindow,
+        dateOf: (item) => String(item?.measuredAt ?? item?.date ?? "")
+          .slice(0, 10),
+      }),
       includeInsufficientData: false,
     }),
     ...createPhotoPIObservations({
@@ -149,13 +154,6 @@ function normalizeEnergyDays(days) {
     activityDayId: day.activityDayId ?? day.evidenceRefs?.[1] ?? null,
     rmrScanId: day.rmrScanId ?? day.evidenceRefs?.[2] ?? null,
   }));
-}
-
-function selectDexaThroughCutoff(scans, cutoff) {
-  return (Array.isArray(scans) ? scans : []).filter((scan) => {
-    const date = String(scan?.measuredAt ?? scan?.date ?? "").slice(0, 10);
-    return date && date <= cutoff;
-  });
 }
 
 function selectWindowRecords(values, { evidenceWindow, comparisonWindow, dateOf }) {

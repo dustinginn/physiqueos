@@ -81,13 +81,16 @@ describe("Cadence PI evidence envelope", () => {
         weight("weight-aug-2", "2026-08-31", 167.4)],
       energyDays: [energy("2026-07-31", 2400, 2500),
         energy("2026-08-31", 2300, 2550)],
+      dexaScans: [dexa("dexa-jul", "2026-07-18", 147.5, 7.7, 167.4),
+        dexa("dexa-aug", "2026-08-15", 148.3, 7.6, 168.3)],
     });
     expect(envelope.provenance.sourceEvidenceIds).not.toContain("training-jul");
     expect(envelope.provenance.sourceEvidenceIds).not.toContain("weight-jul");
     expect(envelope.provenance.sourceEvidenceIds).not.toContain("nutrition-2026-07-31");
+    expect(envelope.provenance.sourceEvidenceIds).not.toContain("dexa-jul");
     expect(envelope.provenance.sourceEvidenceIds).toEqual(expect.arrayContaining([
       "training-aug", "weight-aug-1", "weight-aug-2",
-      "nutrition-2026-08-31", "activity-2026-08-31",
+      "nutrition-2026-08-31", "activity-2026-08-31", "dexa-aug",
     ]));
   });
 });
