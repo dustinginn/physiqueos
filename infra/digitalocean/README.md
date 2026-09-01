@@ -2,7 +2,7 @@
 
 > **Production source governance (2026-09-01).** The authoritative PhysiqueOS
 > web/server source is `origin/combined-app-platform-cutover`. Production is
-> currently running commit `7326b608003f2198977c94a4c6ebcd47b3913433` from
+> currently running commit `bc433db528ff9b3743f8deb3d88488ad69cdef2e` from
 > that branch. `main` is historical and is not a valid starting point for new
 > server work. Before every server patch, run `git fetch --prune origin`, verify
 > the active DigitalOcean branch and commit, and branch from
