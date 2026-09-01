@@ -31,6 +31,8 @@ const BRIEFING_PUBLICATION_COLLECTIONS = Object.freeze([
   "confidenceInitializationArtifacts",
 ]);
 
+const REPLACE_CURRENT_ASSESSMENT = "replace-current-assessment";
+
 export function createCanonicalBriefingConfidencePublicationService(options = {}) {
   const filePath = options.filePath ?? resolveFounderRuntimeStorePath();
   const liveStore = options.liveStore ?? getFounderRuntimeStore();
@@ -104,7 +106,9 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
       const current = currentSnapshot(baseline.store, command.assessment);
       const actualPrior = current?.currentAssessmentId ?? null;
       if (actualPrior !== (command.expectedPriorAssessmentId ?? null) ||
-          actualPrior !== (command.assessment.priorAssessmentId ?? null)) {
+          !validAssessmentPredecessor({
+            store: baseline.store, command, replacementTarget, actualPrior,
+          })) {
         return failure("expected_prior_conflict", "Canonical predecessor changed.");
       }
       const priorAssessment = current ? findAssessment(
@@ -115,6 +119,11 @@ export function createCanonicalBriefingConfidencePublicationService(options = {}
           Date.parse(priorCutoff)) {
         return failure("temporal_cutoff_conflict",
           "A canonical successor cannot move the evidence cutoff backward.");
+      }
+      if (command.replacementSemantics === REPLACE_CURRENT_ASSESSMENT &&
+          priorCutoff !== command.assessment.sourceCutoff) {
+        return failure("replacement_cutoff_conflict",
+          "A canonical correction must preserve the replaced Confidence cutoff.");
       }
       if (current && command.replacementAuthorized !== true &&
           command.assessment.publisherType === "goal_initialization") {
@@ -328,7 +337,9 @@ async function publishBounded({ command, mutateCanonicalRuntime, now }) {
         const current = currentSnapshot(candidate, command.assessment);
         const actualPrior = current?.currentAssessmentId ?? null;
         if (actualPrior !== (command.expectedPriorAssessmentId ?? null) ||
-            actualPrior !== (command.assessment.priorAssessmentId ?? null)) {
+            !validAssessmentPredecessor({
+              store: candidate, command, replacementTarget, actualPrior,
+            })) {
           throw semanticFailure("expected_prior_conflict",
             "Canonical predecessor changed.");
         }
@@ -340,6 +351,11 @@ async function publishBounded({ command, mutateCanonicalRuntime, now }) {
             Date.parse(priorCutoff)) {
           throw semanticFailure("temporal_cutoff_conflict",
             "A canonical successor cannot move the evidence cutoff backward.");
+        }
+        if (command.replacementSemantics === REPLACE_CURRENT_ASSESSMENT &&
+            priorCutoff !== command.assessment.sourceCutoff) {
+          throw semanticFailure("replacement_cutoff_conflict",
+            "A canonical correction must preserve the replaced Confidence cutoff.");
         }
         if (current && command.replacementAuthorized !== true &&
             command.assessment.publisherType === "goal_initialization") {
@@ -419,6 +435,14 @@ function validateCommand(command) {
       command.authorization.artifactId !== command.assessment.briefingArtifactId ||
       command.artifact?.confidencePublication?.assessmentId !== command.assessment.id) {
     throw new Error("Artifact, assessment, and publisher lineage disagree.");
+  }
+  if (command.replacementSemantics != null &&
+      command.replacementSemantics !== REPLACE_CURRENT_ASSESSMENT) {
+    throw new Error("Briefing replacement semantics are invalid.");
+  }
+  if (command.replacementSemantics === REPLACE_CURRENT_ASSESSMENT &&
+      command.replacementAuthorized !== true) {
+    throw new Error("Current-assessment replacement requires explicit authorization.");
   }
 }
 function validateMatchedCommand(command) {
@@ -531,6 +555,47 @@ function currentSnapshot(store, assessment) {
 function findAssessment(store, assessmentId) {
   return (store.goalConfidenceHistory ?? []).find((item) =>
     item.assessmentId === assessmentId)?.assessment ?? null;
+}
+
+export function resolveStableConfidenceReplacementPredecessor({
+  store, assessmentId,
+} = {}) {
+  let assessment = findAssessment(store, assessmentId);
+  if (!assessment) return null;
+  const visited = new Set();
+  while (assessment?.replacementLineage?.replacesAssessmentId) {
+    if (visited.has(assessment.id)) return null;
+    visited.add(assessment.id);
+    const replaced = findAssessment(
+      store, assessment.replacementLineage.replacesAssessmentId);
+    if (!sameReplacementOccurrence(assessment, replaced)) return null;
+    assessment = replaced;
+  }
+  return assessment.priorAssessmentId
+    ? findAssessment(store, assessment.priorAssessmentId) : null;
+}
+
+function validAssessmentPredecessor({
+  store, command, replacementTarget, actualPrior,
+}) {
+  if (command.replacementSemantics !== REPLACE_CURRENT_ASSESSMENT) {
+    return actualPrior === (command.assessment.priorAssessmentId ?? null);
+  }
+  const replacedAssessmentId =
+    replacementTarget?.confidencePublication?.assessmentId ?? null;
+  if (!replacedAssessmentId || replacedAssessmentId !== actualPrior) return false;
+  const stable = resolveStableConfidenceReplacementPredecessor({
+    store, assessmentId: replacedAssessmentId,
+  });
+  return Boolean(stable && stable.id === command.assessment.priorAssessmentId);
+}
+
+function sameReplacementOccurrence(left, right) {
+  return Boolean(left && right &&
+    left.publisherType === right.publisherType &&
+    left.briefingArtifactId === right.briefingArtifactId &&
+    left.evidenceWindowId === right.evidenceWindowId &&
+    left.sourceCutoff === right.sourceCutoff);
 }
 function findHistoricalAssessment(store, assessmentId) {
   const matches = (store.goalConfidenceHistory ?? []).filter((item) =>

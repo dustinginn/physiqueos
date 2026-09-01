@@ -152,6 +152,7 @@ export function createBriefingForecastFinalizer({
         expectedPriorAssessmentId: normalized.expectedPriorAssessmentId,
         expectedPriorArtifactId: normalized.expectedPriorArtifactId,
         replacementAuthorized: normalized.replacementAuthorized,
+        replacementSemantics: normalized.replacementSemantics,
       });
       return freeze({
         status: commitResult.status,
@@ -219,6 +220,7 @@ function normalizeRequest(request, now) {
     replacesArtifactId: request.replacesArtifactId ?? null,
     replacesAssessmentId: request.replacesAssessmentId ?? null,
     replacementAuthorized: request.replacementAuthorized === true,
+    replacementSemantics: request.replacementSemantics ?? null,
     qualifyingPhotoEvent: request.qualifyingPhotoEvent === true,
     startingForecastContext: structuredClone(request.startingForecastContext ?? {}),
     sourceLineage: structuredClone(request.sourceLineage ?? {}),

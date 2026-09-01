@@ -133,6 +133,145 @@ describe("canonical briefing and Confidence V2 atomic publication", () => {
     expect(persisted.goalConfidenceHistory).toHaveLength(3);
   });
 
+  it("corrects a regenerated occurrence at its stable Confidence predecessor", async () => {
+    const fixture = setup();
+    const first = await fixture.finalizer.finalize(fixture.request());
+    let baseline = fixture.publication.captureBaseline();
+    const legacyChainedReplacement = await fixture.finalizer.finalize(fixture.request({
+      idempotencyKey: "weekly-one|legacy-chained-replacement",
+      previousCanonicalAssessment: first.confidenceAssessment,
+      expectedPriorAssessmentId: first.confidenceAssessment.id,
+      expectedPriorArtifactId: "weekly-one",
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+      replacementAuthorized: true,
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: first.confidenceAssessment.id,
+      sourceLineage: { reason: "legacy_content_correction" },
+    }));
+    expect(legacyChainedReplacement.confidenceAssessment.priorAssessmentId)
+      .toBe(first.confidenceAssessment.id);
+
+    baseline = fixture.publication.captureBaseline();
+    const correctionRequest = {
+      idempotencyKey: "weekly-one|stable-root-content-correction",
+      previousCanonicalAssessment: fixture.prior,
+      expectedPriorAssessmentId: legacyChainedReplacement.confidenceAssessment.id,
+      expectedPriorArtifactId: fixture.prior.briefingArtifactId ?? null,
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+      replacementAuthorized: true,
+      replacementSemantics: "replace-current-assessment",
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: legacyChainedReplacement.confidenceAssessment.id,
+      sourceLineage: { reason: "window_driven_narrative_correction" },
+    };
+    const correction = await fixture.finalizer.finalize(
+      fixture.request(correctionRequest));
+
+    expect(correction.commitResult).toMatchObject({
+      status: expect.stringMatching(/^published_/), committed: true,
+    });
+    expect(correction.confidenceAssessment).toMatchObject({
+      priorAssessmentId: fixture.prior.id,
+      sourceCutoff: first.confidenceAssessment.sourceCutoff,
+      replacementLineage: {
+        replacesAssessmentId: legacyChainedReplacement.confidenceAssessment.id,
+      },
+    });
+    expect(correction.numericConfidenceProjection.currentPercentage)
+      .toBe(first.numericConfidenceProjection.currentPercentage);
+
+    const persisted = JSON.parse(fs.readFileSync(fixture.filePath, "utf8"));
+    expect(persisted.dailyBriefings).toHaveLength(1);
+    expect(persisted.goalConfidenceHistory).toHaveLength(4);
+    expect(persisted.goalConfidenceSnapshots[0]).toMatchObject({
+      currentAssessmentId: correction.confidenceAssessment.id,
+      previousCanonicalAssessmentId: fixture.prior.id,
+      evidenceCutoff: first.confidenceAssessment.sourceCutoff,
+    });
+
+    const replayBaseline = fixture.publication.captureBaseline();
+    const replay = await fixture.finalizer.finalize(fixture.request({
+      ...correctionRequest,
+      expectedRevision: replayBaseline.revision,
+      expectedSemanticDigest: replayBaseline.semanticDigest,
+    }));
+    expect(replay.commitResult).toMatchObject({
+      status: "matched", committed: false,
+    });
+    expect(JSON.parse(fs.readFileSync(fixture.filePath, "utf8"))
+      .goalConfidenceHistory).toHaveLength(4);
+  });
+
+  it("rejects a current-assessment correction that moves the cutoff", async () => {
+    const fixture = setup();
+    const first = await fixture.finalizer.finalize(fixture.request());
+    const baseline = fixture.publication.captureBaseline();
+    const result = await fixture.finalizer.finalize(fixture.request({
+      evidenceWindow: { id: "weekly-window", start: "2026-07-01T00:00:00.000Z",
+        cutoff: "2026-08-01T23:59:59.999Z", closed: true },
+      publicationCutoff: "2026-08-01T23:59:59.999Z",
+      idempotencyKey: "weekly-one|invalid-cutoff-correction",
+      previousCanonicalAssessment: fixture.prior,
+      expectedPriorAssessmentId: first.confidenceAssessment.id,
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+      replacementAuthorized: true,
+      replacementSemantics: "replace-current-assessment",
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: first.confidenceAssessment.id,
+    }));
+    expect(result.commitResult).toMatchObject({
+      status: "replacement_cutoff_conflict", committed: false,
+    });
+    const persisted = JSON.parse(fs.readFileSync(fixture.filePath, "utf8"));
+    expect(persisted.goalConfidenceHistory).toHaveLength(2);
+    expect(persisted.dailyBriefings[0].confidencePublication.assessmentId)
+      .toBe(first.confidenceAssessment.id);
+  });
+
+  it("preserves the stable predecessor through bounded provider replacement", async () => {
+    const fixture = setup({ bounded: true });
+    const first = await fixture.finalizer.finalize(fixture.request());
+    const baseline = fixture.publication.captureBaseline();
+    const replacement = await fixture.finalizer.finalize(fixture.request({
+      idempotencyKey: "weekly-one|bounded-content-correction",
+      previousCanonicalAssessment: fixture.prior,
+      expectedPriorAssessmentId: first.confidenceAssessment.id,
+      expectedPriorArtifactId: fixture.prior.briefingArtifactId ?? null,
+      expectedRevision: baseline.revision,
+      expectedSemanticDigest: baseline.semanticDigest,
+      replacementAuthorized: true,
+      replacementSemantics: "replace-current-assessment",
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: first.confidenceAssessment.id,
+    }));
+
+    expect(replacement.commitResult).toMatchObject({
+      committed: true,
+      memoryProfile: {
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+      },
+    });
+    expect(replacement.confidenceAssessment.priorAssessmentId)
+      .toBe(fixture.prior.id);
+    expect(fixture.liveStore.goalConfidenceSnapshots[0]).toMatchObject({
+      currentAssessmentId: replacement.confidenceAssessment.id,
+      previousCanonicalAssessmentId: fixture.prior.id,
+    });
+    expect(fixture.boundedCalls.at(-1)).toMatchObject({
+      operation: "briefing-confidence-publication",
+      allowedCollections: [
+        "dailyBriefings",
+        "goalConfidenceSnapshots",
+        "goalConfidenceHistory",
+        "confidenceInitializationArtifacts",
+      ],
+    });
+  });
+
   it("fails closed on predecessor conflict without a partial artifact", async () => {
     const fixture = setup();
     const result = await fixture.finalizer.finalize(fixture.request({

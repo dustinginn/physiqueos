@@ -1,4 +1,7 @@
-import { createCanonicalBriefingConfidencePublicationService } from "./CanonicalBriefingConfidencePublicationService";
+import {
+  createCanonicalBriefingConfidencePublicationService,
+  resolveStableConfidenceReplacementPredecessor,
+} from "./CanonicalBriefingConfidencePublicationService";
 import { createBriefingForecastFinalizer } from "../confidence/BriefingForecastFinalizer";
 import { createCanonicalConfidenceReadService } from "../confidence/CanonicalConfidenceReadService";
 import { createCadenceEvidenceDurabilityContext } from
@@ -236,13 +239,35 @@ async function publishMonthlyOccurrence({
   const { artifact, activePhase, baseline, current, existing, generatedAt,
     goal, goalContract, userId, window } = prepared;
   const replacement = operation === "regenerate";
+  const replacedAssessmentId = replacement
+    ? existing?.confidencePublication?.assessmentId ?? null : null;
+  if (replacement && current.assessment.id !== replacedAssessmentId) {
+    const error = new Error(
+      "Monthly correction target is not the current canonical Confidence publication."
+    );
+    error.code = "monthly_replacement_target_not_current";
+    throw error;
+  }
+  const confidencePredecessor = replacement
+    ? resolveStableConfidenceReplacementPredecessor({
+      store: baseline.store,
+      assessmentId: replacedAssessmentId,
+    })
+    : current.assessment;
+  if (!confidencePredecessor) {
+    const error = new Error(
+      "Monthly correction requires the stable canonical Confidence predecessor."
+    );
+    error.code = "monthly_replacement_predecessor_unavailable";
+    throw error;
+  }
   const evidenceDescriptors = adaptBriefingArtifactToEvidenceDescriptors({ artifact });
   const durabilityContext = createCadenceEvidenceDurabilityContext({
     store: baseline.store,
     artifact,
     cadence: "monthly",
     goalContract,
-    previousCanonicalAssessment: current.assessment,
+    previousCanonicalAssessment: confidencePredecessor,
   });
   const finalized = await createBriefingForecastFinalizer({
     publicationService, now,
@@ -258,19 +283,20 @@ async function publishMonthlyOccurrence({
       elapsedTimeAdequacy: "adequate", refs: evidenceRefs(artifact) },
     evidenceDescriptors,
     durabilityContext,
-    previousCanonicalAssessment: current.assessment,
+    previousCanonicalAssessment: confidencePredecessor,
     publicationCutoff: window.cutoff, finalizedAt: generatedAt,
     idempotencyKey: replacement
-      ? `confidence_v2|monthly|${artifact.id}|revision|${artifact.dependencyManifest.fingerprint}`
+      ? `confidence_v2|monthly|${artifact.id}|replacement|${replacedAssessmentId}|${
+        artifact.dependencyManifest.fingerprint}`
       : `confidence_v2|monthly|${artifact.id}`,
     expectedPriorAssessmentId: current.assessment.id,
-    expectedPriorArtifactId: current.assessment.briefingArtifactId,
+    expectedPriorArtifactId: confidencePredecessor.briefingArtifactId,
     expectedRevision: baseline.revision,
     expectedSemanticDigest: baseline.semanticDigest,
     replacementAuthorized: replacement,
+    replacementSemantics: replacement ? "replace-current-assessment" : null,
     replacesArtifactId: replacement ? existing?.id ?? null : null,
-    replacesAssessmentId: replacement
-      ? existing?.confidencePublication?.assessmentId ?? null : null,
+    replacesAssessmentId: replacedAssessmentId,
     sourceLineage: { reason, evidenceWindowId: window.id,
       dependencyManifestFingerprint: artifact.dependencyManifest.fingerprint },
     elapsedTimeAdequacy: "adequate",
