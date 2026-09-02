@@ -3,9 +3,9 @@ import Foundation
 /// The app's composition root.
 ///
 /// Screens depend on this type by injection rather than reaching for
-/// globals. Each API seam is fixture-backed today, replaced with a live,
-/// authenticated implementation once one exists, with no change required
-/// to the screens or view models that consume it.
+/// globals. Product screens remain fixture-backed while the isolated
+/// Founder server proof uses its own live, authenticated sandbox client;
+/// neither authority is silently substituted for the other.
 @Observable
 final class AppEnvironment {
     let homeAPI: HomeAPI
@@ -18,7 +18,7 @@ final class AppEnvironment {
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
     /// Deliberately isolated live transport proof. Existing product screens
-    /// remain fixture-backed and cannot silently mix this canonical read.
+    /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
 
     init(

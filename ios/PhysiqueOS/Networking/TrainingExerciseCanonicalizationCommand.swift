@@ -5,12 +5,13 @@ import Foundation
 /// Training Logger exercise.
 ///
 /// **No conforming implementation exists.** Native has no connected
-/// server API for Training canonicalization today — Codex's server
-/// sandbox activation is separately paused pending Founder DigitalOcean
-/// access. This protocol exists purely as the defined seam a future,
-/// authenticated implementation can bind to with no further model or view
-/// change; nothing in the app calls it, injects a conformance for it, or
-/// claims a fabricated `canonicalExerciseId` in its absence. Evidence
+/// server API for Training canonicalization today. The isolated server
+/// sandbox is operational, but it deliberately exposes no approved
+/// canonical exercise-creation command. This protocol exists purely as the
+/// defined seam a future, authenticated implementation can bind to with no
+/// further model or view change; nothing in the app calls it, injects a
+/// conformance for it, or claims a fabricated `canonicalExerciseId` in its
+/// absence. Evidence
 /// Review's "Create New Exercise" action today only records the Founder's
 /// proposed Training Area on the occurrence itself
 /// (`EvidenceReviewExercise.proposedAreaId`) — the local, honest half of

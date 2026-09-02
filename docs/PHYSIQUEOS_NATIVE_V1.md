@@ -2519,8 +2519,9 @@ provisional direct-upload exercise's Match Exercise menu now includes a
 `EvidenceReviewExercise.proposedAreaId` — Founder intent recorded locally —
 and deliberately leaves `isProvisional`/`canonicalExerciseId` unchanged,
 since no connected server command exists to actually create the exercise
-(Codex's server sandbox activation remains separately paused on Founder
-DigitalOcean access). The future handoff contract is a new, unused
+(the isolated server sandbox is operational, but intentionally exposes no
+approved canonical exercise-creation command). The future handoff contract
+is a new, unused
 protocol seam, `TrainingExerciseCanonicalizationCommand`
 (`Networking/TrainingExerciseCanonicalizationCommand.swift`) —
 `createExercise(_ request: TrainingExerciseCreationRequest) async throws
