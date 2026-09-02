@@ -2468,3 +2468,106 @@ confirmed unaffected.
 - Extend `resolveCanonicalExercise` beyond exact-name matching only if
   Workout Logger's own resolution strategy is extended first, so the two
   surfaces do not silently diverge in what "the same exercise" means.
+
+## 2026-09-02 — Direct-upload Training acceptance-matrix hardening (branch `claude/native-v1-training-direct-upload`, not yet merged to `native-v1`)
+
+Follow-up to the exercise-boundary fix above, taking the candidate from
+"systemic parser bug fixed" toward merge-ready. Auditing the acceptance
+matrix (known/unknown exercises in every order, repeated names, multi-word
+headings, a full variant matrix) surfaced one further real defect, not
+merely untested cases.
+
+**New defect found and fixed: repeated exercise names silently merged.**
+`parseExercises` previously kept its exercise state in dictionaries keyed
+by the *normalized name* (`order: [String]`, `setsByExercise: [String:
+[EvidenceReviewSet]]`). Two headings sharing a name — including two
+occurrences of the same base exercise with two different variants, e.g.
+"Spider Curls (Slow Eccentric)" followed later by "Spider Curls (Paused)"
+— resolved to the same dictionary key and their sets merged into one
+occurrence, the same class of bug already fixed for *different*-named
+exercises. The fix replaces the dictionary keying with an ordered array of
+`ExerciseParseBlock`s, each carrying its own synthetic identity (`let id =
+UUID().uuidString`, never derived from the exercise's own mutable, possibly
+repeated name); every recognized heading always opens a *new* block. This
+also incidentally corrected `EvidenceReviewExercise.id` and each
+`EvidenceReviewSet.id`, which were previously derived from the exercise
+name (`"exercise-\(key)"` / `"\(key)-set-\(n)"`) — a second, independent
+instance of deriving SwiftUI identity from mutable content — to the same
+stable synthetic block identity.
+
+**Variant parsing was audited against the canonical web model, not assumed
+sufficient.** The prior trailing-parenthetical form remains; an explicit
+`Variant: <label>` line-directive was added, matching the exact form the
+canonical web parser recognizes (`transformVariantDirectives`,
+`trainingSessionEvidence.js`) rather than inventing a new one. It is parsed
+before heading detection (so a directive line can never itself be mistaken
+for a new exercise heading) and only applied while the open block has no
+sets yet, mirroring the web's own "variant must precede sets" rule — a
+directive arriving after sets is inertly ignored, never corrupting the
+occurrence. No broader natural-language variant parser was added; variants
+remain freeform occurrence-level text exactly as
+`TrainingExecutionVariant`'s own documented model states, never a
+separately persisted registry entity.
+
+**Create New Exercise is now UI/model-ready, without faking server
+persistence.** Reused Workout Logger's own provisional-exercise shape
+exactly (`TrainingLoggerDraftExercise`/`addProvisionalExercise(name:
+areaId:)`, `TrainingLoggerView.swift`'s "Create new exercise" form): a
+provisional direct-upload exercise's Match Exercise menu now includes a
+"Create New Exercise" submenu of the real Training Areas
+(`environment.trainingLoggerAPI`). Choosing one sets the new
+`EvidenceReviewExercise.proposedAreaId` — Founder intent recorded locally —
+and deliberately leaves `isProvisional`/`canonicalExerciseId` unchanged,
+since no connected server command exists to actually create the exercise
+(Codex's server sandbox activation remains separately paused on Founder
+DigitalOcean access). The future handoff contract is a new, unused
+protocol seam, `TrainingExerciseCanonicalizationCommand`
+(`Networking/TrainingExerciseCanonicalizationCommand.swift`) —
+`createExercise(_ request: TrainingExerciseCreationRequest) async throws
+-> TrainingExerciseCreationResponse`, carrying only `reviewId`,
+`occurrenceId`, `proposedName`, and `areaId` (sets/reps/load stay
+occurrence data the confirmation path already owns). No conforming
+implementation exists, no URL or endpoint is assumed, and nothing calls it
+— it exists purely as the seam a future authenticated implementation binds
+to with no further model/view change. There is deliberately no equivalent
+variant-creation request: variants are not a registry concept in this
+architecture, so there is nothing for a server to "create."
+
+**Unresolved-exercise copy was clarified**, per the same
+"preserved, not an error" principle already established: "Preserved as a
+new exercise · not yet matched to your Training library" (was "New
+exercise · not yet in your Training library"), plus a second, muted line
+once a Training Area has been proposed ("Marked for {Area} · Training
+library update pending"). No color or layout change — still the same
+secondary, orange-accented line beneath the compact set summary.
+
+Verified: repeated same-named exercises now separate correctly; Pull Ups,
+Lat Pulldown, Cable Fly, and Romanian Deadlift (mixed known/unknown,
+multi-word) all parse structurally without any per-name special case;
+known/unknown boundaries hold in both orders; occurrence identity is
+provably not name-derived and survives a Match Exercise mutation; matching
+one occurrence never touches a same-named sibling; rematching replaces in
+place without duplicating; Create New Exercise records intent without
+fabricating canonical state; the `Variant:` directive attaches correctly
+and is ignored after sets begin; two same-base-exercise occurrences with
+different variants stay distinct; an unresolved exercise carrying variant
+text never contaminates its neighbors. 11 new tests in
+`LoggingSandboxTests.swift`; the full existing suite (all 258 prior tests,
+including the untouched Workout Logger suite) remained green throughout —
+269 total.
+
+### POST-STABILIZATION INTEGRATION REQUIREMENTS
+
+- Bind `TrainingExerciseCanonicalizationCommand.createExercise` to the real
+  authenticated server command once Codex's server sandbox is connected;
+  on success, set the occurrence's real `canonicalExerciseId` and clear
+  `isProvisional` — do not invent an interim fake success path before then.
+- Carry `proposedAreaId` through to that command's `areaId` field
+  unchanged; it is already exactly the shape the command needs.
+- If a future canonical exercise registry gains an alias map or fuzzy
+  matching, extend `resolveCanonicalExercise` to match, and only after
+  Workout Logger's own resolution is extended first (already noted above;
+  still applies).
+- No production, DigitalOcean, PostgreSQL, OpenAI, PI, worker/outbox, or
+  App Platform surface changed. No paid dependency added. $0 incremental
+  cost.
