@@ -30,7 +30,9 @@ The existing PostgreSQL CA and Spaces settings are reused. No secret belongs in 
 
 The sandbox uses the existing `FounderAuthService`: short-lived bearer access, rotating refresh credentials, refresh-family reuse detection, device/session revocation, and one-time pairing. Its credentials are stored only in the sandbox database and use the sandbox pepper, so they cannot authenticate production routes.
 
-The first sandbox owner and recovery credential must be created in a separately reviewed operational bootstrap after the sandbox database is migrated. That credential is then used once through the existing recovery/device-registration authority. The candidate does not auto-authorize a device and does not add a bootstrap secret or browser-cookie shortcut.
+The first sandbox owner and recovery credential are created in the separately reviewed operational bootstrap after the sandbox database is migrated. The recovery credential is not accepted by the device-pairing route. Instead, `POST /api/v1/native/sandbox/auth/bootstrap/pairing` validates it against the sandbox database and owner, then issues exactly one ten-minute pairing credential. That issuance creates no device, access credential, refresh credential, or session. The existing `/api/v1/native/sandbox/auth/pair` route remains the only device-registration boundary and consumes the pairing credential once.
+
+Recovery and pairing remain separate authorities. Bootstrap pairing issuance does not consume or rotate the recovery credential because it is not a full Founder recovery operation; the database nevertheless permits each recovery record to authorize only one bootstrap pairing credential. The recovery credential therefore cannot become a reusable pairing bearer. The normal recovery flow retains its existing consume-and-rotate semantics. No production auth route exposes this sandbox-only bridge.
 
 ## Weight acceptance fast path
 

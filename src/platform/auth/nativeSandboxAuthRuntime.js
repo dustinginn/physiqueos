@@ -31,6 +31,19 @@ export function createNativeSandboxAuthRuntime({ composition, logger = null, clo
   return Object.freeze({
     ...auth,
     authority: composition.authority.descriptor,
+    async issueBootstrapPairing({ recoveryCredential, requestId = null }) {
+      const startedAt = clock();
+      const result = await composition.founderAuthService.issuePairingCredentialWithRecovery({
+        recoveryCredential,
+        expectedUserId: composition.authority.descriptor.ownerUserId,
+      });
+      logger?.info("native.sandbox.bootstrap_pairing.issued", {
+        requestId,
+        authorityId: composition.authority.descriptor.authorityId,
+        durationMs: Math.max(0, Math.round((clock() - startedAt) * 100) / 100),
+      });
+      return result;
+    },
     async submitWeightCandidate({ request, submission, asset, requestId = null }) {
       return timed("native.sandbox.weight_candidate.review_ready", requestId, async () => {
         const principal = await authenticator.authenticate(request);

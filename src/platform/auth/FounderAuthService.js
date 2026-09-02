@@ -43,6 +43,36 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
     });
   }
 
+  async function issuePairingCredentialWithRecovery({ recoveryCredential, expectedUserId }) {
+    const credentialHash = safeHash(recoveryCredential);
+    if (!String(expectedUserId ?? "").trim()) throw invalidAuthRequest();
+    return transactionRunner.run(async (transaction) => {
+      const now = clock();
+      const recovery = await transaction.identity.findRecoveryCredentialForUse(credentialHash);
+      validateRecoveryRecord(recovery, now);
+      if (recovery.user_id !== expectedUserId) throw invalidCredential("RECOVERY_CREDENTIAL_INVALID");
+      if (await transaction.identity.findPairingCredentialByRecoveryCredentialId(recovery.id)) {
+        throw new ApplicationProblem({
+          status: 409,
+          code: "BOOTSTRAP_PAIRING_ALREADY_ISSUED",
+          title: "A bootstrap pairing credential was already issued.",
+        });
+      }
+      const credential = createSecret();
+      const expiresAt = new Date(now.getTime() + PAIRING_LIFETIME_MS);
+      await transaction.identity.createPairingCredentialWithRecoveryIssuer({
+        id: createId(),
+        userId: recovery.user_id,
+        issuedBySessionId: null,
+        issuedByRecoveryCredentialId: recovery.id,
+        credentialHash: hash(credential),
+        hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH,
+        expiresAt,
+      });
+      return Object.freeze({ pairingCredential: credential, expiresAt: expiresAt.toISOString() });
+    });
+  }
+
   async function registerDeviceWithPairing({ pairingCredential, platform, displayName }) {
     const credentialHash = safeHash(pairingCredential);
     return transactionRunner.run(async (transaction) => {
@@ -122,7 +152,7 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
     return transactionRunner.run(async (transaction) => {
       const now = clock();
       const row = await transaction.identity.findRecoveryCredentialForUse(credentialHash);
-      if (!row || row.used_at || row.revoked_at || (row.expires_at && new Date(row.expires_at) <= now)) throw invalidCredential("RECOVERY_CREDENTIAL_INVALID");
+      validateRecoveryRecord(row, now);
       await transaction.identity.consumeRecoveryCredential({ id: row.id, at: now });
       await transaction.identity.revokeAllSessions({ userId: row.user_id, at: now });
       return Object.freeze({ userId: row.user_id, recoveryRequired: true, canonicalDataDeleted: false });
@@ -134,7 +164,7 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
     return transactionRunner.run(async (transaction) => {
       const now = clock();
       const row = await transaction.identity.findRecoveryCredentialForUse(credentialHash);
-      if (!row || row.used_at || row.revoked_at || (row.expires_at && new Date(row.expires_at) <= now)) throw invalidCredential("RECOVERY_CREDENTIAL_INVALID");
+      validateRecoveryRecord(row, now);
       await transaction.identity.consumeRecoveryCredential({ id: row.id, at: now });
       await transaction.identity.revokeAllSessions({ userId: row.user_id, at: now });
       const deviceId = createId();
@@ -168,7 +198,7 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
     try { return hash(secret); } catch { throw invalidCredential("CREDENTIAL_MALFORMED"); }
   }
 
-  return Object.freeze({ enrollFounder, issuePairingCredential, registerDeviceWithPairing, createSession, authenticateAccessToken, rotateRefreshCredential, revokeSession, revokeDevice, useRecoveryCredential, recoverFounder });
+  return Object.freeze({ enrollFounder, issuePairingCredential, issuePairingCredentialWithRecovery, registerDeviceWithPairing, createSession, authenticateAccessToken, rotateRefreshCredential, revokeSession, revokeDevice, useRecoveryCredential, recoverFounder });
 }
 
 function validateAccessRecord(row, now) {
@@ -180,6 +210,11 @@ function validateAccessRecord(row, now) {
 function validateRefreshRecord(row, now) {
   if (row.revoked_at || row.session_status !== "active" || row.device_status !== "active") throw invalidCredential("REFRESH_CREDENTIAL_REVOKED");
   if (new Date(row.idle_expires_at) <= now || new Date(row.absolute_expires_at) <= now) throw invalidCredential("REFRESH_CREDENTIAL_EXPIRED");
+}
+function validateRecoveryRecord(row, now) {
+  if (!row || row.used_at || row.revoked_at || (row.expires_at && new Date(row.expires_at) <= now)) {
+    throw invalidCredential("RECOVERY_CREDENTIAL_INVALID");
+  }
 }
 
 function minDate(left, right) { return left <= right ? left : right; }

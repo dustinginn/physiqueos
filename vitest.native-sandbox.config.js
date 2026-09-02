@@ -24,6 +24,7 @@ export default defineConfig({
       "src/domain/services/CanonicalBriefingConfidencePublicationService.test.js",
       "src/domain/services/MonthlyBriefingPresentationService.test.js",
       "src/domain/services/MonthlyNarrativeCompositionService.test.js",
+      "db/migrations/000013_native_sandbox_bootstrap_pairing.test.js",
     ],
     fileParallelism: false,
     maxWorkers: 1,

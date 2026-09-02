@@ -121,6 +121,21 @@ export function createPostgresIdentityStore({ query }) {
         [record.id, record.userId, record.issuedBySessionId, record.credentialHash, record.hashAlgorithm, record.expiresAt],
       ));
     },
+    async createPairingCredentialWithRecoveryIssuer(record) {
+      return requiredRow(await query(
+        `INSERT INTO physiqueos.pairing_credentials
+          (id, user_id, issued_by_session_id, issued_by_recovery_credential_id, credential_hash, hash_algorithm, expires_at)
+         VALUES ($1, $2, NULL, $3, $4, $5, $6) RETURNING *`,
+        [record.id, record.userId, record.issuedByRecoveryCredentialId,
+          record.credentialHash, record.hashAlgorithm, record.expiresAt],
+      ));
+    },
+    async findPairingCredentialByRecoveryCredentialId(recoveryCredentialId) {
+      return firstRow(await query(
+        "SELECT * FROM physiqueos.pairing_credentials WHERE issued_by_recovery_credential_id = $1 FOR UPDATE",
+        [recoveryCredentialId],
+      ));
+    },
     async consumePairingCredential({ credentialHash, at }) {
       return firstRow(await query(
         `UPDATE physiqueos.pairing_credentials SET used_at = $2
