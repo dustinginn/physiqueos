@@ -441,6 +441,15 @@ struct EvidenceReviewExercise: Codable, Equatable, Identifiable {
     /// "Create new exercise" flow leaves a provisional exercise usable
     /// until it is later reconciled.
     var isProvisional: Bool = false
+    /// Set once the Founder chooses a Training Area for a provisional
+    /// exercise via Evidence Review's "Create New Exercise" action —
+    /// mirrors the one additional input Workout Logger's own
+    /// `addProvisionalExercise(name:areaId:)` requires. This only records
+    /// Founder intent for the future canonicalization command
+    /// (`TrainingExerciseCanonicalizationCommand`); it does not itself
+    /// assign a `canonicalExerciseId` or clear `isProvisional` — no
+    /// connected server exists yet to actually create the exercise.
+    var proposedAreaId: String? = nil
 }
 
 struct EvidenceReviewFood: Codable, Equatable, Identifiable {

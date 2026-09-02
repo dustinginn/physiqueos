@@ -56,6 +56,7 @@ app_files = [
     ("Networking", "TrainingAPI.swift"),
     ("Networking", "TrainingLoggerAPI.swift"),
     ("Networking", "TrainingExerciseCatalogLoader.swift"),
+    ("Networking", "TrainingExerciseCanonicalizationCommand.swift"),
     ("Networking", "TrainingLoggerDraftStore.swift"),
     ("Networking", "LoggingSandboxStore.swift"),
     ("Networking", "EvidenceAttachmentLoader.swift"),

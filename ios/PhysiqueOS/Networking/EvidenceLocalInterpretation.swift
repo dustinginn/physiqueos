@@ -161,20 +161,35 @@ enum EvidenceLocalInterpretation {
         return items
     }
 
+    /// One typed exercise heading's occurrence, in source order. Identity
+    /// is the block's own synthetic `id` — never derived from its (mutable,
+    /// possibly repeated) name — so two headings that type the exact same
+    /// exercise name (e.g. performed twice, non-adjacently, in one
+    /// workout) remain two distinct occurrences instead of silently
+    /// merging their sets, and a stable SwiftUI identity survives a name
+    /// correction or a canonical-name substitution after Match Exercise.
+    private struct ExerciseParseBlock {
+        let id = UUID().uuidString
+        var base: String
+        var variant: String?
+        var sets: [EvidenceReviewSet] = []
+    }
+
     /// Preserves exercise-block boundaries before attempting canonical
     /// resolution — each typed heading becomes its own occurrence the
     /// instant it is recognized as a heading, independent of whether its
-    /// name later resolves against `catalog`. A heading is recognized
-    /// structurally (the next content line reads as a set) rather than by
-    /// a closed keyword list, so a real but uncatalogued exercise name
-    /// (e.g. "Pull ups", which contains no configured keyword substring)
-    /// still opens its own block instead of silently falling through and
-    /// letting its sets bleed into whatever exercise preceded it. This is
-    /// the fix for the real Founder-reported failure: "Pull ups" typed
-    /// after "Bicep curls" previously matched no heading signal at all, so
-    /// its four sets were appended to the still-active "Bicep curls"
-    /// block, producing a false 8-set Bicep Curls summary instead of two
-    /// distinct 4-set occurrences.
+    /// name later resolves against `catalog`, and independent of whether
+    /// an identically-named heading appeared earlier in the same upload.
+    /// A heading is recognized structurally (the next content line reads
+    /// as a set) rather than by a closed keyword list, so a real but
+    /// uncatalogued exercise name (e.g. "Pull ups", which contains no
+    /// configured keyword substring) still opens its own block instead of
+    /// silently falling through and letting its sets bleed into whatever
+    /// exercise preceded it. This is the fix for the real Founder-reported
+    /// failure: "Pull ups" typed after "Bicep curls" previously matched no
+    /// heading signal at all, so its four sets were appended to the still-
+    /// active "Bicep curls" block, producing a false 8-set Bicep Curls
+    /// summary instead of two distinct 4-set occurrences.
     private static func parseExercises(
         _ text: String,
         catalog: [TrainingLoggerCatalogExercise] = TrainingExerciseCatalogLoader.loadExercises()
@@ -182,56 +197,75 @@ enum EvidenceLocalInterpretation {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        var order: [String] = []
-        var setsByExercise: [String: [EvidenceReviewSet]] = [:]
-        var displayNames: [String: String] = [:]
-        var variantsByExercise: [String: String] = [:]
-        var current: String?
+        var blocks: [ExerciseParseBlock] = []
+        var current: Int?
 
         for (index, line) in lines.enumerated() {
             if let inline = capture(#"^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), inline.count >= 5 {
-                appendExercise(inline[1], load: inline[2], reps: inline[3], count: inline[4], order: &order, sets: &setsByExercise, names: &displayNames, variants: &variantsByExercise)
-                current = normalizeExercise(splitVariant(inline[1]).base)
+                let opened = startBlock(inline[1], blocks: &blocks)
+                appendSets(load: inline[2], reps: inline[3], count: inline[4], to: opened, blocks: &blocks)
+                current = opened
                 continue
             }
             if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
-                appendSets(load: metric[1], reps: metric[2], count: metric[3], to: current, sets: &setsByExercise)
+                appendSets(load: metric[1], reps: metric[2], count: metric[3], to: current, blocks: &blocks)
                 continue
             }
             if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
-                appendSets(load: metric[2], reps: metric[1], count: metric[3], to: current, sets: &setsByExercise)
+                appendSets(load: metric[2], reps: metric[1], count: metric[3], to: current, blocks: &blocks)
                 continue
             }
             if let metric = capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line), metric.count >= 4, let current {
-                appendSets(load: metric[3], reps: metric[2], count: metric[1], to: current, sets: &setsByExercise)
+                appendSets(load: metric[3], reps: metric[2], count: metric[1], to: current, blocks: &blocks)
+                continue
+            }
+            // `Variant: <label>` — the same explicit line-directive form the
+            // canonical web parser recognizes (`transformVariantDirectives`,
+            // `trainingSessionEvidence.js`), not a native-only invention.
+            // Checked before heading detection so a directive line can
+            // never itself be mistaken for a new exercise heading, and
+            // only applied before any sets exist on the open block —
+            // matching the web's own "variant must precede sets" rule —
+            // so a stray directive after sets is inertly ignored rather
+            // than corrupting an already-recorded occurrence.
+            if let variantMatch = capture(#"^variant\s*:\s*(.+)$"#, in: line), variantMatch.count >= 2 {
+                if let current, blocks[current].sets.isEmpty {
+                    blocks[current].variant = variantMatch[1].trimmingCharacters(in: .whitespaces)
+                }
                 continue
             }
             let nextLine = lines.indices.contains(index + 1) ? lines[index + 1] : nil
             if looksLikeExerciseHeading(line, nextLine: nextLine) {
-                let (base, variant) = splitVariant(line)
-                let key = normalizeExercise(base)
-                current = key
-                if !order.contains(key) { order.append(key) }
-                displayNames[key] = displayExerciseName(base)
-                if let variant { variantsByExercise[key] = variant }
-                setsByExercise[key, default: []] = setsByExercise[key, default: []]
+                current = startBlock(line, blocks: &blocks)
             }
         }
 
-        return order.compactMap { key in
-            guard let sets = setsByExercise[key], !sets.isEmpty else { return nil }
-            let name = displayNames[key] ?? key.capitalized
+        return blocks.compactMap { block in
+            guard !block.sets.isEmpty else { return nil }
+            let name = displayExerciseName(block.base)
             let resolution = resolveCanonicalExercise(name: name, catalog: catalog)
             return .init(
-                id: "exercise-\(key.replacingOccurrences(of: " ", with: "-"))",
+                id: "exercise-\(block.id)",
                 name: resolution?.name ?? name,
-                variant: variantsByExercise[key],
+                variant: block.variant,
                 relationship: nil,
-                sets: sets,
+                sets: block.sets,
                 canonicalExerciseId: resolution?.canonicalExerciseId,
                 isProvisional: resolution == nil
             )
         }
+    }
+
+    /// Always opens a *new* block — never reuses an existing one by name —
+    /// so repeated same-named headings remain distinct occurrences. The
+    /// heading's own trailing-parenthetical variant (if any) is captured
+    /// immediately; a later `Variant:` directive line may still overwrite
+    /// it before the block's first set.
+    @discardableResult
+    private static func startBlock(_ headingLine: String, blocks: inout [ExerciseParseBlock]) -> Int {
+        let (base, variant) = splitVariant(headingLine)
+        blocks.append(ExerciseParseBlock(base: base, variant: variant))
+        return blocks.count - 1
     }
 
     /// Case-insensitive exact match against the same catalog Workout
@@ -271,32 +305,14 @@ enum EvidenceLocalInterpretation {
         capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line) != nil
     }
 
-    private static func appendExercise(
-        _ name: String,
-        load: String,
-        reps: String,
-        count: String,
-        order: inout [String],
-        sets: inout [String: [EvidenceReviewSet]],
-        names: inout [String: String],
-        variants: inout [String: String]
-    ) {
-        let (base, variant) = splitVariant(name)
-        let key = normalizeExercise(base)
-        if !order.contains(key) { order.append(key) }
-        names[key] = displayExerciseName(base)
-        if let variant { variants[key] = variant }
-        appendSets(load: load, reps: reps, count: count, to: key, sets: &sets)
-    }
-
-    private static func appendSets(load: String, reps: String, count: String, to key: String, sets: inout [String: [EvidenceReviewSet]]) {
+    private static func appendSets(load: String, reps: String, count: String, to index: Int, blocks: inout [ExerciseParseBlock]) {
         let setCount = min(max(Int(count) ?? 1, 1), 20)
         for _ in 0..<setCount {
-            let index = sets[key, default: []].count + 1
+            let setNumber = blocks[index].sets.count + 1
             let cleanReps = cleanNumber(reps)
             let cleanLoad = cleanNumber(load)
-            sets[key, default: []].append(.init(
-                id: "\(key)-set-\(index)",
+            blocks[index].sets.append(.init(
+                id: "\(blocks[index].id)-set-\(setNumber)",
                 summary: "\(cleanReps) reps @ \(cleanLoad) lb",
                 reps: cleanReps,
                 load: cleanLoad,
