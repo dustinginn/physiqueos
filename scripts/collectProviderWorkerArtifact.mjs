@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_ENTRIES = Object.freeze([
   "scripts/runFoundationWorker.mjs",
   "scripts/runSimplifiedProviderMigration.mjs",
+  "scripts/migrateNativeSandboxDatabase.mjs",
+  "scripts/bootstrapNativeSandboxOwner.mjs",
   "scripts/sourceModuleResolutionHook.mjs",
   "scripts/scanProviderArtifact.mjs",
 ]);
