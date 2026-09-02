@@ -11,6 +11,7 @@ struct LocalEvidenceReviewView: View {
     @State private var focusedNumericFieldID: String?
     @State private var editingExerciseID: String?
     @State private var trainingCatalog: [TrainingLoggerCatalogExercise] = []
+    @State private var trainingAreas: [TrainingLoggerArea] = []
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
     var body: some View {
@@ -41,7 +42,9 @@ struct LocalEvidenceReviewView: View {
         } message: { Text("This review and its selected assets will be permanently removed.") }
         .task {
             guard trainingCatalog.isEmpty else { return }
-            trainingCatalog = (try? await environment.trainingLoggerAPI.fetchConfiguration())?.exercises ?? []
+            let configuration = try? await environment.trainingLoggerAPI.fetchConfiguration()
+            trainingCatalog = configuration?.exercises ?? []
+            trainingAreas = configuration?.areas ?? []
         }
     }
 
@@ -141,9 +144,14 @@ struct LocalEvidenceReviewView: View {
                                 Text(relationship).physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10).foregroundStyle(PhysiqueOSTheme.accent)
                             }
                             if exercise.isProvisional {
-                                Text("New exercise · not yet in your Training library")
+                                Text("Preserved as a new exercise · not yet matched to your Training library")
                                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                                     .foregroundStyle(Color.orange)
+                                if let areaId = exercise.proposedAreaId {
+                                    Text("Marked for \(areaLabel(areaId)) · Training library update pending")
+                                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
                             }
                         }
                         Spacer(minLength: 8)
@@ -155,10 +163,17 @@ struct LocalEvidenceReviewView: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                     }
-                    if exercise.isProvisional, !trainingCatalog.isEmpty {
+                    if exercise.isProvisional, !trainingCatalog.isEmpty || !trainingAreas.isEmpty {
                         Menu {
                             ForEach(trainingCatalog.sorted { $0.name < $1.name }) { candidate in
                                 Button(candidate.name) { matchExercise(item: item, exercise: exercise, to: candidate) }
+                            }
+                            if !trainingAreas.isEmpty {
+                                Menu("Create New Exercise") {
+                                    ForEach(trainingAreas) { area in
+                                        Button(area.label) { createNewExercise(item: item, exercise: exercise, areaId: area.id) }
+                                    }
+                                }
                             }
                         } label: {
                             Label("Match Exercise", systemImage: "link")
@@ -480,8 +495,23 @@ struct LocalEvidenceReviewView: View {
             updated.exercises[index].canonicalExerciseId = candidate.canonicalExerciseId
             updated.exercises[index].name = candidate.name
             updated.exercises[index].isProvisional = false
+            updated.exercises[index].proposedAreaId = nil
         }
     }
+    /// Records the Founder's chosen Training Area on a provisional
+    /// exercise — mirrors the one input Workout Logger's own
+    /// `addProvisionalExercise(name:areaId:)` requires. This is the
+    /// honest local half of the future `TrainingExerciseCanonicalizationCommand`
+    /// handoff: it never assigns a `canonicalExerciseId` or clears
+    /// `isProvisional`, since no connected server exists yet to actually
+    /// create the exercise.
+    private func createNewExercise(item: EvidenceReviewItem, exercise: EvidenceReviewExercise, areaId: String) {
+        store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in
+            guard let index = updated.exercises.firstIndex(where: { $0.id == exercise.id }) else { return }
+            updated.exercises[index].proposedAreaId = areaId
+        }
+    }
+    private func areaLabel(_ areaId: String) -> String { trainingAreas.first { $0.id == areaId }?.label ?? areaId }
     private func updatePhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft, orientation: ProgressPhotoOrientation? = nil, contraction: ProgressPhotoContraction? = nil, poseVariant: ProgressPhotoPoseVariant? = nil) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; if let orientation { updated.photoIdentities[index].orientation = orientation }; if let contraction { updated.photoIdentities[index].contraction = contraction }; if let poseVariant { updated.photoIdentities[index].poseVariant = poseVariant }; updated.photoIdentities[index].confirmed = false } }
     private func confirmPhoto(_ item: EvidenceReviewItem, _ identity: ProgressPhotoIdentityDraft) { store.updateReviewItem(reviewId: reviewId, itemId: item.id) { updated in guard let index = updated.photoIdentities.firstIndex(where: { $0.id == identity.id }) else { return }; updated.photoIdentities[index].confirmed = updated.photoIdentities[index].orientation != .unconfirmed && updated.photoIdentities[index].contraction != .unconfirmed } }
     private func banner(_ text: String, destructive: Bool) -> some View { Text(text).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(destructive ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textSecondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background((destructive ? PhysiqueOSTheme.destructive : Color.yellow).opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 12)) }
