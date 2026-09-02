@@ -21,23 +21,20 @@ import {
 import {
   createEvidenceReviewContinuationWorkerHandler,
 } from "../src/platform/jobs/EvidenceReviewContinuationWorker.js";
-import {
-  createNativeSandboxWorkerComposition,
-  inspectNativeSandboxIntelligenceIsolation,
-} from "../src/platform/sandbox/NativeSandboxWorkerComposition.js";
-import { getNativeSandboxApplicationComposition } from
-  "../src/application/composition/nativeSandboxApplicationComposition.js";
-
 register("./sourceModuleResolutionHook.mjs", import.meta.url);
 
 const [{ EVIDENCE_INTAKE_INTERPRETATION_TOPIC },
   { createEvidenceIntakeInterpretationWorkerHandler },
   { createPostgresEvidenceIntakeStore },
-  { createProviderEvidenceIntakeArtifactLoader }] = await Promise.all([
+  { createProviderEvidenceIntakeArtifactLoader },
+  { createNativeSandboxWorkerComposition, inspectNativeSandboxIntelligenceIsolation },
+  { getNativeSandboxApplicationComposition }] = await Promise.all([
   import("../src/domain/services/EvidenceIntakeBackgroundWork.js"),
   import("../src/platform/jobs/EvidenceIntakeInterpretationWorker.js"),
   import("../src/platform/database/PostgresEvidenceIntakeStore.js"),
   import("../src/application/evidence/AsyncEvidenceIntakeService.js"),
+  import("../src/platform/sandbox/NativeSandboxWorkerComposition.js"),
+  import("../src/application/composition/nativeSandboxApplicationComposition.js"),
 ]);
 
 const simplifiedMigration = process.env.PHYSIQUEOS_SIMPLIFIED_MIGRATION_ENABLED === "1"
