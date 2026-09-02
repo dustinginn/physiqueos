@@ -20,6 +20,7 @@ describe("Training Library primary browse taxonomy", () => {
   it.each([
     ["Glute Squats", "glutes"],
     ["Lying Leg Curls", "hamstrings"],
+    ["Seated Leg Curl", "hamstrings"],
     ["Romanian Deadlifts", "glutes"],
     ["Bulgarian Split Squat (Smith Machine)", "quads"],
     ["Leg Extensions", "quads"],
@@ -41,6 +42,7 @@ describe("Training Library primary browse taxonomy", () => {
   it.each([
     ["Glute Squats", "glutes", "explicit_canonical_exercise_mapping"],
     ["Lying Leg Curls", "hamstrings", "explicit_canonical_exercise_mapping"],
+    ["Seated Leg Curl", "hamstrings", "explicit_canonical_exercise_mapping"],
     ["Romanian Deadlifts", "glutes", "explicit_canonical_exercise_mapping"],
   ])("uses an explicit high-confidence correction for %s", (name, category, source) => {
     const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
@@ -130,7 +132,7 @@ describe("Training Library primary browse taxonomy", () => {
 
   it("keeps the corrected exercises out of their prior categories", () => {
     const categories = Object.fromEntries(
-      ["Glute Squats", "Lying Leg Curls", "Romanian Deadlifts"].map((name) => {
+      ["Glute Squats", "Lying Leg Curls", "Seated Leg Curl", "Romanian Deadlifts"].map((name) => {
         const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
           (candidate) => candidate.name === name
         );
@@ -146,10 +148,69 @@ describe("Training Library primary browse taxonomy", () => {
     expect(categories).toEqual({
       glute_squat: "glutes",
       lying_leg_curl: "hamstrings",
+      seated_leg_curl: "hamstrings",
       romanian_deadlift: "glutes",
     });
     expect(categories.glute_squat).not.toBe("quads");
     expect(categories.lying_leg_curl).not.toBe("biceps");
+    expect(categories.seated_leg_curl).not.toBe("biceps");
+  });
+
+  it("does not let the generic 'curl' movement family capture leg-curl variants, while real biceps curls stay biceps", () => {
+    // ProgressReportingService's inferMovementFamily buckets ANY exercise whose name
+    // contains "curl" into one "Curl" movement family, and FAMILY_NAVIGATION_CATEGORIES
+    // maps that whole family to biceps at a higher priority than primary-muscle-group
+    // resolution. Leg-curl variants must be pulled out via the explicit canonical-ID
+    // override (checked before the family fallback) rather than relying on muscle-group
+    // data the family match would otherwise shadow.
+    const legCurlVariants = ["Lying Leg Curls", "Seated Leg Curl"];
+    const realBicepsCurls = ["Spider Curls", "EZ Bar Curls"];
+
+    for (const name of legCurlVariants) {
+      const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+        (candidate) => candidate.name === name
+      );
+      expect(exercise).toBeDefined();
+      // Simulate the live browse projection: a generic "Curl" family label (as
+      // inferMovementFamily would assign) alongside the exercise's real canonical ID
+      // and muscle groups.
+      const resolution = resolvePrimaryTrainingNavigationCategory({
+        ...browseExercise(exercise),
+        familyLabel: "Curl",
+      });
+      expect(resolution.primaryNavigationCategory).toBe("hamstrings");
+      expect(resolution.primaryNavigationCategory).not.toBe("biceps");
+    }
+
+    for (const name of realBicepsCurls) {
+      const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+        (candidate) => candidate.name === name
+      );
+      expect(exercise).toBeDefined();
+      const resolution = resolvePrimaryTrainingNavigationCategory({
+        ...browseExercise(exercise),
+        familyLabel: "Curl",
+      });
+      expect(resolution.primaryNavigationCategory).toBe("biceps");
+    }
+  });
+
+  it("leaves unrelated Quads/Glutes/Calves categories unaffected by the Seated Leg Curl correction", () => {
+    const unaffected = [
+      ["Glute Squats", "glutes"],
+      ["Hack Squats", "quads"],
+      ["Leg Extensions", "quads"],
+      ["Hip Thrusts", "glutes"],
+    ];
+    for (const [name, expectedCategory] of unaffected) {
+      const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+        (candidate) => candidate.name === name
+      );
+      expect(exercise).toBeDefined();
+      expect(
+        resolvePrimaryTrainingNavigationCategory(browseExercise(exercise))
+      ).toMatchObject({ primaryNavigationCategory: expectedCategory });
+    }
   });
 
   it("registers every browsable canonical exercise exactly once with no duplicates", () => {

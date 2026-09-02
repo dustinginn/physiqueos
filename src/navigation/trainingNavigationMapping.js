@@ -88,6 +88,7 @@ const EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES = {
   seated_abductions: "glutes",
   seated_hip_adductions: "glutes",
   seated_hip_abductions: "quads",
+  seated_leg_curl: "hamstrings",
   single_leg_leg_press: "quads",
   sissy_squat: "quads",
   sumo_squat_machine: "glutes",
