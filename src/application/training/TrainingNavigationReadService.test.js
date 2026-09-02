@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAuthenticationPrincipal } from "../auth/principal.js";
 import { createTrainingPerformanceEvent } from "../../domain/models/trainingPerformanceEvent.js";
 import { createTrainingReadService } from "./TrainingReadService.js";
 import { createTrainingNavigationReadService } from "./TrainingNavigationReadService.js";
+import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
 import { getTrainingTimelineReport } from "../../domain/services/TrainingEvidenceContextService.js";
@@ -14,6 +15,99 @@ import { buildTrainingLibraryNavigation } from "../../navigation/navigationRegis
 import TrainingKnowledgeScreen from "../../screens/TrainingKnowledgeScreen.jsx";
 
 const principal = createAuthenticationPrincipal({ userId: "owner-one", deviceId: "device-one", sessionId: "session-one" });
+
+describe("Founder-created canonical exercise resolution on a fresh process", () => {
+  afterEach(() => registerRuntimeTrainingExercises([]));
+
+  const founderCreatedExercise = Object.freeze({
+    id: "bicep_curl_machine",
+    name: "Bicep Curl Machine",
+    aliases: [],
+    equipment: "machine",
+    body_region: "upper_body",
+    primary_muscle_group_id: "biceps",
+    primary_muscle_groups: ["Biceps"],
+    movement_pattern: null,
+    modifiers: [],
+    secondary_muscle_groups: [],
+  });
+
+  function bicepSession() {
+    const record = training("bicep-session", "2026-08-29");
+    record.payload.exercises[0] = {
+      id: "exercise-entry",
+      name: "Bicep Curl Machine",
+      canonicalExerciseId: "bicep_curl_machine",
+      body_region: "upper_body",
+      sets: [{ reps: 12, weight: 120, weight_unit: "lb" }],
+    };
+    return record;
+  }
+
+  it("fails to resolve a Founder-created exercise's detail without registry hydration (reproduces the fresh-deploy failure)", async () => {
+    registerRuntimeTrainingExercises([]); // module-global registry as it is on a fresh process, before any canonical write has run
+    const store = navigationStore([bicepSession()]);
+    const service = createTrainingNavigationReadService({ store }); // no hydrateCanonicalExerciseRegistry injected
+    const result = await service.getExercise({ context: "all", exerciseSlug: "bicep_curl_machine" });
+
+    expect(result.exerciseRecords).toBeNull();
+    expect(result.report.trainingDays).toEqual([]);
+  });
+
+  it("resolves the Founder-created exercise's detail on the very first read once the registry is hydrated explicitly", async () => {
+    registerRuntimeTrainingExercises([]);
+    const store = navigationStore([bicepSession()]);
+    let hydrateCalls = 0;
+    const service = createTrainingNavigationReadService({
+      store,
+      hydrateCanonicalExerciseRegistry: async () => {
+        hydrateCalls += 1;
+        // Simulates the bounded provider read of canonicalExerciseLibrary that
+        // hydrateProductionTrainingExerciseRegistry performs before this call.
+        registerRuntimeTrainingExercises([founderCreatedExercise]);
+      },
+    });
+    const result = await service.getExercise({ context: "all", exerciseSlug: "bicep_curl_machine" });
+
+    expect(hydrateCalls).toBe(1);
+    expect(result.report.trainingDays).toHaveLength(1);
+    expect(result.report.trainingDays[0].sessions[0].exercises[0].canonicalExerciseId).toBe(
+      "bicep_curl_machine"
+    );
+    expect(store.listCanonicalTrainingEvidenceByExercise).toHaveBeenCalledWith("bicep_curl_machine");
+  });
+
+  it("resolves the Founder-created exercise in Library browse on the very first read once hydrated", async () => {
+    registerRuntimeTrainingExercises([]);
+    const store = navigationStore([bicepSession()]);
+    const service = createTrainingNavigationReadService({
+      store,
+      hydrateCanonicalExerciseRegistry: async () => registerRuntimeTrainingExercises([founderCreatedExercise]),
+    });
+    const result = await service.getLibrary({ context: "all", path: ["biceps"] });
+    const exerciseIds = (result.report.trainingBreakdowns.resistance ?? []).flatMap((region) =>
+      region.movementFamilies.flatMap((family) =>
+        family.exercises.map((exercise) => exercise.canonicalExerciseId)
+      )
+    );
+
+    expect(exerciseIds).toContain("bicep_curl_machine");
+  });
+
+  it("does not require a prior canonical write in the same process to become visible", async () => {
+    registerRuntimeTrainingExercises([]);
+    const store = navigationStore([bicepSession()]);
+    const service = createTrainingNavigationReadService({
+      store,
+      hydrateCanonicalExerciseRegistry: async () => registerRuntimeTrainingExercises([founderCreatedExercise]),
+    });
+
+    // The very first call this service ever makes in this process already resolves
+    // correctly -- nothing upstream registered the exercise beforehand.
+    const result = await service.getExercise({ context: "all", exerciseSlug: "bicep_curl_machine" });
+    expect(result.report.trainingDays).toHaveLength(1);
+  });
+});
 
 describe("provider-native Training navigation", () => {
   it.each(["all", "build-lean-mass"])(
@@ -182,6 +276,27 @@ describe("provider-native Training navigation", () => {
     expect(activity.report.trainingDays[0].sessions[0].label).toBe("Outdoor Walk");
     expect(store.run).toHaveBeenCalledTimes(2);
     expect(store.listCanonicalTrainingEvidenceObjects).toHaveBeenCalledTimes(2);
+  });
+
+  it("hydrates the canonical exercise registry before deciding exercise-detail vs. library browse", () => {
+    // path.at(-1) is resolved against the canonical registry to decide whether the route
+    // reads getExercise or falls back to getLibrary. That decision runs before either read
+    // service call, so the registry must already be hydrated by the time it happens or a
+    // Founder-created exercise's detail URL silently falls back to a library-shaped read.
+    const route = fs.readFileSync("src/app/progress/training/library/[[...path]]/page.js", "utf8");
+    const defaultExport = route.slice(route.indexOf("export default async function"));
+    expect(defaultExport.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
+    expect(defaultExport.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeLessThan(
+      defaultExport.indexOf("resolveTrainingExerciseIdentity(path.at(-1))")
+    );
+  });
+
+  it("hydrates the canonical exercise registry before Map existing reads canonical exercise options", () => {
+    const route = fs.readFileSync("src/app/evidence/review/[reviewId]/page.js", "utf8");
+    expect(route.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
+    expect(route.indexOf("await hydrateProductionTrainingExerciseRegistry()")).toBeLessThan(
+      route.indexOf("listCanonicalTrainingExerciseIdentities()")
+    );
   });
 
   it("removes compatibility-runtime/report construction from Day and Session routes", () => {

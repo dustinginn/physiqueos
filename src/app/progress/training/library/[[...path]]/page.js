@@ -7,7 +7,10 @@ import TrainingKnowledgeScreen, {
 } from "../../../../../screens/TrainingKnowledgeScreen";
 import { resolveTrainingExerciseIdentity } from "../../../../../domain/models/trainingExerciseIdentity";
 import { createTrainingLibraryMetadata } from "../../../../../presentation/trainingExercisePresentation";
-import { getProductionTrainingNavigationReadService } from "../../../../../application/composition/productionApplicationComposition";
+import {
+  getProductionTrainingNavigationReadService,
+  hydrateProductionTrainingExerciseRegistry,
+} from "../../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,7 @@ export async function generateMetadata({ params }) {
 
   if (!exerciseSlug) return { title: "Training Library | PhysiqueOS" };
 
+  await hydrateProductionTrainingExerciseRegistry();
   const presentation = getTrainingLibraryExercisePresentation({
     exerciseSlug,
     report: { trainingDays: [] },
@@ -36,6 +40,11 @@ export default async function TrainingLibraryPage({ params, searchParams }) {
     redirect(withTrainingTimelineContext(legacyRedirect, context));
   }
 
+  // Resolving path.at(-1) against the canonical registry decides whether this request is
+  // treated as an exercise detail or a library browse below. Founder-created exercises only
+  // resolve once the registry is hydrated from provider state, so that must happen before
+  // this branch is decided, not just before the read services that follow it.
+  await hydrateProductionTrainingExerciseRegistry();
   const exerciseIdentity =
     path.length >= 2 && path[0] !== "cardio"
       ? resolveTrainingExerciseIdentity(path.at(-1))

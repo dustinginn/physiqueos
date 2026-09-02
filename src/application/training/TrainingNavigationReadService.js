@@ -12,12 +12,25 @@ import {
 import { createTrainingLibraryExerciseRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExerciseIdentity.js";
 
-export function createTrainingNavigationReadService({ store } = {}) {
+export function createTrainingNavigationReadService({
+  store,
+  hydrateCanonicalExerciseRegistry = null,
+} = {}) {
   if (!store?.run) throw new Error("Training navigation requires a read store.");
+
+  // Founder-created canonical exercise identities live in a module-global registry that is
+  // only populated as a side effect of a canonical write elsewhere in the process. Every
+  // read here that resolves exercise identities/categories must hydrate it explicitly first
+  // so a fresh process/deploy resolves them correctly on the very first request, rather than
+  // depending on some unrelated prior write having already run.
+  async function ensureCanonicalExerciseRegistry() {
+    if (hydrateCanonicalExerciseRegistry) await hydrateCanonicalExerciseRegistry();
+  }
 
   return Object.freeze({
     getReporting({ context, currentDate = new Date() } = {}) {
       return store.run("training.reporting", async () => {
+        await ensureCanonicalExerciseRegistry();
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([
           store.getUser(),
           store.listGoals(),
@@ -53,6 +66,7 @@ export function createTrainingNavigationReadService({ store } = {}) {
     },
     getLanding({ context, currentDate = new Date() } = {}) {
       return store.run("training.landing", async () => {
+        await ensureCanonicalExerciseRegistry();
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([
           store.getUser(),
           store.listGoals(),
@@ -109,6 +123,7 @@ export function createTrainingNavigationReadService({ store } = {}) {
     },
     getLibrary({ context, currentDate = new Date(), path = [] } = {}) {
       return store.run("training.navigation.library", async () => {
+        await ensureCanonicalExerciseRegistry();
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([
           store.getUser(),
           store.listGoals(),
@@ -173,6 +188,7 @@ export function createTrainingNavigationReadService({ store } = {}) {
     },
     getExercise({ context, currentDate = new Date(), exerciseSlug } = {}) {
       return store.run("training.navigation.exercise", async () => {
+        await ensureCanonicalExerciseRegistry();
         const exerciseIdentity = resolveTrainingExerciseIdentity(exerciseSlug);
         const [user, goals, canonicalEvidenceObjects, events] = await Promise.all([
           store.getUser(),

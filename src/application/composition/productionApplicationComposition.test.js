@@ -131,3 +131,69 @@ describe("getProductionApplicationComposition — compatibility owner guard wiri
     expect(poolQuery).not.toHaveBeenCalled();
   });
 });
+
+describe("hydrateProductionTrainingExerciseRegistry — bounded Founder-created exercise read", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    poolQuery.mockReset();
+    poolConnect.mockClear();
+    closePool.mockClear();
+  });
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("hydrates the shared registry from one bounded canonicalExerciseLibrary query, not a full runtime load", async () => {
+    const queries = [];
+    poolQuery.mockImplementation(async (text, values) => {
+      queries.push({ text, values });
+      if (text.includes("canonical_training_records")) {
+        return {
+          rows: [{
+            record_id: "bicep_curl_machine",
+            payload: {
+              id: "bicep_curl_machine",
+              name: "Bicep Curl Machine",
+              aliases: [],
+              equipment: "machine",
+              body_region: "upper_body",
+              primary_muscle_group_id: "biceps",
+              primary_muscle_groups: ["Biceps"],
+            },
+          }],
+        };
+      }
+      if (text.includes("canonical_runtime_metadata")) {
+        return { rows: [{ runtime_version: "v1", revision: 5, last_command_id: null, updated_at: null, imported_at: null }] };
+      }
+      return { rows: [] };
+    });
+
+    const { hydrateProductionTrainingExerciseRegistry } = await import("./productionApplicationComposition.js");
+    const { listCanonicalTrainingExerciseIdentities } = await import("../../domain/models/trainingExerciseIdentity.js");
+
+    await hydrateProductionTrainingExerciseRegistry(compatibilityEnv({ PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE: "0" }));
+
+    const identities = listCanonicalTrainingExerciseIdentities();
+    expect(identities.some((identity) => identity.id === "bicep_curl_machine" && identity.name === "Bicep Curl Machine")).toBe(true);
+
+    // Bounded: exactly one collection query (canonicalExerciseLibrary) plus the mandatory
+    // single-row runtime-metadata lookup -- never the ~39-collection full canonical runtime
+    // a commit path loads.
+    const collectionQueries = queries.filter((query) => query.text.includes("collection_name"));
+    expect(collectionQueries).toHaveLength(1);
+    expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", "canonicalExerciseLibrary"]);
+  });
+
+  it("is a no-op outside provider-full-runtime mode", async () => {
+    const { hydrateProductionTrainingExerciseRegistry } = await import("./productionApplicationComposition.js");
+    await hydrateProductionTrainingExerciseRegistry({ PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "0" });
+    expect(poolQuery).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op during the production build phase", async () => {
+    const { hydrateProductionTrainingExerciseRegistry } = await import("./productionApplicationComposition.js");
+    await hydrateProductionTrainingExerciseRegistry(compatibilityEnv({ NEXT_PHASE: "phase-production-build" }));
+    expect(poolQuery).not.toHaveBeenCalled();
+  });
+});

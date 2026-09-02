@@ -13,7 +13,10 @@ import {
   prepareNutritionEvidencePackageForReview,
 } from "../../../../domain/services/CanonicalNutritionDayService";
 import { resolveEvidenceReviewReprocessEligibility } from "../../../../domain/services/EvidenceReviewReprocessEligibility";
-import { getProductionEvidenceReviewReadService } from "../../../../application/composition/productionApplicationComposition";
+import {
+  getProductionEvidenceReviewReadService,
+  hydrateProductionTrainingExerciseRegistry,
+} from "../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +34,10 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     : await getProductionEvidenceReviewReadService().getReview(reviewId);
   const review = read?.review;
   if (!review) notFound();
+  // Map existing must offer Founder-created canonical exercises (e.g. bicep_curl_machine)
+  // on the very first request after a fresh deploy, not only once some unrelated canonical
+  // write has incidentally hydrated the shared registry in this process.
+  await hydrateProductionTrainingExerciseRegistry();
   const requestedRecoveryContext = parseEvidenceRecoverySearchParams(query) ??
     createEvidenceRecoveryContext(
       review.interpretedEvidence?.review_metadata?.recoveryContext

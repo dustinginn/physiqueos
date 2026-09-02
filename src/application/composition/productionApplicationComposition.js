@@ -15,6 +15,7 @@ import {
   executePostgresFounderRuntimeMutation,
 } from "../../platform/database/PostgresFounderRepositoryFacade.js";
 import { loadCanonicalRuntime } from "../../platform/migration/phase4CanonicalImport.js";
+import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
 import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
@@ -236,11 +237,45 @@ export async function getProductionApplicationCanonicalCommitComposition(
   });
 }
 
+// Founder-created canonical exercises (e.g. a Founder-added machine or variant) are not
+// part of the static FOUNDER_ALPHA_TRAINING_EXERCISES registry; resolving them by ID or
+// exact name depends on the module-global runtimeTrainingExercises map in
+// trainingExerciseIdentity.js. That map is only ever populated as an incidental side
+// effect of a canonical-commit composition (createPhase4PostgresApplicationComposition,
+// which every canonical write path already goes through). Pure read paths that construct
+// their store directly from getOrCreateProviderRuntime (Training navigation, Evidence
+// Review's exercise picker) never trigger that side effect, so on a fresh process — right
+// after every deploy — Founder-created exercises are invisible until an unrelated write
+// happens to run first. This performs the same bounded, single-collection provider read
+// phase4PostgresComposition.js already does for canonical writes, so any read path that
+// needs canonical exercise identities can hydrate them explicitly before use instead of
+// depending on write-time history it has no control over.
+export async function hydrateProductionTrainingExerciseRegistry(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  const canonicalRuntime = await loadCanonicalRuntime({
+    query: (text, values) => runtime.pool.query(text, values),
+    ownerUserId: runtime.ownerUserId,
+    collections: ["canonicalExerciseLibrary"],
+    includeApplicationContext: false,
+    includeImportMetadata: false,
+  });
+  registerRuntimeTrainingExercises(canonicalRuntime.canonicalExerciseLibrary ?? []);
+}
+
 export function getProductionTrainingNavigationReadService(env = process.env) {
-  const store = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build"
+  const providerMode = env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build";
+  const store = providerMode
     ? createProviderTrainingNavigationReadStore(env)
     : createRepositoryTrainingNavigationReadStore({ repositories: LegacyFounderRepositories });
-  return createTrainingNavigationReadService({ store });
+  return createTrainingNavigationReadService({
+    store,
+    hydrateCanonicalExerciseRegistry: providerMode
+      ? () => hydrateProductionTrainingExerciseRegistry(env)
+      : null,
+  });
 }
 
 export function getProductionProgressHubReadService(env = process.env) {
