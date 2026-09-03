@@ -103,9 +103,9 @@ final class TrainingReadModelTests: XCTestCase {
     func testLatestTrainingDayShowsBothOfThatDaysSessionsNewestFirst() async throws {
         let landing = try await api.fetchTrainingLanding()
         let latest = try XCTUnwrap(landing.latestTrainingDay)
-        XCTAssertEqual(latest.date, "2026-08-26")
-        XCTAssertEqual(latest.sessions.map(\.id), ["session-fixture-004", "session-fixture-001"])
-        XCTAssertEqual(latest.daySummary, "Chest · Triceps · Walking")
+        XCTAssertEqual(latest.date, "2026-08-28")
+        XCTAssertEqual(latest.sessions.map(\.id), ["session-fixture-011"])
+        XCTAssertEqual(latest.daySummary, "Biceps · Triceps · Quads")
     }
 
     func testEveryLatestDaySessionCarriesATrainingSessionDestination() async throws {
@@ -134,11 +134,19 @@ final class TrainingReadModelTests: XCTestCase {
     func testTrainingAreaExerciseCountsMatchTheFixturedSessions() async throws {
         let landing = try await api.fetchTrainingLanding()
         let countsByLabel = Dictionary(uniqueKeysWithValues: landing.trainingAreas.map { ($0.label, $0.exerciseCount) })
-        XCTAssertEqual(countsByLabel["Chest"], 3)
-        XCTAssertEqual(countsByLabel["Back"], 2)
-        XCTAssertEqual(countsByLabel["Shoulders"], 1)
-        XCTAssertEqual(countsByLabel["Triceps"], 1)
-        XCTAssertEqual(countsByLabel["Biceps"], 0)
+        XCTAssertEqual(countsByLabel["Chest"], 7)
+        XCTAssertEqual(countsByLabel["Back"], 4)
+        XCTAssertEqual(countsByLabel["Shoulders"], 8)
+        XCTAssertEqual(countsByLabel["Triceps"], 3)
+        XCTAssertEqual(countsByLabel["Biceps"], 3)
+        XCTAssertEqual(countsByLabel["Core"], 3)
+        XCTAssertEqual(countsByLabel["Quads"], 18)
+        XCTAssertEqual(countsByLabel["Hamstrings"], 4)
+        XCTAssertEqual(countsByLabel["Glutes"], 3)
+        XCTAssertEqual(countsByLabel["Calves"], 1)
+        // The full canonical catalog — no area is empty, matching the
+        // Founder's explicit "complete Library, not a partial one" ask.
+        XCTAssertEqual(countsByLabel.values.reduce(0, +), 54)
     }
 
     func testEveryTrainingAreaCarriesATrainingExerciseDestination() async throws {
@@ -411,7 +419,10 @@ final class TrainingReadModelTests: XCTestCase {
     func testChestExerciseIdentityAndDestinationsAreConsistent() async throws {
         let chest = try await api.fetchTrainingArea(areaId: "chest")
         let unwrapped = try XCTUnwrap(chest)
-        XCTAssertEqual(unwrapped.exercises.map(\.label), ["Bench Press", "Cable Fly", "Push-ups"])
+        XCTAssertEqual(unwrapped.exercises.map(\.label), [
+            "Bench Press", "Chest Press Machine", "Incline Bench Press", "Incline Dumbbell Press",
+            "Chest Fly Machine", "Cable Fly", "Push-ups",
+        ])
         XCTAssertEqual(Set(unwrapped.exercises.map(\.id)).count, unwrapped.exercises.count)
         for exercise in unwrapped.exercises {
             guard case .trainingExercise(let exerciseId) = exercise.destination else {
@@ -465,11 +476,15 @@ final class TrainingReadModelTests: XCTestCase {
     /// an empty "Browse" section, not a placeholder or an error — matching
     /// `InformationList`'s real behavior for zero exercises (verified
     /// directly from source: no "come back later" copy exists there).
-    func testAreasWithNoLoggedExercisesRenderAnEmptyBrowseListNotAPlaceholder() async throws {
-        for areaId in ["biceps", "core", "quads", "hamstrings", "glutes", "calves"] {
+    /// Every one of the 10 canonical areas now carries at least one real
+    /// canonical exercise — the full catalog, not a partial subset that
+    /// leaves some areas empty (the Founder's explicit "daily driver, not a
+    /// representative sample" requirement for this pass).
+    func testEveryTrainingAreaIsPopulatedWithItsFullCanonicalCatalog() async throws {
+        for areaId in ["chest", "back", "shoulders", "biceps", "triceps", "core", "quads", "hamstrings", "glutes", "calves"] {
             let area = try await api.fetchTrainingArea(areaId: areaId)
             let unwrapped = try XCTUnwrap(area, "\(areaId) must be fixture-backed.")
-            XCTAssertTrue(unwrapped.exercises.isEmpty)
+            XCTAssertFalse(unwrapped.exercises.isEmpty, "\(areaId) must not be empty.")
             XCTAssertEqual(unwrapped.breadcrumbs.map(\.label), ["Training", "Training Library"])
         }
     }
@@ -481,13 +496,16 @@ final class TrainingReadModelTests: XCTestCase {
     /// have a canonical identity elsewhere in the fixture.
     func testBackShouldersAndTricepsExercisesMatchTheirFixturedSessionExercises() async throws {
         let back = try await api.fetchTrainingArea(areaId: "back")
-        XCTAssertEqual(try XCTUnwrap(back).exercises.map(\.label), ["Lat Pulldown", "Seated Cable Row"])
+        XCTAssertEqual(try XCTUnwrap(back).exercises.map(\.label), ["Pull-Ups", "Iso-Lateral High Rows", "Seated Cable Rows", "Lat Pulldown"])
 
         let shoulders = try await api.fetchTrainingArea(areaId: "shoulders")
-        XCTAssertEqual(try XCTUnwrap(shoulders).exercises.map(\.label), ["Face Pull"])
+        XCTAssertEqual(try XCTUnwrap(shoulders).exercises.map(\.label), [
+            "Shoulder Press Machine", "Lateral Raises Machine", "Lateral Raise", "Cable Machine Front Raises",
+            "Barbell Front Raises", "Dumbbell Front Raise", "Front Raise", "Face Pull",
+        ])
 
         let triceps = try await api.fetchTrainingArea(areaId: "triceps")
-        XCTAssertEqual(try XCTUnwrap(triceps).exercises.map(\.label), ["Overhead Triceps Extension"])
+        XCTAssertEqual(try XCTUnwrap(triceps).exercises.map(\.label), ["Cable Rope Pushdowns", "Straight Bar Cable Pushdowns", "Overhead Triceps Extension"])
     }
 
     /// Every area's exercise rows keep the same identity/destination/no-
@@ -599,7 +617,7 @@ final class TrainingReadModelTests: XCTestCase {
         let chest = try await api.fetchTrainingArea(areaId: "chest")
         let unwrapped = try XCTUnwrap(chest)
         let byLabel = Dictionary(uniqueKeysWithValues: unwrapped.exercises.map { ($0.label, $0.canonicalExerciseId) })
-        XCTAssertEqual(byLabel["Bench Press"], "barbell_bench_press")
+        XCTAssertEqual(byLabel["Bench Press"], "bench_press")
         XCTAssertEqual(byLabel["Cable Fly"], "cable_fly")
         XCTAssertEqual(byLabel["Push-ups"], "pushup")
     }
@@ -626,7 +644,11 @@ final class TrainingReadModelTests: XCTestCase {
     func testBenchPressBenchmarkIsolatesTheSupersetOccurrence() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
         let unwrapped = try XCTUnwrap(exercise)
-        XCTAssertEqual(unwrapped.history.count, 1)
+        // Two total occurrences now (2026-07-28 standalone, 2026-08-26
+        // superset) — history shows both, but isolation still correctly
+        // excludes the standalone one from the benchmark's "comparable"
+        // set since it shares no relationship context with the latest.
+        XCTAssertEqual(unwrapped.history.count, 2)
         let benchmark = try XCTUnwrap(unwrapped.benchmark)
         XCTAssertEqual(benchmark.comparison, "No comparable prior superset session.")
         XCTAssertEqual(benchmark.workingWeight, "155 lb")
@@ -963,12 +985,12 @@ final class TrainingReadModelTests: XCTestCase {
         let resistance = try XCTUnwrap(unwrapped.resistance)
         XCTAssertEqual(resistance.statusGroups.map(\.label), ["Improving", "Stable", "Plateauing", "Regressing"])
         XCTAssertEqual(resistance.statusGroups.map(\.tone), [.success, .stable, .warning, .danger])
-        XCTAssertEqual(resistance.statusGroups.first?.items.map(\.label), ["Lat Pulldown", "Push-ups", "Overhead Triceps Extension"])
+        XCTAssertEqual(resistance.statusGroups.first?.items.map(\.label), ["Lat Pulldown", "Push-ups", "Overhead Triceps Extension", "Squat", "EZ Bar Curls"])
         XCTAssertFalse(resistance.recentPrs.isEmpty)
         XCTAssertFalse(resistance.highlights.isEmpty)
         XCTAssertFalse(resistance.needsAttention.isEmpty)
-        XCTAssertEqual(resistance.categoryRollups.map(\.label), ["Chest", "Back", "Shoulders", "Triceps"])
-        XCTAssertEqual(resistance.categoryRollups.first?.detail, "Latest Aug 26 · 3 exercises · 7 sets · 3,890 lb · 1 improving · 1 plateauing · 1 needs data")
+        XCTAssertEqual(resistance.categoryRollups.map(\.label), ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Quads", "Hamstrings", "Glutes", "Calves"])
+        XCTAssertEqual(resistance.categoryRollups.first?.detail, "Latest Aug 26 · 7 exercises · 7 sets · 3,890 lb · 1 improving · 1 plateauing · 5 needs data")
     }
 
     /// Recent PRs on the Resistance report must reuse the exact same
@@ -977,7 +999,7 @@ final class TrainingReadModelTests: XCTestCase {
     func testResistanceReportRecentPrsMatchThePerformanceEventsFixture() async throws {
         let report = try await api.fetchTrainingReporting(reportId: "resistance")
         let resistance = try XCTUnwrap(report?.resistance)
-        XCTAssertEqual(resistance.recentPrs.count, 3)
+        XCTAssertEqual(resistance.recentPrs.count, 5)
         XCTAssertEqual(resistance.recentPrs.first?.detail, "Volume PR: 3,340 lb.")
         for pr in resistance.recentPrs {
             guard case .trainingExercise = pr.destination else {
@@ -991,7 +1013,10 @@ final class TrainingReadModelTests: XCTestCase {
         let unwrapped = try XCTUnwrap(report)
         XCTAssertEqual(unwrapped.title, "Training History")
         let days = try XCTUnwrap(unwrapped.historyDays)
-        XCTAssertEqual(days.map(\.date), ["2026-08-26", "2026-08-24", "2026-08-22"])
+        XCTAssertEqual(days.map(\.date), [
+            "2026-08-28", "2026-08-26", "2026-08-24", "2026-08-22", "2026-08-19",
+            "2026-08-17", "2026-08-08", "2026-07-28", "2026-07-05", "2026-06-10",
+        ])
         let firstDaySessions = try XCTUnwrap(days.first?.sessions)
         for session in firstDaySessions {
             guard case .trainingSession = session.destination else {
@@ -1062,9 +1087,13 @@ final class TrainingReadModelTests: XCTestCase {
         let all = try await api.fetchTrainingLanding(scope: .all)
         let buildLeanMass = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
-        XCTAssertFalse(all.trainingDays.isEmpty)
-        XCTAssertEqual(buildLeanMass.trainingDays.count, all.trainingDays.count)
-        XCTAssertTrue(visibleAbs.trainingDays.isEmpty)
+        // 10 fixture days span Visible Abs (2), Build Lean Mass Phase 1 (2),
+        // and Phase 2 (6) — both Goal filters must genuinely narrow, not
+        // just relabel the same 10-day set.
+        XCTAssertEqual(all.trainingDays.count, 10)
+        XCTAssertEqual(buildLeanMass.trainingDays.count, 8)
+        XCTAssertEqual(visibleAbs.trainingDays.count, 2)
+        XCTAssertEqual(visibleAbs.trainingDays.map(\.date).sorted(), ["2026-06-10", "2026-07-05"])
         XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
     }
 
@@ -1095,8 +1124,9 @@ final class TrainingReadModelTests: XCTestCase {
     func testPhaseScopeNarrowsTrainingDaysToOnePhase() async throws {
         let leanMassBuild = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
         let establishMaintenance = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
-        XCTAssertFalse(leanMassBuild.trainingDays.isEmpty)
-        XCTAssertTrue(establishMaintenance.trainingDays.isEmpty)
+        XCTAssertEqual(leanMassBuild.trainingDays.count, 6)
+        XCTAssertEqual(establishMaintenance.trainingDays.count, 2)
+        XCTAssertEqual(establishMaintenance.trainingDays.map(\.date).sorted(), ["2026-07-28", "2026-08-08"])
     }
 
     func testTrainingSessionDetailCarriesGoalPhaseAttribution() async throws {

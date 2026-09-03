@@ -236,6 +236,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
+    ("PhysiqueOSTests", "TrainingLibraryCatalogTests.swift"),
     ("PhysiqueOSTests", "ActivityReadModelTests.swift"),
     ("PhysiqueOSTests", "NutritionReadModelTests.swift"),
     ("PhysiqueOSTests", "NutritionReportingCalculatorTests.swift"),

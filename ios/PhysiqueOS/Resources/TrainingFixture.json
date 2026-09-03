@@ -5,76 +5,343 @@
     "tone": "primary",
     "scope": {
       "options": [
-        { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-        { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-        { "id": "all", "label": "All Training", "selected": true }
+        {
+          "id": "build-lean-mass",
+          "label": "Build Lean Mass",
+          "selected": false
+        },
+        {
+          "id": "visible-abs",
+          "label": "Visible Abs",
+          "selected": false
+        },
+        {
+          "id": "all",
+          "label": "All Training",
+          "selected": true
+        }
       ],
       "dateRangeLabel": "Complete history"
     },
     "latestTrainingDay": {
-      "date": "2026-08-26",
-      "label": "Wednesday, August 26",
-      "daySummary": "Chest · Triceps · Walking",
-      "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-26" } },
+      "date": "2026-08-28",
+      "label": "Friday, August 28",
+      "daySummary": "Biceps \u00b7 Triceps \u00b7 Quads",
+      "destination": {
+        "id": "progress.stream",
+        "parameters": {
+          "streamId": "training/day/2026-08-28"
+        }
+      },
       "sessions": [
         {
-          "id": "session-fixture-004",
-          "label": "Walking",
-          "value": "2.1 mi",
-          "detail": "6:10 PM–6:52 PM · 42 min · 2.1 mi · 180 active cal",
-          "date": "2026-08-26T18:10:00-07:00",
-          "sourceEvidence": ["Apple Health"],
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-004" } }
-        },
-        {
-          "id": "session-fixture-001",
-          "label": "Traditional Strength Training",
-          "value": "420 active cal",
-          "detail": "6:02 AM–6:54 AM · 52 min · 420 active cal · Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
-          "date": "2026-08-26T06:02:00-07:00",
-          "sourceEvidence": ["Typed evidence"],
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-001" } }
+          "id": "session-fixture-011",
+          "label": "Arms Superset Day",
+          "value": "330 active cal",
+          "detail": "6:00 AM\u20136:40 AM \u00b7 40 min \u00b7 330 active cal \u00b7 EZ Bar Curls, Cable Rope Pushdowns, Spider Curls, Bulgarian Split Squat",
+          "date": "2026-08-28T06:00:00-07:00",
+          "sourceEvidence": [
+            "Typed evidence"
+          ],
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-011"
+            }
+          }
         }
       ]
     },
     "trainingAreas": [
-      { "id": "chest", "label": "Chest", "exerciseCount": 3, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "chest" } } },
-      { "id": "back", "label": "Back", "exerciseCount": 2, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "back" } } },
-      { "id": "shoulders", "label": "Shoulders", "exerciseCount": 1, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "shoulders" } } },
-      { "id": "biceps", "label": "Biceps", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "biceps" } } },
-      { "id": "triceps", "label": "Triceps", "exerciseCount": 1, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "triceps" } } },
-      { "id": "core", "label": "Core", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "core" } } },
-      { "id": "quads", "label": "Quads", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "quads" } } },
-      { "id": "hamstrings", "label": "Hamstrings", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "hamstrings" } } },
-      { "id": "glutes", "label": "Glutes", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "glutes" } } },
-      { "id": "calves", "label": "Calves", "exerciseCount": 0, "destination": { "id": "training.exercise", "parameters": { "exerciseId": "calves" } } }
+      {
+        "id": "chest",
+        "label": "Chest",
+        "exerciseCount": 7,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "chest"
+          }
+        }
+      },
+      {
+        "id": "back",
+        "label": "Back",
+        "exerciseCount": 4,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "back"
+          }
+        }
+      },
+      {
+        "id": "shoulders",
+        "label": "Shoulders",
+        "exerciseCount": 8,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "shoulders"
+          }
+        }
+      },
+      {
+        "id": "biceps",
+        "label": "Biceps",
+        "exerciseCount": 3,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "biceps"
+          }
+        }
+      },
+      {
+        "id": "triceps",
+        "label": "Triceps",
+        "exerciseCount": 3,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "triceps"
+          }
+        }
+      },
+      {
+        "id": "core",
+        "label": "Core",
+        "exerciseCount": 3,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "core"
+          }
+        }
+      },
+      {
+        "id": "quads",
+        "label": "Quads",
+        "exerciseCount": 18,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "quads"
+          }
+        }
+      },
+      {
+        "id": "hamstrings",
+        "label": "Hamstrings",
+        "exerciseCount": 4,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "hamstrings"
+          }
+        }
+      },
+      {
+        "id": "glutes",
+        "label": "Glutes",
+        "exerciseCount": 3,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "glutes"
+          }
+        }
+      },
+      {
+        "id": "calves",
+        "label": "Calves",
+        "exerciseCount": 1,
+        "destination": {
+          "id": "training.exercise",
+          "parameters": {
+            "exerciseId": "calves"
+          }
+        }
+      }
     ],
     "reportingLinks": [
-      { "id": "resistance", "label": "Resistance Training", "detail": "Strength progression, body-part distribution, and lean mass support.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/resistance" } } },
-      { "id": "cardio", "label": "Cardio", "detail": "Calories, exercise minutes, distance, pace, and heart-rate trends.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/cardio" } } },
-      { "id": "volume", "label": "Volume", "detail": "Sets, reps, loads, and weekly work by exercise or muscle group.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/volume" } } },
-      { "id": "frequency", "label": "Frequency", "detail": "How often each area, modality, and exercise appears.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/frequency" } } },
-      { "id": "consistency", "label": "Consistency", "detail": "Training cadence across days, weeks, cuts, and protocol phases.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/consistency" } } },
-      { "id": "history", "label": "History", "detail": "Chronological training days and sessions.", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/reporting/history" } } }
+      {
+        "id": "resistance",
+        "label": "Resistance Training",
+        "detail": "Strength progression, body-part distribution, and lean mass support.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/resistance"
+          }
+        }
+      },
+      {
+        "id": "cardio",
+        "label": "Cardio",
+        "detail": "Calories, exercise minutes, distance, pace, and heart-rate trends.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/cardio"
+          }
+        }
+      },
+      {
+        "id": "volume",
+        "label": "Volume",
+        "detail": "Sets, reps, loads, and weekly work by exercise or muscle group.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/volume"
+          }
+        }
+      },
+      {
+        "id": "frequency",
+        "label": "Frequency",
+        "detail": "How often each area, modality, and exercise appears.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/frequency"
+          }
+        }
+      },
+      {
+        "id": "consistency",
+        "label": "Consistency",
+        "detail": "Training cadence across days, weeks, cuts, and protocol phases.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/consistency"
+          }
+        }
+      },
+      {
+        "id": "history",
+        "label": "History",
+        "detail": "Chronological training days and sessions.",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/reporting/history"
+          }
+        }
+      }
     ],
     "trainingDays": [
       {
+        "date": "2026-08-28",
+        "label": "Friday, August 28",
+        "summary": "Biceps \u00b7 Triceps \u00b7 Quads",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-28"
+          }
+        }
+      },
+      {
         "date": "2026-08-26",
         "label": "Wednesday, August 26",
-        "summary": "Chest · Triceps · Walking",
-        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-26" } }
+        "summary": "Chest \u00b7 Triceps \u00b7 Walking",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-26"
+          }
+        }
       },
       {
         "date": "2026-08-24",
         "label": "Monday, August 24",
-        "summary": "Back · Shoulders",
-        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-24" } }
+        "summary": "Back \u00b7 Shoulders",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-24"
+          }
+        }
       },
       {
         "date": "2026-08-22",
         "label": "Saturday, August 22",
         "summary": "Cardio",
-        "destination": { "id": "progress.stream", "parameters": { "streamId": "training/day/2026-08-22" } }
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-22"
+          }
+        }
+      },
+      {
+        "date": "2026-08-19",
+        "label": "Wednesday, August 19",
+        "summary": "Core \u00b7 Quads",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-19"
+          }
+        }
+      },
+      {
+        "date": "2026-08-17",
+        "label": "Monday, August 17",
+        "summary": "Back \u00b7 Chest",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-17"
+          }
+        }
+      },
+      {
+        "date": "2026-08-08",
+        "label": "Saturday, August 8",
+        "summary": "Quads \u00b7 Hamstrings \u00b7 Calves",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-08"
+          }
+        }
+      },
+      {
+        "date": "2026-07-28",
+        "label": "Tuesday, July 28",
+        "summary": "Chest \u00b7 Back",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-07-28"
+          }
+        }
+      },
+      {
+        "date": "2026-07-05",
+        "label": "Sunday, July 5",
+        "summary": "Quads \u00b7 Hamstrings \u00b7 Glutes",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-07-05"
+          }
+        }
+      },
+      {
+        "date": "2026-06-10",
+        "label": "Wednesday, June 10",
+        "summary": "Shoulders \u00b7 Biceps \u00b7 Triceps",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-06-10"
+          }
+        }
       }
     ],
     "currentProtocol": {
@@ -84,22 +351,120 @@
       "goal": "Visible abs while preserving lean mass"
     },
     "relatedGoals": [
-      { "id": "goal_visible_abs_at_rest", "title": "Visible Abs At Rest", "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_visible_abs_at_rest" } } },
-      { "id": "goal_preserve_lean_mass", "title": "Preserve Lean Mass", "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_preserve_lean_mass" } } }
+      {
+        "id": "goal_visible_abs_at_rest",
+        "title": "Visible Abs At Rest",
+        "destination": {
+          "id": "goal.detail",
+          "parameters": {
+            "goalId": "goal_visible_abs_at_rest"
+          }
+        }
+      },
+      {
+        "id": "goal_preserve_lean_mass",
+        "title": "Preserve Lean Mass",
+        "destination": {
+          "id": "goal.detail",
+          "parameters": {
+            "goalId": "goal_preserve_lean_mass"
+          }
+        }
+      }
     ],
     "sourceEvidence": [
-      { "id": "session-fixture-003", "label": "Run", "date": "2026-08-22T07:00:00-07:00", "sources": ["Apple Health"] },
-      { "id": "session-fixture-002", "label": "Functional Strength Training", "date": "2026-08-24T05:45:00-07:00", "sources": ["Screenshot"] },
-      { "id": "session-fixture-001", "label": "Traditional Strength Training", "date": "2026-08-26T06:02:00-07:00", "sources": ["Typed evidence"] },
-      { "id": "session-fixture-004", "label": "Walking", "date": "2026-08-26T18:10:00-07:00", "sources": ["Apple Health"] }
+      {
+        "id": "session-fixture-006",
+        "label": "Shoulder & Arms Training",
+        "date": "2026-06-10T06:00:00-07:00",
+        "sources": [
+          "Typed evidence"
+        ]
+      },
+      {
+        "id": "session-fixture-007",
+        "label": "Leg Day",
+        "date": "2026-07-05T06:10:00-07:00",
+        "sources": [
+          "Typed evidence"
+        ]
+      },
+      {
+        "id": "session-fixture-008",
+        "label": "Push Day",
+        "date": "2026-07-28T06:00:00-07:00",
+        "sources": [
+          "Typed evidence"
+        ]
+      },
+      {
+        "id": "session-fixture-009",
+        "label": "Leg Day",
+        "date": "2026-08-08T06:05:00-07:00",
+        "sources": [
+          "Typed evidence"
+        ]
+      },
+      {
+        "id": "session-fixture-005",
+        "label": "Traditional Strength Training",
+        "date": "2026-08-17T06:05:00-07:00",
+        "sources": [
+          "Typed evidence"
+        ]
+      }
     ]
   },
   "days": [
     {
+      "date": "2026-08-28",
+      "label": "Friday, August 28",
+      "summary": {
+        "bodyAreas": [
+          "Biceps",
+          "Triceps",
+          "Quads"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 4,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-011",
+          "activityType": "Arms Superset Day",
+          "title": "Arms Superset Day",
+          "kind": "strength",
+          "exerciseCount": 4,
+          "bodyAreas": [
+            "Biceps",
+            "Triceps",
+            "Quads"
+          ],
+          "durationSeconds": 3240,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 330,
+          "detail": "Biceps, Triceps, Quads \u00b7 4 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-011"
+            }
+          }
+        }
+      ]
+    },
+    {
       "date": "2026-08-26",
       "label": "Wednesday, August 26",
       "summary": {
-        "bodyAreas": ["Chest", "Triceps"],
+        "bodyAreas": [
+          "Chest",
+          "Triceps"
+        ],
         "sessionCount": 2,
         "strengthSessions": 1,
         "exerciseCount": 4,
@@ -113,13 +478,21 @@
           "title": "Traditional Strength Training",
           "kind": "strength",
           "exerciseCount": 4,
-          "bodyAreas": ["Chest", "Triceps"],
-          "durationSeconds": 3120,
+          "bodyAreas": [
+            "Chest",
+            "Triceps"
+          ],
+          "durationSeconds": 3240,
           "distance": null,
           "distanceUnit": null,
           "activeCalories": 420,
-          "detail": "Chest, Triceps · 4 exercises",
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-001" } }
+          "detail": "Chest, Triceps \u00b7 4 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-001"
+            }
+          }
         },
         {
           "id": "session-fixture-004",
@@ -132,8 +505,13 @@
           "distance": 2.1,
           "distanceUnit": "mi",
           "activeCalories": 180,
-          "detail": "42 min · 2.1 mi · 180 active cal",
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-004" } }
+          "detail": "42 min \u00b7 2.1 mi \u00b7 180 active cal",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-004"
+            }
+          }
         }
       ]
     },
@@ -141,7 +519,10 @@
       "date": "2026-08-24",
       "label": "Monday, August 24",
       "summary": {
-        "bodyAreas": ["Back", "Shoulders"],
+        "bodyAreas": [
+          "Back",
+          "Shoulders"
+        ],
         "sessionCount": 1,
         "strengthSessions": 1,
         "exerciseCount": 3,
@@ -155,13 +536,21 @@
           "title": "Functional Strength Training",
           "kind": "strength",
           "exerciseCount": 3,
-          "bodyAreas": ["Back", "Shoulders"],
-          "durationSeconds": 2880,
+          "bodyAreas": [
+            "Back",
+            "Shoulders"
+          ],
+          "durationSeconds": 2580,
           "distance": null,
           "distanceUnit": null,
           "activeCalories": 380,
-          "detail": "Back, Shoulders · 3 exercises",
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-002" } }
+          "detail": "Back, Shoulders \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-002"
+            }
+          }
         }
       ]
     },
@@ -188,30 +577,953 @@
           "distance": 3.4,
           "distanceUnit": "mi",
           "activeCalories": 410,
-          "detail": "34 min · 3.4 mi · 410 active cal",
-          "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-003" } }
+          "detail": "34 min \u00b7 3.4 mi \u00b7 410 active cal",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-003"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-19",
+      "label": "Wednesday, August 19",
+      "summary": {
+        "bodyAreas": [
+          "Core",
+          "Quads"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-010",
+          "activityType": "Core & Legs",
+          "title": "Core & Legs",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": [
+            "Core",
+            "Quads"
+          ],
+          "durationSeconds": 2580,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 310,
+          "detail": "Core, Quads \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-010"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-17",
+      "label": "Monday, August 17",
+      "summary": {
+        "bodyAreas": [
+          "Back",
+          "Chest"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 2,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-005",
+          "activityType": "Traditional Strength Training",
+          "title": "Traditional Strength Training",
+          "kind": "strength",
+          "exerciseCount": 2,
+          "bodyAreas": [
+            "Back",
+            "Chest"
+          ],
+          "durationSeconds": 1920,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 360,
+          "detail": "Back, Chest \u00b7 2 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-005"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-08",
+      "label": "Saturday, August 8",
+      "summary": {
+        "bodyAreas": [
+          "Quads",
+          "Hamstrings",
+          "Calves"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 4,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-009",
+          "activityType": "Leg Day",
+          "title": "Leg Day",
+          "kind": "strength",
+          "exerciseCount": 4,
+          "bodyAreas": [
+            "Quads",
+            "Hamstrings",
+            "Calves"
+          ],
+          "durationSeconds": 3240,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 450,
+          "detail": "Quads, Hamstrings, Calves \u00b7 4 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-009"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-07-28",
+      "label": "Tuesday, July 28",
+      "summary": {
+        "bodyAreas": [
+          "Chest",
+          "Back"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-008",
+          "activityType": "Push Day",
+          "title": "Push Day",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": [
+            "Chest",
+            "Back"
+          ],
+          "durationSeconds": 2580,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 395,
+          "detail": "Chest, Back \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-008"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-07-05",
+      "label": "Sunday, July 5",
+      "summary": {
+        "bodyAreas": [
+          "Quads",
+          "Hamstrings",
+          "Glutes"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 4,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-007",
+          "activityType": "Leg Day",
+          "title": "Leg Day",
+          "kind": "strength",
+          "exerciseCount": 4,
+          "bodyAreas": [
+            "Quads",
+            "Hamstrings",
+            "Glutes"
+          ],
+          "durationSeconds": 3240,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 460,
+          "detail": "Quads, Hamstrings, Glutes \u00b7 4 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-007"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-06-10",
+      "label": "Wednesday, June 10",
+      "summary": {
+        "bodyAreas": [
+          "Shoulders",
+          "Biceps",
+          "Triceps"
+        ],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-006",
+          "activityType": "Shoulder & Arms Training",
+          "title": "Shoulder & Arms Training",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": [
+            "Shoulders",
+            "Biceps",
+            "Triceps"
+          ],
+          "durationSeconds": 2580,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 340,
+          "detail": "Shoulders, Biceps, Triceps \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": {
+              "sessionId": "session-fixture-006"
+            }
+          }
         }
       ]
     }
   ],
   "sessions": [
     {
+      "id": "session-fixture-006",
+      "label": "Shoulder & Arms Training",
+      "value": "340 active cal",
+      "detail": "6:00 AM\u20136:41 AM \u00b7 41 min \u00b7 340 active cal \u00b7 Shoulder Press Machine, EZ Bar Curls, Cable Rope Pushdowns",
+      "date": "2026-06-10T06:00:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "shoulder-press",
+          "name": "Shoulder Press Machine",
+          "canonicalExerciseId": "shoulder_press_machine",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 95,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "ez-curl",
+          "name": "EZ Bar Curls",
+          "canonicalExerciseId": "ez_bar_curl",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 60,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 60,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 65,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "pushdown",
+          "name": "Cable Rope Pushdowns",
+          "canonicalExerciseId": "cable_pushdown",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 50,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 50,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 55,
+              "weight_unit": "lb"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-007",
+      "label": "Leg Day",
+      "value": "460 active cal",
+      "detail": "6:10 AM\u20137:05 AM \u00b7 55 min \u00b7 460 active cal \u00b7 Squat, Leg Extensions, Lying Leg Curls, Hip Thrusts",
+      "date": "2026-07-05T06:10:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "squat",
+          "name": "Squat",
+          "canonicalExerciseId": "squat",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 8,
+              "weight": 185,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 8,
+              "weight": 185,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 6,
+              "weight": 205,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 4,
+              "reps": 6,
+              "weight": 205,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "leg-ext",
+          "name": "Leg Extensions",
+          "canonicalExerciseId": "leg_extension",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 100,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "leg-curl",
+          "name": "Lying Leg Curls",
+          "canonicalExerciseId": "lying_leg_curl",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 70,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 75,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 75,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "hip-thrust",
+          "name": "Hip Thrusts",
+          "canonicalExerciseId": "hip_thrusts",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 155,
+              "weight_unit": "lb"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-008",
+      "label": "Push Day",
+      "value": "395 active cal",
+      "detail": "6:00 AM\u20136:44 AM \u00b7 44 min \u00b7 395 active cal \u00b7 Bench Press, Incline Dumbbell Press, Pull-Ups",
+      "date": "2026-07-28T06:00:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "bench",
+          "name": "Bench Press",
+          "canonicalExerciseId": "bench_press",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 8,
+              "weight": 130,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 8,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 6,
+              "weight": 140,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "incline-db",
+          "name": "Incline Dumbbell Press",
+          "canonicalExerciseId": "incline_dumbbell_press",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 45,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 45,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 50,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "pullup",
+          "name": "Pull-Ups",
+          "canonicalExerciseId": "pull_up",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 8,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 2,
+              "reps": 7,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 3,
+              "reps": 6,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-009",
+      "label": "Leg Day",
+      "value": "450 active cal",
+      "detail": "6:05 AM\u20137:00 AM \u00b7 55 min \u00b7 450 active cal \u00b7 Leg Press, Romanian Deadlifts, Seated Leg Curl, Standing Calf Raise",
+      "date": "2026-08-08T06:05:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "leg-press",
+          "name": "Leg Press",
+          "canonicalExerciseId": "leg_press",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 270,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 290,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 290,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "rdl",
+          "name": "Romanian Deadlifts",
+          "canonicalExerciseId": "romanian_deadlift",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 145,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "seated-leg-curl",
+          "name": "Seated Leg Curl",
+          "canonicalExerciseId": "seated_leg_curl",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 80,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 80,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 90,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "calf-raise",
+          "name": "Standing Calf Raise",
+          "canonicalExerciseId": "standing_calf_raise",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 15,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 15,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 15,
+              "weight": 90,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 4,
+              "reps": 12,
+              "weight": 100,
+              "weight_unit": "lb"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-010",
+      "label": "Core & Legs",
+      "value": "310 active cal",
+      "detail": "6:00 AM\u20136:38 AM \u00b7 38 min \u00b7 310 active cal \u00b7 Planks, Hanging Leg Raises, Hack Squats",
+      "date": "2026-08-19T06:00:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "plank",
+          "name": "Planks",
+          "canonicalExerciseId": "plank",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": null,
+              "weight": null,
+              "duration_seconds": 45
+            },
+            {
+              "set_number": 2,
+              "reps": null,
+              "weight": null,
+              "duration_seconds": 45
+            },
+            {
+              "set_number": 3,
+              "reps": null,
+              "weight": null,
+              "duration_seconds": 60
+            }
+          ]
+        },
+        {
+          "id": "hanging-raise",
+          "name": "Hanging Leg Raises",
+          "canonicalExerciseId": "hanging_leg_raise",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            }
+          ]
+        },
+        {
+          "id": "hack-squat",
+          "name": "Hack Squats",
+          "canonicalExerciseId": "hack_squat",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 180,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 190,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 200,
+              "weight_unit": "lb"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-011",
+      "label": "Arms Superset Day",
+      "value": "330 active cal",
+      "detail": "6:00 AM\u20136:40 AM \u00b7 40 min \u00b7 330 active cal \u00b7 EZ Bar Curls, Cable Rope Pushdowns, Spider Curls, Bulgarian Split Squat",
+      "date": "2026-08-28T06:00:00-07:00",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "exercises": [
+        {
+          "id": "ez-curl-2",
+          "name": "EZ Bar Curls",
+          "canonicalExerciseId": "ez_bar_curl",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 65,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 65,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 70,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "pushdown-2",
+          "name": "Cable Rope Pushdowns",
+          "canonicalExerciseId": "cable_pushdown",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 55,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 55,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 10,
+              "weight": 60,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "spider",
+          "name": "Spider Curls",
+          "canonicalExerciseId": "spider_curl",
+          "executionVariant": null,
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 25,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 25,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 30,
+              "weight_unit": "lb"
+            }
+          ]
+        },
+        {
+          "id": "bss",
+          "name": "Bulgarian Split Squat",
+          "canonicalExerciseId": "bulgarian_split_squat",
+          "executionVariant": {
+            "key": "3_second_pause",
+            "label": "3-Second Pause",
+            "rawLabel": "3-Second Pause"
+          },
+          "sets": [
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 30,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 30,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 35,
+              "weight_unit": "lb"
+            }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": [
+        {
+          "id": "session-fixture-011_superset",
+          "relationshipType": "superset",
+          "memberExerciseIds": [
+            "ez-curl-2",
+            "pushdown-2"
+          ]
+        }
+      ]
+    },
+    {
       "id": "session-fixture-001",
       "label": "Traditional Strength Training",
       "value": "420 active cal",
-      "detail": "6:02 AM–6:54 AM · 52 min · 420 active cal · Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
+      "detail": "6:02 AM\u20136:54 AM \u00b7 52 min \u00b7 420 active cal \u00b7 Bench Press, Cable Fly, Overhead Triceps Extension, Push-ups",
       "date": "2026-08-26T06:02:00-07:00",
-      "sourceEvidence": ["Typed evidence"],
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
       "exercises": [
         {
           "id": "press",
           "name": "Bench Press",
-          "canonicalExerciseId": "barbell_bench_press",
+          "canonicalExerciseId": "bench_press",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 8, "weight": 135, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 8, "weight": 145, "weight_unit": "lb" },
-            { "set_number": 3, "reps": 6, "weight": 155, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 8,
+              "weight": 135,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 8,
+              "weight": 145,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 6,
+              "weight": 155,
+              "weight_unit": "lb"
+            }
           ]
         },
         {
@@ -220,20 +1532,54 @@
           "canonicalExerciseId": "cable_fly",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 12, "weight": 30, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 12, "weight": 30, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 30,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 30,
+              "weight_unit": "lb"
+            }
           ]
         },
         {
           "id": "triceps",
           "name": "Overhead Triceps Extension",
           "canonicalExerciseId": "overhead_triceps_extension",
-          "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" },
+          "executionVariant": {
+            "key": "static_hold",
+            "label": "Static Hold",
+            "rawLabel": "Static Hold"
+          },
           "sets": [
-            { "set_number": 1, "reps": 10, "weight": 40, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 10, "weight": 40, "weight_unit": "lb" },
-            { "set_number": 3, "reps": null, "weight": null, "duration_seconds": 30 },
-            { "set_number": 4, "reps": null, "weight": null, "duration_seconds": 75 }
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 40,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 40,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": null,
+              "weight": null,
+              "duration_seconds": 30
+            },
+            {
+              "set_number": 4,
+              "reps": null,
+              "weight": null,
+              "duration_seconds": 75
+            }
           ]
         },
         {
@@ -242,8 +1588,22 @@
           "canonicalExerciseId": "pushup",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 20, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" },
-            { "set_number": 2, "reps": 18, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" }
+            {
+              "set_number": 1,
+              "reps": 20,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 2,
+              "reps": 18,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            }
           ]
         }
       ],
@@ -251,7 +1611,10 @@
         {
           "id": "session-fixture-001_superset",
           "relationshipType": "superset",
-          "memberExerciseIds": ["press", "fly"]
+          "memberExerciseIds": [
+            "press",
+            "fly"
+          ]
         }
       ]
     },
@@ -259,9 +1622,11 @@
       "id": "session-fixture-004",
       "label": "Walking",
       "value": "2.1 mi",
-      "detail": "6:10 PM–6:52 PM · 42 min · 2.1 mi · 180 active cal",
+      "detail": "6:10 PM\u20136:52 PM \u00b7 42 min \u00b7 2.1 mi \u00b7 180 active cal",
       "date": "2026-08-26T18:10:00-07:00",
-      "sourceEvidence": ["Apple Health"],
+      "sourceEvidence": [
+        "Apple Health"
+      ],
       "exercises": [],
       "exerciseRelationshipGroups": []
     },
@@ -269,9 +1634,11 @@
       "id": "session-fixture-002",
       "label": "Functional Strength Training",
       "value": "380 active cal",
-      "detail": "5:45 AM–6:33 AM · 48 min · 380 active cal · Lat Pulldown, Seated Cable Row, Face Pull",
+      "detail": "5:45 AM\u20136:33 AM \u00b7 48 min \u00b7 380 active cal \u00b7 Lat Pulldown, Seated Cable Row, Face Pull",
       "date": "2026-08-24T05:45:00-07:00",
-      "sourceEvidence": ["Screenshot"],
+      "sourceEvidence": [
+        "Screenshot"
+      ],
       "exercises": [
         {
           "id": "pulldown",
@@ -279,9 +1646,24 @@
           "canonicalExerciseId": "lat_pulldown",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 10, "weight": 110, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 10, "weight": 120, "weight_unit": "lb" },
-            { "set_number": 3, "reps": 8, "weight": 130, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 110,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 120,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 130,
+              "weight_unit": "lb"
+            }
           ]
         },
         {
@@ -290,8 +1672,18 @@
           "canonicalExerciseId": "seated_cable_row",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 12, "weight": 100, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 12, "weight": 100, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 12,
+              "weight": 100,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 12,
+              "weight": 100,
+              "weight_unit": "lb"
+            }
           ]
         },
         {
@@ -300,9 +1692,24 @@
           "canonicalExerciseId": "face_pull",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 15, "weight": 40, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 15, "weight": 40, "weight_unit": "lb" },
-            { "set_number": 3, "reps": 15, "weight": 40, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 15,
+              "weight": 40,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 15,
+              "weight": 40,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 15,
+              "weight": 40,
+              "weight_unit": "lb"
+            }
           ]
         }
       ],
@@ -312,9 +1719,11 @@
       "id": "session-fixture-003",
       "label": "Run",
       "value": "3.4 mi",
-      "detail": "7:00 AM–7:34 AM · 34 min · 3.4 mi · 410 active cal",
+      "detail": "7:00 AM\u20137:34 AM \u00b7 34 min \u00b7 3.4 mi \u00b7 410 active cal",
       "date": "2026-08-22T07:00:00-07:00",
-      "sourceEvidence": ["Apple Health"],
+      "sourceEvidence": [
+        "Apple Health"
+      ],
       "exercises": [],
       "exerciseRelationshipGroups": []
     },
@@ -322,9 +1731,11 @@
       "id": "session-fixture-005",
       "label": "Traditional Strength Training",
       "value": "360 active cal",
-      "detail": "6:05 AM–6:48 AM · 43 min · 360 active cal · Lat Pulldown, Push-ups",
+      "detail": "6:05 AM\u20136:48 AM \u00b7 43 min \u00b7 360 active cal \u00b7 Lat Pulldown, Push-ups",
       "date": "2026-08-17T06:05:00-07:00",
-      "sourceEvidence": ["Typed evidence"],
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
       "exercises": [
         {
           "id": "pulldown-earlier",
@@ -332,9 +1743,24 @@
           "canonicalExerciseId": "lat_pulldown",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 10, "weight": 100, "weight_unit": "lb" },
-            { "set_number": 2, "reps": 10, "weight": 110, "weight_unit": "lb" },
-            { "set_number": 3, "reps": 8, "weight": 120, "weight_unit": "lb" }
+            {
+              "set_number": 1,
+              "reps": 10,
+              "weight": 100,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 2,
+              "reps": 10,
+              "weight": 110,
+              "weight_unit": "lb"
+            },
+            {
+              "set_number": 3,
+              "reps": 8,
+              "weight": 120,
+              "weight_unit": "lb"
+            }
           ]
         },
         {
@@ -343,8 +1769,22 @@
           "canonicalExerciseId": "pushup",
           "executionVariant": null,
           "sets": [
-            { "set_number": 1, "reps": 16, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" },
-            { "set_number": 2, "reps": 15, "weight": null, "weight_unit": "bodyweight", "load_type": "bodyweight", "set_type": "bodyweight_reps" }
+            {
+              "set_number": 1,
+              "reps": 16,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            },
+            {
+              "set_number": 2,
+              "reps": 15,
+              "weight": null,
+              "weight_unit": "bodyweight",
+              "load_type": "bodyweight",
+              "set_type": "bodyweight_reps"
+            }
           ]
         }
       ],
@@ -356,14 +1796,42 @@
       "id": "chest",
       "title": "Chest",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
@@ -372,21 +1840,84 @@
           "id": "bench-press",
           "label": "Bench Press",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "bench-press" } },
-          "canonicalExerciseId": "barbell_bench_press"
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "bench-press"
+            }
+          },
+          "canonicalExerciseId": "bench_press"
+        },
+        {
+          "id": "chest-press-machine",
+          "label": "Chest Press Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "chest-press-machine"
+            }
+          },
+          "canonicalExerciseId": "chest_press_machine"
+        },
+        {
+          "id": "incline-bench-press",
+          "label": "Incline Bench Press",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "incline-bench-press"
+            }
+          },
+          "canonicalExerciseId": "incline_bench_press"
+        },
+        {
+          "id": "incline-dumbbell-press",
+          "label": "Incline Dumbbell Press",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "incline-dumbbell-press"
+            }
+          },
+          "canonicalExerciseId": "incline_dumbbell_press"
+        },
+        {
+          "id": "chest-fly-machine",
+          "label": "Chest Fly Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "chest-fly-machine"
+            }
+          },
+          "canonicalExerciseId": "chest_fly_machine"
         },
         {
           "id": "cable-fly",
           "label": "Cable Fly",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "cable-fly" } },
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "cable-fly"
+            }
+          },
           "canonicalExerciseId": "cable_fly"
         },
         {
           "id": "push-ups",
           "label": "Push-ups",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "push-ups" } },
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "push-ups"
+            }
+          },
           "canonicalExerciseId": "pushup"
         }
       ]
@@ -395,31 +1926,93 @@
       "id": "back",
       "title": "Back",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
       "exercises": [
         {
+          "id": "pull-ups",
+          "label": "Pull-Ups",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "pull-ups"
+            }
+          },
+          "canonicalExerciseId": "pull_up"
+        },
+        {
+          "id": "iso-lateral-high-rows",
+          "label": "Iso-Lateral High Rows",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "iso-lateral-high-rows"
+            }
+          },
+          "canonicalExerciseId": "iso_lateral_high_row"
+        },
+        {
+          "id": "seated-cable-rows",
+          "label": "Seated Cable Rows",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "seated-cable-rows"
+            }
+          },
+          "canonicalExerciseId": "seated_cable_row"
+        },
+        {
           "id": "lat-pulldown",
           "label": "Lat Pulldown",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "lat-pulldown" } },
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "lat-pulldown"
+            }
+          },
           "canonicalExerciseId": "lat_pulldown"
-        },
-        {
-          "id": "seated-cable-row",
-          "label": "Seated Cable Row",
-          "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "seated-cable-row" } },
-          "canonicalExerciseId": "seated_cable_row"
         }
       ]
     },
@@ -427,23 +2020,140 @@
       "id": "shoulders",
       "title": "Shoulders",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
       "exercises": [
         {
+          "id": "shoulder-press-machine",
+          "label": "Shoulder Press Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "shoulder-press-machine"
+            }
+          },
+          "canonicalExerciseId": "shoulder_press_machine"
+        },
+        {
+          "id": "lateral-raises-machine",
+          "label": "Lateral Raises Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "lateral-raises-machine"
+            }
+          },
+          "canonicalExerciseId": "lateral_raise_machine"
+        },
+        {
+          "id": "lateral-raise",
+          "label": "Lateral Raise",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "lateral-raise"
+            }
+          },
+          "canonicalExerciseId": "lateral_raise"
+        },
+        {
+          "id": "cable-machine-front-raises",
+          "label": "Cable Machine Front Raises",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "cable-machine-front-raises"
+            }
+          },
+          "canonicalExerciseId": "cable_machine_front_raise"
+        },
+        {
+          "id": "barbell-front-raises",
+          "label": "Barbell Front Raises",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "barbell-front-raises"
+            }
+          },
+          "canonicalExerciseId": "barbell_front_raises"
+        },
+        {
+          "id": "dumbbell-front-raise",
+          "label": "Dumbbell Front Raise",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "dumbbell-front-raise"
+            }
+          },
+          "canonicalExerciseId": "dumbbell_front_raise"
+        },
+        {
+          "id": "front-raise",
+          "label": "Front Raise",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "front-raise"
+            }
+          },
+          "canonicalExerciseId": "front_raise"
+        },
+        {
           "id": "face-pull",
           "label": "Face Pull",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "face-pull" } },
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "face-pull"
+            }
+          },
           "canonicalExerciseId": "face_pull"
         }
       ]
@@ -452,40 +2162,162 @@
       "id": "biceps",
       "title": "Biceps",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
-        ],
-        "dateRangeLabel": "Complete history"
-      },
-      "exercises": []
-    },
-    {
-      "id": "triceps",
-      "title": "Triceps",
-      "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
-      ],
-      "scope": {
-        "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
       "exercises": [
         {
+          "id": "spider-curls",
+          "label": "Spider Curls",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "spider-curls"
+            }
+          },
+          "canonicalExerciseId": "spider_curl"
+        },
+        {
+          "id": "ez-bar-curls",
+          "label": "EZ Bar Curls",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "ez-bar-curls"
+            }
+          },
+          "canonicalExerciseId": "ez_bar_curl"
+        },
+        {
+          "id": "forearm-curls",
+          "label": "Forearm Curls",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "forearm-curls"
+            }
+          },
+          "canonicalExerciseId": "forearm_curl"
+        }
+      ]
+    },
+    {
+      "id": "triceps",
+      "title": "Triceps",
+      "breadcrumbs": [
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
+      ],
+      "scope": {
+        "options": [
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
+        ],
+        "dateRangeLabel": "Complete history"
+      },
+      "exercises": [
+        {
+          "id": "cable-rope-pushdowns",
+          "label": "Cable Rope Pushdowns",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "cable-rope-pushdowns"
+            }
+          },
+          "canonicalExerciseId": "cable_pushdown"
+        },
+        {
+          "id": "straight-bar-cable-pushdowns",
+          "label": "Straight Bar Cable Pushdowns",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "straight-bar-cable-pushdowns"
+            }
+          },
+          "canonicalExerciseId": "straight_bar_cable_pushdown"
+        },
+        {
           "id": "overhead-triceps-extension",
           "label": "Overhead Triceps Extension",
           "detail": null,
-          "destination": { "id": "training.exercise", "parameters": { "exerciseId": "overhead-triceps-extension" } },
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "overhead-triceps-extension"
+            }
+          },
           "canonicalExerciseId": "overhead_triceps_extension"
         }
       ]
@@ -494,86 +2326,579 @@
       "id": "core",
       "title": "Core",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
-      "exercises": []
+      "exercises": [
+        {
+          "id": "hanging-leg-raises",
+          "label": "Hanging Leg Raises",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "hanging-leg-raises"
+            }
+          },
+          "canonicalExerciseId": "hanging_leg_raise"
+        },
+        {
+          "id": "cable-crunches",
+          "label": "Cable Crunches",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "cable-crunches"
+            }
+          },
+          "canonicalExerciseId": "cable_crunch"
+        },
+        {
+          "id": "planks",
+          "label": "Planks",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "planks"
+            }
+          },
+          "canonicalExerciseId": "plank"
+        }
+      ]
     },
     {
       "id": "quads",
       "title": "Quads",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
-      "exercises": []
+      "exercises": [
+        {
+          "id": "leg-press-feet-middle",
+          "label": "Leg Press (Feet Middle)",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-press-feet-middle"
+            }
+          },
+          "canonicalExerciseId": "leg_press_feet_middle"
+        },
+        {
+          "id": "leg-press-feet-high",
+          "label": "Leg Press (Feet High)",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-press-feet-high"
+            }
+          },
+          "canonicalExerciseId": "leg_press_feet_high"
+        },
+        {
+          "id": "leg-press-feet-low",
+          "label": "Leg Press (Feet Low)",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-press-feet-low"
+            }
+          },
+          "canonicalExerciseId": "leg_press_feet_low"
+        },
+        {
+          "id": "leg-press-sumo-stance",
+          "label": "Leg Press (Sumo Stance)",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-press-sumo-stance"
+            }
+          },
+          "canonicalExerciseId": "leg_press_sumo_stance"
+        },
+        {
+          "id": "leg-press",
+          "label": "Leg Press",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-press"
+            }
+          },
+          "canonicalExerciseId": "leg_press"
+        },
+        {
+          "id": "pendulum-squat-machine",
+          "label": "Pendulum Squat Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "pendulum-squat-machine"
+            }
+          },
+          "canonicalExerciseId": "pendulum_squat_machine"
+        },
+        {
+          "id": "pendulum-squat",
+          "label": "Pendulum Squat",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "pendulum-squat"
+            }
+          },
+          "canonicalExerciseId": "pendulum_squat"
+        },
+        {
+          "id": "bulgarian-split-squat-smith-machine",
+          "label": "Bulgarian Split Squat (Smith Machine)",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "bulgarian-split-squat-smith-machine"
+            }
+          },
+          "canonicalExerciseId": "bulgarian_split_squat_smith_machine"
+        },
+        {
+          "id": "bulgarian-split-squat",
+          "label": "Bulgarian Split Squat",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "bulgarian-split-squat"
+            }
+          },
+          "canonicalExerciseId": "bulgarian_split_squat"
+        },
+        {
+          "id": "walking-lunge",
+          "label": "Walking Lunge",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "walking-lunge"
+            }
+          },
+          "canonicalExerciseId": "walking_lunge"
+        },
+        {
+          "id": "hack-squats",
+          "label": "Hack Squats",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "hack-squats"
+            }
+          },
+          "canonicalExerciseId": "hack_squat"
+        },
+        {
+          "id": "leg-extensions",
+          "label": "Leg Extensions",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "leg-extensions"
+            }
+          },
+          "canonicalExerciseId": "leg_extension"
+        },
+        {
+          "id": "sissy-squats",
+          "label": "Sissy Squats",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "sissy-squats"
+            }
+          },
+          "canonicalExerciseId": "sissy_squat"
+        },
+        {
+          "id": "single-leg-leg-press",
+          "label": "Single-Leg Leg Press",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "single-leg-leg-press"
+            }
+          },
+          "canonicalExerciseId": "single_leg_leg_press"
+        },
+        {
+          "id": "seated-hip-abductions",
+          "label": "Seated Hip Abductions",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "seated-hip-abductions"
+            }
+          },
+          "canonicalExerciseId": "seated_hip_abductions"
+        },
+        {
+          "id": "squat",
+          "label": "Squat",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "squat"
+            }
+          },
+          "canonicalExerciseId": "squat"
+        },
+        {
+          "id": "smith-machine-reverse-lunge",
+          "label": "Smith Machine Reverse Lunge",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "smith-machine-reverse-lunge"
+            }
+          },
+          "canonicalExerciseId": "smith_machine_reverse_lunge"
+        },
+        {
+          "id": "dumbbell-reverse-lunge",
+          "label": "Dumbbell Reverse Lunge",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "dumbbell-reverse-lunge"
+            }
+          },
+          "canonicalExerciseId": "dumbbell_reverse_lunge"
+        }
+      ]
     },
     {
       "id": "hamstrings",
       "title": "Hamstrings",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
-      "exercises": []
+      "exercises": [
+        {
+          "id": "romanian-deadlifts",
+          "label": "Romanian Deadlifts",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "romanian-deadlifts"
+            }
+          },
+          "canonicalExerciseId": "romanian_deadlift"
+        },
+        {
+          "id": "hyperextension-machine",
+          "label": "Hyperextension Machine",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "hyperextension-machine"
+            }
+          },
+          "canonicalExerciseId": "hyperextension_machine"
+        },
+        {
+          "id": "lying-leg-curls",
+          "label": "Lying Leg Curls",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "lying-leg-curls"
+            }
+          },
+          "canonicalExerciseId": "lying_leg_curl"
+        },
+        {
+          "id": "seated-leg-curl",
+          "label": "Seated Leg Curl",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "seated-leg-curl"
+            }
+          },
+          "canonicalExerciseId": "seated_leg_curl"
+        }
+      ]
     },
     {
       "id": "glutes",
       "title": "Glutes",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
-      "exercises": []
+      "exercises": [
+        {
+          "id": "seated-hip-adductions",
+          "label": "Seated Hip Adductions",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "seated-hip-adductions"
+            }
+          },
+          "canonicalExerciseId": "seated_hip_adductions"
+        },
+        {
+          "id": "glute-squats",
+          "label": "Glute Squats",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "glute-squats"
+            }
+          },
+          "canonicalExerciseId": "glute_squat"
+        },
+        {
+          "id": "hip-thrusts",
+          "label": "Hip Thrusts",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "hip-thrusts"
+            }
+          },
+          "canonicalExerciseId": "hip_thrusts"
+        }
+      ]
     },
     {
       "id": "calves",
       "title": "Calves",
       "breadcrumbs": [
-        { "label": "Training", "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } } },
-        { "label": "Training Library", "destination": { "id": "progress.stream", "parameters": { "streamId": "training/library" } } }
+        {
+          "label": "Training",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training"
+            }
+          }
+        },
+        {
+          "label": "Training Library",
+          "destination": {
+            "id": "progress.stream",
+            "parameters": {
+              "streamId": "training/library"
+            }
+          }
+        }
       ],
       "scope": {
         "options": [
-          { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": false },
-          { "id": "visible-abs", "label": "Visible Abs", "selected": false },
-          { "id": "all", "label": "All Training", "selected": true }
+          {
+            "id": "build-lean-mass",
+            "label": "Build Lean Mass",
+            "selected": false
+          },
+          {
+            "id": "visible-abs",
+            "label": "Visible Abs",
+            "selected": false
+          },
+          {
+            "id": "all",
+            "label": "All Training",
+            "selected": true
+          }
         ],
         "dateRangeLabel": "Complete history"
       },
-      "exercises": []
+      "exercises": [
+        {
+          "id": "standing-calf-raise",
+          "label": "Standing Calf Raise",
+          "detail": null,
+          "destination": {
+            "id": "training.exercise",
+            "parameters": {
+              "exerciseId": "standing-calf-raise"
+            }
+          },
+          "canonicalExerciseId": "standing_calf_raise"
+        }
+      ]
     }
   ],
   "trainingPerformanceEvents": [
@@ -614,7 +2939,11 @@
       "canonicalExerciseId": "overhead_triceps_extension",
       "canonicalExerciseName": "Overhead Triceps Extension",
       "currentValue": 10,
-      "executionVariant": { "key": "static_hold", "label": "Static Hold", "rawLabel": "Static Hold" },
+      "executionVariant": {
+        "key": "static_hold",
+        "label": "Static Hold",
+        "rawLabel": "Static Hold"
+      },
       "previousBaselineValue": 8,
       "improvement": 2,
       "unit": "reps",
@@ -625,7 +2954,7 @@
       "createdAt": "2026-08-26T13:00:00Z"
     },
     {
-      "id": "training_performance_event_5ce7057c13ee8cf7784752a36c97456b",
+      "id": "training_performance_event_c0b5699ddde84b3a70deeffa551e92b8",
       "schemaVersion": "training_performance_event_v1",
       "category": "training_performance",
       "eventType": "reps_at_load_pr",
@@ -635,14 +2964,17 @@
       "sourceSessionId": "session-fixture-001",
       "sourceAnalysisId": "analysis-fixture-001",
       "workoutDate": "2026-08-26",
-      "canonicalExerciseId": "barbell_bench_press",
+      "canonicalExerciseId": "bench_press",
       "canonicalExerciseName": "Bench Press",
       "currentValue": 6,
       "relationshipContext": {
         "relationshipType": "superset",
         "memberIndex": 0,
         "orderedPartners": [
-          { "canonicalExerciseId": "cable_fly", "name": "Cable Fly" }
+          {
+            "canonicalExerciseId": "cable_fly",
+            "name": "Cable Fly"
+          }
         ],
         "comparisonKey": "superset|partners:cable_fly"
       },
@@ -654,50 +2986,293 @@
       "reps": 6,
       "sessionVolume": null,
       "createdAt": "2026-08-26T13:00:00Z"
+    },
+    {
+      "id": "training_performance_event_42159faa3a58c44f06e0bcba7037d48b",
+      "schemaVersion": "training_performance_event_v1",
+      "category": "training_performance",
+      "eventType": "session_volume_pr",
+      "sourceReviewId": "review-fixture-007",
+      "sourceEvidencePackageId": "evidence-package-fixture-007",
+      "sourceCanonicalTrainingId": "canonical-training-fixture-007",
+      "sourceSessionId": "session-fixture-007",
+      "sourceAnalysisId": "analysis-fixture-007",
+      "workoutDate": "2026-07-05",
+      "canonicalExerciseId": "squat",
+      "canonicalExerciseName": "Squat",
+      "currentValue": 5780,
+      "previousBaselineValue": 5200,
+      "improvement": 580,
+      "unit": "lb",
+      "load": null,
+      "loadUnit": null,
+      "reps": null,
+      "sessionVolume": 5780,
+      "createdAt": "2026-07-05T13:10:00Z"
+    },
+    {
+      "id": "training_performance_event_462e2b04c1c419b490a7603607aaa42a",
+      "schemaVersion": "training_performance_event_v1",
+      "category": "training_performance",
+      "eventType": "reps_at_load_pr",
+      "sourceReviewId": "review-fixture-011",
+      "sourceEvidencePackageId": "evidence-package-fixture-011",
+      "sourceCanonicalTrainingId": "canonical-training-fixture-011",
+      "sourceSessionId": "session-fixture-011",
+      "sourceAnalysisId": "analysis-fixture-011",
+      "workoutDate": "2026-08-28",
+      "canonicalExerciseId": "ez_bar_curl",
+      "canonicalExerciseName": "EZ Bar Curls",
+      "currentValue": 8,
+      "relationshipContext": {
+        "relationshipType": "superset",
+        "memberIndex": 0,
+        "orderedPartners": [
+          {
+            "canonicalExerciseId": "cable_pushdown",
+            "name": "Cable Rope Pushdowns"
+          }
+        ],
+        "comparisonKey": "superset|partners:cable_pushdown"
+      },
+      "previousBaselineValue": 8,
+      "improvement": 5,
+      "unit": "lb",
+      "load": 70,
+      "loadUnit": "lb",
+      "reps": 8,
+      "sessionVolume": null,
+      "createdAt": "2026-08-28T13:05:00Z"
     }
   ],
   "reporting": {
     "resistance": {
       "exerciseObservations": [
-        { "exerciseId": "lat-pulldown", "status": "improving", "latestDate": "2026-08-24", "volumeTrendDirection": "up", "prEventId": "training_performance_event_d018fa4468cdcd222d8fce6da1ca87be" },
-        { "exerciseId": "push-ups", "status": "improving", "latestDate": "2026-08-26", "volumeTrendDirection": "up", "prEventId": null },
-        { "exerciseId": "overhead-triceps-extension", "status": "improving", "latestDate": "2026-08-26", "volumeTrendDirection": null, "prEventId": "training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385" },
-        { "exerciseId": "seated-cable-row", "status": "stable", "latestDate": "2026-08-24", "volumeTrendDirection": null, "prEventId": null },
-        { "exerciseId": "face-pull", "status": "stable", "latestDate": "2026-08-24", "volumeTrendDirection": null, "prEventId": null },
-        { "exerciseId": "bench-press", "status": "plateauing", "latestDate": "2026-08-26", "volumeTrendDirection": null, "prEventId": "training_performance_event_5ce7057c13ee8cf7784752a36c97456b" }
+        {
+          "exerciseId": "lat-pulldown",
+          "status": "improving",
+          "latestDate": "2026-08-24",
+          "volumeTrendDirection": "up",
+          "prEventId": "training_performance_event_d018fa4468cdcd222d8fce6da1ca87be"
+        },
+        {
+          "exerciseId": "push-ups",
+          "status": "improving",
+          "latestDate": "2026-08-26",
+          "volumeTrendDirection": "up",
+          "prEventId": null
+        },
+        {
+          "exerciseId": "overhead-triceps-extension",
+          "status": "improving",
+          "latestDate": "2026-08-26",
+          "volumeTrendDirection": null,
+          "prEventId": "training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385"
+        },
+        {
+          "exerciseId": "seated-cable-rows",
+          "status": "stable",
+          "latestDate": "2026-08-24",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        },
+        {
+          "exerciseId": "face-pull",
+          "status": "stable",
+          "latestDate": "2026-08-24",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        },
+        {
+          "exerciseId": "bench-press",
+          "status": "plateauing",
+          "latestDate": "2026-08-26",
+          "volumeTrendDirection": null,
+          "prEventId": "training_performance_event_c0b5699ddde84b3a70deeffa551e92b8"
+        },
+        {
+          "exerciseId": "squat",
+          "status": "improving",
+          "latestDate": "2026-07-05",
+          "volumeTrendDirection": "up",
+          "prEventId": "training_performance_event_42159faa3a58c44f06e0bcba7037d48b"
+        },
+        {
+          "exerciseId": "ez-bar-curls",
+          "status": "improving",
+          "latestDate": "2026-08-28",
+          "volumeTrendDirection": "up",
+          "prEventId": "training_performance_event_462e2b04c1c419b490a7603607aaa42a"
+        },
+        {
+          "exerciseId": "hip-thrusts",
+          "status": "insufficient_data",
+          "latestDate": "2026-07-05",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        },
+        {
+          "exerciseId": "hack-squats",
+          "status": "insufficient_data",
+          "latestDate": "2026-08-19",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        },
+        {
+          "exerciseId": "pull-ups",
+          "status": "insufficient_data",
+          "latestDate": "2026-07-28",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        },
+        {
+          "exerciseId": "standing-calf-raise",
+          "status": "insufficient_data",
+          "latestDate": "2026-08-08",
+          "volumeTrendDirection": null,
+          "prEventId": null
+        }
       ],
       "categoryObservations": [
         {
           "areaId": "chest",
           "latestTrainedAt": "2026-08-26",
-          "exerciseCount": 3,
+          "exerciseCount": 7,
           "latestKnownSets": 7,
           "latestKnownVolume": 3890,
-          "statusCounts": { "improving": 1, "stable": 0, "plateauing": 1, "regressing": 0, "insufficientData": 1 }
+          "statusCounts": {
+            "improving": 1,
+            "stable": 0,
+            "plateauing": 1,
+            "regressing": 0,
+            "insufficientData": 5
+          }
         },
         {
           "areaId": "back",
           "latestTrainedAt": "2026-08-24",
-          "exerciseCount": 2,
+          "exerciseCount": 4,
           "latestKnownSets": 5,
           "latestKnownVolume": 5740,
-          "statusCounts": { "improving": 1, "stable": 1, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+          "statusCounts": {
+            "improving": 1,
+            "stable": 1,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 2
+          }
         },
         {
           "areaId": "shoulders",
           "latestTrainedAt": "2026-08-24",
-          "exerciseCount": 1,
+          "exerciseCount": 8,
           "latestKnownSets": 3,
           "latestKnownVolume": 1800,
-          "statusCounts": { "improving": 0, "stable": 1, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+          "statusCounts": {
+            "improving": 0,
+            "stable": 1,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 7
+          }
+        },
+        {
+          "areaId": "biceps",
+          "latestTrainedAt": "2026-08-28",
+          "exerciseCount": 3,
+          "latestKnownSets": 6,
+          "latestKnownVolume": 2600,
+          "statusCounts": {
+            "improving": 1,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 2
+          }
         },
         {
           "areaId": "triceps",
-          "latestTrainedAt": "2026-08-26",
+          "latestTrainedAt": "2026-08-28",
+          "exerciseCount": 3,
+          "latestKnownSets": 3,
+          "latestKnownVolume": 1920,
+          "statusCounts": {
+            "improving": 1,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 2
+          }
+        },
+        {
+          "areaId": "core",
+          "latestTrainedAt": "2026-08-19",
+          "exerciseCount": 3,
+          "latestKnownSets": 6,
+          "latestKnownVolume": null,
+          "statusCounts": {
+            "improving": 0,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 3
+          }
+        },
+        {
+          "areaId": "quads",
+          "latestTrainedAt": "2026-08-19",
+          "exerciseCount": 18,
+          "latestKnownSets": 3,
+          "latestKnownVolume": 5300,
+          "statusCounts": {
+            "improving": 1,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 17
+          }
+        },
+        {
+          "areaId": "hamstrings",
+          "latestTrainedAt": "2026-08-08",
+          "exerciseCount": 4,
+          "latestKnownSets": 6,
+          "latestKnownVolume": 6680,
+          "statusCounts": {
+            "improving": 0,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 4
+          }
+        },
+        {
+          "areaId": "glutes",
+          "latestTrainedAt": "2026-07-05",
+          "exerciseCount": 3,
+          "latestKnownSets": 3,
+          "latestKnownVolume": 3940,
+          "statusCounts": {
+            "improving": 0,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 3
+          }
+        },
+        {
+          "areaId": "calves",
+          "latestTrainedAt": "2026-08-08",
           "exerciseCount": 1,
           "latestKnownSets": 4,
-          "latestKnownVolume": 800,
-          "statusCounts": { "improving": 1, "stable": 0, "plateauing": 0, "regressing": 0, "insufficientData": 0 }
+          "latestKnownVolume": 5250,
+          "statusCounts": {
+            "improving": 0,
+            "stable": 0,
+            "plateauing": 0,
+            "regressing": 0,
+            "insufficientData": 1
+          }
         }
       ]
     }
