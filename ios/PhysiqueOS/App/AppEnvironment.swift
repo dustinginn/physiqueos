@@ -19,6 +19,8 @@ final class AppEnvironment {
     /// mixed with `founderServerAPI`'s isolated live Sandbox Weight write
     /// proof (see `WeightEvidenceAPI.swift`'s doc comment).
     let weightEvidenceAPI: WeightEvidenceAPI
+    let dexaAPI: DEXAAPI
+    let photosAPI: PhotosAPI
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
@@ -36,6 +38,8 @@ final class AppEnvironment {
         activityAPI: ActivityAPI = FixtureActivityAPI(),
         nutritionAPI: NutritionAPI = FixtureNutritionAPI(),
         weightEvidenceAPI: WeightEvidenceAPI = FixtureWeightEvidenceAPI(),
+        dexaAPI: DEXAAPI = FixtureDEXAAPI(),
+        photosAPI: PhotosAPI = FixturePhotosAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
@@ -50,6 +54,8 @@ final class AppEnvironment {
         self.activityAPI = activityAPI
         self.nutritionAPI = nutritionAPI
         self.weightEvidenceAPI = weightEvidenceAPI
+        self.dexaAPI = dexaAPI
+        self.photosAPI = photosAPI
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore

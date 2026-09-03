@@ -10,7 +10,7 @@ extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
-        case strategyType, strategyId, protocolId, executionId
+        case strategyType, strategyId, protocolId, executionId, setId
     }
 
     init(from decoder: Decoder) throws {
@@ -77,6 +77,9 @@ extension AppDestination {
         case "native.evidence-review":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .localEvidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
+        case "native.photo-set-detail":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .photoSetDetail(setId: try parameters.decode(String.self, forKey: .setId))
         case "native.operating-plan":
             self = .operatingPlan
         case "native.operating-plan.strategy":
@@ -146,6 +149,7 @@ extension AppDestination {
         case .activityDay(let date): try parameters.encode(Self.activityDayStreamIdPrefix + date, forKey: .streamId)
         case .nutritionDay(let dayId): try parameters.encode(Self.nutritionDayStreamIdPrefix + dayId, forKey: .streamId)
         case .localEvidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
+        case .photoSetDetail(let setId): try parameters.encode(setId, forKey: .setId)
         case .operatingPlanStrategy(let strategyType, let strategyId):
             try parameters.encode(strategyType, forKey: .strategyType)
             try parameters.encode(strategyId, forKey: .strategyId)

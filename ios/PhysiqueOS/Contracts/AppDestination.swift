@@ -58,6 +58,13 @@ enum AppDestination: Hashable, Codable {
     /// `destinationFromWebHref`'s pattern list during this port's audit),
     /// with a compound `streamId` of `"nutrition/day/<dayId>"`.
     case nutritionDay(dayId: String)
+    /// Photo set/session detail — a Native-only typed push destination.
+    /// The web has no route here at all (confirmed by audit: set detail
+    /// is a client-side `PhotoModal`, not a URL) — this doesn't claim a
+    /// server destination contract, the same "Native-only" treatment
+    /// `manualWeighIn`/`evidenceIntake` already use, matching this port's
+    /// Detail Navigation requirement (a real push instead of a web modal).
+    case photoSetDetail(setId: String)
     /// The web's own typed-destination registry currently maps
     /// `/log/training` (the Training Logger entry point) to the same
     /// `log` destination id as `/log` itself — Training Logger has no
@@ -134,6 +141,7 @@ enum AppDestination: Hashable, Codable {
         case .manualWeighIn: "native.manual-weigh-in"
         case .evidenceIntake: "native.evidence-intake"
         case .localEvidenceReview: "native.evidence-review"
+        case .photoSetDetail: "native.photo-set-detail"
         case .operatingPlan: "native.operating-plan"
         case .operatingPlanStrategy: "native.operating-plan.strategy"
         case .operatingPlanStrategyEdit: "native.operating-plan.strategy.edit"
