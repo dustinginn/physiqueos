@@ -56,8 +56,8 @@
       "id": "activity",
       "title": "Activity",
       "metric": "612 active cal",
-      "trend": "Supports the current cut protocol.",
-      "lastUpdated": "2026-08-27",
+      "trend": "38 active calories below the recorded daily target.",
+      "lastUpdated": "2026-08-30",
       "status": "available",
       "tone": "success",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "activity" } }

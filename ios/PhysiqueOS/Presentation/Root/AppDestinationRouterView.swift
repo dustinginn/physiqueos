@@ -42,6 +42,10 @@ struct AppDestinationRouterView: View {
             TrainingDayView(date: date)
         case .progressStream(let streamId) where streamId == "training":
             TrainingHistoryView()
+        case .progressStream(let streamId) where streamId == "activity":
+            ActivityHistoryView()
+        case .activityDay(let date):
+            ActivityDayView(date: date)
         // The bare Training Library root (`/progress/training/library`,
         // no area/exercise segment) — the same 10 canonical areas the
         // landing page's own "Training Areas" grid shows, rendered as a

@@ -47,6 +47,11 @@ enum AppDestination: Hashable, Codable {
     /// `trainingLogger` — rather than inventing a dedicated destination id
     /// the server does not have.
     case trainingDay(date: String)
+    /// `/progress/activity/day/:date` — same catch-all `progress.stream`
+    /// contract quirk as `trainingDay` above (no dedicated Activity Day
+    /// destination id on the server yet), with a compound `streamId` of
+    /// `"activity/day/<date>"`.
+    case activityDay(date: String)
     /// The web's own typed-destination registry currently maps
     /// `/log/training` (the Training Logger entry point) to the same
     /// `log` destination id as `/log` itself — Training Logger has no
@@ -117,6 +122,7 @@ enum AppDestination: Hashable, Codable {
         case .trainingExercise: "training.exercise"
         case .progressStream: "progress.stream"
         case .trainingDay: "progress.stream"
+        case .activityDay: "progress.stream"
         case .trainingLogger: "log"
         case .manualWeighIn: "native.manual-weigh-in"
         case .evidenceIntake: "native.evidence-intake"

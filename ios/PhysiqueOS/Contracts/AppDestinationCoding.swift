@@ -61,6 +61,8 @@ extension AppDestination {
             let streamId = try parameters.decode(String.self, forKey: .streamId)
             if streamId.hasPrefix(Self.trainingDayStreamIdPrefix) {
                 self = .trainingDay(date: String(streamId.dropFirst(Self.trainingDayStreamIdPrefix.count)))
+            } else if streamId.hasPrefix(Self.activityDayStreamIdPrefix) {
+                self = .activityDay(date: String(streamId.dropFirst(Self.activityDayStreamIdPrefix.count)))
             } else {
                 self = .progressStream(streamId: streamId)
             }
@@ -139,6 +141,7 @@ extension AppDestination {
         case .trainingExercise(let exerciseId): try parameters.encode(exerciseId, forKey: .exerciseId)
         case .progressStream(let streamId): try parameters.encode(streamId, forKey: .streamId)
         case .trainingDay(let date): try parameters.encode(Self.trainingDayStreamIdPrefix + date, forKey: .streamId)
+        case .activityDay(let date): try parameters.encode(Self.activityDayStreamIdPrefix + date, forKey: .streamId)
         case .localEvidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
         case .operatingPlanStrategy(let strategyType, let strategyId):
             try parameters.encode(strategyType, forKey: .strategyType)
@@ -163,4 +166,8 @@ extension AppDestination {
     /// `"training/day/<date>"`), matching `destinationFromWebHref`'s
     /// catch-all capture exactly.
     fileprivate static let trainingDayStreamIdPrefix = "training/day/"
+    /// `progress.stream`'s compound streamId prefix for an Activity Day
+    /// href (`/progress/activity/day/<date>` → streamId
+    /// `"activity/day/<date>"`), mirroring `trainingDayStreamIdPrefix`.
+    fileprivate static let activityDayStreamIdPrefix = "activity/day/"
 }

@@ -13,6 +13,7 @@ final class AppEnvironment {
     let logAPI: LogAPI
     let evidenceAPI: EvidenceAPI
     let trainingAPI: TrainingAPI
+    let activityAPI: ActivityAPI
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
@@ -27,6 +28,7 @@ final class AppEnvironment {
         logAPI: LogAPI = FixtureLogAPI(),
         evidenceAPI: EvidenceAPI = FixtureEvidenceAPI(),
         trainingAPI: TrainingAPI = FixtureTrainingAPI(),
+        activityAPI: ActivityAPI = FixtureActivityAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
@@ -38,6 +40,7 @@ final class AppEnvironment {
         self.logAPI = logAPI
         self.evidenceAPI = evidenceAPI
         self.trainingAPI = trainingAPI
+        self.activityAPI = activityAPI
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore

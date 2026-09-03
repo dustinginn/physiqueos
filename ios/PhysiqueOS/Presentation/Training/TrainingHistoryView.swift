@@ -419,8 +419,10 @@ struct TrainingSectionHeaderView<Action: View>: View {
 /// render `{label} &gt;`, a plain greater-than character — not an arrow.
 /// "View Training Day →" (`latestTrainingDayCard`) is a different, genuine
 /// web string that really does use "→" and is left as-is; this label was
-/// previously (incorrectly) unified with that one.
-private struct TrainingCompactActionLabel: View {
+/// previously (incorrectly) unified with that one. Not `private`: also
+/// reused by `ActivityHistoryView`'s own "Show All" trigger, the identical
+/// `CompactAction` shape on that page.
+struct TrainingCompactActionLabel: View {
     let label: String
 
     var body: some View {

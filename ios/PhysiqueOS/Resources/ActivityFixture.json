@@ -1,0 +1,139 @@
+{
+  "landing": {
+    "title": "Activity",
+    "subtitle": "Whole-day movement, energy output, and daily activity context.",
+    "tone": "success",
+    "scope": {
+      "options": [
+        { "id": "build-lean-mass", "label": "Build Lean Mass", "selected": true },
+        { "id": "visible-abs", "label": "Visible Abs", "selected": false },
+        { "id": "all", "label": "All Activity", "selected": false }
+      ],
+      "dateRangeLabel": "Aug 1, 2026 – Present"
+    },
+    "latestActivityDay": {
+      "id": "activity-day-fixture-004",
+      "label": "Daily Activity",
+      "value": "612 active cal / 48 min",
+      "detail": "2860 total calories · 1 workouts linked · 210 non-workout active cal",
+      "date": "2026-08-30",
+      "isToday": true,
+      "activeCalories": 612,
+      "totalCalories": 2860,
+      "exerciseMinutes": 48,
+      "standHours": 11,
+      "moveGoal": 650,
+      "exerciseGoal": 30,
+      "standGoal": 12,
+      "ringCompletion": { "move": 94, "exercise": 160, "stand": 92 },
+      "workoutActiveCalories": 402,
+      "nonWorkoutActiveCalories": 210,
+      "linkedTrainingSessionCount": 1,
+      "protocolStatus": "38 active calories below the recorded daily target."
+    },
+    "activityAreas": [
+      { "id": "active-calories", "label": "Active Calories", "value": "612 cal" },
+      { "id": "exercise-minutes", "label": "Exercise Minutes", "value": "48 min" },
+      { "id": "workout-activity", "label": "Workout Activity", "value": "402 cal" },
+      { "id": "non-workout-activity", "label": "Non-Workout Activity", "value": "210 cal" }
+    ],
+    "linkedTrainingContext": [
+      {
+        "id": "training-context-fixture-001",
+        "label": "Push Day - Chest & Triceps",
+        "value": "42 min",
+        "detail": "5 exercises · 4 sets logged",
+        "date": "2026-08-30",
+        "sourceEvidence": ["Apple Fitness"]
+      }
+    ],
+    "activityHistory": [
+      {
+        "id": "activity-day-fixture-004",
+        "label": "Daily Activity",
+        "value": "612 active cal / 48 min",
+        "detail": "2860 total calories · 1 workouts linked · 210 non-workout active cal",
+        "date": "2026-08-30",
+        "isToday": true,
+        "activeCalories": 612,
+        "totalCalories": 2860,
+        "exerciseMinutes": 48,
+        "standHours": 11,
+        "moveGoal": 650,
+        "exerciseGoal": 30,
+        "standGoal": 12,
+        "ringCompletion": { "move": 94, "exercise": 160, "stand": 92 },
+        "workoutActiveCalories": 402,
+        "nonWorkoutActiveCalories": 210,
+        "linkedTrainingSessionCount": 1,
+        "protocolStatus": "38 active calories below the recorded daily target."
+      },
+      {
+        "id": "activity-day-fixture-003",
+        "label": "Daily Activity",
+        "value": "705 active cal / 52 min",
+        "detail": "2910 total calories · 1 workouts linked · 225 non-workout active cal",
+        "date": "2026-08-29",
+        "isToday": false,
+        "activeCalories": 705,
+        "totalCalories": 2910,
+        "exerciseMinutes": 52,
+        "standHours": 12,
+        "moveGoal": 650,
+        "exerciseGoal": 30,
+        "standGoal": 12,
+        "ringCompletion": { "move": 108, "exercise": 173, "stand": 100 },
+        "workoutActiveCalories": 480,
+        "nonWorkoutActiveCalories": 225,
+        "linkedTrainingSessionCount": 1,
+        "protocolStatus": "55 active calories above the recorded daily target."
+      },
+      {
+        "id": "activity-day-fixture-002",
+        "label": "Daily Activity",
+        "value": "Pending / 35 min",
+        "detail": "Full-day activity summary has not been added yet.",
+        "date": "2026-08-28",
+        "isToday": false,
+        "activeCalories": null,
+        "totalCalories": null,
+        "exerciseMinutes": 35,
+        "standHours": null,
+        "moveGoal": 650,
+        "exerciseGoal": null,
+        "standGoal": null,
+        "ringCompletion": null,
+        "workoutActiveCalories": null,
+        "nonWorkoutActiveCalories": null,
+        "linkedTrainingSessionCount": 0,
+        "protocolStatus": "Activity context available."
+      },
+      {
+        "id": "activity-day-fixture-001",
+        "label": "Daily Activity",
+        "value": "588 active cal / 40 min",
+        "detail": "2790 total calories · 0 workouts linked · 588 non-workout active cal",
+        "date": "2026-08-27",
+        "isToday": false,
+        "activeCalories": 588,
+        "totalCalories": 2790,
+        "exerciseMinutes": 40,
+        "standHours": 10,
+        "moveGoal": 650,
+        "exerciseGoal": 30,
+        "standGoal": 12,
+        "ringCompletion": { "move": 90, "exercise": 133, "stand": 83 },
+        "workoutActiveCalories": 0,
+        "nonWorkoutActiveCalories": 588,
+        "linkedTrainingSessionCount": 0,
+        "protocolStatus": "62 active calories below the recorded daily target."
+      }
+    ],
+    "dataSources": [
+      { "name": "Upload Anything", "status": "Connected" },
+      { "name": "Apple Fitness", "status": "Connected" },
+      { "name": "Apple Health", "status": "Suggested" },
+      { "name": "Manual Corrections", "status": "Future" }
+    ]
+  }
+}
