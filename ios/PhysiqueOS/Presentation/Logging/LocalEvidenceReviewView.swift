@@ -12,6 +12,8 @@ struct LocalEvidenceReviewView: View {
     @State private var editingExerciseID: String?
     @State private var trainingCatalog: [TrainingLoggerCatalogExercise] = []
     @State private var trainingAreas: [TrainingLoggerArea] = []
+    @State private var matchTarget: ExerciseMatchTarget?
+    @State private var createTarget: ExerciseMatchTarget?
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
 
     var body: some View {
@@ -45,6 +47,16 @@ struct LocalEvidenceReviewView: View {
             let configuration = try? await environment.trainingLoggerAPI.fetchConfiguration()
             trainingCatalog = configuration?.exercises ?? []
             trainingAreas = configuration?.areas ?? []
+        }
+        .sheet(item: $matchTarget) { target in
+            ExercisePickerSheet(catalog: trainingCatalog, areas: trainingAreas) { candidate in
+                matchExercise(item: target.item, exercise: target.exercise, to: candidate)
+            }
+        }
+        .sheet(item: $createTarget) { target in
+            TrainingAreaPickerSheet(areas: trainingAreas) { area in
+                createNewExercise(item: target.item, exercise: target.exercise, areaId: area.id)
+            }
         }
     }
 
@@ -165,14 +177,18 @@ struct LocalEvidenceReviewView: View {
                     }
                     if exercise.isProvisional, !trainingCatalog.isEmpty || !trainingAreas.isEmpty {
                         Menu {
-                            ForEach(trainingCatalog.sorted { $0.name < $1.name }) { candidate in
-                                Button(candidate.name) { matchExercise(item: item, exercise: exercise, to: candidate) }
+                            if !trainingCatalog.isEmpty {
+                                Button {
+                                    matchTarget = ExerciseMatchTarget(item: item, exercise: exercise)
+                                } label: {
+                                    Label("Match Existing Exercise", systemImage: "checklist")
+                                }
                             }
                             if !trainingAreas.isEmpty {
-                                Menu("Create New Exercise") {
-                                    ForEach(trainingAreas) { area in
-                                        Button(area.label) { createNewExercise(item: item, exercise: exercise, areaId: area.id) }
-                                    }
+                                Button {
+                                    createTarget = ExerciseMatchTarget(item: item, exercise: exercise)
+                                } label: {
+                                    Label("Create New Exercise", systemImage: "plus.circle")
                                 }
                             }
                         } label: {
@@ -208,7 +224,9 @@ struct LocalEvidenceReviewView: View {
                             ).frame(width: 74, height: 34)
                             Text("reps").foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
-                        if set.load != nil {
+                        if set.isBodyweight {
+                            Text("BW").foregroundStyle(PhysiqueOSTheme.textMuted)
+                        } else if set.load != nil {
                             let loadID = setFocusID(item: item, exercise: exercise, set: set, field: "load")
                             NumericEditField(
                                 text: setValueBinding(item, exercise, set, keyPath: \.load),
@@ -522,6 +540,128 @@ struct LocalEvidenceReviewView: View {
 
 private extension View { func secondaryReviewButton() -> some View { frame(maxWidth: .infinity, minHeight: 48).background(PhysiqueOSTheme.surfaceElevated).clipShape(RoundedRectangle(cornerRadius: 12)).physiqueOSFont(PhysiqueOSTypography.label14Heavy) } }
 
+/// The one provisional exercise occurrence a picker sheet is currently
+/// acting on. Captured by value (not just an id) so the sheet's completion
+/// closure never has to re-look the occurrence up mid-presentation.
+private struct ExerciseMatchTarget: Identifiable {
+    let item: EvidenceReviewItem
+    let exercise: EvidenceReviewExercise
+    var id: String { "\(item.id)|\(exercise.id)" }
+}
+
+/// Replaces the old single giant popup menu (every canonical exercise as
+/// one flat list) with a searchable, Training-Area-filterable sheet — the
+/// popup did not scale as the catalog grows. Search is a plain tolerant
+/// substring match (`ExerciseSearchMatching`), never a silent fuzzy
+/// auto-match: the Founder always taps the exact canonical exercise they
+/// want from the filtered results.
+private struct ExercisePickerSheet: View {
+    let catalog: [TrainingLoggerCatalogExercise]
+    let areas: [TrainingLoggerArea]
+    let onSelect: (TrainingLoggerCatalogExercise) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var selectedAreaId: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                areaFilterRow
+                List(filteredCatalog) { exercise in
+                    Button {
+                        onSelect(exercise)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(exercise.name)
+                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text(areaLabel(exercise.areaId))
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                    .accessibilityIdentifier("evidenceReview.exercisePicker.result.\(exercise.canonicalExerciseId)")
+                }
+                .listStyle(.plain)
+                .overlay {
+                    if filteredCatalog.isEmpty {
+                        ContentUnavailableView.search(text: query)
+                    }
+                }
+            }
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search exercises")
+            .navigationTitle("Match Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+    }
+
+    private var areaFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                areaChip(label: "All", isSelected: selectedAreaId == nil) { selectedAreaId = nil }
+                ForEach(areas) { area in
+                    areaChip(label: area.label, isSelected: selectedAreaId == area.id) { selectedAreaId = area.id }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .accessibilityIdentifier("evidenceReview.exercisePicker.areaFilter")
+    }
+
+    private func areaChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(isSelected ? Color.white : PhysiqueOSTheme.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var filteredCatalog: [TrainingLoggerCatalogExercise] {
+        ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: selectedAreaId, query: query)
+    }
+
+    private func areaLabel(_ areaId: String) -> String { areas.first { $0.id == areaId }?.label ?? areaId }
+}
+
+/// A simple, single-purpose Training Area chooser for "Create New
+/// Exercise" — kept as its own flat sheet (not folded into the exercise
+/// picker above) so Match Existing Exercise and Create New Exercise stay
+/// two visibly distinct flows rather than one ambiguous combined list.
+private struct TrainingAreaPickerSheet: View {
+    let areas: [TrainingLoggerArea]
+    let onSelect: (TrainingLoggerArea) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(areas) { area in
+                Button {
+                    onSelect(area)
+                    dismiss()
+                } label: {
+                    Text(area.label)
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                }
+                .accessibilityIdentifier("evidenceReview.createExercise.area.\(area.id)")
+            }
+            .listStyle(.plain)
+            .navigationTitle("Create New Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 enum EvidenceReviewMetricTone: Equatable {
     case standard, calories, protein, carbohydrates, fat
 }
@@ -579,7 +719,9 @@ enum EvidenceReviewPresentationPolicy {
         var ordered: [(key: String, count: Int)] = []
         for set in exercise.sets {
             let key: String
-            if let reps = set.reps, let load = set.load {
+            if set.isBodyweight, let reps = set.reps {
+                key = "\(reps) reps · BW"
+            } else if let reps = set.reps, let load = set.load {
                 key = "\(reps) @ \(load) \(set.unit ?? "lb")"
             } else if let reps = set.reps {
                 key = "\(reps) reps"

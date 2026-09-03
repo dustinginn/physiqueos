@@ -102,6 +102,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Qualifying non-strength workouts remain separate observations even
     /// when this review reconciles the same gym visit.
     var supportingWorkouts: [TrainingLoggerSupportingWorkout]?
+    /// Supporting-evidence asset ids whose local interpretation could not
+    /// extract workout details — kept separate from `supportingWorkouts`
+    /// so a failed screenshot never silently falls back to a fixture
+    /// result and is never confused with a genuinely successful read.
+    var supportingWorkoutFailureAssetIds: [String]?
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String) -> Self {
         .init(
@@ -115,7 +120,8 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
             exercisePickerReturnStep: nil,
             exercisePickerExistingExerciseIds: nil,
             supportingEvidence: nil,
-            supportingWorkouts: nil
+            supportingWorkouts: nil,
+            supportingWorkoutFailureAssetIds: nil
         )
     }
 
@@ -132,6 +138,7 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var isAddingExercises: Bool { exercisePickerReturnStep == .workout }
     var supportingEvidenceAssets: [TrainingLoggerSupportingEvidence] { supportingEvidence ?? [] }
     var supportingWorkoutObservations: [TrainingLoggerSupportingWorkout] { supportingWorkouts ?? [] }
+    var supportingWorkoutFailureIds: [String] { supportingWorkoutFailureAssetIds ?? [] }
     var addedExerciseCount: Int {
         guard isAddingExercises else { return exercises.count }
         let existing = Set(exercisePickerExistingExerciseIds ?? [])
@@ -185,10 +192,18 @@ struct TrainingLoggerSupportingWorkout: Codable, Equatable, Identifiable {
     var category: String
     var durationMinutes: Double
     var activeCalories: Double?
+    var totalCalories: Double?
     var averageHeartRate: Double?
+    var distance: Double?
+    var distanceUnit: String?
     var sourceEvidenceIds: [String]
     var recordOwner: TrainingLoggerWorkoutRecordOwner
 
+    /// Fixture/test-only demonstration workout. Never produced by the real
+    /// attach flow — `TrainingLoggerDraft.addSupportingEvidence` no longer
+    /// auto-populates this; a real screenshot's metrics come only from
+    /// `EvidenceLocalInterpretation.supportingWorkout(id:sourceEvidenceIds:from:)`
+    /// via `setSupportingWorkoutInterpretation`.
     static func stairStepper(sourceEvidenceIds: [String]) -> Self {
         .init(
             id: "supporting-cardio-stair-stepper",
@@ -196,7 +211,10 @@ struct TrainingLoggerSupportingWorkout: Codable, Equatable, Identifiable {
             category: "Cardio",
             durationMinutes: 42,
             activeCalories: 386,
+            totalCalories: nil,
             averageHeartRate: 128,
+            distance: nil,
+            distanceUnit: nil,
             sourceEvidenceIds: sourceEvidenceIds,
             recordOwner: .activity
         )
@@ -388,6 +406,11 @@ extension TrainingLoggerDraft {
         return Set(exercisePickerExistingExerciseIds ?? []).contains(draftExercise.id)
     }
 
+    /// Records asset metadata only — it does not itself decide what the
+    /// workout was. Real interpretation is async (local OCR), so the
+    /// caller attaches metadata here immediately for a responsive picker,
+    /// then reports each asset's actual interpreted result separately via
+    /// `setSupportingWorkoutInterpretation` once local extraction finishes.
     mutating func addSupportingEvidence(_ assets: [TrainingLoggerSupportingEvidence]) {
         var current = supportingEvidenceAssets
         var identities = Set(current.map { "\($0.source.rawValue)|\($0.displayName)" })
@@ -395,28 +418,37 @@ extension TrainingLoggerDraft {
             current.append(asset)
         }
         supportingEvidence = current
-        if supportingWorkoutObservations.isEmpty, !current.isEmpty {
-            supportingWorkouts = [.stairStepper(sourceEvidenceIds: current.map(\.id))]
-        } else {
-            supportingWorkouts = supportingWorkoutObservations.map { observation in
-                var updated = observation
-                updated.sourceEvidenceIds = current.map(\.id)
-                return updated
-            }
-        }
     }
 
     mutating func removeSupportingEvidence(id: String) {
         supportingEvidence = supportingEvidenceAssets.filter { $0.id != id }
-        if supportingEvidenceAssets.isEmpty {
-            supportingWorkouts = []
+        supportingWorkouts = supportingWorkoutObservations.filter { !$0.sourceEvidenceIds.contains(id) }
+        let remainingFailures = supportingWorkoutFailureIds.filter { $0 != id }
+        supportingWorkoutFailureAssetIds = remainingFailures.isEmpty ? nil : remainingFailures
+    }
+
+    /// Attaches one supporting-evidence asset's real, locally interpreted
+    /// workout — one entry per asset (`sourceEvidenceIds: [assetId]`), so
+    /// multiple attached screenshots that represent multiple distinct
+    /// workouts stay distinct rather than being merged into one combined
+    /// record. `workout == nil` records that this specific asset's local
+    /// interpretation could not extract workout details — a genuinely
+    /// different, explicit outcome from a successful read, never
+    /// papered over with fixture/demo values.
+    mutating func setSupportingWorkoutInterpretation(assetId: String, workout: TrainingLoggerSupportingWorkout?) {
+        guard supportingEvidenceAssets.contains(where: { $0.id == assetId }) else { return }
+        var workouts = supportingWorkoutObservations.filter { $0.sourceEvidenceIds != [assetId] }
+        var failures = Set(supportingWorkoutFailureIds)
+        if let workout {
+            var stamped = workout
+            stamped.sourceEvidenceIds = [assetId]
+            workouts.append(stamped)
+            failures.remove(assetId)
         } else {
-            supportingWorkouts = supportingWorkoutObservations.map { observation in
-                var updated = observation
-                updated.sourceEvidenceIds = supportingEvidenceAssets.map(\.id)
-                return updated
-            }
+            failures.insert(assetId)
         }
+        supportingWorkouts = workouts
+        supportingWorkoutFailureAssetIds = failures.isEmpty ? nil : failures.sorted()
     }
 
     mutating func addProvisionalExercise(name: String, areaId: String) {

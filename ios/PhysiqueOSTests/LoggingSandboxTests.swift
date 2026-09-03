@@ -892,6 +892,158 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(Set(exercises.map(\.id)).count, 3)
     }
 
+    // MARK: - Variant identity: named spec examples
+
+    /// "Bicep Curls (Static Hold)" against a known canonical exercise
+    /// (using Spider Curls, the fixture's real canonical entry, in the same
+    /// role): the base name resolves canonically, the variant attaches to
+    /// the occurrence, and no new canonical exercise is created — the
+    /// variant never becomes part of the exercise's own name/identity.
+    func testKnownCanonicalExerciseWithFreeformVariantAttachesVariantWithoutCreatingANewExercise() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Spider curls (Static Hold)\n12r 40p x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertEqual(exercise.name, "Spider Curls")
+        XCTAssertEqual(exercise.canonicalExerciseId, "spider-curls")
+        XCTAssertFalse(exercise.isProvisional)
+        XCTAssertEqual(exercise.variant, "Static Hold")
+    }
+
+    /// "Pull Ups (Neutral Grip)", with Pull Ups itself unknown to the
+    /// catalog: the base exercise stays provisional/new, the variant
+    /// remains attached independently, and neither collapses into the
+    /// other.
+    func testUnknownExercisePullUpsWithVariantStaysProvisionalWithVariantAttached() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull Ups (Neutral Grip)\n8r bw x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertEqual(exercise.name, "Pull Ups")
+        XCTAssertNil(exercise.canonicalExerciseId)
+        XCTAssertTrue(exercise.isProvisional)
+        XCTAssertEqual(exercise.variant, "Neutral Grip")
+    }
+
+    /// Matching a provisional exercise that carries a variant: the base
+    /// resolves canonically, but the variant is preserved on the
+    /// occurrence exactly as it was typed — never folded into the
+    /// canonical name and never dropped by the match action.
+    func testMatchingAProvisionalExerciseWithAVariantPreservesTheVariantSeparateFromTheCanonicalName() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull Ups (Neutral Grip)\n8r bw x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let itemId = try XCTUnwrap(store.review(id: id)?.items.first?.id)
+        let exerciseId = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.id)
+
+        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "lat-pulldown" })
+        store.updateReviewItem(reviewId: id, itemId: itemId) { item in
+            guard let index = item.exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+            item.exercises[index].canonicalExerciseId = catalogExercise.canonicalExerciseId
+            item.exercises[index].name = catalogExercise.name
+            item.exercises[index].isProvisional = false
+        }
+        let matched = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+        XCTAssertEqual(matched.name, "Lat Pulldown")
+        XCTAssertEqual(matched.canonicalExerciseId, "lat-pulldown")
+        XCTAssertFalse(matched.isProvisional)
+        XCTAssertEqual(matched.variant, "Neutral Grip")
+    }
+
+    // MARK: - Bodyweight parsing
+
+    func testBWLoadTokenProducesFourBodyweightSetsOfTwelveReps() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull ups\n12r bw x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertEqual(exercise.sets.count, 4)
+        for set in exercise.sets {
+            XCTAssertEqual(set.reps, "12")
+            XCTAssertNil(set.load)
+            XCTAssertEqual(set.unit, "bodyweight")
+            XCTAssertTrue(set.isBodyweight)
+        }
+    }
+
+    func testBodyweightLoadTokenProducesFourBodyweightSetsOfTwelveReps() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull ups\n12r bodyweight x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertEqual(exercise.sets.count, 4)
+        XCTAssertTrue(exercise.sets.allSatisfy { $0.reps == "12" && $0.isBodyweight })
+    }
+
+    func testBodyWeightTwoWordLoadTokenProducesFourBodyweightSetsOfTwelveReps() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull ups\n12r body weight x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertEqual(exercise.sets.count, 4)
+        XCTAssertTrue(exercise.sets.allSatisfy { $0.reps == "12" && $0.isBodyweight })
+    }
+
+    /// Bodyweight must remain semantically bodyweight — never coerced to a
+    /// fake `0` numeric load, which would misrepresent it as an unloaded
+    /// or zero-weight set rather than a genuine bodyweight one.
+    func testBodyweightSetsAreNeverCoercedToAZeroNumericLoad() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.scenario = .training
+        store.evidenceDraft.details = "Pull ups\n12r bw x4"
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
+
+        XCTAssertTrue(exercise.sets.allSatisfy { $0.load != "0" && $0.load == nil })
+        XCTAssertTrue(exercise.sets.allSatisfy(\.isValid))
+    }
+
+    // MARK: - Exercise picker filtering
+
+    func testExerciseSearchMatchingIsToleranceOfCasePunctuationAndSpacing() {
+        XCTAssertTrue(ExerciseSearchMatching.matches(query: "pull ups", exerciseName: "Pull-ups"))
+        XCTAssertTrue(ExerciseSearchMatching.matches(query: "PULL-UPS", exerciseName: "pull ups"))
+        XCTAssertTrue(ExerciseSearchMatching.matches(query: "bench", exerciseName: "Bench Press"))
+        XCTAssertFalse(ExerciseSearchMatching.matches(query: "squat", exerciseName: "Bench Press"))
+        XCTAssertTrue(ExerciseSearchMatching.matches(query: "", exerciseName: "Bench Press"))
+    }
+
+    func testExercisePickerFilteringAppliesSearchAndTrainingAreaTogether() async throws {
+        let catalog = try await configuration().exercises
+
+        let searchOnly = ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: nil, query: "curl")
+        XCTAssertEqual(searchOnly.map(\.name), ["Spider Curls"])
+
+        let areaOnly = ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: "chest", query: "")
+        XCTAssertEqual(Set(areaOnly.map(\.areaId)), ["chest"])
+        XCTAssertTrue(areaOnly.map(\.name).contains("Bench Press"))
+
+        let combined = ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: "back", query: "curl")
+        XCTAssertTrue(combined.isEmpty, "Spider Curls is a biceps exercise, not back")
+    }
+
+    private func configuration() async throws -> TrainingLoggerConfiguration {
+        try await FixtureTrainingLoggerAPI().fetchConfiguration()
+    }
+
     func testTypeSpecificReviewsUseSubmittedValuesAndNeverCannedValues() async throws {
         let cases: [(EvidenceFixtureScenario, String, String, String)] = [
             (.nutrition, "Calories 1987 Protein 176 Carbohydrates 204 Fat 61", "calories", "1987"),

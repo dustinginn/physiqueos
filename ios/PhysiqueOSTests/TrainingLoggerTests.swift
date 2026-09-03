@@ -242,10 +242,97 @@ final class TrainingLoggerTests: XCTestCase {
         let file = TrainingLoggerSupportingEvidence(id: "f", displayName: "Health 2.pdf", source: .files)
         draft.addSupportingEvidence([photo, file, photo])
         XCTAssertEqual(draft.supportingEvidenceAssets, [photo, file])
-        XCTAssertEqual(draft.supportingWorkoutObservations.first?.sourceEvidenceIds, ["p", "f"])
+        // Adding asset metadata alone never synthesizes a workout result —
+        // that only happens once real local interpretation reports back.
+        XCTAssertTrue(draft.supportingWorkoutObservations.isEmpty)
+
+        draft.setSupportingWorkoutInterpretation(assetId: "p", workout: .stairStepper(sourceEvidenceIds: ["p"]))
+        draft.setSupportingWorkoutInterpretation(assetId: "f", workout: nil)
+        XCTAssertEqual(draft.supportingWorkoutObservations.map(\.sourceEvidenceIds), [["p"]])
+        XCTAssertEqual(draft.supportingWorkoutFailureIds, ["f"])
+
         draft.removeSupportingEvidence(id: photo.id)
         XCTAssertEqual(draft.supportingEvidenceAssets, [file])
-        XCTAssertEqual(draft.supportingWorkoutObservations.first?.sourceEvidenceIds, ["f"])
+        XCTAssertTrue(draft.supportingWorkoutObservations.isEmpty)
+        XCTAssertEqual(draft.supportingWorkoutFailureIds, ["f"])
+    }
+
+    func testSupportingWorkoutInterpretationKeepsMultipleScreenshotsAsDistinctWorkouts() {
+        var draft = draft()
+        let stairs = TrainingLoggerSupportingEvidence(id: "stairs", displayName: "Stairs.png", source: .photos)
+        let run = TrainingLoggerSupportingEvidence(id: "run", displayName: "Run.png", source: .photos)
+        draft.addSupportingEvidence([stairs, run])
+
+        draft.setSupportingWorkoutInterpretation(assetId: "stairs", workout: .stairStepper(sourceEvidenceIds: ["stairs"]))
+        let runWorkout = TrainingLoggerSupportingWorkout(
+            id: "supporting-run", activityName: "Outdoor Run", category: "Cardio", durationMinutes: 31,
+            activeCalories: 402, totalCalories: nil, averageHeartRate: 151, distance: 3.2, distanceUnit: "mi",
+            sourceEvidenceIds: ["run"], recordOwner: .activity
+        )
+        draft.setSupportingWorkoutInterpretation(assetId: "run", workout: runWorkout)
+
+        XCTAssertEqual(Set(draft.supportingWorkoutObservations.map(\.activityName)), ["Stair Stepper", "Outdoor Run"])
+        XCTAssertEqual(draft.supportingWorkoutObservations.first { $0.sourceEvidenceIds == ["stairs"] }?.activityName, "Stair Stepper")
+        XCTAssertEqual(draft.supportingWorkoutObservations.first { $0.sourceEvidenceIds == ["run"] }?.activityName, "Outdoor Run")
+        XCTAssertTrue(draft.supportingWorkoutFailureIds.isEmpty)
+    }
+
+    // MARK: - Real Apple Health screenshot interpretation
+    // Exercises `EvidenceLocalInterpretation.supportingWorkout`, the exact
+    // shared local-extraction function Workout Logger's reconciliation
+    // screen now calls on real OCR'd text instead of always returning the
+    // fixture Stair Stepper result.
+
+    func testRealAppleHealthTextInterpretsIntoTheActualUploadedWorkout() {
+        let text = """
+        Stair Stepper
+        Workout Time 42:18
+        Active Calories 386
+        Total Calories 512
+        Average Heart Rate 128
+        """
+        let workout = EvidenceLocalInterpretation.supportingWorkout(id: "supporting-a", sourceEvidenceIds: ["a"], from: text)
+        let resolved = try? XCTUnwrap(workout)
+
+        XCTAssertEqual(resolved?.activityName, "Stair Stepper")
+        XCTAssertEqual(resolved?.category, "Cardio")
+        XCTAssertEqual(resolved?.activeCalories, 386)
+        XCTAssertEqual(resolved?.totalCalories, 512)
+        XCTAssertEqual(resolved?.averageHeartRate, 128)
+        XCTAssertEqual(resolved?.sourceEvidenceIds, ["a"])
+    }
+
+    func testTwoDifferentRealScreenshotsInterpretIntoTwoDistinctWorkouts() {
+        let stairsText = "Stair Stepper\nWorkout Time 42:18\nActive Calories 386"
+        let runText = "Outdoor Run\nWorkout Time 31:00\nActive Calories 402\nDistance 3.2 mi"
+        let stairs = EvidenceLocalInterpretation.supportingWorkout(id: "supporting-stairs", sourceEvidenceIds: ["stairs"], from: stairsText)
+        let run = EvidenceLocalInterpretation.supportingWorkout(id: "supporting-run", sourceEvidenceIds: ["run"], from: runText)
+
+        XCTAssertEqual(stairs?.activityName, "Stair Stepper")
+        XCTAssertEqual(run?.activityName, "Outdoor Run")
+        XCTAssertEqual(run?.distance, 3.2)
+        XCTAssertNotEqual(stairs?.id, run?.id)
+        XCTAssertNotEqual(stairs?.sourceEvidenceIds, run?.sourceEvidenceIds)
+    }
+
+    /// Text with no recognizable cardio/strength workout signal — the
+    /// real "could not read" case a garbled or unrelated screenshot
+    /// produces. Must return `nil`, never a fixture/demo fallback.
+    func testUnreadableAppleHealthTextFailsInterpretationRatherThanFallingBackToTheFixture() {
+        let workout = EvidenceLocalInterpretation.supportingWorkout(id: "supporting-x", sourceEvidenceIds: ["x"], from: "Some unrelated screenshot text with no workout data")
+        XCTAssertNil(workout)
+    }
+
+    func testFailedSupportingWorkoutInterpretationDoesNotFallBackToTheFixture() {
+        var draft = draft()
+        let unreadable = TrainingLoggerSupportingEvidence(id: "unreadable", displayName: "Blurry.png", source: .photos)
+        draft.addSupportingEvidence([unreadable])
+
+        draft.setSupportingWorkoutInterpretation(assetId: "unreadable", workout: nil)
+
+        XCTAssertTrue(draft.supportingWorkoutObservations.isEmpty)
+        XCTAssertEqual(draft.supportingWorkoutFailureIds, ["unreadable"])
+        XCTAssertFalse(draft.supportingWorkoutObservations.contains { $0.activityName == "Stair Stepper" })
     }
 
     func testMixedGymVisitPreservesStrengthDetailAndSeparateCardioOwnership() async throws {
@@ -262,6 +349,7 @@ final class TrainingLoggerTests: XCTestCase {
         draft.exercises[0].sets[0].load = 145
         draft.exercises[0].sets[0].isCompleted = true
         draft.addSupportingEvidence([.init(id: "health", displayName: "Apple Health.png", source: .photos)])
+        draft.setSupportingWorkoutInterpretation(assetId: "health", workout: .stairStepper(sourceEvidenceIds: ["health"]))
 
         XCTAssertEqual(draft.exercises.map(\.name), ["Bench Press", "Cable Fly"])
         XCTAssertEqual(draft.exercises[0].sets[0].reps, 8)

@@ -16,6 +16,10 @@ struct TrainingLoggerView: View {
     @State private var isSupportingPhotosPickerPresented = false
     @State private var isSupportingFilePickerPresented = false
     @State private var supportingPhotoItems: [PhotosPickerItem] = []
+    /// Assets currently being locally interpreted — transient UI-only
+    /// state, not persisted to the draft, so a mid-read screen rotation
+    /// or draft reload never leaves a stuck "reading" row.
+    @State private var pendingInterpretationAssetIDs: Set<String> = []
 
     var body: some View {
         Group {
@@ -62,22 +66,78 @@ struct TrainingLoggerView: View {
         .onChange(of: focusedNumericFieldID) { isNumericKeyboardVisible = focusedNumericFieldID != nil }
         .photosPicker(isPresented: $isSupportingPhotosPickerPresented, selection: $supportingPhotoItems, matching: .images)
         .onChange(of: supportingPhotoItems) {
-            guard !supportingPhotoItems.isEmpty else { return }
-            let start = viewModel?.draft?.supportingEvidenceAssets.filter { $0.source == .photos }.count ?? 0
-            let assets = supportingPhotoItems.indices.map { index in
-                TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: "Apple Health Screenshot \(start + index + 1)", source: .photos)
-            }
-            viewModel?.update { $0.addSupportingEvidence(assets) }
+            let items = supportingPhotoItems
             supportingPhotoItems = []
+            attachAndInterpretPhotos(items)
         }
         .fileImporter(isPresented: $isSupportingFilePickerPresented, allowedContentTypes: [.image, .pdf], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
-            viewModel?.update { draft in
-                draft.addSupportingEvidence(urls.map {
-                    .init(id: UUID().uuidString, displayName: $0.lastPathComponent, source: .files)
-                })
+            attachAndInterpretFiles(urls)
+        }
+    }
+
+    /// Attaches picked Photos items immediately (so the list responds
+    /// right away), then loads each item's real bytes and runs the shared
+    /// local interpretation path — the reconciliation screen never shows a
+    /// result until that real read actually completes.
+    private func attachAndInterpretPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        let start = viewModel?.draft?.supportingEvidenceAssets.filter { $0.source == .photos }.count ?? 0
+        let newAssets = items.indices.map { index in
+            TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: "Apple Health Screenshot \(start + index + 1)", source: .photos)
+        }
+        viewModel?.update { $0.addSupportingEvidence(newAssets) }
+        for (asset, item) in zip(newAssets, items) {
+            pendingInterpretationAssetIDs.insert(asset.id)
+            Task {
+                let data = try? await item.loadTransferable(type: Data.self)
+                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: "image/jpeg", source: .photos)
             }
         }
+    }
+
+    /// Same real-interpretation path as `attachAndInterpretPhotos`, for
+    /// files picked via the Files importer (image or PDF).
+    private func attachAndInterpretFiles(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let newAssets = urls.map { TrainingLoggerSupportingEvidence(id: UUID().uuidString, displayName: $0.lastPathComponent, source: .files) }
+        viewModel?.update { $0.addSupportingEvidence(newAssets) }
+        for (asset, url) in zip(newAssets, urls) {
+            pendingInterpretationAssetIDs.insert(asset.id)
+            Task {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                let data = try? Data(contentsOf: url)
+                await interpretAndStoreSupportingEvidence(assetId: asset.id, data: data, contentType: nil, filename: url.lastPathComponent, source: .files)
+            }
+        }
+    }
+
+    /// Runs the shared `EvidenceLocalInterpretation` OCR/extraction path
+    /// (the same one Evidence Review's cardio/strength parsing uses) on
+    /// one asset's real bytes, then records the outcome — a real workout,
+    /// or an explicit "could not read" failure — via
+    /// `setSupportingWorkoutInterpretation`. Never synthesizes a fixture
+    /// result on failure.
+    @MainActor
+    private func interpretAndStoreSupportingEvidence(
+        assetId: String,
+        data: Data?,
+        contentType: String?,
+        filename: String? = nil,
+        source: SandboxAttachment.Source
+    ) async {
+        defer { pendingInterpretationAssetIDs.remove(assetId) }
+        guard let data else {
+            viewModel?.update { $0.setSupportingWorkoutInterpretation(assetId: assetId, workout: nil) }
+            return
+        }
+        let attachment = SandboxAttachment(id: assetId, displayName: filename ?? assetId, source: source, contentType: contentType, data: data)
+        let prepared = await EvidenceLocalInterpretation.prepare(attachment)
+        let workout = prepared.extractedText.flatMap {
+            EvidenceLocalInterpretation.supportingWorkout(id: "supporting-\(assetId)", sourceEvidenceIds: [assetId], from: $0)
+        }
+        viewModel?.update { $0.setSupportingWorkoutInterpretation(assetId: assetId, workout: workout) }
     }
 
     private func content(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -738,7 +798,7 @@ struct TrainingLoggerView: View {
                         ForEach(draft.supportingWorkoutObservations) { workout in
                             Divider().overlay(PhysiqueOSTheme.divider)
                             HStack(alignment: .top, spacing: 10) {
-                                IconBadge(systemImage: "figure.stair.stepper", color: .evidence, size: .sm)
+                                IconBadge(systemImage: workout.category == "Strength" ? "dumbbell" : "figure.stair.stepper", color: .evidence, size: .sm)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(workout.activityName)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
@@ -752,6 +812,31 @@ struct TrainingLoggerView: View {
                                 }
                             }
                             .accessibilityIdentifier("trainingLogger.supportingWorkout.\(workout.id)")
+                        }
+                        ForEach(pendingSupportingAssets(draft)) { asset in
+                            Divider().overlay(PhysiqueOSTheme.divider)
+                            HStack(spacing: 10) {
+                                ProgressView().tint(PhysiqueOSTheme.accent)
+                                Text("Reading \(asset.displayName)…")
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            }
+                            .accessibilityIdentifier("trainingLogger.supportingWorkout.pending.\(asset.id)")
+                        }
+                        ForEach(failedSupportingAssets(draft)) { asset in
+                            Divider().overlay(PhysiqueOSTheme.divider)
+                            HStack(alignment: .top, spacing: 10) {
+                                IconBadge(systemImage: "exclamationmark.triangle", color: .warning, size: .sm)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Couldn't read workout details")
+                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text("\(asset.displayName) · remove and re-attach to try again")
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                            }
+                            .accessibilityIdentifier("trainingLogger.supportingWorkout.failed.\(asset.id)")
                         }
                     }
                 }
@@ -946,8 +1031,22 @@ struct TrainingLoggerView: View {
     private func supportingWorkoutMetrics(_ workout: TrainingLoggerSupportingWorkout) -> String {
         var parts = ["\(formatNumber(workout.durationMinutes)) min"]
         if let calories = workout.activeCalories { parts.append("\(formatNumber(calories)) active cal") }
+        if let totalCalories = workout.totalCalories { parts.append("\(formatNumber(totalCalories)) total cal") }
         if let heartRate = workout.averageHeartRate { parts.append("\(formatNumber(heartRate)) bpm avg") }
+        if let distance = workout.distance { parts.append("\(formatNumber(distance)) \(workout.distanceUnit ?? "mi")") }
         return parts.joined(separator: " · ")
+    }
+
+    /// Assets currently mid-read — cross-referenced against the transient
+    /// `pendingInterpretationAssetIDs` set rather than anything persisted
+    /// on the draft.
+    private func pendingSupportingAssets(_ draft: TrainingLoggerDraft) -> [TrainingLoggerSupportingEvidence] {
+        draft.supportingEvidenceAssets.filter { pendingInterpretationAssetIDs.contains($0.id) }
+    }
+
+    private func failedSupportingAssets(_ draft: TrainingLoggerDraft) -> [TrainingLoggerSupportingEvidence] {
+        let failedIds = Set(draft.supportingWorkoutFailureIds)
+        return draft.supportingEvidenceAssets.filter { failedIds.contains($0.id) }
     }
 
     private func numericEditingChanged(_ editing: Bool) {

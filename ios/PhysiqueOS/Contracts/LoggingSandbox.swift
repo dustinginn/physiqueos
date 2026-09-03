@@ -406,6 +406,12 @@ struct EvidenceReviewSet: Codable, Equatable, Identifiable {
     var load: String? = nil
     var unit: String? = nil
 
+    /// Mirrors `TrainingSet.isBodyweight` — a set explicitly performed at
+    /// bodyweight, not a set whose load is merely unset/unknown. `load`
+    /// stays `nil` for a bodyweight set (never coerced to `0`); this flag
+    /// is what actually distinguishes the two "no numeric load" cases.
+    var isBodyweight: Bool { unit == "bodyweight" }
+
     var isValid: Bool {
         guard reps != nil || load != nil else { return !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard let reps, let repValue = Double(reps), repValue.isFinite, repValue > 0 else { return false }
@@ -416,7 +422,8 @@ struct EvidenceReviewSet: Codable, Equatable, Identifiable {
 
     mutating func refreshSummary() {
         guard let reps else { return }
-        if let load { summary = "\(reps) reps @ \(load) \(unit ?? "lb")" }
+        if isBodyweight { summary = "\(reps) reps · BW" }
+        else if let load { summary = "\(reps) reps @ \(load) \(unit ?? "lb")" }
         else { summary = "\(reps) reps" }
     }
 }
@@ -553,6 +560,38 @@ struct LocalEvidenceReview: Codable, Equatable, Identifiable {
         case .recovery: "Recovery review complete"
         case .generic: "Review complete"
         }
+    }
+}
+
+/// The exercise picker's combined Training-Area + search filtering, pulled
+/// out of the sheet view so both rules are independently unit-testable.
+enum ExercisePickerFiltering {
+    static func filtered(
+        catalog: [TrainingLoggerCatalogExercise],
+        selectedAreaId: String?,
+        query: String
+    ) -> [TrainingLoggerCatalogExercise] {
+        catalog
+            .filter { selectedAreaId == nil || $0.areaId == selectedAreaId }
+            .filter { ExerciseSearchMatching.matches(query: query, exerciseName: $0.name) }
+            .sorted { $0.name < $1.name }
+    }
+}
+
+/// Tolerant substring matching for the exercise picker's search field —
+/// forgiving of capitalization, punctuation, and spacing differences (e.g.
+/// "pull ups" surfaces "Pull-ups") without doing any fuzzy/typo-tolerant
+/// matching. The Founder always explicitly picks the canonical exercise
+/// from the filtered results; this never silently auto-matches.
+enum ExerciseSearchMatching {
+    static func matches(query: String, exerciseName: String) -> Bool {
+        let normalizedQuery = normalize(query)
+        guard !normalizedQuery.isEmpty else { return true }
+        return normalize(exerciseName).contains(normalizedQuery)
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.lowercased().replacingOccurrences(of: #"[^a-z0-9]+"#, with: "", options: .regularExpression)
     }
 }
 

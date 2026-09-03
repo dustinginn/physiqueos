@@ -207,6 +207,24 @@ enum EvidenceLocalInterpretation {
                 current = opened
                 continue
             }
+            // Bodyweight forms — "Pull ups\n12r bw x4" and the inline
+            // "Pull ups 12r bw x4" — recognize `bw`/`bodyweight`/
+            // `body weight` as the load token instead of requiring a
+            // numeric weight. Mirrors the live Workout Logger's own
+            // `bodyweight_reps` measurement (`TrainingLoggerMeasurement`,
+            // `TrainingSet.isBodyweight`) rather than coercing the load to
+            // 0 lb, which would misrepresent a real bodyweight set as an
+            // unloaded/zero-weight one.
+            if let inlineBW = capture(#"^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(?:bw|body\s*weight|bodyweight)\s*[x×]\s*(\d+)\s*$"#, in: line), inlineBW.count >= 4 {
+                let opened = startBlock(inlineBW[1], blocks: &blocks)
+                appendBodyweightSets(reps: inlineBW[2], count: inlineBW[3], to: opened, blocks: &blocks)
+                current = opened
+                continue
+            }
+            if let metricBW = capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(?:bw|body\s*weight|bodyweight)\s*[x×]\s*(\d+)\s*$"#, in: line), metricBW.count >= 3, let current {
+                appendBodyweightSets(reps: metricBW[1], count: metricBW[2], to: current, blocks: &blocks)
+                continue
+            }
             if let metric = capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line), metric.count >= 4, let current {
                 appendSets(load: metric[1], reps: metric[2], count: metric[3], to: current, blocks: &blocks)
                 continue
@@ -302,7 +320,8 @@ enum EvidenceLocalInterpretation {
     private static func isSetShorthandLine(_ line: String) -> Bool {
         capture(#"^(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s+(\d+(?:\.\d+)?)\s*(?:r|reps?)\s*[x×]\s*(\d+)\s*$"#, in: line) != nil ||
         capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(\d+(?:\.\d+)?)\s*(?:p|lb|lbs|pounds?)\s*[x×]\s*(\d+)\s*$"#, in: line) != nil ||
-        capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line) != nil
+        capture(#"^(\d+)\s*(?:sets?|x)\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*(?:reps?|r)?\s*(?:@|at|with)?\s*#?(\d+(?:\.\d+)?)\s*(?:lb|lbs|p|pounds?)?\s*$"#, in: line) != nil ||
+        capture(#"^(\d+(?:\.\d+)?)\s*(?:r|reps?)\s+(?:bw|body\s*weight|bodyweight)\s*[x×]\s*(\d+)\s*$"#, in: line) != nil
     }
 
     private static func appendSets(load: String, reps: String, count: String, to index: Int, blocks: inout [ExerciseParseBlock]) {
@@ -319,6 +338,77 @@ enum EvidenceLocalInterpretation {
                 unit: "lb"
             ))
         }
+    }
+
+    /// Bodyweight counterpart of `appendSets` — `load` stays `nil` and
+    /// `unit` is set to the same `"bodyweight"` sentinel
+    /// `TrainingSet.isBodyweight` already checks for, rather than
+    /// coercing to a fake `0` load.
+    private static func appendBodyweightSets(reps: String, count: String, to index: Int, blocks: inout [ExerciseParseBlock]) {
+        let setCount = min(max(Int(count) ?? 1, 1), 20)
+        for _ in 0..<setCount {
+            let setNumber = blocks[index].sets.count + 1
+            let cleanReps = cleanNumber(reps)
+            blocks[index].sets.append(.init(
+                id: "\(blocks[index].id)-set-\(setNumber)",
+                summary: "\(cleanReps) reps · BW",
+                reps: cleanReps,
+                load: nil,
+                unit: "bodyweight"
+            ))
+        }
+    }
+
+    /// Derives a real supporting-workout record for Workout Logger's Apple
+    /// Health reconciliation screen from one screenshot's already-extracted
+    /// text — the exact same `cardioTitle`/`workoutMetricFields` local
+    /// extraction Evidence Review's own cardio parsing uses, reused rather
+    /// than duplicated. Returns `nil` when the text carries no recognizable
+    /// cardio/strength workout signal or no readable duration — callers
+    /// must treat `nil` as "could not read," never fall back to a fixture.
+    static func supportingWorkout(id: String, sourceEvidenceIds: [String], from text: String) -> TrainingLoggerSupportingWorkout? {
+        let activityName: String
+        let category: String
+        if isCardioText(text) {
+            activityName = cardioTitle(text)
+            category = "Cardio"
+        } else if isStrengthText(text) {
+            activityName = strengthTitle(text)
+            category = "Strength"
+        } else {
+            return nil
+        }
+        guard let durationMinutes = workoutDurationMinutes(text) else { return nil }
+        let distanceValue = firstNumber(in: text, labels: ["distance"]).flatMap(groupedNumber)
+        return TrainingLoggerSupportingWorkout(
+            id: id,
+            activityName: activityName,
+            category: category,
+            durationMinutes: durationMinutes,
+            activeCalories: firstNumber(in: text, labels: ["active calories", "active energy"]).flatMap(groupedNumber),
+            totalCalories: firstNumber(in: text, labels: ["total calories"]).flatMap(groupedNumber),
+            averageHeartRate: firstNumber(in: text, labels: ["average heart rate", "avg heart rate", "avg. heart rate"]).flatMap(groupedNumber),
+            distance: distanceValue,
+            distanceUnit: distanceValue != nil ? distanceUnit(text) : nil,
+            sourceEvidenceIds: sourceEvidenceIds,
+            recordOwner: .activity
+        )
+    }
+
+    /// Accepts either colon duration notation ("42:18", "1:02:18" — the
+    /// same form `firstDuration` already recognizes) or a plain number
+    /// paired with a "workout time"/"duration" label, converting either
+    /// into total minutes.
+    private static func workoutDurationMinutes(_ text: String) -> Double? {
+        if let colonForm = firstDuration(in: text, labels: ["workout time", "duration"]) {
+            let parts = colonForm.split(separator: ":").compactMap { Double($0) }
+            switch parts.count {
+            case 2: return parts[0] + parts[1] / 60
+            case 3: return parts[0] * 60 + parts[1] + parts[2] / 60
+            default: break
+            }
+        }
+        return firstNumber(in: text, labels: ["workout time", "duration"]).flatMap(groupedNumber)
     }
 
     private static func cardioItem(id: String, text: String, date: Date) -> EvidenceReviewItem {
