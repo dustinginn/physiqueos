@@ -1,0 +1,228 @@
+import SwiftUI
+
+/// Photo set/session detail (`.photoSetDetail(setId:)`) — a Native-only
+/// push destination replacing the web's `PhotoModal`
+/// (`ProgressPhotoGallery.jsx:202-271`), which has no URL of its own (see
+/// `PhotosReadModel.swift`'s doc comment). Mirrors the modal's own content
+/// and Previous/Next paging through every pose view in the session:
+///
+/// per view — side-by-side Previous/Current comparison (or a single image
+/// when no prior comparison exists) → "Interpretation" → "Capture
+/// Conditions" → collapsible "Source History".
+struct PhotoSetDetailView: View {
+    @Environment(AppEnvironment.self) private var environment
+    @State private var viewModel: PhotoSetDetailViewModel?
+    @State private var selectedViewIndex = 0
+    @State private var isSourceHistoryExpanded = false
+    let setId: String
+
+    var body: some View {
+        ScrollView {
+            content
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+        }
+        .physiqueOSScrollBottomClearance()
+        .background(PhysiqueOSTheme.background)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .task {
+            if viewModel == nil { viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId) }
+            await viewModel?.load()
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel?.state {
+        case .none, .loading:
+            ProgressView()
+                .tint(PhysiqueOSTheme.accent)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .failed(let message):
+            Text(message)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(.none):
+            Text("No photo set found for this date.")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(.some(let set)):
+            VStack(alignment: .leading, spacing: 16) {
+                header(for: set)
+                if !set.views.isEmpty {
+                    let clampedIndex = min(selectedViewIndex, set.views.count - 1)
+                    viewPager(set: set, currentIndex: clampedIndex)
+                    let view = set.views[clampedIndex]
+                    comparisonCard(view)
+                    interpretationCard(view)
+                    conditionsCard(view)
+                    sourceHistoryCard(view)
+                }
+            }
+        }
+    }
+
+    private func header(for set: PhotoSetRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Photo Set")
+                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
+                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text(TrainingDateFormatting.short(set.date))
+                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text("\(set.weightLabel) · \(set.views.count) views")
+                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            EvidenceScopeAttributionChip(attribution: set.attributedScope)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The Previous/Next paging control the web's own modal uses to cycle
+    /// through a session's other views.
+    private func viewPager(set: PhotoSetRecord, currentIndex: Int) -> some View {
+        let sortedViews = set.views
+        return HStack {
+            Button {
+                selectedViewIndex = max(0, currentIndex - 1)
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.system(size: 22))
+            }
+            .disabled(currentIndex == 0)
+            .foregroundStyle(currentIndex == 0 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.accent)
+
+            Spacer(minLength: 8)
+            VStack(spacing: 2) {
+                Text(sortedViews[currentIndex].poseId.label)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("\(currentIndex + 1) of \(sortedViews.count)")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+            Spacer(minLength: 8)
+
+            Button {
+                selectedViewIndex = min(sortedViews.count - 1, currentIndex + 1)
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.system(size: 22))
+            }
+            .disabled(currentIndex == sortedViews.count - 1)
+            .foregroundStyle(currentIndex == sortedViews.count - 1 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.accent)
+        }
+    }
+
+    /// Side-by-side Previous/Current when a comparison exists, matching
+    /// `ProgressPhotoGallery.jsx:238-244`'s literal 2-column layout; a
+    /// single tile plus the exact empty-state string otherwise. No real
+    /// image assets exist in fixture mode — see `PhotosHistoryView.swift`'s
+    /// doc comment.
+    private func comparisonCard(_ view: PhotoViewRecord) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 10) {
+                if view.hasComparisonImage {
+                    HStack(spacing: 8) {
+                        photoPlaceholder(label: "Previous", detail: view.comparedAgainst)
+                        photoPlaceholder(label: "Current", detail: nil)
+                    }
+                } else {
+                    photoPlaceholder(label: "Current", detail: nil)
+                    Text(view.comparedAgainst)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+            }
+        }
+    }
+
+    private func photoPlaceholder(label: String, detail: String?) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            RoundedRectangle(cornerRadius: 10)
+                .fill(PhysiqueOSTheme.surfaceElevated)
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+                .overlay(
+                    Image(systemName: "figure.stand")
+                        .font(.system(size: 32, weight: .light))
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                )
+            if let detail {
+                Text(detail)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Server-owned presentation copy — fixtured verbatim, never
+    /// recomputed locally (see `PhotosReadModel.swift`'s doc comment on
+    /// `PhotoViewRecord`).
+    private func interpretationCard(_ view: PhotoViewRecord) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeading("Interpretation")
+                Text(view.interpretationSummary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if !view.comparisonBullets.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(view.comparisonBullets, id: \.self) { bullet in
+                            HStack(alignment: .top, spacing: 6) {
+                                Text("•").foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Text(bullet)
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func conditionsCard(_ view: PhotoViewRecord) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeading("Capture Conditions")
+                Text(view.conditionSummary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+        }
+    }
+
+    private func sourceHistoryCard(_ view: PhotoViewRecord) -> some View {
+        CardContainer {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isSourceHistoryExpanded.toggle() }
+                } label: {
+                    HStack {
+                        SectionHeading("Source History")
+                        Spacer(minLength: 8)
+                        Image(systemName: isSourceHistoryExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isSourceHistoryExpanded {
+                    Text(view.sourceHistory)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .padding(.top, 8)
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,65 @@
+{
+  "sets": [
+    {
+      "id": "photo-set-fixture-001",
+      "date": "2026-05-24",
+      "weightLb": 185.5,
+      "poses": [
+        "front-relaxed",
+        "back-relaxed",
+        "back-flexed"
+      ],
+      "conditionSummary": "Morning, fasted, standard lighting."
+    },
+    {
+      "id": "photo-set-fixture-002",
+      "date": "2026-06-14",
+      "weightLb": 179.8,
+      "poses": [
+        "front-relaxed",
+        "back-relaxed",
+        "back-flexed"
+      ],
+      "conditionSummary": "Morning, fasted, standard lighting."
+    },
+    {
+      "id": "photo-set-fixture-003",
+      "date": "2026-07-18",
+      "weightLb": 172.0,
+      "poses": [
+        "front-relaxed",
+        "back-relaxed",
+        "back-flexed"
+      ],
+      "conditionSummary": "Morning, fasted, standard lighting."
+    },
+    {
+      "id": "photo-set-fixture-004",
+      "date": "2026-08-16",
+      "weightLb": 177.1,
+      "poses": [
+        "front-relaxed",
+        "back-relaxed",
+        "back-flexed"
+      ],
+      "conditionSummary": "Morning, fasted, standard lighting."
+    },
+    {
+      "id": "photo-set-fixture-005",
+      "date": "2026-08-30",
+      "weightLb": null,
+      "poses": [
+        "front-relaxed",
+        "back-relaxed",
+        "back-flexed"
+      ],
+      "conditionSummary": "Evening, post-workout, pump present."
+    }
+  ],
+  "dataSources": [
+    {
+      "name": "Progress Photo Uploads",
+      "status": "Connected"
+    }
+  ]
+}
