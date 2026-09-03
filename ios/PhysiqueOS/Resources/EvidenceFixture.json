@@ -37,7 +37,7 @@
       "title": "Progress Photos",
       "metric": "Latest Photo Set",
       "trend": "View photo progress",
-      "lastUpdated": "2026-08-21",
+      "lastUpdated": "2026-08-30",
       "status": "available",
       "tone": "primary",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "photos" } }
@@ -45,9 +45,9 @@
     {
       "id": "dexa",
       "title": "DEXA",
-      "metric": "14.8%",
-      "trend": "3 scans during this cut.",
-      "lastUpdated": "2026-07-30",
+      "metric": "9.4%",
+      "trend": "5 scans on record.",
+      "lastUpdated": "2026-08-30",
       "status": "available",
       "tone": "success",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "dexa" } }
