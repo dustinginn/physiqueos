@@ -15,9 +15,9 @@
     {
       "id": "nutrition",
       "title": "Nutrition",
-      "metric": "5 days",
+      "metric": "9 days",
       "trend": "Nutrition history available.",
-      "lastUpdated": "2026-08-27",
+      "lastUpdated": "2026-08-30",
       "status": "available",
       "tone": "primary",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "nutrition" } }
@@ -27,7 +27,7 @@
       "title": "Weight",
       "metric": "179.4 lb",
       "trend": "Down 6.1 lb since the cut began.",
-      "lastUpdated": "2026-08-28",
+      "lastUpdated": "2026-08-30",
       "status": "available",
       "tone": "evidence",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "weight" } }

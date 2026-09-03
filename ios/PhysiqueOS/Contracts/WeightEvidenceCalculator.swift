@@ -1,0 +1,134 @@
+import Foundation
+
+/// Reproduces `buildWeightSummary`/`getWeeklyAverages`/`getWeightExtreme`
+/// (`src/domain/services/ProgressReportingService.js:556-606,2315-2349`)
+/// exactly, including the parts that read as surprising: the Highest/
+/// Lowest cards are a **hardcoded, literal `contextId` string match**, not
+/// a computation over any goal-direction property. This port reproduces
+/// that faithfully rather than "fixing" it — a future goal that isn't
+/// literally `"build-lean-mass"` or `"visible-abs"` falls into the "all"-
+/// style branch on the web today, and would do the same here.
+enum WeightEvidenceCalculator {
+    enum Extreme { case highest, lowest }
+
+    /// `getWeightExtreme(weights, direction)` — a plain linear reduction,
+    /// not a sort; ties keep the first-encountered (chronologically
+    /// earliest) entry, matching the web's `reduce` exactly.
+    static func extreme(_ weights: [WeightEntryFixture], _ direction: Extreme) -> WeightEntryFixture? {
+        weights.reduce(into: WeightEntryFixture?.none) { result, entry in
+            guard let current = result else { result = entry; return }
+            switch direction {
+            case .highest: if entry.value > current.value { result = entry }
+            case .lowest: if entry.value < current.value { result = entry }
+            }
+        }
+    }
+
+    private static func formatWeight(_ entry: WeightEntryFixture?) -> String {
+        guard let entry else { return "Pending" }
+        return String(format: "%.1f %@", entry.value, entry.unit)
+    }
+
+    /// `summaryChange(label, first, last)` — `"Pending"` when either side
+    /// is missing or identical (`first === last` on the web); otherwise a
+    /// signed value, e.g. `"+3.0 lb"` / `"-4.0 lb"`.
+    private static func formatChange(_ first: WeightEntryFixture?, _ last: WeightEntryFixture?) -> String {
+        guard let first, let last, first.id != last.id else { return "Pending" }
+        let delta = last.value - first.value
+        let sign = delta >= 0 ? "+" : ""
+        return String(format: "%@%.1f %@", sign, delta, last.unit)
+    }
+
+    /// `buildWeightSummary` — the literal 3-branch lookup table keyed on
+    /// `scopeID`, verified directly against
+    /// `WeightEvidenceContextService.test.js:64-104`. `allWeights` and
+    /// `scopedWeights` are both chronologically ascending (oldest first);
+    /// when `scopeID == .all`, callers pass `scopedWeights == allWeights`.
+    static func summary(scopeID: EvidenceScopeID, allWeights: [WeightEntryFixture], scopedWeights: [WeightEntryFixture]) -> [WeightSummaryCard] {
+        let overallLatest = allWeights.last
+        let scopedFirst = scopedWeights.first
+        let scopedLatest = scopedWeights.last
+        let scopedPrevious = scopedWeights.count >= 2 ? scopedWeights[scopedWeights.count - 2] : nil
+        let highest = extreme(scopedWeights, .highest)
+        let lowest = extreme(scopedWeights, .lowest)
+
+        switch scopeID {
+        case .buildLeanMass:
+            return [
+                WeightSummaryCard(label: "Latest", value: formatWeight(overallLatest)),
+                WeightSummaryCard(label: "Since Start", value: formatChange(scopedFirst, overallLatest)),
+                WeightSummaryCard(label: "Highest", value: formatWeight(highest)),
+                WeightSummaryCard(label: "Lowest", value: formatWeight(lowest)),
+            ]
+        case .visibleAbs:
+            return [
+                WeightSummaryCard(label: "Latest", value: formatWeight(scopedLatest)),
+                WeightSummaryCard(label: "Since Start", value: formatChange(scopedFirst, scopedLatest)),
+                WeightSummaryCard(label: "Last Change", value: formatChange(scopedPrevious, scopedLatest)),
+                WeightSummaryCard(label: "Lowest", value: formatWeight(lowest)),
+            ]
+        case .all:
+            return [
+                WeightSummaryCard(label: "Latest", value: formatWeight(overallLatest)),
+                WeightSummaryCard(label: "Since First", value: formatChange(allWeights.first, overallLatest)),
+                WeightSummaryCard(label: "Highest", value: formatWeight(extreme(allWeights, .highest))),
+                WeightSummaryCard(label: "Lowest", value: formatWeight(extreme(allWeights, .lowest))),
+            ]
+        }
+    }
+
+    /// `getWeeklyAverages` — groups by ISO week (Monday start; the web's
+    /// exact `getWeekStartKey` day-of-week convention was not independently
+    /// re-derivable from this port's audit, so Monday — the common ISO-8601
+    /// default — is used as a documented, reasonable choice), averages
+    /// each week, computes week-over-week against the immediately prior
+    /// week in the FULL scoped series (so the oldest of the kept last-6
+    /// weeks still gets a real delta when an earlier week exists), then
+    /// keeps only the most recent 6 weeks, newest-first for display.
+    static func weeklyAverages(scopedWeights: [WeightEntryFixture]) -> [WeightWeeklyAverage] {
+        guard !scopedWeights.isEmpty else { return [] }
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+
+        func weekStart(_ dateString: String) -> Date? {
+            guard let date = formatter.date(from: String(dateString.prefix(10))) else { return nil }
+            let weekday = calendar.component(.weekday, from: date) // 1 = Sunday
+            let daysSinceMonday = (weekday + 5) % 7
+            return calendar.date(byAdding: .day, value: -daysSinceMonday, to: date)
+        }
+
+        var groups: [Date: [WeightEntryFixture]] = [:]
+        for entry in scopedWeights {
+            guard let key = weekStart(entry.date) else { continue }
+            groups[key, default: []].append(entry)
+        }
+
+        let orderedKeys = groups.keys.sorted()
+        let averagesByKey: [Date: Double] = groups.mapValues { entries in
+            entries.reduce(0) { $0 + $1.value } / Double(entries.count)
+        }
+
+        let allWeeks: [(key: Date, average: Double, weekOverWeek: Double?)] = orderedKeys.enumerated().map { index, key in
+            let average = averagesByKey[key] ?? 0
+            let weekOverWeek: Double? = index > 0 ? average - (averagesByKey[orderedKeys[index - 1]] ?? average) : nil
+            return (key, average, weekOverWeek)
+        }
+
+        let kept = Array(allWeeks.suffix(6))
+        let labelFormatter = DateFormatter()
+        labelFormatter.dateFormat = "MMM d"
+        labelFormatter.timeZone = TimeZone(identifier: "UTC")
+
+        return kept.reversed().map { week in
+            WeightWeeklyAverage(
+                week: labelFormatter.string(from: week.key),
+                average: week.average,
+                weekOverWeek: week.weekOverWeek,
+                isBaseWeek: week.weekOverWeek == nil
+            )
+        }
+    }
+}
