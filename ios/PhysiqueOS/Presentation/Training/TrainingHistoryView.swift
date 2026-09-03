@@ -81,7 +81,7 @@ struct TrainingHistoryView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(for: landing)
                 TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(scopeID) }
+                    Task { await viewModel?.selectScope(pillID: scopeID) }
                 }
                 latestTrainingDayCard(landing.latestTrainingDay)
                 trainingAreasCard(landing.trainingAreas)
@@ -668,9 +668,13 @@ private struct TrainingProtocolRow: View {
 /// shared mechanism backing the web's own re-fetch-on-select behavior.
 struct TrainingScopeSelectorView: View {
     let scope: TrainingScopeContext
-    var onSelect: ((EvidenceScopeID) -> Void)?
+    /// Called with the tapped option's raw `TrainingScopeOption.id` (a
+    /// `EvidenceScopeSelection.pillID` string) — from either the primary
+    /// Goal row or the contextual Phase row below it. The caller parses it
+    /// via `EvidenceScopeSelection(pillID:)`.
+    var onSelect: ((String) -> Void)?
 
-    init(scope: TrainingScopeContext, onSelect: ((EvidenceScopeID) -> Void)? = nil) {
+    init(scope: TrainingScopeContext, onSelect: ((String) -> Void)? = nil) {
         self.scope = scope
         self.onSelect = onSelect
     }
@@ -682,7 +686,19 @@ struct TrainingScopeSelectorView: View {
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
             HStack(spacing: 6) {
                 ForEach(scope.options) { option in
-                    pill(for: option)
+                    pill(for: option, style: .primary)
+                }
+            }
+            // Contextual secondary row: only appears when the focused Goal
+            // has more than one canonical Phase (`EvidenceChronology.
+            // scopeContext`) — "a selected Goal may expose its Phases
+            // contextually" rather than one giant flat row of every Goal
+            // and Phase.
+            if !scope.phaseOptions.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(scope.phaseOptions) { option in
+                        pill(for: option, style: .phase)
+                    }
                 }
             }
             Text(scope.dateRangeLabel)
@@ -699,20 +715,22 @@ struct TrainingScopeSelectorView: View {
         )
     }
 
+    private enum PillStyle { case primary, phase }
+
     @ViewBuilder
-    private func pill(for option: TrainingScopeOption) -> some View {
+    private func pill(for option: TrainingScopeOption, style: PillStyle) -> some View {
+        let selectedBackground = style == .primary ? PhysiqueOSTheme.accent : PhysiqueOSTheme.accent.opacity(0.7)
         let label = Text(option.label)
-            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+            .physiqueOSFont(style == .primary ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
             .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.textSecondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(option.selected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
+            .padding(.horizontal, style == .primary ? 10 : 8)
+            .padding(.vertical, style == .primary ? 6 : 4)
+            .background(option.selected ? selectedBackground : PhysiqueOSTheme.surfaceMuted)
             .clipShape(Capsule())
 
         if let onSelect {
             Button {
-                guard let scopeID = EvidenceScopeID(rawValue: option.id) else { return }
-                onSelect(scopeID)
+                onSelect(option.id)
             } label: {
                 label
             }

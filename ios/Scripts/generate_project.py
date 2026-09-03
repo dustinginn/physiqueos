@@ -174,6 +174,7 @@ resource_files = [
     ("Resources", "OperatingPlanFixture.json"),
     ("Resources", "LogFixture.json"),
     ("Resources", "EvidenceFixture.json"),
+    ("Resources", "EvidenceChronologyFixture.json"),
     ("Resources", "TrainingFixture.json"),
     ("Resources", "ActivityFixture.json"),
     ("Resources", "NutritionFixture.json"),

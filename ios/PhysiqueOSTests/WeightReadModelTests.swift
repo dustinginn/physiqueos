@@ -34,7 +34,16 @@ final class WeightReadModelTests: XCTestCase {
     /// against `WeightEvidenceContextService.test.js:64-104`, not inferred
     /// from the goal's name.
     func testBuildLeanMassSummaryShowsBothHighestAndLowest() async throws {
-        let report = try await api.fetchWeightReport(scope: .buildLeanMass)
+        let report = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        XCTAssertEqual(report.summary.map(\.label), ["Latest", "Since Start", "Highest", "Lowest"])
+    }
+
+    /// Selecting a specific Phase of Build Lean Mass still uses the
+    /// Build-Lean-Mass-style branch (both Highest and Lowest) — the
+    /// Highest/Lowest choice is a Goal-level fact; Phase selection only
+    /// narrows which entries are considered.
+    func testBuildLeanMassPhaseSummaryStillShowsBothHighestAndLowest() async throws {
+        let report = try await api.fetchWeightReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
         XCTAssertEqual(report.summary.map(\.label), ["Latest", "Since Start", "Highest", "Lowest"])
     }
 
@@ -44,7 +53,7 @@ final class WeightReadModelTests: XCTestCase {
     /// right by luck; the real point this test locks in is that the 3rd
     /// card is "Last Change", not "Highest", for this specific goal.
     func testVisibleAbsSummaryShowsOnlyLowestAndReplacesHighestWithLastChange() async throws {
-        let report = try await api.fetchWeightReport(scope: .visibleAbs)
+        let report = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertEqual(report.summary.map(\.label), ["Latest", "Since Start", "Last Change", "Lowest"])
     }
 
@@ -57,8 +66,8 @@ final class WeightReadModelTests: XCTestCase {
     /// scoped window — the confirmed real web asymmetry (`overallLatest`
     /// used even inside Build Lean Mass's own scoped view).
     func testLatestCardIsAlwaysTheOverallLatestEntry() async throws {
-        let buildLeanMass = try await api.fetchWeightReport(scope: .buildLeanMass)
-        let visibleAbs = try await api.fetchWeightReport(scope: .visibleAbs)
+        let buildLeanMass = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        let visibleAbs = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         let latestCard = { (report: WeightReportReadModel) in report.summary.first { $0.label == "Latest" }?.value }
         XCTAssertEqual(latestCard(buildLeanMass), "179.4 lb")
         // Visible Abs's own "Latest" reads its *scoped* latest, per the
@@ -72,7 +81,7 @@ final class WeightReadModelTests: XCTestCase {
         // Abs began, so Visible Abs's own Highest/Lowest reducer never
         // sees it — Lowest inside that scope must be 172.0, not anything
         // from outside the window.
-        let report = try await api.fetchWeightReport(scope: .visibleAbs)
+        let report = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         let lowest = try XCTUnwrap(report.summary.first { $0.label == "Lowest" })
         XCTAssertEqual(lowest.value, "172.0 lb")
     }
@@ -123,7 +132,7 @@ final class WeightReadModelTests: XCTestCase {
     /// `getWeeklyAverages`'s own "keep only the last 6" behavior applied
     /// AFTER week-over-week computation across the full series.
     func testWeeklyAveragesForALongSeriesStillComputesADeltaForTheOldestKeptWeek() async throws {
-        let report = try await api.fetchWeightReport(scope: .visibleAbs)
+        let report = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         let oldestShown = try XCTUnwrap(report.weeklyAverages.last)
         XCTAssertNotNil(oldestShown.weekOverWeek)
         XCTAssertFalse(oldestShown.isBaseWeek)
@@ -141,7 +150,7 @@ final class WeightReadModelTests: XCTestCase {
 
     func testDEXAMarkersAreScopedWithTheSameWindowAsWeights() async throws {
         let allReport = try await api.fetchWeightReport(scope: .all)
-        let visibleAbsReport = try await api.fetchWeightReport(scope: .visibleAbs)
+        let visibleAbsReport = try await api.fetchWeightReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertEqual(allReport.chart.markers.count, 3)
         // Only the 2026-05-24 and 2026-07-05 scans fall inside Visible
         // Abs's window; 2026-08-16 does not.
@@ -164,9 +173,20 @@ final class WeightReadModelTests: XCTestCase {
 
     func testHistoryEntriesCarryAttribution() async throws {
         let report = try await api.fetchWeightReport(scope: .all)
-        XCTAssertTrue(report.history.allSatisfy { $0.attributedScope != nil })
+        // Every entry except the one dated before Visible Abs began
+        // resolves to a real Goal — that one entry is honestly
+        // unattributed (`attributedScope == nil`) rather than defaulted to
+        // whichever Goal happens to be current.
+        let attributed = report.history.filter { $0.date != "2026-05-23" }
+        XCTAssertTrue(attributed.allSatisfy { $0.attributedScope != nil })
         let preVisibleAbs = try XCTUnwrap(report.history.first { $0.date == "2026-05-23" })
-        XCTAssertNil(preVisibleAbs.attributedScope?.label)
+        XCTAssertNil(preVisibleAbs.attributedScope)
+    }
+
+    func testPhaseScopeFiltersWeightHistoryToOnePhase() async throws {
+        let report = try await api.fetchWeightReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
+        XCTAssertTrue(report.history.allSatisfy { $0.date >= "2026-07-19" && $0.date <= "2026-08-15" })
+        XCTAssertFalse(report.history.isEmpty)
     }
 
     // MARK: - Empty/sparse chart state

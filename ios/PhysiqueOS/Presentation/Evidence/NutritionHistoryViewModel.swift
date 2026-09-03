@@ -10,10 +10,10 @@ final class NutritionHistoryViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    /// Nutrition's own real default context ("build-lean-mass", matching
+    /// Nutrition's own real default context (Build Lean Mass, matching
     /// Weight/Activity — see `NutritionAPI.fetchNutritionLanding()`'s doc
     /// comment).
-    private(set) var scope: EvidenceScopeID = .buildLeanMass
+    private(set) var scope: EvidenceScopeSelection = NutritionScopeDefault.selection
     private let api: NutritionAPI
 
     init(api: NutritionAPI) {
@@ -28,9 +28,9 @@ final class NutritionHistoryViewModel {
         }
     }
 
-    func selectScope(_ scopeID: EvidenceScopeID) async {
-        guard scopeID != scope else { return }
-        scope = scopeID
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
         await load()
     }
 }

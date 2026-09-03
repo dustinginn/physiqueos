@@ -13,7 +13,7 @@ protocol NutritionAPI: Sendable {
     /// list is date-scoped). The no-`scope` overload below defaults to
     /// `.buildLeanMass`, Nutrition's own real default context (matching
     /// Weight/Activity, unlike Training's `.all`).
-    func fetchNutritionLanding(scope: EvidenceScopeID) async throws -> NutritionLandingReadModel
+    func fetchNutritionLanding(scope: EvidenceScopeSelection) async throws -> NutritionLandingReadModel
     /// `nil` for an id with no matching Nutrition day — mirrors
     /// `TrainingAPI.fetchTrainingDay(date:)`'s own not-found contract.
     func fetchNutritionDay(dayId: String) async throws -> NutritionDayRecord?
@@ -21,8 +21,14 @@ protocol NutritionAPI: Sendable {
 
 extension NutritionAPI {
     func fetchNutritionLanding() async throws -> NutritionLandingReadModel {
-        try await fetchNutritionLanding(scope: .buildLeanMass)
+        try await fetchNutritionLanding(scope: NutritionScopeDefault.selection)
     }
+}
+
+/// Nutrition's own real default context is Build Lean Mass (matching Weight/
+/// Activity, unlike Training's "all").
+enum NutritionScopeDefault {
+    static let selection: EvidenceScopeSelection = .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass)
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file containing the
@@ -60,7 +66,7 @@ struct FixtureNutritionAPI: NutritionAPI {
     /// `scope`'s window when scoped; `latestNutritionDay` stays the true
     /// overall latest regardless of scope, matching Weight's confirmed
     /// "Latest" asymmetry.
-    func fetchNutritionLanding(scope: EvidenceScopeID) async throws -> NutritionLandingReadModel {
+    func fetchNutritionLanding(scope: EvidenceScopeSelection) async throws -> NutritionLandingReadModel {
         let fixture = try loadFixture()
         let attributedDays = fixture.days.map { day -> NutritionDayRecord in
             var day = day

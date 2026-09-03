@@ -10,10 +10,10 @@ final class ActivityHistoryViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    /// Activity's own real default context ("build-lean-mass", matching
+    /// Activity's own real default context (Build Lean Mass, matching
     /// Weight/Nutrition — see `ActivityAPI.fetchActivityLanding()`'s doc
     /// comment).
-    private(set) var scope: EvidenceScopeID = .buildLeanMass
+    private(set) var scope: EvidenceScopeSelection = ActivityScopeDefault.selection
     private let api: ActivityAPI
 
     init(api: ActivityAPI) {
@@ -29,9 +29,9 @@ final class ActivityHistoryViewModel {
     }
 
     /// Same shared-chronology adoption as `TrainingHistoryViewModel.selectScope`.
-    func selectScope(_ scopeID: EvidenceScopeID) async {
-        guard scopeID != scope else { return }
-        scope = scopeID
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
         await load()
     }
 }

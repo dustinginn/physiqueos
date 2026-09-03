@@ -15,7 +15,7 @@ protocol TrainingAPI: Sendable {
     /// `nutritionReportingLinks` stay global even when the day list is
     /// date-scoped). The no-`scope` overload below (`.all`, Training's own
     /// real default context) keeps every existing call site unchanged.
-    func fetchTrainingLanding(scope: EvidenceScopeID) async throws -> TrainingLandingReadModel
+    func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
     /// Fixture-backed for all 10 canonical areas (see `TrainingAreaReadModel`).
@@ -42,6 +42,13 @@ extension TrainingAPI {
     func fetchTrainingLanding() async throws -> TrainingLandingReadModel {
         try await fetchTrainingLanding(scope: .all)
     }
+}
+
+/// Training's own real default context is "all" (`normalizeTrainingContextId`
+/// defaults an absent/unmatched context to `"all"`, unlike Weight/Nutrition/
+/// Activity's Build Lean Mass default).
+enum TrainingScopeDefault {
+    static let selection: EvidenceScopeSelection = .all
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file mirroring the
@@ -131,7 +138,7 @@ struct FixtureTrainingAPI: TrainingAPI {
     /// (`EvidenceChronology.filter`) — the same shared mechanism every
     /// other Evidence vertical uses, applied here for the first time to
     /// make Training's previously-inert scope selector real.
-    func fetchTrainingLanding(scope: EvidenceScopeID) async throws -> TrainingLandingReadModel {
+    func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel {
         var landing = try loadFixture().landing
         if var latest = landing.latestTrainingDay {
             latest.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: latest.date)

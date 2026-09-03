@@ -75,7 +75,32 @@ struct TrainingLandingReadModel: Codable, Equatable {
 /// …) exists server-side but is not part of what this screen displays.
 struct TrainingScopeContext: Codable, Equatable {
     var options: [TrainingScopeOption]
+    /// Phase-level sub-options for the currently focused Goal option, when
+    /// that Goal has more than one canonical Phase (`EvidenceChronology.swift`)
+    /// — empty when not applicable (an un-phased Goal, or "All" selected).
+    /// Defaulted to `[]` explicitly in `init(from:)` below rather than
+    /// relying on the synthesized decoder's own default-value handling: the
+    /// many existing fixture JSON blocks (`TrainingFixture.json`,
+    /// `ActivityFixture.json`) predate this field and have no
+    /// `phaseOptions` key at all, and decoding must not require touching
+    /// every one of them.
+    var phaseOptions: [TrainingScopeOption] = []
     var dateRangeLabel: String
+
+    init(options: [TrainingScopeOption], phaseOptions: [TrainingScopeOption] = [], dateRangeLabel: String) {
+        self.options = options
+        self.phaseOptions = phaseOptions
+        self.dateRangeLabel = dateRangeLabel
+    }
+
+    private enum CodingKeys: String, CodingKey { case options, phaseOptions, dateRangeLabel }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        options = try container.decode([TrainingScopeOption].self, forKey: .options)
+        phaseOptions = try container.decodeIfPresent([TrainingScopeOption].self, forKey: .phaseOptions) ?? []
+        dateRangeLabel = try container.decode(String.self, forKey: .dateRangeLabel)
+    }
 }
 
 struct TrainingScopeOption: Codable, Equatable, Identifiable {

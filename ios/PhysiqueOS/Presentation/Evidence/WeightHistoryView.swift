@@ -76,7 +76,7 @@ struct WeightHistoryView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(for: report)
                 TrainingScopeSelectorView(scope: report.scope) { scopeID in
-                    Task { await viewModel?.selectScope(scopeID) }
+                    Task { await viewModel?.selectScope(pillID: scopeID) }
                 }
                 summaryGrid(report.summary)
                 trendCard(report.chart)

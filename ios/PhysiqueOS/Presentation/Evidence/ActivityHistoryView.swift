@@ -98,7 +98,7 @@ struct ActivityHistoryView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(for: landing)
                 TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(scopeID) }
+                    Task { await viewModel?.selectScope(pillID: scopeID) }
                 }
                 latestActivityDayCard(landing.latestActivityDay)
                 activityAreasCard(landing.activityAreas)

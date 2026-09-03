@@ -12,9 +12,9 @@ final class TrainingHistoryViewModel {
     private(set) var state: LoadState = .loading
     /// Training's own real default context ("all" —
     /// `normalizeTrainingContextId`, unlike Weight/Nutrition/Activity's
-    /// `.buildLeanMass` default), matching the existing fixture's
+    /// Build Lean Mass default), matching the existing fixture's
     /// `"all"`-selected pill.
-    private(set) var scope: EvidenceScopeID = .all
+    private(set) var scope: EvidenceScopeSelection = TrainingScopeDefault.selection
     private let api: TrainingAPI
 
     init(api: TrainingAPI) {
@@ -33,9 +33,12 @@ final class TrainingHistoryViewModel {
     /// selecting a scope re-fetches the same fixture, narrowed to that
     /// scope's window — mirroring the web's own full-navigation re-fetch
     /// (`/progress/training?context=...`) with an in-memory reload instead.
-    func selectScope(_ scopeID: EvidenceScopeID) async {
-        guard scopeID != scope else { return }
-        scope = scopeID
+    /// `pillID` is a tapped `TrainingScopeOption.id` from either the Goal
+    /// row or the contextual Phase row — both routed through this one
+    /// entry point.
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
         await load()
     }
 }

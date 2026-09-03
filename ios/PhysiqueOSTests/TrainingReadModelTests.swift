@@ -91,7 +91,7 @@ final class TrainingReadModelTests: XCTestCase {
     /// param is present.
     func testScopeDefaultsToAllTrainingWithCompleteHistoryLabel() async throws {
         let landing = try await api.fetchTrainingLanding()
-        XCTAssertEqual(landing.scope.options.map(\.id), ["build-lean-mass", "visible-abs", "all"])
+        XCTAssertEqual(landing.scope.options.map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)", "goal:\(EvidenceCanonicalGoalID.visibleAbs)", "all"])
         XCTAssertEqual(landing.scope.options.map(\.label), ["Build Lean Mass", "Visible Abs", "All Training"])
         let selected = landing.scope.options.filter(\.selected)
         XCTAssertEqual(selected.map(\.id), ["all"])
@@ -1060,12 +1060,12 @@ final class TrainingReadModelTests: XCTestCase {
     /// previously-documented "inert snapshot."
     func testScopeSelectionActuallyNarrowsTrainingDaysNowInsteadOfBeingInert() async throws {
         let all = try await api.fetchTrainingLanding(scope: .all)
-        let buildLeanMass = try await api.fetchTrainingLanding(scope: .buildLeanMass)
-        let visibleAbs = try await api.fetchTrainingLanding(scope: .visibleAbs)
+        let buildLeanMass = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertFalse(all.trainingDays.isEmpty)
         XCTAssertEqual(buildLeanMass.trainingDays.count, all.trainingDays.count)
         XCTAssertTrue(visibleAbs.trainingDays.isEmpty)
-        XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["build-lean-mass"])
+        XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
     }
 
     /// Unscoped landing fields (areas, current protocol) must NOT narrow
@@ -1073,7 +1073,7 @@ final class TrainingReadModelTests: XCTestCase {
     /// `dateWindow`-only filtering.
     func testNonHistoryLandingFieldsStayUnscopedAcrossSelection() async throws {
         let all = try await api.fetchTrainingLanding(scope: .all)
-        let visibleAbs = try await api.fetchTrainingLanding(scope: .visibleAbs)
+        let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertEqual(all.trainingAreas.count, visibleAbs.trainingAreas.count)
         XCTAssertEqual(all.currentProtocol, visibleAbs.currentProtocol)
     }
@@ -1082,12 +1082,21 @@ final class TrainingReadModelTests: XCTestCase {
     /// screens previously carried zero Goal/Phase attribution at all
     /// (`TrainingReadService.getDay`/session lookup had no `goalId`/
     /// `phaseId`/date-window field whatsoever, verified directly from
-    /// source during this port's audit). They now do.
+    /// source during this port's audit). They now do — including the
+    /// specific Phase, not just the Goal.
     func testTrainingDayDetailCarriesGoalPhaseAttribution() async throws {
         let landing = try await api.fetchTrainingLanding(scope: .all)
         let firstDayDate = try XCTUnwrap(landing.trainingDays.first?.date)
         let day = try await api.fetchTrainingDay(date: firstDayDate)
-        XCTAssertEqual(day?.attributedScope?.scopeID, .buildLeanMass)
+        XCTAssertEqual(day?.attributedScope?.goalId, EvidenceCanonicalGoalID.buildLeanMass)
+        XCTAssertEqual(day?.attributedScope?.phaseName, "Lean Mass Build")
+    }
+
+    func testPhaseScopeNarrowsTrainingDaysToOnePhase() async throws {
+        let leanMassBuild = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
+        let establishMaintenance = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
+        XCTAssertFalse(leanMassBuild.trainingDays.isEmpty)
+        XCTAssertTrue(establishMaintenance.trainingDays.isEmpty)
     }
 
     func testTrainingSessionDetailCarriesGoalPhaseAttribution() async throws {

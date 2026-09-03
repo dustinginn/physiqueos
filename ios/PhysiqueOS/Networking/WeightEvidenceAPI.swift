@@ -16,13 +16,18 @@ protocol WeightEvidenceAPI: Sendable {
     /// `dexaScans` together via `scopeWeightReportContext`). The no-`scope`
     /// overload defaults to `.buildLeanMass`, Weight's own confirmed real
     /// default context.
-    func fetchWeightReport(scope: EvidenceScopeID) async throws -> WeightReportReadModel
+    func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel
 }
 
 extension WeightEvidenceAPI {
     func fetchWeightReport() async throws -> WeightReportReadModel {
-        try await fetchWeightReport(scope: .buildLeanMass)
+        try await fetchWeightReport(scope: WeightScopeDefault.selection)
     }
+}
+
+/// Weight's own confirmed real default context is Build Lean Mass.
+enum WeightScopeDefault {
+    static let selection: EvidenceScopeSelection = .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass)
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file of raw,
@@ -54,7 +59,7 @@ struct FixtureWeightEvidenceAPI: WeightEvidenceAPI {
         return try JSONDecoder().decode(WeightFixtureFile.self, from: data)
     }
 
-    func fetchWeightReport(scope: EvidenceScopeID) async throws -> WeightReportReadModel {
+    func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel {
         let fixture = try loadFixture()
         let scopedWeights = EvidenceChronology.filter(fixture.weights, scope: scope, date: \.date)
         let scopedScans = EvidenceChronology.filter(fixture.dexaScans, scope: scope, date: \.date)
@@ -84,7 +89,7 @@ struct FixtureWeightEvidenceAPI: WeightEvidenceAPI {
             title: "Weight",
             subtitle: "Weight evidence over time.",
             scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Weight"),
-            summary: WeightEvidenceCalculator.summary(scopeID: scope, allWeights: fixture.weights, scopedWeights: scopedWeights),
+            summary: WeightEvidenceCalculator.summary(scope: scope, allWeights: fixture.weights, scopedWeights: scopedWeights),
             chart: WeightChartData(points: points, markers: markers),
             weeklyAverages: WeightEvidenceCalculator.weeklyAverages(scopedWeights: scopedWeights),
             history: history,

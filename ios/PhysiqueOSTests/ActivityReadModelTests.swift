@@ -45,9 +45,9 @@ final class ActivityReadModelTests: XCTestCase {
     /// from Training's reporting service, which defaults to "all".
     func testScopeDefaultsToBuildLeanMass() async throws {
         let landing = try await api.fetchActivityLanding()
-        XCTAssertEqual(landing.scope.options.map(\.id), ["build-lean-mass", "visible-abs", "all"])
+        XCTAssertEqual(landing.scope.options.map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)", "goal:\(EvidenceCanonicalGoalID.visibleAbs)", "all"])
         let selected = landing.scope.options.filter(\.selected)
-        XCTAssertEqual(selected.map(\.id), ["build-lean-mass"])
+        XCTAssertEqual(selected.map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
     }
 
     // MARK: - History ordering
@@ -225,8 +225,8 @@ final class ActivityReadModelTests: XCTestCase {
     /// presentation.
     func testScopeSelectionActuallyNarrowsActivityHistoryNowInsteadOfBeingInert() async throws {
         let all = try await api.fetchActivityLanding(scope: .all)
-        let buildLeanMass = try await api.fetchActivityLanding(scope: .buildLeanMass)
-        let visibleAbs = try await api.fetchActivityLanding(scope: .visibleAbs)
+        let buildLeanMass = try await api.fetchActivityLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        let visibleAbs = try await api.fetchActivityLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertFalse(all.activityHistory.isEmpty)
         XCTAssertEqual(buildLeanMass.activityHistory.count, all.activityHistory.count)
         XCTAssertTrue(visibleAbs.activityHistory.isEmpty)

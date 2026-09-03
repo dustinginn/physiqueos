@@ -11,7 +11,7 @@ protocol ActivityAPI: Sendable {
     /// no-`scope` overload below defaults to `.buildLeanMass`, Activity's
     /// own real default context (matching Weight/Nutrition, unlike
     /// Training's `.all`), so every existing call site keeps working.
-    func fetchActivityLanding(scope: EvidenceScopeID) async throws -> ActivityLandingReadModel
+    func fetchActivityLanding(scope: EvidenceScopeSelection) async throws -> ActivityLandingReadModel
     /// `nil` for a date with no matching Activity day — mirrors
     /// `TrainingAPI.fetchTrainingDay(date:)`'s own not-found contract.
     func fetchActivityDay(date: String) async throws -> ActivityDayRecord?
@@ -19,8 +19,14 @@ protocol ActivityAPI: Sendable {
 
 extension ActivityAPI {
     func fetchActivityLanding() async throws -> ActivityLandingReadModel {
-        try await fetchActivityLanding(scope: .buildLeanMass)
+        try await fetchActivityLanding(scope: ActivityScopeDefault.selection)
     }
+}
+
+/// Activity's own real default context is Build Lean Mass (matching Weight/
+/// Nutrition, unlike Training's "all").
+enum ActivityScopeDefault {
+    static let selection: EvidenceScopeSelection = .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass)
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file containing the
@@ -49,7 +55,7 @@ struct FixtureActivityAPI: ActivityAPI {
     /// Same shared chronology adoption as `FixtureTrainingAPI`: backfills
     /// `attributedScope` on every history row (and `latestActivityDay`),
     /// then narrows `activityHistory` to `scope`'s window when scoped.
-    func fetchActivityLanding(scope: EvidenceScopeID) async throws -> ActivityLandingReadModel {
+    func fetchActivityLanding(scope: EvidenceScopeSelection) async throws -> ActivityLandingReadModel {
         var landing = try loadFixture().landing
         if var latest = landing.latestActivityDay {
             latest.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: latest.date)

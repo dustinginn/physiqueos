@@ -39,12 +39,16 @@ enum WeightEvidenceCalculator {
         return String(format: "%@%.1f %@", sign, delta, last.unit)
     }
 
-    /// `buildWeightSummary` — the literal 3-branch lookup table keyed on
-    /// `scopeID`, verified directly against
-    /// `WeightEvidenceContextService.test.js:64-104`. `allWeights` and
-    /// `scopedWeights` are both chronologically ascending (oldest first);
-    /// when `scopeID == .all`, callers pass `scopedWeights == allWeights`.
-    static func summary(scopeID: EvidenceScopeID, allWeights: [WeightEntryFixture], scopedWeights: [WeightEntryFixture]) -> [WeightSummaryCard] {
+    /// `buildWeightSummary` — the literal 3-branch lookup table, verified
+    /// directly against `WeightEvidenceContextService.test.js:64-104`.
+    /// Originally keyed on a flat `contextId` string; now keyed on which
+    /// canonical Goal is focused by the selection (a specific Phase of that
+    /// Goal still counts as "focused on that Goal" — the Highest/Lowest
+    /// branch is a Goal-level fact, Phase selection only narrows which
+    /// entries are considered). `allWeights` and `scopedWeights` are both
+    /// chronologically ascending (oldest first); for `.all`, callers pass
+    /// `scopedWeights == allWeights`.
+    static func summary(scope: EvidenceScopeSelection, allWeights: [WeightEntryFixture], scopedWeights: [WeightEntryFixture]) -> [WeightSummaryCard] {
         let overallLatest = allWeights.last
         let scopedFirst = scopedWeights.first
         let scopedLatest = scopedWeights.last
@@ -52,22 +56,25 @@ enum WeightEvidenceCalculator {
         let highest = extreme(scopedWeights, .highest)
         let lowest = extreme(scopedWeights, .lowest)
 
-        switch scopeID {
-        case .buildLeanMass:
+        switch scope.focusedGoalID {
+        case EvidenceCanonicalGoalID.buildLeanMass:
             return [
                 WeightSummaryCard(label: "Latest", value: formatWeight(overallLatest)),
                 WeightSummaryCard(label: "Since Start", value: formatChange(scopedFirst, overallLatest)),
                 WeightSummaryCard(label: "Highest", value: formatWeight(highest)),
                 WeightSummaryCard(label: "Lowest", value: formatWeight(lowest)),
             ]
-        case .visibleAbs:
+        case EvidenceCanonicalGoalID.visibleAbs:
             return [
                 WeightSummaryCard(label: "Latest", value: formatWeight(scopedLatest)),
                 WeightSummaryCard(label: "Since Start", value: formatChange(scopedFirst, scopedLatest)),
                 WeightSummaryCard(label: "Last Change", value: formatChange(scopedPrevious, scopedLatest)),
                 WeightSummaryCard(label: "Lowest", value: formatWeight(lowest)),
             ]
-        case .all:
+        default:
+            // `.all`, or a future Goal id this literal lookup doesn't
+            // recognize — falls into the same "all"-style branch the web
+            // itself falls into for an unrecognized contextId.
             return [
                 WeightSummaryCard(label: "Latest", value: formatWeight(overallLatest)),
                 WeightSummaryCard(label: "Since First", value: formatChange(allWeights.first, overallLatest)),

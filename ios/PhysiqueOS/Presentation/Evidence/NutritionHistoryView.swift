@@ -86,7 +86,7 @@ struct NutritionHistoryView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(for: landing)
                 TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(scopeID) }
+                    Task { await viewModel?.selectScope(pillID: scopeID) }
                 }
                 latestNutritionDayCard(landing.latestNutritionDay)
                 infoLinksCard(title: "Reporting", links: landing.reportingLinks)

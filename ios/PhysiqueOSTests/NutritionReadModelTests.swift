@@ -84,17 +84,17 @@ final class NutritionReadModelTests: XCTestCase {
 
     func testScopeDefaultsToBuildLeanMass() async throws {
         let landing = try await api.fetchNutritionLanding()
-        XCTAssertEqual(landing.scope.options.filter(\.selected).map(\.id), ["build-lean-mass"])
+        XCTAssertEqual(landing.scope.options.filter(\.selected).map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
     }
 
     func testBuildLeanMassScopeExcludesVisibleAbsEraDays() async throws {
-        let landing = try await api.fetchNutritionLanding(scope: .buildLeanMass)
+        let landing = try await api.fetchNutritionLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         XCTAssertTrue(landing.nutritionHistory.allSatisfy { $0.date >= "2026-07-19" })
         XCTAssertEqual(landing.nutritionHistory.count, 5)
     }
 
     func testVisibleAbsScopeExcludesBuildLeanMassEraDays() async throws {
-        let landing = try await api.fetchNutritionLanding(scope: .visibleAbs)
+        let landing = try await api.fetchNutritionLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertTrue(landing.nutritionHistory.allSatisfy { $0.date >= "2026-05-24" && $0.date <= "2026-07-18" })
         XCTAssertEqual(landing.nutritionHistory.count, 3)
     }
@@ -108,7 +108,7 @@ final class NutritionReadModelTests: XCTestCase {
     /// the Build Lean Mass scope even though Build Lean Mass is the
     /// current Goal — the task's explicit non-negotiable invariant.
     func testPreVisibleAbsRecordNeverAppearsInBuildLeanMassScope() async throws {
-        let landing = try await api.fetchNutritionLanding(scope: .buildLeanMass)
+        let landing = try await api.fetchNutritionLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         XCTAssertFalse(landing.nutritionHistory.contains { $0.id == "nutrition-day-fixture-001" })
     }
 
@@ -116,7 +116,7 @@ final class NutritionReadModelTests: XCTestCase {
     /// selected scope — mirroring Weight's confirmed "Latest" asymmetry
     /// (unscoped even in a goal-scoped view).
     func testLatestNutritionDayIsUnscopedEvenUnderVisibleAbsScope() async throws {
-        let landing = try await api.fetchNutritionLanding(scope: .visibleAbs)
+        let landing = try await api.fetchNutritionLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertEqual(landing.latestNutritionDay?.date, "2026-08-30")
     }
 
@@ -124,12 +124,32 @@ final class NutritionReadModelTests: XCTestCase {
 
     func testEveryDayCarriesAttributionAfterFetch() async throws {
         let landing = try await api.fetchNutritionLanding(scope: .all)
-        XCTAssertTrue(landing.nutritionHistory.allSatisfy { $0.attributedScope != nil })
+        // Every day except the one dated before Visible Abs began resolves
+        // to a real Goal — that one day is honestly unattributed
+        // (`attributedScope == nil`) rather than defaulted to whichever
+        // Goal happens to be current.
+        let attributed = landing.nutritionHistory.filter { $0.id != "nutrition-day-fixture-001" }
+        XCTAssertTrue(attributed.allSatisfy { $0.attributedScope != nil })
+        let unattributed = landing.nutritionHistory.first { $0.id == "nutrition-day-fixture-001" }
+        XCTAssertNil(unattributed?.attributedScope)
     }
 
     func testBuildLeanMassEraDayIsAttributedToBuildLeanMass() async throws {
         let day = try await api.fetchNutritionDay(dayId: "nutrition-day-fixture-004")
-        XCTAssertEqual(day?.attributedScope?.scopeID, .buildLeanMass)
+        XCTAssertEqual(day?.attributedScope?.goalId, EvidenceCanonicalGoalID.buildLeanMass)
+    }
+
+    /// Phase-level attribution: 2026-08-01 falls inside Build Lean Mass's
+    /// "Establish Maintenance" phase window in the bundled fixture.
+    func testBuildLeanMassEraDayCarriesPhaseAttribution() async throws {
+        let day = try await api.fetchNutritionDay(dayId: "nutrition-day-fixture-005")
+        XCTAssertEqual(day?.attributedScope?.phaseName, "Establish Maintenance")
+    }
+
+    func testPhaseScopeNarrowsNutritionHistoryToOnePhase() async throws {
+        let landing = try await api.fetchNutritionLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
+        XCTAssertTrue(landing.nutritionHistory.allSatisfy { $0.date >= "2026-07-19" && $0.date <= "2026-08-15" })
+        XCTAssertFalse(landing.nutritionHistory.isEmpty)
     }
 
     // MARK: - Server-owned intelligence is never fabricated

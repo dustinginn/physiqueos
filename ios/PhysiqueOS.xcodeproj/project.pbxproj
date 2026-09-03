@@ -150,46 +150,47 @@
 		00000000000000000000111A /* OperatingPlanFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001119 /* OperatingPlanFixture.json */; };
 		00000000000000000000111C /* LogFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111B /* LogFixture.json */; };
 		00000000000000000000111E /* EvidenceFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111D /* EvidenceFixture.json */; };
-		000000000000000000001120 /* TrainingFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111F /* TrainingFixture.json */; };
-		000000000000000000001122 /* ActivityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001121 /* ActivityFixture.json */; };
-		000000000000000000001124 /* NutritionFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001123 /* NutritionFixture.json */; };
-		000000000000000000001126 /* WeightFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001125 /* WeightFixture.json */; };
-		000000000000000000001128 /* TrainingLoggerFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001127 /* TrainingLoggerFixture.json */; };
-		00000000000000000000112A /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001129 /* PlusJakartaSans[wght].ttf */; };
-		00000000000000000000112C /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112B /* OFL.txt */; };
-		000000000000000000001188 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001187 /* Assets.xcassets */; };
-		00000000000000000000112F /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112E /* AppTabTests.swift */; };
-		000000000000000000001131 /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001130 /* HomeReadModelTests.swift */; };
-		000000000000000000001133 /* GoalsReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001132 /* GoalsReadModelTests.swift */; };
-		000000000000000000001135 /* OperatingPlanReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001134 /* OperatingPlanReadModelTests.swift */; };
-		000000000000000000001137 /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001136 /* LogReadModelTests.swift */; };
-		000000000000000000001139 /* SharedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001138 /* SharedUITests.swift */; };
-		00000000000000000000113B /* EvidenceReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113A /* EvidenceReadModelTests.swift */; };
-		00000000000000000000113D /* EvidenceHubUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113C /* EvidenceHubUsageTests.swift */; };
-		00000000000000000000113F /* TrainingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113E /* TrainingReadModelTests.swift */; };
-		000000000000000000001141 /* ActivityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001140 /* ActivityReadModelTests.swift */; };
-		000000000000000000001143 /* NutritionReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001142 /* NutritionReadModelTests.swift */; };
-		000000000000000000001145 /* WeightReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001144 /* WeightReadModelTests.swift */; };
-		000000000000000000001147 /* EvidenceChronologyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001146 /* EvidenceChronologyTests.swift */; };
-		000000000000000000001149 /* TrainingLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001148 /* TrainingLoggerTests.swift */; };
-		00000000000000000000114B /* LoggingSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114A /* LoggingSandboxTests.swift */; };
-		00000000000000000000114D /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114C /* FounderServerAPITests.swift */; };
-		00000000000000000000117B /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117A /* TrainingAcceptanceUITests.swift */; };
+		000000000000000000001120 /* EvidenceChronologyFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111F /* EvidenceChronologyFixture.json */; };
+		000000000000000000001122 /* TrainingFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001121 /* TrainingFixture.json */; };
+		000000000000000000001124 /* ActivityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001123 /* ActivityFixture.json */; };
+		000000000000000000001126 /* NutritionFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001125 /* NutritionFixture.json */; };
+		000000000000000000001128 /* WeightFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001127 /* WeightFixture.json */; };
+		00000000000000000000112A /* TrainingLoggerFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001129 /* TrainingLoggerFixture.json */; };
+		00000000000000000000112C /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112B /* PlusJakartaSans[wght].ttf */; };
+		00000000000000000000112E /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112D /* OFL.txt */; };
+		00000000000000000000118A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001189 /* Assets.xcassets */; };
+		000000000000000000001131 /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001130 /* AppTabTests.swift */; };
+		000000000000000000001133 /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001132 /* HomeReadModelTests.swift */; };
+		000000000000000000001135 /* GoalsReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001134 /* GoalsReadModelTests.swift */; };
+		000000000000000000001137 /* OperatingPlanReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001136 /* OperatingPlanReadModelTests.swift */; };
+		000000000000000000001139 /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001138 /* LogReadModelTests.swift */; };
+		00000000000000000000113B /* SharedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113A /* SharedUITests.swift */; };
+		00000000000000000000113D /* EvidenceReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113C /* EvidenceReadModelTests.swift */; };
+		00000000000000000000113F /* EvidenceHubUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113E /* EvidenceHubUsageTests.swift */; };
+		000000000000000000001141 /* TrainingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001140 /* TrainingReadModelTests.swift */; };
+		000000000000000000001143 /* ActivityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001142 /* ActivityReadModelTests.swift */; };
+		000000000000000000001145 /* NutritionReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001144 /* NutritionReadModelTests.swift */; };
+		000000000000000000001147 /* WeightReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001146 /* WeightReadModelTests.swift */; };
+		000000000000000000001149 /* EvidenceChronologyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001148 /* EvidenceChronologyTests.swift */; };
+		00000000000000000000114B /* TrainingLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114A /* TrainingLoggerTests.swift */; };
+		00000000000000000000114D /* LoggingSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114C /* LoggingSandboxTests.swift */; };
+		00000000000000000000114F /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114E /* FounderServerAPITests.swift */; };
+		00000000000000000000117D /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117C /* TrainingAcceptanceUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		000000000000000000001179 /* PBXContainerItemProxy */ = {
+		00000000000000000000117B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000001166 /* Project object */;
+			containerPortal = 000000000000000000001168 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000116A;
+			remoteGlobalIDString = 00000000000000000000116C;
 			remoteInfo = PhysiqueOS;
 		};
-		000000000000000000001186 /* PBXContainerItemProxy */ = {
+		000000000000000000001188 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000001166 /* Project object */;
+			containerPortal = 000000000000000000001168 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000116A;
+			remoteGlobalIDString = 00000000000000000000116C;
 			remoteInfo = PhysiqueOS;
 		};
 /* End PBXContainerItemProxy section */
@@ -338,53 +339,54 @@
 		000000000000000000001119 /* OperatingPlanFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "OperatingPlanFixture.json"; sourceTree = "<group>"; };
 		00000000000000000000111B /* LogFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "LogFixture.json"; sourceTree = "<group>"; };
 		00000000000000000000111D /* EvidenceFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000111F /* TrainingFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001121 /* ActivityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ActivityFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001123 /* NutritionFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "NutritionFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001125 /* WeightFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "WeightFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001127 /* TrainingLoggerFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingLoggerFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001129 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
-		00000000000000000000112B /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
-		000000000000000000001187 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
-		00000000000000000000112D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
-		00000000000000000000112E /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001130 /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001132 /* GoalsReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001134 /* OperatingPlanReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001136 /* LogReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001138 /* SharedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SharedUITests.swift"; sourceTree = "<group>"; };
-		00000000000000000000113A /* EvidenceReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModelTests.swift"; sourceTree = "<group>"; };
-		00000000000000000000113C /* EvidenceHubUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsageTests.swift"; sourceTree = "<group>"; };
-		00000000000000000000113E /* TrainingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001140 /* ActivityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001142 /* NutritionReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001144 /* WeightReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightReadModelTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001146 /* EvidenceChronologyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceChronologyTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001148 /* TrainingLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerTests.swift"; sourceTree = "<group>"; };
-		00000000000000000000114A /* LoggingSandboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggingSandboxTests.swift"; sourceTree = "<group>"; };
-		00000000000000000000114C /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
-		00000000000000000000117A /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
-		000000000000000000001164 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001165 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		00000000000000000000117C /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000111F /* EvidenceChronologyFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceChronologyFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001121 /* TrainingFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001123 /* ActivityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ActivityFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001125 /* NutritionFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "NutritionFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001127 /* WeightFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "WeightFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001129 /* TrainingLoggerFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingLoggerFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000112B /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
+		00000000000000000000112D /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
+		000000000000000000001189 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		00000000000000000000112F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		000000000000000000001130 /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001132 /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001134 /* GoalsReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001136 /* OperatingPlanReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001138 /* LogReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModelTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000113A /* SharedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SharedUITests.swift"; sourceTree = "<group>"; };
+		00000000000000000000113C /* EvidenceReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModelTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000113E /* EvidenceHubUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsageTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001140 /* TrainingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001142 /* ActivityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001144 /* NutritionReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001146 /* WeightReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001148 /* EvidenceChronologyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceChronologyTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000114A /* TrainingLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000114C /* LoggingSandboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggingSandboxTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000114E /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
+		00000000000000000000117C /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
+		000000000000000000001166 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001167 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000117E /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		00000000000000000000116F /* Frameworks */ = {
+		000000000000000000001171 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001176 /* Frameworks */ = {
+		000000000000000000001178 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001183 /* Frameworks */ = {
+		000000000000000000001185 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -394,21 +396,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		000000000000000000001150 /* PhysiqueOS */ = {
+		000000000000000000001152 /* PhysiqueOS */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001152 /* App */,
-				000000000000000000001153 /* Contracts */,
-				000000000000000000001154 /* Networking */,
-				000000000000000000001157 /* SharedUI */,
-				000000000000000000001155 /* Presentation */,
-				000000000000000000001156 /* Resources */,
-				000000000000000000001158 /* Supporting */,
+				000000000000000000001154 /* App */,
+				000000000000000000001155 /* Contracts */,
+				000000000000000000001156 /* Networking */,
+				000000000000000000001159 /* SharedUI */,
+				000000000000000000001157 /* Presentation */,
+				000000000000000000001158 /* Resources */,
+				00000000000000000000115A /* Supporting */,
 			);
 			path = PhysiqueOS;
 			sourceTree = "<group>";
 		};
-		000000000000000000001152 /* App */ = {
+		000000000000000000001154 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001001 /* PhysiqueOSApp.swift */,
@@ -417,7 +419,7 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		000000000000000000001153 /* Contracts */ = {
+		000000000000000000001155 /* Contracts */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001005 /* AppTab.swift */,
@@ -449,7 +451,7 @@
 			path = Contracts;
 			sourceTree = "<group>";
 		};
-		000000000000000000001154 /* Networking */ = {
+		000000000000000000001156 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001037 /* HomeAPI.swift */,
@@ -474,43 +476,44 @@
 			path = Networking;
 			sourceTree = "<group>";
 		};
-		000000000000000000001155 /* Presentation */ = {
+		000000000000000000001157 /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001159 /* Evidence */,
-				00000000000000000000115A /* Goals */,
-				00000000000000000000115B /* Home */,
-				00000000000000000000115C /* Log */,
-				00000000000000000000115D /* Logging */,
-				00000000000000000000115E /* OperatingPlan */,
-				00000000000000000000115F /* Root */,
-				000000000000000000001160 /* Training */,
-				000000000000000000001161 /* TrainingLogger */,
-				000000000000000000001162 /* You */,
+				00000000000000000000115B /* Evidence */,
+				00000000000000000000115C /* Goals */,
+				00000000000000000000115D /* Home */,
+				00000000000000000000115E /* Log */,
+				00000000000000000000115F /* Logging */,
+				000000000000000000001160 /* OperatingPlan */,
+				000000000000000000001161 /* Root */,
+				000000000000000000001162 /* Training */,
+				000000000000000000001163 /* TrainingLogger */,
+				000000000000000000001164 /* You */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
 		};
-		000000000000000000001156 /* Resources */ = {
+		000000000000000000001158 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001163 /* Fonts */,
+				000000000000000000001165 /* Fonts */,
 				000000000000000000001115 /* HomeFixture.json */,
 				000000000000000000001117 /* GoalsFixture.json */,
 				000000000000000000001119 /* OperatingPlanFixture.json */,
 				00000000000000000000111B /* LogFixture.json */,
 				00000000000000000000111D /* EvidenceFixture.json */,
-				00000000000000000000111F /* TrainingFixture.json */,
-				000000000000000000001121 /* ActivityFixture.json */,
-				000000000000000000001123 /* NutritionFixture.json */,
-				000000000000000000001125 /* WeightFixture.json */,
-				000000000000000000001127 /* TrainingLoggerFixture.json */,
-				000000000000000000001187 /* Assets.xcassets */,
+				00000000000000000000111F /* EvidenceChronologyFixture.json */,
+				000000000000000000001121 /* TrainingFixture.json */,
+				000000000000000000001123 /* ActivityFixture.json */,
+				000000000000000000001125 /* NutritionFixture.json */,
+				000000000000000000001127 /* WeightFixture.json */,
+				000000000000000000001129 /* TrainingLoggerFixture.json */,
+				000000000000000000001189 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		000000000000000000001157 /* SharedUI */ = {
+		000000000000000000001159 /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
 				00000000000000000000105B /* PhysiqueOSTheme.swift */,
@@ -537,15 +540,15 @@
 			path = SharedUI;
 			sourceTree = "<group>";
 		};
-		000000000000000000001158 /* Supporting */ = {
+		00000000000000000000115A /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000112D /* Info.plist */,
+				00000000000000000000112F /* Info.plist */,
 			);
 			path = Supporting;
 			sourceTree = "<group>";
 		};
-		000000000000000000001159 /* Evidence */ = {
+		00000000000000000000115B /* Evidence */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010D1 /* EvidenceView.swift */,
@@ -566,7 +569,7 @@
 			path = Evidence;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115A /* Goals */ = {
+		00000000000000000000115C /* Goals */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010AB /* GoalsView.swift */,
@@ -579,7 +582,7 @@
 			path = Goals;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115B /* Home */ = {
+		00000000000000000000115D /* Home */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001089 /* HomeView.swift */,
@@ -596,7 +599,7 @@
 			path = Home;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115C /* Log */ = {
+		00000000000000000000115E /* Log */ = {
 			isa = PBXGroup;
 			children = (
 				00000000000000000000109D /* LogView.swift */,
@@ -610,7 +613,7 @@
 			path = Log;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115D /* Logging */ = {
+		00000000000000000000115F /* Logging */ = {
 			isa = PBXGroup;
 			children = (
 				00000000000000000000110F /* ManualWeighInView.swift */,
@@ -620,7 +623,7 @@
 			path = Logging;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115E /* OperatingPlan */ = {
+		000000000000000000001160 /* OperatingPlan */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010B7 /* OperatingPlanComponents.swift */,
@@ -638,7 +641,7 @@
 			path = OperatingPlan;
 			sourceTree = "<group>";
 		};
-		00000000000000000000115F /* Root */ = {
+		000000000000000000001161 /* Root */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001083 /* RootTabView.swift */,
@@ -648,7 +651,7 @@
 			path = Root;
 			sourceTree = "<group>";
 		};
-		000000000000000000001160 /* Training */ = {
+		000000000000000000001162 /* Training */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010ED /* TrainingHistoryView.swift */,
@@ -670,7 +673,7 @@
 			path = Training;
 			sourceTree = "<group>";
 		};
-		000000000000000000001161 /* TrainingLogger */ = {
+		000000000000000000001163 /* TrainingLogger */ = {
 			isa = PBXGroup;
 			children = (
 				00000000000000000000110B /* TrainingLoggerView.swift */,
@@ -679,7 +682,7 @@
 			path = TrainingLogger;
 			sourceTree = "<group>";
 		};
-		000000000000000000001162 /* You */ = {
+		000000000000000000001164 /* You */ = {
 			isa = PBXGroup;
 			children = (
 				0000000000000000000010CD /* YouPlaceholderView.swift */,
@@ -688,76 +691,76 @@
 			path = You;
 			sourceTree = "<group>";
 		};
-		000000000000000000001163 /* Fonts */ = {
+		000000000000000000001165 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001129 /* PlusJakartaSans[wght].ttf */,
-				00000000000000000000112B /* OFL.txt */,
+				00000000000000000000112B /* PlusJakartaSans[wght].ttf */,
+				00000000000000000000112D /* OFL.txt */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		000000000000000000001151 /* PhysiqueOSTests */ = {
+		000000000000000000001153 /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000112E /* AppTabTests.swift */,
-				000000000000000000001130 /* HomeReadModelTests.swift */,
-				000000000000000000001132 /* GoalsReadModelTests.swift */,
-				000000000000000000001134 /* OperatingPlanReadModelTests.swift */,
-				000000000000000000001136 /* LogReadModelTests.swift */,
-				000000000000000000001138 /* SharedUITests.swift */,
-				00000000000000000000113A /* EvidenceReadModelTests.swift */,
-				00000000000000000000113C /* EvidenceHubUsageTests.swift */,
-				00000000000000000000113E /* TrainingReadModelTests.swift */,
-				000000000000000000001140 /* ActivityReadModelTests.swift */,
-				000000000000000000001142 /* NutritionReadModelTests.swift */,
-				000000000000000000001144 /* WeightReadModelTests.swift */,
-				000000000000000000001146 /* EvidenceChronologyTests.swift */,
-				000000000000000000001148 /* TrainingLoggerTests.swift */,
-				00000000000000000000114A /* LoggingSandboxTests.swift */,
-				00000000000000000000114C /* FounderServerAPITests.swift */,
+				000000000000000000001130 /* AppTabTests.swift */,
+				000000000000000000001132 /* HomeReadModelTests.swift */,
+				000000000000000000001134 /* GoalsReadModelTests.swift */,
+				000000000000000000001136 /* OperatingPlanReadModelTests.swift */,
+				000000000000000000001138 /* LogReadModelTests.swift */,
+				00000000000000000000113A /* SharedUITests.swift */,
+				00000000000000000000113C /* EvidenceReadModelTests.swift */,
+				00000000000000000000113E /* EvidenceHubUsageTests.swift */,
+				000000000000000000001140 /* TrainingReadModelTests.swift */,
+				000000000000000000001142 /* ActivityReadModelTests.swift */,
+				000000000000000000001144 /* NutritionReadModelTests.swift */,
+				000000000000000000001146 /* WeightReadModelTests.swift */,
+				000000000000000000001148 /* EvidenceChronologyTests.swift */,
+				00000000000000000000114A /* TrainingLoggerTests.swift */,
+				00000000000000000000114C /* LoggingSandboxTests.swift */,
+				00000000000000000000114E /* FounderServerAPITests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
 		};
-		00000000000000000000117D /* PhysiqueOSUITests */ = {
+		00000000000000000000117F /* PhysiqueOSUITests */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000117A /* TrainingAcceptanceUITests.swift */,
+				00000000000000000000117C /* TrainingAcceptanceUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
 		};
-		00000000000000000000114F /* Products */ = {
+		000000000000000000001151 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001164 /* PhysiqueOS.app */,
-				000000000000000000001165 /* PhysiqueOSTests.xctest */,
-				00000000000000000000117C /* PhysiqueOSUITests.xctest */,
+				000000000000000000001166 /* PhysiqueOS.app */,
+				000000000000000000001167 /* PhysiqueOSTests.xctest */,
+				00000000000000000000117E /* PhysiqueOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		00000000000000000000114E /* Main */ = {
+		000000000000000000001150 /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001150 /* PhysiqueOS */,
-				000000000000000000001151 /* PhysiqueOSTests */,
-				00000000000000000000117D /* PhysiqueOSUITests */,
-				00000000000000000000114F /* Products */,
+				000000000000000000001152 /* PhysiqueOS */,
+				000000000000000000001153 /* PhysiqueOSTests */,
+				00000000000000000000117F /* PhysiqueOSUITests */,
+				000000000000000000001151 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00000000000000000000116A /* PhysiqueOS */ = {
+		00000000000000000000116C /* PhysiqueOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00000000000000000000116B /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
+			buildConfigurationList = 00000000000000000000116D /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
 			buildPhases = (
-				00000000000000000000116E /* Sources */,
-				00000000000000000000116F /* Frameworks */,
-				000000000000000000001170 /* Resources */,
+				000000000000000000001170 /* Sources */,
+				000000000000000000001171 /* Frameworks */,
+				000000000000000000001172 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -765,69 +768,69 @@
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
-			productReference = 000000000000000000001164 /* PhysiqueOS.app */;
+			productReference = 000000000000000000001166 /* PhysiqueOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001171 /* PhysiqueOSTests */ = {
+		000000000000000000001173 /* PhysiqueOSTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001172 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
+			buildConfigurationList = 000000000000000000001174 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
 			buildPhases = (
-				000000000000000000001175 /* Sources */,
-				000000000000000000001176 /* Frameworks */,
-				000000000000000000001177 /* Resources */,
+				000000000000000000001177 /* Sources */,
+				000000000000000000001178 /* Frameworks */,
+				000000000000000000001179 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				000000000000000000001178 /* PBXTargetDependency */,
+				00000000000000000000117A /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSTests;
 			productName = PhysiqueOSTests;
-			productReference = 000000000000000000001165 /* PhysiqueOSTests.xctest */;
+			productReference = 000000000000000000001167 /* PhysiqueOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		00000000000000000000117E /* PhysiqueOSUITests */ = {
+		000000000000000000001180 /* PhysiqueOSUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00000000000000000000117F /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
+			buildConfigurationList = 000000000000000000001181 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
 			buildPhases = (
-				000000000000000000001182 /* Sources */,
-				000000000000000000001183 /* Frameworks */,
-				000000000000000000001184 /* Resources */,
+				000000000000000000001184 /* Sources */,
+				000000000000000000001185 /* Frameworks */,
+				000000000000000000001186 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				000000000000000000001185 /* PBXTargetDependency */,
+				000000000000000000001187 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSUITests;
 			productName = PhysiqueOSUITests;
-			productReference = 00000000000000000000117C /* PhysiqueOSUITests.xctest */;
+			productReference = 00000000000000000000117E /* PhysiqueOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		000000000000000000001166 /* Project object */ = {
+		000000000000000000001168 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					00000000000000000000116A = {
+					00000000000000000000116C = {
 						CreatedOnToolsVersion = 26.0;
 					};
-					000000000000000000001171 = {
+					000000000000000000001173 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 00000000000000000000116A;
+						TestTargetID = 00000000000000000000116C;
 					};
-					00000000000000000000117E = {
+					000000000000000000001180 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 00000000000000000000116A;
+						TestTargetID = 00000000000000000000116C;
 					};
 				};
 			};
-			buildConfigurationList = 000000000000000000001167 /* Build configuration list for PBXProject "PhysiqueOS" */;
+			buildConfigurationList = 000000000000000000001169 /* Build configuration list for PBXProject "PhysiqueOS" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -835,20 +838,20 @@
 				en,
 				Base,
 			);
-			mainGroup = 00000000000000000000114E;
-			productRefGroup = 00000000000000000000114F /* Products */;
+			mainGroup = 000000000000000000001150;
+			productRefGroup = 000000000000000000001151 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				00000000000000000000116A /* PhysiqueOS */,
-				000000000000000000001171 /* PhysiqueOSTests */,
-				00000000000000000000117E /* PhysiqueOSUITests */,
+				00000000000000000000116C /* PhysiqueOS */,
+				000000000000000000001173 /* PhysiqueOSTests */,
+				000000000000000000001180 /* PhysiqueOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		000000000000000000001170 /* Resources */ = {
+		000000000000000000001172 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -857,25 +860,26 @@
 				00000000000000000000111A /* OperatingPlanFixture.json in Resources */,
 				00000000000000000000111C /* LogFixture.json in Resources */,
 				00000000000000000000111E /* EvidenceFixture.json in Resources */,
-				000000000000000000001120 /* TrainingFixture.json in Resources */,
-				000000000000000000001122 /* ActivityFixture.json in Resources */,
-				000000000000000000001124 /* NutritionFixture.json in Resources */,
-				000000000000000000001126 /* WeightFixture.json in Resources */,
-				000000000000000000001128 /* TrainingLoggerFixture.json in Resources */,
-				00000000000000000000112A /* PlusJakartaSans[wght].ttf in Resources */,
-				00000000000000000000112C /* OFL.txt in Resources */,
-				000000000000000000001188 /* Assets.xcassets in Resources */,
+				000000000000000000001120 /* EvidenceChronologyFixture.json in Resources */,
+				000000000000000000001122 /* TrainingFixture.json in Resources */,
+				000000000000000000001124 /* ActivityFixture.json in Resources */,
+				000000000000000000001126 /* NutritionFixture.json in Resources */,
+				000000000000000000001128 /* WeightFixture.json in Resources */,
+				00000000000000000000112A /* TrainingLoggerFixture.json in Resources */,
+				00000000000000000000112C /* PlusJakartaSans[wght].ttf in Resources */,
+				00000000000000000000112E /* OFL.txt in Resources */,
+				00000000000000000000118A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001177 /* Resources */ = {
+		000000000000000000001179 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001184 /* Resources */ = {
+		000000000000000000001186 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -885,7 +889,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		00000000000000000000116E /* Sources */ = {
+		000000000000000000001170 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1030,54 +1034,54 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001175 /* Sources */ = {
+		000000000000000000001177 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00000000000000000000112F /* AppTabTests.swift in Sources */,
-				000000000000000000001131 /* HomeReadModelTests.swift in Sources */,
-				000000000000000000001133 /* GoalsReadModelTests.swift in Sources */,
-				000000000000000000001135 /* OperatingPlanReadModelTests.swift in Sources */,
-				000000000000000000001137 /* LogReadModelTests.swift in Sources */,
-				000000000000000000001139 /* SharedUITests.swift in Sources */,
-				00000000000000000000113B /* EvidenceReadModelTests.swift in Sources */,
-				00000000000000000000113D /* EvidenceHubUsageTests.swift in Sources */,
-				00000000000000000000113F /* TrainingReadModelTests.swift in Sources */,
-				000000000000000000001141 /* ActivityReadModelTests.swift in Sources */,
-				000000000000000000001143 /* NutritionReadModelTests.swift in Sources */,
-				000000000000000000001145 /* WeightReadModelTests.swift in Sources */,
-				000000000000000000001147 /* EvidenceChronologyTests.swift in Sources */,
-				000000000000000000001149 /* TrainingLoggerTests.swift in Sources */,
-				00000000000000000000114B /* LoggingSandboxTests.swift in Sources */,
-				00000000000000000000114D /* FounderServerAPITests.swift in Sources */,
+				000000000000000000001131 /* AppTabTests.swift in Sources */,
+				000000000000000000001133 /* HomeReadModelTests.swift in Sources */,
+				000000000000000000001135 /* GoalsReadModelTests.swift in Sources */,
+				000000000000000000001137 /* OperatingPlanReadModelTests.swift in Sources */,
+				000000000000000000001139 /* LogReadModelTests.swift in Sources */,
+				00000000000000000000113B /* SharedUITests.swift in Sources */,
+				00000000000000000000113D /* EvidenceReadModelTests.swift in Sources */,
+				00000000000000000000113F /* EvidenceHubUsageTests.swift in Sources */,
+				000000000000000000001141 /* TrainingReadModelTests.swift in Sources */,
+				000000000000000000001143 /* ActivityReadModelTests.swift in Sources */,
+				000000000000000000001145 /* NutritionReadModelTests.swift in Sources */,
+				000000000000000000001147 /* WeightReadModelTests.swift in Sources */,
+				000000000000000000001149 /* EvidenceChronologyTests.swift in Sources */,
+				00000000000000000000114B /* TrainingLoggerTests.swift in Sources */,
+				00000000000000000000114D /* LoggingSandboxTests.swift in Sources */,
+				00000000000000000000114F /* FounderServerAPITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001182 /* Sources */ = {
+		000000000000000000001184 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00000000000000000000117B /* TrainingAcceptanceUITests.swift in Sources */,
+				00000000000000000000117D /* TrainingAcceptanceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		000000000000000000001178 /* PBXTargetDependency */ = {
+		00000000000000000000117A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000116A /* PhysiqueOS */;
-			targetProxy = 000000000000000000001179 /* PBXContainerItemProxy */;
+			target = 00000000000000000000116C /* PhysiqueOS */;
+			targetProxy = 00000000000000000000117B /* PBXContainerItemProxy */;
 		};
-		000000000000000000001185 /* PBXTargetDependency */ = {
+		000000000000000000001187 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000116A /* PhysiqueOS */;
-			targetProxy = 000000000000000000001186 /* PBXContainerItemProxy */;
+			target = 00000000000000000000116C /* PhysiqueOS */;
+			targetProxy = 000000000000000000001188 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		000000000000000000001168 /* Debug */ = {
+		00000000000000000000116A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1138,7 +1142,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001169 /* Release */ = {
+		00000000000000000000116B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1193,7 +1197,7 @@
 			};
 			name = Release;
 		};
-		00000000000000000000116C /* Debug */ = {
+		00000000000000000000116E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1220,7 +1224,7 @@
 			};
 			name = Debug;
 		};
-		00000000000000000000116D /* Release */ = {
+		00000000000000000000116F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1247,7 +1251,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001173 /* Debug */ = {
+		000000000000000000001175 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1264,7 +1268,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001174 /* Release */ = {
+		000000000000000000001176 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1281,7 +1285,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001180 /* Debug */ = {
+		000000000000000000001182 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1297,7 +1301,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001181 /* Release */ = {
+		000000000000000000001183 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1316,43 +1320,43 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		000000000000000000001167 /* Build configuration list for PBXProject "PhysiqueOS" */ = {
+		000000000000000000001169 /* Build configuration list for PBXProject "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001168 /* Debug */,
-				000000000000000000001169 /* Release */,
+				00000000000000000000116A /* Debug */,
+				00000000000000000000116B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		00000000000000000000116B /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
+		00000000000000000000116D /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				00000000000000000000116C /* Debug */,
-				00000000000000000000116D /* Release */,
+				00000000000000000000116E /* Debug */,
+				00000000000000000000116F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001172 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
+		000000000000000000001174 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001173 /* Debug */,
-				000000000000000000001174 /* Release */,
+				000000000000000000001175 /* Debug */,
+				000000000000000000001176 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		00000000000000000000117F /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
+		000000000000000000001181 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001180 /* Debug */,
-				000000000000000000001181 /* Release */,
+				000000000000000000001182 /* Debug */,
+				000000000000000000001183 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 000000000000000000001166 /* Project object */;
+	rootObject = 000000000000000000001168 /* Project object */;
 }
