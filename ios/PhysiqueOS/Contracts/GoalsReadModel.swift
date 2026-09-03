@@ -38,8 +38,31 @@ struct GoalSummaryReadModel: Codable, Equatable, Identifiable {
 struct GoalDetailReadModel: Codable, Equatable {
     var active: ActiveGoalReadModel?
     var completed: CompletedGoalReadModel?
+    /// A lightweight, ongoing guardrail/supporting objective shown on Home
+    /// alongside the primary Goal (e.g. "Maintain Strength Baseline",
+    /// "Preserve Lean Mass") — real, distinct, individually-linked pages on
+    /// the live product (`getGoalHref`'s own whitelist maps these to
+    /// `/goals/maintenance`, `/goals/lean-mass`, thin single-purpose pages,
+    /// confirmed by source audit — not the same rich multi-phase page the
+    /// primary Goal gets). Deliberately its own minimal case rather than
+    /// forced into `ActiveGoalReadModel`'s much larger shape (phases,
+    /// turning points, training progress, …), none of which the real
+    /// supporting-objective pages carry.
+    var supporting: SupportingObjectiveReadModel?
 
-    var id: String? { active?.id ?? completed?.id }
+    var id: String? { active?.id ?? completed?.id ?? supporting?.id }
+}
+
+/// Mirrors the real `/goals/maintenance`, `/goals/lean-mass`-style thin
+/// supporting-objective pages: a title, a status line, and a short
+/// narrative — no phases, no confidence ring, no training-progress
+/// breakdown.
+struct SupportingObjectiveReadModel: Codable, Equatable, Identifiable {
+    var id: String
+    var title: String
+    var status: String
+    var detail: String
+    var narrative: String
 }
 
 struct ActiveGoalReadModel: Codable, Equatable, Identifiable {

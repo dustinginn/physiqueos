@@ -3,8 +3,8 @@
     "id": "goal_fixture_build_lean_mass",
     "title": "Build Lean Mass",
     "status": "Active Goal",
-    "objective": "Build 10 lb of lean mass while maintaining approximately 8–9% body fat.",
-    "dateRange": "Jul 19 → Oct 31, 2026",
+    "objective": "Build 10 lb of lean mass while maintaining approximately 8\u20139% body fat.",
+    "dateRange": "Jul 19 \u2192 Oct 31, 2026",
     "confidence": {
       "value": 68,
       "band": "Developing",
@@ -22,7 +22,7 @@
         "order": 1,
         "name": "Establish Maintenance",
         "status": "completed",
-        "dates": "Jul 19 → Aug 15",
+        "dates": "Jul 19 \u2192 Aug 15",
         "purpose": "Establish a reliable maintenance baseline before beginning the dedicated lean-mass build.",
         "progress": {
           "percentage": 100,
@@ -41,7 +41,7 @@
           "Training performance and recovery support progressive work."
         ],
         "guardrails": [
-          "Maintain approximately 8–9% body fat.",
+          "Maintain approximately 8\u20139% body fat.",
           "Use DEXA as the authoritative body-composition measure."
         ]
       },
@@ -50,7 +50,7 @@
         "order": 2,
         "name": "Lean Mass Build",
         "status": "active",
-        "dates": "Started Aug 16 · Target Oct 31",
+        "dates": "Started Aug 16 \u00b7 Target Oct 31",
         "purpose": "Build measurable lean mass through a controlled surplus, progressive training, and deliberate recovery.",
         "progress": {
           "percentage": 18,
@@ -69,7 +69,7 @@
           "A follow-up DEXA shows measured movement toward the lean-mass target."
         ],
         "guardrails": [
-          "Maintain approximately 8–9% body fat.",
+          "Maintain approximately 8\u20139% body fat.",
           "Do not treat scale weight alone as lean-mass progress."
         ]
       }
@@ -82,7 +82,7 @@
       "The next DEXA provides the authoritative phase-outcome measurement."
     ],
     "guardrail": {
-      "title": "Maintain approximately 8–9% body fat",
+      "title": "Maintain approximately 8\u20139% body fat",
       "state": "On track",
       "scope": "Applies across every phase",
       "body": "DEXA remains authoritative for body composition. Scale weight provides context between scans, but does not replace it."
@@ -106,9 +106,18 @@
         "Lower Body, Core, and Arms trends"
       ],
       "muscleGroups": [
-        { "name": "Chest", "status": "Improving" },
-        { "name": "Back", "status": "Steady" },
-        { "name": "Legs", "status": "Review forming" }
+        {
+          "name": "Chest",
+          "status": "Improving"
+        },
+        {
+          "name": "Back",
+          "status": "Steady"
+        },
+        {
+          "name": "Legs",
+          "status": "Review forming"
+        }
       ]
     },
     "turningPoints": [
@@ -138,13 +147,41 @@
       }
     ],
     "strategy": [
-      { "id": "strategy_energy", "label": "Energy", "active": true },
-      { "id": "strategy_nutrition", "label": "Nutrition", "active": true },
-      { "id": "strategy_activity", "label": "Activity", "active": true },
-      { "id": "strategy_training", "label": "Training", "active": true },
-      { "id": "strategy_coaching", "label": "Coaching Updates", "active": true },
-      { "id": "strategy_peptide", "label": "Peptide", "active": false },
-      { "id": "strategy_supplement", "label": "Supplement", "active": true }
+      {
+        "id": "strategy_energy",
+        "label": "Energy",
+        "active": true
+      },
+      {
+        "id": "strategy_nutrition",
+        "label": "Nutrition",
+        "active": true
+      },
+      {
+        "id": "strategy_activity",
+        "label": "Activity",
+        "active": true
+      },
+      {
+        "id": "strategy_training",
+        "label": "Training",
+        "active": true
+      },
+      {
+        "id": "strategy_coaching",
+        "label": "Coaching Updates",
+        "active": true
+      },
+      {
+        "id": "strategy_peptide",
+        "label": "Peptide",
+        "active": false
+      },
+      {
+        "id": "strategy_supplement",
+        "label": "Supplement",
+        "active": true
+      }
     ]
   },
   "completedGoals": [
@@ -152,9 +189,9 @@
       "id": "goal_visible_abs_at_rest",
       "title": "Visible Abs",
       "status": "Completed",
-      "dateRange": "May 24 → Jul 18, 2026",
+      "dateRange": "May 24 \u2192 Jul 18, 2026",
       "achievement": "8.2% Body Fat",
-      "recap": "This journey began with a clear finish line: reveal visible abdominal definition without sacrificing the muscle built before the cut. Across eight deliberate weeks, body fat moved into the target range, the waist and midsection became substantially leaner, and training continued to protect the shape underneath. The final DEXA and relaxed photos told the same story—the goal had reached its intended conclusion.",
+      "recap": "This journey began with a clear finish line: reveal visible abdominal definition without sacrificing the muscle built before the cut. Across eight deliberate weeks, body fat moved into the target range, the waist and midsection became substantially leaner, and training continued to protect the shape underneath. The final DEXA and relaxed photos told the same story\u2014the goal had reached its intended conclusion.",
       "highlights": [
         {
           "id": "highlight_start",
@@ -178,16 +215,28 @@
           "id": "highlight_lean_mass",
           "date": "Jul 18, 2026",
           "title": "Lean mass largely preserved",
-          "body": "Measured lean mass remained within the journey’s preservation tolerance."
+          "body": "Measured lean mass remained within the journey\u2019s preservation tolerance."
         }
       ],
       "photos": [
-        { "id": "photo_beginning", "label": "Beginning", "date": "May 24, 2026", "systemImage": "figure.stand" },
-        { "id": "photo_completion", "label": "Completion", "date": "Jul 18, 2026", "systemImage": "figure.strengthtraining.traditional" }
+        {
+          "id": "photo_beginning",
+          "label": "Beginning",
+          "date": "May 24, 2026",
+          "systemImage": "figure.stand"
+        },
+        {
+          "id": "photo_completion",
+          "label": "Completion",
+          "date": "Jul 18, 2026",
+          "systemImage": "figure.strengthtraining.traditional"
+        }
       ],
       "photoHistoryDestination": {
         "id": "progress.stream",
-        "parameters": { "streamId": "photos" }
+        "parameters": {
+          "streamId": "photos"
+        }
       },
       "finalComposition": {
         "date": "Jul 18, 2026",
@@ -195,10 +244,12 @@
         "leanMass": "149.0 lb",
         "fatMass": "13.4 lb",
         "weight": "169.1 lb",
-        "narrative": "This scan closed the journey because the numerical target and final visual confirmation converged: fat mass fell meaningfully, abdominal definition was visible at rest, and measured lean mass remained within the journey’s preservation tolerance.",
+        "narrative": "This scan closed the journey because the numerical target and final visual confirmation converged: fat mass fell meaningfully, abdominal definition was visible at rest, and measured lean mass remained within the journey\u2019s preservation tolerance.",
         "briefingDestination": {
           "id": "briefing.detail",
-          "parameters": { "briefingId": "briefing_fixture_visible_abs_completion" }
+          "parameters": {
+            "briefingId": "briefing_fixture_visible_abs_completion"
+          }
         }
       },
       "achievedBy": [
@@ -212,9 +263,27 @@
         "body": "Completing the cut while preserving lean mass created the foundation for the current Build Lean Mass journey.",
         "destination": {
           "id": "goal.detail",
-          "parameters": { "goalId": "goal_fixture_build_lean_mass" }
+          "parameters": {
+            "goalId": "goal_fixture_build_lean_mass"
+          }
         }
       }
+    }
+  ],
+  "supportingObjectives": [
+    {
+      "id": "goal_maintain_8_9_body_fat",
+      "title": "Maintain Strength Baseline",
+      "status": "Maintaining",
+      "detail": "Strength holding steady",
+      "narrative": "Working sets across major lifts have held within 5% of their Establish Maintenance baseline through the current Build Lean Mass phase, confirming training load is being preserved rather than traded away for the lean-mass build."
+    },
+    {
+      "id": "goal_preserve_lean_mass",
+      "title": "Preserve Lean Mass",
+      "status": "On track",
+      "detail": "Lean mass stable across recent DEXA scans",
+      "narrative": "Lean mass has held or increased across every DEXA scan recorded during the current Goal, confirming the lean-mass build is proceeding without an offsetting loss elsewhere."
     }
   ],
   "addGoalAvailable": false,

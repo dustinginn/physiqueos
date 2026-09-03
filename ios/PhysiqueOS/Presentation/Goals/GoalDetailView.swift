@@ -54,6 +54,8 @@ struct GoalDetailView: View {
                 ActiveGoalDetailContent(goal: active, onNavigate: onNavigate)
             } else if let completed = detail.completed {
                 CompletedGoalDetailContent(goal: completed, onNavigate: onNavigate)
+            } else if let supporting = detail.supporting {
+                SupportingObjectiveDetailContent(goal: supporting)
             } else {
                 GoalUnavailableView(message: "This goal is unavailable.")
             }
@@ -669,5 +671,42 @@ struct GoalUnavailableView: View {
             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
             .foregroundStyle(PhysiqueOSTheme.textSecondary)
             .frame(maxWidth: .infinity, minHeight: 300)
+    }
+}
+
+/// A thin, single-purpose supporting-objective page — mirrors the real
+/// `/goals/maintenance`/`/goals/lean-mass`-style pages the audit for this
+/// task confirmed exist as their own real (but simple) routes, distinct
+/// from the primary Goal's much richer multi-phase page. Fixes the
+/// "Home → Your Goals looks tappable but goes nowhere" gap for these two
+/// rows by giving them a real, existing destination rather than a
+/// duplicated Home-only detail surface.
+private struct SupportingObjectiveDetailContent: View {
+    let goal: SupportingObjectiveReadModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Supporting Objective")
+                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(goal.title)
+                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(goal.status)
+                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            CardContainer {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(goal.detail)
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(goal.narrative)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+        }
     }
 }

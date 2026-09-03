@@ -109,6 +109,59 @@ final class HomeReadModelTests: XCTestCase {
         }
     }
 
+    /// The literal reported bug: "Home → Your Goals looks tappable but goes
+    /// nowhere." Every row `GoalRowView` renders — primary and every
+    /// supporting/guardrail objective — must carry a real destination, not
+    /// a `nil` that leaves the row hover-styled but inert (verified against
+    /// source for this task: the real web's `GoalRow` applies its hover/
+    /// focus styling unconditionally, so a missing `href` there is exactly
+    /// this "looks tappable but isn't" bug class, not merely a cosmetic
+    /// difference).
+    func testEveryHomeGoalRowHasARealDestinationNotNil() throws {
+        let model = try Self.loadBundledFixture()
+        for goal in model.goals {
+            XCTAssertNotNil(goal.destination, "\(goal.title) must have a real destination.")
+        }
+    }
+
+    /// Each Home goal's destination must resolve to an *existing* Goal
+    /// page — not merely be non-`nil` syntactically. Uses canonical Goal
+    /// identity end-to-end through `GoalsAPI`, the same seam
+    /// `GoalDetailView` itself calls, so this fails if a Home goal ever
+    /// points at an id nothing in the Goals vertical actually resolves.
+    func testEveryHomeGoalDestinationResolvesThroughTheRealGoalsAPI() async throws {
+        let model = try Self.loadBundledFixture()
+        let api = FixtureGoalsAPI()
+        for goal in model.goals {
+            guard case .goalDetail(let goalId) = goal.destination else {
+                return XCTFail("\(goal.title) destination is not a goalDetail case.")
+            }
+            let detail = try await api.fetchGoalDetail(goalId: goalId)
+            XCTAssertNotNil(detail, "\(goal.title) (\(goalId)) does not resolve to a real Goal.")
+            XCTAssertNotNil(detail?.id)
+        }
+    }
+
+    /// Do not duplicate Goal detail inside Home: a supporting/guardrail
+    /// objective must resolve to the *lightweight* supporting-objective
+    /// shape, not accidentally collide with the primary Goal's own rich
+    /// `active` detail (which would mean Home and the Goals vertical are
+    /// describing two different things under the same id, or that a
+    /// supporting row is silently rendering the full multi-phase page).
+    func testSupportingGoalRowsResolveToTheLightweightSupportingShapeNotActiveOrCompleted() async throws {
+        let model = try Self.loadBundledFixture()
+        let api = FixtureGoalsAPI()
+        let supportingRows = model.goals.filter { if case .supporting = $0.presentation { true } else { false } }
+        XCTAssertFalse(supportingRows.isEmpty)
+        for goal in supportingRows {
+            guard case .goalDetail(let goalId) = goal.destination else { continue }
+            let detail = try await api.fetchGoalDetail(goalId: goalId)
+            XCTAssertNotNil(detail?.supporting, "\(goal.title) should resolve to a supporting objective.")
+            XCTAssertNil(detail?.active)
+            XCTAssertNil(detail?.completed)
+        }
+    }
+
     // MARK: - Natural prose capitalization
 
     /// Mirrors the product rule in

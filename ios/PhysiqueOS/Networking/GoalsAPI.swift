@@ -15,6 +15,7 @@ struct FixtureGoalsAPI: GoalsAPI {
     private struct FixtureFile: Codable {
         var activeGoal: ActiveGoalReadModel
         var completedGoals: [CompletedGoalReadModel]
+        var supportingObjectives: [SupportingObjectiveReadModel] = []
         var addGoalAvailable: Bool
         var addGoalMessage: String
     }
@@ -39,10 +40,13 @@ struct FixtureGoalsAPI: GoalsAPI {
     func fetchGoalDetail(goalId: String) async throws -> GoalDetailReadModel? {
         let fixture = try loadFixture()
         if fixture.activeGoal.id == goalId {
-            return GoalDetailReadModel(active: fixture.activeGoal, completed: nil)
+            return GoalDetailReadModel(active: fixture.activeGoal, completed: nil, supporting: nil)
         }
         if let completed = fixture.completedGoals.first(where: { $0.id == goalId }) {
-            return GoalDetailReadModel(active: nil, completed: completed)
+            return GoalDetailReadModel(active: nil, completed: completed, supporting: nil)
+        }
+        if let supporting = fixture.supportingObjectives.first(where: { $0.id == goalId }) {
+            return GoalDetailReadModel(active: nil, completed: nil, supporting: supporting)
         }
         return nil
     }
