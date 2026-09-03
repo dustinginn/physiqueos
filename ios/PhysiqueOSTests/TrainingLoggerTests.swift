@@ -474,11 +474,11 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertTrue(InteractivePopGesturePolicy.shouldEnable(viewControllerCount: 2))
     }
 
-    func testAppDeclaresExemptEncryptionAndBuildTwelveInSourceControlledConfiguration() throws {
+    func testAppDeclaresExemptEncryptionAndBuildThirteenInSourceControlledConfiguration() throws {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "12")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "13")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }
