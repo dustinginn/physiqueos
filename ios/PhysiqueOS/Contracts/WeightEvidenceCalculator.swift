@@ -11,6 +11,31 @@ import Foundation
 enum WeightEvidenceCalculator {
     enum Extreme { case highest, lowest }
 
+    /// The Weight Trend chart's y-axis domain — tight to the actual
+    /// plotted min/max (`ProgressLineChart.jsx:18-23`'s own
+    /// `Math.min`/`Math.max` over `points.map(p => p.value)`), with zero
+    /// headroom padding above/below, exactly matching the web chart. A
+    /// single-value domain (every point identical) gets a +1 pad purely so
+    /// Swift Charts never receives a zero-width range — the web's own SVG
+    /// math degrades the same way in that edge case (a flat line at
+    /// mid-height), this just keeps the native chart rendering instead of
+    /// crashing on an empty `ClosedRange`.
+    static func chartYDomain(points: [WeightChartPoint]) -> ClosedRange<Double> {
+        let values = points.compactMap(\.value)
+        let minValue = values.min() ?? 0
+        let maxValue = values.max() ?? 1
+        return minValue...(maxValue > minValue ? maxValue : minValue + 1)
+    }
+
+    /// Nearest-x-neighbor scan — the Swift mirror of `updateActivePoint`
+    /// (`ProgressLineChart.jsx:49-62`): given an arbitrary touched date,
+    /// returns whichever plotted observation's own date is closest to it.
+    /// `dateValue` is injected so this stays pure/testable without pulling
+    /// in `TrainingDateFormatting`'s `Date` parsing as a hidden dependency.
+    static func nearestPoint(to touchedDate: Date, in points: [WeightChartPoint], dateValue: (String) -> Date) -> WeightChartPoint? {
+        points.min(by: { abs(dateValue($0.date).timeIntervalSince(touchedDate)) < abs(dateValue($1.date).timeIntervalSince(touchedDate)) })
+    }
+
     /// `getWeightExtreme(weights, direction)` — a plain linear reduction,
     /// not a sort; ties keep the first-encountered (chronologically
     /// earliest) entry, matching the web's `reduce` exactly.

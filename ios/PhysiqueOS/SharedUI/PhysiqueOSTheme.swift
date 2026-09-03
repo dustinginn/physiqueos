@@ -43,6 +43,18 @@ enum PhysiqueOSTheme {
     static let mealLunch = Color(hex: 0x34D399)
     static let mealDinner = Color(hex: 0xA78BFA)
     static let mealSnacks = Color(hex: 0xF472B6)
+
+    /// `--chart-marker` in the web dark theme — the DEXA scan marker color
+    /// on the Weight Trend chart, confirmed purple/violet (Tailwind
+    /// violet-400) during this port's chart-parity audit, distinct from
+    /// every ordinary Weight observation color so a DEXA event is never
+    /// confused with a daily weigh-in.
+    static let dexaMarker = Color(hex: 0xA78BFA)
+    /// The Weight Trend line's own fixed color — `WeightReportScreen.jsx`
+    /// passes a literal `color="#0EA5E9"` to its chart component rather
+    /// than a semantic theme token, so this stays a Weight-specific
+    /// constant here too rather than a general-purpose chart token.
+    static let weightTrendLine = Color(hex: 0x0EA5E9)
 }
 
 /// Semantic color slots mirroring `IconBadge.jsx`'s `colors` map, so icon

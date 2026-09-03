@@ -133,7 +133,11 @@ struct WeightHistoryView: View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Weight Trend")
-                WeightTrendChartView(chart: chart)
+                WeightTrendChartView(
+                    chart: chart,
+                    selectedPointID: viewModel?.selectedChartPointID,
+                    onSelect: { id in viewModel?.selectChartPoint(id: id) }
+                )
             }
         }
     }
@@ -181,43 +185,174 @@ struct WeightHistoryView: View {
     }
 }
 
-/// Swift Charts line chart with DEXA markers as dashed `RuleMark`s —
-/// deliberately unlabeled (no in-chart text, no legend), matching the live
-/// web chart exactly: `ProgressLineChart.jsx` decodes a `label: "DEXA"`
-/// field but never actually renders it as visible text (verified directly
-/// from source — no `<text>` element for it). Falls back to a "More
-/// history needed" placeholder for fewer than 2 points, mirroring
-/// `ProgressLineChart.jsx:41-47`'s own sparse-data guard.
+/// A faithful Swift Charts port of `ProgressLineChart.jsx`, re-audited
+/// specifically for this correction pass (the first native attempt was too
+/// simplified). Reproduces, from the live web source:
+///
+/// - The trend line: a fixed `#0EA5E9` (`weightTrendLine`), 3pt, round cap —
+///   `WeightReportScreen.jsx` passes this literal color to the chart
+///   component rather than a semantic token, so this stays a literal here
+///   too.
+/// - Individual observation points as small hollow-ring dots (surface fill,
+///   line-color stroke) — the selected/active point enlarges into a solid
+///   filled dot, exactly matching the web's own `r=3` → `r=5`,
+///   hollow → solid transition on selection.
+/// - DEXA markers as full-height dashed **purple** (`dexaMarker`) rules
+///   with a small solid dot at the top — verified corrected color from a
+///   prior audit pass that mis-read this as an unlabeled neutral line; the
+///   web's `--chart-marker` token really is violet/purple in the dark
+///   theme, just easy to miss at 1.5pt.
+/// - A **data-driven y-domain** (tight to the actual plotted min/max, no
+///   padding) — replacing a prior arbitrary fixed 0–200 scale that
+///   flattened real weight variation. An x-domain tight to the first/last
+///   *plotted* point (not the selected scope's window bounds), also
+///   matching source exactly.
+/// - Touch equivalent of the web's pointer-scrub interaction: a
+///   `minimumDistance: 0` drag gesture over the full plot area snaps to
+///   the nearest observation by date and reports it up via `onSelect`,
+///   mirroring `updateActivePoint`'s own nearest-x-neighbor scan. A single
+///   tap and a horizontal drag both work through the same gesture.
+/// - A below-chart tooltip ("`MMM d` / Weight: `value` lb") for the
+///   selected point, defaulting to the latest point when nothing has been
+///   touched yet — matching the web's own `activeIndex === null → latest
+///   point` default — plus the web's separate, always-present summary row
+///   (first date / latest value / last date).
+///
+/// Falls back to a "More history needed" placeholder for fewer than 2
+/// points, mirroring `ProgressLineChart.jsx:41-47`'s own sparse-data guard
+/// and exact copy/threshold.
 private struct WeightTrendChartView: View {
     let chart: WeightChartData
+    let selectedPointID: String?
+    let onSelect: (String) -> Void
+
+    private var validPoints: [WeightChartPoint] { chart.points.filter { $0.value != nil } }
+
+    private var selectedPoint: WeightChartPoint? {
+        (selectedPointID.flatMap { id in validPoints.first { $0.id == id } }) ?? validPoints.last
+    }
 
     var body: some View {
-        let validPoints = chart.points.filter { $0.value != nil }
         if validPoints.count < 2 {
             Text("More history needed")
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 140)
         } else {
-            Chart {
-                ForEach(validPoints) { point in
-                    LineMark(x: .value("Date", point.date), y: .value("Weight", point.value ?? 0))
-                        .foregroundStyle(PhysiqueOSTheme.chartEvidence)
-                        .interpolationMethod(.monotone)
-                    PointMark(x: .value("Date", point.date), y: .value("Weight", point.value ?? 0))
-                        .foregroundStyle(PhysiqueOSTheme.chartEvidence)
-                        .symbolSize(18)
-                }
-                ForEach(chart.markers) { marker in
-                    RuleMark(x: .value("DEXA", marker.date))
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                }
+            VStack(alignment: .leading, spacing: 10) {
+                chartBody
+                selectedPointDetail
+                summaryRow
             }
-            .chartXAxis(.hidden)
-            .frame(height: 160)
-            .accessibilityLabel("Weight trend over \(validPoints.count) recorded entries")
         }
+    }
+
+    private var chartBody: some View {
+        let yDomain = WeightEvidenceCalculator.chartYDomain(points: validPoints)
+        let firstDate = dateValue(validPoints.first!.date)
+        let lastDate = dateValue(validPoints.last!.date)
+
+        return Chart {
+            ForEach(validPoints) { point in
+                LineMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
+                    .foregroundStyle(PhysiqueOSTheme.weightTrendLine)
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .interpolationMethod(.linear)
+            }
+            ForEach(validPoints) { point in
+                let isSelected = point.id == selectedPoint?.id
+                PointMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
+                    .symbol {
+                        if isSelected {
+                            Circle().fill(PhysiqueOSTheme.weightTrendLine).frame(width: 10, height: 10)
+                        } else {
+                            Circle().fill(PhysiqueOSTheme.surfaceElevated).frame(width: 6, height: 6)
+                                .overlay(Circle().strokeBorder(PhysiqueOSTheme.weightTrendLine, lineWidth: 2))
+                        }
+                    }
+            }
+            ForEach(chart.markers) { marker in
+                RuleMark(x: .value("DEXA", dateValue(marker.date)))
+                    .foregroundStyle(PhysiqueOSTheme.dexaMarker)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 4]))
+                    .annotation(position: .top, spacing: 0) {
+                        Circle().fill(PhysiqueOSTheme.dexaMarker).frame(width: 6, height: 6)
+                    }
+            }
+            if let selectedPoint {
+                RuleMark(x: .value("Selected", dateValue(selectedPoint.date)))
+                    .foregroundStyle(PhysiqueOSTheme.divider)
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+        }
+        .chartYScale(domain: yDomain)
+        .chartXScale(domain: firstDate...lastDate)
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .frame(height: 160)
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { drag in selectNearestPoint(at: drag.location, proxy: proxy, geometry: geometry) }
+                    )
+            }
+        }
+        .accessibilityLabel("Weight trend over \(validPoints.count) recorded entries")
+    }
+
+    /// The below-chart tooltip — mirrors `ProgressLineChart.jsx`'s own
+    /// info bar exactly: date, a "/" separator, then "Weight: {value}".
+    private var selectedPointDetail: some View {
+        Group {
+            if let selectedPoint {
+                Text("\(TrainingDateFormatting.short(selectedPoint.date)) / Weight: \(selectedPoint.label)")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    /// The web's own always-present static row, independent of any
+    /// interaction: first date (left), latest value (center), last date
+    /// (right).
+    private var summaryRow: some View {
+        HStack {
+            Text(TrainingDateFormatting.short(validPoints.first!.date))
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Spacer()
+            Text(validPoints.last!.label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Spacer()
+            Text(TrainingDateFormatting.short(validPoints.last!.date))
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+    }
+
+    /// Nearest-x-neighbor scan, mirroring `updateActivePoint`
+    /// (`ProgressLineChart.jsx:49-62`) exactly: a tap or drag anywhere over
+    /// the plot area snaps to whichever observation's date is closest to
+    /// the touch location, not whichever dot the finger happens to land on
+    /// — the same "move across observations quickly" behavior the web's
+    /// pointer-scrub already provides.
+    private func selectNearestPoint(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        let plotFrame = geometry[proxy.plotAreaFrame]
+        let relativeX = location.x - plotFrame.origin.x
+        guard let touchedDate: Date = proxy.value(atX: relativeX) else { return }
+        guard let nearest = WeightEvidenceCalculator.nearestPoint(to: touchedDate, in: validPoints, dateValue: dateValue) else { return }
+        onSelect(nearest.id)
+    }
+
+    private func dateValue(_ dateString: String) -> Date {
+        TrainingDateFormatting.date(from: dateString) ?? Date(timeIntervalSince1970: 0)
     }
 }
 

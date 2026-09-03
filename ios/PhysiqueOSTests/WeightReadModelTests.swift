@@ -200,4 +200,105 @@ final class WeightReadModelTests: XCTestCase {
         XCTAssertLessThan(noPoints.count, 2)
         XCTAssertLessThan(onePoint.count, 2)
     }
+
+    // MARK: - Chart domain/scaling (fixes the reported "arbitrary 0-200" gap)
+
+    /// The y-domain must be tight to the actual plotted min/max — not a
+    /// fixed 0–200 range that would flatten real weight variation, matching
+    /// `ProgressLineChart.jsx:18-23`'s own `Math.min`/`Math.max` with zero
+    /// padding.
+    func testChartYDomainIsTightToActualDataNotAFixedRange() {
+        let points = [
+            WeightChartPoint(id: "a", date: "2026-01-01", value: 172.0, label: "", detail: ""),
+            WeightChartPoint(id: "b", date: "2026-01-08", value: 179.4, label: "", detail: ""),
+            WeightChartPoint(id: "c", date: "2026-01-15", value: 175.0, label: "", detail: ""),
+        ]
+        let domain = WeightEvidenceCalculator.chartYDomain(points: points)
+        XCTAssertEqual(domain.lowerBound, 172.0)
+        XCTAssertEqual(domain.upperBound, 179.4)
+    }
+
+    func testChartYDomainDegradesSafelyWhenEveryPointIsIdentical() {
+        let points = [
+            WeightChartPoint(id: "a", date: "2026-01-01", value: 175.0, label: "", detail: ""),
+            WeightChartPoint(id: "b", date: "2026-01-08", value: 175.0, label: "", detail: ""),
+        ]
+        let domain = WeightEvidenceCalculator.chartYDomain(points: points)
+        XCTAssertLessThan(domain.lowerBound, domain.upperBound)
+    }
+
+    func testChartYDomainAgainstTheShippedFixtureMatchesTheKnownMinMax() async throws {
+        let report = try await api.fetchWeightReport(scope: .all)
+        let domain = WeightEvidenceCalculator.chartYDomain(points: report.chart.points)
+        XCTAssertEqual(domain.lowerBound, 172.0)
+        XCTAssertEqual(domain.upperBound, 185.5)
+    }
+
+    // MARK: - Chart point selection (touch scrub equivalent)
+
+    func testNearestPointSelectsTheClosestObservationByDate() {
+        let points = [
+            WeightChartPoint(id: "a", date: "2026-01-01", value: 180, label: "", detail: ""),
+            WeightChartPoint(id: "b", date: "2026-01-08", value: 178, label: "", detail: ""),
+            WeightChartPoint(id: "c", date: "2026-01-15", value: 176, label: "", detail: ""),
+        ]
+        let dateValue: (String) -> Date = { string in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone(identifier: "UTC")
+            return formatter.date(from: string) ?? .distantPast
+        }
+        let touchedNearB = dateValue("2026-01-06")
+        XCTAssertEqual(WeightEvidenceCalculator.nearestPoint(to: touchedNearB, in: points, dateValue: dateValue)?.id, "b")
+        let touchedExactlyC = dateValue("2026-01-15")
+        XCTAssertEqual(WeightEvidenceCalculator.nearestPoint(to: touchedExactlyC, in: points, dateValue: dateValue)?.id, "c")
+        let touchedBeforeAll = dateValue("2025-12-01")
+        XCTAssertEqual(WeightEvidenceCalculator.nearestPoint(to: touchedBeforeAll, in: points, dateValue: dateValue)?.id, "a")
+    }
+
+    func testNearestPointReturnsNilForAnEmptyCollection() {
+        XCTAssertNil(WeightEvidenceCalculator.nearestPoint(to: Date(), in: [], dateValue: { _ in Date() }))
+    }
+
+    // MARK: - View model selection state
+
+    @MainActor
+    func testViewModelDefaultsSelectedChartPointToTheLatestObservation() async {
+        let viewModel = WeightHistoryViewModel(api: api)
+        await viewModel.load()
+        guard case .loaded(let report) = viewModel.state else { return XCTFail("Expected loaded state.") }
+        XCTAssertEqual(viewModel.selectedChartPointID, report.chart.points.last?.id)
+    }
+
+    @MainActor
+    func testViewModelSelectChartPointUpdatesSelection() async {
+        let viewModel = WeightHistoryViewModel(api: api)
+        await viewModel.load()
+        guard case .loaded(let report) = viewModel.state, let firstPointID = report.chart.points.first?.id else {
+            return XCTFail("Expected loaded state with points.")
+        }
+        viewModel.selectChartPoint(id: firstPointID)
+        XCTAssertEqual(viewModel.selectedChartPointID, firstPointID)
+    }
+
+    @MainActor
+    func testViewModelResetsSelectionOnScopeReload() async {
+        let viewModel = WeightHistoryViewModel(api: api)
+        await viewModel.load()
+        guard case .loaded(let allReport) = viewModel.state, let firstPointID = allReport.chart.points.first?.id else {
+            return XCTFail("Expected loaded state with points.")
+        }
+        viewModel.selectChartPoint(id: firstPointID)
+        await viewModel.selectScope(pillID: "goal:\(EvidenceCanonicalGoalID.visibleAbs)")
+        guard case .loaded(let scopedReport) = viewModel.state else { return XCTFail("Expected loaded state.") }
+        XCTAssertEqual(viewModel.selectedChartPointID, scopedReport.chart.points.last?.id)
+    }
+
+    // MARK: - DEXA marker mapping
+
+    func testDEXAMarkersMapFromTheCanonicalScanRecordsNotHardcodedPositions() async throws {
+        let report = try await api.fetchWeightReport(scope: .all)
+        XCTAssertEqual(Set(report.chart.markers.map(\.date)), ["2026-05-24", "2026-07-05", "2026-08-16"])
+        XCTAssertTrue(report.chart.markers.allSatisfy { $0.label == "DEXA" })
+    }
 }
