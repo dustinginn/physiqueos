@@ -52,7 +52,7 @@ enum NutritionReportingCalculator {
     /// The 5-way client-side range selector (`resolveLongRangeWindow`) —
     /// narrows to the last N calendar months counted back from the latest
     /// day's own date, or everything for `.all`.
-    static func rangeFiltered(days: [NutritionDayRecord], range: NutritionReportRange) -> [NutritionDayRecord] {
+    static func rangeFiltered(days: [NutritionDayRecord], range: EvidenceChartRange) -> [NutritionDayRecord] {
         guard let months = range.months, let latestDate = days.map(\.date).max() else { return days }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!

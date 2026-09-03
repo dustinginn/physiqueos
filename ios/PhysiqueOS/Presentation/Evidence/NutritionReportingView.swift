@@ -113,7 +113,7 @@ struct NutritionReportingView: View {
 
     private func rangeSelector() -> some View {
         HStack(spacing: 6) {
-            ForEach(NutritionReportRange.allCases) { range in
+            ForEach(EvidenceChartRange.allCases) { range in
                 let isSelected = range == viewModel?.range
                 Button {
                     Task { await viewModel?.selectRange(range) }

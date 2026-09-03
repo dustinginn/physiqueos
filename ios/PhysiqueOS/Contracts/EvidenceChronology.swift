@@ -316,23 +316,37 @@ enum EvidenceChronology {
         return TrainingScopeContext(options: options, phaseOptions: phaseOptions, dateRangeLabel: dateRangeLabel(selected: selected, goals: goals))
     }
 
-    /// `"Complete history"` for `.all`, otherwise a formatted
-    /// `start → end`/`start → Present` range over the selection's real
-    /// canonical boundary dates (a whole Goal's `[startDate, targetDate]`,
-    /// or one Phase's `[startDate, completedAt]`).
-    static func dateRangeLabel(selected: EvidenceScopeSelection, goals: [CanonicalGoal] = canonicalGoals) -> String {
+    /// The selection's real canonical boundary dates — a whole Goal's
+    /// `[startDate, targetDate]`, one Phase's `[startDate, completedAt]`, or
+    /// `(nil, nil)` for `.all`/an unresolved id (no boundary at all, i.e.
+    /// unbounded). Factored out of `dateRangeLabel` below so any vertical
+    /// needing the raw window — not just its formatted display label — has
+    /// one shared place to get it, rather than re-deriving canonical Goal/
+    /// Phase date math per vertical (Energy's own weekly
+    /// expected-day-count/partial-week computation needs exactly this; see
+    /// `EnergyEvidenceCalculator.weekBuckets`).
+    static func dateWindow(selected: EvidenceScopeSelection, goals: [CanonicalGoal] = canonicalGoals) -> (start: String?, end: String?) {
         switch selected {
         case .all:
-            return "Complete history"
+            return (nil, nil)
         case .goal(let goalId):
-            guard let goal = goals.first(where: { $0.id == goalId }) else { return "Complete history" }
-            return formatRange(start: goal.startDate, end: goal.targetDate)
+            guard let goal = goals.first(where: { $0.id == goalId }) else { return (nil, nil) }
+            return (goal.startDate, goal.targetDate)
         case .phase(let goalId, let phaseId):
             guard let goal = goals.first(where: { $0.id == goalId }), let phase = goal.phases.first(where: { $0.id == phaseId }) else {
-                return "Complete history"
+                return (nil, nil)
             }
-            return formatRange(start: phase.startDate, end: phase.completedAt)
+            return (phase.startDate, phase.completedAt)
         }
+    }
+
+    /// `"Complete history"` for `.all`, otherwise a formatted
+    /// `start → end`/`start → Present` range over `dateWindow`'s own
+    /// boundary dates.
+    static func dateRangeLabel(selected: EvidenceScopeSelection, goals: [CanonicalGoal] = canonicalGoals) -> String {
+        let window = dateWindow(selected: selected, goals: goals)
+        guard let start = window.start else { return "Complete history" }
+        return formatRange(start: start, end: window.end)
     }
 
     private static func formatRange(start: String, end: String?) -> String {

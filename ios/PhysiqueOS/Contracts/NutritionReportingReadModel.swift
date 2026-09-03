@@ -48,10 +48,17 @@ struct NutritionTrendPoint: Equatable, Identifiable {
     var loggedDayCount: Int
 }
 
-/// The 5-way client-side chart range selector every line-trend chart
-/// shows (`LONG_RANGE_OPTIONS`) — narrows the already Goal/Phase-scoped
-/// week/day series further, in-memory, no navigation.
-enum NutritionReportRange: String, CaseIterable, Identifiable {
+/// The 5-way client-side chart range selector every applicable line-trend
+/// chart shows — a direct mirror of the server's own shared
+/// `LONG_RANGE_OPTIONS` (`src/domain/services/LongRangeTimeSeriesService.js`),
+/// which Nutrition Reporting's charts and Energy's "Energy Over Time" chart
+/// both genuinely reuse verbatim on the web (confirmed directly from
+/// source: Energy's own `ENERGY_RANGE_OPTIONS = LONG_RANGE_OPTIONS`, no
+/// separate Energy range table). Kept here rather than duplicated per
+/// vertical for that reason — narrows the already Goal/Phase-scoped week/
+/// day series further, in-memory, no navigation. Despite the file it lives
+/// in, this type is not Nutrition-specific.
+enum EvidenceChartRange: String, CaseIterable, Identifiable {
     case oneMonth = "1m", threeMonths = "3m", sixMonths = "6m", oneYear = "1y", all
 
     var id: String { rawValue }

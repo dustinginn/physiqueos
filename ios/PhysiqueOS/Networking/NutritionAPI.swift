@@ -29,7 +29,7 @@ protocol NutritionAPI: Sendable {
     func fetchNutritionReporting(
         reportId: String,
         scope: EvidenceScopeSelection,
-        range: NutritionReportRange,
+        range: EvidenceChartRange,
         macro: NutritionMacroKey,
         mealMacroMixSlot: NutritionMealSlotFilter,
         mealTrendSlot: NutritionMealSlotFilter,
@@ -130,7 +130,7 @@ struct FixtureNutritionAPI: NutritionAPI {
     func fetchNutritionReporting(
         reportId: String,
         scope: EvidenceScopeSelection,
-        range: NutritionReportRange,
+        range: EvidenceChartRange,
         macro: NutritionMacroKey,
         mealMacroMixSlot: NutritionMealSlotFilter,
         mealTrendSlot: NutritionMealSlotFilter,

@@ -19,7 +19,7 @@ final class NutritionReportingViewModel {
 
     private(set) var state: LoadState = .loading
     private(set) var scope: EvidenceScopeSelection = NutritionScopeDefault.selection
-    private(set) var range: NutritionReportRange = .all
+    private(set) var range: EvidenceChartRange = .all
     private(set) var selectedMacro: NutritionMacroKey = .protein
     private(set) var mealMacroMixSlot: NutritionMealSlotFilter = .dinner
     private(set) var mealTrendSlot: NutritionMealSlotFilter = .all
@@ -51,7 +51,7 @@ final class NutritionReportingViewModel {
         await load()
     }
 
-    func selectRange(_ newRange: NutritionReportRange) async {
+    func selectRange(_ newRange: EvidenceChartRange) async {
         guard newRange != range else { return }
         range = newRange
         await load()
