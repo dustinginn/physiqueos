@@ -166,10 +166,209 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertNotNil(body.range(of: Data("\"measurementDate\":\"2026-08-31\"".utf8)))
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
     }
+
+    func testManualWeightRequestEncodesOnlyScalarFieldsWithNoMediaOrOCR() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, manualWeightResultJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+
+        _ = try await api.submitManualWeight(request)
+
+        let requests = await transport.requests
+        let lastRequest = try XCTUnwrap(requests.last)
+        XCTAssertEqual(lastRequest.url?.path, "/api/v1/native/sandbox/weight/manual")
+        XCTAssertEqual(lastRequest.httpMethod, "POST")
+        let body = try XCTUnwrap(lastRequest.httpBody)
+        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(Set(fields.keys), ["submissionIdentity", "idempotencyKey", "measurementDate", "value", "unit"])
+    }
+
+    func testManualWeightSendsBearerAndDecodesConfirmedResponse() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, manualWeightResultJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+
+        let result = try await api.submitManualWeight(request)
+
+        XCTAssertEqual(result.status, "confirmed")
+        XCTAssertEqual(result.value, 168.4)
+        XCTAssertEqual(result.measurementDate, "2026-08-31")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
+    }
+
+    func testManualWeightRefreshesExpiredAccessTokenOnceAndRetries() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .problem(401, code: "ACCESS_TOKEN_EXPIRED"),
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .json(200, manualWeightResultJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+
+        let result = try await api.submitManualWeight(request)
+
+        XCTAssertEqual(result.id, "weight-manual-1")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/sandbox/auth/pair", "/api/v1/native/sandbox/weight/manual",
+            "/api/v1/native/sandbox/auth/refresh", "/api/v1/native/sandbox/weight/manual",
+        ])
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "b", count: 43))")
+    }
+
+    func testManualWeightMeasurementDateRoundTripsWithoutTimezoneShift() async throws {
+        let oldTimeZone = TimeZone.ReferenceType.default
+        TimeZone.ReferenceType.default = TimeZone(identifier: "America/Los_Angeles")!
+        defer { TimeZone.ReferenceType.default = oldTimeZone }
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, manualWeightResultJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+
+        let result = try await api.submitManualWeight(request)
+
+        XCTAssertEqual(result.measurementDate, "2026-08-31")
+        let requests = await transport.requests
+        let body = try XCTUnwrap(requests.last?.httpBody)
+        XCTAssertNotNil(body.range(of: Data(#""measurementDate":"2026-08-31""#.utf8)))
+    }
+
+    func testManualWeightServerFailureDoesNotSynthesizeSuccess() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .problem(503, code: "INTERNAL_ERROR"),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+
+        await XCTAssertThrowsErrorAsync(try await api.submitManualWeight(request)) { error in
+            XCTAssertEqual(error as? FounderServerError, .serverUnavailable)
+        }
+    }
+
+    func testSandboxHostStaysPinnedAcrossPairManualWriteAndSummaryRefresh() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, manualWeightResultJSON),
+            .json(200, weightJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let request = NativeSandboxWeightManualRequest(
+            submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41000",
+            idempotencyKey: "native-weight-manual-1",
+            measurementDate: "2026-08-31",
+            value: 168.4,
+            unit: "lb"
+        )
+        _ = try await api.submitManualWeight(request)
+        _ = try await api.readCurrentWeight()
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertTrue(requests.allSatisfy { $0.url?.host == testOrigin.host && $0.url?.scheme == testOrigin.scheme })
+    }
+
+    func testManualSubmissionIdentityStaysStableForASameSignatureRetry() {
+        let previous = NativeSandboxWeightManualSubmission.Identity(submissionIdentity: "sub-1", idempotencyKey: "key-1")
+        let fresh = NativeSandboxWeightManualSubmission.Identity(submissionIdentity: "sub-2", idempotencyKey: "key-2")
+        let signature = NativeSandboxWeightManualSubmission.signature(value: 168.4, unit: "lb", measurementDate: "2026-08-31")
+
+        let resolved = NativeSandboxWeightManualSubmission.resolvedIdentity(
+            signature: signature,
+            previousSignature: signature,
+            previousIdentity: previous,
+            freshIdentity: fresh
+        )
+
+        XCTAssertEqual(resolved, previous)
+    }
+
+    func testManualSubmissionIdentityIsFreshForADeliberateCorrection() {
+        let previous = NativeSandboxWeightManualSubmission.Identity(submissionIdentity: "sub-1", idempotencyKey: "key-1")
+        let fresh = NativeSandboxWeightManualSubmission.Identity(submissionIdentity: "sub-2", idempotencyKey: "key-2")
+        let previousSignature = NativeSandboxWeightManualSubmission.signature(value: 168.4, unit: "lb", measurementDate: "2026-08-31")
+        let correctedSignature = NativeSandboxWeightManualSubmission.signature(value: 169.0, unit: "lb", measurementDate: "2026-08-31")
+
+        let resolved = NativeSandboxWeightManualSubmission.resolvedIdentity(
+            signature: correctedSignature,
+            previousSignature: previousSignature,
+            previousIdentity: previous,
+            freshIdentity: fresh
+        )
+
+        XCTAssertEqual(resolved, fresh)
+    }
+
+    func testManualSubmissionIdentityIsFreshForTheFirstAttempt() {
+        let fresh = NativeSandboxWeightManualSubmission.Identity(submissionIdentity: "sub-2", idempotencyKey: "key-2")
+        let signature = NativeSandboxWeightManualSubmission.signature(value: 168.4, unit: "lb", measurementDate: "2026-08-31")
+
+        let resolved = NativeSandboxWeightManualSubmission.resolvedIdentity(
+            signature: signature,
+            previousSignature: nil,
+            previousIdentity: nil,
+            freshIdentity: fresh
+        )
+
+        XCTAssertEqual(resolved, fresh)
+    }
 }
 
 private let testOrigin = URL(string: "https://example.invalid")!
 private let weightJSON = #"{"schemaVersion":"1","currentWeight":{"id":"weight-1","value":168.4,"unit":"lb","measurementDate":"2026-08-31"}}"#
+private let manualWeightResultJSON = #"{"schemaVersion":"1","id":"weight-manual-1","status":"confirmed","measurementDate":"2026-08-31","value":168.4,"unit":"lb"}"#
 
 private func sessionJSON(access: Character, refresh: Character) -> String {
     let accessToken = String(repeating: String(access), count: 43)

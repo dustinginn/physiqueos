@@ -69,6 +69,20 @@ actor FounderServerAPI {
         }
     }
 
+    /// Writes canonical sandbox Weight directly from a Founder-entered
+    /// scalar — the sandbox-only counterpart to the web's
+    /// `saveDirectWeighIn`. No media, OCR, or candidate/review pipeline is
+    /// involved; the server commits (or corrects) the day record itself.
+    func submitManualWeight(_ manualWeight: NativeSandboxWeightManualRequest) async throws -> NativeSandboxWeightManualResult {
+        let token = try await validAccessToken()
+        do {
+            return try await sendJSON(path: "\(Self.sandboxRoutePrefix)/weight/manual", method: "POST", body: manualWeight, bearer: token)
+        } catch FounderServerError.accessTokenExpired {
+            let refreshedToken = try await refreshAccessToken()
+            return try await sendJSON(path: "\(Self.sandboxRoutePrefix)/weight/manual", method: "POST", body: manualWeight, bearer: refreshedToken)
+        }
+    }
+
     /// Prepares the real-asset Weight acceptance path without committing a
     /// canonical Weight record. The server receives both the original bytes
     /// and Native's local candidate and remains responsible for validation.
@@ -150,6 +164,19 @@ actor FounderServerAPI {
     ) async throws -> Response {
         var request = request(path: path, method: method)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+        return try await execute(request)
+    }
+
+    private func sendJSON<Response: Decodable, Body: Encodable>(
+        path: String,
+        method: String,
+        body: Body,
+        bearer: String
+    ) async throws -> Response {
+        var request = request(path: path, method: method)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         request.httpBody = try encoder.encode(body)
         return try await execute(request)
     }
