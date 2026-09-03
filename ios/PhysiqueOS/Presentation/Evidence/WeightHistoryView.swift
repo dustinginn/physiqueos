@@ -290,15 +290,7 @@ private struct WeightTrendChartView: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .frame(height: 160)
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { drag in selectNearestPoint(at: drag.location, proxy: proxy, geometry: geometry) }
-                    )
-            }
-        }
+        .chartScrub { location, proxy, geometry in selectNearestPoint(at: location, proxy: proxy, geometry: geometry) }
         .accessibilityLabel("Weight trend over \(validPoints.count) recorded entries")
     }
 
@@ -344,8 +336,7 @@ private struct WeightTrendChartView: View {
     /// — the same "move across observations quickly" behavior the web's
     /// pointer-scrub already provides.
     private func selectNearestPoint(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let plotFrame = geometry[proxy.plotAreaFrame]
-        let relativeX = location.x - plotFrame.origin.x
+        let relativeX = geometry.relativeX(in: proxy, at: location)
         guard let touchedDate: Date = proxy.value(atX: relativeX) else { return }
         guard let nearest = WeightEvidenceCalculator.nearestPoint(to: touchedDate, in: validPoints, dateValue: dateValue) else { return }
         onSelect(nearest.id)

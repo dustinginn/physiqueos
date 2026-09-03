@@ -6,13 +6,17 @@ import SwiftUI
 /// one), one bar-chart type (Average Daily Macros, Meal Distribution), and
 /// one donut type (Macro Distribution, reused verbatim for Meal Macro Mix
 /// — matching the web reusing `NutritionMacroDistributionChart` for both).
-/// Interaction is **tap-to-select**, not drag-scrub: verified directly from
-/// source that none of the 3 report charts has hover/pointer-scrub — each
-/// point is a discrete `role="button"` the web selects via click or
-/// Enter/Space, defaulting to the latest week until touched. This
-/// deliberately differs from the Weight Trend chart's own drag-scrub
-/// (`WeightHistoryView.swift`), which genuinely does have that richer
-/// pointer interaction on the web.
+///
+/// The web itself is **tap-to-select**, not drag-scrub: verified directly
+/// from source that none of the 3 report charts has hover/pointer-scrub —
+/// each point is a discrete `role="button"` the web selects via click or
+/// Enter/Space, defaulting to the latest week until touched. Native's touch
+/// equivalent standardizes on the same tap-and-drag `chartScrub` gesture
+/// every other interactive Evidence chart uses (see `ChartInteraction.swift`
+/// and this task's chart-interaction standardization pass): a continuous
+/// horizontal drag is the natural mobile equivalent of "moving across
+/// points to inspect them" even though web's own input is click-only, and a
+/// plain tap still resolves identically to before (drag distance zero).
 
 /// One weekly point on a line-trend chart, tap-selectable. Falls back to a
 /// single centered dot + caption for exactly one point, and an empty
@@ -73,20 +77,14 @@ struct NutritionTrendChartView: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .frame(height: 120)
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .onTapGesture { location in selectNearest(at: location, proxy: proxy, geometry: geometry) }
-            }
-        }
+        .chartScrub { location, proxy, geometry in selectNearest(at: location, proxy: proxy, geometry: geometry) }
         .accessibilityLabel("Weekly trend over \(validPoints.count) weeks")
     }
 
     private func selectNearest(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let plotFrame = geometry[proxy.plotAreaFrame]
-        let relativeX = location.x - plotFrame.origin.x
-        guard let touchedWeek: String = proxy.value(atX: relativeX) else { return }
-        guard let nearest = validPoints.first(where: { $0.weekStart == touchedWeek }) ?? validPoints.last else { return }
+        let relativeX = geometry.relativeX(in: proxy, at: location)
+        let touchedWeek: String? = proxy.value(atX: relativeX)
+        guard let nearest = ChartCategoricalSelection.nearestPoint(matching: touchedWeek, in: validPoints, keyPath: \.weekStart) else { return }
         selectedWeekID = nearest.id
     }
 

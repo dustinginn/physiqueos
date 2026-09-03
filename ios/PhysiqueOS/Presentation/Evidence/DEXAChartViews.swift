@@ -3,10 +3,11 @@ import SwiftUI
 
 /// The primary, interactive DEXA chart — used for "Body Fat %", the one
 /// chart `DEXAReportScreen.jsx` shows first and largest ("Core Trends"
-/// drawer, default-open). Tap-to-select nearest scan (matching the
-/// interaction convention already established for every other Reporting
-/// chart in this codebase except Weight's own richer drag-scrub), with a
-/// below-chart "date: value" detail defaulting to the latest scan.
+/// drawer, default-open). Tap-and-drag nearest-scan selection via the
+/// shared `chartScrub` gesture (see `ChartInteraction.swift`) — a single
+/// tap and a continuous horizontal drag both resolve to the nearest scan,
+/// the same touch equivalent of pointer-hover Weight's own chart provides —
+/// with a below-chart "date: value" detail defaulting to the latest scan.
 struct DEXATrendChartView: View {
     let series: DEXAMetricSeries
     let color: Color
@@ -60,66 +61,14 @@ struct DEXATrendChartView: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .frame(height: 120)
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .onTapGesture { location in selectNearest(at: location, proxy: proxy, geometry: geometry) }
-            }
-        }
+        .chartScrub { location, proxy, geometry in selectNearest(at: location, proxy: proxy, geometry: geometry) }
         .accessibilityLabel("\(series.title) trend over \(validPoints.count) scans")
     }
 
     private func selectNearest(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let plotFrame = geometry[proxy.plotAreaFrame]
-        let relativeX = location.x - plotFrame.origin.x
-        guard let touchedDate: String = proxy.value(atX: relativeX) else { return }
-        guard let nearest = validPoints.first(where: { $0.date == touchedDate }) ?? validPoints.last else { return }
+        let relativeX = geometry.relativeX(in: proxy, at: location)
+        let touchedDate: String? = proxy.value(atX: relativeX)
+        guard let nearest = ChartCategoricalSelection.nearestPoint(matching: touchedDate, in: validPoints, keyPath: \.date) else { return }
         selectedPointID = nearest.id
-    }
-}
-
-/// A compact, non-interactive sparkline row — used for the secondary DEXA
-/// trend series (core mass/RMR, supplemental, regional) where a dozen full
-/// interactive charts on one screen would be more clutter than signal.
-/// Still a real chart of real trend data, not text-only: label, latest
-/// value, and a small line sparkline.
-struct DEXASparklineRow: View {
-    let series: DEXAMetricSeries
-    let color: Color
-
-    private var validPoints: [DEXATrendPoint] { series.points.filter { $0.value != nil } }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(series.title)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let latest = validPoints.last?.value {
-                    Text(series.unit.isEmpty ? String(format: "%.2f", latest) : "\(String(format: "%.1f", latest))\(series.unit)")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                } else {
-                    Text("Pending")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-            }
-            Spacer(minLength: 8)
-            if validPoints.count >= 2 {
-                Chart {
-                    ForEach(validPoints) { point in
-                        LineMark(x: .value("Date", point.date), y: .value("Value", point.value ?? 0))
-                            .foregroundStyle(color)
-                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    }
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(width: 90, height: 32)
-                .accessibilityHidden(true)
-            }
-        }
-        .padding(.vertical, 4)
     }
 }

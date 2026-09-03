@@ -25,6 +25,15 @@ struct DEXAHistoryView: View {
     @State private var viewModel: DEXAHistoryViewModel?
 
     @State private var selectedBodyFatPointID: String?
+    /// One selection per secondary metric series, keyed by a
+    /// section-namespaced series title (e.g. `"regionalFat-Arms"`) since
+    /// "Arms"/"Legs"/etc. titles repeat across the lean and fat regional
+    /// sections. Re-verified against source: every DEXA metric chart on the
+    /// live web page (Fat/Lean/Total Mass, RMR, VAT Mass, A/G Ratio, and
+    /// all 10 regional lean/fat series) reuses the same fully-interactive
+    /// hover/drag-scrub chart component as Body Fat % — none of them are
+    /// decorative sparklines on web, so none stay sparkline-only here.
+    @State private var selectedMetricPointIDs: [String: String] = [:]
     @State private var isSupplementalExpanded = false
     @State private var isRegionalLeanExpanded = false
     @State private var isRegionalFatExpanded = false
@@ -90,8 +99,8 @@ struct DEXAHistoryView: View {
                 if let delta = report.delta { deltaRow(delta) }
                 coreTrendsCard(report)
                 supplementalCard(report)
-                regionalCard(title: "Regional Tissue Lean Mass", series: report.regionalLeanTrends, isExpanded: $isRegionalLeanExpanded)
-                regionalCard(title: "Regional Tissue Fat Mass", series: report.regionalFatTrends, isExpanded: $isRegionalFatExpanded)
+                regionalCard(title: "Regional Tissue Lean Mass", series: report.regionalLeanTrends, namespace: "regionalLean", isExpanded: $isRegionalLeanExpanded)
+                regionalCard(title: "Regional Tissue Fat Mass", series: report.regionalFatTrends, namespace: "regionalFat", isExpanded: $isRegionalFatExpanded)
                 historyCard(report.history)
                 DEXADataSourcesFooterView(items: report.dataSources)
             }
@@ -192,9 +201,9 @@ struct DEXAHistoryView: View {
                 TrainingSectionHeaderView(title: "Core Trends")
                 DEXATrendChartView(series: report.bodyFatTrend, color: PhysiqueOSTheme.chartSuccess, selectedPointID: $selectedBodyFatPointID)
                 Divider().overlay(PhysiqueOSTheme.divider)
-                VStack(spacing: 4) {
+                VStack(spacing: 14) {
                     ForEach(report.coreTrends) { series in
-                        DEXASparklineRow(series: series, color: PhysiqueOSTheme.chartEvidence)
+                        metricChart(series, namespace: "core", color: PhysiqueOSTheme.chartEvidence)
                     }
                 }
             }
@@ -222,8 +231,10 @@ struct DEXAHistoryView: View {
                         }
                     }
                     if isSupplementalExpanded {
-                        ForEach(report.supplementalTrends) { series in
-                            DEXASparklineRow(series: series, color: PhysiqueOSTheme.chartEffort)
+                        VStack(spacing: 14) {
+                            ForEach(report.supplementalTrends) { series in
+                                metricChart(series, namespace: "supplemental", color: PhysiqueOSTheme.chartEffort)
+                            }
                         }
                     }
                 }
@@ -231,18 +242,37 @@ struct DEXAHistoryView: View {
         }
     }
 
-    private func regionalCard(title: String, series: [DEXAMetricSeries], isExpanded: Binding<Bool>) -> some View {
+    private func regionalCard(title: String, series: [DEXAMetricSeries], namespace: String, isExpanded: Binding<Bool>) -> some View {
         let preview = Array(series.prefix(Self.regionalPreviewLimit))
         return CardContainer {
             DEXADisclosureRow(isExpanded: isExpanded) {
                 TrainingSectionHeaderView(title: title)
             } expanded: {
-                VStack(spacing: 4) {
+                VStack(spacing: 14) {
                     ForEach(isExpanded.wrappedValue ? series : preview) { item in
-                        DEXASparklineRow(series: item, color: PhysiqueOSTheme.accent)
+                        metricChart(item, namespace: namespace, color: PhysiqueOSTheme.accent)
                     }
                 }
             }
+        }
+    }
+
+    /// A titled, fully-interactive tap-and-drag chart for one secondary
+    /// DEXA metric series — see `selectedMetricPointIDs`'s doc comment for
+    /// why every series (not just Body Fat %) is interactive here.
+    private func metricChart(_ series: DEXAMetricSeries, namespace: String, color: Color) -> some View {
+        let key = "\(namespace)-\(series.title)"
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(series.title)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            DEXATrendChartView(
+                series: series, color: color,
+                selectedPointID: Binding(
+                    get: { selectedMetricPointIDs[key] },
+                    set: { selectedMetricPointIDs[key] = $0 }
+                )
+            )
         }
     }
 
