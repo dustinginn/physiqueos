@@ -14,6 +14,11 @@ final class AppEnvironment {
     let evidenceAPI: EvidenceAPI
     let trainingAPI: TrainingAPI
     let activityAPI: ActivityAPI
+    let nutritionAPI: NutritionAPI
+    /// Fixture/read-model-backed Weight Evidence product surface — never
+    /// mixed with `founderServerAPI`'s isolated live Sandbox Weight write
+    /// proof (see `WeightEvidenceAPI.swift`'s doc comment).
+    let weightEvidenceAPI: WeightEvidenceAPI
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
@@ -29,6 +34,8 @@ final class AppEnvironment {
         evidenceAPI: EvidenceAPI = FixtureEvidenceAPI(),
         trainingAPI: TrainingAPI = FixtureTrainingAPI(),
         activityAPI: ActivityAPI = FixtureActivityAPI(),
+        nutritionAPI: NutritionAPI = FixtureNutritionAPI(),
+        weightEvidenceAPI: WeightEvidenceAPI = FixtureWeightEvidenceAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
@@ -41,6 +48,8 @@ final class AppEnvironment {
         self.evidenceAPI = evidenceAPI
         self.trainingAPI = trainingAPI
         self.activityAPI = activityAPI
+        self.nutritionAPI = nutritionAPI
+        self.weightEvidenceAPI = weightEvidenceAPI
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
