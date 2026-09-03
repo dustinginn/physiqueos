@@ -1,0 +1,25 @@
+{
+  "days": [
+    { "id": "energy-day-fixture-001", "date": "2026-05-20", "calorieIntake": 2400, "activeCalories": 550, "hasActivityRecord": true, "rmr": null },
+    { "id": "energy-day-fixture-002", "date": "2026-06-05", "calorieIntake": 2350, "activeCalories": 520, "hasActivityRecord": true, "rmr": 2140 },
+    { "id": "energy-day-fixture-003", "date": "2026-06-25", "calorieIntake": 2300, "activeCalories": null, "hasActivityRecord": false, "rmr": 2160 },
+    { "id": "energy-day-fixture-004", "date": "2026-07-18", "calorieIntake": 2400, "activeCalories": 560, "hasActivityRecord": true, "rmr": 2185 },
+    { "id": "energy-day-fixture-005", "date": "2026-07-19", "calorieIntake": 2450, "activeCalories": 540, "hasActivityRecord": true, "rmr": 2185 },
+    { "id": "energy-day-fixture-006", "date": "2026-07-22", "calorieIntake": null, "activeCalories": 600, "hasActivityRecord": true, "rmr": 2185 },
+    { "id": "energy-day-fixture-007", "date": "2026-08-01", "calorieIntake": 2500, "activeCalories": 580, "hasActivityRecord": true, "rmr": 2185 },
+    { "id": "energy-day-fixture-008", "date": "2026-08-10", "calorieIntake": null, "activeCalories": null, "hasActivityRecord": false, "rmr": 2185 },
+    { "id": "energy-day-fixture-009", "date": "2026-08-15", "calorieIntake": 2480, "activeCalories": 570, "hasActivityRecord": true, "rmr": 2185 },
+    { "id": "energy-day-fixture-010", "date": "2026-08-16", "calorieIntake": 2600, "activeCalories": 600, "hasActivityRecord": true, "rmr": 2220 },
+    { "id": "energy-day-fixture-011", "date": "2026-08-18", "calorieIntake": 2650, "activeCalories": 610, "hasActivityRecord": true, "rmr": 2220 },
+    { "id": "energy-day-fixture-012", "date": "2026-08-22", "calorieIntake": 2700, "activeCalories": 590, "hasActivityRecord": true, "rmr": 2220 },
+    { "id": "energy-day-fixture-013", "date": "2026-08-27", "calorieIntake": 2790, "activeCalories": 588, "hasActivityRecord": true, "rmr": 2220 },
+    { "id": "energy-day-fixture-014", "date": "2026-08-29", "calorieIntake": 2750, "activeCalories": 705, "hasActivityRecord": true, "rmr": 2220 },
+    { "id": "energy-day-fixture-015", "date": "2026-08-30", "calorieIntake": 2860, "activeCalories": 612, "hasActivityRecord": true, "rmr": 2240 }
+  ],
+  "dataSources": [
+    { "name": "Nutrition", "status": "Connected" },
+    { "name": "Activity", "status": "Connected" },
+    { "name": "DEXA", "status": "Connected" },
+    { "name": "Apple Health", "status": "Suggested" }
+  ]
+}

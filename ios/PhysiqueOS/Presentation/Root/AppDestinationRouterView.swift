@@ -58,6 +58,8 @@ struct AppDestinationRouterView: View {
             PhotosHistoryView()
         case .photoSetDetail(let setId):
             PhotoSetDetailView(setId: setId)
+        case .progressStream(let streamId) where streamId == "energy":
+            EnergyHistoryView()
         // The bare Training Library root (`/progress/training/library`,
         // no area/exercise segment) — the same 10 canonical areas the
         // landing page's own "Training Areas" grid shows, rendered as a

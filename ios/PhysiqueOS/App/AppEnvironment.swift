@@ -21,6 +21,7 @@ final class AppEnvironment {
     let weightEvidenceAPI: WeightEvidenceAPI
     let dexaAPI: DEXAAPI
     let photosAPI: PhotosAPI
+    let energyAPI: EnergyAPI
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
@@ -40,6 +41,7 @@ final class AppEnvironment {
         weightEvidenceAPI: WeightEvidenceAPI = FixtureWeightEvidenceAPI(),
         dexaAPI: DEXAAPI = FixtureDEXAAPI(),
         photosAPI: PhotosAPI = FixturePhotosAPI(),
+        energyAPI: EnergyAPI = FixtureEnergyAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
@@ -56,6 +58,7 @@ final class AppEnvironment {
         self.weightEvidenceAPI = weightEvidenceAPI
         self.dexaAPI = dexaAPI
         self.photosAPI = photosAPI
+        self.energyAPI = energyAPI
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore

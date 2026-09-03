@@ -55,6 +55,15 @@ enum PhysiqueOSTheme {
     /// than a semantic theme token, so this stays a Weight-specific
     /// constant here too rather than a general-purpose chart token.
     static let weightTrendLine = Color(hex: 0x0EA5E9)
+
+    /// `--energy-intake` / `--energy-expenditure` in the web dark theme —
+    /// the two fixed series colors `EnergyOverTimeChart`/`EnergyWeeklyChart`
+    /// use (solid amber for intake, blue for estimated expenditure), kept
+    /// as their own named tokens rather than reused from `chartEffort`/
+    /// `chartEvidence` even though the hex values happen to coincide, so a
+    /// reader sees "energy" semantics here, not "effort"/"evidence" ones.
+    static let energyIntake = Color(hex: 0xFBBF24)
+    static let energyExpenditure = Color(hex: 0x60A5FA)
 }
 
 /// Semantic color slots mirroring `IconBadge.jsx`'s `colors` map, so icon
