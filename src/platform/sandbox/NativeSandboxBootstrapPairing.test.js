@@ -20,6 +20,7 @@ function runtime(overrides = {}) {
     weightCandidateService: {
       submit: vi.fn(), getReview: vi.fn(), confirm: vi.fn(), discard: vi.fn(),
     },
+    weightManualService: { submit: vi.fn() },
     authority: { descriptor: {
       authorityId: "native-sandbox-founder-acceptance",
       ownerUserId: "user_native_sandbox_founder_acceptance",

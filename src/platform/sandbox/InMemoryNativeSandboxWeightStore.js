@@ -4,6 +4,7 @@ export function createInMemoryNativeSandboxWeightStore({ authority, state = null
     submissions: new Map(),
     reviews: new Map(),
     weightEntries: new Map(),
+    manualSubmissions: new Map(),
     outbox: [],
   };
   return Object.freeze({
@@ -43,6 +44,31 @@ export function createInMemoryNativeSandboxWeightStore({ authority, state = null
       const updated = { ...review, status: "confirmed", version: review.version + 1, confirmation: { confirmedAt }, updatedAt: confirmedAt };
       data.reviews.set(reviewId, updated);
       return structuredClone({ review: updated, weightEntry });
+    },
+    // Direct canonical write for the manual scalar Weight path (no Evidence
+    // Review stage, mirroring production manual Weight). idempotencyKey
+    // guards true request replay; weightEntry.id is date-scoped by the
+    // caller so a second distinct value for the same day corrects the same
+    // canonical record, matching MorningCheckInPersistenceService's
+    // one-entry-per-day semantics.
+    async writeManual({ authority: descriptor, ownerUserId, submissionIdentity, idempotencyKey, weightEntry, continuation, confirmedAt }) {
+      assertAuthority(authority, descriptor, ownerUserId);
+      const priorSubmission = data.manualSubmissions.get(idempotencyKey);
+      if (priorSubmission) {
+        if (priorSubmission.submissionIdentity !== submissionIdentity) throw conflict();
+        return structuredClone({ weightEntry: priorSubmission.weightEntry, changed: false });
+      }
+      authority.assertOutboxMessage(continuation);
+      const existing = data.weightEntries.get(weightEntry.id);
+      const unchanged = existing != null &&
+        existing.weight.value === weightEntry.weight.value &&
+        existing.weight.unit === weightEntry.weight.unit;
+      if (!unchanged) {
+        data.weightEntries.set(weightEntry.id, structuredClone(weightEntry));
+        data.outbox.push(structuredClone(continuation));
+      }
+      data.manualSubmissions.set(idempotencyKey, { submissionIdentity, weightEntry: structuredClone(weightEntry), confirmedAt });
+      return structuredClone({ weightEntry, changed: !unchanged });
     },
     async discard({ authority: descriptor, ownerUserId, reviewId, expectedVersion }) {
       assertAuthority(authority, descriptor, ownerUserId);

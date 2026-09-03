@@ -22,8 +22,11 @@ export function createNativeSandboxWorkerComposition({
     databaseAuthority: composition.databaseAuthority,
     handle: async (message, context) => {
       const weightEntryId = String(message.payload?.weightEntryId ?? "").trim();
-      const reviewId = String(message.payload?.reviewId ?? "").trim();
-      if (!weightEntryId || !reviewId) throw invalidContinuation();
+      // The manual scalar Weight path (NativeSandboxManualWeightService)
+      // writes canonical Weight directly with no Evidence Review, so its
+      // continuation carries no reviewId - only weightEntryId is required.
+      const reviewId = String(message.payload?.reviewId ?? "").trim() || null;
+      if (!weightEntryId) throw invalidContinuation();
       const result = await composition.pool.query(
         `SELECT record_id FROM physiqueos.canonical_checkin_records
           WHERE owner_user_id=$1 AND collection_name='weightEntries' AND record_id=$2

@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
+import {
+  calendarWeightDate as sharedCalendarDate,
+  validUnit as sharedValidUnit,
+  validWeight as sharedValidWeight,
+} from "../../platform/sandbox/nativeSandboxWeightValidation.js";
 
 export const NATIVE_WEIGHT_CANDIDATE_SCHEMA_VERSION = "1";
 export const NATIVE_WEIGHT_PARSER_SCHEMA_VERSION = "1";
@@ -239,22 +244,17 @@ function createPendingWeightReview({ authority, ownerUserId, intakeId, candidate
   });
 }
 
+// Delegates to the validators shared with the manual scalar Weight path
+// (nativeSandboxWeightValidation.js) but preserves this route's exact
+// existing ApplicationProblem status/code/title for every rejection.
 function validWeight(value) {
-  const result = Number(value);
-  if (!Number.isFinite(result) || result < 50 || result > 1_000) throw invalid("Enter a valid Weight value.");
-  return Math.round(result * 10) / 10;
+  try { return sharedValidWeight(value); } catch { throw invalid("Enter a valid Weight value."); }
 }
 function validUnit(value) {
-  const unit = String(value ?? "").toLowerCase();
-  if (!["lb", "kg"].includes(unit)) throw invalid("Weight unit must be lb or kg.");
-  return unit;
+  try { return sharedValidUnit(value); } catch { throw invalid("Weight unit must be lb or kg."); }
 }
 function calendarDate(value) {
-  const candidate = String(value ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) throw invalid("The measurement date is invalid.");
-  const [year, month, day] = candidate.split("-").map(Number);
-  if (new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) !== candidate) throw invalid("The measurement date is invalid.");
-  return candidate;
+  try { return sharedCalendarDate(value); } catch { throw invalid("The measurement date is invalid."); }
 }
 function cleanOptionalText(value, max) {
   const text = String(value ?? "").trim();

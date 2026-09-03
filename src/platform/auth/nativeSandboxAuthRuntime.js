@@ -6,7 +6,8 @@ import { foundationLogger } from "../foundation/runtime.js";
 let runtime;
 
 export function createNativeSandboxAuthRuntime({ composition, logger = null, clock = () => performance.now() } = {}) {
-  if (!composition?.founderAuthService || !composition?.weightSummaryReadService || !composition?.weightCandidateService) {
+  if (!composition?.founderAuthService || !composition?.weightSummaryReadService ||
+      !composition?.weightCandidateService || !composition?.weightManualService) {
     throw new Error("Native sandbox runtime dependencies are required.");
   }
   const auth = createNativeFounderAuthRuntime({
@@ -48,6 +49,12 @@ export function createNativeSandboxAuthRuntime({ composition, logger = null, clo
       return timed("native.sandbox.weight_candidate.review_ready", requestId, async () => {
         const principal = await authenticator.authenticate(request);
         return composition.weightCandidateService.submit({ principal, submission, asset, requestId });
+      });
+    },
+    async submitManualWeight({ request, submission, requestId = null }) {
+      return timed("native.sandbox.weight_manual.confirmed", requestId, async () => {
+        const principal = await authenticator.authenticate(request);
+        return composition.weightManualService.submit({ principal, submission, requestId });
       });
     },
     async getWeightReview({ request, reviewId, requestId = null }) {

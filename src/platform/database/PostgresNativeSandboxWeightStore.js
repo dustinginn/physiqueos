@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 
 const SUBMISSION_COLLECTION = "nativeSandboxWeightSubmissions";
 const REVIEW_COLLECTION = "evidenceReviews";
+const MANUAL_SUBMISSION_COLLECTION = "nativeSandboxManualWeightSubmissions";
+const WEIGHT_ENTRY_COLLECTION = "weightEntries";
+const WEIGHT_ENTRY_TABLE = "canonical_checkin_records";
 
 export function createPostgresNativeSandboxWeightStore({
   pool,
@@ -100,6 +103,61 @@ export function createPostgresNativeSandboxWeightStore({
       });
     },
 
+    // Direct canonical write for the manual scalar Weight path (no Evidence
+    // Review stage, mirroring production manual Weight). idempotencyKey
+    // guards true request replay; weightEntry.id is date-scoped by the
+    // caller so a second distinct value for the same day corrects the same
+    // canonical record, matching MorningCheckInPersistenceService's
+    // one-entry-per-day semantics.
+    async writeManual({ authority: descriptor, ownerUserId: requestedOwner, submissionIdentity,
+      idempotencyKey, weightEntry, continuation, confirmedAt }) {
+      assertDescriptor(authority.descriptor, descriptor, requestedOwner);
+      return transaction(pool, async (client) => {
+        await authority.assertDatabase(client);
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+          [`native-sandbox-weight-manual:${ownerUserId}:${idempotencyKey}`],
+        );
+        const priorSubmission = await getRecord(client, ownerUserId, MANUAL_SUBMISSION_COLLECTION, idempotencyKey);
+        if (priorSubmission) {
+          if (priorSubmission.submissionIdentity !== submissionIdentity) throw conflict();
+          return Object.freeze({ weightEntry: priorSubmission.weightEntry, changed: false });
+        }
+        authority.assertOutboxMessage(continuation);
+        const existing = await getRecord(client, ownerUserId, WEIGHT_ENTRY_COLLECTION, weightEntry.id, true, WEIGHT_ENTRY_TABLE);
+        const unchanged = existing != null &&
+          existing.weight?.value === weightEntry.weight.value &&
+          existing.weight?.unit === weightEntry.weight.unit;
+        if (!unchanged) {
+          if (existing) {
+            await client.query(
+              `UPDATE physiqueos.${WEIGHT_ENTRY_TABLE} SET payload=$4::jsonb,status='confirmed',version=version+1,updated_at=$5
+                 WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3`,
+              [ownerUserId, WEIGHT_ENTRY_COLLECTION, weightEntry.id, JSON.stringify(weightEntry), confirmedAt],
+            );
+          } else {
+            await putRecord(client, { table: WEIGHT_ENTRY_TABLE, collection: WEIGHT_ENTRY_COLLECTION,
+              ownerUserId, recordId: weightEntry.id, sourceIdentity: `native-sandbox-weight-manual:${weightEntry.id}`,
+              occurrenceDate: weightEntry.measuredAt, status: "confirmed",
+              provenance: { sandboxAuthority: authority.descriptor }, payload: weightEntry });
+          }
+          await client.query(
+            `INSERT INTO physiqueos.outbox_messages
+              (id,user_id,topic,dedupe_key,payload_version,payload,due_at)
+             VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)
+             ON CONFLICT (topic,dedupe_key) DO NOTHING`,
+            [`native_sandbox_outbox_${createId()}`, continuation.userId, continuation.topic,
+              continuation.dedupeKey, continuation.payloadVersion, JSON.stringify(continuation.payload), confirmedAt],
+          );
+        }
+        await putRecord(client, { table: "canonical_evidence_records", collection: MANUAL_SUBMISSION_COLLECTION,
+          ownerUserId, recordId: idempotencyKey, sourceIdentity: idempotencyKey, occurrenceDate: weightEntry.measuredAt,
+          status: "recorded", provenance: { sandboxAuthority: authority.descriptor },
+          payload: { submissionIdentity, weightEntry } });
+        return Object.freeze({ weightEntry, changed: !unchanged });
+      });
+    },
+
     async discard({ authority: descriptor, ownerUserId: requestedOwner, reviewId, expectedVersion }) {
       assertDescriptor(authority.descriptor, descriptor, requestedOwner);
       return transaction(pool, async (client) => {
@@ -133,9 +191,9 @@ async function getSubmission(client, ownerUserId, idempotencyKey, lock = false) 
   );
   return result.rows[0]?.payload ?? null;
 }
-async function getRecord(client, ownerUserId, collection, recordId, lock = false) {
+async function getRecord(client, ownerUserId, collection, recordId, lock = false, table = "canonical_evidence_records") {
   const result = await client.query(
-    `SELECT payload,version FROM physiqueos.canonical_evidence_records
+    `SELECT payload,version FROM physiqueos.${table}
       WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3${lock ? " FOR UPDATE" : ""}`,
     [ownerUserId, collection, recordId],
   );

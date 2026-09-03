@@ -36,6 +36,7 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
         messageId: message.id,
         workerId,
         topic: message.topic,
+        userId: message.user_id ?? null,
         payloadVersion: message.payload_version,
         payload: structuredClone(message.payload),
         correlation: Object.freeze({ commandId: message.payload?.commandId ?? null, operationId: message.operation_id ?? null }),

@@ -1,5 +1,6 @@
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { createNativeSandboxWeightCandidateService } from "../evidence/NativeSandboxWeightCandidateService.js";
+import { createNativeSandboxManualWeightService } from "../evidence/NativeSandboxManualWeightService.js";
 import { createProviderCanonicalUploadService } from "../media/ProviderCanonicalUploadService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
 import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
@@ -54,6 +55,11 @@ export function getNativeSandboxApplicationComposition(env = process.env) {
     media: uploads,
     logger: foundationLogger,
   });
+  const weightManualService = createNativeSandboxManualWeightService({
+    authority: boundary,
+    store: weightStore,
+    logger: foundationLogger,
+  });
   const founderAuthService = createFounderAuthService({
     transactionRunner: createFoundationPostgresTransactionRunner({ pool }),
     credentialPepper: config.credentialPepper,
@@ -81,6 +87,7 @@ export function getNativeSandboxApplicationComposition(env = process.env) {
     founderAuthService,
     weightSummaryReadService,
     weightCandidateService,
+    weightManualService,
   });
   return runtime;
 }
