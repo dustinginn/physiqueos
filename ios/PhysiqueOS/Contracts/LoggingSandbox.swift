@@ -334,8 +334,84 @@ enum EvidenceSandboxRouter {
         }
     }
 
+    /// Classifies each evidence *source* (the typed details, and each
+    /// attachment's own extracted text + filename) independently, then
+    /// unions the results — rather than classifying one blob concatenated
+    /// across the entire package. A package legitimately containing
+    /// Nutrition, Activity, and Training evidence at once must keep all
+    /// three: the intra-source Training-vs-Activity/Weight disambiguation
+    /// below (a single image whose own text is ambiguous between "a
+    /// workout screenshot" and "an Activity/Weight reading") is a
+    /// same-source heuristic and must never suppress a genuinely separate
+    /// Activity or Weight screenshot elsewhere in the same package just
+    /// because a *different* attachment happens to contain Training
+    /// signal. This was the actual cause of a real Founder regression:
+    /// Activity was silently dropped from a Nutrition+Activity+Training
+    /// upload (present and correct when the same Activity evidence was
+    /// paired with only Nutrition) because the suppression previously ran
+    /// against the whole package's merged text.
     static func detectedCategories(for draft: EvidenceIntakeDraft) -> [EvidenceCategory] {
-        let text = (draft.submittedText + "\n" + draft.attachments.map(\.displayName).joined(separator: "\n")).lowercased()
+        var result: [EvidenceCategory] = []
+        for source in classificationSources(for: draft) where !source.classificationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            for category in detectedCategories(inSingleSource: source.classificationText) where !result.contains(category) {
+                result.append(category)
+            }
+        }
+        // Local Vision OCR cannot identify a physique. When a multi-image
+        // package has no recognized document/workout/nutrition signals
+        // anywhere, route it to an explicitly unconfirmed Progress Photo
+        // review rather than pretending high-confidence visual recognition
+        // occurred. This stays package-level by design — it only applies
+        // once every source has been checked and none matched anything.
+        let imageAttachments = draft.attachments.filter(\.isImage)
+        if result.isEmpty,
+           imageAttachments.count >= 2,
+           imageAttachments.count == draft.attachments.count {
+            result.append(.progressPhotos)
+        }
+        return result
+    }
+
+    /// The concatenated, original-case text of just the sources whose own
+    /// per-source classification actually included `category` — used by
+    /// per-category field extraction (e.g. `activityItem`) so a field
+    /// label shared with another domain (e.g. "active calories", which
+    /// appears both on an Activity rings summary as "Move ... cal" and on
+    /// a Training workout summary) is never read from a *different*
+    /// domain's attachment once both are legitimately present in the same
+    /// package. Falls back to the caller using the whole package's text
+    /// when no source's own classification matches (e.g. an explicitly
+    /// chosen scenario whose typed text doesn't happen to use the
+    /// automatic classifier's exact keyword phrasing) — callers are
+    /// expected to fall back to `draft.submittedText` when this is empty.
+    static func sourceText(for draft: EvidenceIntakeDraft, matching category: EvidenceCategory) -> String {
+        classificationSources(for: draft)
+            .filter { !$0.classificationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && detectedCategories(inSingleSource: $0.classificationText).contains(category) }
+            .map(\.valueText)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    /// One source per attachment (its own extracted text, paired with a
+    /// classification-only text that also folds in its own filename —
+    /// never another attachment's), plus the typed details as their own
+    /// source. `valueText` (used for field extraction) never includes the
+    /// filename; `classificationText` (used only to decide which
+    /// category(ies) this source belongs to) does, preserving the
+    /// original filename-assisted classification (e.g. a DEXA export
+    /// named "BodySpec.pdf") without letting a filename leak into
+    /// extracted field values.
+    private static func classificationSources(for draft: EvidenceIntakeDraft) -> [(classificationText: String, valueText: String)] {
+        var sources: [(String, String)] = [(draft.details.lowercased(), draft.details)]
+        sources.append(contentsOf: draft.attachments.map { attachment in
+            let classification = [attachment.extractedText, attachment.displayName].compactMap { $0 }.joined(separator: "\n").lowercased()
+            return (classification, attachment.extractedText ?? "")
+        })
+        return sources
+    }
+
+    private static func detectedCategories(inSingleSource text: String) -> [EvidenceCategory] {
         var result: [EvidenceCategory] = []
         func add(_ category: EvidenceCategory, when condition: Bool) {
             if condition, !result.contains(category) { result.append(category) }
@@ -365,16 +441,6 @@ enum EvidenceSandboxRouter {
         add(.activity, when: containsAny(text, ["activity rings", "move goal", "stand hours", "exercise minutes", "steps"]) && !trainingSignal)
         let weightSignal = containsAny(text, ["morning weight", "body weight", "weighed in", "scale weight"]) || text.range(of: #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#, options: .regularExpression) != nil
         add(.weight, when: weightSignal && !trainingSignal && !result.contains(.dexa))
-        // Local Vision OCR cannot identify a physique. When a multi-image
-        // package has no recognized document/workout/nutrition signals, route
-        // it to an explicitly unconfirmed Progress Photo review rather than
-        // pretending high-confidence visual recognition occurred.
-        let imageAttachments = draft.attachments.filter(\.isImage)
-        if result.isEmpty,
-           imageAttachments.count >= 2,
-           imageAttachments.count == draft.attachments.count {
-            add(.progressPhotos, when: true)
-        }
         return result
     }
 

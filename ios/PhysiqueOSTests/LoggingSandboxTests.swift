@@ -276,6 +276,194 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(EvidenceSandboxRouter.scenario(for: nutrition), .mixed)
     }
 
+    // MARK: - Multi-domain package reconciliation
+    //
+    // Regression coverage for a real Founder-reported bug: a single upload
+    // containing Nutrition + Activity + Training evidence silently dropped
+    // Activity, while the same Activity evidence survived when paired with
+    // only Nutrition. Root cause: `EvidenceSandboxRouter.detectedCategories`
+    // classified one blob of text concatenated across the *entire* package,
+    // and Activity/Weight detection was gated on `!trainingSignal` computed
+    // over that same whole-package blob — so Training evidence anywhere in
+    // the package silently suppressed Activity (and Weight) detection
+    // everywhere in the package, even in a completely different attachment.
+    // Fixed by classifying each source (typed details, each attachment's own
+    // extracted text + filename) independently and unioning the results, so
+    // the same intra-source disambiguation still applies but never crosses
+    // between genuinely separate sources.
+
+    private static let nutritionSourceText = "Daily nutrition summary Calories 1987 Protein 176 Carbohydrates 204 Fat 61"
+    private static let activitySourceText = "9:47\nActivity\nMove 923 cal\nExercise 114 min\nStand 15 hr\nSteps 8,473\n47 bpm"
+    private static let trainingCardioSourceText = "Outdoor Walk\nWorkout Time 18 min\nActive Calories 91\nAverage Heart Rate 104"
+    private static let secondTrainingCardioSourceText = "Indoor Cycling\nWorkout Time 24 min\nActive Calories 280\nAverage Heart Rate 134"
+
+    private func domainAttachment(id: String, text: String) -> SandboxAttachment {
+        .init(id: id, displayName: "\(id).png", source: .photos, contentType: "image/png", extractedText: text)
+    }
+
+    func testNutritionAndActivityBothSurviveAsFullReviewItems() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+            domainAttachment(id: "activity", text: Self.activitySourceText),
+        ])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft)), Set([.nutrition, .activity]))
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(Set(items.map(\.category)), Set([.nutrition, .activity]))
+        let nutrition = try XCTUnwrap(items.first { $0.category == .nutrition })
+        XCTAssertEqual(nutrition.fields.first { $0.id == "calories" }?.value, "1987")
+        let activity = try XCTUnwrap(items.first { $0.category == .activity })
+        XCTAssertEqual(activity.fields.first { $0.id == "steps" }?.value, "8473")
+        XCTAssertEqual(activity.fields.first { $0.id == "activeCalories" }?.value, "923")
+    }
+
+    func testNutritionAndTrainingBothSurviveAsFullReviewItems() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+            domainAttachment(id: "training", text: Self.trainingCardioSourceText),
+        ])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft)), Set([.nutrition, .training]))
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(Set(items.map(\.category)), Set([.nutrition, .training]))
+        let nutrition = try XCTUnwrap(items.first { $0.category == .nutrition })
+        XCTAssertEqual(nutrition.fields.first { $0.id == "calories" }?.value, "1987")
+        let training = try XCTUnwrap(items.first { $0.category == .training })
+        XCTAssertEqual(training.title, "Outdoor Walk")
+        XCTAssertEqual(training.fields.first { $0.id == "activeCalories" }?.value, "91")
+    }
+
+    /// The pairing that was never actually broken in isolation — Activity
+    /// and Training together, with no Nutrition present. Confirms the fix
+    /// didn't just special-case the three-domain case.
+    func testActivityAndTrainingBothSurviveAsFullReviewItems() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            domainAttachment(id: "activity", text: Self.activitySourceText),
+            domainAttachment(id: "training", text: Self.trainingCardioSourceText),
+        ])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft)), Set([.activity, .training]))
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(Set(items.map(\.category)), Set([.activity, .training]))
+        let activity = try XCTUnwrap(items.first { $0.category == .activity })
+        XCTAssertEqual(activity.fields.first { $0.id == "steps" }?.value, "8473")
+        let training = try XCTUnwrap(items.first { $0.category == .training })
+        XCTAssertEqual(training.fields.first { $0.id == "activeCalories" }?.value, "91")
+        // Workout calories must not replace/overwrite Activity's own totals.
+        XCTAssertNotEqual(activity.fields.first { $0.id == "activeCalories" }?.value, training.fields.first { $0.id == "activeCalories" }?.value)
+    }
+
+    /// The exact reported failure: Nutrition + Activity + Training in one
+    /// package, checked across every asset order — since the original bug
+    /// was order-dependent on which attachment happened to carry the
+    /// Training signal, this must hold regardless of upload order.
+    func testTripleDomainPackageSurvivesInEveryAssetOrder() async throws {
+        let orders: [[String]] = [
+            ["nutrition", "activity", "training"],
+            ["training", "nutrition", "activity"],
+            ["activity", "training", "nutrition"],
+            ["training", "activity", "nutrition"],
+        ]
+        for order in orders {
+            let attachmentsByDomain: [String: SandboxAttachment] = [
+                "nutrition": domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+                "activity": domainAttachment(id: "activity", text: Self.activitySourceText),
+                "training": domainAttachment(id: "training", text: Self.trainingCardioSourceText),
+            ]
+            let store = LoggingSandboxStore(now: date(2026, 8, 30))
+            store.addAttachments(order.compactMap { attachmentsByDomain[$0] })
+
+            let categories = Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft))
+            XCTAssertEqual(categories, Set([.nutrition, .activity, .training]), "order: \(order)")
+
+            _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+            let id = try await reviewID(store)
+            let items = try XCTUnwrap(store.review(id: id)?.items, "order: \(order)")
+
+            XCTAssertEqual(Set(items.map(\.category)), Set([.nutrition, .activity, .training]), "order: \(order)")
+            // No duplicate Activity or Training evidence regardless of order.
+            XCTAssertEqual(items.filter { $0.category == .activity }.count, 1, "order: \(order)")
+            XCTAssertEqual(items.filter { $0.category == .training }.count, 1, "order: \(order)")
+            let nutrition = try XCTUnwrap(items.first { $0.category == .nutrition }, "order: \(order)")
+            let activity = try XCTUnwrap(items.first { $0.category == .activity }, "order: \(order)")
+            let training = try XCTUnwrap(items.first { $0.category == .training }, "order: \(order)")
+            XCTAssertEqual(nutrition.fields.first { $0.id == "calories" }?.value, "1987", "order: \(order)")
+            XCTAssertEqual(activity.fields.first { $0.id == "steps" }?.value, "8473", "order: \(order)")
+            XCTAssertEqual(activity.fields.first { $0.id == "activeCalories" }?.value, "923", "order: \(order)")
+            XCTAssertEqual(training.fields.first { $0.id == "activeCalories" }?.value, "91", "order: \(order)")
+        }
+    }
+
+    /// Exactly the shape the Founder actually uploaded: one screenshot per
+    /// domain in a single package.
+    func testOneActivityOneNutritionOneTrainingScreenshotAllSurvive() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            domainAttachment(id: "activity", text: Self.activitySourceText),
+            domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+            domainAttachment(id: "training", text: Self.trainingCardioSourceText),
+        ])
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(items.count, 3)
+        XCTAssertEqual(Set(items.map(\.category)), Set([.nutrition, .activity, .training]))
+    }
+
+    func testActivityNutritionAndMultipleTrainingScreenshotsAllSurvive() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.addAttachments([
+            domainAttachment(id: "activity", text: Self.activitySourceText),
+            domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+            domainAttachment(id: "walk", text: Self.trainingCardioSourceText),
+            domainAttachment(id: "cycle", text: Self.secondTrainingCardioSourceText),
+        ])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft)), Set([.nutrition, .activity, .training]))
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        XCTAssertEqual(items.filter { $0.category == .training }.count, 2, "two distinct Training workout screenshots, not merged or deduplicated away")
+        XCTAssertEqual(items.filter { $0.category == .activity }.count, 1)
+        XCTAssertEqual(items.filter { $0.category == .nutrition }.count, 1)
+        XCTAssertEqual(Set(items.filter { $0.category == .training }.map(\.title)), Set(["Outdoor Walk", "Indoor Cycling"]))
+    }
+
+    /// Multiple typed Training exercises (a real workout with sets) plus a
+    /// separate Activity day screenshot plus Nutrition — the fullest
+    /// realistic package shape.
+    func testMultipleTrainingExercisesActivityDayAndNutritionAllSurvive() async throws {
+        let store = LoggingSandboxStore(now: date(2026, 8, 30))
+        store.evidenceDraft.details = "Bicep curls\n12r 50p x4\n\nSpider curls\n12r 40p x4"
+        store.addAttachments([
+            domainAttachment(id: "activity", text: Self.activitySourceText),
+            domainAttachment(id: "nutrition", text: Self.nutritionSourceText),
+        ])
+        XCTAssertEqual(Set(EvidenceSandboxRouter.detectedCategories(for: store.evidenceDraft)), Set([.nutrition, .activity, .training]))
+        _ = try value(store.submitEvidence(now: date(2026, 8, 30)))
+        let id = try await reviewID(store)
+        let items = try XCTUnwrap(store.review(id: id)?.items)
+
+        let training = try XCTUnwrap(items.first { $0.category == .training })
+        XCTAssertEqual(training.exercises.map(\.name), ["Bicep Curls", "Spider Curls"])
+        XCTAssertEqual(training.exercises.map { $0.sets.count }, [4, 4])
+        let activity = try XCTUnwrap(items.first { $0.category == .activity })
+        XCTAssertEqual(activity.fields.first { $0.id == "steps" }?.value, "8473")
+        let nutrition = try XCTUnwrap(items.first { $0.category == .nutrition })
+        XCTAssertEqual(nutrition.fields.first { $0.id == "calories" }?.value, "1987")
+        XCTAssertEqual(items.count, 3)
+    }
+
     func testMyFitnessPalDailyTotalAndMacrosSurviveWhileInterfaceChromeIsExcluded() async throws {
         let store = LoggingSandboxStore(now: date(2026, 8, 30))
         store.evidenceDraft.scenario = .nutrition

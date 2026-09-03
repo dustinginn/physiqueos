@@ -468,7 +468,14 @@ enum EvidenceLocalInterpretation {
     }
 
     private static func activityItem(_ draft: EvidenceIntakeDraft) -> EvidenceReviewItem {
-        let text = draft.submittedText
+        // Scoped to only the source(s) actually classified as Activity, so
+        // a field label shared with Training (e.g. "active calories")
+        // never reads a value from a different attachment in the same
+        // package. Falls back to the whole package's text when nothing
+        // scopes cleanly (e.g. an explicitly chosen Activity scenario
+        // whose typed text doesn't match the classifier's own keywords).
+        let scoped = EvidenceSandboxRouter.sourceText(for: draft, matching: .activity)
+        let text = scoped.isEmpty ? draft.submittedText : scoped
         return .init(id: "activity-\(UUID().uuidString)", category: .activity, title: "Activity", occurrenceDate: draft.occurrenceDate, fields: [
             numericField("activeCalories", "Active calories", text, labels: ["active calories", "move"], unit: "cal", required: false) ?? field("activeCalories", "Active calories", "", "cal", required: false),
             numericField("exerciseMinutes", "Exercise", text, labels: ["exercise minutes", "exercise"], unit: "min", required: false) ?? field("exerciseMinutes", "Exercise", "", "min", required: false),
