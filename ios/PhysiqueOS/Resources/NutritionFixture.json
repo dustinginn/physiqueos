@@ -1,0 +1,1084 @@
+{
+  "title": "Nutrition",
+  "tone": "primary",
+  "reportingLinks": [
+    {
+      "id": "calories",
+      "label": "Calories",
+      "detail": "Daily and weekly calorie trends against target."
+    },
+    {
+      "id": "macros",
+      "label": "Macros",
+      "detail": "Protein, carbohydrate, and fat trends over time."
+    },
+    {
+      "id": "meals",
+      "label": "Meals",
+      "detail": "Meal-by-meal history across breakfast, lunch, dinner, and snacks."
+    }
+  ],
+  "nutritionAreas": [
+    {
+      "id": "calories",
+      "label": "Calories",
+      "detail": "Daily calorie intake and targets."
+    },
+    {
+      "id": "macros",
+      "label": "Macros",
+      "detail": "Protein, carbohydrate, and fat breakdown."
+    },
+    {
+      "id": "meals",
+      "label": "Meals",
+      "detail": "Meal timing and composition."
+    },
+    {
+      "id": "micronutrients",
+      "label": "Micronutrients",
+      "detail": "Coming soon."
+    },
+    {
+      "id": "supplements",
+      "label": "Supplements",
+      "detail": "Coming soon."
+    },
+    {
+      "id": "hydration",
+      "label": "Hydration",
+      "detail": "Coming soon."
+    }
+  ],
+  "dataSources": [
+    {
+      "name": "Typed Evidence",
+      "status": "Connected"
+    },
+    {
+      "name": "Nutrition Screenshots",
+      "status": "Connected"
+    },
+    {
+      "name": "Apple Health",
+      "status": "Suggested"
+    },
+    {
+      "name": "MyFitnessPal",
+      "status": "Future"
+    }
+  ],
+  "days": [
+    {
+      "id": "nutrition-day-fixture-008",
+      "date": "2026-08-30",
+      "value": "2140 calories",
+      "detail": "180g protein \u00b7 220g carbs \u00b7 90g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "totals": {
+        "calories": 2140,
+        "proteinG": 180,
+        "carbsG": 220,
+        "fatG": 90,
+        "fiberG": 28
+      },
+      "meals": [
+        {
+          "id": "meal-008-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 520,
+            "proteinG": 42,
+            "carbsG": 55,
+            "fatG": 18,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-008-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            },
+            {
+              "id": "food-008-1b",
+              "name": "Oatmeal",
+              "brand": "Quaker",
+              "servingSize": "1/2 cup dry",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-008-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 680,
+            "proteinG": 58,
+            "carbsG": 70,
+            "fatG": 22,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-008-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            },
+            {
+              "id": "food-008-2b",
+              "name": "Brown Rice",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-008-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 720,
+            "proteinG": 62,
+            "carbsG": 68,
+            "fatG": 32,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-008-3a",
+              "name": "Salmon",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            },
+            {
+              "id": "food-008-3b",
+              "name": "Sweet Potato",
+              "brand": null,
+              "servingSize": "1 medium",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-008-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "partial",
+          "totals": {
+            "calories": 220,
+            "proteinG": 18,
+            "carbsG": 27,
+            "fatG": 18,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-008-4a",
+              "name": "Greek Yogurt",
+              "brand": "Fage",
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-007",
+      "date": "2026-08-29",
+      "value": "2085 calories",
+      "detail": "175g protein \u00b7 210g carbs \u00b7 85g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Screenshot"
+      ],
+      "totals": {
+        "calories": 2085,
+        "proteinG": 175,
+        "carbsG": 210,
+        "fatG": 85,
+        "fiberG": 24
+      },
+      "meals": [
+        {
+          "id": "meal-007-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 480,
+            "proteinG": 38,
+            "carbsG": 52,
+            "fatG": 16,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-007-1a",
+              "name": "Protein Shake",
+              "brand": "Optimum Nutrition",
+              "servingSize": "1 scoop",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-007-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 650,
+            "proteinG": 55,
+            "carbsG": 65,
+            "fatG": 20,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-007-2a",
+              "name": "Turkey Sandwich",
+              "brand": null,
+              "servingSize": "1 sandwich",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-007-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 700,
+            "proteinG": 60,
+            "carbsG": 65,
+            "fatG": 30,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-007-3a",
+              "name": "Lean Beef",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-007-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 255,
+            "proteinG": 22,
+            "carbsG": 28,
+            "fatG": 19,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-007-4a",
+              "name": "Almonds",
+              "brand": null,
+              "servingSize": "1 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-006",
+      "date": "2026-08-28",
+      "value": "2210 calories",
+      "detail": "190g protein \u00b7 225g carbs \u00b7 92g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Apple Health"
+      ],
+      "totals": {
+        "calories": 2210,
+        "proteinG": 190,
+        "carbsG": 225,
+        "fatG": 92,
+        "fiberG": 26
+      },
+      "meals": [
+        {
+          "id": "meal-006-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 540,
+            "proteinG": 44,
+            "carbsG": 58,
+            "fatG": 19,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-006-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-006-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 690,
+            "proteinG": 60,
+            "carbsG": 70,
+            "fatG": 23,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-006-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-006-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 730,
+            "proteinG": 64,
+            "carbsG": 68,
+            "fatG": 33,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-006-3a",
+              "name": "Salmon",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-006-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 250,
+            "proteinG": 22,
+            "carbsG": 29,
+            "fatG": 17,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-006-4a",
+              "name": "Cottage Cheese",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-005",
+      "date": "2026-08-15",
+      "value": "2050 calories",
+      "detail": "172g protein \u00b7 205g carbs \u00b7 82g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "totals": {
+        "calories": 2050,
+        "proteinG": 172,
+        "carbsG": 205,
+        "fatG": 82,
+        "fiberG": 22
+      },
+      "meals": [
+        {
+          "id": "meal-005-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "partial",
+          "totals": {
+            "calories": 460,
+            "proteinG": 36,
+            "carbsG": 50,
+            "fatG": 15,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-005-1a",
+              "name": "Oatmeal",
+              "brand": "Quaker",
+              "servingSize": "1/2 cup dry",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-005-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 640,
+            "proteinG": 54,
+            "carbsG": 64,
+            "fatG": 20,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-005-2a",
+              "name": "Turkey Sandwich",
+              "brand": null,
+              "servingSize": "1 sandwich",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-005-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 690,
+            "proteinG": 58,
+            "carbsG": 63,
+            "fatG": 28,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-005-3a",
+              "name": "Salmon",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-005-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 260,
+            "proteinG": 24,
+            "carbsG": 28,
+            "fatG": 19,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-005-4a",
+              "name": "Almonds",
+              "brand": null,
+              "servingSize": "1 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-004",
+      "date": "2026-07-19",
+      "value": "2100 calories",
+      "detail": "178g protein \u00b7 215g carbs \u00b7 88g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "totals": {
+        "calories": 2100,
+        "proteinG": 178,
+        "carbsG": 215,
+        "fatG": 88,
+        "fiberG": 25
+      },
+      "meals": [
+        {
+          "id": "meal-004-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 500,
+            "proteinG": 40,
+            "carbsG": 54,
+            "fatG": 17,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-004-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-004-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 660,
+            "proteinG": 56,
+            "carbsG": 66,
+            "fatG": 21,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-004-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-004-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 700,
+            "proteinG": 60,
+            "carbsG": 65,
+            "fatG": 30,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-004-3a",
+              "name": "Salmon",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-004-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 240,
+            "proteinG": 22,
+            "carbsG": 30,
+            "fatG": 20,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-004-4a",
+              "name": "Greek Yogurt",
+              "brand": "Fage",
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-003",
+      "date": "2026-07-18",
+      "value": "1850 calories",
+      "detail": "165g protein \u00b7 170g carbs \u00b7 65g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Screenshot"
+      ],
+      "totals": {
+        "calories": 1850,
+        "proteinG": 165,
+        "carbsG": 170,
+        "fatG": 65,
+        "fiberG": 24
+      },
+      "meals": [
+        {
+          "id": "meal-003-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 420,
+            "proteinG": 36,
+            "carbsG": 42,
+            "fatG": 12,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-003-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-003-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 560,
+            "proteinG": 50,
+            "carbsG": 52,
+            "fatG": 16,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-003-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "5 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-003-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 600,
+            "proteinG": 54,
+            "carbsG": 50,
+            "fatG": 24,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-003-3a",
+              "name": "Cod",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-003-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "partial",
+          "totals": {
+            "calories": 270,
+            "proteinG": 25,
+            "carbsG": 26,
+            "fatG": 13,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-003-4a",
+              "name": "Cottage Cheese",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-002",
+      "date": "2026-06-10",
+      "value": "1800 calories",
+      "detail": "160g protein \u00b7 165g carbs \u00b7 62g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "totals": {
+        "calories": 1800,
+        "proteinG": 160,
+        "carbsG": 165,
+        "fatG": 62,
+        "fiberG": 22
+      },
+      "meals": [
+        {
+          "id": "meal-002-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 400,
+            "proteinG": 34,
+            "carbsG": 40,
+            "fatG": 11,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-002-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-002-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 550,
+            "proteinG": 48,
+            "carbsG": 50,
+            "fatG": 15,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-002-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "5 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-002-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 590,
+            "proteinG": 52,
+            "carbsG": 48,
+            "fatG": 23,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-002-3a",
+              "name": "Cod",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-002-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 260,
+            "proteinG": 26,
+            "carbsG": 27,
+            "fatG": 13,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-002-4a",
+              "name": "Almonds",
+              "brand": null,
+              "servingSize": "0.5 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-001b",
+      "date": "2026-05-24",
+      "value": "1780 calories",
+      "detail": "158g protein \u00b7 160g carbs \u00b7 60g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Screenshot"
+      ],
+      "totals": {
+        "calories": 1780,
+        "proteinG": 158,
+        "carbsG": 160,
+        "fatG": 60,
+        "fiberG": 21
+      },
+      "meals": [
+        {
+          "id": "meal-001b-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 390,
+            "proteinG": 33,
+            "carbsG": 39,
+            "fatG": 10,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001b-1a",
+              "name": "Egg Whites",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001b-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 540,
+            "proteinG": 47,
+            "carbsG": 49,
+            "fatG": 15,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001b-2a",
+              "name": "Grilled Chicken Breast",
+              "brand": null,
+              "servingSize": "5 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001b-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 580,
+            "proteinG": 51,
+            "carbsG": 47,
+            "fatG": 22,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001b-3a",
+              "name": "Cod",
+              "brand": null,
+              "servingSize": "6 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001b-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 270,
+            "proteinG": 27,
+            "carbsG": 25,
+            "fatG": 13,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001b-4a",
+              "name": "Cottage Cheese",
+              "brand": null,
+              "servingSize": "1 cup",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    },
+    {
+      "id": "nutrition-day-fixture-001",
+      "date": "2026-05-23",
+      "value": "1950 calories",
+      "detail": "150g protein \u00b7 200g carbs \u00b7 70g fat \u00b7 4 meals",
+      "sourceEvidence": [
+        "Typed evidence"
+      ],
+      "totals": {
+        "calories": 1950,
+        "proteinG": 150,
+        "carbsG": 200,
+        "fatG": 70,
+        "fiberG": 20
+      },
+      "meals": [
+        {
+          "id": "meal-001-1",
+          "slot": "breakfast",
+          "name": null,
+          "completeness": "partial",
+          "totals": {
+            "calories": 450,
+            "proteinG": 32,
+            "carbsG": 48,
+            "fatG": 14,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001-1a",
+              "name": "Oatmeal",
+              "brand": "Quaker",
+              "servingSize": "1/2 cup dry",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001-2",
+          "slot": "lunch",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 600,
+            "proteinG": 48,
+            "carbsG": 62,
+            "fatG": 18,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001-2a",
+              "name": "Turkey Sandwich",
+              "brand": null,
+              "servingSize": "1 sandwich",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001-3",
+          "slot": "dinner",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 650,
+            "proteinG": 50,
+            "carbsG": 60,
+            "fatG": 24,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001-3a",
+              "name": "Lean Beef",
+              "brand": null,
+              "servingSize": "5 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        },
+        {
+          "id": "meal-001-4",
+          "slot": "snacks",
+          "name": null,
+          "completeness": "complete",
+          "totals": {
+            "calories": 250,
+            "proteinG": 20,
+            "carbsG": 30,
+            "fatG": 14,
+            "fiberG": null
+          },
+          "foods": [
+            {
+              "id": "food-001-4a",
+              "name": "Almonds",
+              "brand": null,
+              "servingSize": "1 oz",
+              "servings": 1
+            }
+          ],
+          "additionalFoodsDetected": false
+        }
+      ]
+    }
+  ]
+}
