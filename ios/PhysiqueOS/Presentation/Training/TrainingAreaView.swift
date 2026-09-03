@@ -21,6 +21,17 @@ import SwiftUI
 /// already use — `AppDestinationRouterView` tells the two apart by id
 /// membership in `TrainingAreaIcon.canonicalAreaIds` and routes a real
 /// exercise id to `TrainingExerciseDetailView`.
+///
+/// The scope selector here is deliberately display-only (no `onSelect`),
+/// re-verified against source for this task's Training Library pass rather
+/// than left as an unexamined gap: `TrainingEvidenceContextService`'s own
+/// `trainingLibrary: globalReport.trainingLibrary` keeps the Areas/exercise
+/// catalog and per-exercise counts global even when a Goal/Phase is
+/// selected — only an exercise's own occurrence history (Current Benchmark/
+/// Last Session/Recent History on `TrainingExerciseDetailView`, which *does*
+/// wire this selector) narrows with scope. Selecting a Goal/Phase here would
+/// change nothing to select against, matching real product behavior exactly
+/// rather than a Native-only limitation.
 struct TrainingAreaView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingAreaViewModel?
@@ -76,7 +87,7 @@ struct TrainingAreaView: View {
         CardContainer(padding: .sm) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Browse")
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(exercises) { exercise in
                         NavigationLink(value: exercise.destination) {
                             HStack(spacing: 8) {

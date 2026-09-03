@@ -10,6 +10,8 @@ final class TrainingExerciseDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    /// Training's own real default context — see `TrainingScopeDefault`.
+    private(set) var scope: EvidenceScopeSelection = TrainingScopeDefault.selection
     private let api: TrainingAPI
     private let exerciseId: String
 
@@ -20,9 +22,19 @@ final class TrainingExerciseDetailViewModel {
 
     func load() async {
         do {
-            state = .loaded(try await api.fetchTrainingExercise(exerciseId: exerciseId))
+            state = .loaded(try await api.fetchTrainingExercise(exerciseId: exerciseId, scope: scope))
         } catch {
             state = .failed("This exercise could not be loaded.")
         }
+    }
+
+    /// Same shared-chronology adoption as every other Evidence vertical's
+    /// `selectScope` — genuinely re-fetches Current Benchmark/Last Session/
+    /// Recent History for the newly selected Goal/Phase window rather than
+    /// leaving the selector inert.
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
+        await load()
     }
 }

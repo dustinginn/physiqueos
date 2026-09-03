@@ -4,9 +4,17 @@ import SwiftUI
 /// (`/progress/training/library/:area/:exercise`) — mirrors
 /// `getExerciseDetailContent` (`TrainingKnowledgeScreen.jsx:1154-1199`)
 /// exactly: `TrainingLibraryHeaderView` (shared with `TrainingAreaView`) →
-/// the same inert scope selector every Training Library page shows →
-/// Current Benchmark → Performance Records → Last Session → Recent
-/// History. The web's sixth section, a "Source workouts" metadata footer,
+/// the shared Goal/Phase scope selector → Current Benchmark → Performance
+/// Records → Last Session → Recent History. The selector genuinely re-scopes
+/// this page (re-verified against source for this task's Training Library
+/// pass): `getPlaceholderReport("training", ..., { dateWindow })` filters
+/// sessions by the selected Goal/Phase window *before*
+/// `getExerciseOccurrences` ever runs, so Current Benchmark/Last Session/
+/// Recent History all narrow with it — `TrainingExerciseDetailViewModel
+/// .selectScope` now re-fetches on selection rather than leaving the
+/// selector inert, matching every other Evidence vertical's pattern (a
+/// prior pass here left it display-only; corrected in this one). The web's
+/// sixth section, a "Source workouts" metadata footer,
 /// is deliberately not reproduced here — `page.js:84` passes
 /// `showSourceWorkouts: false` on the real `/progress/training/library/...`
 /// route, so it never renders there either. Performance Records
@@ -63,7 +71,9 @@ struct TrainingExerciseDetailView: View {
         case .loaded(.some(let exercise)):
             VStack(alignment: .leading, spacing: 16) {
                 TrainingLibraryHeaderView(title: exercise.title, breadcrumbs: exercise.breadcrumbs)
-                TrainingScopeSelectorView(scope: exercise.scope)
+                TrainingScopeSelectorView(scope: exercise.scope) { pillID in
+                    Task { await viewModel?.selectScope(pillID: pillID) }
+                }
                 benchmarkCard(exercise.benchmark)
                 performanceRecordsCard(exercise.performanceRecords)
                 lastSessionCard(exercise.lastSession)

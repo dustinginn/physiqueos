@@ -25,7 +25,21 @@ protocol TrainingAPI: Sendable {
     /// occurrence of that canonical exercise across every session
     /// (area-agnostic, matching the web's own area-agnostic history query)
     /// plus the computed benchmark/last-session/history projection.
-    func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel?
+    ///
+    /// `scope` genuinely narrows this page — verified directly against
+    /// source: `getPlaceholderReport("training", ..., { dateWindow })`
+    /// filters `context.trainingSessions` by the selected Goal/Phase window
+    /// *before* `trainingDays`/`entries` are derived, and Exercise Detail's
+    /// `occurrences` (`getExerciseOccurrences`) are computed from that same
+    /// already-filtered `report.trainingDays` — so Current Benchmark, Last
+    /// Session, and Recent History are all Goal/Phase-scoped on the live
+    /// product, not just the day-list on the Training landing page. (The
+    /// Training Areas catalog/exercise-count nav one level up stays
+    /// deliberately global even in scoped mode — `trainingLibrary:
+    /// globalReport.trainingLibrary` — which is why `fetchTrainingArea`
+    /// below carries no `scope` parameter; only this method and the
+    /// landing's own history list narrow.)
+    func fetchTrainingExercise(exerciseId: String, scope: EvidenceScopeSelection) async throws -> TrainingExerciseDetailReadModel?
     /// Mirrors `getReportingContent`: `nil` for an id outside the fixed
     /// `reportingLinks` set (matching the web's `notFound()` guard),
     /// otherwise the report's content — real data for `resistance` and
@@ -41,6 +55,10 @@ extension TrainingAPI {
     /// keeps exactly today's unscoped behavior.
     func fetchTrainingLanding() async throws -> TrainingLandingReadModel {
         try await fetchTrainingLanding(scope: .all)
+    }
+
+    func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel? {
+        try await fetchTrainingExercise(exerciseId: exerciseId, scope: TrainingScopeDefault.selection)
     }
 }
 
@@ -178,7 +196,7 @@ struct FixtureTrainingAPI: TrainingAPI {
     /// the raw ISO date string, descending, mirrors
     /// `getTrainingDays`/`getTrainingRecords`'s own `localeCompare`-based
     /// sort rather than parsing to `Date` for comparison.
-    func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel? {
+    func fetchTrainingExercise(exerciseId: String, scope: EvidenceScopeSelection) async throws -> TrainingExerciseDetailReadModel? {
         let fixture = try loadFixture()
         guard
             let area = fixture.areas.first(where: { area in area.exercises.contains { $0.id == exerciseId } }),
@@ -188,7 +206,13 @@ struct FixtureTrainingAPI: TrainingAPI {
             return nil
         }
 
-        let occurrences = fixture.sessions
+        // Scoped first (mirrors `report.trainingDays` already being
+        // date-window-filtered before `getExerciseOccurrences` ever runs on
+        // the web — see this method's doc comment on the protocol), then
+        // sessions outside the window never contribute to benchmark/last
+        // session/history math at all.
+        let scopedSessions = EvidenceChronology.filter(fixture.sessions, scope: scope, date: \.date)
+        let occurrences = scopedSessions
             .flatMap { session in
                 session.exercises
                     .filter { $0.canonicalExerciseId == canonicalExerciseId }
@@ -211,7 +235,7 @@ struct FixtureTrainingAPI: TrainingAPI {
                 TrainingBreadcrumb(label: "Training Library", destination: .progressStream(streamId: "training/library")),
                 TrainingBreadcrumb(label: area.title, destination: .trainingExercise(exerciseId: area.id)),
             ],
-            scope: area.scope,
+            scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training"),
             benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
             performanceRecords: TrainingPerformanceRecordsCalculator.recordsReadModel(
                 canonicalExerciseId: canonicalExerciseId,
