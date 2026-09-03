@@ -5,10 +5,22 @@ import Foundation
 /// transport. A live implementation replaces `FixtureActivityAPI` with no
 /// change to either screen.
 protocol ActivityAPI: Sendable {
-    func fetchActivityLanding() async throws -> ActivityLandingReadModel
+    /// `scope` mirrors `TrainingAPI.fetchTrainingLanding(scope:)` — only
+    /// `activityHistory` narrows; `latestActivityDay`, `activityAreas`,
+    /// `linkedTrainingContext`, and `dataSources` stay unscoped. The
+    /// no-`scope` overload below defaults to `.buildLeanMass`, Activity's
+    /// own real default context (matching Weight/Nutrition, unlike
+    /// Training's `.all`), so every existing call site keeps working.
+    func fetchActivityLanding(scope: EvidenceScopeID) async throws -> ActivityLandingReadModel
     /// `nil` for a date with no matching Activity day — mirrors
     /// `TrainingAPI.fetchTrainingDay(date:)`'s own not-found contract.
     func fetchActivityDay(date: String) async throws -> ActivityDayRecord?
+}
+
+extension ActivityAPI {
+    func fetchActivityLanding() async throws -> ActivityLandingReadModel {
+        try await fetchActivityLanding(scope: .buildLeanMass)
+    }
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file containing the
@@ -34,11 +46,28 @@ struct FixtureActivityAPI: ActivityAPI {
         return try JSONDecoder().decode(ActivityFixtureFile.self, from: data)
     }
 
-    func fetchActivityLanding() async throws -> ActivityLandingReadModel {
-        try loadFixture().landing
+    /// Same shared chronology adoption as `FixtureTrainingAPI`: backfills
+    /// `attributedScope` on every history row (and `latestActivityDay`),
+    /// then narrows `activityHistory` to `scope`'s window when scoped.
+    func fetchActivityLanding(scope: EvidenceScopeID) async throws -> ActivityLandingReadModel {
+        var landing = try loadFixture().landing
+        if var latest = landing.latestActivityDay {
+            latest.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: latest.date)
+            landing.latestActivityDay = latest
+        }
+        let attributedHistory = landing.activityHistory.map { day -> ActivityDayRecord in
+            var day = day
+            day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
+            return day
+        }
+        landing.activityHistory = EvidenceChronology.filter(attributedHistory, scope: scope, date: \.date)
+        landing.scope = EvidenceChronology.scopeContext(selected: scope, allLabel: "All Activity")
+        return landing
     }
 
     func fetchActivityDay(date: String) async throws -> ActivityDayRecord? {
-        try loadFixture().landing.activityHistory.first { $0.date == date }
+        guard var day = try loadFixture().landing.activityHistory.first(where: { $0.date == date }) else { return nil }
+        day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
+        return day
     }
 }

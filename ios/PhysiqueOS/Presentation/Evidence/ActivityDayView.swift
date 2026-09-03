@@ -84,6 +84,7 @@ struct ActivityDayView: View {
             Text(day.protocolStatus)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

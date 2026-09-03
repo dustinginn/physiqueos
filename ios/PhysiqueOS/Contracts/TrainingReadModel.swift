@@ -98,6 +98,12 @@ struct TrainingLandingDay: Codable, Equatable {
     /// them client-side. `nil` when no exercises/activities resolve to a
     /// label, matching the web's own `daySummary && (...)` conditional.
     var daySummary: String?
+    /// Goal/Phase chronology backfill (see `EvidenceChronology.swift`):
+    /// which named goal window `date` falls inside, computed centrally by
+    /// `FixtureTrainingAPI` from this same `date` field — never decoded
+    /// from the fixture JSON, so it can never drift out of sync with it.
+    /// `nil` only before `FixtureTrainingAPI` populates it post-decode.
+    var attributedScope: EvidenceScopeAttribution? = nil
     /// "View Training Day →" action.
     var destination: AppDestination
     var sessions: [TrainingSessionPreview]
@@ -182,6 +188,9 @@ struct TrainingDaySummary: Codable, Equatable, Identifiable {
     var label: String
     var summary: String?
     var destination: AppDestination
+    /// See `TrainingLandingDay.attributedScope` — same backfilled
+    /// chronology field, populated by `FixtureTrainingAPI` from `date`.
+    var attributedScope: EvidenceScopeAttribution? = nil
 
     var id: String { date }
 }
@@ -256,6 +265,13 @@ struct TrainingDayReadModel: Codable, Equatable {
     var label: String
     var summary: TrainingDaySummaryDetail
     var sessions: [TrainingDaySessionSummary]
+    /// Goal/Phase chronology backfill: the literal fix for the reported
+    /// Training bug. `TrainingReadService.getDay` carries no `goalId`/
+    /// `phaseId`/date-window field on the web at all today (verified
+    /// directly from source) — this screen dropped all Goal/Phase context
+    /// the moment a Founder drilled into a specific day. `TrainingDayView`
+    /// now displays this, computed by `FixtureTrainingAPI` from `date`.
+    var attributedScope: EvidenceScopeAttribution? = nil
 }
 
 struct TrainingDaySummaryDetail: Codable, Equatable {
@@ -305,6 +321,12 @@ struct TrainingSessionDetailReadModel: Codable, Equatable, Identifiable {
     var sourceEvidence: [String]
     var exercises: [TrainingExerciseOccurrence]
     var exerciseRelationshipGroups: [TrainingExerciseRelationshipGroup]
+    /// Goal/Phase chronology backfill — same gap as `TrainingDayReadModel`:
+    /// `getPlaceholderReport("training")` here is called fully unscoped
+    /// (verified directly from `session/[sessionId]/page.js`), so a
+    /// session's own Goal/Phase context was previously undiscoverable.
+    /// Computed by `FixtureTrainingAPI` from `date`.
+    var attributedScope: EvidenceScopeAttribution? = nil
 }
 
 /// Mirrors `normalizeTrainingExercises`'s per-occurrence shape

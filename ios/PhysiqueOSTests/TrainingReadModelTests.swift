@@ -1051,4 +1051,54 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertFalse(protocolSummary.trainingObjective.isEmpty)
         XCTAssertFalse(protocolSummary.goal.isEmpty)
     }
+
+    // MARK: - Goal/Phase chronology backfill (the reported Training bug)
+
+    /// Every fixture training day currently falls inside the Build Lean
+    /// Mass window, so selecting Visible Abs must legitimately return zero
+    /// days — proving the scope pills are now real filtering, not the
+    /// previously-documented "inert snapshot."
+    func testScopeSelectionActuallyNarrowsTrainingDaysNowInsteadOfBeingInert() async throws {
+        let all = try await api.fetchTrainingLanding(scope: .all)
+        let buildLeanMass = try await api.fetchTrainingLanding(scope: .buildLeanMass)
+        let visibleAbs = try await api.fetchTrainingLanding(scope: .visibleAbs)
+        XCTAssertFalse(all.trainingDays.isEmpty)
+        XCTAssertEqual(buildLeanMass.trainingDays.count, all.trainingDays.count)
+        XCTAssertTrue(visibleAbs.trainingDays.isEmpty)
+        XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["build-lean-mass"])
+    }
+
+    /// Unscoped landing fields (areas, current protocol) must NOT narrow
+    /// with scope — only `trainingDays` does, matching the real web's
+    /// `dateWindow`-only filtering.
+    func testNonHistoryLandingFieldsStayUnscopedAcrossSelection() async throws {
+        let all = try await api.fetchTrainingLanding(scope: .all)
+        let visibleAbs = try await api.fetchTrainingLanding(scope: .visibleAbs)
+        XCTAssertEqual(all.trainingAreas.count, visibleAbs.trainingAreas.count)
+        XCTAssertEqual(all.currentProtocol, visibleAbs.currentProtocol)
+    }
+
+    /// The literal fix for the reported bug: Training's day/session detail
+    /// screens previously carried zero Goal/Phase attribution at all
+    /// (`TrainingReadService.getDay`/session lookup had no `goalId`/
+    /// `phaseId`/date-window field whatsoever, verified directly from
+    /// source during this port's audit). They now do.
+    func testTrainingDayDetailCarriesGoalPhaseAttribution() async throws {
+        let landing = try await api.fetchTrainingLanding(scope: .all)
+        let firstDayDate = try XCTUnwrap(landing.trainingDays.first?.date)
+        let day = try await api.fetchTrainingDay(date: firstDayDate)
+        XCTAssertEqual(day?.attributedScope?.scopeID, .buildLeanMass)
+    }
+
+    func testTrainingSessionDetailCarriesGoalPhaseAttribution() async throws {
+        let landing = try await api.fetchTrainingLanding(scope: .all)
+        let sessionId = try XCTUnwrap(landing.latestTrainingDay?.sessions.first?.id)
+        let session = try await api.fetchTrainingSession(sessionId: sessionId)
+        XCTAssertNotNil(session?.attributedScope)
+    }
+
+    func testLatestTrainingDayCarriesGoalPhaseAttribution() async throws {
+        let landing = try await api.fetchTrainingLanding()
+        XCTAssertNotNil(landing.latestTrainingDay?.attributedScope)
+    }
 }

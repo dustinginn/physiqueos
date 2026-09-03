@@ -72,6 +72,7 @@ struct TrainingDayView: View {
             Text(Self.formatSummary(day.summary))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

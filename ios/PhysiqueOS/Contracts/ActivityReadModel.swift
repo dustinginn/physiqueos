@@ -143,6 +143,15 @@ struct ActivityDayRecord: Codable, Equatable, Identifiable {
     var workoutActiveCalories: Double?
     var nonWorkoutActiveCalories: Double?
     var linkedTrainingSessionCount: Int
+    /// Goal/Phase chronology adoption (see `EvidenceChronology.swift`):
+    /// Activity's scope selector had the identical "inert pills, no second
+    /// scoped dataset" gap Training's did (same shared
+    /// `TrainingScopeSelectorView`/`TrainingScopeContext` type, same
+    /// underlying web mechanism) — this is the minimal adoption the final
+    /// report notes, not a redesign of Activity's already-accepted
+    /// presentation. Populated by `FixtureActivityAPI` from `date`, same as
+    /// every other vertical.
+    var attributedScope: EvidenceScopeAttribution? = nil
     /// Already server-formatted interpretive copy — the only claim-like
     /// text on the live Activity Evidence page (e.g. `"153 active calories
     /// above the recorded daily target."`, or the neutral `"Activity

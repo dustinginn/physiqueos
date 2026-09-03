@@ -80,7 +80,9 @@ struct TrainingHistoryView: View {
         case .loaded(let landing):
             VStack(alignment: .leading, spacing: 16) {
                 header(for: landing)
-                TrainingScopeSelectorView(scope: landing.scope)
+                TrainingScopeSelectorView(scope: landing.scope) { scopeID in
+                    Task { await viewModel?.selectScope(scopeID) }
+                }
                 latestTrainingDayCard(landing.latestTrainingDay)
                 trainingAreasCard(landing.trainingAreas)
                 reportingCard(landing.reportingLinks)
@@ -649,15 +651,29 @@ private struct TrainingProtocolRow: View {
 }
 
 /// `TrainingTimelineSelector` — the "Build Lean Mass" / "Visible Abs" /
-/// "All Training" scope pills plus the date-range label beneath them
-/// ("Complete history" when All Training is selected). Rendered as an
-/// accurate but inert snapshot of the current scope: switching pills on
-/// the web re-fetches a differently date-windowed report, which this
-/// fixture-only slice has no second scoped dataset to honestly back yet —
-/// see the final report's noted deviation. Internal (not `private`): every
-/// Training Library page (Chest included) shows this same selector.
+/// "All ___" scope pills plus the date-range label beneath them
+/// ("Complete history" when All is selected). Internal (not `private`):
+/// every Training Library page (Chest included), Activity, and now
+/// Nutrition/Weight all show this same selector.
+///
+/// `onSelect == nil` (every Training Library page, Activity's original
+/// usage) renders the prior inert display-only pills — a browse page
+/// showing the current scope isn't expected to let you change it web-side
+/// either. Passing `onSelect` (Training's own landing page, Activity after
+/// its chronology adoption, and Nutrition/Weight) makes the pills real
+/// `Button`s: this is the fix for the pills being "an accurate but inert
+/// snapshot of the current scope" this type's doc comment previously
+/// recorded as a known deviation — tapping a pill now actually re-fetches
+/// a differently date-windowed report via `EvidenceChronology`, the same
+/// shared mechanism backing the web's own re-fetch-on-select behavior.
 struct TrainingScopeSelectorView: View {
     let scope: TrainingScopeContext
+    var onSelect: ((EvidenceScopeID) -> Void)?
+
+    init(scope: TrainingScopeContext, onSelect: ((EvidenceScopeID) -> Void)? = nil) {
+        self.scope = scope
+        self.onSelect = onSelect
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -666,13 +682,7 @@ struct TrainingScopeSelectorView: View {
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
             HStack(spacing: 6) {
                 ForEach(scope.options) { option in
-                    Text(option.label)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.textSecondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(option.selected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(Capsule())
+                    pill(for: option)
                 }
             }
             Text(scope.dateRangeLabel)
@@ -687,6 +697,30 @@ struct TrainingScopeSelectorView: View {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func pill(for option: TrainingScopeOption) -> some View {
+        let label = Text(option.label)
+            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+            .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(option.selected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
+            .clipShape(Capsule())
+
+        if let onSelect {
+            Button {
+                guard let scopeID = EvidenceScopeID(rawValue: option.id) else { return }
+                onSelect(scopeID)
+            } label: {
+                label
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(option.selected ? [.isButton, .isSelected] : .isButton)
+        } else {
+            label
+        }
     }
 }
 

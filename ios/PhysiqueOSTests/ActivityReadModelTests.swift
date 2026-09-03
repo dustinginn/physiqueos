@@ -215,4 +215,25 @@ final class ActivityReadModelTests: XCTestCase {
         XCTAssertTrue(landing.activityAreas.isEmpty)
         XCTAssertTrue(landing.linkedTrainingContext.isEmpty)
     }
+
+    // MARK: - Shared chronology adoption
+
+    /// Activity's scope selector had the identical "inert pills" gap
+    /// Training's did (same shared `TrainingScopeSelectorView`/
+    /// `TrainingScopeContext` type) — this is the minimal adoption noted in
+    /// the final report, not a redesign of Activity's already-accepted
+    /// presentation.
+    func testScopeSelectionActuallyNarrowsActivityHistoryNowInsteadOfBeingInert() async throws {
+        let all = try await api.fetchActivityLanding(scope: .all)
+        let buildLeanMass = try await api.fetchActivityLanding(scope: .buildLeanMass)
+        let visibleAbs = try await api.fetchActivityLanding(scope: .visibleAbs)
+        XCTAssertFalse(all.activityHistory.isEmpty)
+        XCTAssertEqual(buildLeanMass.activityHistory.count, all.activityHistory.count)
+        XCTAssertTrue(visibleAbs.activityHistory.isEmpty)
+    }
+
+    func testEveryActivityHistoryRowCarriesGoalPhaseAttribution() async throws {
+        let landing = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertTrue(landing.activityHistory.allSatisfy { $0.attributedScope != nil })
+    }
 }

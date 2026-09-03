@@ -6,7 +6,16 @@ import Foundation
 /// client — the three-projection shape lives in the read models themselves
 /// (see `TrainingReadModel.swift`), not in the transport boundary.
 protocol TrainingAPI: Sendable {
-    func fetchTrainingLanding() async throws -> TrainingLandingReadModel
+    /// `scope` mirrors the web's `context` query param
+    /// (`getTrainingEvidenceContext`): it only narrows `trainingDays` (the
+    /// history list) — every other landing field (latest day, areas,
+    /// reporting links, current protocol, related goals) stays unscoped,
+    /// matching real web behavior (verified for Nutrition's identical
+    /// mechanism: `currentNutritionProtocol`/`nutritionLibrary`/
+    /// `nutritionReportingLinks` stay global even when the day list is
+    /// date-scoped). The no-`scope` overload below (`.all`, Training's own
+    /// real default context) keeps every existing call site unchanged.
+    func fetchTrainingLanding(scope: EvidenceScopeID) async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
     /// Fixture-backed for all 10 canonical areas (see `TrainingAreaReadModel`).
@@ -22,6 +31,17 @@ protocol TrainingAPI: Sendable {
     /// otherwise the report's content — real data for `resistance` and
     /// `history`, the identical static placeholder for the other four.
     func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel?
+}
+
+extension TrainingAPI {
+    /// Training's own real default context is "all" (`normalizeTrainingContextId`
+    /// defaults an absent/unmatched context to `"all"`, unlike Weight/
+    /// Nutrition/Activity's `"build-lean-mass"` default) — every existing
+    /// non-scope-aware call site (Library root, every pre-existing test)
+    /// keeps exactly today's unscoped behavior.
+    func fetchTrainingLanding() async throws -> TrainingLandingReadModel {
+        try await fetchTrainingLanding(scope: .all)
+    }
 }
 
 /// Fixture-backed conformance: decodes one bundled JSON file mirroring the
@@ -105,16 +125,38 @@ struct FixtureTrainingAPI: TrainingAPI {
         return try Self.decoder.decode(TrainingFixtureFile.self, from: data)
     }
 
-    func fetchTrainingLanding() async throws -> TrainingLandingReadModel {
-        try loadFixture().landing
+    /// Backfills Goal/Phase chronology onto every day/session row
+    /// (`EvidenceChronology.attribution(forOccurrenceDate:)`) and, when
+    /// `scope != .all`, narrows `trainingDays` to that window
+    /// (`EvidenceChronology.filter`) — the same shared mechanism every
+    /// other Evidence vertical uses, applied here for the first time to
+    /// make Training's previously-inert scope selector real.
+    func fetchTrainingLanding(scope: EvidenceScopeID) async throws -> TrainingLandingReadModel {
+        var landing = try loadFixture().landing
+        if var latest = landing.latestTrainingDay {
+            latest.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: latest.date)
+            landing.latestTrainingDay = latest
+        }
+        let attributedDays = landing.trainingDays.map { day -> TrainingDaySummary in
+            var day = day
+            day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
+            return day
+        }
+        landing.trainingDays = EvidenceChronology.filter(attributedDays, scope: scope, date: \.date)
+        landing.scope = EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training")
+        return landing
     }
 
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel? {
-        try loadFixture().days.first { $0.date == date }
+        guard var day = try loadFixture().days.first(where: { $0.date == date }) else { return nil }
+        day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
+        return day
     }
 
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel? {
-        try loadFixture().sessions.first { $0.id == sessionId }
+        guard var session = try loadFixture().sessions.first(where: { $0.id == sessionId }) else { return nil }
+        session.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: session.date)
+        return session
     }
 
     func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel? {

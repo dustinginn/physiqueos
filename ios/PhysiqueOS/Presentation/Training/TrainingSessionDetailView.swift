@@ -91,6 +91,7 @@ struct TrainingSessionDetailView: View {
             Text("\(session.value) · \(Self.formatDate(session.date))")
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            EvidenceScopeAttributionChip(attribution: session.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
