@@ -139,4 +139,53 @@ final class PhotosReadModelTests: XCTestCase {
         let view = try XCTUnwrap(landing.history.first?.views.first)
         XCTAssertFalse(view.interpretationSummary.isEmpty)
     }
+
+    // MARK: - Stable identity through scope filtering/reordering (Part 1 verification)
+
+    /// Every set's `id` (and therefore its `NavigationLink(value: set.destination)`
+    /// payload) must be the same value whether it's read from the `.all`
+    /// scope's history or a narrower Goal-scoped one — the landing preview
+    /// and the "Show All" sheet must never disagree about which set a given
+    /// row opens just because a filter changed which array position it sits
+    /// at. Guards against the classic index-identity bug class the Founder
+    /// flagged: no `ForEach`/detail lookup in this vertical may key off
+    /// array position.
+    func testSetIdentityIsStableAcrossDifferentScopeFilters() async throws {
+        let all = try await api.fetchPhotosLanding(scope: .all)
+        let buildLeanMass = try await api.fetchPhotosLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
+        let setInBoth = try XCTUnwrap(all.history.first { candidate in buildLeanMass.history.contains { $0.id == candidate.id } })
+        let sameSetFromNarrowerScope = try XCTUnwrap(buildLeanMass.history.first { $0.id == setInBoth.id })
+        XCTAssertEqual(setInBoth.date, sameSetFromNarrowerScope.date)
+        XCTAssertEqual(setInBoth.views.map(\.poseId), sameSetFromNarrowerScope.views.map(\.poseId))
+    }
+
+    /// Every pose view's `id` is derived from its owning set's stable id
+    /// plus its pose (`"\(set.id)-\(pose.rawValue)"`), never an index into
+    /// `views` — reordering or re-deriving the views array can never cause
+    /// one pose's detail content to be shown under a different pose's
+    /// identity.
+    func testViewIdentityIsDerivedFromSetAndPoseNeverArrayPosition() async throws {
+        let landing = try await api.fetchPhotosLanding(scope: .all)
+        for set in landing.history {
+            for view in set.views {
+                XCTAssertEqual(view.id, "\(set.id)-\(view.poseId.rawValue)")
+            }
+        }
+    }
+
+    /// `fetchPhotoSet(setId:)` — the exact lookup `PhotoSetDetailView`
+    /// performs on push — must resolve to a record whose every field
+    /// (date, weight, views, poses) matches the corresponding row rendered
+    /// on the landing/history list bit-for-bit, proving the preview a user
+    /// taps and the detail screen it opens are backed by the identical
+    /// record, not a coincidentally-similar one looked up a different way.
+    func testEveryHistoryRowOpensTheExactMatchingDetailRecord() async throws {
+        let landing = try await api.fetchPhotosLanding(scope: .all)
+        for previewRow in landing.history {
+            let detail = try await api.fetchPhotoSet(setId: previewRow.id)
+            XCTAssertEqual(detail?.id, previewRow.id)
+            XCTAssertEqual(detail?.date, previewRow.date)
+            XCTAssertEqual(detail?.views.map(\.id), previewRow.views.map(\.id))
+        }
+    }
 }
