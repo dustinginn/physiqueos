@@ -66,6 +66,10 @@ struct AppDestinationRouterView: View {
         // renders the correct content per id.
         case .progressStream(let streamId) where streamId.hasPrefix("training/reporting/"):
             TrainingReportingView(reportId: String(streamId.dropFirst("training/reporting/".count)))
+        // Nutrition Reporting: `nutrition/reporting/{reportId}` — one
+        // screen handles all 3 real report ids (calories/macros/meals).
+        case .progressStream(let streamId) where streamId.hasPrefix("nutrition/reporting/"):
+            NutritionReportingView(reportId: String(streamId.dropFirst("nutrition/reporting/".count)))
         // All 10 canonical Training Areas are fixture-backed (see
         // TrainingFixture.json's `areas` array) — `TrainingAreaView` is
         // fully generic over `areaId` and already renders an honest empty

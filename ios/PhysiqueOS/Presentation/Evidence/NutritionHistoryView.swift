@@ -160,29 +160,53 @@ struct NutritionHistoryView: View {
 
     /// "Reporting" / "Nutrition Areas" — informational rows only (see the
     /// type-level doc comment above for why these don't navigate yet).
+    /// Rows with a real `destination` (the 3 real Reporting ids) navigate;
+    /// rows without one (Nutrition Areas, still out of scope this pass)
+    /// stay informational, matching `ActivityAreaSummary`'s own
+    /// non-navigating treatment.
     private func infoLinksCard(title: String, links: [NutritionInfoLink]) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: title)
                 VStack(spacing: 8) {
                     ForEach(links) { link in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(link.label)
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(link.detail)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        if let destination = link.destination {
+                            NavigationLink(value: destination) {
+                                infoLinkRow(link)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            infoLinkRow(link)
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .accessibilityElement(children: .combine)
                     }
                 }
             }
         }
+    }
+
+    private func infoLinkRow(_ link: NutritionInfoLink) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(link.label)
+                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(link.detail)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            if link.destination != nil {
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(link.destination != nil ? .isButton : [])
     }
 
     private func recentHistoryCard(_ history: [NutritionDayRecord]) -> some View {

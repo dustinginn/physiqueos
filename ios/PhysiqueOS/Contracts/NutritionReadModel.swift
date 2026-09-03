@@ -5,26 +5,19 @@ import Foundation
 /// `report.id === "nutrition"` render path →
 /// `NutritionEvidenceContextService.getNutritionTimelineReport` →
 /// `ProgressReportingService.getPlaceholderReport("nutrition", ...)`), read
-/// directly from source during this port's audit — not inferred from
-/// filenames. Two routes that exist under `src/app/progress/nutrition/**`
-/// were confirmed NOT part of the live, navigable product and are
-/// deliberately not ported:
+/// directly from source — not inferred from filenames. One route under
+/// `src/app/progress/nutrition/**` was confirmed NOT part of the live,
+/// navigable product and is deliberately not ported: `enrichment-review`
+/// (zero inbound links anywhere in the web app — an internal ops/
+/// reprocessing-eligibility tool, not a Founder-facing screen).
 ///
-/// - `enrichment-review` — zero inbound links anywhere in the web app;
-///   an internal ops/reprocessing-eligibility tool, not a Founder-facing
-///   screen.
-/// - The three `reporting/[reportId]` deep report screens (Calories/
-///   Macros/Meals, each with its own weekly/day aggregation charts) and
-///   the `library/[[...path]]` Nutrition Areas browse pages ARE genuinely
-///   live on web, but porting their full depth (three more chart-bearing
-///   screens) is out of scope for this pass alongside Weight, the shared
-///   chronology backfill, and Training's fix — landing/history/day-detail
-///   is the core parity slice this task asked for. Their entry points are
-///   preserved as informational rows here (mirroring how the web's own
-///   Nutrition Areas page already leaves several of its own sub-items as
-///   "Coming soon" stubs) rather than silently dropped, and the deep
-///   report screens are flagged as a known, honest deviation in this
-///   port's final report — not hidden.
+/// The three `reporting/[reportId]` deep report screens (Calories/Macros/
+/// Meals) ARE genuinely live and ARE ported — see
+/// `NutritionReportingReadModel.swift`/`NutritionReportingView.swift`. The
+/// `library/[[...path]]` Nutrition Areas browse pages remain out of scope
+/// for this pass (their own rows stay informational, see
+/// `NutritionInfoLink`) — a smaller, disclosed deviation than the prior
+/// revision's, which had reduced Reporting to informational rows too.
 struct NutritionLandingReadModel: Codable, Equatable {
     /// `report.title` — "Nutrition".
     var title: String
@@ -58,16 +51,20 @@ struct NutritionLandingReadModel: Codable, Equatable {
     var dataSources: [NutritionDataSource]
 }
 
-/// A "Reporting"/"Nutrition Areas" row — informational only in this pass
-/// (see `NutritionLandingReadModel`'s doc comment); intentionally has no
-/// `destination`, the same honest non-navigating treatment
-/// `ActivityAreaSummary` already established for a different reason
-/// (dead web links) — here the web links ARE live, this port's own scope
-/// just doesn't extend to their destination screens yet.
+/// A "Reporting"/"Nutrition Areas" row. `destination` is populated for the
+/// 3 real Reporting rows (Calories/Macros/Meals — routed through
+/// `.progressStream(streamId: "nutrition/reporting/<id>")`, the same
+/// catch-all pattern `.trainingDay`/`.activityDay` already use) and left
+/// `nil` for Nutrition Areas rows, which stay informational-only: the
+/// honest non-navigating treatment `ActivityAreaSummary` already
+/// established for a different reason (dead web links) — here the web
+/// links ARE live, this port's own scope just doesn't extend to the
+/// Nutrition Library browse screens yet.
 struct NutritionInfoLink: Codable, Equatable, Identifiable {
     var id: String
     var label: String
     var detail: String
+    var destination: AppDestination?
 }
 
 struct NutritionDataSource: Codable, Equatable, Identifiable {

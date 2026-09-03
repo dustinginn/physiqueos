@@ -17,6 +17,24 @@ protocol NutritionAPI: Sendable {
     /// `nil` for an id with no matching Nutrition day — mirrors
     /// `TrainingAPI.fetchTrainingDay(date:)`'s own not-found contract.
     func fetchNutritionDay(dayId: String) async throws -> NutritionDayRecord?
+    /// Mirrors `getReportingContent`-style dispatch: `nil` for an id
+    /// outside the 3 real report ids (`calories`/`macros`/`meals`) — the
+    /// other 2 `nutritionReportingLinks` entries (`adherence`/
+    /// `consistency`) are real links but resolve to the web's own generic
+    /// placeholder screen, not a real report, and are intentionally not
+    /// modeled here (see `NutritionReportingReadModel`'s doc comment).
+    /// `scope` mirrors the landing page's own Goal/Phase scope; `range`
+    /// narrows further, purely client-side, matching the web's own 5-way
+    /// chart range selector layered on top of the scope window.
+    func fetchNutritionReporting(
+        reportId: String,
+        scope: EvidenceScopeSelection,
+        range: NutritionReportRange,
+        macro: NutritionMacroKey,
+        mealMacroMixSlot: NutritionMealSlotFilter,
+        mealTrendSlot: NutritionMealSlotFilter,
+        mealTrendMetric: NutritionMealTrendMetric
+    ) async throws -> NutritionReportingReadModel?
 }
 
 extension NutritionAPI {
@@ -73,13 +91,23 @@ struct FixtureNutritionAPI: NutritionAPI {
             day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
             return day
         }
+        // The 3 real report ids each get a real destination
+        // (`.progressStream(streamId: "nutrition/reporting/<id>")`); any
+        // other reportingLinks entry stays informational-only (`nil`).
+        let reportingLinks = fixture.reportingLinks.map { link -> NutritionInfoLink in
+            var link = link
+            if Self.realReportIDs.contains(link.id) {
+                link.destination = .progressStream(streamId: "nutrition/reporting/\(link.id)")
+            }
+            return link
+        }
         return NutritionLandingReadModel(
             title: fixture.title,
             subtitle: nil,
             tone: fixture.tone,
             scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Nutrition"),
             latestNutritionDay: attributedDays.first,
-            reportingLinks: fixture.reportingLinks,
+            reportingLinks: reportingLinks,
             nutritionAreas: fixture.nutritionAreas,
             nutritionHistory: EvidenceChronology.filter(attributedDays, scope: scope, date: \.date),
             dataSources: fixture.dataSources
@@ -90,5 +118,52 @@ struct FixtureNutritionAPI: NutritionAPI {
         guard var day = try loadFixture().days.first(where: { $0.id == dayId }) else { return nil }
         day.attributedScope = EvidenceChronology.attribution(forOccurrenceDate: day.date)
         return day
+    }
+
+    /// The 3 real report ids, in `nutritionReportingLinks` order — used
+    /// only to validate `reportId` here; `NutritionHistoryView`'s own
+    /// "Reporting" card renders `fixture.reportingLinks` directly (which
+    /// also includes the non-report `adherence`/`consistency` placeholder
+    /// links).
+    private static let realReportIDs: Set<String> = ["calories", "macros", "meals"]
+
+    func fetchNutritionReporting(
+        reportId: String,
+        scope: EvidenceScopeSelection,
+        range: NutritionReportRange,
+        macro: NutritionMacroKey,
+        mealMacroMixSlot: NutritionMealSlotFilter,
+        mealTrendSlot: NutritionMealSlotFilter,
+        mealTrendMetric: NutritionMealTrendMetric
+    ) async throws -> NutritionReportingReadModel? {
+        guard Self.realReportIDs.contains(reportId) else { return nil }
+        let fixture = try loadFixture()
+        let scopedDays = EvidenceChronology.filter(fixture.days, scope: scope, date: \.date)
+        let days = NutritionReportingCalculator.rangeFiltered(days: scopedDays, range: range)
+        let scopeContext = EvidenceChronology.scopeContext(selected: scope, allLabel: "All Nutrition")
+
+        switch reportId {
+        case "calories":
+            return NutritionReportingReadModel(
+                id: reportId, eyebrow: "Nutrition Reporting", title: "Calories",
+                subtitle: "Daily intake, weekly averages, and calorie history over time.",
+                scope: scopeContext, dataSources: fixture.dataSources, calories: NutritionReportingCalculator.caloriesReport(days: days), macros: nil, meals: nil
+            )
+        case "macros":
+            return NutritionReportingReadModel(
+                id: reportId, eyebrow: "Nutrition Reporting", title: "Macros",
+                subtitle: "Macro distribution, daily averages, and weekly trends over time.",
+                scope: scopeContext, dataSources: fixture.dataSources, calories: nil, macros: NutritionReportingCalculator.macrosReport(days: days, selectedMacro: macro), meals: nil
+            )
+        case "meals":
+            return NutritionReportingReadModel(
+                id: reportId, eyebrow: "Nutrition Reporting", title: "Meals",
+                subtitle: "Meal structure across the selected period.",
+                scope: scopeContext, dataSources: fixture.dataSources, calories: nil, macros: nil,
+                meals: NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: mealMacroMixSlot, trendSlot: mealTrendSlot, trendMetric: mealTrendMetric)
+            )
+        default:
+            return nil
+        }
     }
 }
