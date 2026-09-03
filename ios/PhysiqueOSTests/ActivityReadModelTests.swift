@@ -227,13 +227,56 @@ final class ActivityReadModelTests: XCTestCase {
         let all = try await api.fetchActivityLanding(scope: .all)
         let buildLeanMass = try await api.fetchActivityLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         let visibleAbs = try await api.fetchActivityLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
-        XCTAssertFalse(all.activityHistory.isEmpty)
-        XCTAssertEqual(buildLeanMass.activityHistory.count, all.activityHistory.count)
-        XCTAssertTrue(visibleAbs.activityHistory.isEmpty)
+        XCTAssertEqual(all.activityHistory.count, 7)
+        // Build Lean Mass excludes the one Visible-Abs-era day (2026-06-05);
+        // Visible Abs is the complementary single day — proves both
+        // directions of the filter genuinely narrow, not just relabel the
+        // same dataset.
+        XCTAssertEqual(buildLeanMass.activityHistory.count, 6)
+        XCTAssertEqual(visibleAbs.activityHistory.count, 1)
+        XCTAssertEqual(visibleAbs.activityHistory.first?.date, "2026-06-05")
+    }
+
+    /// `phase-establish-maintenance` (2026-07-19...2026-08-15) vs
+    /// `phase-lean-mass-build` (2026-08-16...) — the fixture now carries
+    /// real days in both Build Lean Mass phases, so this proves the
+    /// contextual Phase pill genuinely filters, not just Goal-level scope.
+    func testPhaseScopeNarrowsActivityHistoryToOnePhase() async throws {
+        let phase1 = try await api.fetchActivityLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
+        let phase2 = try await api.fetchActivityLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
+        XCTAssertEqual(phase1.activityHistory.map(\.date).sorted(), ["2026-07-25", "2026-08-05"])
+        XCTAssertEqual(phase2.activityHistory.count, 4)
+        XCTAssertTrue(phase2.activityHistory.allSatisfy { $0.date >= "2026-08-16" })
+    }
+
+    /// Verified directly against source (`ProgressReportingService
+    /// .getActivityReport`/`buildActivityReport`): `latestActivityDay` is
+    /// re-derived from the scoped `activityDays` array, not held fixed
+    /// while only `activityHistory` narrows. Selecting Visible Abs must
+    /// surface *that* era's latest day, not the global-latest Phase 2 day.
+    func testLatestActivityDayIsReDerivedFromTheScopedHistoryNotHeldFixed() async throws {
+        let all = try await api.fetchActivityLanding(scope: .all)
+        let visibleAbs = try await api.fetchActivityLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
+        let phase1 = try await api.fetchActivityLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
+
+        XCTAssertEqual(all.latestActivityDay?.date, "2026-08-30")
+        XCTAssertEqual(visibleAbs.latestActivityDay?.date, "2026-06-05")
+        XCTAssertEqual(phase1.latestActivityDay?.date, "2026-08-05")
     }
 
     func testEveryActivityHistoryRowCarriesGoalPhaseAttribution() async throws {
         let landing = try await api.fetchActivityLanding(scope: .all)
         XCTAssertTrue(landing.activityHistory.allSatisfy { $0.attributedScope != nil })
+    }
+
+    /// No historical Activity record may be attributed to the Phase that
+    /// happens to be active *today* just because "today" is Phase 2 — each
+    /// day's chip must reflect the Phase that owned its own date.
+    func testHistoricalActivityDaysAreAttributedToThePhaseActiveOnTheirOwnDateNotToday() async throws {
+        let landing = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-06-05" }?.attributedScope?.goalId, EvidenceCanonicalGoalID.visibleAbs)
+        XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-07-25" }?.attributedScope?.phaseName, "Establish Maintenance")
+        XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-08-05" }?.attributedScope?.phaseName, "Establish Maintenance")
+        XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-08-30" }?.attributedScope?.phaseName, "Lean Mass Build")
     }
 }
