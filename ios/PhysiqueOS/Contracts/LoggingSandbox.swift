@@ -20,21 +20,6 @@ struct LocalWeightEntry: Codable, Equatable {
     var correctionCount: Int
 }
 
-enum MorningPriorityDisposition: String, Codable, CaseIterable, Identifiable {
-    case completed, skipped, note
-    var id: String { rawValue }
-    var label: String { switch self { case .completed: "Completed"; case .skipped: "Skipped"; case .note: "Add note" } }
-}
-
-struct MorningPriorityItem: Codable, Equatable, Identifiable {
-    var id: String
-    var title: String
-    var detail: String
-    var occurrenceDate: Date
-    var disposition: MorningPriorityDisposition?
-    var note: String
-}
-
 struct MorningCheckInResult: Equatable {
     var weight: LocalWeightEntry
     var reconciledPriorityCount: Int

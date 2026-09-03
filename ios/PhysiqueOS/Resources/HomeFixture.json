@@ -44,8 +44,8 @@
   ],
   "goals": [
     {
-      "id": "goal_fixture_lean_definition",
-      "title": "Lean Definition Goal",
+      "id": "goal_fixture_build_lean_mass",
+      "title": "Build Lean Mass",
       "current": "16.2",
       "target": "12.0",
       "unit": "%",
@@ -53,10 +53,10 @@
       "color": "success",
       "presentationMode": "primary",
       "progress": 61,
-      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_lean_definition" } }
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_build_lean_mass" } }
     },
     {
-      "id": "goal_fixture_maintain_strength",
+      "id": "goal_maintain_8_9_body_fat",
       "title": "Maintain Strength Baseline",
       "current": "",
       "target": "",
@@ -66,10 +66,10 @@
       "presentationMode": "supporting",
       "status": "Maintaining",
       "detail": "Strength holding steady",
-      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_maintain_strength" } }
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_maintain_8_9_body_fat" } }
     },
     {
-      "id": "goal_fixture_preserve_lean_mass",
+      "id": "goal_preserve_lean_mass",
       "title": "Preserve Lean Mass",
       "current": "",
       "target": "",
@@ -79,49 +79,8 @@
       "presentationMode": "supporting",
       "status": "On track",
       "detail": "Lean mass stable across recent DEXA scans",
-      "destination": null
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_preserve_lean_mass" } }
     }
   ],
-  "todaysFocus": [
-    {
-      "id": "focus-fixture-weight",
-      "label": "Morning Weight",
-      "subtitle": null,
-      "icon": "scale",
-      "color": "primary",
-      "completed": true,
-      "actionLabel": null,
-      "destination": null
-    },
-    {
-      "id": "focus-fixture-foam-roll",
-      "label": "Foam Roll",
-      "subtitle": "10 minutes",
-      "icon": "activity",
-      "color": "evidence",
-      "completed": false,
-      "actionLabel": null,
-      "destination": null
-    },
-    {
-      "id": "focus-fixture-photo",
-      "label": "Front Progress Photo",
-      "subtitle": "Weekly photo set",
-      "icon": "camera",
-      "color": "warning",
-      "completed": false,
-      "actionLabel": "Needs Setup",
-      "destination": { "id": "photo.upload", "parameters": {} }
-    },
-    {
-      "id": "focus-fixture-peptide",
-      "label": "Evening Peptide",
-      "subtitle": "Retatrutide",
-      "icon": "syringe",
-      "color": "effort",
-      "completed": false,
-      "actionLabel": null,
-      "destination": null
-    }
-  ]
+  "todaysFocus": []
 }

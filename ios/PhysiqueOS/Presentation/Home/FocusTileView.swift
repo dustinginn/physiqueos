@@ -10,33 +10,28 @@ private let iconMap: [HomeFocusIcon: String] = [
     .utensils: "fork.knife",
 ]
 
-/// Mirrors `FocusTile.jsx`. Native V1 does not implement completion writes
-/// in this slice (that requires a command boundary this slice deliberately
-/// does not build — see docs/PHYSIQUEOS_NATIVE_V1.md); a completable,
-/// not-yet-completed item is shown read-only rather than with a live
-/// "mark complete" action, matching what the fixture can honestly support.
+/// Mirrors `FocusTile.jsx` exactly, including its two independent
+/// affordances (verified directly against source for this task): the row
+/// body is a `Link` to `/priorities/{id}` (navigation, no write), and a
+/// completable-but-not-yet-completed item additionally renders a small
+/// round check button in its own `<form>` that completes the occurrence
+/// in place, without navigating away from Home. `item.actionLabel` (e.g.
+/// "Upload Photos") replaces the completion indicator entirely for a
+/// non-completable item, matching `FocusTile.jsx`'s own
+/// `actionLabel`-present branch.
 struct FocusTileView: View {
-    let item: HomeFocusItem
+    let item: PriorityOccurrence
     var onTap: (AppDestination) -> Void
+    var onComplete: (PriorityOccurrence) -> Void
 
     var body: some View {
-        let tile = HStack(spacing: 8) {
-            IconBadge(systemImage: iconMap[item.icon] ?? "target", color: item.color, size: .xs, isCircular: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.label)
-                    .physiqueOSFont(PhysiqueOSTypography.focusLabel)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-            }
-            Spacer(minLength: 4)
-            if let actionLabel = item.actionLabel {
-                StatusChip(text: actionLabel, color: .effort)
-            } else {
-                completionIndicator
+        HStack(spacing: 6) {
+            Button { onTap(item.destination) } label: { rowBody }
+                .buttonStyle(.plain)
+            if item.completable, !item.completed {
+                Button { onComplete(item) } label: { completeButton }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Mark \(item.title) complete")
             }
         }
         .padding(10)
@@ -47,21 +42,37 @@ struct FocusTileView: View {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(item.color.foreground.opacity(0.24), lineWidth: 1)
         )
-
-        Group {
-            if let destination = item.destination {
-                Button { onTap(destination) } label: { tile }.buttonStyle(.plain)
-            } else {
-                tile
-            }
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(item.destination != nil ? .isButton : [])
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var rowBody: some View {
+        HStack(spacing: 8) {
+            IconBadge(systemImage: iconMap[item.icon] ?? "target", color: item.color, size: .xs, isCircular: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .physiqueOSFont(PhysiqueOSTypography.focusLabel)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+            }
+            Spacer(minLength: 4)
+            if !item.completable || item.completed {
+                if let actionLabel = item.actionLabel {
+                    StatusChip(text: actionLabel, color: .effort)
+                } else {
+                    completionIndicator
+                }
+            }
+        }
     }
 
     private var accessibilityLabel: String {
-        var parts = [item.label]
+        var parts = [item.title]
         if let subtitle = item.subtitle { parts.append(subtitle) }
         parts.append(item.actionLabel ?? (item.completed ? "Completed" : "Not completed"))
         return parts.joined(separator: ", ")
@@ -81,5 +92,17 @@ struct FocusTileView: View {
         }
         .frame(width: 20, height: 20)
         .accessibilityHidden(true)
+    }
+
+    private var completeButton: some View {
+        Circle()
+            .fill(PhysiqueOSTheme.surfaceElevated)
+            .overlay(Circle().stroke(PhysiqueOSTheme.divider, lineWidth: 1))
+            .overlay(
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            )
+            .frame(width: 22, height: 22)
     }
 }

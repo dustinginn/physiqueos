@@ -23,7 +23,7 @@ struct HomeView: View {
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if viewModel == nil { viewModel = HomeViewModel(api: environment.homeAPI) }
+            if viewModel == nil { viewModel = HomeViewModel(api: environment.homeAPI, priorityStore: environment.loggingSandboxStore) }
             await viewModel?.load()
         }
         .sheet(item: Binding(
@@ -69,7 +69,10 @@ struct HomeView: View {
                 GoalsCardView(goals: home.goals, onTap: onNavigate)
 
                 if home.hasTodaysFocus {
-                    TodaysFocusCardView(items: home.todaysFocus, onTap: onNavigate)
+                    TodaysFocusCardView(items: home.todaysFocus, onTap: onNavigate) { occurrence in
+                        environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
+                        viewModel?.refreshTodaysFocus()
+                    }
                 }
             }
         }

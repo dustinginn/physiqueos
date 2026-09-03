@@ -22,6 +22,8 @@ struct AppDestinationRouterView: View {
             GoalStrategyView(goalId: goalId, focus: focus)
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
             MorningCheckInView()
+        case .priorityDetail(let priorityId):
+            PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId)
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:

@@ -32,6 +32,8 @@ app_files = [
     ("Contracts", "AppDestination.swift"),
     ("Contracts", "AppDestinationCoding.swift"),
     ("Contracts", "HomeReadModel.swift"),
+    ("Contracts", "PriorityReadModel.swift"),
+    ("Contracts", "PriorityOccurrenceCalculator.swift"),
     ("Contracts", "GoalsReadModel.swift"),
     ("Contracts", "OperatingPlanReadModel.swift"),
     ("Contracts", "LogReadModel.swift"),
@@ -62,6 +64,8 @@ app_files = [
     ("Contracts", "LoggingSandbox.swift"),
     ("Contracts", "FounderServerModels.swift"),
     ("Networking", "HomeAPI.swift"),
+    ("Networking", "PriorityAPI.swift"),
+    ("Networking", "PriorityCatalogLoader.swift"),
     ("Networking", "GoalsAPI.swift"),
     ("Networking", "OperatingPlanSandboxStore.swift"),
     ("Networking", "LogAPI.swift"),
@@ -116,6 +120,8 @@ app_files = [
     ("Presentation/Home", "GoalRowView.swift"),
     ("Presentation/Home", "FocusTileView.swift"),
     ("Presentation/Home", "TodaysFocusCardView.swift"),
+    ("Presentation/Home", "PriorityDetailView.swift"),
+    ("Presentation/Home", "PriorityDetailViewModel.swift"),
     ("Presentation/Log", "LogView.swift"),
     ("Presentation/Log", "LogViewModel.swift"),
     ("Presentation/Log", "LogHeaderView.swift"),
@@ -196,6 +202,7 @@ app_files = [
 # built app bundle via the Resources build phase.
 resource_files = [
     ("Resources", "HomeFixture.json"),
+    ("Resources", "PriorityFixture.json"),
     ("Resources", "GoalsFixture.json"),
     ("Resources", "OperatingPlanFixture.json"),
     ("Resources", "LogFixture.json"),
@@ -229,6 +236,7 @@ reference_only_files = [
 test_files = [
     ("PhysiqueOSTests", "AppTabTests.swift"),
     ("PhysiqueOSTests", "HomeReadModelTests.swift"),
+    ("PhysiqueOSTests", "PriorityReadModelTests.swift"),
     ("PhysiqueOSTests", "GoalsReadModelTests.swift"),
     ("PhysiqueOSTests", "OperatingPlanReadModelTests.swift"),
     ("PhysiqueOSTests", "LogReadModelTests.swift"),

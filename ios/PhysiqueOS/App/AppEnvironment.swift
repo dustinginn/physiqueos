@@ -22,6 +22,15 @@ final class AppEnvironment {
     let dexaAPI: DEXAAPI
     let photosAPI: PhotosAPI
     let energyAPI: EnergyAPI
+    /// The read seam for the canonical Operating Plan execution-item
+    /// catalog. `loggingSandboxStore` loads the same catalog synchronously
+    /// at init (`PriorityCatalogLoader`, mirroring
+    /// `TrainingExerciseCatalogLoader`'s own established rationale) since
+    /// Home/Priority Detail/Morning Check-In need it before any `await`
+    /// can run — this property exists so a future live implementation has
+    /// the same seam every other vertical already does, not because
+    /// today's fixture-only screens call it directly.
+    let priorityAPI: PriorityAPI
     let trainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
@@ -42,6 +51,7 @@ final class AppEnvironment {
         dexaAPI: DEXAAPI = FixtureDEXAAPI(),
         photosAPI: PhotosAPI = FixturePhotosAPI(),
         energyAPI: EnergyAPI = FixtureEnergyAPI(),
+        priorityAPI: PriorityAPI = FixturePriorityAPI(),
         trainingLoggerAPI: TrainingLoggerAPI = FixtureTrainingLoggerAPI(),
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
@@ -59,6 +69,7 @@ final class AppEnvironment {
         self.dexaAPI = dexaAPI
         self.photosAPI = photosAPI
         self.energyAPI = energyAPI
+        self.priorityAPI = priorityAPI
         self.trainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore

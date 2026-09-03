@@ -6,7 +6,15 @@ struct MorningCheckInView: View {
     @State private var weightText = ""
     @State private var message: String?
     @State private var complete = false
+    /// One disposition + note per occurrence id — mirrors the real check-in
+    /// form's own per-item `${occurrenceKey}_status`/`${occurrenceKey}_note`
+    /// fields, submitted together in one save (see
+    /// `LoggingSandboxStore.saveMorningCheckIn`'s doc comment). Not written
+    /// to the shared store until "Complete Morning Check-In" is tapped —
+    /// matching the real form's single-submit behavior.
+    @State private var choices: [String: (disposition: PriorityDisposition?, note: String)] = [:]
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
+    private var unfinished: [PriorityOccurrence] { store.previousDayUnfinishedPriorities() }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
@@ -19,8 +27,10 @@ struct MorningCheckInView: View {
                 CardContainer { Label("Priorities reconciled and weight saved", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess) }
                 PrimaryActionButton(title: "Return Home") { dismiss() }
             } else {
-                Text("Yesterday’s unfinished priorities").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                ForEach(store.morningPriorities) { priority in priorityCard(priority) }
+                if !unfinished.isEmpty {
+                    Text("Yesterday’s unfinished priorities").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    ForEach(unfinished) { priority in priorityCard(priority) }
+                }
                 CardContainer { VStack(alignment: .leading, spacing: 10) {
                     Text("What’s your weight today?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight", placeholder: "150.5").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
@@ -34,39 +44,60 @@ struct MorningCheckInView: View {
         .onAppear { if let entry = store.weighIn(on: Date()) { weightText = formatWeight(entry.value) } }
     }
 
-    private func priorityCard(_ priority: MorningPriorityItem) -> some View {
-        VStack(spacing: 0) {
+    /// Completed / Skipped / Add note radios, plus an **always-visible**
+    /// optional note textarea — verified real web behavior for this task: a
+    /// note can accompany a Completed or Skipped disposition too, it is not
+    /// gated behind selecting "Add note" specifically.
+    private func priorityCard(_ priority: PriorityOccurrence) -> some View {
+        let selected = choices[priority.id]?.disposition
+        return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(priority.title).physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                Text(priority.detail).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                HStack(spacing: 6) { ForEach(MorningPriorityDisposition.allCases) { disposition in
-                    Button(disposition.label) { store.updateMorningPriority(id: priority.id, disposition: disposition) }
+                if let metadata = priority.metadata {
+                    Text(metadata).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                HStack(spacing: 6) { ForEach(PriorityDisposition.allCases) { disposition in
+                    Button(disposition.label) { setDisposition(disposition, for: priority.id) }
                         .buttonStyle(.borderedProminent)
-                        .tint(priority.disposition == disposition ? dispositionColor(disposition) : PhysiqueOSTheme.surfaceElevated)
-                        .foregroundStyle(priority.disposition == disposition ? Color.white : PhysiqueOSTheme.textSecondary)
+                        .tint(selected == disposition ? dispositionColor(disposition) : PhysiqueOSTheme.surfaceElevated)
+                        .foregroundStyle(selected == disposition ? Color.white : PhysiqueOSTheme.textSecondary)
                         .controlSize(.small)
                 } }
-                if priority.disposition == .note {
-                    ZStack(alignment: .topLeading) {
-                        if (store.morningPriorities.first(where: { $0.id == priority.id })?.note ?? "").isEmpty {
-                            Text("Add context if it will help later.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textMuted).padding(.horizontal, 12).padding(.vertical, 14)
-                        }
-                        TextEditor(text: Binding(get: { store.morningPriorities.first(where: { $0.id == priority.id })?.note ?? "" }, set: { store.updateMorningPriority(id: priority.id, disposition: .note, note: $0) }))
-                            .frame(minHeight: 96).padding(6).scrollContentBackground(.hidden).background(Color.clear)
+                ZStack(alignment: .topLeading) {
+                    if (choices[priority.id]?.note ?? "").isEmpty {
+                        Text("Add context if it will help later.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textMuted).padding(.horizontal, 12).padding(.vertical, 14)
                     }
-                    .background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
+                    TextEditor(text: Binding(get: { choices[priority.id]?.note ?? "" }, set: { setNote($0, for: priority.id) }))
+                        .frame(minHeight: 72).padding(6).scrollContentBackground(.hidden).background(Color.clear)
                 }
+                .background(PhysiqueOSTheme.surfaceMuted).clipShape(RoundedRectangle(cornerRadius: 10))
             }.padding(.vertical, 10)
             Divider().overlay(PhysiqueOSTheme.divider)
         }
     }
 
-    private func dispositionColor(_ disposition: MorningPriorityDisposition) -> Color {
+    private func setDisposition(_ disposition: PriorityDisposition, for id: String) {
+        choices[id] = (disposition, choices[id]?.note ?? "")
+    }
+
+    private func setNote(_ note: String, for id: String) {
+        choices[id] = (choices[id]?.disposition, note)
+    }
+
+    private func dispositionColor(_ disposition: PriorityDisposition) -> Color {
         switch disposition { case .completed: PhysiqueOSTheme.chartSuccess; case .skipped: .orange; case .note: PhysiqueOSTheme.accent }
     }
 
     private func save() {
-        switch store.saveMorningCheckIn(weightText: weightText) {
+        var resolved: [String: (disposition: PriorityDisposition, note: String)] = [:]
+        for occurrence in unfinished {
+            guard let disposition = choices[occurrence.id]?.disposition else {
+                message = "Choose an outcome for each unfinished priority."
+                return
+            }
+            resolved[occurrence.id] = (disposition, choices[occurrence.id]?.note ?? "")
+        }
+        switch store.saveMorningCheckIn(weightText: weightText, dispositions: resolved) {
         case .success: message = nil; complete = true
         case .failure(let error): message = error.message
         }

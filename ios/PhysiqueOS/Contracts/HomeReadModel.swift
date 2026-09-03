@@ -16,7 +16,13 @@ struct HomeReadModel: Codable, Equatable {
     var nextBestAction: HomeNextBestAction
     var briefingCards: [HomeBriefingCard]
     var goals: [HomeGoal]
-    var todaysFocus: [HomeFocusItem]
+    /// `DailyFocusService.getDailyFocus()`'s own occurrence list — the
+    /// exact same `PriorityOccurrence` shape (and identity) the Priority
+    /// detail screen and Morning Check-In read, computed by
+    /// `PriorityOccurrenceCalculator.project` from the same
+    /// `ExecutionItemFixture` catalog, never a Home-only projection. See
+    /// `PriorityReadModel.swift`'s type-level doc comment.
+    var todaysFocus: [PriorityOccurrence]
 
     var hasBriefingCards: Bool { !briefingCards.isEmpty }
     var hasTodaysFocus: Bool { !todaysFocus.isEmpty }
@@ -174,17 +180,4 @@ extension HomeGoal {
 
 enum HomeFocusIcon: String, Codable {
     case activity, camera, moon, scale, syringe, target, utensils
-}
-
-struct HomeFocusItem: Codable, Equatable, Identifiable {
-    var id: String
-    var label: String
-    var subtitle: String?
-    var icon: HomeFocusIcon
-    var color: HomeColorToken
-    var completed: Bool
-    /// A short badge (e.g. "Needs Setup") shown instead of the completion
-    /// indicator, mirroring `FocusTile.jsx`'s `actionLabel` prop.
-    var actionLabel: String?
-    var destination: AppDestination?
 }

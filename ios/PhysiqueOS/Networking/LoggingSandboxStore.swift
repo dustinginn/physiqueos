@@ -7,21 +7,105 @@ final class LoggingSandboxStore {
     var interpretationState: EvidenceInterpretationState = .editing
     private(set) var pipelineTimings = EvidencePipelineTimings()
     private(set) var reviews: [String: LocalEvidenceReview]
-    private(set) var morningPriorities: [MorningPriorityItem]
+
+    /// The one canonical Operating Plan execution-item catalog — loaded
+    /// once, shared by Home, the Priority detail screen, and Morning
+    /// Check-In. See `PriorityReadModel.swift`'s type-level doc comment:
+    /// this is not a Priority model of its own, it is the same catalog
+    /// `PriorityOccurrenceCalculator` projects occurrences from everywhere.
+    let executionItems: [ExecutionItemFixture]
+    /// Mirrors the Reminder's own `completedAt` — keyed by occurrence id
+    /// (`PriorityOccurrenceCalculator.occurrenceId`), append-only in spirit
+    /// (a re-completion of the same id is idempotent, matching source).
+    private(set) var priorityCompletions: [String: PriorityCompletionRecord]
+    /// Mirrors one `DailyCheckIn.reconciliation[]` entry per occurrence —
+    /// skip/note dispositions never touch `priorityCompletions` directly
+    /// (only a `.completed` disposition also writes a completion record),
+    /// matching the real server's own separation between the Reminder
+    /// record and the DailyCheckIn's own reconciliation array.
+    private(set) var priorityReconciliations: [String: PriorityReconciliationRecord]
 
     init(
         now: Date = Date(),
         weighIns: [String: LocalWeightEntry] = [:],
-        reviews: [String: LocalEvidenceReview] = [:]
+        reviews: [String: LocalEvidenceReview] = [:],
+        executionItems: [ExecutionItemFixture] = PriorityCatalogLoader.loadExecutionItems(),
+        priorityCompletions: [String: PriorityCompletionRecord] = [:],
+        priorityReconciliations: [String: PriorityReconciliationRecord] = [:]
     ) {
         self.weighIns = weighIns
         self.reviews = reviews
         self.evidenceDraft = .fresh(now: now)
-        let priorDay = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
-        self.morningPriorities = [
-            .init(id: "priority-mobility", title: "Mobility", detail: "10 minutes", occurrenceDate: priorDay, disposition: nil, note: ""),
-            .init(id: "priority-evening", title: "Evening routine", detail: "Complete before bed", occurrenceDate: priorDay, disposition: nil, note: ""),
-        ]
+        self.executionItems = executionItems
+        self.priorityCompletions = priorityCompletions
+        self.priorityReconciliations = priorityReconciliations
+    }
+
+    // MARK: - Priorities (Home / Priority Detail / Morning Check-In shared engine)
+
+    /// Today's occurrences — the exact list Home's "Today's Priorities"
+    /// renders, computed the same way the Priority detail screen and
+    /// Morning Check-In's "today" context would resolve the same id.
+    func todaysPriorities(now: Date = Date()) -> [PriorityOccurrence] {
+        let localDate = PriorityOccurrenceCalculator.localDateKey(now: now)
+        return PriorityOccurrenceCalculator.project(executionItems: executionItems, completions: priorityCompletions, localDate: localDate, now: now)
+    }
+
+    /// A single occurrence by id, resolved from `executionItems` +
+    /// `priorityCompletions` — the Priority detail screen's own fetch, so
+    /// it can never disagree with what Home showed for the same id.
+    func priorityOccurrence(id: String, now: Date = Date()) -> PriorityOccurrence? {
+        let localDate = PriorityOccurrenceCalculator.localDateKey(now: now)
+        guard let item = executionItems.first(where: { PriorityOccurrenceCalculator.occurrenceId(executionItemId: $0.id, localDate: localDate) == id }) else {
+            return nil
+        }
+        return PriorityOccurrenceCalculator.occurrence(for: item, localDate: localDate, completions: priorityCompletions, now: now)
+    }
+
+    /// Yesterday's unfinished occurrences — `getPreviousDayIncompletePrioritySelection`,
+    /// ported: scheduled yesterday, no completion, no terminal reconciliation.
+    /// `canonicalEvidence` items (Morning Weigh-In) are additionally excluded
+    /// when a matching weigh-in already exists for that date, mirroring the
+    /// real server's evidence-based auto-completion.
+    func previousDayUnfinishedPriorities(now: Date = Date()) -> [PriorityOccurrence] {
+        let today = PriorityOccurrenceCalculator.localDateKey(now: now)
+        guard let yesterday = PriorityOccurrenceCalculator.previousDateKey(today) else { return [] }
+        return PriorityOccurrenceCalculator.previousDayIncomplete(
+            executionItems: executionItems,
+            completions: priorityCompletions,
+            reconciliations: priorityReconciliations,
+            previousLocalDate: yesterday,
+            now: now,
+            hasEvidence: { [weak self] item, date in
+                guard item.id == "execution_morning_weigh_in", let self, let entry = self.weighIns[date] else { return false }
+                return entry.value.isFinite
+            }
+        )
+    }
+
+    /// Completes an occurrence — mirrors `completeReminder`/
+    /// `completeReminderFromEvidence`: a `context` with all three fields
+    /// present (dose/protocolId/occurrenceDate) records an evidence-aware
+    /// completion snapshot, matching the Priority detail screen's own
+    /// server action. Idempotent: completing an already-completed
+    /// occurrence again just re-confirms it (no duplicate/second record),
+    /// matching source's own idempotent-completion behavior.
+    func completePriority(occurrenceId: String, context: PriorityCompletionContext?, now: Date = Date()) {
+        let iso = ISO8601DateFormatter().string(from: now)
+        priorityCompletions[occurrenceId] = PriorityCompletionRecord(occurrenceId: occurrenceId, completedAt: iso, context: context)
+    }
+
+    /// Records a skip/note/completed disposition for a specific past
+    /// occurrence — Morning Check-In's own reconciliation write. Only a
+    /// `.completed` disposition also writes a `priorityCompletions` record
+    /// (mirroring `MorningPriorityReconciliationService.save`'s own "only
+    /// completed also completes the Reminder" rule); skip/note stay on the
+    /// reconciliation record alone.
+    func reconcilePriority(occurrenceId: String, occurrenceDate: String, disposition: PriorityDisposition, note: String, now: Date = Date()) {
+        priorityReconciliations[occurrenceId] = PriorityReconciliationRecord(occurrenceId: occurrenceId, occurrenceDate: occurrenceDate, disposition: disposition, note: note)
+        if disposition == .completed {
+            completePriority(occurrenceId: occurrenceId, context: nil, now: now)
+        }
     }
 
     @discardableResult
@@ -49,20 +133,31 @@ final class LoggingSandboxStore {
 
     func weighIn(on date: Date) -> LocalWeightEntry? { weighIns[Self.dateKey(date)] }
 
-    func updateMorningPriority(id: String, disposition: MorningPriorityDisposition, note: String? = nil) {
-        guard let index = morningPriorities.firstIndex(where: { $0.id == id }) else { return }
-        morningPriorities[index].disposition = disposition
-        if let note { morningPriorities[index].note = note }
-    }
-
-    func saveMorningCheckIn(weightText: String, now: Date = Date()) -> Result<MorningCheckInResult, LoggingSandboxError> {
-        guard morningPriorities.allSatisfy({ $0.disposition != nil }) else {
+    /// One combined atomic submit — real web behavior confirmed by this
+    /// task's audit: weight and priority reconciliation share a single
+    /// `&lt;form&gt;`/server action (`saveMorningCheckIn`), not two separate
+    /// writes. `dispositions` must cover every occurrence
+    /// `previousDayUnfinishedPriorities` currently returns; any missing
+    /// entry fails validation the same way the real form's `required`
+    /// radio group does.
+    func saveMorningCheckIn(
+        weightText: String,
+        dispositions: [String: (disposition: PriorityDisposition, note: String)],
+        now: Date = Date()
+    ) -> Result<MorningCheckInResult, LoggingSandboxError> {
+        let unfinished = previousDayUnfinishedPriorities(now: now)
+        guard unfinished.allSatisfy({ dispositions[$0.id] != nil }) else {
             return .failure(.init(message: "Choose an outcome for each unfinished priority."))
         }
         switch saveWeighIn(weightText: weightText, unit: .lb, date: now, now: now) {
-        case .failure(let error): return .failure(error)
+        case .failure(let error):
+            return .failure(error)
         case .success(let weight):
-            return .success(.init(weight: weight, reconciledPriorityCount: morningPriorities.count))
+            for occurrence in unfinished {
+                guard let choice = dispositions[occurrence.id] else { continue }
+                reconcilePriority(occurrenceId: occurrence.id, occurrenceDate: occurrence.date, disposition: choice.disposition, note: choice.note, now: now)
+            }
+            return .success(.init(weight: weight, reconciledPriorityCount: unfinished.count))
         }
     }
 

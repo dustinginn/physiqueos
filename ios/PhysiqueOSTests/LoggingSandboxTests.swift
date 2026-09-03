@@ -9,9 +9,11 @@ final class LoggingSandboxTests: XCTestCase {
         let store = LoggingSandboxStore(now: now)
         XCTAssertEqual(try value(store.saveWeighIn(weightText: "166.8", unit: .lb, date: occurrence, now: now)).dateKey, "2026-08-18")
         XCTAssertEqual(try value(store.saveWeighIn(weightText: "166.2", unit: .lb, date: occurrence, now: now)).correctionCount, 1)
-        XCTAssertFailure(store.saveMorningCheckIn(weightText: "166.4", now: now), "Choose an outcome for each unfinished priority.")
-        store.morningPriorities.forEach { store.updateMorningPriority(id: $0.id, disposition: .completed) }
-        XCTAssertEqual(try value(store.saveMorningCheckIn(weightText: "166.4", now: now)).reconciledPriorityCount, 2)
+        XCTAssertFailure(store.saveMorningCheckIn(weightText: "166.4", dispositions: [:], now: now), "Choose an outcome for each unfinished priority.")
+        let unfinished = store.previousDayUnfinishedPriorities(now: now)
+        XCTAssertFalse(unfinished.isEmpty)
+        let dispositions = Dictionary(uniqueKeysWithValues: unfinished.map { ($0.id, (disposition: PriorityDisposition.completed, note: "")) })
+        XCTAssertEqual(try value(store.saveMorningCheckIn(weightText: "166.4", dispositions: dispositions, now: now)).reconciledPriorityCount, unfinished.count)
         XCTAssertTrue(store.reviews.isEmpty)
     }
 

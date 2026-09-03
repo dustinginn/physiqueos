@@ -6,8 +6,9 @@ import SwiftUI
 /// modeled in this slice — no Home fixture case needs it yet, and it is
 /// closely tied to Training Logger, which is explicitly out of scope.
 struct TodaysFocusCardView: View {
-    let items: [HomeFocusItem]
+    let items: [PriorityOccurrence]
     var onTap: (AppDestination) -> Void
+    var onComplete: (PriorityOccurrence) -> Void
 
     private var useSingleColumn: Bool {
         items.count == 1 || items.contains { $0.actionLabel != nil }
@@ -19,11 +20,11 @@ struct TodaysFocusCardView: View {
                 SectionHeading("Today's Priorities")
                 if useSingleColumn {
                     VStack(spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap) }
+                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete) }
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap) }
+                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete) }
                     }
                 }
             }
