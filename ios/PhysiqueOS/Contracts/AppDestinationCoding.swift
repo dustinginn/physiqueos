@@ -116,6 +116,10 @@ extension AppDestination {
         case "native.operating-plan.supplement.edit":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .operatingPlanSupplementEdit(protocolId: try parameters.decode(String.self, forKey: .protocolId))
+        case "native.operating-plan.dexa-appointment":
+            self = .operatingPlanDexaAppointment
+        case "native.operating-plan.training.new":
+            self = .operatingPlanTrainingStrategyBuilder
         case "native.founder-server-connection":
             self = .founderServerConnection
         default:
@@ -163,7 +167,8 @@ extension AppDestination {
         case .operatingPlanSupplementSupport(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
-             .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew, .founderServerConnection:
+             .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew,
+             .operatingPlanDexaAppointment, .operatingPlanTrainingStrategyBuilder, .founderServerConnection:
             break
         }
     }

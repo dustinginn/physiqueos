@@ -88,7 +88,7 @@
     "contextDetail": "Body composition scan",
     "completionMethod": "canonical_evidence",
     "cadence": { "type": "scheduled_date" },
-    "schedule": { "daysOfWeek": [], "timeOfDay": "morning", "scheduledDate": "2026-09-15", "startDate": null, "endDate": null },
+    "schedule": { "daysOfWeek": [], "timeOfDay": "morning", "scheduledDate": "2026-10-31", "startDate": null, "endDate": null },
     "active": true,
     "linkedGoalIds": ["goal-build-lean-mass"],
     "reminderPreference": "remind",
@@ -96,8 +96,8 @@
     "icon": "target",
     "color": "success",
     "completable": false,
-    "continueActionLabel": "View Execution",
-    "continueActionDestination": { "id": "dexa.upload", "parameters": {} }
+    "continueActionLabel": "View DEXA Appointment",
+    "continueActionDestination": { "id": "native.operating-plan.dexa-appointment", "parameters": {} }
   },
   {
     "id": "execution_cold_plunge",

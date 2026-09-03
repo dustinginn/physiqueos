@@ -30,7 +30,13 @@ final class OperatingPlanSandboxStore {
     private let goalOptions: [OperatingPlanGoalLinkReadModel]
     private let goalTitle: String
 
-    init(bundle: Bundle = .main) {
+    /// Test-only seam: the fixture always ships with an active Training
+    /// strategy (matching the current Founder's real state), so this is
+    /// the one way to exercise the genuinely-unconfigured path the real
+    /// `/profile/operating-plan/training/new` page's own
+    /// `if (context.activeProtocol) redirect(...)` guard exists for.
+    /// Defaults to `false` for every real call site.
+    init(bundle: Bundle = .main, startWithoutActiveTrainingProtocol: Bool = false) {
         guard let url = bundle.url(forResource: "OperatingPlanFixture", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let fixture = try? JSONDecoder().decode(OperatingPlanFixtureFile.self, from: data)
@@ -53,6 +59,11 @@ final class OperatingPlanSandboxStore {
         self.supplementLifecycle = fixture.supplementLifecycle
         self.goalOptions = fixture.goalOptions
         self.goalTitle = fixture.goalOptions.first?.title ?? "Build Lean Mass"
+        if startWithoutActiveTrainingProtocol {
+            trainingEditors[Self.trainingBuilderStrategyId] = nil
+            strategyDetails[Self.trainingBuilderStrategyId] = nil
+        }
+        refreshTrainingLandingSection()
     }
 
     // MARK: - Strategy detail
@@ -126,6 +137,139 @@ final class OperatingPlanSandboxStore {
             strategyDetails[model.strategyId] = detail
         }
         return .success(())
+    }
+
+    // MARK: - DEXA Appointment (`/profile/operating-plan/execution/dexa`)
+
+    /// Reuses the SAME `CoachingDexaReadModel` the Coaching Updates editor
+    /// already reads and writes (`coachingEditors[…].dexa`) — the real
+    /// web's standalone appointment page and its Coaching Updates form
+    /// both ultimately edit one `execution_next_dexa` execution item, so
+    /// Native must not stand up a second, disconnected copy of this data.
+    /// An empty `plannedDate` represents "not scheduled" (the web's
+    /// `item === null` state), matching `DexaAppointmentDetailScreen`.
+    var dexaAppointment: CoachingDexaReadModel? {
+        coachingEditors.values.first?.dexa
+    }
+
+    @discardableResult
+    func saveDexaAppointment(_ model: CoachingDexaReadModel, today: String = OperatingPlanSandboxStore.todayDateKey()) -> Result<Void, OperatingPlanSandboxError> {
+        if let error = DexaAppointmentValidation.error(model: model, today: today) {
+            return .failure(.init(message: error))
+        }
+        guard var editor = coachingEditors.values.first else {
+            return .failure(.init(message: "Coaching settings are unavailable."))
+        }
+        editor.dexa = model
+        coachingEditors[editor.strategyId] = editor
+        if var detail = strategyDetails[editor.strategyId] {
+            detail.fields = Self.coachingFields(editor)
+            strategyDetails[editor.strategyId] = detail
+        }
+        return .success(())
+    }
+
+    // MARK: - Training Protocol Builder (`/profile/operating-plan/training/new`)
+
+    private static let trainingBuilderStrategyId = "strategy_fixture_training"
+
+    /// `training-protocol-create` vs `training-protocol-active`
+    /// (`OperatingPlanScreen.jsx: buildTrainingPlanItem`) — whether the
+    /// landing shows a "Create Protocol" row (and the builder route
+    /// actually renders) or the active strategy row.
+    var hasActiveTrainingProtocol: Bool {
+        trainingEditors[Self.trainingBuilderStrategyId] != nil
+    }
+
+    /// `getBuilderContext` — on web this redirects away before rendering
+    /// anything once a protocol is already active; Native returns that
+    /// same fact for the screen to gate on instead of showing the wizard.
+    func trainingProtocolBuilderContext() -> TrainingProtocolBuilderContextReadModel {
+        TrainingProtocolBuilderContextReadModel(
+            hasActiveProtocol: hasActiveTrainingProtocol,
+            defaultFrequencies: TrainingStrategyArea.allCases.map { TrainingAreaFrequency(area: $0, count: Self.defaultTrainingFrequency[$0] ?? 0) },
+            defaultRhythm: Self.defaultTrainingRhythm,
+            effectiveDateLabel: Self.longDateLabel(Date())
+        )
+    }
+
+    /// `createFounderTrainingProtocolActivation` + the version's write into
+    /// `store.protocols`/`store.protocolVersions` on web — Native's
+    /// equivalent commit is populating `trainingEditors` and
+    /// `strategyDetails` for this same strategy id, then refreshing the
+    /// landing row so Training flips from "Create Protocol" to "Active"
+    /// exactly like the real page does after `activateInitialProtocol`.
+    @discardableResult
+    func activateTrainingProtocol(_ draft: TrainingProtocolBuilderDraft) -> Result<Void, OperatingPlanSandboxError> {
+        guard !hasActiveTrainingProtocol else {
+            return .failure(.init(message: "A Training strategy is already active."))
+        }
+        if let error = TrainingProtocolBuilderValidation.error(draft: draft) {
+            return .failure(.init(message: error))
+        }
+        let editor = TrainingStrategyEditorReadModel(
+            strategyId: Self.trainingBuilderStrategyId,
+            frequencies: draft.frequencies,
+            priorities: draft.priorities,
+            progression: draft.progressionPace
+        )
+        trainingEditors[Self.trainingBuilderStrategyId] = editor
+        strategyDetails[Self.trainingBuilderStrategyId] = OperatingPlanStrategyDetailReadModel(
+            strategyType: .training,
+            strategyId: Self.trainingBuilderStrategyId,
+            title: "Maintenance Training Strategy",
+            purpose: draft.objective.reviewSummary,
+            goal: goalTitle,
+            startedDate: "Started \(Self.longDateLabel(Date()))",
+            status: "Active",
+            fields: Self.trainingFields(editor, currentGoalPhase: "Maintenance"),
+            editLabel: "Edit Training Strategy",
+            energyPhaseHistory: []
+        )
+        refreshTrainingLandingSection()
+        return .success(())
+    }
+
+    private func refreshTrainingLandingSection() {
+        guard let index = landing.sections.firstIndex(where: { $0.id == "training" }) else { return }
+        landing.sections[index].items = [
+            hasActiveTrainingProtocol
+                ? OperatingPlanSectionItemReadModel(
+                    id: Self.trainingBuilderStrategyId,
+                    title: "\(trainingEditors[Self.trainingBuilderStrategyId]?.totalWeeklySessions ?? 0) area sessions · \((trainingEditors[Self.trainingBuilderStrategyId]?.progression.label ?? "")) progression",
+                    detail: "Priorities: \((trainingEditors[Self.trainingBuilderStrategyId]?.priorities.map(\.label).joined(separator: ", ")) ?? "")",
+                    destination: .operatingPlanStrategy(strategyType: "training", strategyId: Self.trainingBuilderStrategyId),
+                    status: nil
+                )
+                : OperatingPlanSectionItemReadModel(
+                    id: "training-protocol-create",
+                    title: "Training",
+                    detail: "Define weekly frequency and progression strategy",
+                    destination: .operatingPlanTrainingStrategyBuilder,
+                    status: "Create Protocol"
+                ),
+        ]
+    }
+
+    static let defaultTrainingFrequency: [TrainingStrategyArea: Int] = [
+        .arms: 2, .core: 2, .lowerBody: 2, .back: 1, .chest: 1, .shoulders: 1,
+    ]
+    static let defaultTrainingRhythm: [TrainingBuilderRhythmDay] = [
+        .init(day: .monday, focus: [.chest, .shoulders], isFlexibleRecovery: false),
+        .init(day: .tuesday, focus: [.lowerBody], isFlexibleRecovery: false),
+        .init(day: .wednesday, focus: [.arms, .core], isFlexibleRecovery: false),
+        .init(day: .thursday, focus: [.back], isFlexibleRecovery: false),
+        .init(day: .friday, focus: [.lowerBody], isFlexibleRecovery: false),
+        .init(day: .saturday, focus: [.arms, .core], isFlexibleRecovery: false),
+        .init(day: .sunday, focus: [], isFlexibleRecovery: true),
+    ]
+
+    private static func longDateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        formatter.dateStyle = .long
+        return formatter.string(from: date)
     }
 
     // MARK: - Protocol domain (Recovery / Peptide / Supplement roll-up)

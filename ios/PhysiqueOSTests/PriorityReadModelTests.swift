@@ -81,9 +81,9 @@ final class PriorityReadModelTests: XCTestCase {
     }
 
     func testScheduledDateCadenceAppliesOnlyOnTheExactBookedDate() {
-        let dexa = item("execution_dexa") // scheduledDate 2026-09-15
-        XCTAssertTrue(PriorityOccurrenceCalculator.scheduleApplies(schedule: dexa.schedule, cadence: dexa.cadence, localDate: "2026-09-15"))
-        XCTAssertFalse(PriorityOccurrenceCalculator.scheduleApplies(schedule: dexa.schedule, cadence: dexa.cadence, localDate: "2026-09-14"))
+        let dexa = item("execution_dexa") // scheduledDate 2026-10-31 (matches OperatingPlanFixture's coaching-editor dexa appointment)
+        XCTAssertTrue(PriorityOccurrenceCalculator.scheduleApplies(schedule: dexa.schedule, cadence: dexa.cadence, localDate: "2026-10-31"))
+        XCTAssertFalse(PriorityOccurrenceCalculator.scheduleApplies(schedule: dexa.schedule, cadence: dexa.cadence, localDate: "2026-10-30"))
         XCTAssertFalse(PriorityOccurrenceCalculator.scheduleApplies(schedule: dexa.schedule, cadence: dexa.cadence, localDate: "2026-08-30"))
     }
 
@@ -117,7 +117,7 @@ final class PriorityReadModelTests: XCTestCase {
         // Sunday: daily (weigh-in, foam-roll), specific-weekdays (tesamorelin),
         // every-2-days anchor-parity (cold plunge), biweekly (vitamin D).
         // Not: retatrutide (Thursday-only), progress photos (Saturday-only),
-        // DEXA (scheduled for 2026-09-15, not today).
+        // DEXA (scheduled for 2026-10-31, not today).
         let occurrences = PriorityOccurrenceCalculator.project(executionItems: catalog, completions: [:], localDate: "2026-08-30")
         let ids = Set(occurrences.map(\.executionItemId))
         XCTAssertEqual(ids, [

@@ -113,6 +113,16 @@ enum AppDestination: Hashable, Codable {
     case operatingPlanSupplementSupport(protocolId: String)
     case operatingPlanSupplementNew
     case operatingPlanSupplementEdit(protocolId: String)
+    /// `/profile/operating-plan/execution/dexa` — view/edit the next DEXA
+    /// appointment. Reached from Priority Detail's "View DEXA Appointment"
+    /// action, not from a landing card (the real Tracking section only
+    /// surfaces Morning Weigh-In).
+    case operatingPlanDexaAppointment
+    /// `/profile/operating-plan/training/new` — the 11-step Training
+    /// Protocol Builder. Reached from the Operating Plan landing's
+    /// Training row only while no Training strategy is active yet; the
+    /// real web page itself redirects away once one exists.
+    case operatingPlanTrainingStrategyBuilder
     /// Native-only controlled proof of the live Founder bearer transport.
     /// This does not claim a current web destination id.
     case founderServerConnection
@@ -153,6 +163,8 @@ enum AppDestination: Hashable, Codable {
         case .operatingPlanSupplementSupport: "native.operating-plan.protocol.supplement.support"
         case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
         case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
+        case .operatingPlanDexaAppointment: "native.operating-plan.dexa-appointment"
+        case .operatingPlanTrainingStrategyBuilder: "native.operating-plan.training.new"
         case .founderServerConnection: "native.founder-server-connection"
         }
     }

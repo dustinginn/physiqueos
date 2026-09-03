@@ -539,4 +539,168 @@ final class OperatingPlanReadModelTests: XCTestCase {
             XCTAssertFalse(renderedCopy.localizedCaseInsensitiveContains(forbidden), "Developer-facing prose leaked into product copy: \"\(forbidden)\"")
         }
     }
+
+    // MARK: - DEXA Appointment (`/profile/operating-plan/execution/dexa`)
+
+    /// The standalone appointment screen and the Coaching Updates editor
+    /// are two real web entry points onto the SAME `execution_next_dexa`
+    /// data — Native must expose one shared value, not two independent
+    /// copies that could drift.
+    func testDexaAppointmentIsTheSameValueTheCoachingEditorAlreadyOwns() throws {
+        let store = makeStore()
+        let coaching = try XCTUnwrap(store.coachingEditor(strategyId: "strategy_fixture_coaching"))
+        XCTAssertEqual(store.dexaAppointment, coaching.dexa)
+    }
+
+    func testSavingTheDexaAppointmentUpdatesTheSameCoachingEditorRecord() throws {
+        let store = makeStore()
+        var updated = try XCTUnwrap(store.dexaAppointment)
+        updated.plannedDate = "2026-11-15"
+        updated.preparationNote = "Fasted 12 hours."
+        guard case .success = store.saveDexaAppointment(updated, today: "2026-09-03") else { return XCTFail("Expected save to succeed") }
+        XCTAssertEqual(store.dexaAppointment?.plannedDate, "2026-11-15")
+        let coaching = try XCTUnwrap(store.coachingEditor(strategyId: "strategy_fixture_coaching"))
+        XCTAssertEqual(coaching.dexa.plannedDate, "2026-11-15", "Saving through the standalone screen must update the Coaching Updates editor's own copy, not a separate one.")
+    }
+
+    func testDexaAppointmentDateMustBeInTheFuture() throws {
+        let store = makeStore()
+        var draft = try XCTUnwrap(store.dexaAppointment)
+        draft.plannedDate = "2026-09-01"
+        let result = store.saveDexaAppointment(draft, today: "2026-09-03")
+        guard case .failure(let error) = result else { return XCTFail("Expected a past-date rejection.") }
+        XCTAssertEqual(error.message, "Choose a future date for your next DEXA.")
+    }
+
+    func testDexaAppointmentCanBeCleared() throws {
+        let store = makeStore()
+        var draft = try XCTUnwrap(store.dexaAppointment)
+        draft.plannedDate = ""
+        guard case .success = store.saveDexaAppointment(draft, today: "2026-09-03") else { return XCTFail("Expected clearing the schedule to succeed") }
+        XCTAssertEqual(store.dexaAppointment?.plannedDate, "")
+    }
+
+    func testDexaAppointmentInvalidTimeIsRejected() throws {
+        let store = makeStore()
+        var draft = try XCTUnwrap(store.dexaAppointment)
+        draft.localTime = "25:99"
+        let result = store.saveDexaAppointment(draft, today: "2026-09-03")
+        guard case .failure(let error) = result else { return XCTFail("Expected an invalid-time rejection.") }
+        XCTAssertEqual(error.message, "Choose a valid local appointment time.")
+    }
+
+    /// Priorities routes to this exact destination for the DEXA execution
+    /// item's "View DEXA Appointment" action — a shared-identity guard
+    /// against the two fixtures drifting apart again.
+    func testDexaAppointmentDestinationRoundTrips() throws {
+        let data = try JSONEncoder().encode(AppDestination.operatingPlanDexaAppointment)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["id"] as? String, "native.operating-plan.dexa-appointment")
+        XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: data), .operatingPlanDexaAppointment)
+    }
+
+    // MARK: - Training Protocol Builder (`/profile/operating-plan/training/new`)
+
+    /// The fixture's Training strategy is already active — matching the
+    /// current Founder's real state — so the builder context must report
+    /// that, exactly like the real page's own redirect guard would.
+    func testTrainingBuilderReportsActiveWhenAFixtureStrategyAlreadyExists() {
+        let store = makeStore()
+        XCTAssertTrue(store.hasActiveTrainingProtocol)
+        XCTAssertTrue(store.trainingProtocolBuilderContext().hasActiveProtocol)
+    }
+
+    func testActivatingTrainingIsRejectedWhenAlreadyActive() {
+        let store = makeStore()
+        let context = store.trainingProtocolBuilderContext()
+        let draft = TrainingProtocolBuilderDraft(context: context)
+        let result = store.activateTrainingProtocol(draft)
+        guard case .failure(let error) = result else { return XCTFail("Expected the already-active guard to reject activation.") }
+        XCTAssertEqual(error.message, "A Training strategy is already active.")
+    }
+
+    func testTrainingBuilderContextDefaultsMatchTheRealBuilderSeeds() {
+        let store = makeStore()
+        let context = store.trainingProtocolBuilderContext()
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: context.defaultFrequencies.map { ($0.area, $0.count) }), [
+            .arms: 2, .core: 2, .lowerBody: 2, .back: 1, .chest: 1, .shoulders: 1,
+        ])
+        XCTAssertEqual(context.defaultRhythm.count, 7)
+        XCTAssertTrue(context.defaultRhythm.first { $0.day == .sunday }?.isFlexibleRecovery ?? false)
+    }
+
+    func testTrainingBuilderValidationRejectsNoPriorities() {
+        var draft = TrainingProtocolBuilderDraft(context: .init(hasActiveProtocol: false, defaultFrequencies: [], defaultRhythm: [], effectiveDateLabel: ""))
+        draft.priorities = []
+        XCTAssertEqual(TrainingProtocolBuilderValidation.error(draft: draft), "Choose at least one physique priority.")
+    }
+
+    func testTrainingBuilderValidationRejectsIncompleteRhythm() {
+        var draft = TrainingProtocolBuilderDraft(context: .init(hasActiveProtocol: false, defaultFrequencies: [], defaultRhythm: [], effectiveDateLabel: ""))
+        draft.rhythm = [.init(day: .monday, focus: [], isFlexibleRecovery: true)]
+        XCTAssertEqual(TrainingProtocolBuilderValidation.error(draft: draft), "Define a preferred rhythm for each day of the week.")
+    }
+
+    func testTrainingBuilderValidationPassesForTheDefaultDraft() {
+        let context = TrainingProtocolBuilderContextReadModel(
+            hasActiveProtocol: false,
+            defaultFrequencies: TrainingStrategyArea.allCases.map { TrainingAreaFrequency(area: $0, count: 1) },
+            defaultRhythm: OperatingPlanWeekday.allCases.map { TrainingBuilderRhythmDay(day: $0, focus: [], isFlexibleRecovery: true) },
+            effectiveDateLabel: "September 3, 2026"
+        )
+        let draft = TrainingProtocolBuilderDraft(context: context)
+        XCTAssertNil(TrainingProtocolBuilderValidation.error(draft: draft))
+    }
+
+    /// Exercises the full commit path against a store seeded (via the
+    /// test-only `startWithoutActiveTrainingProtocol` init flag) to the
+    /// genuinely-unconfigured state the real page's redirect guard exists
+    /// for: landing flips from "Create Protocol" to the active row, and
+    /// `strategyDetails`/`trainingEditors` are populated from the draft.
+    func testActivatingTrainingProtocolPopulatesLandingAndStrategyDetail() throws {
+        let store = OperatingPlanSandboxStore(startWithoutActiveTrainingProtocol: true)
+        XCTAssertFalse(store.hasActiveTrainingProtocol)
+        let creating = try XCTUnwrap(store.landing.sections.first { $0.id == "training" }?.items.first)
+        XCTAssertEqual(creating.status, "Create Protocol")
+        XCTAssertEqual(creating.destination, .operatingPlanTrainingStrategyBuilder)
+
+        var draft = TrainingProtocolBuilderDraft(context: store.trainingProtocolBuilderContext())
+        draft.priorities = [.chest, .back]
+        draft.frequencies = TrainingStrategyArea.allCases.map { TrainingAreaFrequency(area: $0, count: $0 == .chest || $0 == .back ? 2 : 1) }
+        draft.objective = .recomposition
+        draft.progressionPace = .aggressive
+
+        guard case .success = store.activateTrainingProtocol(draft) else { return XCTFail("Expected activation to succeed") }
+        XCTAssertTrue(store.hasActiveTrainingProtocol)
+
+        let editor = try XCTUnwrap(store.trainingEditor(strategyId: "strategy_fixture_training"))
+        XCTAssertEqual(editor.priorities, [.chest, .back])
+        XCTAssertEqual(editor.progression, .aggressive)
+        XCTAssertEqual(editor.totalWeeklySessions, 8)
+
+        let detail = try XCTUnwrap(store.strategyDetail(strategyType: "training", strategyId: "strategy_fixture_training"))
+        XCTAssertEqual(detail.status, "Active")
+        XCTAssertNotNil(detail.editDestination)
+
+        let active = try XCTUnwrap(store.landing.sections.first { $0.id == "training" }?.items.first)
+        XCTAssertNil(active.status)
+        XCTAssertEqual(active.destination, .operatingPlanStrategy(strategyType: "training", strategyId: "strategy_fixture_training"))
+    }
+
+    func testActivatingTrainingRejectsInvalidDraft() {
+        let store = OperatingPlanSandboxStore(startWithoutActiveTrainingProtocol: true)
+        var draft = TrainingProtocolBuilderDraft(context: store.trainingProtocolBuilderContext())
+        draft.priorities = []
+        let result = store.activateTrainingProtocol(draft)
+        guard case .failure(let error) = result else { return XCTFail("Expected validation to reject an empty priorities list.") }
+        XCTAssertEqual(error.message, "Choose at least one physique priority.")
+        XCTAssertFalse(store.hasActiveTrainingProtocol)
+    }
+
+    func testTrainingStrategyBuilderDestinationRoundTrips() throws {
+        let data = try JSONEncoder().encode(AppDestination.operatingPlanTrainingStrategyBuilder)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["id"] as? String, "native.operating-plan.training.new")
+        XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: data), .operatingPlanTrainingStrategyBuilder)
+    }
 }

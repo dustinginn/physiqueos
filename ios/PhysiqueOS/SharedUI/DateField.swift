@@ -16,6 +16,11 @@ struct DateField: View {
     /// The latest selectable date (evidence cannot be logged for the
     /// future) — semantics unchanged from the prior inline `DatePicker`.
     var maximumDate: Date = Date()
+    /// The earliest selectable date. `nil` (the default, used by every
+    /// evidence-logging call site) leaves the range open on the low end;
+    /// a future-only picker (e.g. scheduling a DEXA appointment) passes
+    /// both bounds explicitly instead.
+    var minimumDate: Date? = nil
     var label: String = "Date"
 
     @State private var isPresented = false
@@ -54,7 +59,7 @@ struct DateField: View {
         .accessibilityAddTraits(.isButton)
         .sheet(isPresented: $isPresented) {
             NavigationStack {
-                DatePicker(label, selection: $date, in: ...maximumDate, displayedComponents: .date)
+                DatePicker(label, selection: $date, in: (minimumDate ?? .distantPast)...maximumDate, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .tint(PhysiqueOSTheme.accent)
                     .padding()

@@ -679,6 +679,173 @@ enum RecoverySupportValidation {
     }
 }
 
+// MARK: - DEXA Appointment (`/profile/operating-plan/execution/dexa`)
+
+/// `validateDexaAppointmentDraft` (`DexaAppointmentManagementService.js`) —
+/// an empty `plannedDate` is always valid (it means "clear the schedule");
+/// a non-empty one must be a real future date, and `localTime` if present
+/// must be `HH:mm`.
+enum DexaAppointmentValidation {
+    static func error(model: CoachingDexaReadModel, today: String) -> String? {
+        guard !model.plannedDate.isEmpty else { return nil }
+        guard model.plannedDate.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+              model.plannedDate > today else {
+            return "Choose a future date for your next DEXA."
+        }
+        if !model.localTime.isEmpty,
+           model.localTime.range(of: #"^([01]\d|2[0-3]):[0-5]\d$"#, options: .regularExpression) == nil {
+            return "Choose a valid local appointment time."
+        }
+        return nil
+    }
+}
+
+// MARK: - Training Protocol Builder (`/profile/operating-plan/training/new`)
+
+/// `TrainingProtocolBuilderScreen.jsx` step 2's four objectives.
+enum TrainingBuilderObjective: String, Codable, CaseIterable, Identifiable {
+    case preserveLeanMass = "preserve_lean_mass"
+    case recomposition
+    case maximizeMuscleGrowth = "maximize_muscle_growth"
+    case improvePerformance = "improve_performance"
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .preserveLeanMass: "Preserve lean mass"
+        case .recomposition: "Recomposition"
+        case .maximizeMuscleGrowth: "Maximize muscle growth"
+        case .improvePerformance: "Improve performance"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .preserveLeanMass: "Maintain the muscle and strength you already have while limiting losses during a deficit or transition."
+        case .recomposition: "Gradually add muscle while keeping body fat relatively stable."
+        case .maximizeMuscleGrowth: "Prioritize adding muscle as efficiently as possible."
+        case .improvePerformance: "Prioritize strength, work capacity, or athletic output over physique change."
+        }
+    }
+    var impact: String {
+        switch self {
+        case .preserveLeanMass: "Progression can be slower, and maintaining performance may count as success."
+        case .recomposition: "Progress is slower than a dedicated bulk, but it fits well near maintenance calories."
+        case .maximizeMuscleGrowth: "This usually requires a calorie surplus, stronger recovery, and some tolerance for fat gain."
+        case .improvePerformance: "Exercise selection and progression will be judged primarily by performance outcomes."
+        }
+    }
+    /// `objectiveLabel` (`TrainingProtocolBuilderService.js`) — the review-screen summary sentence.
+    var reviewSummary: String {
+        switch self {
+        case .preserveLeanMass: "Preserve lean mass through the end of the cut, then restore performance in maintenance."
+        case .recomposition: "Improve body composition while building steady training performance."
+        case .maximizeMuscleGrowth: "Make muscle growth the primary outcome of the training plan."
+        case .improvePerformance: "Make measurable training performance the primary outcome."
+        }
+    }
+}
+
+/// `TrainingProtocolBuilderScreen.jsx` step 8's three nutrition phases.
+enum TrainingBuilderNutritionPhase: String, Codable, CaseIterable, Identifiable {
+    case deficit, maintenance, surplus
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var detail: String {
+        switch self {
+        case .deficit: "Calories are below maintenance, so training is mainly protecting muscle and strength."
+        case .maintenance: "Calories are near energy balance, allowing performance to recover and gradual progression to resume."
+        case .surplus: "Calories are above maintenance to provide more energy for recovery and growth."
+        }
+    }
+    var impact: String {
+        switch self {
+        case .deficit: "Progression may slow, and maintaining performance can still represent a successful phase."
+        case .maintenance: "Muscle gain is possible, but rapid increases in lean mass should not be assumed."
+        case .surplus: "Volume and progression can be pushed more aggressively, with some potential body-fat gain accepted."
+        }
+    }
+}
+
+/// `TrainingProtocolBuilderScreen.jsx` step 9's four recovery safeguards.
+enum TrainingBuilderRecoveryGate: String, Codable, CaseIterable, Identifiable {
+    case recoveryDeclines = "recovery_declines"
+    case painDevelops = "pain_develops"
+    case performanceRegresses = "performance_regresses"
+    case evidenceIncomplete = "evidence_incomplete"
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .recoveryDeclines: "Recovery declines"
+        case .painDevelops: "Pain develops"
+        case .performanceRegresses: "Performance regresses"
+        case .evidenceIncomplete: "The evidence is incomplete"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .recoveryDeclines: "Hold increases when your recovery trend no longer supports more demand."
+        case .painDevelops: "Avoid progressing through a new or worsening pain signal."
+        case .performanceRegresses: "Pause when repeated sessions show performance moving backward."
+        case .evidenceIncomplete: "Wait when there isn't enough reliable training evidence to judge readiness."
+        }
+    }
+}
+
+/// One day of the preferred weekly rhythm editor (step 5) — `focus` is
+/// empty and `isFlexibleRecovery` is true for a day left open, mirroring
+/// `WeeklySplitEditor`'s "Flexible / Recovery" toggle.
+struct TrainingBuilderRhythmDay: Codable, Equatable, Identifiable {
+    var id: String { day.rawValue }
+    var day: OperatingPlanWeekday
+    var focus: [TrainingStrategyArea]
+    var isFlexibleRecovery: Bool
+}
+
+/// `getBuilderContext` (`TrainingProtocolBuilderService.js`) — whether a
+/// protocol is already active gates the entire route on web (the page
+/// redirects to `/profile/operating-plan?training=active` before ever
+/// rendering the wizard), so Native mirrors the same gate rather than
+/// always showing the builder.
+struct TrainingProtocolBuilderContextReadModel: Codable, Equatable {
+    var hasActiveProtocol: Bool
+    var defaultFrequencies: [TrainingAreaFrequency]
+    var defaultRhythm: [TrainingBuilderRhythmDay]
+    var effectiveDateLabel: String
+}
+
+/// The wizard's in-progress selections (`TrainingProtocolBuilderScreen.jsx`'s
+/// local `useState` fields), collected into one draft so the 11 steps and
+/// the review/activation call operate on a single testable value rather
+/// than scattered view state.
+struct TrainingProtocolBuilderDraft: Equatable {
+    var objective: TrainingBuilderObjective = .preserveLeanMass
+    var priorities: [TrainingStrategyArea] = [.arms, .core, .lowerBody]
+    var frequencies: [TrainingAreaFrequency]
+    var rhythm: [TrainingBuilderRhythmDay]
+    var progressionPace: ProgressionPace = .moderate
+    var nutritionPhase: TrainingBuilderNutritionPhase = .maintenance
+    var recoveryGates: [TrainingBuilderRecoveryGate] = [.recoveryDeclines, .painDevelops, .performanceRegresses, .evidenceIncomplete]
+
+    var totalWeeklySessions: Int { frequencies.reduce(0) { $0 + $1.count } }
+
+    init(context: TrainingProtocolBuilderContextReadModel) {
+        frequencies = context.defaultFrequencies
+        rhythm = context.defaultRhythm
+    }
+}
+
+/// `validateTrainingProtocolInput` (`TrainingProtocolBuilderService.js`).
+enum TrainingProtocolBuilderValidation {
+    static func error(draft: TrainingProtocolBuilderDraft) -> String? {
+        guard !draft.priorities.isEmpty else { return "Choose at least one physique priority." }
+        guard draft.frequencies.allSatisfy({ (0...4).contains($0.count) }) else {
+            return "Choose a valid weekly frequency for every area."
+        }
+        guard draft.rhythm.count == 7 else { return "Define a preferred rhythm for each day of the week." }
+        return nil
+    }
+}
+
 enum SupportScheduleValidation {
     static func error(model: OperatingPlanSupportScheduleReadModel) -> String? {
         guard model.startDate.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else {
