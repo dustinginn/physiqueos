@@ -589,6 +589,11 @@ struct LocalEvidenceReview: Codable, Equatable, Identifiable {
     var items: [EvidenceReviewItem]
     var status: LocalEvidenceReviewStatus
     var interpretationMessage: String? = nil
+    /// Set only when this review was started from a Morning Check-In
+    /// evidence-recovery action — mirrors the real `EvidenceRecoveryContext`
+    /// carried in `review_metadata` on web. When present, confirming or
+    /// discarding this review returns to Morning Check-In instead of Log.
+    var recoveryContext: MorningEvidenceRecoveryContext? = nil
 
     var category: EvidenceCategory { items.first?.category ?? .generic }
     var occurrenceDate: Date { items.first?.occurrenceDate ?? .distantPast }

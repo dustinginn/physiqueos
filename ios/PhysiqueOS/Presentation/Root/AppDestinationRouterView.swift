@@ -35,7 +35,7 @@ struct AppDestinationRouterView: View {
         case .goalPhaseTransition(let goalId, let phaseId):
             PhaseTransitionView(goalId: goalId, phaseId: phaseId)
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
-            MorningCheckInView()
+            MorningCheckInView(onNavigate: onNavigate)
         case .priorityDetail(let priorityId):
             PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId)
         case .manualWeighIn:
@@ -47,9 +47,15 @@ struct AppDestinationRouterView: View {
         case .dexaUpload:
             EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
         case .localEvidenceReview(let reviewId):
-            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog)
+            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
         case .evidenceReview(let reviewId):
-            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog)
+            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
+        case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
+            EvidenceIntakeView(
+                initialScenario: type.evidenceScenario,
+                initialRecoveryContext: .init(evidenceType: type, occurrenceDateKey: occurrenceDateKey),
+                onNavigate: onNavigate
+            )
         case .trainingLogger:
             TrainingLoggerView()
         case .trainingSession(let sessionId):

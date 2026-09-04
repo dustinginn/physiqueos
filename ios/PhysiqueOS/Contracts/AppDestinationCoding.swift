@@ -11,6 +11,7 @@ extension AppDestination {
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
         case strategyType, strategyId, protocolId, executionId, setId, category
+        case evidenceRecoveryType, occurrenceDateKey
     }
 
     init(from decoder: Decoder) throws {
@@ -97,6 +98,12 @@ extension AppDestination {
         case "native.evidence-review":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .localEvidenceReview(reviewId: try parameters.decode(String.self, forKey: .reviewId))
+        case "native.evidence-recovery-upload":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .evidenceRecoveryUpload(
+                type: try parameters.decode(MorningEvidenceRecoveryType.self, forKey: .evidenceRecoveryType),
+                occurrenceDateKey: try parameters.decode(String.self, forKey: .occurrenceDateKey)
+            )
         case "native.photo-set-detail":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
             self = .photoSetDetail(setId: try parameters.decode(String.self, forKey: .setId))
@@ -178,6 +185,9 @@ extension AppDestination {
         case .activityDay(let date): try parameters.encode(Self.activityDayStreamIdPrefix + date, forKey: .streamId)
         case .nutritionDay(let dayId): try parameters.encode(Self.nutritionDayStreamIdPrefix + dayId, forKey: .streamId)
         case .localEvidenceReview(let reviewId): try parameters.encode(reviewId, forKey: .reviewId)
+        case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
+            try parameters.encode(type, forKey: .evidenceRecoveryType)
+            try parameters.encode(occurrenceDateKey, forKey: .occurrenceDateKey)
         case .photoSetDetail(let setId): try parameters.encode(setId, forKey: .setId)
         case .operatingPlanStrategy(let strategyType, let strategyId):
             try parameters.encode(strategyType, forKey: .strategyType)

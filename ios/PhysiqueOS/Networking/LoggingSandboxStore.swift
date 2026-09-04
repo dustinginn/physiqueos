@@ -24,6 +24,15 @@ final class LoggingSandboxStore {
     /// matching the real server's own separation between the Reminder
     /// record and the DailyCheckIn's own reconciliation array.
     private(set) var priorityReconciliations: [String: PriorityReconciliationRecord]
+    /// Set by `EvidenceIntakeView` when reached via Morning Check-In's
+    /// Evidence Recovery card; consumed (and cleared) by
+    /// `finishInterpretation` so the newly created review carries it.
+    var pendingRecoveryContext: MorningEvidenceRecoveryContext?
+    /// Today's Recovery Evidence submission (sleep/subjective recovery/
+    /// soreness) — a fully independent, optional form, never gated by or
+    /// gating Priority reconciliation or evidence recovery.
+    private(set) var recoveryCheckIn: RecoveryCheckInDraft
+    private(set) var briefingReconciliationWorkItems: [BriefingReconciliationWorkItem]
 
     init(
         now: Date = Date(),
@@ -31,7 +40,9 @@ final class LoggingSandboxStore {
         reviews: [String: LocalEvidenceReview] = [:],
         executionItems: [ExecutionItemFixture] = PriorityCatalogLoader.loadExecutionItems(),
         priorityCompletions: [String: PriorityCompletionRecord] = [:],
-        priorityReconciliations: [String: PriorityReconciliationRecord] = [:]
+        priorityReconciliations: [String: PriorityReconciliationRecord] = [:],
+        recoveryCheckIn: RecoveryCheckInDraft = .init(),
+        briefingReconciliationWorkItems: [BriefingReconciliationWorkItem] = []
     ) {
         self.weighIns = weighIns
         self.reviews = reviews
@@ -39,6 +50,8 @@ final class LoggingSandboxStore {
         self.executionItems = executionItems
         self.priorityCompletions = priorityCompletions
         self.priorityReconciliations = priorityReconciliations
+        self.recoveryCheckIn = recoveryCheckIn
+        self.briefingReconciliationWorkItems = briefingReconciliationWorkItems
     }
 
     // MARK: - Priorities (Home / Priority Detail / Morning Check-In shared engine)
@@ -161,6 +174,137 @@ final class LoggingSandboxStore {
         }
     }
 
+    // MARK: - Morning Evidence Recovery (`MorningEvidenceRecoveryService.js`)
+
+    /// The four recovery types evaluated for yesterday's date, computed
+    /// live from `reviews` — the SAME canonical review state Evidence
+    /// Intake/Review already mutate, so recovering an item here
+    /// genuinely re-evaluates rather than being optimistically hidden.
+    /// Only `.missing`/`.pendingConfirmation`/`.presentPartial` ever
+    /// surface a card (`MorningEvidenceRecoveryStatus.surfacesCard`).
+    func evidenceRecoveryItems(now: Date = Date()) -> [MorningEvidenceRecoveryItem] {
+        let today = PriorityOccurrenceCalculator.localDateKey(now: now)
+        guard let yesterday = PriorityOccurrenceCalculator.previousDateKey(today) else { return [] }
+        return MorningEvidenceRecoveryType.allCases.compactMap { recoveryItem(for: $0, dateKey: yesterday) }
+    }
+
+    private func recoveryItem(for type: MorningEvidenceRecoveryType, dateKey: String) -> MorningEvidenceRecoveryItem? {
+        let matches = reviews.values.filter { $0.category == type.evidenceCategory && Self.dateKey($0.occurrenceDate) == dateKey }
+        if let pending = matches.first(where: { $0.status == .awaitingConfirmation }) {
+            return MorningEvidenceRecoveryItem(
+                type: type, status: .pendingConfirmation,
+                title: "\(type.displayName) awaiting confirmation",
+                actionLabel: "Resume review",
+                destination: .localEvidenceReview(reviewId: pending.id)
+            )
+        }
+        if let confirmed = matches.first(where: { $0.status == .confirmed }) {
+            if type == .training {
+                let trainingItems = confirmed.items.filter { $0.included && $0.category == .training }
+                if !trainingItems.isEmpty, trainingItems.allSatisfy({ $0.exercises.isEmpty }) {
+                    return MorningEvidenceRecoveryItem(
+                        type: .training, status: .presentPartial,
+                        title: "Workout recorded; details incomplete",
+                        actionLabel: "Add workout details",
+                        destination: .evidenceRecoveryUpload(type: .training, occurrenceDateKey: dateKey)
+                    )
+                }
+            }
+            return nil // presentComplete — never surfaces a card
+        }
+        return MorningEvidenceRecoveryItem(
+            type: type, status: .missing,
+            title: type == .photoSession ? "Progress Photos are still missing" : "Yesterday's \(type.displayName.lowercased()) hasn't been logged",
+            actionLabel: type.missingActionLabel,
+            destination: .evidenceRecoveryUpload(type: type, occurrenceDateKey: dateKey)
+        )
+    }
+
+    // MARK: - Recovery Evidence (`RecoveryCheckInIngestionService.js`)
+
+    /// Fully independent of weight/Priority reconciliation and evidence
+    /// recovery — a submission with every field empty is a real, defined
+    /// no-op (`.omitted`), not an error, matching source exactly.
+    @discardableResult
+    func saveRecoveryCheckIn(sleepDurationHours: Double?, subjectiveRecovery: SubjectiveRecoveryRating?, soreness: SorenessLevel?) -> Result<RecoveryCheckInSaveOutcome, LoggingSandboxError> {
+        guard sleepDurationHours != nil || subjectiveRecovery != nil || soreness != nil else {
+            return .success(.omitted)
+        }
+        if let error = RecoveryCheckInValidation.error(sleepDurationHours: sleepDurationHours) {
+            return .failure(.init(message: error))
+        }
+        let draft = RecoveryCheckInDraft(sleepDurationHours: sleepDurationHours, subjectiveRecovery: subjectiveRecovery, soreness: soreness)
+        recoveryCheckIn = draft
+        return .success(.saved(draft))
+    }
+
+    // MARK: - Briefing Reconciliation (`BriefingReconciliationPresentationService.js`)
+    //
+    // See `MorningCheckInModel.swift`'s doc comment on this section for
+    // why `finalizeBriefingReconciliation` never fabricates a successful
+    // regeneration.
+
+    func briefingReconciliationPresentation(now: Date = Date()) -> BriefingReconciliationPresentation? {
+        let today = PriorityOccurrenceCalculator.localDateKey(now: now)
+        guard let yesterday = PriorityOccurrenceCalculator.previousDateKey(today),
+              let item = briefingReconciliationWorkItems.first(where: { $0.evidenceDateKey == yesterday })
+        else { return nil }
+        let hasPendingConfirmation = evidenceRecoveryItems(now: now).contains { $0.status == .pendingConfirmation }
+        switch item.status {
+        case .current:
+            return nil
+        case .revisionPending, .revising:
+            return BriefingReconciliationPresentation(
+                visible: true, cadenceLabel: item.cadence.label,
+                title: hasPendingConfirmation ? "Briefing update is waiting for confirmation" : "\(item.cadence.label) is ready to update",
+                message: hasPendingConfirmation
+                    ? "Confirm your pending evidence review above before updating the briefing."
+                    : "Late-confirmed evidence has changed since this briefing published.",
+                canFinalize: item.status == .revisionPending && !hasPendingConfirmation,
+                actionLabel: "Finish recovery and update briefing", isFailure: false
+            )
+        case .failed:
+            return BriefingReconciliationPresentation(
+                visible: true, cadenceLabel: item.cadence.label,
+                title: "Briefing update failed",
+                message: hasPendingConfirmation
+                    ? "Confirm your pending evidence review above before retrying."
+                    : "The last update attempt failed.",
+                canFinalize: item.retryable && item.attempts < 3 && !hasPendingConfirmation,
+                actionLabel: "Retry briefing update", isFailure: true
+            )
+        case .currentAfterRevision:
+            return BriefingReconciliationPresentation(
+                visible: true, cadenceLabel: item.cadence.label,
+                title: "\(item.cadence.label) is up to date",
+                message: "This briefing already reflects your latest evidence.",
+                canFinalize: false, actionLabel: "", isFailure: false
+            )
+        }
+    }
+
+    /// `finalizeMorningBriefingReconciliation` → `MorningBriefingFinalizationService.finalize`.
+    /// Never fabricates a successful regeneration — see the type-level
+    /// doc comment on `BriefingReconciliationOutcome`.
+    @discardableResult
+    func finalizeBriefingReconciliation(now: Date = Date()) -> BriefingReconciliationOutcome {
+        let today = PriorityOccurrenceCalculator.localDateKey(now: now)
+        guard let yesterday = PriorityOccurrenceCalculator.previousDateKey(today) else { return .noPendingWorkItem }
+        if evidenceRecoveryItems(now: now).contains(where: { $0.status == .pendingConfirmation }) {
+            return .waitingOnEvidence
+        }
+        guard let index = briefingReconciliationWorkItems.firstIndex(where: {
+            $0.evidenceDateKey == yesterday && ($0.status == .revisionPending || $0.status == .failed)
+        }) else {
+            return .noPendingWorkItem
+        }
+        if briefingReconciliationWorkItems[index].resolvesAsNoOp {
+            briefingReconciliationWorkItems[index].status = .currentAfterRevision
+            return .resolvedNoOp
+        }
+        return .requiresBriefingEngine
+    }
+
     func resetEvidenceDraft(now: Date = Date()) {
         evidenceDraft = .fresh(now: now)
         interpretationState = .editing
@@ -202,6 +346,22 @@ final class LoggingSandboxStore {
         EvidenceLocalInterpretation.applyExtractedDEXAValues(to: &evidenceDraft)
         if scenario == .progressPhotos { syncPhotoIdentities() }
         interpretationState = .editing
+    }
+
+    /// Dates the draft to the missing occurrence being recovered (e.g.
+    /// yesterday) rather than today — preserves the real occurrence date
+    /// through intake exactly as the web's recovery flow pre-fills its
+    /// upload date from the recovery context.
+    func setEvidenceOccurrenceDateKey(_ dateKey: String) {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = ManualWeighInValidation.calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dateKey) else { return }
+        // Anchor to noon so the date-key round-trips through `Self.dateKey`
+        // unchanged regardless of DST transitions on the local day boundary.
+        evidenceDraft.occurrenceDate = Calendar(identifier: .gregorian).date(bySettingHour: 12, minute: 0, second: 0, of: date) ?? date
     }
 
     func updatePhotoIdentity(id: String, _ mutation: (inout ProgressPhotoIdentityDraft) -> Void) {
@@ -257,6 +417,8 @@ final class LoggingSandboxStore {
             return .failure(error)
         case .success(var review):
             applyNutritionReconciliation(to: &review)
+            review.recoveryContext = pendingRecoveryContext
+            pendingRecoveryContext = nil
             reviews[id] = review
             pipelineTimings.reconciliationSeconds = seconds(since: reconciliationStart)
             pipelineTimings.reviewReadySeconds = (pipelineTimings.assetLoadingSeconds ?? 0) + (pipelineTimings.interpretationSeconds ?? 0) + (pipelineTimings.reconciliationSeconds ?? 0)

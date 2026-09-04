@@ -94,6 +94,14 @@ enum AppDestination: Hashable, Codable {
     case manualWeighIn
     case evidenceIntake
     case localEvidenceReview(reviewId: String)
+    /// Morning Check-In's Evidence Recovery card — routes into the SAME
+    /// `EvidenceIntakeView` every other upload uses, pre-seeded with the
+    /// missing type's scenario and a recovery context so confirming/
+    /// discarding the resulting review returns to Morning Check-In
+    /// instead of Log (mirrors `EvidenceRecoveryContext`'s exact role on
+    /// web — verified this is a context-passing wrapper around the
+    /// identical intake/review pipeline, not a separate ingestion path).
+    case evidenceRecoveryUpload(type: MorningEvidenceRecoveryType, occurrenceDateKey: String)
     /// Native-only typed routes for the fixture-backed Operating Plan
     /// browse/sandbox vertical (`src/app/profile/operating-plan/**`,
     /// `src/app/profile/protocols/**`). Like the logging-sandbox cases
@@ -175,6 +183,7 @@ enum AppDestination: Hashable, Codable {
         case .manualWeighIn: "native.manual-weigh-in"
         case .evidenceIntake: "native.evidence-intake"
         case .localEvidenceReview: "native.evidence-review"
+        case .evidenceRecoveryUpload: "native.evidence-recovery-upload"
         case .photoSetDetail: "native.photo-set-detail"
         case .operatingPlan: "native.operating-plan"
         case .operatingPlanStrategy: "native.operating-plan.strategy"

@@ -15,6 +15,12 @@ struct EvidenceIntakeView: View {
     @State private var focusedNumericFieldID: String?
     @FocusState private var isDetailsFocused: Bool
     var initialScenario: EvidenceFixtureScenario? = nil
+    /// Set only when reached from Morning Check-In's Evidence Recovery
+    /// card — pre-dates the draft to the missing occurrence and tags the
+    /// resulting review so its confirm/discard bounces back to Morning
+    /// Check-In instead of Log (see `AppDestination.evidenceRecoveryUpload`'s
+    /// doc comment).
+    var initialRecoveryContext: MorningEvidenceRecoveryContext? = nil
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
@@ -90,10 +96,12 @@ struct EvidenceIntakeView: View {
             }
         }
         .onAppear {
-            guard let initialScenario,
-                  store.interpretationState == .editing,
-                  !store.evidenceDraft.hasContent else { return }
-            store.setEvidenceScenario(initialScenario)
+            guard store.interpretationState == .editing, !store.evidenceDraft.hasContent else { return }
+            if let initialScenario { store.setEvidenceScenario(initialScenario) }
+            if let initialRecoveryContext {
+                store.pendingRecoveryContext = initialRecoveryContext
+                store.setEvidenceOccurrenceDateKey(initialRecoveryContext.occurrenceDateKey)
+            }
         }
     }
 

@@ -4,6 +4,7 @@ struct LocalEvidenceReviewView: View {
     @Environment(AppEnvironment.self) private var environment
     let reviewId: String
     var onReturnToLog: () -> Void = {}
+    var onNavigate: (AppDestination) -> Void = { _ in }
     @State private var errorMessage: String?
     @State private var rereadMessage: String?
     @State private var isRereading = false
@@ -15,6 +16,17 @@ struct LocalEvidenceReviewView: View {
     @State private var matchTarget: ExerciseMatchTarget?
     @State private var createTarget: ExerciseMatchTarget?
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
+
+    /// Mirrors the real `EvidenceRecoveryContext`'s `returnTo` redirect:
+    /// a review started from Morning Check-In's Evidence Recovery card
+    /// bounces back there on confirm/discard/save-for-later instead of
+    /// the default Log destination.
+    private var returnAction: () -> Void {
+        if store.review(id: reviewId)?.recoveryContext != nil {
+            return { onNavigate(.checkIn(checkInType: "morning")) }
+        }
+        return onReturnToLog
+    }
 
     var body: some View {
         ScrollView {
@@ -40,7 +52,7 @@ struct LocalEvidenceReviewView: View {
         }
         .alert("Discard this review?", isPresented: $showingDiscard) {
             Button("Cancel", role: .cancel) {}
-            Button("Discard Review", role: .destructive) { store.discardReview(id: reviewId); onReturnToLog() }
+            Button("Discard Review", role: .destructive) { let action = returnAction; store.discardReview(id: reviewId); action() }
         } message: { Text("This review and its selected assets will be permanently removed.") }
         .task {
             guard trainingCatalog.isEmpty else { return }
@@ -79,7 +91,7 @@ struct LocalEvidenceReviewView: View {
                 Button(isRereading ? "Reading upload…" : "Read upload again") { reread() }.secondaryReviewButton().disabled(isRereading)
                 if let rereadMessage { banner(rereadMessage, destructive: false) }
             }
-            Button("Save and return later", action: onReturnToLog).secondaryReviewButton()
+            Button("Save and return later", action: returnAction).secondaryReviewButton()
             Button("Discard review", role: .destructive) {
                 PhysiqueOSKeyboard.dismiss()
                 Task { @MainActor in showingDiscard = true }
@@ -448,7 +460,7 @@ struct LocalEvidenceReviewView: View {
             Image(systemName: "checkmark").font(.system(size: 28, weight: .bold)).foregroundStyle(PhysiqueOSTheme.chartSuccess).frame(width: 64, height: 64).background(PhysiqueOSTheme.chartSuccess.opacity(0.14)).clipShape(Circle())
             Text(review.completionTitle).physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
             Text("Your included records have been reviewed.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            PrimaryActionButton(title: "Continue", action: onReturnToLog)
+            PrimaryActionButton(title: "Continue", action: returnAction)
         }.frame(maxWidth: .infinity).padding(.top, 40)
     }
 

@@ -3,6 +3,7 @@ import SwiftUI
 struct MorningCheckInView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    var onNavigate: (AppDestination) -> Void = { _ in }
     @State private var weightText = ""
     @State private var message: String?
     @State private var complete = false
@@ -13,8 +14,19 @@ struct MorningCheckInView: View {
     /// to the shared store until "Complete Morning Check-In" is tapped —
     /// matching the real form's single-submit behavior.
     @State private var choices: [String: (disposition: PriorityDisposition?, note: String)] = [:]
+    /// Recovery Evidence (sleep/subjective recovery/soreness) — a
+    /// genuinely separate, always-optional third form (verified: its own
+    /// server action, its own submit button, never gates or is gated by
+    /// weight/Priority reconciliation).
+    @State private var sleepDurationText = ""
+    @State private var subjectiveRecovery: SubjectiveRecoveryRating?
+    @State private var soreness: SorenessLevel?
+    @State private var recoveryMessage: String?
+    @State private var briefingMessage: String?
     private var store: LoggingSandboxStore { environment.loggingSandboxStore }
     private var unfinished: [PriorityOccurrence] { store.previousDayUnfinishedPriorities() }
+    private var evidenceRecoveryItems: [MorningEvidenceRecoveryItem] { store.evidenceRecoveryItems() }
+    private var briefingReconciliation: BriefingReconciliationPresentation? { store.briefingReconciliationPresentation() }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
@@ -22,6 +34,9 @@ struct MorningCheckInView: View {
                 Text("MORNING CHECK-IN").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
                 Text(complete ? "Check-in complete" : "Good morning").physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
                 Text(Self.fullDate.string(from: Date())).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            if let briefingReconciliation, briefingReconciliation.visible {
+                briefingReconciliationCard(briefingReconciliation)
             }
             if complete {
                 CardContainer { Label("Priorities reconciled and weight saved", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess) }
@@ -31,17 +46,102 @@ struct MorningCheckInView: View {
                     Text("Yesterday’s unfinished priorities").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     ForEach(unfinished) { priority in priorityCard(priority) }
                 }
+                if !evidenceRecoveryItems.isEmpty {
+                    Text("Recover missing evidence").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    ForEach(evidenceRecoveryItems) { item in evidenceRecoveryCard(item) }
+                }
                 CardContainer { VStack(alignment: .leading, spacing: 10) {
                     Text("What’s your weight today?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     HStack { NumericEditField(text: $weightText, accessibilityLabel: "Morning weight", placeholder: "150.5").frame(height: 48); Text("lb").physiqueOSFont(PhysiqueOSTypography.cardHeading16) }
                 } }
                 if let message { Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive) }
                 PrimaryActionButton(title: "Complete Morning Check-In") { save() }.accessibilityIdentifier("morningCheckIn.save")
+                recoveryEvidenceCard
             }
         }.padding(16) }
         .scrollDismissesKeyboard(.interactively)
         .background(PhysiqueOSTheme.background).navigationTitle("Morning Check-In").navigationBarTitleDisplayMode(.inline)
         .onAppear { if let entry = store.weighIn(on: Date()) { weightText = formatWeight(entry.value) } }
+    }
+
+    /// `EvidenceRecoveryCard` — plain navigation, no form fields; never
+    /// gates "Complete Morning Check-In" (verified: the real button's
+    /// `required` fields are the Priority reconciliation radios only).
+    private func evidenceRecoveryCard(_ item: MorningEvidenceRecoveryItem) -> some View {
+        Button { onNavigate(item.destination) } label: {
+            CardContainer { HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(item.actionLabel).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(PhysiqueOSTheme.textMuted)
+            } }
+        }.buttonStyle(.plain).accessibilityIdentifier("morningCheckIn.evidenceRecovery.\(item.type.rawValue)")
+    }
+
+    /// `BriefingReconciliationCard` — its own single action, independent
+    /// of the weight form. `finalizeBriefingReconciliation` never
+    /// fabricates a real regeneration (see `LoggingSandboxStore`'s doc
+    /// comment); a `.requiresBriefingEngine` outcome surfaces as an
+    /// explanatory message rather than a false success.
+    private func briefingReconciliationCard(_ presentation: BriefingReconciliationPresentation) -> some View {
+        CardContainer { VStack(alignment: .leading, spacing: 10) {
+            Label(presentation.title, systemImage: presentation.isFailure ? "exclamationmark.triangle.fill" : "doc.text.fill")
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading16).foregroundStyle(presentation.isFailure ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.textPrimary)
+            Text(presentation.message).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            if presentation.canFinalize {
+                PrimaryActionButton(title: presentation.actionLabel) { finalizeBriefing() }
+                    .accessibilityIdentifier("morningCheckIn.briefingReconciliation.finalize")
+            }
+            if let briefingMessage { Text(briefingMessage).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary) }
+        } }
+    }
+
+    private func finalizeBriefing() {
+        switch store.finalizeBriefingReconciliation() {
+        case .resolvedNoOp: briefingMessage = nil
+        case .waitingOnEvidence: briefingMessage = "Confirm your pending evidence review before updating the briefing."
+        case .requiresBriefingEngine: briefingMessage = "This update requires the Briefings engine, which isn't connected in this build yet."
+        case .noPendingWorkItem: briefingMessage = nil
+        }
+    }
+
+    /// `RecoveryCheckInIngestionService` — a second, fully independent
+    /// form (own submit, own outcome message), never bundled with the
+    /// weight/Priority-reconciliation submission.
+    private var recoveryEvidenceCard: some View {
+        CardContainer { VStack(alignment: .leading, spacing: 12) {
+            Text("Recovery Evidence").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+            Text("Optional. These notes are not interpreted — they support future coaching context.")
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            HStack {
+                Text("Sleep duration").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                Spacer()
+                NumericEditField(text: $sleepDurationText, accessibilityLabel: "Sleep duration hours", placeholder: "7.5").frame(width: 80, height: 40)
+                Text("hrs").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            Picker("Subjective recovery", selection: $subjectiveRecovery) {
+                Text("Not entered").tag(SubjectiveRecoveryRating?.none)
+                ForEach(SubjectiveRecoveryRating.allCases) { Text($0.label).tag(SubjectiveRecoveryRating?.some($0)) }
+            }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+            Picker("Soreness", selection: $soreness) {
+                Text("Not entered").tag(SorenessLevel?.none)
+                ForEach(SorenessLevel.allCases) { Text($0.label).tag(SorenessLevel?.some($0)) }
+            }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+            if let recoveryMessage { Text(recoveryMessage).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary) }
+            PrimaryActionButton(title: "Save Recovery Evidence") { saveRecovery() }
+                .accessibilityIdentifier("morningCheckIn.recoveryEvidence.save")
+        } }
+    }
+
+    private func saveRecovery() {
+        let hours = sleepDurationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : Double(sleepDurationText)
+        switch store.saveRecoveryCheckIn(sleepDurationHours: hours, subjectiveRecovery: subjectiveRecovery, soreness: soreness) {
+        case .success(.omitted): recoveryMessage = "No recovery evidence entered."
+        case .success(.saved): recoveryMessage = "Recovery evidence saved."
+        case .failure(let error): recoveryMessage = error.message
+        }
     }
 
     /// Completed / Skipped / Add note radios, plus an **always-visible**

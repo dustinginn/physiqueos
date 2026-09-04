@@ -63,6 +63,7 @@ app_files = [
     ("Contracts", "TrainingReportingReadModel.swift"),
     ("Contracts", "TrainingLoggerReadModel.swift"),
     ("Contracts", "LoggingSandbox.swift"),
+    ("Contracts", "MorningCheckInModel.swift"),
     ("Contracts", "FounderServerModels.swift"),
     ("Networking", "HomeAPI.swift"),
     ("Networking", "PriorityAPI.swift"),
@@ -268,6 +269,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceChronologyTests.swift"),
     ("PhysiqueOSTests", "TrainingLoggerTests.swift"),
     ("PhysiqueOSTests", "LoggingSandboxTests.swift"),
+    ("PhysiqueOSTests", "MorningCheckInModelTests.swift"),
     ("PhysiqueOSTests", "FounderServerAPITests.swift"),
 ]
 
