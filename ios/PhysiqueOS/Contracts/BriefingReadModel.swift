@@ -1,14 +1,17 @@
 import Foundation
 
-/// Read models for the recurring-Briefing vertical (Weekly/Midweek/Monthly +
+/// Read models for the Briefing vertical (Weekly/Midweek/Monthly/DEXA Event +
 /// History + Home's latest-Briefing projection) — verified against source
 /// for this task (`dailyBriefing.js`, `WeeklyNarrativeService.js`,
 /// `MidweekBriefingService.js`, `MonthlyBriefingService.js`,
-/// `BriefingGoalConfidencePresentationService.js`,
+/// `DEXAEventNarrativeService.js`, `DEXAEventContextService.js`,
+/// `PIDEXAEventLifecycleService.js`, `BriefingGoalConfidencePresentationService.js`,
 /// `DailyBriefingHistory.js`, `DailyBriefingRepository.js`,
 /// `HomeBriefingRoutingService.js`, `HomeBriefingService.js`,
-/// `BriefingReviewArtifactResolver.js`). DEXA Event and Photo Event
-/// Briefings are a later batch — nothing here models the `event` cadence.
+/// `BriefingReviewArtifactResolver.js`). Photo Event Briefings are a later
+/// batch — the shared `.event` cadence is modeled, but only DEXA's own
+/// `dexa` content payload exists today; a `photo` payload would be added
+/// alongside it the same way `weekly`/`midweek`/`monthly` already coexist.
 ///
 /// Native does not recreate server intelligence: narrative text and
 /// Confidence are opaque, server-authored fields carried by fixture data,
@@ -20,10 +23,13 @@ import Foundation
 // MARK: - Identity, cadence, lifecycle
 
 /// The real product's cadence discriminator on the shared `dailyBriefings`
-/// collection (`artifact.cadence`). `.event` (DEXA/Photo) is a later batch
-/// and is deliberately not modeled here.
+/// collection (`artifact.cadence`). `.event` covers both DEXA and Photo
+/// event Briefings on the real product (`artifactType: "event"`,
+/// `cadence: "event"` — the same literal value for both trigger types,
+/// discriminated instead by `trigger.evidenceType`); only DEXA's content is
+/// modeled in this pass via `BriefingReadModel.dexa`.
 enum BriefingCadence: String, Codable, CaseIterable, Identifiable, Equatable {
-    case daily, midweek, weekly, monthly
+    case daily, midweek, weekly, monthly, event
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -31,6 +37,7 @@ enum BriefingCadence: String, Codable, CaseIterable, Identifiable, Equatable {
         case .midweek: "Midweek Briefing"
         case .weekly: "Weekly Briefing"
         case .monthly: "Monthly Briefing"
+        case .event: "DEXA Event Briefing"
         }
     }
 }
@@ -334,6 +341,181 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var monthAhead: [String]
 }
 
+// MARK: - DEXA Event content (verified section list: Hero [title/body/
+// results grid/optional milestones] → Snapshot → Progress [Since-Last-Scan
+// headline, Regional Fat/Lean Change, Other Notable Changes, the amber
+// "Cut Timeline" module] → Interpretation → Coach's Insight → optional
+// read-only Phase Review → optional Goal Completion Handoff. Verified NOT
+// present on the real screen: a forecast section, a revision/republication
+// banner, any interactive chart (`CutTimeline` is a static per-scan point
+// grid — no hover/tap), and a rendered Confidence ring — see
+// `BriefingReadModel.confidence`'s note below.)
+
+struct DEXAHeroResult: Codable, Equatable, Identifiable {
+    var id: String { label }
+    var emoji: String
+    var label: String
+    var value: String
+    var context: String
+}
+
+struct DEXABriefingHero: Codable, Equatable {
+    var title: String
+    var body: String
+    /// Always the 2×2 grid on the real screen: DEXA Weight, Body Fat, Fat
+    /// Mass, Lean Tissue.
+    var results: [DEXAHeroResult]
+    /// The conditional emerald "Phase milestone" box — empty when this
+    /// scan isn't a milestone moment.
+    var milestones: [String]
+}
+
+struct DEXABriefingSnapshot: Codable, Equatable {
+    var scanDate: String
+    var daysBetweenScans: Int
+    var weightLb: String
+    var bodyFatPercent: String
+    var fatMassLb: String
+    var leanMassLb: String
+    /// `nil` omits the "Estimated RMR" footnote, matching the real
+    /// screen's own `snapshot.rmr != null` guard.
+    var restingMetabolicRateKcal: String?
+}
+
+struct DEXAComparisonMetric: Codable, Equatable, Identifiable {
+    var id: String { label }
+    var label: String
+    var previous: String
+    var current: String
+    var delta: String
+}
+
+struct DEXARegionalChangeMetric: Codable, Equatable, Identifiable {
+    var id: String { region }
+    var region: String
+    var previous: String
+    var current: String
+    var delta: String
+}
+
+struct DEXATimelinePoint: Codable, Equatable, Identifiable {
+    var id: String { scanId }
+    var scanId: String
+    var date: String
+    var value: String
+}
+
+struct DEXATimelineMetricTrack: Codable, Equatable, Identifiable {
+    var id: String { label }
+    var label: String
+    var unit: String
+    var points: [DEXATimelinePoint]
+    var delta: String
+}
+
+/// The amber "Cut Timeline" module — verified this uses a **different**
+/// baseline than the "Since Last Scan" headline comparisons above: the
+/// current Phase's own baseline scan (`goal.phase.dexaBaselineScanId`, or
+/// else the latest eligible scan on/before the Phase's — or, for a goal
+/// without phases, the Goal's — start date), never the immediately-prior
+/// scan and never a Goal-level baseline (that field is computed
+/// server-side but never rendered). `timelineLabel` reads "Since Starting
+/// {Phase Name}" when a Phase exists, else "Available Body-Composition
+/// History". Verified non-interactive: a static per-scan point grid, no
+/// hover/tap/tooltip.
+struct DEXACutTimeline: Codable, Equatable {
+    var timelineLabel: String
+    var isSimulated: Bool
+    var baselineDate: String
+    var currentDate: String
+    var elapsedDays: Int
+    var scans: [DEXATimelinePoint]
+    var metrics: [DEXATimelineMetricTrack]
+    var summary: String
+}
+
+struct DEXAProgressSection: Codable, Equatable {
+    /// "Since Last Scan" — DEXA Weight, Body Fat, Fat Mass, Lean Tissue vs.
+    /// the immediately-previous scan.
+    var headline: [DEXAComparisonMetric]
+    var regionalFat: [DEXARegionalChangeMetric]
+    var regionalLean: [DEXARegionalChangeMetric]
+    /// "Other Notable Changes" — VAT, A:G Ratio, RMR; verified real
+    /// behavior only includes an entry when both prior and current values
+    /// are present.
+    var supplemental: [DEXAComparisonMetric]
+    var timeline: DEXACutTimeline
+}
+
+struct DEXAInterpretationSection: Codable, Equatable {
+    var opening: String
+    /// Label varies by narrative branch on the real product (e.g. a
+    /// fat-loss guardrail framing vs. a lean-mass-gain framing) — carried
+    /// as opaque server-authored text/label rather than a fixed enum.
+    var primaryLabel: String
+    var primaryText: String
+    var leanMassText: String
+    var regionalText: String
+    /// Present only when the real narrative actually composed a
+    /// phase-and-strategy paragraph.
+    var phaseMeaning: String?
+    /// Present only when something genuinely stood out this scan.
+    var stoodOut: String?
+    var supportingEvidenceText: String
+    var uncertaintyText: String
+}
+
+struct DEXACoachInsightSection: Codable, Equatable {
+    var biggestWin: String
+    var protect: String
+    var watch: String
+    var next: String
+}
+
+/// Verified real behavior: the historical replay route
+/// (`/briefings/review/[artifactId]`) always renders this card
+/// `readOnly`; only the direct, current-scan route
+/// (`/briefings/dexa/[scanId]`) can render it as a live, submittable
+/// decision. Native renders it read-only always — the interactive
+/// decision-submission variant is a genuine write path
+/// (`submitProductionPhaseReviewDecision`) and is intentionally not
+/// ported in this pass (see this task's final report).
+struct DEXAPhaseReviewSummary: Codable, Equatable {
+    var title: String
+    var promptText: String
+    var options: [String]
+    var recordedDecisionLabel: String?
+}
+
+/// The one real conditional CTA on this screen — verified hard-coded to
+/// the "Visible Abs at Rest" fat-loss-goal-completion narrative branch,
+/// routing to Photo evidence intake. Native reuses the existing, already-
+/// built `.photoUpload` destination rather than inventing a new one.
+struct DEXAGoalCompletionHandoff: Codable, Equatable {
+    var questionText: String
+    var actionLabel: String
+    var actionDestination: AppDestination
+}
+
+struct DEXABriefingContent: Codable, Equatable {
+    var scanId: String
+    /// `nil` exactly on the first-scan/baseline narrative path
+    /// (`composeFirstDEXAEventNarrative`) — see `isBaselineScan`.
+    var priorScanId: String?
+    var scanDate: String
+    var priorScanDate: String?
+    var daysBetweenScans: Int
+    var hero: DEXABriefingHero
+    var snapshot: DEXABriefingSnapshot
+    var progress: DEXAProgressSection
+    var interpretation: DEXAInterpretationSection
+    var coachInsight: DEXACoachInsightSection
+    var phaseReview: DEXAPhaseReviewSummary?
+    var goalCompletionHandoff: DEXAGoalCompletionHandoff?
+
+    var isBaselineScan: Bool { priorScanId == nil }
+}
+
 // MARK: - The Briefing artifact (one type, cadence-discriminated content)
 
 /// One recurring-Briefing artifact — the single identity Home, History,
@@ -348,13 +530,40 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
     var evidenceWindow: BriefingEvidenceWindowReadModel
     var lifecycleState: BriefingArtifactLifecycleState
     var attribution: BriefingGoalAttribution
+    /// For `cadence == .event` (DEXA): the artifact genuinely carries a
+    /// persisted `goalConfidence` block (built by the same
+    /// `createBriefingGoalConfidenceBlockFromV2` finalizer every other
+    /// cadence uses), so this field is populated and decodable for
+    /// fixture/test/continuity purposes — but verified against source: the
+    /// real DEXA Event Briefing screen checks `hero.confidence` (which the
+    /// real narrative composer never sets) rather than
+    /// `narrative.goalConfidence`, so **no Confidence ring ever renders on
+    /// the real production or historical DEXA screen**. This looks like an
+    /// unwired real-product gap, not a deliberate omission — Native
+    /// deliberately does not "fix" it by rendering a ring the real product
+    /// doesn't show; `DEXABriefingSections` intentionally omits
+    /// `BriefingConfidenceCard`. See this task's final report.
     var confidence: BriefingConfidenceReadModel?
     var revisionProvenance: BriefingRevisionProvenance?
     var replacedHistory: [BriefingRevisionSnapshot]
+    /// `lifecycle.consumedAt` — verified real behavior (`isEventActiveForHome`,
+    /// `HomeBriefingRoutingService.js`): an `.event` artifact stays eligible
+    /// to win Home's latest-Briefing selection indefinitely (no same-day
+    /// window, unlike Photo events) until it is consumed. `nil` means still
+    /// active; a timestamp means it has been consumed and Home falls
+    /// through to the ordinary Monthly/Weekly/Midweek precedence. Only
+    /// meaningful for `cadence == .event`; always `nil` for every other
+    /// cadence. Native does not build an interactive "mark as consumed"
+    /// write — see this task's final report for why.
+    var eventConsumedAt: String? = nil
 
     var weekly: WeeklyBriefingContent?
     var midweek: MidweekBriefingContent?
     var monthly: MonthlyBriefingContent?
+    /// DEXA Event Briefing content — populated only when `cadence == .event`
+    /// and the triggering evidence was a DEXA scan (the only event trigger
+    /// type modeled this pass; see the type-level doc comment).
+    var dexa: DEXABriefingContent?
 
     /// Whether this artifact has ever been revised/republished — verified
     /// this is represented by a non-nil `revisionProvenance` plus a
@@ -363,12 +572,24 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
 
     /// Title shown in History — verified exact per-cadence format
     /// (`artifactTitle()`, `src/app/briefings/review/page.js`).
+    /// Verified real behavior: History's own `artifactTitle()`
+    /// (`src/app/briefings/review/page.js`) only special-cases
+    /// `cadence === "monthly"`/`"midweek"` — an `event` artifact falls
+    /// through to the generic branch, which reads `briefing?.hero?.title`.
+    /// A DEXA event artifact's narrative nests under
+    /// `briefing.dexaEventNarrative.hero.title`, not `briefing.hero.title`,
+    /// so on the real product this renders the raw artifact id
+    /// (`"dexa_event_<scanId>"`) instead of real title text — a verified
+    /// product gap, not a deliberate design. Native gives DEXA rows their
+    /// own sensible title/subtitle here rather than reproducing that
+    /// fallback bug; this is disclosed in this task's final report.
     var historyTitle: String {
         switch cadence {
         case .monthly: "Monthly Briefing · \(monthly?.monthLabel ?? evidenceWindow.relativeLabel)"
         case .midweek: "Midweek Briefing"
         case .weekly: weekly?.heroHeadline ?? "Weekly Briefing"
         case .daily: "Daily Briefing"
+        case .event: dexa?.hero.title ?? "DEXA Event Briefing"
         }
     }
 
@@ -378,6 +599,7 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
         case .monthly: "Delivered \(Self.shortDate(evidenceWindow.briefingDate))"
         case .midweek: "Sun–Tue · \(Self.shortDate(evidenceWindow.startDate))–\(Self.shortDate(evidenceWindow.endDate))"
         case .weekly, .daily: "\(Self.shortDate(evidenceWindow.startDate))–\(Self.shortDate(evidenceWindow.endDate))"
+        case .event: "DEXA scan · \(Self.shortDate(dexa?.scanDate ?? evidenceWindow.startDate))"
         }
     }
 

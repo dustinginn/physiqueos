@@ -67,6 +67,7 @@ struct BriefingCadenceBadge: View {
         case .midweek: .effort
         case .monthly: .primary
         case .daily: .evidence
+        case .event: .success
         }
     }
 

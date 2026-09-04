@@ -1,131 +1,359 @@
 [
   {
     "id": "weekly_briefing_2026-06-28_2026-07-04",
-    "occurrence": { "value": "founder|scheduled|weekly|weekly:2026-06-28_2026-07-04" },
+    "occurrence": {
+      "value": "founder|scheduled|weekly|weekly:2026-06-28_2026-07-04"
+    },
     "cadence": "weekly",
     "generatedAt": "2026-07-05T09:05:00.000Z",
-    "evidenceWindow": { "id": "weekly:2026-06-28_2026-07-04", "startDate": "2026-06-28", "endDate": "2026-07-04", "briefingDate": "2026-07-05", "relativeLabel": "this completed week", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "weekly:2026-06-28_2026-07-04",
+      "startDate": "2026-06-28",
+      "endDate": "2026-07-04",
+      "briefingDate": "2026-07-05",
+      "relativeLabel": "this completed week",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_visible_abs_at_rest", "goalTitle": "Visible Abs at Rest", "phaseId": null, "phaseName": null },
+    "attribution": {
+      "goalId": "goal_visible_abs_at_rest",
+      "goalTitle": "Visible Abs at Rest",
+      "phaseId": null,
+      "phaseName": null
+    },
     "confidence": {
-      "score": 55, "band": "low", "priorScore": null, "delta": null, "movementDirection": "initial",
+      "score": 55,
+      "band": "low",
+      "priorScore": null,
+      "delta": null,
+      "movementDirection": "initial",
       "primaryReason": "Body-fat trend is still noisy this early in the cut, so the forecast has wide error bars.",
-      "supportingReasons": ["Weight is trending down on schedule."],
-      "limitingReasons": ["Only two weeks of consistent logging so far.", "No DEXA yet to anchor the fat-loss rate."],
-      "unresolvedUncertainty": ["How training performance will respond as the deficit deepens."],
-      "goalId": "goal_visible_abs_at_rest", "phaseId": null, "capturedAt": "2026-07-05T09:05:00.000Z", "source": "canonical_pi_snapshot"
+      "supportingReasons": [
+        "Weight is trending down on schedule."
+      ],
+      "limitingReasons": [
+        "Only two weeks of consistent logging so far.",
+        "No DEXA yet to anchor the fat-loss rate."
+      ],
+      "unresolvedUncertainty": [
+        "How training performance will respond as the deficit deepens."
+      ],
+      "goalId": "goal_visible_abs_at_rest",
+      "phaseId": null,
+      "capturedAt": "2026-07-05T09:05:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "weekly": {
-      "periodLabel": "Completed week", "reportingRangeLabel": "Jun 28–Jul 4",
-      "heroHeadline": "A steady first full week.", "heroBody": "Intake held close to target on 6 of 7 days, and the scale is moving in the expected direction. Nothing dramatic yet, which is exactly the point this early.",
-      "strategyPhaseLabel": null, "strategyWeekLabel": "Week 2", "strategyNextMilestone": "Next: first DEXA check-in",
-      "energy": { "pairedDayCount": 6, "eligibleDayCount": 7, "averageIntakeKcal": 2180, "averageExpenditureKcal": 2510, "averageBalanceKcal": -330, "narrative": "A consistent daily deficit close to the planned -350 kcal/day target.",
+      "periodLabel": "Completed week",
+      "reportingRangeLabel": "Jun 28–Jul 4",
+      "heroHeadline": "A steady first full week.",
+      "heroBody": "Intake held close to target on 6 of 7 days, and the scale is moving in the expected direction. Nothing dramatic yet, which is exactly the point this early.",
+      "strategyPhaseLabel": null,
+      "strategyWeekLabel": "Week 2",
+      "strategyNextMilestone": "Next: first DEXA check-in",
+      "energy": {
+        "pairedDayCount": 6,
+        "eligibleDayCount": 7,
+        "averageIntakeKcal": 2180,
+        "averageExpenditureKcal": 2510,
+        "averageBalanceKcal": -330,
+        "narrative": "A consistent daily deficit close to the planned -350 kcal/day target.",
         "dailyBalances": [
-          { "date": "2026-06-28", "intakeKcal": 2150, "expenditureKcal": 2480, "hasPairedData": true },
-          { "date": "2026-06-29", "intakeKcal": 2200, "expenditureKcal": 2530, "hasPairedData": true },
-          { "date": "2026-06-30", "intakeKcal": null, "expenditureKcal": 2500, "hasPairedData": false },
-          { "date": "2026-07-01", "intakeKcal": 2190, "expenditureKcal": 2490, "hasPairedData": true },
-          { "date": "2026-07-02", "intakeKcal": 2160, "expenditureKcal": 2520, "hasPairedData": true },
-          { "date": "2026-07-03", "intakeKcal": 2210, "expenditureKcal": 2540, "hasPairedData": true },
-          { "date": "2026-07-04", "intakeKcal": 2170, "expenditureKcal": 2510, "hasPairedData": true }
+          {
+            "date": "2026-06-28",
+            "intakeKcal": 2150,
+            "expenditureKcal": 2480,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-06-29",
+            "intakeKcal": 2200,
+            "expenditureKcal": 2530,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-06-30",
+            "intakeKcal": null,
+            "expenditureKcal": 2500,
+            "hasPairedData": false
+          },
+          {
+            "date": "2026-07-01",
+            "intakeKcal": 2190,
+            "expenditureKcal": 2490,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-07-02",
+            "intakeKcal": 2160,
+            "expenditureKcal": 2520,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-07-03",
+            "intakeKcal": 2210,
+            "expenditureKcal": 2540,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-07-04",
+            "intakeKcal": 2170,
+            "expenditureKcal": 2510,
+            "hasPairedData": true
+          }
         ]
       },
-      "weight": { "averageWeightLb": 176.4, "changeLb": -1.1, "narrative": "Down 1.1 lb on the weekly average — right on the plan's expected pace." },
-      "photos": { "narrative": "No new comparison photos were logged this week.", "photoEventDestination": null },
-      "training": { "comparableCategoryCount": 4, "improvingCount": 1, "steadyCount": 3, "narrative": "Working sets held steady across every tracked lift; no regressions from the deficit yet." },
+      "weight": {
+        "averageWeightLb": 176.4,
+        "changeLb": -1.1,
+        "narrative": "Down 1.1 lb on the weekly average — right on the plan's expected pace."
+      },
+      "photos": {
+        "narrative": "No new comparison photos were logged this week.",
+        "photoEventDestination": null
+      },
+      "training": {
+        "comparableCategoryCount": 4,
+        "improvingCount": 1,
+        "steadyCount": 3,
+        "narrative": "Working sets held steady across every tracked lift; no regressions from the deficit yet."
+      },
       "bodyComposition": null,
       "coachTake": {
         "biggestTakeaway": "The plan is executing exactly as designed — no adjustments needed.",
         "recommendation": "Keep the current intake target through next week rather than reacting to one strong week.",
-        "intoNextWeek": ["Hold the current calorie target.", "Log the two missed lunches you mentioned — every paired day sharpens next week's read.", "No training changes."]
+        "intoNextWeek": [
+          "Hold the current calorie target.",
+          "Log the two missed lunches you mentioned — every paired day sharpens next week's read.",
+          "No training changes."
+        ]
       }
     }
   },
   {
     "id": "weekly_briefing_2026-07-12_2026-07-18",
-    "occurrence": { "value": "founder|scheduled|weekly|weekly:2026-07-12_2026-07-18" },
+    "occurrence": {
+      "value": "founder|scheduled|weekly|weekly:2026-07-12_2026-07-18"
+    },
     "cadence": "weekly",
     "generatedAt": "2026-07-19T09:10:00.000Z",
-    "evidenceWindow": { "id": "weekly:2026-07-12_2026-07-18", "startDate": "2026-07-12", "endDate": "2026-07-18", "briefingDate": "2026-07-19", "relativeLabel": "this completed week", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "weekly:2026-07-12_2026-07-18",
+      "startDate": "2026-07-12",
+      "endDate": "2026-07-18",
+      "briefingDate": "2026-07-19",
+      "relativeLabel": "this completed week",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_visible_abs_at_rest", "goalTitle": "Visible Abs at Rest", "phaseId": null, "phaseName": null },
+    "attribution": {
+      "goalId": "goal_visible_abs_at_rest",
+      "goalTitle": "Visible Abs at Rest",
+      "phaseId": null,
+      "phaseName": null
+    },
     "confidence": {
-      "score": 74, "band": "moderate", "priorScore": 66, "delta": 8, "movementDirection": "increased",
+      "score": 74,
+      "band": "moderate",
+      "priorScore": 66,
+      "delta": 8,
+      "movementDirection": "increased",
       "primaryReason": "The July 18 DEXA confirmed 8.2% body fat, in line with the projected trajectory — the forecast error bars narrow significantly with a real scan to anchor them.",
-      "supportingReasons": ["DEXA measured fat loss matched the modeled estimate within 0.3%.", "Visible definition at rest is consistent with the target."],
-      "limitingReasons": ["Lean mass held but did not increase — worth watching into maintenance."],
+      "supportingReasons": [
+        "DEXA measured fat loss matched the modeled estimate within 0.3%.",
+        "Visible definition at rest is consistent with the target."
+      ],
+      "limitingReasons": [
+        "Lean mass held but did not increase — worth watching into maintenance."
+      ],
       "unresolvedUncertainty": [],
-      "goalId": "goal_visible_abs_at_rest", "phaseId": null, "capturedAt": "2026-07-19T09:10:00.000Z", "source": "canonical_pi_snapshot"
+      "goalId": "goal_visible_abs_at_rest",
+      "phaseId": null,
+      "capturedAt": "2026-07-19T09:10:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "weekly": {
-      "periodLabel": "Completed week", "reportingRangeLabel": "Jul 12–Jul 18",
-      "heroHeadline": "The finish line held up under the final scan.", "heroBody": "This week's DEXA confirmed 8.2% body fat — the goal's own target was 8-9%. Visible Abs at Rest is complete.",
-      "strategyPhaseLabel": null, "strategyWeekLabel": "Week 8", "strategyNextMilestone": "Next: choose what comes next",
-      "energy": { "pairedDayCount": 7, "eligibleDayCount": 7, "averageIntakeKcal": 2050, "averageExpenditureKcal": 2470, "averageBalanceKcal": -420, "narrative": "A slightly deeper deficit than usual in the closing week — every day was logged.", "dailyBalances": null },
-      "weight": { "averageWeightLb": 169.1, "changeLb": -0.9, "narrative": "The scale continued its slow, controlled decline through the final week." },
-      "photos": { "narrative": "The closing comparison photo confirmed visible abdominal definition at rest.", "photoEventDestination": null },
-      "training": { "comparableCategoryCount": 4, "improvingCount": 0, "steadyCount": 4, "narrative": "Every tracked lift held its working weight through the deepest week of the cut — the goal here was preservation, and it held." },
-      "bodyComposition": { "scanDate": "2026-07-18", "bodyFatPercent": "8.2%", "leanMassLb": "149.0 lb", "fatMassLb": "13.4 lb", "objective": "Visible Abs at Rest", "narrative": "This scan closed the goal: the numerical target and the visual confirmation converged." },
+      "periodLabel": "Completed week",
+      "reportingRangeLabel": "Jul 12–Jul 18",
+      "heroHeadline": "The finish line held up under the final scan.",
+      "heroBody": "This week's DEXA confirmed 8.2% body fat — the goal's own target was 8-9%. Visible Abs at Rest is complete.",
+      "strategyPhaseLabel": null,
+      "strategyWeekLabel": "Week 8",
+      "strategyNextMilestone": "Next: choose what comes next",
+      "energy": {
+        "pairedDayCount": 7,
+        "eligibleDayCount": 7,
+        "averageIntakeKcal": 2050,
+        "averageExpenditureKcal": 2470,
+        "averageBalanceKcal": -420,
+        "narrative": "A slightly deeper deficit than usual in the closing week — every day was logged.",
+        "dailyBalances": null
+      },
+      "weight": {
+        "averageWeightLb": 169.1,
+        "changeLb": -0.9,
+        "narrative": "The scale continued its slow, controlled decline through the final week."
+      },
+      "photos": {
+        "narrative": "The closing comparison photo confirmed visible abdominal definition at rest.",
+        "photoEventDestination": null
+      },
+      "training": {
+        "comparableCategoryCount": 4,
+        "improvingCount": 0,
+        "steadyCount": 4,
+        "narrative": "Every tracked lift held its working weight through the deepest week of the cut — the goal here was preservation, and it held."
+      },
+      "bodyComposition": {
+        "scanDate": "2026-07-18",
+        "bodyFatPercent": "8.2%",
+        "leanMassLb": "149.0 lb",
+        "fatMassLb": "13.4 lb",
+        "objective": "Visible Abs at Rest",
+        "narrative": "This scan closed the goal: the numerical target and the visual confirmation converged."
+      },
       "coachTake": {
         "biggestTakeaway": "Visible Abs at Rest is complete, and lean mass was preserved through the entire cut.",
         "recommendation": "Take a few days before deciding what's next — don't rush straight into a new deficit.",
-        "intoNextWeek": ["Review the goal-transition options when ready.", "No new calorie target until a new goal is set.", "Keep logging weight daily through the transition."]
+        "intoNextWeek": [
+          "Review the goal-transition options when ready.",
+          "No new calorie target until a new goal is set.",
+          "Keep logging weight daily through the transition."
+        ]
       }
     }
   },
   {
     "id": "weekly_briefing_2026-07-19_2026-07-25",
-    "occurrence": { "value": "founder|scheduled|weekly|weekly:2026-07-19_2026-07-25" },
+    "occurrence": {
+      "value": "founder|scheduled|weekly|weekly:2026-07-19_2026-07-25"
+    },
     "cadence": "weekly",
     "generatedAt": "2026-07-26T09:05:00.000Z",
-    "evidenceWindow": { "id": "weekly:2026-07-19_2026-07-25", "startDate": "2026-07-19", "endDate": "2026-07-25", "briefingDate": "2026-07-26", "relativeLabel": "this completed week", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "weekly:2026-07-19_2026-07-25",
+      "startDate": "2026-07-19",
+      "endDate": "2026-07-25",
+      "briefingDate": "2026-07-26",
+      "relativeLabel": "this completed week",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_maintenance", "phaseName": "Establish Maintenance" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_maintenance",
+      "phaseName": "Establish Maintenance"
+    },
     "confidence": {
-      "score": 61, "band": "developing", "priorScore": 74, "delta": -13, "movementDirection": "decreased",
+      "score": 61,
+      "band": "developing",
+      "priorScore": 74,
+      "delta": -13,
+      "movementDirection": "decreased",
       "primaryReason": "A new goal always starts with a wide forecast — there isn't yet a maintenance-calorie trend to project a lean-mass rate from.",
-      "supportingReasons": ["The prior goal's discipline (daily logging, consistent training) has carried over cleanly."],
-      "limitingReasons": ["Maintenance calibration has only one week of data.", "No surplus has been introduced yet."],
-      "unresolvedUncertainty": ["How many weeks of calibration will be needed before intake can be raised."],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_maintenance", "capturedAt": "2026-07-26T09:05:00.000Z", "source": "canonical_pi_snapshot"
+      "supportingReasons": [
+        "The prior goal's discipline (daily logging, consistent training) has carried over cleanly."
+      ],
+      "limitingReasons": [
+        "Maintenance calibration has only one week of data.",
+        "No surplus has been introduced yet."
+      ],
+      "unresolvedUncertainty": [
+        "How many weeks of calibration will be needed before intake can be raised."
+      ],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_maintenance",
+      "capturedAt": "2026-07-26T09:05:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "weekly": {
-      "periodLabel": "Completed week", "reportingRangeLabel": "Jul 19–Jul 25",
-      "heroHeadline": "Week one of Establish Maintenance.", "heroBody": "The first week of Build Lean Mass is about finding true maintenance calories before any surplus is added — this week's numbers are the starting reference point, not a verdict.",
-      "strategyPhaseLabel": "Current strategy: Establish Maintenance", "strategyWeekLabel": "Week 1", "strategyNextMilestone": "Next: confirm maintenance range",
-      "energy": { "pairedDayCount": 7, "eligibleDayCount": 7, "averageIntakeKcal": 2450, "averageExpenditureKcal": 2440, "averageBalanceKcal": 10, "narrative": "Intake and expenditure landed almost exactly even — a strong first maintenance estimate.", "dailyBalances": null },
-      "weight": { "averageWeightLb": 168.9, "changeLb": -0.2, "narrative": "Weight held essentially flat, consistent with a true maintenance intake." },
+      "periodLabel": "Completed week",
+      "reportingRangeLabel": "Jul 19–Jul 25",
+      "heroHeadline": "Week one of Establish Maintenance.",
+      "heroBody": "The first week of Build Lean Mass is about finding true maintenance calories before any surplus is added — this week's numbers are the starting reference point, not a verdict.",
+      "strategyPhaseLabel": "Current strategy: Establish Maintenance",
+      "strategyWeekLabel": "Week 1",
+      "strategyNextMilestone": "Next: confirm maintenance range",
+      "energy": {
+        "pairedDayCount": 7,
+        "eligibleDayCount": 7,
+        "averageIntakeKcal": 2450,
+        "averageExpenditureKcal": 2440,
+        "averageBalanceKcal": 10,
+        "narrative": "Intake and expenditure landed almost exactly even — a strong first maintenance estimate.",
+        "dailyBalances": null
+      },
+      "weight": {
+        "averageWeightLb": 168.9,
+        "changeLb": -0.2,
+        "narrative": "Weight held essentially flat, consistent with a true maintenance intake."
+      },
       "photos": null,
-      "training": { "comparableCategoryCount": 4, "improvingCount": 0, "steadyCount": 4, "narrative": "Training volume matched the prior week — no changes were made yet." },
+      "training": {
+        "comparableCategoryCount": 4,
+        "improvingCount": 0,
+        "steadyCount": 4,
+        "narrative": "Training volume matched the prior week — no changes were made yet."
+      },
       "bodyComposition": null,
       "coachTake": {
         "biggestTakeaway": "The maintenance estimate from week one lines up well with the pre-transition intake.",
         "recommendation": "Hold this intake for one more week before treating it as confirmed maintenance.",
-        "intoNextWeek": ["Repeat this intake target.", "Keep training volume unchanged.", "No surplus yet."]
+        "intoNextWeek": [
+          "Repeat this intake target.",
+          "Keep training volume unchanged.",
+          "No surplus yet."
+        ]
       }
     }
   },
   {
     "id": "midweek_briefing_2026-08-02_2026-08-04",
-    "occurrence": { "value": "founder|scheduled|midweek|midweek:2026-08-02_2026-08-04" },
+    "occurrence": {
+      "value": "founder|scheduled|midweek|midweek:2026-08-02_2026-08-04"
+    },
     "cadence": "midweek",
     "generatedAt": "2026-08-05T13:00:00.000Z",
-    "evidenceWindow": { "id": "midweek:2026-08-02_2026-08-04", "startDate": "2026-08-02", "endDate": "2026-08-04", "briefingDate": "2026-08-05", "relativeLabel": "Sunday through Tuesday", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "midweek:2026-08-02_2026-08-04",
+      "startDate": "2026-08-02",
+      "endDate": "2026-08-04",
+      "briefingDate": "2026-08-05",
+      "relativeLabel": "Sunday through Tuesday",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_maintenance", "phaseName": "Establish Maintenance" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_maintenance",
+      "phaseName": "Establish Maintenance"
+    },
     "confidence": {
-      "score": 63, "band": "developing", "priorScore": 61, "delta": 2, "movementDirection": "increased",
+      "score": 63,
+      "band": "developing",
+      "priorScore": 61,
+      "delta": 2,
+      "movementDirection": "increased",
       "primaryReason": "A second consistent week of near-zero energy balance is reinforcing the maintenance estimate.",
-      "supportingReasons": ["Three straight paired days within 100 kcal of the running average."],
-      "limitingReasons": ["Still short of the two full weeks the calibration plan calls for."],
+      "supportingReasons": [
+        "Three straight paired days within 100 kcal of the running average."
+      ],
+      "limitingReasons": [
+        "Still short of the two full weeks the calibration plan calls for."
+      ],
       "unresolvedUncertainty": [],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_maintenance", "capturedAt": "2026-08-05T13:00:00.000Z", "source": "canonical_pi_snapshot"
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_maintenance",
+      "capturedAt": "2026-08-05T13:00:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
@@ -133,29 +361,69 @@
       "reportingRangeLabel": "Sun–Tue, Aug 2–4",
       "heroVerdict": "Calories are tracking close enough to hold steady.",
       "heroSummary": "The first three days of this week sit right on the maintenance estimate from last week. Keep logging through Saturday and wait for Sunday's full review before changing anything.",
-      "energy": { "pairedDayCount": 3, "eligibleDayCount": 3, "averageIntakeKcal": 2460, "averageExpenditureKcal": 2445, "averageBalanceKcal": 15, "narrative": "Three for three paired days, balance essentially flat.", "dailyBalances": null },
+      "energy": {
+        "pairedDayCount": 3,
+        "eligibleDayCount": 3,
+        "averageIntakeKcal": 2460,
+        "averageExpenditureKcal": 2445,
+        "averageBalanceKcal": 15,
+        "narrative": "Three for three paired days, balance essentially flat.",
+        "dailyBalances": null
+      },
       "weightContextNarrative": "Morning weight is unchanged across the three days — nothing here would change the maintenance read.",
       "trainingResponseNarrative": "Tuesday's session matched last week's working weights with one added rep on the final set.",
       "bodyComposition": null,
       "coachTakeNarrative": "I'd rather protect this momentum than react to three days of calorie math. Sunday's full week will tell the real story.",
-      "prioritiesThroughSunday": ["Keep logging every meal through Saturday.", "No calorie changes before Sunday.", "Log Thursday's workout promptly so the week stays complete."]
+      "prioritiesThroughSunday": [
+        "Keep logging every meal through Saturday.",
+        "No calorie changes before Sunday.",
+        "Log Thursday's workout promptly so the week stays complete."
+      ]
     }
   },
   {
     "id": "weekly_briefing_2026-08-23_2026-08-29",
-    "occurrence": { "value": "founder|scheduled|weekly|weekly:2026-08-23_2026-08-29" },
+    "occurrence": {
+      "value": "founder|scheduled|weekly|weekly:2026-08-23_2026-08-29"
+    },
     "cadence": "weekly",
     "generatedAt": "2026-08-30T15:30:00.000Z",
-    "evidenceWindow": { "id": "weekly:2026-08-23_2026-08-29", "startDate": "2026-08-23", "endDate": "2026-08-29", "briefingDate": "2026-08-30", "relativeLabel": "this completed week", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "weekly:2026-08-23_2026-08-29",
+      "startDate": "2026-08-23",
+      "endDate": "2026-08-29",
+      "briefingDate": "2026-08-30",
+      "relativeLabel": "this completed week",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_lean_mass_build", "phaseName": "Lean Mass Build" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
     "confidence": {
-      "score": 68, "band": "moderate", "priorScore": 63, "delta": 5, "movementDirection": "increased",
+      "score": 68,
+      "band": "moderate",
+      "priorScore": 63,
+      "delta": 5,
+      "movementDirection": "increased",
       "primaryReason": "Two consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.",
-      "supportingReasons": ["Working weight increased on 2 of 4 tracked lifts.", "Weight trend is climbing at the modeled rate, not faster."],
-      "limitingReasons": ["No DEXA yet to confirm the gain is lean tissue rather than water/fat."],
-      "unresolvedUncertainty": ["Whether the current surplus size is the right long-term rate."],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_lean_mass_build", "capturedAt": "2026-08-30T15:30:00.000Z", "source": "canonical_pi_snapshot"
+      "supportingReasons": [
+        "Working weight increased on 2 of 4 tracked lifts.",
+        "Weight trend is climbing at the modeled rate, not faster."
+      ],
+      "limitingReasons": [
+        "No DEXA yet to confirm the gain is lean tissue rather than water/fat."
+      ],
+      "unresolvedUncertainty": [
+        "Whether the current surplus size is the right long-term rate."
+      ],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-08-30T15:30:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": {
       "priorPublicationId": "weekly_briefing_2026-08-23_2026-08-29",
@@ -164,49 +432,135 @@
       "reason": "A confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion."
     },
     "replacedHistory": [
-      { "generatedAt": "2026-08-30T09:15:00.000Z", "headline": "A quiet week with one still-pending workout.", "replacedReason": "Thursday's workout was confirmed later the same day." }
+      {
+        "generatedAt": "2026-08-30T09:15:00.000Z",
+        "headline": "A quiet week with one still-pending workout.",
+        "replacedReason": "Thursday's workout was confirmed later the same day."
+      }
     ],
     "weekly": {
-      "periodLabel": "Completed week", "reportingRangeLabel": "Aug 23–Aug 29",
-      "heroHeadline": "Two straight weeks of clean progression.", "heroBody": "Every tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.",
-      "strategyPhaseLabel": "Current strategy: Lean Mass Build", "strategyWeekLabel": "Week 2", "strategyNextMilestone": "Next: DEXA review, Oct 31",
-      "energy": { "pairedDayCount": 7, "eligibleDayCount": 7, "averageIntakeKcal": 2790, "averageExpenditureKcal": 2440, "averageBalanceKcal": 350, "narrative": "A steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.",
+      "periodLabel": "Completed week",
+      "reportingRangeLabel": "Aug 23–Aug 29",
+      "heroHeadline": "Two straight weeks of clean progression.",
+      "heroBody": "Every tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.",
+      "strategyPhaseLabel": "Current strategy: Lean Mass Build",
+      "strategyWeekLabel": "Week 2",
+      "strategyNextMilestone": "Next: DEXA review, Oct 31",
+      "energy": {
+        "pairedDayCount": 7,
+        "eligibleDayCount": 7,
+        "averageIntakeKcal": 2790,
+        "averageExpenditureKcal": 2440,
+        "averageBalanceKcal": 350,
+        "narrative": "A steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.",
         "dailyBalances": [
-          { "date": "2026-08-23", "intakeKcal": 2800, "expenditureKcal": 2420, "hasPairedData": true },
-          { "date": "2026-08-24", "intakeKcal": 2760, "expenditureKcal": 2460, "hasPairedData": true },
-          { "date": "2026-08-25", "intakeKcal": 2820, "expenditureKcal": 2450, "hasPairedData": true },
-          { "date": "2026-08-26", "intakeKcal": 2770, "expenditureKcal": 2410, "hasPairedData": true },
-          { "date": "2026-08-27", "intakeKcal": 2830, "expenditureKcal": 2470, "hasPairedData": true },
-          { "date": "2026-08-28", "intakeKcal": 2790, "expenditureKcal": 2430, "hasPairedData": true },
-          { "date": "2026-08-29", "intakeKcal": 2760, "expenditureKcal": 2440, "hasPairedData": true }
+          {
+            "date": "2026-08-23",
+            "intakeKcal": 2800,
+            "expenditureKcal": 2420,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-24",
+            "intakeKcal": 2760,
+            "expenditureKcal": 2460,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-25",
+            "intakeKcal": 2820,
+            "expenditureKcal": 2450,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-26",
+            "intakeKcal": 2770,
+            "expenditureKcal": 2410,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-27",
+            "intakeKcal": 2830,
+            "expenditureKcal": 2470,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-28",
+            "intakeKcal": 2790,
+            "expenditureKcal": 2430,
+            "hasPairedData": true
+          },
+          {
+            "date": "2026-08-29",
+            "intakeKcal": 2760,
+            "expenditureKcal": 2440,
+            "hasPairedData": true
+          }
         ]
       },
-      "weight": { "averageWeightLb": 170.6, "changeLb": 0.6, "narrative": "Up 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely." },
-      "photos": { "narrative": "No new comparison photos were logged this week.", "photoEventDestination": null },
-      "training": { "comparableCategoryCount": 4, "improvingCount": 2, "steadyCount": 2, "narrative": "Bench and lower-body work both progressed; arms and back held steady." },
+      "weight": {
+        "averageWeightLb": 170.6,
+        "changeLb": 0.6,
+        "narrative": "Up 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely."
+      },
+      "photos": {
+        "narrative": "No new comparison photos were logged this week.",
+        "photoEventDestination": null
+      },
+      "training": {
+        "comparableCategoryCount": 4,
+        "improvingCount": 2,
+        "steadyCount": 2,
+        "narrative": "Bench and lower-body work both progressed; arms and back held steady."
+      },
       "bodyComposition": null,
       "coachTake": {
         "biggestTakeaway": "The surplus is producing training progression without the scale running away.",
         "recommendation": "Hold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.",
-        "intoNextWeek": ["Keep the surplus in the 2,750–2,850 kcal range.", "Push for another working-weight increase on arms this week.", "Log Thursday's workout the same day to avoid another late confirmation."]
+        "intoNextWeek": [
+          "Keep the surplus in the 2,750–2,850 kcal range.",
+          "Push for another working-weight increase on arms this week.",
+          "Log Thursday's workout the same day to avoid another late confirmation."
+        ]
       }
     }
   },
   {
     "id": "midweek_briefing_2026-08-30_2026-09-01",
-    "occurrence": { "value": "founder|scheduled|midweek|midweek:2026-08-30_2026-09-01" },
+    "occurrence": {
+      "value": "founder|scheduled|midweek|midweek:2026-08-30_2026-09-01"
+    },
     "cadence": "midweek",
     "generatedAt": "2026-09-02T13:00:00.000Z",
-    "evidenceWindow": { "id": "midweek:2026-08-30_2026-09-01", "startDate": "2026-08-30", "endDate": "2026-09-01", "briefingDate": "2026-09-02", "relativeLabel": "Sunday through Tuesday", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "midweek:2026-08-30_2026-09-01",
+      "startDate": "2026-08-30",
+      "endDate": "2026-09-01",
+      "briefingDate": "2026-09-02",
+      "relativeLabel": "Sunday through Tuesday",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_lean_mass_build", "phaseName": "Lean Mass Build" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
     "confidence": {
-      "score": 68, "band": "moderate", "priorScore": 68, "delta": 0, "movementDirection": "held",
+      "score": 68,
+      "band": "moderate",
+      "priorScore": 68,
+      "delta": 0,
+      "movementDirection": "held",
       "primaryReason": "Nothing in the first three days of this week changes last week's conclusion — this is the expected in-between-Briefings state.",
       "supportingReasons": [],
       "limitingReasons": [],
       "unresolvedUncertainty": [],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_lean_mass_build", "capturedAt": "2026-09-02T13:00:00.000Z", "source": "canonical_pi_snapshot"
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-09-02T13:00:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
@@ -214,53 +568,126 @@
       "reportingRangeLabel": "Sun–Tue, Aug 30–Sep 1",
       "heroVerdict": "Nothing here changes last week's plan.",
       "heroSummary": "Intake is sitting right where it's been for three weeks. Keep logging through Saturday — Sunday's review will have the fuller picture.",
-      "energy": { "pairedDayCount": 3, "eligibleDayCount": 3, "averageIntakeKcal": 2805, "averageExpenditureKcal": 2445, "averageBalanceKcal": 360, "narrative": "Right in the middle of the target surplus range for all three paired days.", "dailyBalances": null },
+      "energy": {
+        "pairedDayCount": 3,
+        "eligibleDayCount": 3,
+        "averageIntakeKcal": 2805,
+        "averageExpenditureKcal": 2445,
+        "averageBalanceKcal": 360,
+        "narrative": "Right in the middle of the target surplus range for all three paired days.",
+        "dailyBalances": null
+      },
       "weightContextNarrative": "Weight is up slightly, consistent with the ongoing controlled surplus.",
       "trainingResponseNarrative": "Monday's session matched last week's working weights.",
       "bodyComposition": null,
       "coachTakeNarrative": "Steady is the right word here — no reason to touch anything before Sunday.",
-      "prioritiesThroughSunday": ["Keep logging every meal through Saturday.", "No calorie changes before Sunday."]
+      "prioritiesThroughSunday": [
+        "Keep logging every meal through Saturday.",
+        "No calorie changes before Sunday."
+      ]
     }
   },
   {
     "id": "monthly_briefing_2026-08",
-    "occurrence": { "value": "founder|scheduled|monthly|monthly:2026-08" },
+    "occurrence": {
+      "value": "founder|scheduled|monthly|monthly:2026-08"
+    },
     "cadence": "monthly",
     "generatedAt": "2026-09-01T14:00:00.000Z",
-    "evidenceWindow": { "id": "monthly:2026-08", "startDate": "2026-08-01", "endDate": "2026-08-31", "briefingDate": "2026-09-01", "relativeLabel": "August 2026", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "monthly:2026-08",
+      "startDate": "2026-08-01",
+      "endDate": "2026-08-31",
+      "briefingDate": "2026-09-01",
+      "relativeLabel": "August 2026",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_lean_mass_build", "phaseName": "Lean Mass Build" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
     "confidence": {
-      "score": 68, "band": "moderate", "priorScore": 61, "delta": 7, "movementDirection": "increased",
+      "score": 68,
+      "band": "moderate",
+      "priorScore": 61,
+      "delta": 7,
+      "movementDirection": "increased",
       "primaryReason": "A full month of consistent maintenance calibration followed by a clean transition into a controlled surplus is a strong early trajectory for a goal that only started August 16.",
-      "supportingReasons": ["Weight trend matches the modeled surplus rate within the expected range.", "Training performance held or improved through the phase transition."],
-      "limitingReasons": ["No DEXA has occurred yet inside Build Lean Mass — every read so far is scale- and performance-based."],
-      "unresolvedUncertainty": ["How closely the October 31 DEXA will match the modeled lean-mass estimate."],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_lean_mass_build", "capturedAt": "2026-09-01T14:00:00.000Z", "source": "canonical_pi_snapshot"
+      "supportingReasons": [
+        "Weight trend matches the modeled surplus rate within the expected range.",
+        "Training performance held or improved through the phase transition."
+      ],
+      "limitingReasons": [
+        "No DEXA has occurred yet inside Build Lean Mass — every read so far is scale- and performance-based."
+      ],
+      "unresolvedUncertainty": [
+        "How closely the October 31 DEXA will match the modeled lean-mass estimate."
+      ],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-09-01T14:00:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "monthly": {
       "monthLabel": "August 2026",
-      "heroHeadline": "The month that started Build Lean Mass.", "heroBody": "August opened with the July 18 DEXA that closed Visible Abs at Rest, spent two weeks confirming true maintenance, then moved into a controlled surplus on August 16. Both halves of the month did their job.",
+      "heroHeadline": "The month that started Build Lean Mass.",
+      "heroBody": "August opened with the July 18 DEXA that closed Visible Abs at Rest, spent two weeks confirming true maintenance, then moved into a controlled surplus on August 16. Both halves of the month did their job.",
       "heroGoalLabel": "Build Lean Mass · Lean Mass Build",
       "goalMilestone": null,
       "trainingProgress": {
         "narrative": "Working weights held through the maintenance weeks and began climbing again once the surplus started — exactly the order this plan called for.",
-        "stats": [ { "label": "Comparable lifts tracked", "value": "4" }, { "label": "Improving", "value": "2" }, { "label": "Steady", "value": "2" } ]
+        "stats": [
+          {
+            "label": "Comparable lifts tracked",
+            "value": "4"
+          },
+          {
+            "label": "Improving",
+            "value": "2"
+          },
+          {
+            "label": "Steady",
+            "value": "2"
+          }
+        ]
       },
       "energyEvolution": {
         "weeks": [
-          { "weekLabel": "Aug 2–8", "averageIntakeKcal": 2455, "averageExpenditureKcal": 2440 },
-          { "weekLabel": "Aug 9–15", "averageIntakeKcal": 2460, "averageExpenditureKcal": 2445 },
-          { "weekLabel": "Aug 16–22", "averageIntakeKcal": 2770, "averageExpenditureKcal": 2435 },
-          { "weekLabel": "Aug 23–29", "averageIntakeKcal": 2790, "averageExpenditureKcal": 2440 }
+          {
+            "weekLabel": "Aug 2–8",
+            "averageIntakeKcal": 2455,
+            "averageExpenditureKcal": 2440
+          },
+          {
+            "weekLabel": "Aug 9–15",
+            "averageIntakeKcal": 2460,
+            "averageExpenditureKcal": 2445
+          },
+          {
+            "weekLabel": "Aug 16–22",
+            "averageIntakeKcal": 2770,
+            "averageExpenditureKcal": 2435
+          },
+          {
+            "weekLabel": "Aug 23–29",
+            "averageIntakeKcal": 2790,
+            "averageExpenditureKcal": 2440
+          }
         ],
-        "averageIntakeKcal": 2619, "averageExpenditureKcal": 2440, "averageBalanceKcal": 179
+        "averageIntakeKcal": 2619,
+        "averageExpenditureKcal": 2440,
+        "averageBalanceKcal": 179
       },
       "newBaseline": {
         "referenceDateLabel": "July 18, 2026",
-        "bodyFatPercent": "8.2%", "leanMassLb": "149.0 lb", "fatMassLb": "13.4 lb",
+        "bodyFatPercent": "8.2%",
+        "leanMassLb": "149.0 lb",
+        "fatMassLb": "13.4 lb",
         "narrative": "The July 18 DEXA is the starting point for Build Lean Mass — it established where this goal began, not proof of anything gained since. The October 31 scan will be the first real read on lean-mass progress."
       },
       "whatChanged": [
@@ -269,8 +696,14 @@
         "Intake moved from a maintenance estimate to a controlled surplus."
       ],
       "definingMoments": [
-        { "label": "Aug 15", "value": "Maintenance confirmed, Establish Maintenance phase complete" },
-        { "label": "Aug 16", "value": "Lean Mass Build phase begins" }
+        {
+          "label": "Aug 15",
+          "value": "Maintenance confirmed, Establish Maintenance phase complete"
+        },
+        {
+          "label": "Aug 16",
+          "value": "Lean Mass Build phase begins"
+        }
       ],
       "monthAhead": [
         "Continue the controlled surplus through September.",
@@ -281,82 +714,838 @@
   },
   {
     "id": "weekly_briefing_2026-10-26_2026-11-01",
-    "occurrence": { "value": "founder|scheduled|weekly|weekly:2026-10-26_2026-11-01" },
+    "occurrence": {
+      "value": "founder|scheduled|weekly|weekly:2026-10-26_2026-11-01"
+    },
     "cadence": "weekly",
     "generatedAt": "2026-11-01T15:00:00.000Z",
-    "evidenceWindow": { "id": "weekly:2026-10-26_2026-11-01", "startDate": "2026-10-26", "endDate": "2026-11-01", "briefingDate": "2026-11-01", "relativeLabel": "this completed week", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "weekly:2026-10-26_2026-11-01",
+      "startDate": "2026-10-26",
+      "endDate": "2026-11-01",
+      "briefingDate": "2026-11-01",
+      "relativeLabel": "this completed week",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_lean_mass_build", "phaseName": "Lean Mass Build" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
     "confidence": {
-      "score": 72, "band": "moderate", "priorScore": 72, "delta": 0, "movementDirection": "held",
+      "score": 72,
+      "band": "moderate",
+      "priorScore": 72,
+      "delta": 0,
+      "movementDirection": "held",
       "primaryReason": "This week's numbers confirm the existing trend rather than adding new information ahead of tomorrow's DEXA.",
-      "supportingReasons": ["Training and intake both held steady through the final week before the scan."],
+      "supportingReasons": [
+        "Training and intake both held steady through the final week before the scan."
+      ],
       "limitingReasons": [],
-      "unresolvedUncertainty": ["Tomorrow's DEXA will be the real test of this month's trajectory."],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_lean_mass_build", "capturedAt": "2026-11-01T15:00:00.000Z", "source": "canonical_pi_snapshot"
+      "unresolvedUncertainty": [
+        "Tomorrow's DEXA will be the real test of this month's trajectory."
+      ],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-11-01T15:00:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "weekly": {
-      "periodLabel": "Completed week", "reportingRangeLabel": "Oct 26–Nov 1",
-      "heroHeadline": "The last full week before the October DEXA.", "heroBody": "This is a collision-precedence fixture example: a Weekly Briefing whose delivery date lands the same day as October's Monthly Briefing. Home's latest-Briefing projection promotes the Monthly artifact on this day — Weekly stays fully retained here in History.",
-      "strategyPhaseLabel": "Current strategy: Lean Mass Build", "strategyWeekLabel": "Week 11", "strategyNextMilestone": "Next: DEXA review, Oct 31",
-      "energy": { "pairedDayCount": 7, "eligibleDayCount": 7, "averageIntakeKcal": 2800, "averageExpenditureKcal": 2450, "averageBalanceKcal": 350, "narrative": "The surplus held its range for an eleventh straight week.", "dailyBalances": null },
-      "weight": { "averageWeightLb": 173.8, "changeLb": 0.5, "narrative": "Consistent with the modeled surplus rate." },
+      "periodLabel": "Completed week",
+      "reportingRangeLabel": "Oct 26–Nov 1",
+      "heroHeadline": "The last full week before the October DEXA.",
+      "heroBody": "This is a collision-precedence fixture example: a Weekly Briefing whose delivery date lands the same day as October's Monthly Briefing. Home's latest-Briefing projection promotes the Monthly artifact on this day — Weekly stays fully retained here in History.",
+      "strategyPhaseLabel": "Current strategy: Lean Mass Build",
+      "strategyWeekLabel": "Week 11",
+      "strategyNextMilestone": "Next: DEXA review, Oct 31",
+      "energy": {
+        "pairedDayCount": 7,
+        "eligibleDayCount": 7,
+        "averageIntakeKcal": 2800,
+        "averageExpenditureKcal": 2450,
+        "averageBalanceKcal": 350,
+        "narrative": "The surplus held its range for an eleventh straight week.",
+        "dailyBalances": null
+      },
+      "weight": {
+        "averageWeightLb": 173.8,
+        "changeLb": 0.5,
+        "narrative": "Consistent with the modeled surplus rate."
+      },
       "photos": null,
-      "training": { "comparableCategoryCount": 4, "improvingCount": 1, "steadyCount": 3, "narrative": "Lower body progressed again; everything else held." },
+      "training": {
+        "comparableCategoryCount": 4,
+        "improvingCount": 1,
+        "steadyCount": 3,
+        "narrative": "Lower body progressed again; everything else held."
+      },
       "bodyComposition": null,
       "coachTake": {
         "biggestTakeaway": "Ten weeks of consistent execution are about to get their first real DEXA read.",
         "recommendation": "Hold everything steady through the scan — don't change intake based on scale weight this week.",
-        "intoNextWeek": ["No changes before the DEXA.", "Log the scan the same day it happens."]
+        "intoNextWeek": [
+          "No changes before the DEXA.",
+          "Log the scan the same day it happens."
+        ]
       }
     }
   },
   {
     "id": "monthly_briefing_2026-10",
-    "occurrence": { "value": "founder|scheduled|monthly|monthly:2026-10" },
+    "occurrence": {
+      "value": "founder|scheduled|monthly|monthly:2026-10"
+    },
     "cadence": "monthly",
     "generatedAt": "2026-11-01T16:00:00.000Z",
-    "evidenceWindow": { "id": "monthly:2026-10", "startDate": "2026-10-01", "endDate": "2026-10-31", "briefingDate": "2026-11-01", "relativeLabel": "October 2026", "timeZone": "America/Los_Angeles" },
+    "evidenceWindow": {
+      "id": "monthly:2026-10",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31",
+      "briefingDate": "2026-11-01",
+      "relativeLabel": "October 2026",
+      "timeZone": "America/Los_Angeles"
+    },
     "lifecycleState": "published",
-    "attribution": { "goalId": "goal_fixture_build_lean_mass", "goalTitle": "Build Lean Mass", "phaseId": "phase_fixture_lean_mass_build", "phaseName": "Lean Mass Build" },
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
     "confidence": {
-      "score": 72, "band": "moderate", "priorScore": 68, "delta": 4, "movementDirection": "increased",
+      "score": 72,
+      "band": "moderate",
+      "priorScore": 68,
+      "delta": 4,
+      "movementDirection": "increased",
       "primaryReason": "A second full month of consistent surplus execution with no stalled weeks continues to support the current trajectory.",
-      "supportingReasons": ["Every tracked lift is at or above where it was at the start of the month."],
-      "limitingReasons": ["Still awaiting the October 31 DEXA to confirm lean-mass gain directly."],
+      "supportingReasons": [
+        "Every tracked lift is at or above where it was at the start of the month."
+      ],
+      "limitingReasons": [
+        "Still awaiting the October 31 DEXA to confirm lean-mass gain directly."
+      ],
       "unresolvedUncertainty": [],
-      "goalId": "goal_fixture_build_lean_mass", "phaseId": "phase_fixture_lean_mass_build", "capturedAt": "2026-11-01T16:00:00.000Z", "source": "canonical_pi_snapshot"
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-11-01T16:00:00.000Z",
+      "source": "canonical_pi_snapshot"
     },
     "revisionProvenance": null,
     "replacedHistory": [],
     "monthly": {
       "monthLabel": "October 2026",
-      "heroHeadline": "A full month of steady surplus execution.", "heroBody": "October was the first complete calendar month entirely inside Lean Mass Build — no phase changes, no goal changes, just consistent execution. This is also this fixture's collision-precedence example: it delivers the same day as the Weekly Briefing above, and Home shows this one as current.",
+      "heroHeadline": "A full month of steady surplus execution.",
+      "heroBody": "October was the first complete calendar month entirely inside Lean Mass Build — no phase changes, no goal changes, just consistent execution. This is also this fixture's collision-precedence example: it delivers the same day as the Weekly Briefing above, and Home shows this one as current.",
       "heroGoalLabel": "Build Lean Mass · Lean Mass Build",
       "goalMilestone": null,
       "trainingProgress": {
         "narrative": "Progression continued across the month without a single stalled week.",
-        "stats": [ { "label": "Comparable lifts tracked", "value": "4" }, { "label": "Improving", "value": "3" }, { "label": "Steady", "value": "1" } ]
+        "stats": [
+          {
+            "label": "Comparable lifts tracked",
+            "value": "4"
+          },
+          {
+            "label": "Improving",
+            "value": "3"
+          },
+          {
+            "label": "Steady",
+            "value": "1"
+          }
+        ]
       },
       "energyEvolution": {
         "weeks": [
-          { "weekLabel": "Oct 4–10", "averageIntakeKcal": 2795, "averageExpenditureKcal": 2445 },
-          { "weekLabel": "Oct 11–17", "averageIntakeKcal": 2810, "averageExpenditureKcal": 2450 },
-          { "weekLabel": "Oct 18–24", "averageIntakeKcal": 2785, "averageExpenditureKcal": 2440 },
-          { "weekLabel": "Oct 25–31", "averageIntakeKcal": 2800, "averageExpenditureKcal": 2450 }
+          {
+            "weekLabel": "Oct 4–10",
+            "averageIntakeKcal": 2795,
+            "averageExpenditureKcal": 2445
+          },
+          {
+            "weekLabel": "Oct 11–17",
+            "averageIntakeKcal": 2810,
+            "averageExpenditureKcal": 2450
+          },
+          {
+            "weekLabel": "Oct 18–24",
+            "averageIntakeKcal": 2785,
+            "averageExpenditureKcal": 2440
+          },
+          {
+            "weekLabel": "Oct 25–31",
+            "averageIntakeKcal": 2800,
+            "averageExpenditureKcal": 2450
+          }
         ],
-        "averageIntakeKcal": 2798, "averageExpenditureKcal": 2446, "averageBalanceKcal": 352
+        "averageIntakeKcal": 2798,
+        "averageExpenditureKcal": 2446,
+        "averageBalanceKcal": 352
       },
       "newBaseline": {
         "referenceDateLabel": "July 18, 2026",
-        "bodyFatPercent": "8.2%", "leanMassLb": "149.0 lb", "fatMassLb": "13.4 lb",
+        "bodyFatPercent": "8.2%",
+        "leanMassLb": "149.0 lb",
+        "fatMassLb": "13.4 lb",
         "narrative": "Still the same starting point established when Build Lean Mass began — the October 31 DEXA (the day after this window closes) will be the first update to it."
       },
-      "whatChanged": [ "Nothing structural — this was a full month of steady execution inside the same phase." ],
-      "definingMoments": [ { "label": "Oct 31", "value": "Second DEXA scan of Build Lean Mass" } ],
-      "monthAhead": [ "Review the October 31 DEXA results as soon as they're confirmed.", "Reassess the surplus size once the DEXA read is in." ]
+      "whatChanged": [
+        "Nothing structural — this was a full month of steady execution inside the same phase."
+      ],
+      "definingMoments": [
+        {
+          "label": "Oct 31",
+          "value": "Second DEXA scan of Build Lean Mass"
+        }
+      ],
+      "monthAhead": [
+        "Review the October 31 DEXA results as soon as they're confirmed.",
+        "Reassess the surplus size once the DEXA read is in."
+      ]
+    }
+  },
+  {
+    "id": "dexa_event_dexa-fixture-005",
+    "occurrence": {
+      "value": "founder|event|dexa_event_dexa-fixture-005"
+    },
+    "cadence": "event",
+    "generatedAt": "2026-08-31T14:00:00.000Z",
+    "evidenceWindow": {
+      "id": "dexa-event:dexa-fixture-005",
+      "startDate": "2026-08-30",
+      "endDate": "2026-08-30",
+      "briefingDate": "2026-08-31",
+      "relativeLabel": "DEXA scan",
+      "timeZone": "America/Los_Angeles"
+    },
+    "lifecycleState": "published",
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
+    "confidence": {
+      "score": 63,
+      "band": "developing",
+      "priorScore": 70,
+      "delta": -7,
+      "movementDirection": "decreased",
+      "primaryReason": "Lean mass continued climbing but fat mass grew alongside it faster than the modeled surplus predicted, widening the uncertainty band on how clean this gain is.",
+      "supportingReasons": [
+        "Lean tissue is trending upward for the second scan in a row."
+      ],
+      "limitingReasons": [
+        "Fat mass grew 1.0 lb in two weeks — above the modeled rate for this surplus size.",
+        "Regional fat gain concentrated in the trunk, worth watching."
+      ],
+      "unresolvedUncertainty": [
+        "Whether the next scan confirms this as a real trend or normal scan-to-scan noise."
+      ],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-08-31T14:00:00.000Z",
+      "source": "canonical_pi_snapshot"
+    },
+    "revisionProvenance": {
+      "priorPublicationId": "dexa_event_dexa-fixture-005",
+      "priorPublicationVersion": "2026-08-31T09:00:00.000Z",
+      "replacementTimestamp": "2026-08-31T14:00:00.000Z",
+      "reason": "A confirmed training-evidence review arrived after the initial publish and updated the regional fat-change figures."
+    },
+    "replacedHistory": [
+      {
+        "generatedAt": "2026-08-31T09:00:00.000Z",
+        "headline": "Two weeks into the surplus, growth continues.",
+        "replacedReason": "A training-evidence confirmation updated the regional breakdown."
+      }
+    ],
+    "eventConsumedAt": "2026-09-10T09:00:00.000Z",
+    "weekly": null,
+    "midweek": null,
+    "monthly": null,
+    "dexa": {
+      "scanId": "dexa-fixture-005",
+      "priorScanId": "dexa-fixture-004",
+      "scanDate": "2026-08-30",
+      "priorScanDate": "2026-08-16",
+      "daysBetweenScans": 14,
+      "hero": {
+        "title": "Two weeks into the surplus, the gain is real — and mostly lean.",
+        "body": "This scan compares against your August 16 baseline, the day Lean Mass Build began. Weight is up 2.4 lb, and just over 60% of that gain measured as lean tissue.",
+        "results": [
+          {
+            "emoji": "⚖️",
+            "label": "DEXA Weight",
+            "value": "179.4 lb",
+            "context": "+2.4 lb vs Aug 16"
+          },
+          {
+            "emoji": "📊",
+            "label": "Body Fat",
+            "value": "9.4%",
+            "context": "+0.4 pts vs Aug 16"
+          },
+          {
+            "emoji": "💪",
+            "label": "Lean Tissue",
+            "value": "159.5 lb",
+            "context": "+1.5 lb vs Aug 16"
+          },
+          {
+            "emoji": "🔥",
+            "label": "Fat Mass",
+            "value": "16.9 lb",
+            "context": "+1.0 lb vs Aug 16"
+          }
+        ],
+        "milestones": []
+      },
+      "snapshot": {
+        "scanDate": "2026-08-30",
+        "daysBetweenScans": 14,
+        "weightLb": "179.4 lb",
+        "bodyFatPercent": "9.4%",
+        "fatMassLb": "16.9 lb",
+        "leanMassLb": "159.5 lb",
+        "restingMetabolicRateKcal": "2240"
+      },
+      "progress": {
+        "headline": [
+          {
+            "label": "DEXA Weight",
+            "previous": "177.0 lb",
+            "current": "179.4 lb",
+            "delta": "+2.4 lb"
+          },
+          {
+            "label": "Body Fat",
+            "previous": "9.0%",
+            "current": "9.4%",
+            "delta": "+0.4 pts"
+          },
+          {
+            "label": "Fat Mass",
+            "previous": "15.9 lb",
+            "current": "16.9 lb",
+            "delta": "+1.0 lb"
+          },
+          {
+            "label": "Lean Tissue",
+            "previous": "158.0 lb",
+            "current": "159.5 lb",
+            "delta": "+1.5 lb"
+          }
+        ],
+        "regionalFat": [
+          {
+            "region": "Arms",
+            "previous": "1.8 lb",
+            "current": "1.9 lb",
+            "delta": "+0.1 lb"
+          },
+          {
+            "region": "Legs",
+            "previous": "5.1 lb",
+            "current": "5.4 lb",
+            "delta": "+0.3 lb"
+          },
+          {
+            "region": "Trunk",
+            "previous": "7.6 lb",
+            "current": "8.1 lb",
+            "delta": "+0.5 lb"
+          }
+        ],
+        "regionalLean": [
+          {
+            "region": "Arms",
+            "previous": "18.3 lb",
+            "current": "18.6 lb",
+            "delta": "+0.3 lb"
+          },
+          {
+            "region": "Legs",
+            "previous": "54.6 lb",
+            "current": "55.1 lb",
+            "delta": "+0.5 lb"
+          },
+          {
+            "region": "Trunk",
+            "previous": "72.9 lb",
+            "current": "73.7 lb",
+            "delta": "+0.8 lb"
+          }
+        ],
+        "supplemental": [
+          {
+            "label": "Visceral Fat",
+            "previous": "1.0 lb",
+            "current": "1.1 lb",
+            "delta": "+0.1 lb"
+          },
+          {
+            "label": "A:G Ratio",
+            "previous": "1.41",
+            "current": "1.43",
+            "delta": "+0.02"
+          },
+          {
+            "label": "RMR",
+            "previous": "2220 cal/day",
+            "current": "2240 cal/day",
+            "delta": "+20 cal/day"
+          }
+        ],
+        "timeline": {
+          "timelineLabel": "Since Starting Lean Mass Build",
+          "isSimulated": false,
+          "baselineDate": "2026-08-16",
+          "currentDate": "2026-08-30",
+          "elapsedDays": 14,
+          "scans": [
+            {
+              "scanId": "dexa-fixture-004",
+              "date": "2026-08-16",
+              "value": "—"
+            },
+            {
+              "scanId": "dexa-fixture-005",
+              "date": "2026-08-30",
+              "value": "—"
+            }
+          ],
+          "metrics": [
+            {
+              "label": "DEXA Weight",
+              "unit": "lb",
+              "delta": "+2.4 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-004",
+                  "date": "2026-08-16",
+                  "value": "177.0"
+                },
+                {
+                  "scanId": "dexa-fixture-005",
+                  "date": "2026-08-30",
+                  "value": "179.4"
+                }
+              ]
+            },
+            {
+              "label": "Body Fat",
+              "unit": "%",
+              "delta": "+0.4 pts",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-004",
+                  "date": "2026-08-16",
+                  "value": "9.0"
+                },
+                {
+                  "scanId": "dexa-fixture-005",
+                  "date": "2026-08-30",
+                  "value": "9.4"
+                }
+              ]
+            },
+            {
+              "label": "Fat Mass",
+              "unit": "lb",
+              "delta": "+1.0 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-004",
+                  "date": "2026-08-16",
+                  "value": "15.9"
+                },
+                {
+                  "scanId": "dexa-fixture-005",
+                  "date": "2026-08-30",
+                  "value": "16.9"
+                }
+              ]
+            },
+            {
+              "label": "Lean Tissue",
+              "unit": "lb",
+              "delta": "+1.5 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-004",
+                  "date": "2026-08-16",
+                  "value": "158.0"
+                },
+                {
+                  "scanId": "dexa-fixture-005",
+                  "date": "2026-08-30",
+                  "value": "159.5"
+                }
+              ]
+            }
+          ],
+          "summary": "14 days into Lean Mass Build, weight is up 2.4 lb and lean tissue accounts for about 60% of that — right in line with the modeled surplus."
+        }
+      },
+      "interpretation": {
+        "opening": "This is the second scan since Lean Mass Build began, and the surplus is producing measurable tissue gain rather than just scale weight.",
+        "primaryLabel": "Body Composition",
+        "primaryText": "Fat mass grew slightly faster than modeled over these two weeks — not a guardrail breach, but worth watching if it continues at this rate.",
+        "leanMassText": "Lean tissue gained 1.5 lb, consistent with the training progression logged over the same window.",
+        "regionalText": "Most of the fat gain concentrated in the trunk; lean gain was distributed fairly evenly across arms, legs, and trunk.",
+        "phaseMeaning": "Lean Mass Build calls for exactly this kind of controlled gain — the question going forward is whether the fat-to-lean ratio holds as the surplus continues.",
+        "stoodOut": null,
+        "supportingEvidenceText": "Fourteen days of consistent nutrition and training logging back this comparison.",
+        "uncertaintyText": "One more scan is needed to know whether the trunk fat gain is a real trend or normal scan-to-scan noise."
+      },
+      "coachInsight": {
+        "biggestWin": "Lean tissue is climbing for the second scan in a row.",
+        "protect": "Keep the current surplus size — don't cut calories over one slightly-faster-than-modeled fat gain.",
+        "watch": "Trunk fat gain rate at the next scan.",
+        "next": "Hold intake steady and reassess at the next DEXA."
+      },
+      "phaseReview": null,
+      "goalCompletionHandoff": null
+    }
+  },
+  {
+    "id": "dexa_event_dexa-fixture-003",
+    "occurrence": {
+      "value": "founder|event|dexa_event_dexa-fixture-003"
+    },
+    "cadence": "event",
+    "generatedAt": "2026-07-19T08:00:00.000Z",
+    "evidenceWindow": {
+      "id": "dexa-event:dexa-fixture-003",
+      "startDate": "2026-07-18",
+      "endDate": "2026-07-18",
+      "briefingDate": "2026-07-19",
+      "relativeLabel": "DEXA scan",
+      "timeZone": "America/Los_Angeles"
+    },
+    "lifecycleState": "published",
+    "attribution": {
+      "goalId": "goal_visible_abs_at_rest",
+      "goalTitle": "Visible Abs at Rest",
+      "phaseId": null,
+      "phaseName": null
+    },
+    "confidence": {
+      "score": 88,
+      "band": "high",
+      "priorScore": 79,
+      "delta": 9,
+      "movementDirection": "increased",
+      "primaryReason": "The scan confirms the goal's numeric target was reached with lean mass fully preserved through the final stretch of the cut.",
+      "supportingReasons": [
+        "Body fat landed at 8.2%, inside the 8–9% target range.",
+        "Lean mass increased slightly despite the deficit."
+      ],
+      "limitingReasons": [],
+      "unresolvedUncertainty": [],
+      "goalId": "goal_visible_abs_at_rest",
+      "phaseId": null,
+      "capturedAt": "2026-07-19T08:00:00.000Z",
+      "source": "canonical_pi_snapshot"
+    },
+    "revisionProvenance": null,
+    "replacedHistory": [],
+    "eventConsumedAt": "2026-07-19T10:00:00.000Z",
+    "weekly": null,
+    "midweek": null,
+    "monthly": null,
+    "dexa": {
+      "scanId": "dexa-fixture-003",
+      "priorScanId": "dexa-fixture-002",
+      "scanDate": "2026-07-18",
+      "priorScanDate": "2026-06-20",
+      "daysBetweenScans": 28,
+      "hero": {
+        "title": "Body composition confirms Visible Abs at Rest.",
+        "body": "Twenty-eight days after your last scan, body fat dropped to 8.2% — inside the goal's target range — while lean mass held.",
+        "results": [
+          {
+            "emoji": "⚖️",
+            "label": "DEXA Weight",
+            "value": "172.0 lb",
+            "context": "-6.0 lb vs Jun 20"
+          },
+          {
+            "emoji": "📊",
+            "label": "Body Fat",
+            "value": "8.2%",
+            "context": "-3.3 pts vs Jun 20"
+          },
+          {
+            "emoji": "💪",
+            "label": "Lean Tissue",
+            "value": "155.0 lb",
+            "context": "+0.4 lb vs Jun 20"
+          },
+          {
+            "emoji": "🔥",
+            "label": "Fat Mass",
+            "value": "14.1 lb",
+            "context": "-6.4 lb vs Jun 20"
+          }
+        ],
+        "milestones": [
+          "Visible Abs at Rest — target body fat range reached"
+        ]
+      },
+      "snapshot": {
+        "scanDate": "2026-07-18",
+        "daysBetweenScans": 28,
+        "weightLb": "172.0 lb",
+        "bodyFatPercent": "8.2%",
+        "fatMassLb": "14.1 lb",
+        "leanMassLb": "155.0 lb",
+        "restingMetabolicRateKcal": "2185"
+      },
+      "progress": {
+        "headline": [
+          {
+            "label": "DEXA Weight",
+            "previous": "178.0 lb",
+            "current": "172.0 lb",
+            "delta": "-6.0 lb"
+          },
+          {
+            "label": "Body Fat",
+            "previous": "11.5%",
+            "current": "8.2%",
+            "delta": "-3.3 pts"
+          },
+          {
+            "label": "Fat Mass",
+            "previous": "20.5 lb",
+            "current": "14.1 lb",
+            "delta": "-6.4 lb"
+          },
+          {
+            "label": "Lean Tissue",
+            "previous": "154.6 lb",
+            "current": "155.0 lb",
+            "delta": "+0.4 lb"
+          }
+        ],
+        "regionalFat": [
+          {
+            "region": "Arms",
+            "previous": "2.4 lb",
+            "current": "1.6 lb",
+            "delta": "-0.8 lb"
+          },
+          {
+            "region": "Legs",
+            "previous": "6.8 lb",
+            "current": "4.6 lb",
+            "delta": "-2.2 lb"
+          },
+          {
+            "region": "Trunk",
+            "previous": "10.4 lb",
+            "current": "6.8 lb",
+            "delta": "-3.6 lb"
+          }
+        ],
+        "regionalLean": [
+          {
+            "region": "Arms",
+            "previous": "17.5 lb",
+            "current": "17.8 lb",
+            "delta": "+0.3 lb"
+          },
+          {
+            "region": "Legs",
+            "previous": "53.0 lb",
+            "current": "53.6 lb",
+            "delta": "+0.6 lb"
+          },
+          {
+            "region": "Trunk",
+            "previous": "71.8 lb",
+            "current": "71.6 lb",
+            "delta": "-0.2 lb"
+          }
+        ],
+        "supplemental": [
+          {
+            "label": "Visceral Fat",
+            "previous": "1.3 lb",
+            "current": "0.9 lb",
+            "delta": "-0.4 lb"
+          },
+          {
+            "label": "A:G Ratio",
+            "previous": "1.49",
+            "current": "1.40",
+            "delta": "-0.09"
+          },
+          {
+            "label": "RMR",
+            "previous": "2160 cal/day",
+            "current": "2185 cal/day",
+            "delta": "+25 cal/day"
+          }
+        ],
+        "timeline": {
+          "timelineLabel": "Available Body-Composition History",
+          "isSimulated": false,
+          "baselineDate": "2026-05-24",
+          "currentDate": "2026-07-18",
+          "elapsedDays": 55,
+          "scans": [
+            {
+              "scanId": "dexa-fixture-001",
+              "date": "2026-05-24",
+              "value": "—"
+            },
+            {
+              "scanId": "dexa-fixture-002",
+              "date": "2026-06-20",
+              "value": "—"
+            },
+            {
+              "scanId": "dexa-fixture-003",
+              "date": "2026-07-18",
+              "value": "—"
+            }
+          ],
+          "metrics": [
+            {
+              "label": "DEXA Weight",
+              "unit": "lb",
+              "delta": "-13.5 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-001",
+                  "date": "2026-05-24",
+                  "value": "185.5"
+                },
+                {
+                  "scanId": "dexa-fixture-002",
+                  "date": "2026-06-20",
+                  "value": "178.0"
+                },
+                {
+                  "scanId": "dexa-fixture-003",
+                  "date": "2026-07-18",
+                  "value": "172.0"
+                }
+              ]
+            },
+            {
+              "label": "Body Fat",
+              "unit": "%",
+              "delta": "-6.6 pts",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-001",
+                  "date": "2026-05-24",
+                  "value": "14.8"
+                },
+                {
+                  "scanId": "dexa-fixture-002",
+                  "date": "2026-06-20",
+                  "value": "11.5"
+                },
+                {
+                  "scanId": "dexa-fixture-003",
+                  "date": "2026-07-18",
+                  "value": "8.2"
+                }
+              ]
+            },
+            {
+              "label": "Fat Mass",
+              "unit": "lb",
+              "delta": "-13.3 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-001",
+                  "date": "2026-05-24",
+                  "value": "27.4"
+                },
+                {
+                  "scanId": "dexa-fixture-002",
+                  "date": "2026-06-20",
+                  "value": "20.5"
+                },
+                {
+                  "scanId": "dexa-fixture-003",
+                  "date": "2026-07-18",
+                  "value": "14.1"
+                }
+              ]
+            },
+            {
+              "label": "Lean Tissue",
+              "unit": "lb",
+              "delta": "+0.2 lb",
+              "points": [
+                {
+                  "scanId": "dexa-fixture-001",
+                  "date": "2026-05-24",
+                  "value": "154.8"
+                },
+                {
+                  "scanId": "dexa-fixture-002",
+                  "date": "2026-06-20",
+                  "value": "154.6"
+                },
+                {
+                  "scanId": "dexa-fixture-003",
+                  "date": "2026-07-18",
+                  "value": "155.0"
+                }
+              ]
+            }
+          ],
+          "summary": "Fifty-five days and three scans across the full cut, body fat dropped 6.6 points while lean mass held essentially flat — exactly the outcome Visible Abs at Rest was built around."
+        }
+      },
+      "interpretation": {
+        "opening": "This scan closes the loop on Visible Abs at Rest: the numeric target and eight weeks of visual tracking now agree.",
+        "primaryLabel": "Fat Loss",
+        "primaryText": "Body fat fell 3.3 points in four weeks, the fastest single-scan drop of the entire cut, with the deficit held through the final stretch rather than eased up.",
+        "leanMassText": "Lean mass gained 0.4 lb despite the deficit — a strong preservation result for an eight-week cut.",
+        "regionalText": "Trunk fat dropped the most of any region (-3.6 lb), consistent with the visual definition the goal was built around.",
+        "phaseMeaning": null,
+        "stoodOut": "Lean mass didn't just hold — it went up slightly, unusual for the final weeks of a cut.",
+        "supportingEvidenceText": "Twenty-eight days of consistent weigh-ins and training logs support this comparison.",
+        "uncertaintyText": "None — this scan is the closing measurement for the goal, not a projection."
+      },
+      "coachInsight": {
+        "biggestWin": "Visible Abs at Rest is complete, with lean mass preserved through the entire cut.",
+        "protect": "Don't rush straight into a new deficit — confirm the goal transition before changing intake again.",
+        "watch": "How the body responds to the first few weeks back at maintenance.",
+        "next": "Confirm the visual criterion with an updated photo, then choose what's next."
+      },
+      "phaseReview": {
+        "title": "Goal Complete: Visible Abs at Rest",
+        "promptText": "The numeric target has been reached. Choose what comes next.",
+        "options": [
+          "Begin Build Lean Mass",
+          "Continue Visible Abs at Rest"
+        ],
+        "recordedDecisionLabel": "Began Build Lean Mass"
+      },
+      "goalCompletionHandoff": {
+        "questionText": "The body-fat target is confirmed — one visual check remains before Visible Abs at Rest can close.",
+        "actionLabel": "Upload Progress Photos",
+        "actionDestination": {
+          "id": "photo.upload"
+        }
+      }
     }
   }
 ]

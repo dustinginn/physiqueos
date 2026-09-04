@@ -125,6 +125,7 @@ private struct BriefingHistoryRow: View {
         case .midweek: "calendar.badge.clock"
         case .monthly: "calendar.circle"
         case .daily: "sun.max"
+        case .event: "waveform.path.ecg"
         }
     }
 

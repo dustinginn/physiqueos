@@ -1,14 +1,21 @@
 import SwiftUI
 
-/// `/briefings/review/[artifactId]` — one router-level container for all
-/// three recurring cadences. Looks the artifact up through the SAME
-/// `BriefingSandboxStore` History reads from (never a duplicate fixture),
-/// renders the shared top-of-Detail navigation the Founder asked for
-/// (clear access to Home and to Briefing History from every Briefing
+/// `/briefings/review/[artifactId]` — one router-level container for every
+/// cadence, including DEXA Event Briefings. Looks the artifact up through
+/// the SAME `BriefingSandboxStore` History reads from (never a duplicate
+/// fixture), renders the shared top-of-Detail navigation the Founder asked
+/// for (clear access to Home and to Briefing History from every Briefing
 /// Detail), the shared revision disclosure, then dispatches to the
-/// cadence-specific section content — Weekly, Midweek, and Monthly are
-/// genuinely distinct screens on the real product (verified per-cadence
-/// during this task's audit), not one reskinned template.
+/// cadence-specific section content — Weekly, Midweek, Monthly, and DEXA
+/// Event are genuinely distinct screens on the real product (verified
+/// per-cadence across this and a prior task's audit), not one reskinned
+/// template. DEXA Event Briefings reach this exact same architecture from
+/// either Home or History — the real product actually splits this across
+/// two different URL shapes for the same underlying artifact
+/// (`/briefings/dexa/[scanId]` from Home, `/briefings/review/[artifactId]`
+/// from History); Native unifies both onto the one existing
+/// `briefingId`-keyed lookup rather than building a second navigation
+/// path.
 struct BriefingDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     let briefingId: String
@@ -57,6 +64,10 @@ struct BriefingDetailView: View {
                 case .monthly:
                     if let monthly = briefing.monthly {
                         MonthlyBriefingSections(content: monthly, confidence: briefing.confidence, onNavigate: onNavigate)
+                    }
+                case .event:
+                    if let dexa = briefing.dexa {
+                        DEXABriefingSections(content: dexa, onNavigate: onNavigate)
                     }
                 case .daily:
                     EmptyView()

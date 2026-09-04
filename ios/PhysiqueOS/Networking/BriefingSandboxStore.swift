@@ -61,26 +61,39 @@ final class BriefingSandboxStore {
     // MARK: - Home latest-Briefing projection (collision precedence)
 
     /// `resolveHomeBriefingSelection` (`HomeBriefingRoutingService.js`) —
-    /// verified real precedence: a Monthly Briefing whose delivery day is
-    /// TODAY takes over Home's "current Briefing" card, short-circuiting
-    /// before Weekly/Midweek are even considered (confirmed by source:
-    /// "promotes Monthly on its delivery date... returns to routine
-    /// cadence selection after Monthly delivery day" — i.e. the promotion
-    /// window is exactly the delivery day itself). This is a
-    /// PRESENTATION-ONLY rule: it changes nothing about generation or
-    /// History, which lists every artifact independently regardless of
-    /// this projection (see `history` above). DEXA/Photo Event Briefings
-    /// would take precedence over all of this on the real product — not
-    /// modeled here since Event Briefings are a later batch.
+    /// verified real precedence, checked in this exact order:
+    ///
+    /// 1. An **active `.event` artifact always wins**, unconditionally —
+    ///    this is checked FIRST and short-circuits before Monthly is even
+    ///    considered (verified: `HomeBriefingRoutingService.test.js`'s own
+    ///    "promotes Monthly on its delivery date without hiding an active
+    ///    Event" case proves Event beats Monthly even on Monthly's own
+    ///    delivery day). "Active" for a DEXA event has **no same-day
+    ///    window at all** (`isEventActiveForHome` returns `true`
+    ///    unconditionally for `evidenceType == "dexa"`, unlike Photo
+    ///    events) — it stays the Home selection indefinitely until
+    ///    `eventConsumedAt` is set. See `BriefingReadModel.eventConsumedAt`.
+    /// 2. Else, a Monthly Briefing whose delivery day is TODAY takes over
+    ///    ("promotes Monthly on its delivery date... returns to routine
+    ///    cadence selection after Monthly delivery day" — the promotion
+    ///    window is exactly the delivery day itself).
+    /// 3. Else, whichever of Weekly/Midweek has the more recent
+    ///    `generatedAt` (Weekly breaks ties).
+    ///
+    /// This is a PRESENTATION-ONLY rule: it changes nothing about
+    /// generation or History, which lists every artifact independently
+    /// regardless of this projection (see `history` above).
     func latestForHome(now: Date = Date()) -> BriefingReadModel? {
         Self.latestForHome(from: briefings, now: now)
     }
 
-    /// Pure form of `latestForHome` above — the Monthly-collision-
+    /// Pure form of `latestForHome` above — the Event/Monthly-collision-
     /// precedence contract, directly testable against synthetic artifacts
-    /// (a same-delivery-day Monthly/Weekly pair, an unpublished/failed
-    /// artifact that must never win, etc.) without depending on the
-    /// bundled fixture's own dates lining up with `now`.
+    /// (an active-event-vs-Monthly-delivery-day collision, a consumed
+    /// event that must fall through, a same-delivery-day Monthly/Weekly
+    /// pair, an unpublished/failed artifact that must never win, etc.)
+    /// without depending on the bundled fixture's own dates lining up with
+    /// `now`.
     static func latestForHome(from briefings: [BriefingReadModel], now: Date = Date()) -> BriefingReadModel? {
         let today = Self.dateKey(now)
         // On the real product `now` is always "the current moment," so the
@@ -93,6 +106,19 @@ final class BriefingSandboxStore {
         // `.max(by: generatedAt)` comparisons below.
         let nowISO = Self.isoTimestamp(now)
         let published = briefings.filter { $0.lifecycleState == .published && $0.generatedAt <= nowISO }
+
+        // Same reasoning as the `generatedAt <= nowISO` bound above: a
+        // fixture-authored `eventConsumedAt` in the future relative to
+        // `now` hasn't happened yet from that moment's perspective (on the
+        // real product `now` is always literally "the current moment," so
+        // a set `consumedAt` there always already lies in the past) — an
+        // event only counts as consumed once its own `eventConsumedAt` has
+        // actually been reached.
+        if let activeEvent = published
+            .filter({ $0.cadence == .event && ($0.eventConsumedAt.map { $0 > nowISO } ?? true) })
+            .max(by: { $0.generatedAt < $1.generatedAt }) {
+            return activeEvent
+        }
 
         if let monthly = published.filter({ $0.cadence == .monthly }).max(by: { $0.generatedAt < $1.generatedAt }),
            monthly.evidenceWindow.briefingDate == today {

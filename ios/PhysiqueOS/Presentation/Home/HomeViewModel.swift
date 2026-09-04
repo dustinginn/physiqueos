@@ -85,17 +85,25 @@ final class HomeViewModel {
     /// there's nothing to show" contract.
     private static func projectBriefingCards(from briefing: BriefingReadModel?) -> [HomeBriefingCard] {
         guard let briefing else { return [] }
+        // Verified real copy (`mapBriefingCard`, `HomeBriefingService.js`):
+        // an active `.event` artifact's Home card always reads
+        // "DEXA Analysis Ready" under an "Event Briefing" section label —
+        // fixed copy, not the artifact's own hero title (unlike every
+        // other cadence, which does use its own hero text on Home).
+        let sectionLabel = briefing.cadence == .event ? "Event Briefing" : briefing.cadence.label
+        let title = briefing.cadence == .event ? "DEXA Analysis Ready" : briefing.historyTitle
         let prompt: String = switch briefing.cadence {
         case .weekly: briefing.weekly?.heroBody ?? ""
         case .midweek: briefing.midweek?.heroSummary ?? ""
         case .monthly: briefing.monthly?.heroBody ?? ""
+        case .event: briefing.dexa?.hero.body ?? ""
         case .daily: ""
         }
         return [
             HomeBriefingCard(
                 id: briefing.id,
-                sectionLabel: briefing.cadence.label,
-                title: briefing.historyTitle,
+                sectionLabel: sectionLabel,
+                title: title,
                 prompt: prompt,
                 createdAt: briefing.generatedAt,
                 destination: .briefingDetail(briefingId: briefing.id)
