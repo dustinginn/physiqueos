@@ -31,9 +31,9 @@ struct GoalPhaseDetailView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = GoalPhaseDetailViewModel(api: environment.goalsAPI, goalId: goalId, phaseId: phaseId)
+                viewModel = GoalPhaseDetailViewModel(store: environment.goalsSandboxStore, goalId: goalId, phaseId: phaseId)
             }
-            await viewModel?.load()
+            viewModel?.load()
         }
     }
 

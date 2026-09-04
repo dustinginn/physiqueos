@@ -10,7 +10,7 @@ extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
-        case strategyType, strategyId, protocolId, executionId, setId
+        case strategyType, strategyId, protocolId, executionId, setId, category
     }
 
     init(from decoder: Decoder) throws {
@@ -31,6 +31,26 @@ extension AppDestination {
             self = .goalPlan(
                 goalId: try parameters.decode(String.self, forKey: .goalId),
                 focus: try parameters.decode(GoalPlanFocus.self, forKey: .focus)
+            )
+        case "native.goal.edit":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .goalEdit(goalId: try parameters.decode(String.self, forKey: .goalId))
+        case "native.goal.transition":
+            self = .goalTransition
+        case "native.goal.transition.protocols":
+            self = .goalProtocolTransition
+        case "native.goal.transition.protocols.edit":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .goalProtocolTransitionEdit(category: try parameters.decode(String.self, forKey: .category))
+        case "native.goal.transition.review":
+            self = .goalTransitionReview
+        case "native.goal.transition.success":
+            self = .goalTransitionSuccess
+        case "native.goal.phase.transition":
+            let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
+            self = .goalPhaseTransition(
+                goalId: try parameters.decode(String.self, forKey: .goalId),
+                phaseId: try parameters.decode(String.self, forKey: .phaseId)
             )
         case "check-in":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
@@ -142,6 +162,11 @@ extension AppDestination {
         case .goalPlan(let goalId, let focus):
             try parameters.encode(goalId, forKey: .goalId)
             try parameters.encode(focus, forKey: .focus)
+        case .goalEdit(let goalId): try parameters.encode(goalId, forKey: .goalId)
+        case .goalProtocolTransitionEdit(let category): try parameters.encode(category, forKey: .category)
+        case .goalPhaseTransition(let goalId, let phaseId):
+            try parameters.encode(goalId, forKey: .goalId)
+            try parameters.encode(phaseId, forKey: .phaseId)
         case .checkIn(let checkInType): try parameters.encode(checkInType, forKey: .checkInType)
         case .briefingDetail(let briefingId): try parameters.encode(briefingId, forKey: .briefingId)
         case .priorityDetail(let priorityId): try parameters.encode(priorityId, forKey: .priorityId)
@@ -168,7 +193,8 @@ extension AppDestination {
         case .operatingPlanSupplementEdit(let protocolId): try parameters.encode(protocolId, forKey: .protocolId)
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
              .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew,
-             .operatingPlanDexaAppointment, .operatingPlanTrainingStrategyBuilder, .founderServerConnection:
+             .operatingPlanDexaAppointment, .operatingPlanTrainingStrategyBuilder, .founderServerConnection,
+             .goalTransition, .goalProtocolTransition, .goalTransitionReview, .goalTransitionSuccess:
             break
         }
     }

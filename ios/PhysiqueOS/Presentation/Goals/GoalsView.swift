@@ -18,8 +18,8 @@ struct GoalsView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .task {
-            if viewModel == nil { viewModel = GoalsViewModel(api: environment.goalsAPI) }
-            await viewModel?.load()
+            if viewModel == nil { viewModel = GoalsViewModel(store: environment.goalsSandboxStore) }
+            viewModel?.load()
         }
     }
 
@@ -143,6 +143,18 @@ struct GoalsView: View {
     }
 
     private func addGoalCard(_ hub: GoalsHubReadModel) -> some View {
+        Group {
+            if hub.addGoalAvailable {
+                Button { onNavigate(.goalTransition) } label: { addGoalCardContent(hub) }
+                    .buttonStyle(.plain)
+            } else {
+                addGoalCardContent(hub)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func addGoalCardContent(_ hub: GoalsHubReadModel) -> some View {
         GoalAtmosphericCard(tone: .neutral, padding: 12, cornerRadius: 18) {
             HStack(alignment: .center, spacing: 11) {
                 IconBadge(systemImage: "plus", color: .primary, size: .sm, isCircular: true)
@@ -154,8 +166,11 @@ struct GoalsView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+                if hub.addGoalAvailable {
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right").foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
             }
         }
-        .accessibilityElement(children: .combine)
     }
 }

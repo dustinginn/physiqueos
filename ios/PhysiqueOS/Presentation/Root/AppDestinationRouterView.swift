@@ -20,6 +20,20 @@ struct AppDestinationRouterView: View {
             GoalPhaseDetailView(goalId: goalId, phaseId: phaseId)
         case .goalPlan(let goalId, let focus):
             GoalStrategyView(goalId: goalId, focus: focus)
+        case .goalEdit(let goalId):
+            GoalEditWizardView(onNavigate: onNavigate, goalId: goalId)
+        case .goalTransition:
+            GoalTransitionWizardView(onNavigate: onNavigate)
+        case .goalProtocolTransition:
+            GoalProtocolTransitionView(onNavigate: onNavigate)
+        case .goalProtocolTransitionEdit(let category):
+            GoalProtocolCategoryEditorView(category: category)
+        case .goalTransitionReview:
+            GoalTransitionFinalReviewView(onNavigate: onNavigate)
+        case .goalTransitionSuccess:
+            GoalTransitionSuccessView(onNavigate: onNavigate)
+        case .goalPhaseTransition(let goalId, let phaseId):
+            PhaseTransitionView(goalId: goalId, phaseId: phaseId)
         case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
             MorningCheckInView()
         case .priorityDetail(let priorityId):

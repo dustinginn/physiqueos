@@ -35,6 +35,7 @@ final class AppEnvironment {
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
+    let goalsSandboxStore: GoalsSandboxStore
     /// Deliberately isolated live transport proof. Existing product screens
     /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
@@ -56,6 +57,7 @@ final class AppEnvironment {
         trainingLoggerDraftStore: TrainingLoggerDraftStore = UserDefaultsTrainingLoggerDraftStore(),
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
         operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
+        goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI()
     ) {
         self.homeAPI = homeAPI
@@ -74,6 +76,7 @@ final class AppEnvironment {
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
+        self.goalsSandboxStore = goalsSandboxStore
         self.founderServerAPI = founderServerAPI
     }
 }

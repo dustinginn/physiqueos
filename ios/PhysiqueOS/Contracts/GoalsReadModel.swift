@@ -81,6 +81,13 @@ struct ActiveGoalReadModel: Codable, Equatable, Identifiable {
     var trainingProgress: GoalTrainingProgressReadModel
     var turningPoints: [GoalTurningPointReadModel]
     var strategy: [GoalStrategyItemReadModel]
+    /// The raw, editable Goal Plan — `/goals/[goalId]/edit`'s source of
+    /// truth. Every presentation field above (`title`, `objective`,
+    /// `dateRange`, `guardrail`) is regenerated from this after a Goal
+    /// Edit save, the same "raw editor → derived display" split
+    /// `OperatingPlanSandboxStore` already establishes for Training/
+    /// Nutrition/Coaching strategy edits.
+    var plan: GoalPlanReadModel
 
     var activePhase: GoalPhaseReadModel? {
         phases.first { $0.id == activePhaseId && $0.status == .active }
@@ -131,6 +138,21 @@ enum GoalPhaseStatus: String, Codable, Equatable {
     }
 }
 
+/// `goalPhase.js`'s `timingMode` — how a phase's end is determined.
+enum GoalPhaseTimingMode: String, Codable, CaseIterable, Identifiable {
+    case fixedDuration = "fixed_duration"
+    case targetDate = "target_date"
+    case completionCriteria = "completion_criteria"
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .fixedDuration: "Planned duration"
+        case .targetDate: "Reach a target date"
+        case .completionCriteria: "Open-ended and evidence-led"
+        }
+    }
+}
+
 struct GoalPhaseReadModel: Codable, Equatable, Identifiable {
     var id: String
     var order: Int
@@ -143,6 +165,14 @@ struct GoalPhaseReadModel: Codable, Equatable, Identifiable {
     var strategy: [String]
     var successCriteria: [String]
     var guardrails: [String]
+    /// Raw calendar-date boundaries (`yyyy-MM-dd`) backing the
+    /// presentation-only `dates` string above — the fields Goal Edit's
+    /// Phases section and the Phase Transition flow actually read/write.
+    /// `startDate` is always present; `targetDate` is nil for an
+    /// open-ended (`.completionCriteria`) phase.
+    var startDate: String = ""
+    var targetDate: String? = nil
+    var timingMode: GoalPhaseTimingMode = .targetDate
 
     func destination(goalId: String) -> AppDestination {
         .goalPhase(goalId: goalId, phaseId: id)

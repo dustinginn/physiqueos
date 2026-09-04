@@ -1,5 +1,10 @@
 import Foundation
 
+/// Reads through `GoalsSandboxStore` — the mutable source of truth Goal
+/// Edit/Goal Transition commands write to — rather than the stateless
+/// `GoalsAPI`, so the Goals tab reflects a fixture-session edit
+/// immediately. `GoalStrategyViewModel` below is unaffected by this
+/// task's commands and is left on `GoalsAPI`.
 @Observable
 @MainActor
 final class GoalsViewModel {
@@ -10,18 +15,14 @@ final class GoalsViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    private let api: GoalsAPI
+    private let store: GoalsSandboxStore
 
-    init(api: GoalsAPI) {
-        self.api = api
+    init(store: GoalsSandboxStore) {
+        self.store = store
     }
 
-    func load() async {
-        do {
-            state = .loaded(try await api.fetchGoalsHub())
-        } catch {
-            state = .failed("Goals could not be loaded.")
-        }
+    func load() {
+        state = .loaded(store.hub)
     }
 }
 
@@ -36,24 +37,20 @@ final class GoalDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    private let api: GoalsAPI
+    private let store: GoalsSandboxStore
     private let goalId: String
 
-    init(api: GoalsAPI, goalId: String) {
-        self.api = api
+    init(store: GoalsSandboxStore, goalId: String) {
+        self.store = store
         self.goalId = goalId
     }
 
-    func load() async {
-        do {
-            guard let detail = try await api.fetchGoalDetail(goalId: goalId) else {
-                state = .unavailable
-                return
-            }
-            state = .loaded(detail)
-        } catch {
-            state = .failed("Goal details could not be loaded.")
+    func load() {
+        guard let detail = store.goalDetail(goalId: goalId) else {
+            state = .unavailable
+            return
         }
+        state = .loaded(detail)
     }
 }
 
@@ -68,26 +65,26 @@ final class GoalPhaseDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
-    private let api: GoalsAPI
+    private let store: GoalsSandboxStore
     private let goalId: String
     private let phaseId: String
 
-    init(api: GoalsAPI, goalId: String, phaseId: String) {
-        self.api = api
+    init(store: GoalsSandboxStore, goalId: String, phaseId: String) {
+        self.store = store
         self.goalId = goalId
         self.phaseId = phaseId
     }
 
-    func load() async {
-        do {
-            guard let detail = try await api.fetchGoalPhase(goalId: goalId, phaseId: phaseId) else {
-                state = .unavailable
-                return
-            }
-            state = .loaded(detail)
-        } catch {
-            state = .failed("Phase details could not be loaded.")
+    func load() {
+        guard let active = store.goalDetail(goalId: goalId)?.active,
+              let phase = active.phases.first(where: { $0.id == phaseId }) else {
+            state = .unavailable
+            return
         }
+        state = .loaded(GoalPhaseDetailReadModel(
+            goalId: active.id, goalTitle: active.title, phase: phase,
+            goalProgress: active.goalProgress, confidence: active.confidence, guardrail: active.guardrail
+        ))
     }
 }
 

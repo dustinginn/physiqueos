@@ -23,7 +23,7 @@ struct HomeView: View {
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if viewModel == nil { viewModel = HomeViewModel(api: environment.homeAPI, priorityStore: environment.loggingSandboxStore) }
+            if viewModel == nil { viewModel = HomeViewModel(api: environment.homeAPI, priorityStore: environment.loggingSandboxStore, goalsSandboxStore: environment.goalsSandboxStore) }
             await viewModel?.load()
         }
         .sheet(item: Binding(

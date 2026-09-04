@@ -15,6 +15,23 @@ enum AppDestination: Hashable, Codable {
     /// they do not claim a production mutation contract.
     case goalPhase(goalId: String, phaseId: String)
     case goalPlan(goalId: String, focus: GoalPlanFocus)
+    /// `/goals/[goalId]/edit`.
+    case goalEdit(goalId: String)
+    /// `/goals/transition` (Route A of the 5-route Goal Transition tree).
+    case goalTransition
+    /// `/goals/transition/protocols` (Route B).
+    case goalProtocolTransition
+    /// `/goals/transition/protocols/edit/[category]` (Route C).
+    case goalProtocolTransitionEdit(category: String)
+    /// `/goals/transition/review` (Route D).
+    case goalTransitionReview
+    /// `/goals/transition/success` (Route E).
+    case goalTransitionSuccess
+    /// Native-only: the honest Phase Transition + Energy Strategy
+    /// extension (see `GoalsSandboxModel.swift`'s doc comment — the live
+    /// web's Phase Review flow does not yet prompt for a new Energy
+    /// Strategy; this models the intended domain contract).
+    case goalPhaseTransition(goalId: String, phaseId: String)
     case checkIn(checkInType: String)
     case photoUpload
     case dexaUpload
@@ -134,6 +151,13 @@ enum AppDestination: Hashable, Codable {
         case .goalDetail: "goal.detail"
         case .goalPhase: "native.goal.phase"
         case .goalPlan: "native.goal.plan"
+        case .goalEdit: "native.goal.edit"
+        case .goalTransition: "native.goal.transition"
+        case .goalProtocolTransition: "native.goal.transition.protocols"
+        case .goalProtocolTransitionEdit: "native.goal.transition.protocols.edit"
+        case .goalTransitionReview: "native.goal.transition.review"
+        case .goalTransitionSuccess: "native.goal.transition.success"
+        case .goalPhaseTransition: "native.goal.phase.transition"
         case .checkIn: "check-in"
         case .photoUpload: "photo.upload"
         case .dexaUpload: "dexa.upload"

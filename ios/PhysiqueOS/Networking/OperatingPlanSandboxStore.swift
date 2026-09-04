@@ -139,6 +139,61 @@ final class OperatingPlanSandboxStore {
         return .success(())
     }
 
+    // MARK: - Phase 2 Energy Strategy (honest domain-contract extension — see GoalsSandboxModel.swift)
+
+    private static let energyStrategyId = "strategy_fixture_energy"
+
+    func hasEnergyStrategy(forPhaseId phaseId: String) -> Bool {
+        strategyDetails[Self.energyStrategyId]?.energyPhaseHistory.contains { $0.id == phaseId } ?? false
+    }
+
+    /// Appends a new, active `OperatingPlanEnergyPhaseSnapshotReadModel`
+    /// for the phase beginning, flips every prior snapshot's `isActive` to
+    /// false WITHOUT removing or overwriting them (Phase 1's calibration
+    /// history stays exactly as recorded), and updates the live Energy
+    /// Strategy landing/detail fields to reflect the new active numbers —
+    /// the same "raw command + regenerated derived display" pattern every
+    /// other save method here follows.
+    @discardableResult
+    func establishPhaseEnergyStrategy(goalId: String, phaseId: String, phaseName: String, phaseOrder: Int, caloricMin: Int, caloricMax: Int, activityTarget: Int, reviewCadence: String, note: String) -> Result<Void, OperatingPlanSandboxError> {
+        guard caloricMax >= caloricMin, caloricMin > 0, activityTarget > 0 else {
+            return .failure(.init(message: "Enter a valid caloric intake range and activity target."))
+        }
+        guard var detail = strategyDetails[Self.energyStrategyId] else {
+            return .failure(.init(message: "Energy Strategy is unavailable."))
+        }
+        let snapshot = OperatingPlanEnergyPhaseSnapshotReadModel(
+            id: phaseId, goalId: goalId, phaseName: phaseName, phaseOrder: phaseOrder, isActive: true,
+            caloricIntake: "\(caloricMin)–\(caloricMax) kcal/day", activityTarget: "\(activityTarget) active kcal/day",
+            reviewCadence: reviewCadence, note: note
+        )
+        var history = detail.energyPhaseHistory.map { entry -> OperatingPlanEnergyPhaseSnapshotReadModel in
+            var copy = entry
+            copy.isActive = false
+            return copy
+        }
+        if let existingIndex = history.firstIndex(where: { $0.id == phaseId }) {
+            history[existingIndex] = snapshot
+        } else {
+            history.append(snapshot)
+        }
+        detail.energyPhaseHistory = history
+        detail.fields = [
+            .init(label: "Current Energy Phase", value: phaseName),
+            .init(label: "Caloric Intake", value: snapshot.caloricIntake),
+            .init(label: "Activity Target", value: snapshot.activityTarget),
+            .init(label: "Calibration Approach", value: "\(reviewCadence) · Small adjustments"),
+        ]
+        strategyDetails[Self.energyStrategyId] = detail
+
+        if let sectionIndex = landing.sections.firstIndex(where: { $0.id == "energy" }), var item = landing.sections[sectionIndex].items.first {
+            item.title = "\(phaseName) Energy Strategy"
+            item.detail = "\(snapshot.caloricIntake) · \(snapshot.activityTarget) · \(reviewCadence) review"
+            landing.sections[sectionIndex].items = [item]
+        }
+        return .success(())
+    }
+
     // MARK: - DEXA Appointment (`/profile/operating-plan/execution/dexa`)
 
     /// Reuses the SAME `CoachingDexaReadModel` the Coaching Updates editor

@@ -32,9 +32,9 @@ struct GoalDetailView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = GoalDetailViewModel(api: environment.goalsAPI, goalId: goalId)
+                viewModel = GoalDetailViewModel(store: environment.goalsSandboxStore, goalId: goalId)
             }
-            await viewModel?.load()
+            viewModel?.load()
         }
     }
 
@@ -97,12 +97,15 @@ private struct ActiveGoalDetailContent: View {
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     Spacer(minLength: 4)
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                        .frame(width: 48, height: 48)
-                        .background(PhysiqueOSTheme.accent.opacity(0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    Button { onNavigate(.goalEdit(goalId: goal.id)) } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(PhysiqueOSTheme.accent)
+                            .frame(width: 40, height: 40)
+                            .background(PhysiqueOSTheme.accent.opacity(0.14))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("Edit Goal")
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 HStack(spacing: 8) {
@@ -161,6 +164,11 @@ private struct ActiveGoalDetailContent: View {
                 )
                 GoalContextBody(label: "Evidence in View", text: phase.evidence)
                 GoalContextBody(label: "What's Next", text: phase.progress.detail)
+                if goal.orderedPhases.contains(where: { $0.order == phase.order + 1 }) {
+                    GoalNavigationButton(title: "Review Phase Transition") {
+                        onNavigate(.goalPhaseTransition(goalId: goal.id, phaseId: phase.id))
+                    }
+                }
             }
         }
         .padding(.vertical, 12)
