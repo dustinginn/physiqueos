@@ -59,10 +59,10 @@ extension ISO8601DateFormatter {
 // MARK: - Cadence badge
 
 struct BriefingCadenceBadge: View {
-    let cadence: BriefingCadence
+    let briefing: BriefingReadModel
 
     private var color: HomeColorToken {
-        switch cadence {
+        switch briefing.cadence {
         case .weekly: .evidence
         case .midweek: .effort
         case .monthly: .primary
@@ -72,7 +72,7 @@ struct BriefingCadenceBadge: View {
     }
 
     var body: some View {
-        StatusChip(text: cadence.label, color: color)
+        StatusChip(text: briefing.displayCadenceLabel, color: color)
     }
 }
 

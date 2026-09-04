@@ -18,13 +18,15 @@ import Foundation
 /// inline).
 ///
 /// A second, richer live surface exists on web —
-/// `/briefings/photo/[sessionId]`, the "Photo Event" narrative briefing
-/// (5-card OpenAI-derived story + a goal-completion decision action) —
-/// and is deliberately NOT built here: it is a Briefings-namespaced
-/// surface, explicitly excluded by this task's own "do not build Briefing
-/// surfaces, do not trigger Events" instruction. The Photos landing page's
-/// own "Read Photo Briefing" affordance is preserved as informational
-/// text (not a dead-end tappable control) rather than a built destination.
+/// `/briefings/photo/[sessionId]`, the "Photo Event" narrative briefing —
+/// and is built separately in the Briefings vertical
+/// (`PhotoBriefingContent`, `Presentation/Briefings/PhotoBriefingSections.swift`).
+/// That surface shares this exact same canonical photo-set/pose identity
+/// (`PhotoViewRecord.id`/`setId`/`captureDate` below) rather than inventing
+/// a parallel photo universe — verified real behavior: both the Evidence
+/// page and the Photo Event Briefing build their photo sessions through
+/// the identical `createPhotoSessionReadModels` read-model service on the
+/// real product.
 struct PhotosLandingReadModel: Equatable {
     var title: String
     var subtitle: String?
@@ -103,8 +105,19 @@ struct PhotoSetRecord: Codable, Equatable, Identifiable {
 /// fixtured verbatim here, never locally generated or recomputed, per
 /// this task's explicit OpenAI/intelligence boundary.
 struct PhotoViewRecord: Codable, Equatable, Identifiable {
+    /// `"<setId>-<poseId>"` — the stable canonical identity for ONE
+    /// captured pose-photo, shared verbatim with the Photo Event Briefing
+    /// (`PhotoBriefingView.id`) so both surfaces reference the exact same
+    /// underlying media, never independent fixture universes. Never
+    /// reassigned by array position or reordering.
     var id: String
     var poseId: PhotoPoseID
+    /// The capture session this view belongs to — `PhotoSetRecord.id`.
+    /// Carried directly on the view (not just implied by its parent) so a
+    /// Photo Briefing artifact can reference a specific pose-photo by id
+    /// alone and still resolve which session/date it came from.
+    var setId: String
+    var captureDate: String
     /// `"Jul 11"` | `"No prior matching pose"` | `"Prior image unavailable"`
     /// | `"Prior matching photo pending"` — the web's own exact empty-state
     /// vocabulary for `comparedAgainst`.

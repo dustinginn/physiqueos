@@ -68,6 +68,8 @@ struct BriefingDetailView: View {
                 case .event:
                     if let dexa = briefing.dexa {
                         DEXABriefingSections(content: dexa, onNavigate: onNavigate)
+                    } else if let photo = briefing.photo {
+                        PhotoBriefingSections(content: photo, onNavigate: onNavigate)
                     }
                 case .daily:
                     EmptyView()
@@ -87,7 +89,7 @@ struct BriefingDetailView: View {
     private func header(for briefing: BriefingReadModel) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                BriefingCadenceBadge(cadence: briefing.cadence)
+                BriefingCadenceBadge(briefing: briefing)
                 Text(BriefingDateFormatting.timestamp(briefing.generatedAt))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)

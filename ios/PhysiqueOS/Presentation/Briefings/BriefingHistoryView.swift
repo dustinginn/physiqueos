@@ -88,7 +88,7 @@ private struct BriefingHistoryRow: View {
                     IconBadge(systemImage: iconName, color: .evidence)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            BriefingCadenceBadge(cadence: briefing.cadence)
+                            BriefingCadenceBadge(briefing: briefing)
                             if briefing.isRevised {
                                 StatusChip(text: "Revised", color: .muted)
                             }
@@ -125,7 +125,7 @@ private struct BriefingHistoryRow: View {
         case .midweek: "calendar.badge.clock"
         case .monthly: "calendar.circle"
         case .daily: "sun.max"
-        case .event: "waveform.path.ecg"
+        case .event: briefing.dexa != nil ? "waveform.path.ecg" : "camera.fill"
         }
     }
 

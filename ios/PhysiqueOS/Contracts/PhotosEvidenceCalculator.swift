@@ -57,7 +57,7 @@ enum PhotosEvidenceCalculator {
                 let priorDate = priorDateByPose[pose]
                 if let priorDate {
                     return PhotoViewRecord(
-                        id: "\(set.id)-\(pose.rawValue)", poseId: pose,
+                        id: "\(set.id)-\(pose.rawValue)", poseId: pose, setId: set.id, captureDate: set.date,
                         comparedAgainst: TrainingDateFormatting.short(priorDate),
                         comparisonStatus: "comparable",
                         conditionSummary: set.conditionSummary,
@@ -68,7 +68,7 @@ enum PhotosEvidenceCalculator {
                     )
                 } else {
                     return PhotoViewRecord(
-                        id: "\(set.id)-\(pose.rawValue)", poseId: pose,
+                        id: "\(set.id)-\(pose.rawValue)", poseId: pose, setId: set.id, captureDate: set.date,
                         comparedAgainst: "No prior matching pose",
                         comparisonStatus: "no_prior_matching_pose",
                         conditionSummary: set.conditionSummary,

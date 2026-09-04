@@ -51,7 +51,8 @@
       "poses": [
         "front-relaxed",
         "back-relaxed",
-        "back-flexed"
+        "back-flexed",
+        "side-relaxed"
       ],
       "conditionSummary": "Evening, post-workout, pump present."
     }

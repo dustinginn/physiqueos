@@ -63,21 +63,26 @@ final class BriefingSandboxStore {
     /// `resolveHomeBriefingSelection` (`HomeBriefingRoutingService.js`) —
     /// verified real precedence, checked in this exact order:
     ///
-    /// 1. An **active `.event` artifact always wins**, unconditionally —
-    ///    this is checked FIRST and short-circuits before Monthly is even
-    ///    considered (verified: `HomeBriefingRoutingService.test.js`'s own
-    ///    "promotes Monthly on its delivery date without hiding an active
-    ///    Event" case proves Event beats Monthly even on Monthly's own
-    ///    delivery day). "Active" for a DEXA event has **no same-day
-    ///    window at all** (`isEventActiveForHome` returns `true`
-    ///    unconditionally for `evidenceType == "dexa"`, unlike Photo
-    ///    events) — it stays the Home selection indefinitely until
-    ///    `eventConsumedAt` is set. See `BriefingReadModel.eventConsumedAt`.
-    /// 2. Else, a Monthly Briefing whose delivery day is TODAY takes over
+    /// 1. Select the single most-recently-generated, un-consumed `.event`
+    ///    artifact — DEXA or Photo, whichever type — exactly mirroring
+    ///    `getLatestActiveEventBriefing` (`DailyBriefingRepository.js`):
+    ///    there is NO type-based precedence between DEXA and Photo events,
+    ///    purely `generatedAt` recency among the un-consumed ones (verified
+    ///    directly by a real test where a Photo event published an hour
+    ///    before a DEXA event loses to it, then wins again once the DEXA
+    ///    event is consumed).
+    /// 2. Then, and ONLY on that single candidate, check whether it is
+    ///    still "active" (`isEventActiveForHome`) — see
+    ///    `isEventActiveForHome(_:today:nowISO:)` below. If it fails this
+    ///    check, Home does **not** fall back to an older still-technically-
+    ///    active event of the other type — it falls straight through to
+    ///    Monthly/Weekly/Midweek, exactly matching verified real behavior
+    ///    (the routing function only ever receives ONE `eventArtifact`).
+    /// 3. Else, a Monthly Briefing whose delivery day is TODAY takes over
     ///    ("promotes Monthly on its delivery date... returns to routine
     ///    cadence selection after Monthly delivery day" — the promotion
     ///    window is exactly the delivery day itself).
-    /// 3. Else, whichever of Weekly/Midweek has the more recent
+    /// 4. Else, whichever of Weekly/Midweek has the more recent
     ///    `generatedAt` (Weekly breaks ties).
     ///
     /// This is a PRESENTATION-ONLY rule: it changes nothing about
@@ -89,11 +94,13 @@ final class BriefingSandboxStore {
 
     /// Pure form of `latestForHome` above — the Event/Monthly-collision-
     /// precedence contract, directly testable against synthetic artifacts
-    /// (an active-event-vs-Monthly-delivery-day collision, a consumed
-    /// event that must fall through, a same-delivery-day Monthly/Weekly
-    /// pair, an unpublished/failed artifact that must never win, etc.)
-    /// without depending on the bundled fixture's own dates lining up with
-    /// `now`.
+    /// (a DEXA-vs-Photo event recency collision, a Photo event outside its
+    /// active window that must NOT fall back to an older active DEXA
+    /// event, an active-event-vs-Monthly-delivery-day collision, a
+    /// consumed event that must fall through, a same-delivery-day
+    /// Monthly/Weekly pair, an unpublished/failed artifact that must never
+    /// win, etc.) without depending on the bundled fixture's own dates
+    /// lining up with `now`.
     static func latestForHome(from briefings: [BriefingReadModel], now: Date = Date()) -> BriefingReadModel? {
         let today = Self.dateKey(now)
         // On the real product `now` is always "the current moment," so the
@@ -114,10 +121,11 @@ final class BriefingSandboxStore {
         // a set `consumedAt` there always already lies in the past) — an
         // event only counts as consumed once its own `eventConsumedAt` has
         // actually been reached.
-        if let activeEvent = published
-            .filter({ $0.cadence == .event && ($0.eventConsumedAt.map { $0 > nowISO } ?? true) })
-            .max(by: { $0.generatedAt < $1.generatedAt }) {
-            return activeEvent
+        let latestUnconsumedEvent = published
+            .filter { $0.cadence == .event && ($0.eventConsumedAt.map { $0 > nowISO } ?? true) }
+            .max(by: { $0.generatedAt < $1.generatedAt })
+        if let event = latestUnconsumedEvent, Self.isEventActiveForHome(event, today: today, nowISO: nowISO) {
+            return event
         }
 
         if let monthly = published.filter({ $0.cadence == .monthly }).max(by: { $0.generatedAt < $1.generatedAt }),
@@ -137,6 +145,23 @@ final class BriefingSandboxStore {
         return published.filter { $0.cadence == .daily }.max(by: { $0.generatedAt < $1.generatedAt })
     }
 
+    /// `isEventActiveForHome` (`HomeBriefingRoutingService.js`) — verified
+    /// exact real logic:
+    /// - A non-photo event (DEXA) is active unconditionally — no date
+    ///   window at all.
+    /// - A photo event is active only if its own `eventDate` (date-only,
+    ///   NOT `generatedAt`) equals `today`, OR its `eventDate` was
+    ///   yesterday AND it was itself generated/published today (a late-
+    ///   published photo session still gets one day of Home visibility).
+    ///   Any other combination — including an ordinary previously-active
+    ///   photo event from further in the past — is inactive.
+    private static func isEventActiveForHome(_ event: BriefingReadModel, today: String, nowISO: String) -> Bool {
+        guard let photo = event.photo else { return true }
+        if photo.eventDate == today { return true }
+        let publicationLocalDate = Self.dateKey(fromISO: event.generatedAt)
+        return photo.eventDate == Self.shiftDate(today, byDays: -1) && publicationLocalDate == today
+    }
+
     private static func dateKey(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -144,6 +169,41 @@ final class BriefingSandboxStore {
         formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+
+    /// Converts a `generatedAt`-style ISO-8601 UTC instant string into its
+    /// Pacific-local `"yyyy-MM-dd"` date key — used to compare a Photo
+    /// event's real publication date against `today` for the late-publish
+    /// window above. Falls back to the raw prefix for a malformed value.
+    private static func dateKey(fromISO iso: String) -> String {
+        guard let date = ISO8601DateFormatter.briefingTimestamp.date(from: iso) ?? Self.isoDateOnlyFormatter.date(from: iso) else {
+            return String(iso.prefix(10))
+        }
+        return Self.dateKey(date)
+    }
+
+    // Only ever read after construction; safe to share across isolation
+    // domains despite ISO8601DateFormatter not being marked Sendable.
+    nonisolated(unsafe) private static let isoDateOnlyFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    /// Shifts a `"yyyy-MM-dd"` date key by `byDays` calendar days, staying
+    /// in the same Pacific-anchored calendar `dateKey`/`isEventActiveForHome`
+    /// already use.
+    private static func shiftDate(_ dateKey: String, byDays: Int) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let parser = DateFormatter()
+        parser.calendar = calendar
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = calendar.timeZone
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: dateKey),
+              let shifted = calendar.date(byAdding: .day, value: byDays, to: date) else { return dateKey }
+        return Self.dateKey(shifted)
     }
 
     /// `generatedAt` is always encoded as an ISO-8601 UTC instant with

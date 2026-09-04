@@ -18,7 +18,9 @@ final class DEXABriefingTests: XCTestCase {
 
     func testFixtureDecodesBothDEXAEventBriefings() {
         let store = makeStore()
-        let events = store.briefings.filter { $0.cadence == .event }
+        // A later task added Photo Event Briefings sharing the same
+        // `.event` cadence — filter to DEXA's own content specifically.
+        let events = store.briefings.filter { $0.cadence == .event && $0.dexa != nil }
         XCTAssertEqual(events.count, 2)
         XCTAssertTrue(events.contains { $0.id == "dexa_event_dexa-fixture-005" })
         XCTAssertTrue(events.contains { $0.id == "dexa_event_dexa-fixture-003" })
@@ -36,7 +38,7 @@ final class DEXABriefingTests: XCTestCase {
     func testDEXABriefingScanIdsAreRealCanonicalDEXAEvidenceScans() throws {
         let dexaScanIds = try loadDEXAScanIds()
         let store = makeStore()
-        for event in store.briefings.filter({ $0.cadence == .event }) {
+        for event in store.briefings.filter({ $0.cadence == .event && $0.dexa != nil }) {
             let scanId = try XCTUnwrap(event.dexa?.scanId)
             XCTAssertTrue(dexaScanIds.contains(scanId), "\(scanId) must be a real DEXA Evidence scan id, not a Briefing-only duplicate")
             if let priorScanId = event.dexa?.priorScanId {

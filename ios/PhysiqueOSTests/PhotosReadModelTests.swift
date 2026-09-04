@@ -40,7 +40,10 @@ final class PhotosReadModelTests: XCTestCase {
     func testViewsAreOrderedByCanonicalPoseOrder() async throws {
         let landing = try await api.fetchPhotosLanding(scope: .all)
         let set = try XCTUnwrap(landing.history.first)
-        XCTAssertEqual(set.views.map(\.poseId), [.frontRelaxed, .backRelaxed, .backFlexed])
+        // The latest set (2026-08-30) added a fourth pose (Side Relaxed) —
+        // a later task's "new baseline / missing prior pose" fixture
+        // scenario — which sorts after Back Flexed in `POSE_ORDER`.
+        XCTAssertEqual(set.views.map(\.poseId), [.frontRelaxed, .backRelaxed, .backFlexed, .sideRelaxed])
     }
 
     // MARK: - Comparison pairing (nearest prior same-pose)

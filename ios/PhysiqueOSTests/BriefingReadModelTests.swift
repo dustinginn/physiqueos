@@ -10,8 +10,9 @@ final class BriefingReadModelTests: XCTestCase {
     func testFixtureDecodesEveryBundledBriefing() {
         let store = makeStore()
         // 9 recurring-cadence artifacts (this task) + 2 DEXA Event
-        // Briefings (a later task) sharing the same fixture provider.
-        XCTAssertEqual(store.briefings.count, 11)
+        // Briefings + 2 Photo Event Briefings (later tasks) sharing the
+        // same fixture provider.
+        XCTAssertEqual(store.briefings.count, 13)
         let ids = Set(store.briefings.map(\.id))
         XCTAssertTrue(ids.contains("weekly_briefing_2026-06-28_2026-07-04"))
         XCTAssertTrue(ids.contains("weekly_briefing_2026-07-12_2026-07-18"))
@@ -24,6 +25,8 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertTrue(ids.contains("monthly_briefing_2026-10"))
         XCTAssertTrue(ids.contains("dexa_event_dexa-fixture-005"))
         XCTAssertTrue(ids.contains("dexa_event_dexa-fixture-003"))
+        XCTAssertTrue(ids.contains("event_briefing_progress_photo_photo-set-fixture-005"))
+        XCTAssertTrue(ids.contains("event_briefing_progress_photo_photo-set-fixture-003"))
     }
 
     func testBriefingLookupByStableId() {

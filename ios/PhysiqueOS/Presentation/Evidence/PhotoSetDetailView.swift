@@ -119,47 +119,28 @@ struct PhotoSetDetailView: View {
 
     /// Side-by-side Previous/Current when a comparison exists, matching
     /// `ProgressPhotoGallery.jsx:238-244`'s literal 2-column layout; a
-    /// single tile plus the exact empty-state string otherwise. No real
-    /// image assets exist in fixture mode — see `PhotosHistoryView.swift`'s
-    /// doc comment.
+    /// single tile plus the exact empty-state string otherwise. Renders
+    /// through the shared `ProgressPhotoTile` (`SharedUI/ProgressPhotoTile.swift`)
+    /// — the same component the Photo Event Briefing uses — so a later
+    /// real-photo pass changes one rendering seam, not two. No authorized
+    /// image media exists in this pass; both surfaces remain PENDING REAL
+    /// PHOTOS visual acceptance.
     private func comparisonCard(_ view: PhotoViewRecord) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 if view.hasComparisonImage {
                     HStack(spacing: 8) {
-                        photoPlaceholder(label: "Previous", detail: view.comparedAgainst)
-                        photoPlaceholder(label: "Current", detail: nil)
+                        ProgressPhotoTile(roleLabel: "Previous", caption: view.comparedAgainst)
+                        ProgressPhotoTile(roleLabel: "Current")
                     }
                 } else {
-                    photoPlaceholder(label: "Current", detail: nil)
+                    ProgressPhotoTile(roleLabel: "Current")
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
         }
-    }
-
-    private func photoPlaceholder(label: String, detail: String?) -> some View {
-        VStack(spacing: 4) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            RoundedRectangle(cornerRadius: 10)
-                .fill(PhysiqueOSTheme.surfaceElevated)
-                .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                .overlay(
-                    Image(systemName: "figure.stand")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                )
-            if let detail {
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-        }
-        .frame(maxWidth: .infinity)
     }
 
     /// Server-owned presentation copy — fixtured verbatim, never

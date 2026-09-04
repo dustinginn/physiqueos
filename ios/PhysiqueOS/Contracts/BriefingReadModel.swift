@@ -516,6 +516,131 @@ struct DEXABriefingContent: Codable, Equatable {
     var isBaselineScan: Bool { priorScanId == nil }
 }
 
+// MARK: - Photo Event content (verified section list: Hero → Snapshot
+// [facts + the session's own capture-photo grid] → Progress [one of three
+// mutually exclusive branches: completion-journey comparisons, ordinary
+// comparisons, or a plain text-only card] → Interpretation → Coach's
+// Insight → optional Completion Decision. Verified NOT present on the real
+// screen: a Phase Review card (unlike DEXA — this screen has no
+// `PhaseReviewCard` at all), a forecast section, a rendered Confidence UI,
+// a revision/republication banner, or any link to a Goal/Phase/Operating
+// Plan/DEXA screen. Confirmed real behavior: `goalCompletionHandoff`/
+// `completionExperience` are gated EXCLUSIVELY on
+// `confirmationPurpose == "visible_abs_completion"` — never inferred from
+// "this is a Photo Event" alone, and never present for an ordinary scan.)
+
+/// One captured pose-photo within a Photo Event Briefing — shares its `id`
+/// verbatim with `PhotoViewRecord.id` (`"<setId>-<poseId>"`) so the
+/// Briefing and Progress Photos Evidence reference the exact same
+/// canonical media, never independent fixture universes.
+struct PhotoBriefingView: Codable, Equatable, Identifiable {
+    var id: String
+    var poseId: PhotoPoseID
+    var setId: String
+    var captureDate: String
+    var headline: String
+    var supportingObservations: [String]
+    /// Same real vocabulary as `PhotoViewRecord.comparisonStatus`
+    /// (`"comparable"` / `"no_prior_matching_pose"` / etc.) — verified
+    /// this Event artifact's `activeViews[]` uses identical comparison
+    /// classification to Progress Photos Evidence, since both are built
+    /// from the same `createPhotoSessionReadModels` read model.
+    var comparisonStatus: String
+    var establishesBaseline: Bool
+    /// `"primary"` | `"supporting"` — verified real field name.
+    var goalRelevance: String
+}
+
+struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
+    var id: String
+    var poseId: PhotoPoseID
+    var priorSetId: String?
+    var priorDate: String?
+    var currentSetId: String
+    var currentDate: String
+    /// "First" / "Final" — only meaningful for journey comparisons; `nil`
+    /// for ordinary ones.
+    var roleLabel: String?
+    var narrative: String
+}
+
+struct PhotoNewBaselineEntry: Codable, Equatable, Identifiable {
+    var id: String
+    var poseId: PhotoPoseID
+    var narrative: String
+}
+
+enum PhotoCompletionDecisionState: String, Codable, Equatable {
+    case completed
+    case awaitingDecision
+    case retry
+}
+
+/// The Founder's real "Create Next Goal" affordance is itself a disabled
+/// `<button>` on the live product ("· Coming next") — this is genuinely
+/// inert on the real screen, not a Native simplification. Native mirrors
+/// that inertness rather than wiring a fake next-goal creation flow.
+struct PhotoCompletionDecision: Codable, Equatable {
+    var state: PhotoCompletionDecisionState
+    var nextGoalTitle: String?
+    var nextGoalActionLabel: String?
+    var question: String?
+    var completeActionLabel: String?
+    var keepOpenActionLabel: String?
+    var keepOpenDestination: AppDestination?
+    var retryQuestion: String?
+    var retryActionLabel: String?
+    var retryDestination: AppDestination?
+}
+
+/// Present only when `confirmationPurpose == "visible_abs_completion"` —
+/// see the type-level doc comment above. Anchors its "journey" comparisons
+/// to the Goal's own start date (`journeyWindowStart`), a genuinely
+/// different baseline than the ordinary nearest-prior-same-pose comparison
+/// used everywhere else (including this same artifact's own
+/// `ordinaryComparisons`, when both happen to be present).
+struct PhotoCompletionExperience: Codable, Equatable {
+    var recentComparisons: [PhotoComparisonEntry]
+    var journeyComparisons: [PhotoComparisonEntry]
+    var newBaselines: [PhotoNewBaselineEntry]
+    var decision: PhotoCompletionDecision
+}
+
+struct PhotoBriefingContent: Codable, Equatable {
+    /// The canonical photo session id — `PhotoSetFixture.id` /
+    /// `PhotoSetRecord.id`, the exact same identity Progress Photos
+    /// Evidence uses for this same capture session.
+    var photoSessionId: String
+    /// Date-only — verified this drives Home's Photo-specific same-day/
+    /// late-publish active window (`isEventActiveForHome`), distinct from
+    /// `generatedAt` (a true publication instant).
+    var eventDate: String
+    /// `"3/3 complete"` — verified real completion-label copy.
+    var completionLabel: String
+    var weightLabel: String
+    var poseLabels: [String]
+    var conditionsSummary: String
+    var activeViews: [PhotoBriefingView]
+    var heroTitle: String
+    var heroBody: String
+    var snapshotTitle: String
+    /// Used only by the plain text-only Progress branch (no comparisons
+    /// available at all) — the real screen's third, no-images branch.
+    var progressTitle: String
+    var progressBody: String
+    /// The ordinary (nearest-prior-same-pose) comparison branch — rendered
+    /// when non-empty AND `completionExperience == nil` (verified: the two
+    /// branches are mutually exclusive on the real screen).
+    var ordinaryComparisons: [PhotoComparisonEntry]
+    var interpretationTitle: String
+    var interpretationParagraphs: [String]
+    var coachInsightBody: String
+    /// Rendered as a "Next: …" chip — verified only shown when
+    /// `completionExperience == nil`.
+    var nextMilestoneLabel: String?
+    var completionExperience: PhotoCompletionExperience?
+}
+
 // MARK: - The Briefing artifact (one type, cadence-discriminated content)
 
 /// One recurring-Briefing artifact — the single identity Home, History,
@@ -530,40 +655,48 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
     var evidenceWindow: BriefingEvidenceWindowReadModel
     var lifecycleState: BriefingArtifactLifecycleState
     var attribution: BriefingGoalAttribution
-    /// For `cadence == .event` (DEXA): the artifact genuinely carries a
-    /// persisted `goalConfidence` block (built by the same
+    /// For `cadence == .event` (DEXA and Photo): the artifact genuinely
+    /// carries a persisted `goalConfidence` block (built by the same
     /// `createBriefingGoalConfidenceBlockFromV2` finalizer every other
     /// cadence uses), so this field is populated and decodable for
-    /// fixture/test/continuity purposes — but verified against source: the
-    /// real DEXA Event Briefing screen checks `hero.confidence` (which the
-    /// real narrative composer never sets) rather than
-    /// `narrative.goalConfidence`, so **no Confidence ring ever renders on
-    /// the real production or historical DEXA screen**. This looks like an
-    /// unwired real-product gap, not a deliberate omission — Native
-    /// deliberately does not "fix" it by rendering a ring the real product
-    /// doesn't show; `DEXABriefingSections` intentionally omits
-    /// `BriefingConfidenceCard`. See this task's final report.
+    /// fixture/test/continuity purposes — but verified against source: both
+    /// the DEXA AND Photo Event Briefing screens check `hero.confidence`
+    /// (which the real narrative composer never sets for either) rather
+    /// than `narrative.goalConfidence`, so **no Confidence ring ever
+    /// renders on either real production or historical Event screen**.
+    /// This looks like an unwired real-product gap, not a deliberate
+    /// omission — Native deliberately does not "fix" it by rendering a
+    /// ring the real product doesn't show; neither `DEXABriefingSections`
+    /// nor `PhotoBriefingSections` render `BriefingConfidenceCard`. See
+    /// this task's final report.
     var confidence: BriefingConfidenceReadModel?
     var revisionProvenance: BriefingRevisionProvenance?
     var replacedHistory: [BriefingRevisionSnapshot]
     /// `lifecycle.consumedAt` — verified real behavior (`isEventActiveForHome`,
-    /// `HomeBriefingRoutingService.js`): an `.event` artifact stays eligible
-    /// to win Home's latest-Briefing selection indefinitely (no same-day
-    /// window, unlike Photo events) until it is consumed. `nil` means still
-    /// active; a timestamp means it has been consumed and Home falls
-    /// through to the ordinary Monthly/Weekly/Midweek precedence. Only
-    /// meaningful for `cadence == .event`; always `nil` for every other
-    /// cadence. Native does not build an interactive "mark as consumed"
-    /// write — see this task's final report for why.
+    /// `HomeBriefingRoutingService.js`): a non-photo `.event` artifact
+    /// (DEXA) stays eligible to win Home's latest-Briefing selection
+    /// indefinitely until it is consumed. A photo `.event` artifact instead
+    /// has its own same-day/late-publish active WINDOW (see
+    /// `BriefingSandboxStore.isEventActiveForHome`) — verified real
+    /// behavior confirms nothing in the live app actually calls
+    /// `markBriefingConsumed` for either trigger type today, so a Photo
+    /// event's disappearance from Home is driven entirely by that window
+    /// naturally expiring, not by consumption. `nil` here means not yet
+    /// consumed; a timestamp means consumed. Native does not build an
+    /// interactive "mark as consumed" write — see this task's final report.
     var eventConsumedAt: String? = nil
 
     var weekly: WeeklyBriefingContent?
     var midweek: MidweekBriefingContent?
     var monthly: MonthlyBriefingContent?
     /// DEXA Event Briefing content — populated only when `cadence == .event`
-    /// and the triggering evidence was a DEXA scan (the only event trigger
-    /// type modeled this pass; see the type-level doc comment).
+    /// and the triggering evidence was a DEXA scan. Mutually exclusive with
+    /// `photo` below — verified the real product's `trigger.evidenceType`
+    /// discriminates exactly this way (`"dexa"` vs `"photo_session"`).
     var dexa: DEXABriefingContent?
+    /// Photo Event Briefing content — populated only when `cadence == .event`
+    /// and the triggering evidence was a confirmed photo session.
+    var photo: PhotoBriefingContent?
 
     /// Whether this artifact has ever been revised/republished — verified
     /// this is represented by a non-nil `revisionProvenance` plus a
@@ -589,7 +722,7 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
         case .midweek: "Midweek Briefing"
         case .weekly: weekly?.heroHeadline ?? "Weekly Briefing"
         case .daily: "Daily Briefing"
-        case .event: dexa?.hero.title ?? "DEXA Event Briefing"
+        case .event: dexa?.hero.title ?? photo?.heroTitle ?? "Event Briefing"
         }
     }
 
@@ -599,7 +732,25 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
         case .monthly: "Delivered \(Self.shortDate(evidenceWindow.briefingDate))"
         case .midweek: "Sun–Tue · \(Self.shortDate(evidenceWindow.startDate))–\(Self.shortDate(evidenceWindow.endDate))"
         case .weekly, .daily: "\(Self.shortDate(evidenceWindow.startDate))–\(Self.shortDate(evidenceWindow.endDate))"
-        case .event: "DEXA scan · \(Self.shortDate(dexa?.scanDate ?? evidenceWindow.startDate))"
+        case .event:
+            if let dexa {
+                "DEXA scan · \(Self.shortDate(dexa.scanDate))"
+            } else if let photo {
+                "Progress photos · \(Self.shortDate(photo.eventDate))"
+            } else {
+                "Event · \(Self.shortDate(evidenceWindow.startDate))"
+            }
+        }
+    }
+
+    /// The cadence badge label — verified real product copy differs for
+    /// DEXA vs Photo events even though both share the literal `"event"`
+    /// cadence value; every other cadence uses `BriefingCadence.label`
+    /// as-is.
+    var displayCadenceLabel: String {
+        switch cadence {
+        case .event: dexa != nil ? "DEXA Event Briefing" : "Photo Event Briefing"
+        default: cadence.label
         }
     }
 

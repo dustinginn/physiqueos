@@ -1547,5 +1547,324 @@
         }
       }
     }
+  },
+  {
+    "id": "event_briefing_progress_photo_photo-set-fixture-005",
+    "occurrence": {
+      "value": "founder|event|event_briefing_progress_photo_photo-set-fixture-005"
+    },
+    "cadence": "event",
+    "generatedAt": "2026-08-30T20:00:00.000Z",
+    "evidenceWindow": {
+      "id": "photo-event:photo-set-fixture-005",
+      "startDate": "2026-08-30",
+      "endDate": "2026-08-30",
+      "briefingDate": "2026-08-30",
+      "relativeLabel": "Photo session",
+      "timeZone": "America/Los_Angeles"
+    },
+    "lifecycleState": "published",
+    "attribution": {
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalTitle": "Build Lean Mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "phaseName": "Lean Mass Build"
+    },
+    "confidence": {
+      "score": 66,
+      "band": "developing",
+      "priorScore": 63,
+      "delta": 3,
+      "movementDirection": "increased",
+      "primaryReason": "Visual comparison across all four poses continues to support steady, controlled progress with no signs of excess fat gain.",
+      "supportingReasons": [
+        "All four poses show consistent, controlled changes since the last session."
+      ],
+      "limitingReasons": [
+        "Photo-based visual assessment carries more subjective variance than DEXA numbers."
+      ],
+      "unresolvedUncertainty": [],
+      "goalId": "goal_fixture_build_lean_mass",
+      "phaseId": "phase_fixture_lean_mass_build",
+      "capturedAt": "2026-08-30T20:00:00.000Z",
+      "source": "canonical_pi_snapshot"
+    },
+    "revisionProvenance": null,
+    "replacedHistory": [],
+    "eventConsumedAt": null,
+    "weekly": null,
+    "midweek": null,
+    "monthly": null,
+    "dexa": null,
+    "photo": {
+      "photoSessionId": "photo-set-fixture-005",
+      "eventDate": "2026-08-30",
+      "completionLabel": "4/4 complete",
+      "weightLabel": "No same-day weight",
+      "poseLabels": [
+        "Front Relaxed",
+        "Back Relaxed",
+        "Back Flexed",
+        "Side Relaxed"
+      ],
+      "conditionsSummary": "Evening, post-workout, pump present.",
+      "activeViews": [
+        {
+          "id": "photo-set-fixture-005-front-relaxed",
+          "poseId": "front-relaxed",
+          "setId": "photo-set-fixture-005",
+          "captureDate": "2026-08-30",
+          "headline": "Controlled, gradual change since Aug 16.",
+          "supportingObservations": [
+            "Waist appears stable, no excess softness."
+          ],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "primary"
+        },
+        {
+          "id": "photo-set-fixture-005-back-relaxed",
+          "poseId": "back-relaxed",
+          "setId": "photo-set-fixture-005",
+          "captureDate": "2026-08-30",
+          "headline": "Shoulder and back width trending up slightly.",
+          "supportingObservations": [
+            "Consistent with logged upper-body training progression."
+          ],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "supporting"
+        },
+        {
+          "id": "photo-set-fixture-005-back-flexed",
+          "poseId": "back-flexed",
+          "setId": "photo-set-fixture-005",
+          "captureDate": "2026-08-30",
+          "headline": "Definition holding under flex despite the surplus.",
+          "supportingObservations": [],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "supporting"
+        },
+        {
+          "id": "photo-set-fixture-005-side-relaxed",
+          "poseId": "side-relaxed",
+          "setId": "photo-set-fixture-005",
+          "captureDate": "2026-08-30",
+          "headline": "First Side Relaxed photo on file.",
+          "supportingObservations": [
+            "Establishes a new baseline for waist-line tracking going forward."
+          ],
+          "comparisonStatus": "no_prior_matching_pose",
+          "establishesBaseline": true,
+          "goalRelevance": "supporting"
+        }
+      ],
+      "heroTitle": "Four poses in, the visual story matches the scan.",
+      "heroBody": "This session adds a new Side Relaxed pose to your rotation. Across all four poses, the two-week trend since your last check-in looks controlled — no signs of the surplus showing up as excess fat.",
+      "snapshotTitle": "This Session",
+      "progressTitle": "What Changed",
+      "progressBody": "No comparable photos are available yet for this period.",
+      "ordinaryComparisons": [
+        {
+          "id": "photo-set-fixture-005-front-relaxed-ordinary",
+          "poseId": "front-relaxed",
+          "priorSetId": "photo-set-fixture-004",
+          "priorDate": "2026-08-16",
+          "currentSetId": "photo-set-fixture-005",
+          "currentDate": "2026-08-30",
+          "roleLabel": null,
+          "narrative": "Two weeks in, the midsection looks stable — no visible softening from the surplus."
+        },
+        {
+          "id": "photo-set-fixture-005-back-relaxed-ordinary",
+          "poseId": "back-relaxed",
+          "priorSetId": "photo-set-fixture-004",
+          "priorDate": "2026-08-16",
+          "currentSetId": "photo-set-fixture-005",
+          "currentDate": "2026-08-30",
+          "roleLabel": null,
+          "narrative": "Back width looks marginally fuller, consistent with the logged training volume."
+        },
+        {
+          "id": "photo-set-fixture-005-back-flexed-ordinary",
+          "poseId": "back-flexed",
+          "priorSetId": "photo-set-fixture-004",
+          "priorDate": "2026-08-16",
+          "currentSetId": "photo-set-fixture-005",
+          "currentDate": "2026-08-30",
+          "roleLabel": null,
+          "narrative": "Flexed definition holds steady — no loss of sharpness under the surplus."
+        }
+      ],
+      "interpretationTitle": "What This Comparison Shows",
+      "interpretationParagraphs": [
+        "Front, back, and back-flexed views all show the controlled, gradual changes expected from a lean-mass-building surplus — no excess softness or rapid fat accumulation visible.",
+        "The new Side Relaxed pose gives a clearer read on waist definition going forward and will be the baseline for every future comparison."
+      ],
+      "coachInsightBody": "The visual read backs up the DEXA numbers from this same window — steady lean gain, nothing concerning in the photos.",
+      "nextMilestoneLabel": "October 31 DEXA scan",
+      "completionExperience": null
+    }
+  },
+  {
+    "id": "event_briefing_progress_photo_photo-set-fixture-003",
+    "occurrence": {
+      "value": "founder|event|event_briefing_progress_photo_photo-set-fixture-003"
+    },
+    "cadence": "event",
+    "generatedAt": "2026-07-19T09:30:00.000Z",
+    "evidenceWindow": {
+      "id": "photo-event:photo-set-fixture-003",
+      "startDate": "2026-07-18",
+      "endDate": "2026-07-18",
+      "briefingDate": "2026-07-18",
+      "relativeLabel": "Photo session",
+      "timeZone": "America/Los_Angeles"
+    },
+    "lifecycleState": "published",
+    "attribution": {
+      "goalId": "goal_visible_abs_at_rest",
+      "goalTitle": "Visible Abs at Rest",
+      "phaseId": null,
+      "phaseName": null
+    },
+    "confidence": {
+      "score": 91,
+      "band": "high",
+      "priorScore": 84,
+      "delta": 7,
+      "movementDirection": "increased",
+      "primaryReason": "Front Relaxed visual criteria are now clearly met alongside the DEXA-confirmed body fat target.",
+      "supportingReasons": [
+        "Abdominal definition is visible at rest in the Front Relaxed pose.",
+        "Consistent with the DEXA scan taken the same day."
+      ],
+      "limitingReasons": [],
+      "unresolvedUncertainty": [],
+      "goalId": "goal_visible_abs_at_rest",
+      "phaseId": null,
+      "capturedAt": "2026-07-19T09:30:00.000Z",
+      "source": "canonical_pi_snapshot"
+    },
+    "revisionProvenance": {
+      "priorPublicationId": "event_briefing_progress_photo_photo-set-fixture-003",
+      "priorPublicationVersion": "2026-07-19T09:00:00.000Z",
+      "replacementTimestamp": "2026-07-19T09:30:00.000Z",
+      "reason": "A confirmed DEXA scan from the same morning arrived after the initial publish and strengthened the goal-completion assessment."
+    },
+    "replacedHistory": [
+      {
+        "generatedAt": "2026-07-19T09:00:00.000Z",
+        "headline": "Photos confirm strong final-week definition.",
+        "replacedReason": "The same-day DEXA scan was confirmed shortly after and folded into the goal-completion read."
+      }
+    ],
+    "eventConsumedAt": null,
+    "weekly": null,
+    "midweek": null,
+    "monthly": null,
+    "dexa": null,
+    "photo": {
+      "photoSessionId": "photo-set-fixture-003",
+      "eventDate": "2026-07-18",
+      "completionLabel": "3/3 complete",
+      "weightLabel": "172.0 lb",
+      "poseLabels": [
+        "Front Relaxed",
+        "Back Relaxed",
+        "Back Flexed"
+      ],
+      "conditionsSummary": "Morning, fasted, standard lighting.",
+      "activeViews": [
+        {
+          "id": "photo-set-fixture-003-front-relaxed",
+          "poseId": "front-relaxed",
+          "setId": "photo-set-fixture-003",
+          "captureDate": "2026-07-18",
+          "headline": "Lower-abdominal definition now visible at rest.",
+          "supportingObservations": [
+            "Meets the goal's own visual criterion."
+          ],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "primary"
+        },
+        {
+          "id": "photo-set-fixture-003-back-relaxed",
+          "poseId": "back-relaxed",
+          "setId": "photo-set-fixture-003",
+          "captureDate": "2026-07-18",
+          "headline": "Lean, controlled look carried through the final week.",
+          "supportingObservations": [],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "supporting"
+        },
+        {
+          "id": "photo-set-fixture-003-back-flexed",
+          "poseId": "back-flexed",
+          "setId": "photo-set-fixture-003",
+          "captureDate": "2026-07-18",
+          "headline": "Definition consistent with the closing DEXA numbers.",
+          "supportingObservations": [],
+          "comparisonStatus": "comparable",
+          "establishesBaseline": false,
+          "goalRelevance": "supporting"
+        }
+      ],
+      "heroTitle": "Visible abs at rest, confirmed.",
+      "heroBody": "This session's Front Relaxed photo shows the lower-abdominal definition the goal was built around — the same day's DEXA scan backs it up with an 8.2% body fat reading.",
+      "snapshotTitle": "Closing Session",
+      "progressTitle": "What Changed",
+      "progressBody": "The visual comparison for this session is shown below.",
+      "ordinaryComparisons": [],
+      "interpretationTitle": "What This Scan Confirms",
+      "interpretationParagraphs": [
+        "The lower-abdominal definition target set at the start of this goal is now visible at rest in the Front Relaxed pose — the same criterion the goal was built around.",
+        "Back and Back Flexed views confirm the same lean, controlled look carried through the final weeks of the cut."
+      ],
+      "coachInsightBody": "Eight weeks of consistent photos plus today's DEXA scan agree: Visible Abs at Rest is complete.",
+      "nextMilestoneLabel": null,
+      "completionExperience": {
+        "recentComparisons": [
+          {
+            "id": "photo-set-fixture-003-front-relaxed-recent",
+            "poseId": "front-relaxed",
+            "priorSetId": "photo-set-fixture-002",
+            "priorDate": "2026-06-14",
+            "currentSetId": "photo-set-fixture-003",
+            "currentDate": "2026-07-18",
+            "roleLabel": null,
+            "narrative": "Compared with four weeks ago, definition through the midsection is noticeably sharper."
+          }
+        ],
+        "journeyComparisons": [
+          {
+            "id": "photo-set-fixture-003-front-relaxed-journey",
+            "poseId": "front-relaxed",
+            "priorSetId": "photo-set-fixture-001",
+            "priorDate": "2026-05-24",
+            "currentSetId": "photo-set-fixture-003",
+            "currentDate": "2026-07-18",
+            "roleLabel": "First → Final",
+            "narrative": "From your first upload on May 24 to today, the transformation across the full cut is visible at a glance."
+          }
+        ],
+        "newBaselines": [],
+        "decision": {
+          "state": "completed",
+          "nextGoalTitle": "Visible Abs at Rest is complete. Build Lean Mass is already underway.",
+          "nextGoalActionLabel": "Create Next Goal · Coming next",
+          "question": null,
+          "completeActionLabel": null,
+          "keepOpenActionLabel": null,
+          "keepOpenDestination": null,
+          "retryQuestion": null,
+          "retryActionLabel": null,
+          "retryDestination": null
+        }
+      }
+    }
   }
 ]
