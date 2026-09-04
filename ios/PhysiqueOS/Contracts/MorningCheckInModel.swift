@@ -209,6 +209,12 @@ struct BriefingReconciliationWorkItem: Identifiable, Equatable, Codable {
     var cadence: BriefingReconciliationCadence
     var evidenceDateKey: String
     var status: BriefingReconciliationWorkItemStatus
+    /// The specific Briefing artifact this work item is reconciling —
+    /// verified real: `publicationRootId === artifact.id` on the real
+    /// product, the exact same identity `BriefingReadModel.id` uses.
+    /// `nil` only for fixture rows that don't reference a concrete
+    /// artifact; a real work item always has one.
+    var briefingId: String? = nil
     var attempts: Int = 0
     var retryable: Bool = true
     /// Fixture-only disclosure: whether resolving this item locally would

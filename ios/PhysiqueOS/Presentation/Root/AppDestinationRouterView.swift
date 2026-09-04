@@ -10,6 +10,7 @@ import SwiftUI
 struct AppDestinationRouterView: View {
     let destination: AppDestination
     var onReturnToLog: () -> Void = {}
+    var onReturnToHome: () -> Void = {}
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
@@ -38,6 +39,10 @@ struct AppDestinationRouterView: View {
             MorningCheckInView(onNavigate: onNavigate)
         case .priorityDetail(let priorityId):
             PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId)
+        case .briefingDetail(let briefingId):
+            BriefingDetailView(briefingId: briefingId, onNavigate: onNavigate, onReturnToHome: onReturnToHome)
+        case .briefingList:
+            BriefingHistoryView(onNavigate: onNavigate)
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:

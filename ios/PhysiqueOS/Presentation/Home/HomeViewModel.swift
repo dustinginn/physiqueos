@@ -27,11 +27,17 @@ final class HomeViewModel {
     /// rather than the static Home fixture so it never points at a goal
     /// id that no longer exists.
     private let goalsSandboxStore: GoalsSandboxStore
+    /// The same Briefing fixture provider History and Detail read through —
+    /// Home's briefing card is a *projection* over that one published
+    /// collection (`latestForHome`), never a second Home-only Briefing
+    /// fixture (see `BriefingSandboxStore.swift`'s doc comment).
+    private let briefingStore: BriefingSandboxStore
 
-    init(api: HomeAPI, priorityStore: LoggingSandboxStore, goalsSandboxStore: GoalsSandboxStore) {
+    init(api: HomeAPI, priorityStore: LoggingSandboxStore, goalsSandboxStore: GoalsSandboxStore, briefingStore: BriefingSandboxStore) {
         self.api = api
         self.priorityStore = priorityStore
         self.goalsSandboxStore = goalsSandboxStore
+        self.briefingStore = briefingStore
     }
 
     func load(now: Date = Date()) async {
@@ -39,6 +45,7 @@ final class HomeViewModel {
             var home = try await api.fetchHome()
             home.todaysFocus = priorityStore.todaysPriorities(now: now)
             home.goals = Self.projectPrimaryGoal(home.goals, from: goalsSandboxStore.hub.activeGoal)
+            home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
             state = .loaded(home)
         } catch {
             state = .failed("Home could not be loaded.")
@@ -68,5 +75,31 @@ final class HomeViewModel {
         updated[index].title = activeGoal.title
         updated[index].destination = activeGoal.destination
         return updated
+    }
+
+    /// Home shows exactly one Briefing card — whichever artifact
+    /// `latestForHome` selects (the same Monthly-collision-precedence
+    /// projection History's own artifacts feed from), never a
+    /// Home-specific duplicate. `nil` yields an empty list, matching
+    /// `HomeReadModel.hasBriefingCards`'s existing "hide the section if
+    /// there's nothing to show" contract.
+    private static func projectBriefingCards(from briefing: BriefingReadModel?) -> [HomeBriefingCard] {
+        guard let briefing else { return [] }
+        let prompt: String = switch briefing.cadence {
+        case .weekly: briefing.weekly?.heroBody ?? ""
+        case .midweek: briefing.midweek?.heroSummary ?? ""
+        case .monthly: briefing.monthly?.heroBody ?? ""
+        case .daily: ""
+        }
+        return [
+            HomeBriefingCard(
+                id: briefing.id,
+                sectionLabel: briefing.cadence.label,
+                title: briefing.historyTitle,
+                prompt: prompt,
+                createdAt: briefing.generatedAt,
+                destination: .briefingDetail(briefingId: briefing.id)
+            )
+        ]
     }
 }

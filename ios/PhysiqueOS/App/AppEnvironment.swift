@@ -36,6 +36,11 @@ final class AppEnvironment {
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
     let goalsSandboxStore: GoalsSandboxStore
+    /// The single fixture provider for the recurring-Briefing vertical —
+    /// Home's latest-Briefing projection, Briefing History, and Briefing
+    /// Detail all read through this one store (see
+    /// `BriefingSandboxStore.swift`'s doc comment).
+    let briefingSandboxStore: BriefingSandboxStore
     /// Deliberately isolated live transport proof. Existing product screens
     /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
@@ -58,6 +63,7 @@ final class AppEnvironment {
         loggingSandboxStore: LoggingSandboxStore = LoggingSandboxStore(),
         operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
         goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
+        briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI()
     ) {
         self.homeAPI = homeAPI
@@ -77,6 +83,7 @@ final class AppEnvironment {
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
         self.goalsSandboxStore = goalsSandboxStore
+        self.briefingSandboxStore = briefingSandboxStore
         self.founderServerAPI = founderServerAPI
     }
 }

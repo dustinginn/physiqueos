@@ -31,7 +31,7 @@ struct RootTabView: View {
             NavigationStack(path: $homePath) {
                 HomeView(onNavigate: { homePath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { homePath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { homePath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.home.title, systemImage: AppTab.home.systemImageName) }
@@ -40,7 +40,7 @@ struct RootTabView: View {
             NavigationStack(path: $goalsPath) {
                 GoalsView(onNavigate: { goalsPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { goalsPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { goalsPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.goals.title, systemImage: AppTab.goals.systemImageName) }
@@ -49,7 +49,7 @@ struct RootTabView: View {
             NavigationStack(path: $logPath) {
                 LogView(onNavigate: { logPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { logPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { logPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.log.title, systemImage: AppTab.log.systemImageName) }
@@ -58,7 +58,7 @@ struct RootTabView: View {
             NavigationStack(path: $evidencePath) {
                 EvidenceView(onNavigate: { evidencePath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { evidencePath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { evidencePath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.evidence.title, systemImage: AppTab.evidence.systemImageName) }
@@ -67,7 +67,7 @@ struct RootTabView: View {
             NavigationStack(path: $youPath) {
                 YouPlaceholderView(onNavigate: { youPath.append($0) })
                     .navigationDestination(for: AppDestination.self) {
-                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onNavigate: { youPath.append($0) })
+                        AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { youPath.append($0) })
                     }
             }
             .tabItem { Label(AppTab.you.title, systemImage: AppTab.you.systemImageName) }
@@ -84,6 +84,18 @@ struct RootTabView: View {
         Task { @MainActor in
             await Task.yield()
             logPath = NavigationPath()
+        }
+    }
+
+    /// Briefing Detail's top-of-screen "Home" navigation (the Founder's
+    /// explicit requirement) — same tab-switch-then-clear-stack pattern as
+    /// `returnToLog()` above, so Home always opens at its own root rather
+    /// than leaving a stale push behind on its stack.
+    private func returnToHome() {
+        selectedTab = .home
+        Task { @MainActor in
+            await Task.yield()
+            homePath = NavigationPath()
         }
     }
 }
