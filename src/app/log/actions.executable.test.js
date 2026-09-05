@@ -58,6 +58,39 @@ afterEach(() => {
 });
 
 describe("Log direct weigh-in executable action", () => {
+  it("saves a historical decimal weight without entering morning priority reconciliation", async () => {
+    vi.setSystemTime(new Date("2026-09-05T09:39:00.000Z"));
+    const fixture = createFixture({
+      reminders: [{
+        id: "reminder_previous_day_due",
+        userId: USER_ID,
+        title: "Previous-day priority",
+        type: "protocol_reminder",
+        active: true,
+        schedule: { cadence: "daily", type: "daily", timeOfDay: "morning" },
+      }],
+    });
+
+    const result = await saveDirectWeighIn(weightForm("170.6", "2026-09-04"));
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "saved",
+      date: "2026-09-04",
+    });
+    expect(structuredClone(result)).toEqual(result);
+    expect(fixture.liveStore.weightEntries.filter(
+      (entry) => entry.measuredAt === "2026-09-04"
+    )).toHaveLength(1);
+    expect(fixture.liveStore.weightEntries.find(
+      (entry) => entry.measuredAt === "2026-09-04"
+    )?.weight.value).toBe(170.6);
+    expect(fixture.liveStore.reminders[0].completedAt).toBeUndefined();
+    expect(fixture.liveStore.dailyCheckIns.find(
+      (entry) => entry.date === HISTORICAL_DATE
+    )?.reconciliation ?? []).toEqual([]);
+  });
+
   it("persists a historical date with current audit timestamps and chronological reporting", async () => {
     const fixture = createFixture();
 
@@ -207,7 +240,7 @@ describe("Log direct weigh-in executable action", () => {
   });
 });
 
-function createFixture({ includeToday = true } = {}) {
+function createFixture({ includeToday = true, reminders = [] } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "log-weigh-in-action-"));
   directories.push(directory);
   const filePath = path.join(directory, "runtime-store.json");
@@ -242,7 +275,7 @@ function createFixture({ includeToday = true } = {}) {
     protocolVersions: [],
     energyStrategyLinks: [],
     executionItems: [],
-    reminders: [],
+    reminders,
     nutritionContext: null,
     operatingPlan: null,
     operatingRhythm: null,

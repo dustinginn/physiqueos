@@ -155,17 +155,21 @@ export function createMorningCheckInPersistenceService({
             (item) =>
               String(item.measuredAt).slice(0, 10) === command.today
           ) ?? null;
-          const reconciliationService =
-            createMorningPriorityReconciliationService({
-              repositories,
-              now: () => recordedAt,
-            });
-          const reconciliation = await reconciliationService.save({
-            userId: command.user.id,
-            timeZone: command.timeZone,
-            submissions: command.reconciliationSubmissions ?? [],
-            at: recordedAt,
-          });
+          const reconciliation = command.reconcilePreviousDayPriorities === false
+            ? {
+                selection: null,
+                persisted: [],
+                idempotent: [],
+              }
+            : await createMorningPriorityReconciliationService({
+                repositories,
+                now: () => recordedAt,
+              }).save({
+                userId: command.user.id,
+                timeZone: command.timeZone,
+                submissions: command.reconciliationSubmissions ?? [],
+                at: recordedAt,
+              });
 
           if (
             existingSameDayWeight?.weight?.value === command.weightValue

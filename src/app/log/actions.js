@@ -53,6 +53,7 @@ export async function saveDirectWeighIn(formData) {
       proteinTarget: null,
       proteinAchieved: null,
       weighInContext: null,
+      reconcilePreviousDayPriorities: false,
       reconciliationSubmissions: [],
     });
   } catch (error) {

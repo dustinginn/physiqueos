@@ -398,7 +398,7 @@ describe("MorningCheckInPersistenceService", () => {
   });
 
   it("preserves historical isolation and same-date correction semantics in the bounded path", async () => {
-    const fixture = createFixture();
+    const fixture = createFixture({ reminders: [reminder("priority_1")] });
     const provider = createBoundedProvider(fixture.liveStore);
     const service = createMorningCheckInPersistenceService({
       mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
@@ -412,6 +412,7 @@ describe("MorningCheckInPersistenceService", () => {
       measurementDate: "2026-08-07",
       weightValue: 168.2,
       weighInContext: null,
+      reconcilePreviousDayPriorities: false,
       reconciliationSubmissions: [],
     };
 
@@ -447,7 +448,28 @@ describe("MorningCheckInPersistenceService", () => {
       (item) => item.date === "2026-08-07"
     )).toHaveLength(1);
     expect(provider.runtime.dailyCheckIns.filter(todayCheckIn)).toHaveLength(0);
-    expect(provider.runtime.reminders).toEqual([]);
+    expect(provider.runtime.reminders).toEqual(fixture.liveStore.reminders);
+    expect(provider.runtime.reminders[0].completedAt).toBeUndefined();
+  });
+
+  it("continues to require prior-day dispositions for the actual morning workflow", async () => {
+    const fixture = createFixture({ reminders: [reminder("priority_1")] });
+    const provider = createBoundedProvider(fixture.liveStore);
+    const before = structuredClone(provider.runtime);
+    const service = createMorningCheckInPersistenceService({
+      mutateCanonicalRuntime: provider.mutateCanonicalRuntime,
+      now: () => NOW,
+    });
+
+    await expect(service.save({
+      ...command(),
+      user: undefined,
+      today: undefined,
+      timeZone: undefined,
+      weighInContext: null,
+      reconciliationSubmissions: [],
+    })).rejects.toMatchObject({ code: "missing_disposition" });
+    expect(provider.runtime).toEqual(before);
   });
 });
 
