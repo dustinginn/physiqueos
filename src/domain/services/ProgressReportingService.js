@@ -170,7 +170,7 @@ function buildPlaceholderReportFromContext({ context, options = {}, streamId }) 
     relatedGoals: getStreamRelatedGoals(streamId, context.goals),
     ...getStreamReportExtras(streamId, scopedContext),
     ...(streamId === "training" && options.dateWindow
-      ? { trainingLibrary: getTrainingReportExtras(context).trainingLibrary }
+      ? { trainingLibrary: getTrainingLibraryForContext(context) }
       : {}),
     evidenceWindow: options.dateWindow ?? null,
   };
@@ -1228,11 +1228,24 @@ export function createTrainingReportingReports({
     trainingSessions,
     weights: [],
   };
-  const globalReport = buildPlaceholderReportFromContext({ context, streamId: "training" });
+  const globalReport = dateWindow
+    ? Object.freeze({
+        trainingBreakdowns: getTrainingBreakdowns(trainingSessions),
+        trainingLibrary: getTrainingLibraryForContext(context),
+      })
+    : buildPlaceholderReportFromContext({ context, streamId: "training" });
   const scopedReport = dateWindow
     ? buildPlaceholderReportFromContext({ context, options: { dateWindow }, streamId: "training" })
     : globalReport;
   return Object.freeze({ globalReport, scopedReport });
+}
+
+function getTrainingLibraryForContext(context = {}) {
+  const { activityDays = [], trainingSessions = [] } = context;
+  return getTrainingLibrary({
+    breakdowns: getTrainingBreakdowns(trainingSessions),
+    understanding: getTrainingUnderstanding({ activityDays, trainingSessions }),
+  });
 }
 
 function buildTrainingLandingReport(context, evidenceWindow) {

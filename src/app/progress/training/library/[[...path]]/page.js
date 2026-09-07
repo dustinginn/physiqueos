@@ -51,11 +51,12 @@ export default async function TrainingLibraryPage({ params, searchParams }) {
       : null;
   const trainingNavigation = getProductionTrainingNavigationReadService();
   const narrowRead = exerciseIdentity?.canonicalExerciseId
-    ? await trainingNavigation.getExercise({
+      ? await trainingNavigation.getExercise({
         context,
         exerciseSlug: path.at(-1),
+        registryHydrated: true,
       })
-    : await trainingNavigation.getLibrary({ context, path });
+    : await trainingNavigation.getLibrary({ context, path, registryHydrated: true });
   const { report, timeline, exerciseRecords = null } = narrowRead;
   const baseNavigation = buildTrainingLibraryNavigation(path);
   const currentPath = baseNavigation.route;

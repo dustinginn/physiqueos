@@ -123,9 +123,9 @@ export function createTrainingNavigationReadService({
         });
       });
     },
-    getLibrary({ context, currentDate = new Date(), path = [] } = {}) {
+    getLibrary({ context, currentDate = new Date(), path = [], registryHydrated = false } = {}) {
       return store.run("training.navigation.library", async () => {
-        await ensureCanonicalExerciseRegistry();
+        if (!registryHydrated) await ensureCanonicalExerciseRegistry();
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([
           store.getUser(),
           store.listGoals(),
@@ -189,9 +189,9 @@ export function createTrainingNavigationReadService({
         return session;
       });
     },
-    getExercise({ context, currentDate = new Date(), exerciseSlug } = {}) {
+    getExercise({ context, currentDate = new Date(), exerciseSlug, registryHydrated = false } = {}) {
       return store.run("training.navigation.exercise", async () => {
-        await ensureCanonicalExerciseRegistry();
+        if (!registryHydrated) await ensureCanonicalExerciseRegistry();
         const exerciseIdentity = resolveTrainingExerciseIdentity(exerciseSlug);
         const [user, goals, canonicalEvidenceObjects, events] = await Promise.all([
           store.getUser(),

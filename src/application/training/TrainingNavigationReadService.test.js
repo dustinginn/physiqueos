@@ -124,6 +124,24 @@ describe("Founder-created canonical exercise resolution on a fresh process", () 
 
     expect(readCanonicalExerciseRegistry).toHaveBeenCalledTimes(2);
   });
+
+  it("does not repeat provider hydration when the route already hydrated before path resolution", async () => {
+    registerRuntimeTrainingExercises([founderCreatedExercise]);
+    const readCanonicalExerciseRegistry = vi.fn();
+    const service = createTrainingNavigationReadService({
+      store: navigationStore([bicepSession()]),
+      readCanonicalExerciseRegistry,
+    });
+
+    const result = await service.getExercise({
+      context: "all",
+      exerciseSlug: "bicep_curl_machine",
+      registryHydrated: true,
+    });
+
+    expect(readCanonicalExerciseRegistry).not.toHaveBeenCalled();
+    expect(result.report.trainingDays).toHaveLength(1);
+  });
 });
 
 describe("provider-native Training navigation", () => {
