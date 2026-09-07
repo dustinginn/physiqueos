@@ -39,4 +39,22 @@ describe("PostgresBriefingNavigationReadStore", () => {
       compatibilityRuntimeLoadCount: 0,
     }));
   });
+
+  it("loads one exact Confidence analysis without reconstructing the runtime", async () => {
+    const complete = vi.fn();
+    const query = vi.fn(async () => ({ rows: [{ payload: { id: "analysis-one" }, version: 2 }] }));
+    const result = await createPostgresBriefingNavigationReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+      ownerUserId: "owner",
+      onComplete: complete,
+    }).getAnalysis({ analysisId: "analysis-one" });
+
+    expect(result).toEqual({ id: "analysis-one", version: 2 });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      readModel: "confidence.analysis",
+      queryCount: 1,
+      compatibilityRuntimeLoadCount: 0,
+    }));
+  });
 });

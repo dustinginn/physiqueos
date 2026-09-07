@@ -77,6 +77,10 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
       const artifact = row ? Object.freeze({ ...row.payload, version: Number(row.version) }) : null;
       return context({ artifact, query });
     }),
+    getAnalysis: tracked("confidence.analysis", async ({ input, query }) => {
+      const records = createPhase4CanonicalRecordStore({ query });
+      return records.get({ ownerUserId, collection: "analyses", recordId: input.analysisId });
+    }),
   });
 }
 
@@ -117,6 +121,9 @@ export function createRepositoryBriefingNavigationReadStore({ repositories, load
         item.briefing?.dexaEventNarrative?.scanId,
       ].some((value) => String(value) === String(scanId))) ?? null;
       return buildContext(artifact);
+    },
+    getAnalysis({ analysisId }) {
+      return repositories.analyses.getAnalysisById(analysisId);
     },
   });
 }

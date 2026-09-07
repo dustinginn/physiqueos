@@ -1,7 +1,7 @@
 import { resolveBriefingReviewArtifact } from "../../domain/services/BriefingReviewArtifactResolver.js";
 
 export function createBriefingNavigationReadService({ store } = {}) {
-  if (!store?.getArtifact || !store?.listHistory) throw new Error("Briefing navigation requires a read store.");
+  if (!store?.getAnalysis || !store?.getArtifact || !store?.listHistory) throw new Error("Briefing navigation requires a read store.");
   return Object.freeze({
     listHistory() {
       return store.listHistory();
@@ -13,6 +13,9 @@ export function createBriefingNavigationReadService({ store } = {}) {
     },
     getDexaArtifact({ scanId } = {}) {
       return store.getDexaArtifact({ scanId });
+    },
+    getAnalysis({ analysisId } = {}) {
+      return store.getAnalysis({ analysisId });
     },
   });
 }
