@@ -3,7 +3,10 @@ import {
   haveSameTrainingPerformanceEventSemantics,
   TRAINING_PERFORMANCE_EVENT_TYPES,
 } from "../models/trainingPerformanceEvent";
-import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import {
+  resolveTrainingExerciseIdentity,
+  resolveTrainingExerciseOccurrenceIdentity,
+} from "../models/trainingExerciseIdentity";
 import {
   getTrainingExecutionVariantKey,
   normalizeTrainingExecutionVariant,
@@ -40,9 +43,8 @@ export function produceTrainingPerformanceEvents({
   const workoutDate = String(session.observed_at ?? "").slice(0, 10);
   const exercises = new Map();
   for (const exercise of session.exercises ?? []) {
-    const identity = resolveTrainingExerciseIdentity(exercise.name);
-    const canonicalExerciseId = exercise.canonicalExerciseId ??
-      identity.canonicalExerciseId;
+    const identity = resolveTrainingExerciseOccurrenceIdentity(exercise);
+    const canonicalExerciseId = identity.canonicalExerciseId;
     if (!canonicalExerciseId) continue;
     const executionVariant = normalizeTrainingExecutionVariant(
       exercise.executionVariant

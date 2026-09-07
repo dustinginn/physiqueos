@@ -270,7 +270,7 @@ describe("historical training exercise canonical materialization", () => {
     expect(projectedReverseFly).toMatchObject({
       canonicalExerciseId: "reverse_fly_machine",
       label: "Reverse Fly Machine",
-      navigationCategorySource: "primary_muscle_mapping",
+      navigationCategorySource: "canonical_primary_muscle_mapping",
       primaryMuscleGroups: ["Back"],
       primaryNavigationCategory: "back",
     });
@@ -328,7 +328,7 @@ describe("historical training exercise canonical materialization", () => {
       .toEqual(expect.arrayContaining([
         expect.objectContaining({
           canonicalExerciseId: "smith_machine_hip_thrust",
-          navigationCategorySource: "primary_muscle_mapping",
+          navigationCategorySource: "canonical_primary_muscle_mapping",
           primaryNavigationCategory: "glutes",
         }),
       ]));
@@ -371,19 +371,31 @@ describe("historical training exercise canonical materialization", () => {
     };
     registerRuntimeTrainingExercises([renamed]);
 
-    const resistance = getResistanceBreakdown([{
-      id: "training|renamed-history",
-      observed_at: "2026-08-03",
-      exercises: [{
-        id: "exercise-occurrence",
-        canonicalExerciseId: "founder_cable_arc",
-        name: "Bench Press",
-        body_region: "Chest",
-        primary_muscle_groups: ["Chest"],
-        movement_pattern: "Horizontal Press",
-        sets: [{ reps: 10, weight: 40, weight_unit: "lb" }],
-      }],
-    }]);
+    const resistance = getResistanceBreakdown([
+      {
+        id: "training|renamed-history",
+        observed_at: "2026-08-03",
+        exercises: [{
+          id: "exercise-occurrence",
+          canonicalExerciseId: "founder_cable_arc",
+          name: "Bench Press",
+          body_region: "Chest",
+          primary_muscle_groups: ["Chest"],
+          movement_pattern: "Horizontal Press",
+          sets: [{ reps: 10, weight: 40, weight_unit: "lb" }],
+        }],
+      },
+      {
+        id: "training|current-name-history",
+        observed_at: "2026-08-05",
+        exercises: [{
+          id: "exercise-occurrence-2",
+          canonicalExerciseId: "founder_cable_arc",
+          name: "Founder Cable Arc",
+          sets: [{ reps: 12, weight: 40, weight_unit: "lb" }],
+        }],
+      },
+    ]);
     const exercises = resistance
       .flatMap((region) => region.movementFamilies)
       .flatMap((family) => family.exercises);
@@ -395,6 +407,7 @@ describe("historical training exercise canonical materialization", () => {
         primaryMuscleGroups: ["Biceps"],
       }),
     ]);
+    expect(exercises[0].occurrences).toHaveLength(2);
     expect(getExercisesForFlatTrainingGroup({
       groupSlug: "biceps",
       report: { trainingBreakdowns: { resistance } },

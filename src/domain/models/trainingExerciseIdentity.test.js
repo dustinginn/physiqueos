@@ -6,6 +6,7 @@ import {
   resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
 } from "./trainingExerciseIdentity";
+import { normalizeTrainingExercises } from "./trainingSessionEvidence";
 
 afterEach(() => registerRuntimeTrainingExercises([]));
 
@@ -95,6 +96,43 @@ describe("Founder Alpha incline bench identity",()=>{
       canonicalExerciseId: "incline_bench_press",
       canonicalExerciseName: "Incline Bench Press",
       resolutionStatus: "resolved_high_confidence",
+    });
+  });
+
+  it("rejects runtime ID and alias collisions without corrupting the current registry", () => {
+    registerRuntimeTrainingExercises([{
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: [],
+    }]);
+
+    expect(() => registerRuntimeTrainingExercises([{
+      id: "runtime_bench_duplicate",
+      name: "Runtime Bench Duplicate",
+      aliases: ["Bench Press"],
+    }])).toThrow(expect.objectContaining({
+      code: "CANONICAL_EXERCISE_REGISTRY_CONFLICT",
+    }));
+    expect(resolveTrainingExerciseIdentity("Founder Cable Arc"))
+      .toMatchObject({ canonicalExerciseId: "founder_cable_arc" });
+  });
+
+  it("keeps the stored ID while normalizing a renamed persisted occurrence", () => {
+    registerRuntimeTrainingExercises([{
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: ["Original Cable Arc"],
+      primary_muscle_group_id: "biceps",
+      primary_muscle_groups: ["Biceps"],
+    }]);
+
+    expect(normalizeTrainingExercises([{
+      canonicalExerciseId: "founder_cable_arc",
+      name: "Bench Press",
+      sets: [{ reps: 10, weight: 40 }],
+    }])[0]).toMatchObject({
+      canonicalExerciseId: "founder_cable_arc",
+      name: "Bench Press",
     });
   });
 });

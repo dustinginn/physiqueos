@@ -46,13 +46,18 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   tracking: Object.freeze(["user", "executionItems", "protocols", "reminders"]),
 });
 
-export function createCoreNavigationReadService({ store, now = () => new Date() } = {}) {
+export function createCoreNavigationReadService({
+  store,
+  now = () => new Date(),
+  readCanonicalExerciseRegistry = null,
+} = {}) {
   if (!store?.run || !store?.getOwnerUserId) {
     throw new Error("Core navigation requires a read store.");
   }
 
   return Object.freeze({
-    getHome() {
+    async getHome() {
+      await ensureCanonicalExerciseRegistry();
       return withContext("core.navigation.home", "home", async ({ ownerUserId, repositories, runtime }) =>
         createHomeBriefingService({ repositories, readRuntimeStore: () => runtime, now })
           .getHomeBriefing(ownerUserId));
@@ -66,7 +71,8 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
         });
       });
     },
-    getGoals() {
+    async getGoals() {
+      await ensureCanonicalExerciseRegistry();
       return withContext("core.navigation.goals", "goals", ({ principal, repositories, runtime }) =>
         createGoalsHubReadService({ repositories, readRuntimeStore: () => runtime })
           .getGoalsHub({ principal }));
@@ -75,7 +81,8 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
       return withContext("core.navigation.operating-plan", "operatingPlan", ({ principal, repositories }) =>
         createOperatingPlanReadService({ repositories }).getOperatingPlan({ principal }));
     },
-    getTrainingLogger() {
+    async getTrainingLogger() {
+      const canonicalExercises = await ensureCanonicalExerciseRegistry();
       return withContext("core.navigation.training-logger", "trainingLogger", ({ runtime }) => {
         const user = runtime.user;
         const initialDate = getLocalDateKey(now(), user?.timeZone ?? user?.timezone ?? "America/Los_Angeles");
@@ -94,7 +101,7 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
           .slice(0, 120);
         return Object.freeze({
           goalContext: projectGoalContext((runtime.goals ?? []).find((goal) => goal.status === "active") ?? null, initialDate),
-          initialCanonicalExercises: listCanonicalTrainingExerciseIdentities(),
+          initialCanonicalExercises: canonicalExercises,
           initialDate,
           initialHistorySessions: historySessions,
           initialPerformedExerciseIds: performedExerciseIds,
@@ -146,6 +153,12 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
       }));
     },
   });
+
+  async function ensureCanonicalExerciseRegistry() {
+    return readCanonicalExerciseRegistry
+      ? readCanonicalExerciseRegistry()
+      : listCanonicalTrainingExerciseIdentities();
+  }
 
   function withContext(readModel, surface, callback) {
     return store.run(readModel, async ({ readCollections }) => {

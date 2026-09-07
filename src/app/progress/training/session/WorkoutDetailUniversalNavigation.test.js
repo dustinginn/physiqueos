@@ -120,7 +120,8 @@ describe("universal Workout Detail navigation", () => {
 
   it("keeps the selector out and the complete canonical session contract intact", () => {
     expect(route).not.toContain("TrainingTimelineSelector");
-    expect(route).toContain('getPlaceholderReport("training")');
+    expect(route).toContain("getProductionTrainingNavigationReadService");
+    expect(route).toContain("service.getSession");
     expect(screen).toContain('title="Session Details"');
     expect(screen).toContain('title="Add / Correct Workout Details"');
     expect(screen).toContain("session.sourceEvidence");

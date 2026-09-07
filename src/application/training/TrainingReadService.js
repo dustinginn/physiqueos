@@ -37,7 +37,7 @@ export function createTrainingReadService({ repositories } = {}) {
       requireAuthenticationPrincipal(principal);
       const normalized = String(query).trim().toLowerCase();
       return listCanonicalTrainingExerciseIdentities()
-        .filter((item) => !normalized || `${item.name} ${item.bodyRegion ?? ""}`.toLowerCase().includes(normalized))
+        .filter((item) => !normalized || `${item.name} ${item.body_region ?? ""}`.toLowerCase().includes(normalized))
         .slice(0, Math.min(100, Math.max(1, Number(limit) || 50)))
         .map(projectExercise);
     },

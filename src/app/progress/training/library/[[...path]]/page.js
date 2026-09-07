@@ -9,7 +9,7 @@ import { resolveTrainingExerciseIdentity } from "../../../../../domain/models/tr
 import { createTrainingLibraryMetadata } from "../../../../../presentation/trainingExercisePresentation";
 import {
   getProductionTrainingNavigationReadService,
-  hydrateProductionTrainingExerciseRegistry,
+  readProductionTrainingExerciseRegistry,
 } from "../../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }) {
 
   if (!exerciseSlug) return { title: "Training Library | PhysiqueOS" };
 
-  await hydrateProductionTrainingExerciseRegistry();
+  await readProductionTrainingExerciseRegistry();
   const presentation = getTrainingLibraryExercisePresentation({
     exerciseSlug,
     report: { trainingDays: [] },
@@ -44,7 +44,7 @@ export default async function TrainingLibraryPage({ params, searchParams }) {
   // treated as an exercise detail or a library browse below. Founder-created exercises only
   // resolve once the registry is hydrated from provider state, so that must happen before
   // this branch is decided, not just before the read services that follow it.
-  await hydrateProductionTrainingExerciseRegistry();
+  await readProductionTrainingExerciseRegistry();
   const exerciseIdentity =
     path.length >= 2 && path[0] !== "cardio"
       ? resolveTrainingExerciseIdentity(path.at(-1))

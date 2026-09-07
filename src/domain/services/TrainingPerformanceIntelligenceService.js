@@ -5,6 +5,7 @@ import {
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseOccurrenceIdentity,
 } from "../models/trainingExerciseIdentity";
 import {
   getTrainingExecutionVariantKey,
@@ -129,7 +130,9 @@ function isResistanceTrainingSession(session = {}) {
 function getExercisePerformanceEntries(sessions = []) {
   return sessions.flatMap((session) =>
     (session.exercises ?? [])
-      .filter((exercise) => String(exercise?.name ?? "").trim())
+      .filter((exercise) => String(
+        exercise?.canonicalExerciseId ?? exercise?.name ?? ""
+      ).trim())
       .map((exercise) =>
         createExercisePerformanceEntry({ exercise, session })
       )
@@ -138,12 +141,16 @@ function getExercisePerformanceEntries(sessions = []) {
 }
 
 function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
+  const identity = resolveTrainingExerciseOccurrenceIdentity(exercise);
   const navigationExercise = withPrimaryTrainingNavigationCategory({
     ...exercise,
+    canonicalExerciseId: identity.canonicalExerciseId,
     familyLabel: exercise.movement_pattern,
-    label: exercise.name,
-    primaryMuscleGroups: exercise.primary_muscle_groups,
-    regionLabel: exercise.body_region,
+    label: identity.canonicalExerciseName ?? exercise.name,
+    primaryMuscleGroups:
+      identity.exercise?.primary_muscle_groups ??
+      exercise.primary_muscle_groups,
+    regionLabel: identity.exercise?.body_region ?? exercise.body_region,
   });
   const sets = normalizeSets(exercise.sets);
   const totalVolume = sumKnownVolume(sets);
@@ -158,8 +165,10 @@ function createExercisePerformanceEntry({ exercise = {}, session = {} }) {
 
   return {
     date: getDateKey(session.observed_at),
-    exerciseKey: getCanonicalTrainingExerciseSlug(exercise.name),
-    exerciseName: getCanonicalTrainingExerciseLabel(exercise.name),
+    exerciseKey: identity.canonicalExerciseId ??
+      getCanonicalTrainingExerciseSlug(exercise.name),
+    exerciseName: identity.canonicalExerciseName ??
+      getCanonicalTrainingExerciseLabel(exercise.name),
     ...(executionVariant ? { executionVariant } : {}),
     ...(relationshipContext ? { relationshipContext } : {}),
     primaryNavigationCategory: navigationExercise.primaryNavigationCategory,

@@ -9,14 +9,17 @@ const route = fs.readFileSync(
   new URL("../app/progress/training/library/[[...path]]/page.js", import.meta.url),
   "utf8"
 );
+const readService = fs.readFileSync(
+  new URL("../application/training/TrainingNavigationReadService.js", import.meta.url),
+  "utf8"
+);
 
 describe("Training Library persisted performance-record presentation", () => {
   it("reads the dedicated repository and resolves the selected canonical identity", () => {
-    expect(route).toContain(
-      "FounderRepositories.trainingPerformanceEvents"
-    );
+    expect(route).toContain("getProductionTrainingNavigationReadService");
     expect(route).toContain("resolveTrainingExerciseIdentity(path.at(-1))");
-    expect(route).toContain("createTrainingLibraryExerciseRecordsReadModel");
+    expect(readService).toContain("listTrainingPerformanceEventsByExercise");
+    expect(readService).toContain("createTrainingLibraryExerciseRecordsReadModel");
     expect(route).not.toMatch(/TrainingPerformanceIntelligenceService|commitProgress|pr_detection/);
   });
 

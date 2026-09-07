@@ -126,6 +126,23 @@ describe("TrainingPerformanceEventProducer", () => {
     expect(first[0].id).toBe(second[0].id);
   });
 
+  it("uses stored canonical identity when a historical display name disagrees", () => {
+    const events = produce({
+      exercises: [exercise("Bench Press", [[15, 35]], {
+        canonicalExerciseId: "spider_curl",
+      })],
+      observations: [observation("spider_curl", "Spider Curls", [
+        repsPr(15, 35, 13),
+      ], 525)],
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      canonicalExerciseId: "spider_curl",
+      canonicalExerciseName: "Spider Curls",
+    });
+  });
+
   it("carries independent Variant and Superset context into durable events", () => {
     const variant = {
       key: "static_hold",

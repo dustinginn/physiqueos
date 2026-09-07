@@ -56,6 +56,31 @@ describe("canonical exercise review resolution", () => {
       .toBeNull();
   });
 
+  it("preserves a validated stored canonical ID when its display name has changed", () => {
+    registerRuntimeTrainingExercises([{
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: ["Original Cable Arc"],
+      primary_muscle_group_id: "biceps",
+      primary_muscle_groups: ["Biceps"],
+    }]);
+    const prepared = prepareCanonicalExerciseIdentitiesForConfirmation({
+      evidence_objects: [{
+        evidence_type: "training",
+        exercises: [{
+          canonicalExerciseId: "founder_cable_arc",
+          name: "Bench Press",
+          sets: [{ reps: 10, weight: 40 }],
+        }],
+      }],
+    });
+
+    expect(prepared.evidence_objects[0].exercises[0]).toMatchObject({
+      canonicalExerciseId: "founder_cable_arc",
+      name: "Founder Cable Arc",
+    });
+  });
+
   it("resolves a new definition while retaining sets and provenance", () => {
     const canonical = createCanonicalExerciseDefinition({
       canonicalName: "Bicep Curl Machine",

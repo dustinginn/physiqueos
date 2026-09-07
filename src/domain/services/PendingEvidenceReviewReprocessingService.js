@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { reinterpretEvidenceIntakeSubmissionFromStoredArtifacts } from "./EvidenceIntakeService";
-import { resolveTrainingExerciseIdentity } from "../models/trainingExerciseIdentity";
+import {
+  resolveTrainingExerciseIdentity,
+  resolveTrainingExerciseOccurrenceIdentity,
+} from "../models/trainingExerciseIdentity";
 import { resolveExecutionVariantHeading } from "../models/trainingSessionEvidence";
 import { remapTrainingExerciseRelationshipGroups } from "../models/trainingExerciseRelationship";
 import { resolveEvidenceReviewReprocessEligibility } from "./EvidenceReviewReprocessEligibility";
@@ -160,8 +163,8 @@ function preserveExerciseSetSemantics({ freshExercises, priorExercises, typedEvi
 
   return freshExercises.map((freshExercise, exerciseIndex) => {
     const priorExercise = priorExercises[exerciseIndex];
-    const freshIdentity = resolveTrainingExerciseIdentity(freshExercise?.name);
-    const priorIdentity = resolveTrainingExerciseIdentity(priorExercise?.name);
+    const freshIdentity = resolveTrainingExerciseOccurrenceIdentity(freshExercise);
+    const priorIdentity = resolveTrainingExerciseOccurrenceIdentity(priorExercise);
     const sameCanonicalExercise = Boolean(
       freshIdentity.canonicalExerciseId &&
       freshIdentity.canonicalExerciseId === priorIdentity.canonicalExerciseId

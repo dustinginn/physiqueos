@@ -1,6 +1,9 @@
 import {
   CANONICAL_TRAINING_MUSCLE_GROUPS,
 } from "../domain/models/trainingMuscleGroupIdentity";
+import {
+  getCanonicalTrainingExerciseIdentityById,
+} from "../domain/models/trainingExerciseIdentity";
 
 export const TRAINING_NAVIGATION_CATEGORIES = Object.freeze(
   CANONICAL_TRAINING_MUSCLE_GROUPS.map((muscleGroup) => muscleGroup.id)
@@ -164,6 +167,43 @@ export function resolvePrimaryTrainingNavigationCategory(exercise = {}) {
       primaryNavigationCategory:
         EXPLICIT_CANONICAL_EXERCISE_NAVIGATION_CATEGORIES[canonicalExerciseId],
       source: "explicit_canonical_exercise_mapping",
+    };
+  }
+
+  const canonicalExercise = getCanonicalTrainingExerciseIdentityById(
+    canonicalExerciseId
+  );
+  const canonicalPrimaryMuscleSlugs = (
+    canonicalExercise?.primary_muscle_groups?.length
+      ? canonicalExercise.primary_muscle_groups
+      : canonicalExercise?.primary_muscle_group_id
+        ? [canonicalExercise.primary_muscle_group_id]
+        : exercise.primaryMuscleGroups?.length
+          ? exercise.primaryMuscleGroups
+          : exercise.primaryMuscleGroupId
+            ? [exercise.primaryMuscleGroupId]
+            : []
+  ).map(slugify);
+  const canonicalPrimaryMuscleGroup = canonicalPrimaryMuscleSlugs.find(
+    (muscle) => REGION_NAVIGATION_CATEGORIES[muscle]
+  );
+  if (canonicalExerciseId && canonicalPrimaryMuscleGroup) {
+    return {
+      confidence: "high",
+      primaryNavigationCategory:
+        REGION_NAVIGATION_CATEGORIES[canonicalPrimaryMuscleGroup],
+      source: "canonical_primary_muscle_mapping",
+    };
+  }
+
+  const canonicalRegion = slugify(
+    canonicalExercise?.body_region ?? exercise.regionLabel
+  );
+  if (canonicalExerciseId && REGION_NAVIGATION_CATEGORIES[canonicalRegion]) {
+    return {
+      confidence: "high",
+      primaryNavigationCategory: REGION_NAVIGATION_CATEGORIES[canonicalRegion],
+      source: "canonical_region_mapping",
     };
   }
 

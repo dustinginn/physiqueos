@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import EvidenceReviewScreen from "../../../../screens/EvidenceReviewScreen";
 import { createMobileEvidenceReviewFixture } from "../../../../fixtures/evidenceReviewFixtures";
 import { repairPendingReviewExerciseIdentities } from "../../../../domain/services/EvidenceReviewPresentationService";
-import { listCanonicalTrainingExerciseIdentities } from "../../../../domain/models/trainingExerciseIdentity";
 import { confirmEvidenceReview, discardEvidenceReview, reprocessEvidenceReview, resolveEvidenceReviewExercise, updateEvidenceReviewDexaMeasurements, updateEvidenceReviewExerciseRelationship, updateEvidenceReviewExerciseVariant, updateEvidenceReviewPhotoPose, updateEvidenceReviewPhotoSessionMetadata } from "./actions";
 import {
   createEvidenceRecoveryContext,
@@ -15,7 +14,7 @@ import {
 import { resolveEvidenceReviewReprocessEligibility } from "../../../../domain/services/EvidenceReviewReprocessEligibility";
 import {
   getProductionEvidenceReviewReadService,
-  hydrateProductionTrainingExerciseRegistry,
+  readProductionTrainingExerciseRegistry,
 } from "../../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +36,7 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   // Map existing must offer Founder-created canonical exercises (e.g. bicep_curl_machine)
   // on the very first request after a fresh deploy, not only once some unrelated canonical
   // write has incidentally hydrated the shared registry in this process.
-  await hydrateProductionTrainingExerciseRegistry();
+  const canonicalExercises = await readProductionTrainingExerciseRegistry();
   const requestedRecoveryContext = parseEvidenceRecoverySearchParams(query) ??
     createEvidenceRecoveryContext(
       review.interpretedEvidence?.review_metadata?.recoveryContext
@@ -67,5 +66,5 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
   });
   const dexaEditOutcome = ["updated", "stale"].includes(query?.dexa) ? query.dexa : null;
   const photoEditOutcome = query?.photo === "stale" ? "stale" : null;
-  return <EvidenceReviewScreen canonicalExercises={listCanonicalTrainingExerciseIdentities()} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoEditOutcome={photoEditOutcome} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessEligibility={reprocessEligibility} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
+  return <EvidenceReviewScreen canonicalExercises={canonicalExercises} confirmAction={confirmEvidenceReview} dexaEditOutcome={dexaEditOutcome} dexaMeasurementsAction={updateEvidenceReviewDexaMeasurements} discardAction={discardEvidenceReview} exerciseRelationshipAction={updateEvidenceReviewExerciseRelationship} exerciseResolutionAction={resolveEvidenceReviewExercise} exerciseVariantAction={updateEvidenceReviewExerciseVariant} photoEditOutcome={photoEditOutcome} photoPoseAction={updateEvidenceReviewPhotoPose} photoSessionMetadataAction={updateEvidenceReviewPhotoSessionMetadata} recoveryContext={recoveryContext} reprocessAction={reprocessEvidenceReview} reprocessEligibility={reprocessEligibility} reprocessOutcome={reprocessOutcome} review={presentedReview} />;
 }

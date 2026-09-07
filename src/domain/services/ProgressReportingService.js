@@ -8,7 +8,7 @@ import {
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
-  resolveTrainingExerciseIdentity,
+  resolveTrainingExerciseOccurrenceIdentity,
 } from "../models/trainingExerciseIdentity";
 import {
   formatTrainingExerciseOccurrenceLabel,
@@ -2308,8 +2308,15 @@ export function getResistanceBreakdown(resistanceSessions = []) {
 
   resistanceSessions.forEach((session) => {
     (session.exercises ?? []).forEach((exercise) => {
-      const regionName = exercise.body_region ?? "Arms";
-      const movementFamily = inferMovementFamily(exercise);
+      const exerciseIdentity = resolveTrainingExerciseOccurrenceIdentity(exercise);
+      const canonicalExercise = exerciseIdentity.exercise ?? null;
+      const regionName = canonicalExercise?.body_region ?? exercise.body_region ?? "Arms";
+      const movementFamily = inferMovementFamily({
+        ...exercise,
+        movement_pattern:
+          canonicalExercise?.movement_pattern ?? exercise.movement_pattern,
+        name: canonicalExercise?.name ?? exercise.name,
+      });
 
       if (!regions.has(regionName)) {
         regions.set(regionName, { label: regionName, movementFamilies: new Map() });
@@ -2325,19 +2332,14 @@ export function getResistanceBreakdown(resistanceSessions = []) {
         });
       }
 
-      const exerciseLabel = getCanonicalTrainingExerciseLabel(
-        exercise.name ?? exercise.id
-      );
-      const exerciseIdentity = resolveTrainingExerciseIdentity(
-        exercise.name ?? exercise.id
-      );
+      const exerciseLabel = exerciseIdentity.canonicalExerciseName ??
+        getCanonicalTrainingExerciseLabel(exercise.name ?? exercise.id);
       const primaryMuscleGroups = getResistanceExercisePrimaryMuscleGroups({
         exercise,
         exerciseIdentity,
       });
-      const exerciseKey = getCanonicalTrainingExerciseSlug(
-        exercise.name ?? exercise.id
-      );
+      const exerciseKey = exerciseIdentity.canonicalExerciseId ??
+        getCanonicalTrainingExerciseSlug(exercise.name ?? exercise.id);
       const family = region.movementFamilies.get(familyKey);
       const groupedSets = groupExerciseSets(exercise.sets ?? []);
       const executionVariant = normalizeTrainingExecutionVariant(

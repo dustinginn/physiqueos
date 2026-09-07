@@ -87,7 +87,7 @@ function createCorrectedTrainingObject({ correctedCanonicalId, target }) {
   });
   return {
     ...structuredClone(target.payload),
-    id: `${target.payload.id}_seated_cable_row_correction_v1`,
+    id: target.payload.id,
     exercises,
     reconciliation: {
       canonical_id: correctedCanonicalId,

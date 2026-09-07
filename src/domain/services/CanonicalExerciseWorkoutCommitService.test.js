@@ -4,10 +4,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFounderStoreUnitOfWork } from "../../data/repositories/FounderStoreUnitOfWork";
 import {
+  listCanonicalTrainingExerciseIdentities,
   registerRuntimeTrainingExercises,
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import { createCanonicalExerciseWorkoutCommitService } from "./CanonicalExerciseWorkoutCommitService";
+import { getResistanceBreakdown } from "./ProgressReportingService";
 
 const directories = [];
 afterEach(() => {
@@ -40,6 +42,18 @@ describe("atomic canonical exercise and workout commit", () => {
         resolutionStatus: "resolved_high_confidence",
         exercise: { id: "bicep_curl_machine" },
       });
+    expect(listCanonicalTrainingExerciseIdentities()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "bicep_curl_machine" }),
+      ])
+    );
+    expect(getResistanceBreakdown(
+      liveStore.canonicalEvidenceObjects.map((record) => record.payload)
+    ).flatMap((region) => region.movementFamilies)
+      .flatMap((family) => family.exercises))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ canonicalExerciseId: "bicep_curl_machine" }),
+      ]));
   });
 
   it("leaves neither record when the atomic commit fails", async () => {

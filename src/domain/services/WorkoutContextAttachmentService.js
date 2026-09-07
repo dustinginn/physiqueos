@@ -1,4 +1,7 @@
-import { getCanonicalTrainingExerciseSlug } from "../models/trainingExerciseIdentity";
+import {
+  getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseOccurrenceIdentity,
+} from "../models/trainingExerciseIdentity";
 
 export function attachVoiceEvidenceToActiveWorkout({
   activeWorkoutContext = null,
@@ -151,7 +154,9 @@ function mergeMetadata(existing = {}, incoming = {}) {
 }
 
 function exerciseKey(exercise) {
-  return getCanonicalTrainingExerciseSlug(exercise.name) || exercise.id;
+  return resolveTrainingExerciseOccurrenceIdentity(exercise).canonicalExerciseId ??
+    getCanonicalTrainingExerciseSlug(exercise.name) ??
+    exercise.id;
 }
 
 function applyExplicitSetCorrection(exercises, transcript) {

@@ -1,4 +1,7 @@
-import { getCanonicalTrainingExerciseLabel } from "../models/trainingExerciseIdentity";
+import {
+  getCanonicalTrainingExerciseLabel,
+  resolveTrainingExerciseOccurrenceIdentity,
+} from "../models/trainingExerciseIdentity";
 import { formatTrainingExerciseOccurrenceLabel } from "../models/trainingExecutionVariant";
 import {
   normalizeTrainingExerciseRelationshipGroups,
@@ -211,7 +214,8 @@ function presentReviewExercise(exercise, exerciseIndex, includeOccurrenceLabel =
     exercise.provisionalExercise?.resolutionStatus === "unresolved"
       ? exercise.provisionalExercise.provisionalExerciseId
       : null;
-  const name = getCanonicalTrainingExerciseLabel(exercise.name);
+  const name = resolveTrainingExerciseOccurrenceIdentity(exercise)
+    .canonicalExerciseName ?? getCanonicalTrainingExerciseLabel(exercise.name);
   return {
     name,
     ...(includeOccurrenceLabel

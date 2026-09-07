@@ -1,5 +1,6 @@
 import {
   getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseOccurrenceIdentity,
 } from "../models/trainingExerciseIdentity";
 import {
   getTrainingExecutionVariantKey,
@@ -84,7 +85,8 @@ function listExerciseOccurrences({ before, canonicalExerciseId, sessions }) {
       session,
     })))
     .filter(({ exercise }) =>
-      (exercise.canonicalExerciseId ?? getCanonicalTrainingExerciseSlug(exercise.name)) ===
+      (resolveTrainingExerciseOccurrenceIdentity(exercise).canonicalExerciseId ??
+        getCanonicalTrainingExerciseSlug(exercise.name)) ===
       canonicalExerciseId
     )
     .filter(({ session }) => {

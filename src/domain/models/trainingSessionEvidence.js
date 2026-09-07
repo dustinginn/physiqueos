@@ -4,6 +4,7 @@ import {
   FOUNDER_ALPHA_TRAINING_EXERCISES,
   getFounderAlphaExerciseIdentityDiagnostics,
   getTrainingExerciseIdentityByName,
+  resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
 } from "./trainingExerciseIdentity";
 import {
@@ -3103,13 +3104,16 @@ export function normalizeTrainingExercises(exercises) {
 
       const sets = normalizeTrainingSets(exercise.sets ?? []);
       if (sets.length === 0) return null;
-      const resolvedIdentity = resolveTrainingExerciseIdentity(name);
+      const resolvedIdentity = resolveTrainingExerciseOccurrenceIdentity({
+        ...exercise,
+        name,
+      });
       const confirmedNewDefinition =
         exercise.resolutionStatus === "resolved_new_canonical"
           ? exercise.provisionalExercise?.confirmedDefinition
           : null;
       const canonicalExerciseId =
-        resolvedIdentity.resolutionStatus === "resolved_high_confidence"
+        resolvedIdentity.canonicalExerciseId
           ? resolvedIdentity.canonicalExerciseId
           : confirmedNewDefinition?.id === exercise.canonicalExerciseId
             ? exercise.canonicalExerciseId

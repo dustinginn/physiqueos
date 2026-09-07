@@ -1,6 +1,7 @@
 import {
   listCanonicalTrainingExerciseIdentities,
   normalizeExercisePhrase,
+  resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
 } from "../models/trainingExerciseIdentity";
 import {
@@ -106,8 +107,8 @@ export function prepareCanonicalExerciseIdentitiesForConfirmation(
           ) {
             return exercise;
           }
-          const resolved = resolveTrainingExerciseIdentity(exercise.name);
-          if (resolved.resolutionStatus !== "resolved_high_confidence") {
+          const resolved = resolveTrainingExerciseOccurrenceIdentity(exercise);
+          if (!resolved.canonicalExerciseId || !resolved.exercise) {
             return { ...exercise, canonicalExerciseId: null };
           }
           return {

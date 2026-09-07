@@ -6,6 +6,10 @@ const logSource = fs.readFileSync(
   "utf8"
 );
 const pageSource = fs.readFileSync(new URL("./page.js", import.meta.url), "utf8");
+const coreNavigationSource = fs.readFileSync(
+  new URL("../../../application/core/CoreNavigationReadService.js", import.meta.url),
+  "utf8"
+);
 const routeSource = fs.readFileSync(new URL("./reconcile/route.js", import.meta.url), "utf8");
 const clientSource = fs.readFileSync(
   new URL("../../../components/training/TrainingLoggerClient.jsx", import.meta.url),
@@ -37,20 +41,18 @@ describe("production Training Logger integration", () => {
   });
 
   it("loads confirmed canonical Training history and active Goal context", () => {
-    expect(pageSource).toContain("listCanonicalEvidenceObjects");
-    expect(pageSource).toContain("confirmedTrainingRecords");
-    expect(pageSource).toContain("initialPerformedExerciseIds={performedExerciseIds}");
-    expect(pageSource).toContain("getActiveGoal");
-    expect(pageSource).toContain("initialHistorySessions");
+    expect(pageSource).toContain("getProductionCoreNavigationReadService().getTrainingLogger()");
+    expect(coreNavigationSource).toContain("confirmedTrainingRecords");
+    expect(coreNavigationSource).toContain("initialPerformedExerciseIds: performedExerciseIds");
+    expect(coreNavigationSource).toContain("goal.status === \"active\"");
+    expect(coreNavigationSource).toContain("initialHistorySessions: historySessions");
   });
 
   it("uses a concrete timezone fallback when profile timezone fields are null", () => {
-    expect(pageSource).toContain(
-      'user.timeZone ?? user.timezone ?? "America/Los_Angeles"'
+    expect(coreNavigationSource).toContain(
+      'user?.timeZone ?? user?.timezone ?? "America/Los_Angeles"'
     );
-    expect(pageSource).toContain(
-      'const resolvedTimeZone = timeZone || "America/Los_Angeles"'
-    );
+    expect(coreNavigationSource).toContain("getLocalDateKey");
   });
 
   it("uses recoverable local draft state without persisting history context", () => {

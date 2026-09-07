@@ -59,16 +59,40 @@ export const LEGACY_TRAINING_EXERCISE_ID_REMAP = Object.freeze({
 const runtimeTrainingExercises = new Map();
 
 export function registerRuntimeTrainingExercises(exercises = []) {
-  runtimeTrainingExercises.clear();
+  const nextRuntimeExercises = new Map();
   exercises.forEach((candidate) => {
     if (candidate?.id && candidate?.name) {
-      runtimeTrainingExercises.set(candidate.id, normalizeRuntimeExercise(candidate));
+      if (nextRuntimeExercises.has(candidate.id)) {
+        throw canonicalRegistryError(
+          `Canonical exercise ID "${candidate.id}" is duplicated.`
+        );
+      }
+      nextRuntimeExercises.set(candidate.id, normalizeRuntimeExercise(candidate));
     }
   });
+  assertCanonicalExerciseIdentityUniqueness([
+    ...FOUNDER_ALPHA_TRAINING_EXERCISES,
+    ...nextRuntimeExercises.values(),
+  ]);
+  runtimeTrainingExercises.clear();
+  nextRuntimeExercises.forEach((exerciseIdentity, id) => {
+    runtimeTrainingExercises.set(id, exerciseIdentity);
+  });
+  return listCanonicalTrainingExerciseIdentities();
 }
 
 export function listCanonicalTrainingExerciseIdentities() {
   return [...FOUNDER_ALPHA_TRAINING_EXERCISES, ...runtimeTrainingExercises.values()];
+}
+
+export function getCanonicalTrainingExerciseIdentityById(value) {
+  const canonicalExerciseId = String(value ?? "").trim();
+  if (!canonicalExerciseId) return null;
+  const remappedId = LEGACY_TRAINING_EXERCISE_ID_REMAP[canonicalExerciseId] ??
+    canonicalExerciseId;
+  return listCanonicalTrainingExerciseIdentities().find(
+    (exerciseIdentity) => exerciseIdentity.id === remappedId
+  ) ?? null;
 }
 
 export function resolveTrainingExerciseIdentity(value, { workoutFocus = null } = {}) {
@@ -136,6 +160,51 @@ export function resolveTrainingExerciseIdentity(value, { workoutFocus = null } =
   };
 }
 
+// Canonical history linkage is immutable: once an occurrence stores a canonical ID,
+// display-name changes and legacy labels may not move it to a different exercise. Name
+// resolution remains the centralized compatibility fallback only for old rows that do
+// not yet carry canonicalExerciseId.
+export function resolveTrainingExerciseOccurrenceIdentity(
+  exercise = {},
+  { workoutFocus = null } = {}
+) {
+  const storedCanonicalExerciseId = String(
+    exercise?.canonicalExerciseId ?? ""
+  ).trim();
+  if (!storedCanonicalExerciseId) {
+    return resolveTrainingExerciseIdentity(
+      exercise?.name ?? exercise?.id,
+      { workoutFocus }
+    );
+  }
+
+  const canonicalExercise = getCanonicalTrainingExerciseIdentityById(
+    storedCanonicalExerciseId
+  );
+  if (canonicalExercise) {
+    return createResolvedIdentity(
+      String(exercise?.name ?? storedCanonicalExerciseId).trim(),
+      normalizeExercisePhrase(exercise?.name ?? storedCanonicalExerciseId),
+      canonicalExercise,
+      storedCanonicalExerciseId,
+      ["stored_canonical_exercise_id"]
+    );
+  }
+
+  return {
+    ...createUnrecognizedResolution(
+      exercise?.name ?? storedCanonicalExerciseId,
+      "The stored canonical exercise is not present in the hydrated registry."
+    ),
+    canonicalExerciseId: storedCanonicalExerciseId,
+    canonicalExerciseName: String(
+      exercise?.canonicalExerciseName ?? exercise?.name ?? storedCanonicalExerciseId
+    ).trim(),
+    matchSignals: ["stored_canonical_exercise_id_unregistered"],
+    resolutionStatus: "stored_canonical_unregistered",
+  };
+}
+
 export function getTrainingExerciseIdentityByName(value) {
   const resolved = resolveTrainingExerciseIdentity(value);
   if (resolved.resolutionStatus !== "resolved_high_confidence") return null;
@@ -143,9 +212,7 @@ export function getTrainingExerciseIdentityByName(value) {
 }
 
 export function getCanonicalTrainingExerciseLabel(value) {
-  const byStableId = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
-    (exerciseIdentity) => exerciseIdentity.id === value
-  );
+  const byStableId = getCanonicalTrainingExerciseIdentityById(value);
   if (byStableId) return byStableId.name;
   const remappedId = LEGACY_TRAINING_EXERCISE_ID_REMAP[value];
   if (remappedId) {
@@ -282,6 +349,39 @@ function normalizeRuntimeExercise(candidate) {
       ? candidate.secondary_muscle_groups
       : [],
   };
+}
+
+function assertCanonicalExerciseIdentityUniqueness(exercises) {
+  const ids = new Set();
+  const phrases = new Map();
+  for (const exerciseIdentity of exercises) {
+    if (ids.has(exerciseIdentity.id)) {
+      throw canonicalRegistryError(
+        `Canonical exercise ID "${exerciseIdentity.id}" is duplicated.`
+      );
+    }
+    ids.add(exerciseIdentity.id);
+    for (const value of [
+      exerciseIdentity.name,
+      ...(exerciseIdentity.aliases ?? []),
+    ]) {
+      const phrase = normalizeExercisePhrase(value);
+      if (!phrase) continue;
+      const owner = phrases.get(phrase);
+      if (owner && owner !== exerciseIdentity.id) {
+        throw canonicalRegistryError(
+          `Canonical exercise phrase "${value}" belongs to both "${owner}" and "${exerciseIdentity.id}".`
+        );
+      }
+      phrases.set(phrase, exerciseIdentity.id);
+    }
+  }
+}
+
+function canonicalRegistryError(message) {
+  return Object.assign(new Error(message), {
+    code: "CANONICAL_EXERCISE_REGISTRY_CONFLICT",
+  });
 }
 
 function slugify(value) {

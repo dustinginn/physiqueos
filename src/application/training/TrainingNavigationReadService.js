@@ -14,17 +14,18 @@ import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExe
 
 export function createTrainingNavigationReadService({
   store,
+  readCanonicalExerciseRegistry = null,
   hydrateCanonicalExerciseRegistry = null,
 } = {}) {
   if (!store?.run) throw new Error("Training navigation requires a read store.");
 
-  // Founder-created canonical exercise identities live in a module-global registry that is
-  // only populated as a side effect of a canonical write elsewhere in the process. Every
-  // read here that resolves exercise identities/categories must hydrate it explicitly first
-  // so a fresh process/deploy resolves them correctly on the very first request, rather than
-  // depending on some unrelated prior write having already run.
+  const readRegistry = readCanonicalExerciseRegistry ??
+    hydrateCanonicalExerciseRegistry;
+
+  // Production injects one canonical registry access path. All Training reads enter it,
+  // including Day and Session, so no caller or page-order side effect owns hydration.
   async function ensureCanonicalExerciseRegistry() {
-    if (hydrateCanonicalExerciseRegistry) await hydrateCanonicalExerciseRegistry();
+    if (readRegistry) await readRegistry();
   }
 
   return Object.freeze({
@@ -109,6 +110,7 @@ export function createTrainingNavigationReadService({
     },
     getDay({ date, timeZone = null } = {}) {
       return store.run("training.navigation.day", async () => {
+        await ensureCanonicalExerciseRegistry();
         const user = await store.getUser();
         const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceForDate(
           date,
@@ -175,6 +177,7 @@ export function createTrainingNavigationReadService({
     },
     getSession({ sessionId } = {}) {
       return store.run("training.navigation.session", async () => {
+        await ensureCanonicalExerciseRegistry();
         const exact = await store.getCanonicalEvidenceObject(sessionId);
         if (exact) return findSession(createTrainingNavigationReport({ canonicalEvidenceObjects: [exact] }), sessionId);
         const canonicalEvidenceObjects = await store.listCanonicalTrainingEvidenceObjects();

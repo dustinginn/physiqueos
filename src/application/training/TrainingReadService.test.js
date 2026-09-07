@@ -29,6 +29,15 @@ describe("training shared-client boundary", () => {
     expect(await service.listRecentExercises({ principal })).toEqual([{ id: "ez_bar_curl", name: "EZ Bar Curls", observedAt: "2026-08-10T17:00:00Z" }]);
   });
 
+  it("searches the canonical body_region field used by the future shared-client seam", async () => {
+    const service = createTrainingReadService({ repositories: repositories([]) });
+
+    expect(await service.getExerciseLibrary({ principal, query: "arms" }))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "ez_bar_curl", bodyRegion: "Arms" }),
+      ]));
+  });
+
   it("builds a platform-neutral day with distinct strength and walking sessions", async () => {
     const records = [
       {

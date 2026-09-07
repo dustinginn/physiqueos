@@ -185,6 +185,46 @@ describe("hydrateProductionTrainingExerciseRegistry — bounded Founder-created 
     expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", "canonicalExerciseLibrary"]);
   });
 
+  it("coalesces concurrent cold-start registry reads into one deterministic provider load", async () => {
+    poolQuery.mockImplementation(async (text) => {
+      if (text.includes("canonical_training_records")) {
+        return {
+          rows: [{
+            record_id: "bicep_curl_machine",
+            payload: {
+              id: "bicep_curl_machine",
+              name: "Bicep Curl Machine",
+              aliases: ["Machine Bicep Curl"],
+              body_region: "upper_body",
+              primary_muscle_group_id: "biceps",
+              primary_muscle_groups: ["Biceps"],
+            },
+          }],
+        };
+      }
+      if (text.includes("canonical_runtime_metadata")) {
+        return { rows: [{ runtime_version: "v1", revision: 5 }] };
+      }
+      return { rows: [] };
+    });
+    const { readProductionTrainingExerciseRegistry } = await import(
+      "./productionApplicationComposition.js"
+    );
+
+    const [first, second] = await Promise.all([
+      readProductionTrainingExerciseRegistry(compatibilityEnv({ PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE: "0" })),
+      readProductionTrainingExerciseRegistry(compatibilityEnv({ PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE: "0" })),
+    ]);
+
+    expect(first).toEqual(second);
+    expect(first).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "bicep_curl_machine" }),
+    ]));
+    expect(poolQuery.mock.calls.filter(([text]) =>
+      text.includes("canonical_training_records")
+    )).toHaveLength(1);
+  });
+
   it("is a no-op outside provider-full-runtime mode", async () => {
     const { hydrateProductionTrainingExerciseRegistry } = await import("./productionApplicationComposition.js");
     await hydrateProductionTrainingExerciseRegistry({ PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "0" });

@@ -22,6 +22,7 @@ import Card from "../components/ui/Card";
 import {
   getCanonicalTrainingExerciseLabel,
   getCanonicalTrainingExerciseSlug,
+  resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
 } from "../domain/models/trainingExerciseIdentity";
 import {
@@ -1560,12 +1561,18 @@ function getExerciseOccurrences({ exerciseSlug, report }) {
   return getTrainingSessions(report).flatMap((session) =>
     (session.exercises ?? [])
       .filter(
-        (exercise) => getCanonicalTrainingExerciseSlug(exercise.name) === targetSlug
+        (exercise) => {
+          const identity = resolveTrainingExerciseOccurrenceIdentity(exercise);
+          return (identity.canonicalExerciseId ??
+            getCanonicalTrainingExerciseSlug(exercise.name)) === targetSlug;
+        }
       )
       .map((exercise) => ({
          exercise: {
            ...exercise,
-            name: getCanonicalTrainingExerciseLabel(exercise.name),
+            name: resolveTrainingExerciseOccurrenceIdentity(exercise)
+              .canonicalExerciseName ??
+              getCanonicalTrainingExerciseLabel(exercise.name),
             sets: normalizeTrainingSetsForPresentation(exercise.sets ?? []),
          },
         relationshipContext: deriveTrainingExerciseRelationshipContext({

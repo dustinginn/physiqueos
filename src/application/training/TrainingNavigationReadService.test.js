@@ -107,6 +107,23 @@ describe("Founder-created canonical exercise resolution on a fresh process", () 
     const result = await service.getExercise({ context: "all", exerciseSlug: "bicep_curl_machine" });
     expect(result.report.trainingDays).toHaveLength(1);
   });
+
+  it("routes Training Day and Session through the same registry access boundary", async () => {
+    const store = navigationStore([bicepSession()]);
+    const readCanonicalExerciseRegistry = vi.fn(async () => {
+      registerRuntimeTrainingExercises([founderCreatedExercise]);
+      return [founderCreatedExercise];
+    });
+    const service = createTrainingNavigationReadService({
+      store,
+      readCanonicalExerciseRegistry,
+    });
+
+    await service.getDay({ date: "2026-08-29" });
+    await service.getSession({ sessionId: "bicep-session" });
+
+    expect(readCanonicalExerciseRegistry).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("provider-native Training navigation", () => {
@@ -285,18 +302,19 @@ describe("provider-native Training navigation", () => {
     // Founder-created exercise's detail URL silently falls back to a library-shaped read.
     const route = fs.readFileSync("src/app/progress/training/library/[[...path]]/page.js", "utf8");
     const defaultExport = route.slice(route.indexOf("export default async function"));
-    expect(defaultExport.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
-    expect(defaultExport.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeLessThan(
+    expect(defaultExport.indexOf("readProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
+    expect(defaultExport.indexOf("readProductionTrainingExerciseRegistry")).toBeLessThan(
       defaultExport.indexOf("resolveTrainingExerciseIdentity(path.at(-1))")
     );
   });
 
   it("hydrates the canonical exercise registry before Map existing reads canonical exercise options", () => {
     const route = fs.readFileSync("src/app/evidence/review/[reviewId]/page.js", "utf8");
-    expect(route.indexOf("hydrateProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
-    expect(route.indexOf("await hydrateProductionTrainingExerciseRegistry()")).toBeLessThan(
-      route.indexOf("listCanonicalTrainingExerciseIdentities()")
+    expect(route.indexOf("readProductionTrainingExerciseRegistry")).toBeGreaterThan(-1);
+    expect(route).toContain(
+      "const canonicalExercises = await readProductionTrainingExerciseRegistry()"
     );
+    expect(route).toContain("canonicalExercises={canonicalExercises}");
   });
 
   it("removes compatibility-runtime/report construction from Day and Session routes", () => {
