@@ -72,12 +72,15 @@ describe("provider-native Progress evidence reads", () => {
     expect(JSON.stringify(first).length).toBeLessThan(250_000);
   });
 
-  it("routes all four production pages through the narrow composition", () => {
+  it("routes production Evidence pages and nested Nutrition surfaces through the narrow composition", () => {
     for (const route of [
       "src/app/progress/dexa/page.js",
       "src/app/progress/weight/page.js",
       "src/app/progress/nutrition/page.js",
       "src/app/progress/activity/page.js",
+      "src/app/progress/nutrition/reporting/[reportId]/page.js",
+      "src/app/progress/nutrition/library/[[...path]]/page.js",
+      "src/app/progress/nutrition/day/[dayId]/page.js",
     ]) {
       const source = fs.readFileSync(route, "utf8");
       expect(source).toContain("getProductionProgressEvidenceReadService");

@@ -1,15 +1,11 @@
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import { getProductionProgressEvidenceReadService } from "../../../../../application/composition/productionApplicationComposition";
 import NutritionKnowledgeScreen from "../../../../../screens/NutritionKnowledgeScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function NutritionLibraryPage({ params }) {
   const { path = [] } = await params;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
-  });
-  const report = await service.getPlaceholderReport("nutrition");
+  const { report } = await getProductionProgressEvidenceReadService().getNutrition({ context: "all" });
 
   return (
     <NutritionKnowledgeScreen

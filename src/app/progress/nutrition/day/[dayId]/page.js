@@ -1,16 +1,12 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import { getProductionProgressEvidenceReadService } from "../../../../../application/composition/productionApplicationComposition";
 import NutritionKnowledgeScreen from "../../../../../screens/NutritionKnowledgeScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function NutritionDayPage({ params }) {
   const { dayId } = await params;
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
-  });
-  const report = await service.getPlaceholderReport("nutrition");
+  const { report } = await getProductionProgressEvidenceReadService().getNutrition({ context: "all" });
   const day =
     dayId === "context"
       ? report.entries?.find((entry) => entry.href === "/progress/nutrition/day/context")

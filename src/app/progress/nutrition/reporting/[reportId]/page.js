@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
-import { getNutritionCaloriesReport } from "../../../../../domain/services/NutritionCaloriesReportingService";
-import { getNutritionMacrosReport } from "../../../../../domain/services/NutritionMacrosReportingService";
-import { getNutritionMealsReport } from "../../../../../domain/services/NutritionMealsReportingService";
-import { createProgressReportingService } from "../../../../../domain/services/ProgressReportingService";
+import { getProductionProgressEvidenceReadService } from "../../../../../application/composition/productionApplicationComposition";
+import { createNutritionCaloriesPageModel } from "../../../../../domain/services/NutritionCaloriesReportingService";
+import { createNutritionMacrosPageModel } from "../../../../../domain/services/NutritionMacrosReportingService";
+import { createNutritionMealsPageModel } from "../../../../../domain/services/NutritionMealsReportingService";
 import NutritionCaloriesReportScreen from "../../../../../screens/NutritionCaloriesReportScreen";
 import NutritionMacrosReportScreen from "../../../../../screens/NutritionMacrosReportScreen";
 import NutritionMealsReportScreen from "../../../../../screens/NutritionMealsReportScreen";
@@ -14,35 +13,21 @@ export const dynamic = "force-dynamic";
 export default async function NutritionReportingPage({ params, searchParams }) {
   const { reportId } = await params;
   const query = await searchParams;
+  const { report, timeline } = await getProductionProgressEvidenceReadService().getNutrition({
+    context: query?.context,
+  });
 
   if (reportId === "calories") {
-    const report = await getNutritionCaloriesReport({
-      context: query?.context,
-    });
-
-    return <NutritionCaloriesReportScreen report={report} />;
+    return <NutritionCaloriesReportScreen report={createNutritionCaloriesPageModel({ report, timeline })} />;
   }
 
   if (reportId === "macros") {
-    const report = await getNutritionMacrosReport({
-      context: query?.context,
-    });
-
-    return <NutritionMacrosReportScreen report={report} />;
+    return <NutritionMacrosReportScreen report={createNutritionMacrosPageModel({ report, timeline })} />;
   }
 
   if (reportId === "meals") {
-    const report = await getNutritionMealsReport({
-      context: query?.context,
-    });
-
-    return <NutritionMealsReportScreen report={report} />;
+    return <NutritionMealsReportScreen report={createNutritionMealsPageModel({ report, timeline })} />;
   }
-
-  const service = createProgressReportingService({
-    repositories: FounderRepositories,
-  });
-  const report = await service.getPlaceholderReport("nutrition");
 
   if (!report?.nutritionReportingLinks?.some((item) => item.id === reportId)) {
     notFound();
