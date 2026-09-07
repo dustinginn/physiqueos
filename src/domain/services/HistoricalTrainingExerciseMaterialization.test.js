@@ -358,6 +358,52 @@ describe("historical training exercise canonical materialization", () => {
       primaryMuscleGroups: ["shoulders"],
     });
   });
+
+  it("keeps renamed history linked by stored canonical ID instead of re-resolving its stale display name", () => {
+    const renamed = {
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: ["Original Cable Arc"],
+      body_region: "upper_body",
+      primary_muscle_group_id: "biceps",
+      primary_muscle_groups: ["Biceps"],
+      movement_pattern: "Elbow Flexion",
+    };
+    registerRuntimeTrainingExercises([renamed]);
+
+    const resistance = getResistanceBreakdown([{
+      id: "training|renamed-history",
+      observed_at: "2026-08-03",
+      exercises: [{
+        id: "exercise-occurrence",
+        canonicalExerciseId: "founder_cable_arc",
+        name: "Bench Press",
+        body_region: "Chest",
+        primary_muscle_groups: ["Chest"],
+        movement_pattern: "Horizontal Press",
+        sets: [{ reps: 10, weight: 40, weight_unit: "lb" }],
+      }],
+    }]);
+    const exercises = resistance
+      .flatMap((region) => region.movementFamilies)
+      .flatMap((family) => family.exercises);
+
+    expect(exercises).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "founder_cable_arc",
+        label: "Founder Cable Arc",
+        primaryMuscleGroups: ["Biceps"],
+      }),
+    ]);
+    expect(getExercisesForFlatTrainingGroup({
+      groupSlug: "biceps",
+      report: { trainingBreakdowns: { resistance } },
+    })).toHaveLength(1);
+    expect(getExercisesForFlatTrainingGroup({
+      groupSlug: "chest",
+      report: { trainingBreakdowns: { resistance } },
+    })).toEqual([]);
+  });
 });
 
 function canonical(id) {

@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
@@ -13,8 +13,11 @@ import {
   CORE_NAVIGATION_COLLECTIONS,
   createCoreNavigationReadService,
 } from "./CoreNavigationReadService.js";
+import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity.js";
 
 const NOW = new Date("2026-08-29T12:00:00-07:00");
+
+afterEach(() => registerRuntimeTrainingExercises([]));
 
 describe("provider-native core navigation reads", () => {
   it("keeps Home output equivalent to the existing domain composition", async () => {
@@ -92,6 +95,33 @@ describe("provider-native core navigation reads", () => {
     });
   });
 
+  it("hydrates the canonical registry before the first cold-start Workout Logger read", async () => {
+    registerRuntimeTrainingExercises([]);
+    const runtimeExercise = {
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: ["Original Cable Arc"],
+      body_region: "upper_body",
+      primary_muscle_group_id: "biceps",
+      primary_muscle_groups: ["Biceps"],
+    };
+    let registryReads = 0;
+    const { narrow } = services({
+      readCanonicalExerciseRegistry: async () => {
+        registryReads += 1;
+        registerRuntimeTrainingExercises([runtimeExercise]);
+        return [runtimeExercise];
+      },
+    });
+
+    const logger = await narrow.getTrainingLogger();
+
+    expect(registryReads).toBe(1);
+    expect(logger.initialCanonicalExercises).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "founder_cable_arc" })])
+    );
+  });
+
   it("uses the deterministic same-day correction in the Morning Check-In read model", async () => {
     const { narrow, runtime } = services();
     runtime.weightEntries.push(
@@ -148,7 +178,7 @@ describe("provider-native core navigation reads", () => {
   });
 });
 
-function services() {
+function services({ readCanonicalExerciseRegistry = null } = {}) {
   const runtime = createPhase5SyntheticRuntime();
   const legacyRuntime = structuredClone(runtime);
   const legacyRepositories = createSeedRepositories(legacyRuntime, {
@@ -169,6 +199,7 @@ function services() {
         readRuntimeStore: () => runtime,
       }),
       now: () => NOW,
+      readCanonicalExerciseRegistry,
     }),
   };
 }

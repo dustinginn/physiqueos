@@ -3,6 +3,7 @@ import {
   FOUNDER_ALPHA_TRAINING_EXERCISES,
   listCanonicalTrainingExerciseIdentities,
   registerRuntimeTrainingExercises,
+  resolveTrainingExerciseOccurrenceIdentity,
   resolveTrainingExerciseIdentity,
 } from "./trainingExerciseIdentity";
 
@@ -66,5 +67,34 @@ describe("Founder Alpha incline bench identity",()=>{
     expect(historicalWorkout.exercises).toHaveLength(1);
     expect(resolveTrainingExerciseIdentity("Sumo Squat Machine").resolutionStatus)
       .toBe("unrecognized");
+  });
+
+  it("treats a stored canonicalExerciseId as authoritative over a conflicting display name", () => {
+    registerRuntimeTrainingExercises([{
+      id: "founder_cable_arc",
+      name: "Founder Cable Arc",
+      aliases: ["Original Cable Arc"],
+      primary_muscle_group_id: "biceps",
+      primary_muscle_groups: ["Biceps"],
+    }]);
+
+    expect(resolveTrainingExerciseOccurrenceIdentity({
+      canonicalExerciseId: "founder_cable_arc",
+      name: "Bench Press",
+    })).toMatchObject({
+      canonicalExerciseId: "founder_cable_arc",
+      canonicalExerciseName: "Founder Cable Arc",
+      matchSignals: ["stored_canonical_exercise_id"],
+    });
+  });
+
+  it("centralizes the legacy name fallback only for occurrences without a stored canonical ID", () => {
+    expect(resolveTrainingExerciseOccurrenceIdentity({
+      name: "Barbell Incline Bench Press",
+    })).toMatchObject({
+      canonicalExerciseId: "incline_bench_press",
+      canonicalExerciseName: "Incline Bench Press",
+      resolutionStatus: "resolved_high_confidence",
+    });
   });
 });

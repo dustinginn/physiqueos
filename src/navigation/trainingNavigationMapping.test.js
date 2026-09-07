@@ -270,6 +270,19 @@ describe("Training Library primary browse taxonomy", () => {
     expect(result.unmappedCanonicalIds).toEqual(["unmapped"]);
   });
 
+  it("uses canonical primary-muscle ownership before nullable text heuristics", () => {
+    expect(resolvePrimaryTrainingNavigationCategory({
+      canonicalExerciseId: "founder_cable_arc",
+      label: "Unclassifiable Founder Movement",
+      primaryMuscleGroups: ["Biceps"],
+      regionLabel: "upper_body",
+    })).toEqual({
+      confidence: "high",
+      primaryNavigationCategory: "biceps",
+      source: "canonical_primary_muscle_mapping",
+    });
+  });
+
   it("preserves canonical IDs and alphabetical browse ordering", () => {
     const names = [
       "Romanian Deadlifts",
