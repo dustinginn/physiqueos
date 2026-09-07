@@ -11,6 +11,7 @@ import { createBriefingReconciliationPresentation } from "../../domain/services/
 import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/MorningEvidenceRecoveryService.js";
 import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -110,8 +111,7 @@ export function createCoreNavigationReadService({ store, now = () => new Date() 
           repositories,
           now: () => current,
         }).getSelection({ userId: ownerUserId, timeZone, at: current });
-        const ordered = [...(runtime.weightEntries ?? [])]
-          .sort((left, right) => String(right.measuredAt).localeCompare(String(left.measuredAt)));
+        const ordered = canonicalWeightEntries(runtime.weightEntries ?? []).reverse();
         const existing = ordered.find((item) => String(item.measuredAt).slice(0, 10) === today) ?? null;
         const previous = ordered.find((item) => String(item.measuredAt).slice(0, 10) < today) ?? null;
         const existingCheckIn = (runtime.dailyCheckIns ?? []).find((item) => item.date === today) ?? null;

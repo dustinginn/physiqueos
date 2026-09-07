@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 
 export function createPostgresProgressEvidenceReadStore({
   pool,
@@ -62,7 +63,7 @@ export function createPostgresProgressEvidenceReadStore({
       return users.find((user) => user?.id === ownerUserId) ?? users[0] ?? null;
     },
     listGoals: () => list("goals"),
-    listWeightEntries: () => list("weightEntries"),
+    listWeightEntries: async () => canonicalWeightEntries(await list("weightEntries")),
     listDEXAScans: () => list("dexaScans"),
     async getNutritionContext() {
       const contexts = await list("nutritionContext");

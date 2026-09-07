@@ -5,6 +5,7 @@ import {
   validUnit as sharedValidUnit,
   validWeight as sharedValidWeight,
 } from "../../platform/sandbox/nativeSandboxWeightValidation.js";
+import { canonicalWeightEntryId } from "../../domain/weight/canonicalWeight.js";
 
 export const NATIVE_WEIGHT_CANDIDATE_SCHEMA_VERSION = "1";
 export const NATIVE_WEIGHT_PARSER_SCHEMA_VERSION = "1";
@@ -100,11 +101,15 @@ export function createNativeSandboxWeightCandidateService({
       const measuredAt = review.candidate.measurementDate;
       const at = clock().toISOString();
       const weightEntry = Object.freeze({
-        id: `weight_${review.submissionIdentity.replaceAll("-", "")}`,
+        id: canonicalWeightEntryId(measuredAt),
         userId: actor.userId,
         measuredAt,
         weight: Object.freeze({ value, unit }),
-        source: Object.freeze({ type: "evidence_review", confidence: "high" }),
+        source: Object.freeze({
+          type: "evidence_review",
+          externalId: review.id,
+          confidence: "high",
+        }),
         evidenceReviewId: review.id,
         createdAt: at,
         updatedAt: at,

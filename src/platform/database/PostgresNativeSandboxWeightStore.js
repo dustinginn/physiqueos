@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  canonicalWeightDayLockKey,
+  canonicalWeightEntries,
+  canonicalWeightWriteChanged,
+  prepareCanonicalWeightCorrection,
+} from "../../domain/weight/canonicalWeight.js";
 
 const SUBMISSION_COLLECTION = "nativeSandboxWeightSubmissions";
 const REVIEW_COLLECTION = "evidenceReviews";
@@ -77,6 +83,7 @@ export function createPostgresNativeSandboxWeightStore({
       authority.assertOutboxMessage(continuation);
       return transaction(pool, async (client) => {
         await authority.assertDatabase(client);
+        await lockWeightDay(client, ownerUserId, weightEntry.measuredAt);
         const review = await getRecord(client, ownerUserId, REVIEW_COLLECTION, reviewId, true);
         if (!review || review.status !== "pending" || Number(review.version) !== Number(expectedVersion)) throw conflict();
         const updated = { ...review, status: "confirmed", version: Number(review.version) + 1,
@@ -87,19 +94,20 @@ export function createPostgresNativeSandboxWeightStore({
           [ownerUserId, REVIEW_COLLECTION, reviewId, expectedVersion, JSON.stringify(updated), confirmedAt],
         );
         if (changed.rowCount !== 1) throw conflict();
-        await putRecord(client, { table: "canonical_checkin_records", collection: "weightEntries",
-          ownerUserId, recordId: weightEntry.id, sourceIdentity: `native-sandbox-review:${reviewId}`,
-          occurrenceDate: weightEntry.measuredAt, status: "confirmed",
-          provenance: { sandboxAuthority: authority.descriptor, reviewId }, payload: weightEntry });
-        await client.query(
-          `INSERT INTO physiqueos.outbox_messages
-            (id,user_id,topic,dedupe_key,payload_version,payload,due_at)
-           VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)
-           ON CONFLICT (topic,dedupe_key) DO NOTHING`,
-          [`native_sandbox_outbox_${createId()}`, continuation.userId, continuation.topic,
-            continuation.dedupeKey, continuation.payloadVersion, JSON.stringify(continuation.payload), confirmedAt],
-        );
-        return Object.freeze({ review: updated, weightEntry });
+        const canonical = await writeCanonicalWeight(client, {
+          ownerUserId,
+          weightEntry,
+          confirmedAt,
+          provenance: { sandboxAuthority: authority.descriptor, reviewId },
+        });
+        if (canonical.changed) {
+          await enqueueContinuation(client, continuation, confirmedAt, createId);
+        }
+        return Object.freeze({
+          review: updated,
+          weightEntry: canonical.weightEntry,
+          changed: canonical.changed,
+        });
       });
     },
 
@@ -114,47 +122,27 @@ export function createPostgresNativeSandboxWeightStore({
       assertDescriptor(authority.descriptor, descriptor, requestedOwner);
       return transaction(pool, async (client) => {
         await authority.assertDatabase(client);
-        await client.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-          [`native-sandbox-weight-manual:${ownerUserId}:${idempotencyKey}`],
-        );
+        await lockWeightDay(client, ownerUserId, weightEntry.measuredAt);
         const priorSubmission = await getRecord(client, ownerUserId, MANUAL_SUBMISSION_COLLECTION, idempotencyKey);
         if (priorSubmission) {
           if (priorSubmission.submissionIdentity !== submissionIdentity) throw conflict();
           return Object.freeze({ weightEntry: priorSubmission.weightEntry, changed: false });
         }
         authority.assertOutboxMessage(continuation);
-        const existing = await getRecord(client, ownerUserId, WEIGHT_ENTRY_COLLECTION, weightEntry.id, true, WEIGHT_ENTRY_TABLE);
-        const unchanged = existing != null &&
-          existing.weight?.value === weightEntry.weight.value &&
-          existing.weight?.unit === weightEntry.weight.unit;
-        if (!unchanged) {
-          if (existing) {
-            await client.query(
-              `UPDATE physiqueos.${WEIGHT_ENTRY_TABLE} SET payload=$4::jsonb,status='confirmed',version=version+1,updated_at=$5
-                 WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3`,
-              [ownerUserId, WEIGHT_ENTRY_COLLECTION, weightEntry.id, JSON.stringify(weightEntry), confirmedAt],
-            );
-          } else {
-            await putRecord(client, { table: WEIGHT_ENTRY_TABLE, collection: WEIGHT_ENTRY_COLLECTION,
-              ownerUserId, recordId: weightEntry.id, sourceIdentity: `native-sandbox-weight-manual:${weightEntry.id}`,
-              occurrenceDate: weightEntry.measuredAt, status: "confirmed",
-              provenance: { sandboxAuthority: authority.descriptor }, payload: weightEntry });
-          }
-          await client.query(
-            `INSERT INTO physiqueos.outbox_messages
-              (id,user_id,topic,dedupe_key,payload_version,payload,due_at)
-             VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)
-             ON CONFLICT (topic,dedupe_key) DO NOTHING`,
-            [`native_sandbox_outbox_${createId()}`, continuation.userId, continuation.topic,
-              continuation.dedupeKey, continuation.payloadVersion, JSON.stringify(continuation.payload), confirmedAt],
-          );
+        const canonical = await writeCanonicalWeight(client, {
+          ownerUserId,
+          weightEntry,
+          confirmedAt,
+          provenance: { sandboxAuthority: authority.descriptor },
+        });
+        if (canonical.changed) {
+          await enqueueContinuation(client, continuation, confirmedAt, createId);
         }
         await putRecord(client, { table: "canonical_evidence_records", collection: MANUAL_SUBMISSION_COLLECTION,
           ownerUserId, recordId: idempotencyKey, sourceIdentity: idempotencyKey, occurrenceDate: weightEntry.measuredAt,
           status: "recorded", provenance: { sandboxAuthority: authority.descriptor },
-          payload: { submissionIdentity, weightEntry } });
-        return Object.freeze({ weightEntry, changed: !unchanged });
+          payload: { submissionIdentity, weightEntry: canonical.weightEntry } });
+        return Object.freeze(canonical);
       });
     },
 
@@ -199,6 +187,82 @@ async function getRecord(client, ownerUserId, collection, recordId, lock = false
   );
   const row = result.rows[0];
   return row ? Object.freeze({ ...row.payload, version: Number(row.version) }) : null;
+}
+
+async function lockWeightDay(client, ownerUserId, measurementDate) {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+    [canonicalWeightDayLockKey(ownerUserId, measurementDate)],
+  );
+}
+
+async function writeCanonicalWeight(client, {
+  ownerUserId,
+  weightEntry,
+  confirmedAt,
+  provenance,
+}) {
+  const existingEntries = await getWeightEntriesForDay(
+    client,
+    ownerUserId,
+    weightEntry.measuredAt
+  );
+  const changed = canonicalWeightWriteChanged(existingEntries, weightEntry);
+  const canonicalEntry = changed
+    ? prepareCanonicalWeightCorrection(weightEntry, existingEntries)
+    : canonicalWeightEntries(existingEntries).at(-1);
+  if (!changed) return Object.freeze({ weightEntry: canonicalEntry, changed: false });
+
+  await client.query(
+    `DELETE FROM physiqueos.${WEIGHT_ENTRY_TABLE}
+      WHERE owner_user_id=$1 AND collection_name=$2 AND occurrence_date=$3::date AND record_id<>$4`,
+    [ownerUserId, WEIGHT_ENTRY_COLLECTION, canonicalEntry.measuredAt, canonicalEntry.id],
+  );
+  const updated = await client.query(
+    `UPDATE physiqueos.${WEIGHT_ENTRY_TABLE} SET payload=$4::jsonb,status='confirmed',
+       occurrence_date=$5::date,source_identity=$6,provenance=$7::jsonb,
+       version=version+1,updated_at=$8
+     WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3`,
+    [ownerUserId, WEIGHT_ENTRY_COLLECTION, canonicalEntry.id,
+      JSON.stringify(canonicalEntry), canonicalEntry.measuredAt,
+      `weight:${canonicalEntry.measuredAt}`, JSON.stringify(provenance), confirmedAt],
+  );
+  if (updated.rowCount !== 1) {
+    await putRecord(client, {
+      table: WEIGHT_ENTRY_TABLE,
+      collection: WEIGHT_ENTRY_COLLECTION,
+      ownerUserId,
+      recordId: canonicalEntry.id,
+      sourceIdentity: `weight:${canonicalEntry.measuredAt}`,
+      occurrenceDate: canonicalEntry.measuredAt,
+      status: "confirmed",
+      provenance,
+      payload: canonicalEntry,
+    });
+  }
+  return Object.freeze({ weightEntry: canonicalEntry, changed: true });
+}
+
+async function getWeightEntriesForDay(client, ownerUserId, measurementDate) {
+  const result = await client.query(
+    `SELECT payload FROM physiqueos.${WEIGHT_ENTRY_TABLE}
+      WHERE owner_user_id=$1 AND collection_name=$2 AND occurrence_date=$3::date
+      ORDER BY updated_at,created_at,record_id FOR UPDATE`,
+    [ownerUserId, WEIGHT_ENTRY_COLLECTION, measurementDate],
+  );
+  return result.rows.map((row) => row.payload);
+}
+
+async function enqueueContinuation(client, continuation, confirmedAt, createId) {
+  await client.query(
+    `INSERT INTO physiqueos.outbox_messages
+      (id,user_id,topic,dedupe_key,payload_version,payload,due_at)
+     VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)
+     ON CONFLICT (topic,dedupe_key) DO NOTHING`,
+    [`native_sandbox_outbox_${createId()}`, continuation.userId, continuation.topic,
+      continuation.dedupeKey, continuation.payloadVersion,
+      JSON.stringify(continuation.payload), confirmedAt],
+  );
 }
 
 async function putRecord(client, { table, collection, ownerUserId, recordId, sourceIdentity,

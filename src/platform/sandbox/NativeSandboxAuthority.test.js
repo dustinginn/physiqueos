@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createAuthenticationPrincipal } from "../../application/auth/principal.js";
 import { createNativeSandboxWeightCandidateService } from "../../application/evidence/NativeSandboxWeightCandidateService.js";
+import { createNativeSandboxManualWeightService } from "../../application/evidence/NativeSandboxManualWeightService.js";
 import {
   createAuthorityScopedObjectProvider,
   createNativeSandboxAuthorityBoundary,
@@ -189,6 +190,77 @@ describe("Native sandbox Weight fast path", () => {
       asset: fixture.asset,
     })).rejects.toMatchObject({ code: "NATIVE_SANDBOX_WEIGHT_CANDIDATE_INVALID" });
     expect(fixture.media.store).not.toHaveBeenCalled();
+  });
+
+  it("serializes concurrent artifact confirmations into one canonical user-day Weight", async () => {
+    const fixture = serviceFixture();
+    const firstReview = await fixture.service.submit({
+      principal: fixture.principal,
+      submission: fixture.submission,
+      asset: fixture.asset,
+    });
+    const secondReview = await fixture.service.submit({
+      principal: fixture.principal,
+      submission: {
+        ...fixture.submission,
+        submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41002",
+        idempotencyKey: "native-weight-acceptance-2",
+        value: 169.1,
+      },
+      asset: fixture.asset,
+    });
+
+    await Promise.all([
+      fixture.service.confirm({ principal: fixture.principal, reviewId: firstReview.id, expectedVersion: 1 }),
+      fixture.service.confirm({ principal: fixture.principal, reviewId: secondReview.id, expectedVersion: 1 }),
+    ]);
+
+    expect(fixture.store.state.weightEntries.size).toBe(1);
+    expect([...fixture.store.state.weightEntries.values()][0]).toMatchObject({
+      id: "weight_2026_08_31",
+      measuredAt: "2026-08-31",
+      weight: { value: 169.1, unit: "lb" },
+      correctionHistory: [expect.objectContaining({
+        previousEntry: expect.objectContaining({ weight: { value: 168.4, unit: "lb" } }),
+      })],
+    });
+    expect(fixture.store.state.outbox).toHaveLength(2);
+  });
+
+  it("shares one canonical user-day identity across artifact and scalar manual paths", async () => {
+    const fixture = serviceFixture();
+    const review = await fixture.service.submit({
+      principal: fixture.principal,
+      submission: fixture.submission,
+      asset: fixture.asset,
+    });
+    await fixture.service.confirm({
+      principal: fixture.principal,
+      reviewId: review.id,
+      expectedVersion: 1,
+    });
+    const manual = createNativeSandboxManualWeightService({
+      authority: fixture.authority,
+      store: fixture.store,
+      clock: () => new Date("2026-09-01T16:00:00.000Z"),
+    });
+
+    await manual.submit({
+      principal: fixture.principal,
+      submission: {
+        submissionIdentity: "018f0f6f-8f4c-7e4d-8a6c-3d831df41003",
+        idempotencyKey: "native-weight-manual-acceptance-3",
+        measurementDate: "2026-08-31",
+        value: 169.3,
+        unit: "lb",
+      },
+    });
+
+    expect(fixture.store.state.weightEntries.size).toBe(1);
+    expect([...fixture.store.state.weightEntries.values()][0]).toMatchObject({
+      id: "weight_2026_08_31",
+      weight: { value: 169.3, unit: "lb" },
+    });
   });
 });
 

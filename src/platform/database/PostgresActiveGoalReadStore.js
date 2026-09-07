@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 
 export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Active Goal storage requires a PostgreSQL pool and owner.");
@@ -52,7 +53,12 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
           dexaScans,
           protocols,
           canonicalEvidence: evidenceRows.rows.map((row) => Object.freeze({ ...row.payload, version: Number(row.version) })),
-          store: Object.freeze({ phaseStrategies, weightEntries, goalConfidenceSnapshots, goalConfidenceHistory }),
+          store: Object.freeze({
+            phaseStrategies,
+            weightEntries: canonicalWeightEntries(weightEntries),
+            goalConfidenceSnapshots,
+            goalConfidenceHistory,
+          }),
         });
       } finally {
         onComplete?.({

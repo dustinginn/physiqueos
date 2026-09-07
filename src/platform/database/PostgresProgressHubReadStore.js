@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 
 const HUB_EVIDENCE_TYPES = Object.freeze([
   "activity_day",
@@ -52,7 +53,7 @@ export function createPostgresProgressHubReadStore({
       }
     },
     getOwnerUserId: async () => ownerUserId,
-    listWeightEntries: () => list("weightEntries"),
+    listWeightEntries: async () => canonicalWeightEntries(await list("weightEntries")),
     listDEXAScans: () => list("dexaScans"),
     async getProgressHubPhotoInputs() {
       queryCount += 1;

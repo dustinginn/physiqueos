@@ -1,20 +1,29 @@
-import { byDateRange, byUserId, latestByDate } from "./repositoryUtils";
+import { byDateRange, byUserId } from "./repositoryUtils";
+import {
+  canonicalWeightDate,
+  canonicalWeightEntries,
+  prepareCanonicalWeightCorrection,
+} from "../../domain/weight/canonicalWeight";
 
 export function createWeightRepository(weightEntries = [], options = {}) {
   return {
     async listWeightEntries(userId, range = {}) {
-      return byDateRange(byUserId(weightEntries, userId), "measuredAt", range);
+      return byDateRange(
+        canonicalWeightEntries(byUserId(weightEntries, userId)),
+        "measuredAt",
+        range
+      );
     },
 
     async getLatestWeightEntry(userId) {
-      return latestByDate(byUserId(weightEntries, userId), "measuredAt");
+      return canonicalWeightEntries(byUserId(weightEntries, userId)).at(-1) ?? null;
     },
 
     async addWeightEntry(entry) {
       const matchingEntries = weightEntries.filter(
         (item) =>
           item.userId === entry.userId &&
-          getDateKey(item.measuredAt) === getDateKey(entry.measuredAt)
+          canonicalWeightDate(item.measuredAt) === canonicalWeightDate(entry.measuredAt)
       );
 
       if (matchingEntries.length > 0) {
@@ -23,34 +32,23 @@ export function createWeightRepository(weightEntries = [], options = {}) {
 
           if (
             item.userId === entry.userId &&
-            getDateKey(item.measuredAt) === getDateKey(entry.measuredAt)
+            canonicalWeightDate(item.measuredAt) === canonicalWeightDate(entry.measuredAt)
           ) {
             weightEntries.splice(index, 1);
           }
         }
 
-        weightEntries.push({
-          ...entry,
-          correctionHistory: [
-            ...matchingEntries.flatMap((item) => item.correctionHistory ?? []),
-            ...matchingEntries
-              .filter(
-                (item) => JSON.stringify(item.weight) !== JSON.stringify(entry.weight)
-              )
-              .map((item) => ({
-                correctedAt: entry.updatedAt ?? new Date().toISOString(),
-                previousEntry: item,
-                reason: "Same-day authoritative weight correction.",
-              })),
-          ],
-        });
+        weightEntries.push(prepareCanonicalWeightCorrection(entry, matchingEntries));
       } else {
-        weightEntries.push(entry);
+        weightEntries.push(prepareCanonicalWeightCorrection(entry));
       }
 
       options.onChange?.();
 
-      return entry;
+      return weightEntries.find((item) =>
+        item.userId === entry.userId &&
+        canonicalWeightDate(item.measuredAt) === canonicalWeightDate(entry.measuredAt)
+      );
     },
 
     async importWeightEntries(entries, source) {
@@ -68,7 +66,3 @@ export function createWeightRepository(weightEntries = [], options = {}) {
 }
 
 export const WeightRepository = createWeightRepository([]);
-
-function getDateKey(value) {
-  return value?.slice(0, 10) ?? "";
-}

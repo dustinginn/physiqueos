@@ -1,4 +1,5 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 
 export function createPostgresProgressPhotosReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) {
@@ -52,7 +53,7 @@ export function createPostgresProgressPhotosReadStore({ pool, ownerUserId, onCom
       return users.find((user) => user?.id === ownerUserId) ?? users[0] ?? null;
     },
     listGoals: () => list("goals"),
-    listWeightEntries: () => list("weightEntries"),
+    listWeightEntries: async () => canonicalWeightEntries(await list("weightEntries")),
     async getPhotoInputs() {
       const rows = await query(
         `SELECT record_kind,payload,version FROM (

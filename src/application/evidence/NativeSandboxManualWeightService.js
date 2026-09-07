@@ -5,6 +5,7 @@ import {
   validWeight,
 } from "../../platform/sandbox/nativeSandboxWeightValidation.js";
 import { NATIVE_SANDBOX_WEIGHT_CONTINUATION_TOPIC } from "../../platform/sandbox/NativeSandboxAuthority.js";
+import { canonicalWeightEntryId } from "../../domain/weight/canonicalWeight.js";
 
 export const NATIVE_SANDBOX_MANUAL_WEIGHT_SCHEMA_VERSION = "1";
 
@@ -37,11 +38,16 @@ export function createNativeSandboxManualWeightService({
 
       const at = clock().toISOString();
       const weightEntry = Object.freeze({
-        id: `native_sandbox_weight_manual_${candidate.measurementDate.replaceAll("-", "_")}`,
+        id: canonicalWeightEntryId(candidate.measurementDate),
         userId: actor.userId,
         measuredAt: candidate.measurementDate,
         weight: Object.freeze({ value: candidate.value, unit: candidate.unit }),
-        source: Object.freeze({ type: "manual", name: "Native sandbox acceptance", confidence: "high" }),
+        source: Object.freeze({
+          type: "manual",
+          name: "Native sandbox acceptance",
+          externalId: candidate.submissionIdentity,
+          confidence: "high",
+        }),
         createdAt: at,
         updatedAt: at,
       });

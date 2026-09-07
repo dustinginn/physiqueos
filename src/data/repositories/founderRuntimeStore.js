@@ -9,6 +9,7 @@ import {
 import { normalizeDailyBriefingRecords } from "./DailyBriefingHistory";
 import { createFounderStoreMutationLockService } from "./FounderStoreMutationLock";
 import { assertProductionLegacyCanonicalWriteAllowed } from "../../platform/cutover/canonicalWriteFence";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight";
 
 const STORE_KEY = "__PHYSIQUEOS_FOUNDER_RUNTIME_STORE__";
 const STORE_WRITE_ATTEMPTS = 6;
@@ -648,7 +649,7 @@ function backfillCanonicalMorningWeights({
 
 function normalizeFounderWeightEntries(weightEntries = []) {
   const entriesByDate = new Map(
-    weightEntries.map((entry) => [
+    canonicalWeightEntries(weightEntries).map((entry) => [
       `${entry.userId}:${getDateKey(entry.measuredAt)}`,
       entry,
     ])
@@ -662,9 +663,7 @@ function normalizeFounderWeightEntries(weightEntries = []) {
     entriesByDate.set(`${entry.userId}:${date}`, entry);
   });
 
-  return [...entriesByDate.values()].sort((left, right) =>
-    String(left.measuredAt ?? "").localeCompare(String(right.measuredAt ?? ""))
-  );
+  return canonicalWeightEntries([...entriesByDate.values()]);
 }
 
 function getAuthoritativeFounderWeightIds() {

@@ -1,3 +1,5 @@
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
+
 export function createPostgresPhotoEventReadStore({
   pool,
   ownerUserId,
@@ -129,7 +131,7 @@ export function createPostgresPhotoEventReadStore({
         return Object.freeze({
           canonicalObjects,
           legacyPhotos,
-          weights: payloads(weightRows),
+          weights: canonicalWeightEntries(payloads(weightRows)),
           analyses,
           goal,
           goals,

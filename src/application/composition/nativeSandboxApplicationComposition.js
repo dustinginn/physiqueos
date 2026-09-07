@@ -3,6 +3,7 @@ import { createNativeSandboxWeightCandidateService } from "../evidence/NativeSan
 import { createNativeSandboxManualWeightService } from "../evidence/NativeSandboxManualWeightService.js";
 import { createProviderCanonicalUploadService } from "../media/ProviderCanonicalUploadService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
+import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
 import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
@@ -71,10 +72,12 @@ export function getNativeSandboxApplicationComposition(env = process.env) {
       const result = await pool.query(
         `SELECT payload FROM physiqueos.canonical_checkin_records
           WHERE owner_user_id=$1 AND collection_name='weightEntries'
-          ORDER BY occurrence_date DESC,source_ordinal DESC LIMIT 1`,
+          ORDER BY occurrence_date DESC,
+            COALESCE(payload->>'updatedAt',payload->>'createdAt','') DESC,
+            record_id DESC`,
         [config.ownerUserId],
       );
-      return result.rows[0]?.payload ?? null;
+      return canonicalWeightEntries(result.rows.map((row) => row.payload)).at(-1) ?? null;
     },
   });
   runtime = Object.freeze({

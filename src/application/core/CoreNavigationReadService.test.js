@@ -92,6 +92,30 @@ describe("provider-native core navigation reads", () => {
     });
   });
 
+  it("uses the deterministic same-day correction in the Morning Check-In read model", async () => {
+    const { narrow, runtime } = services();
+    runtime.weightEntries.push(
+      {
+        id: "weight_today_old",
+        userId: runtime.user.id,
+        measuredAt: "2026-08-29",
+        weight: { value: 168.4, unit: "lb" },
+        updatedAt: "2026-08-29T14:00:00.000Z",
+      },
+      {
+        id: "weight_today_corrected",
+        userId: runtime.user.id,
+        measuredAt: "2026-08-29",
+        weight: { value: 169.1, unit: "lb" },
+        updatedAt: "2026-08-29T15:00:00.000Z",
+      },
+    );
+
+    await expect(narrow.getMorningCheckIn()).resolves.toMatchObject({
+      existingWeight: 169.1,
+    });
+  });
+
   it("uses screen-specific collection sets without reconstructing unrelated domains", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.home).not.toContain("evidencePackages");
     expect(CORE_NAVIGATION_COLLECTIONS.home).not.toContain("trainingPerformanceEvents");

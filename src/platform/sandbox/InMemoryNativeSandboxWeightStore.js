@@ -1,3 +1,10 @@
+import {
+  canonicalWeightDate,
+  canonicalWeightEntries,
+  canonicalWeightWriteChanged,
+  prepareCanonicalWeightCorrection,
+} from "../../domain/weight/canonicalWeight.js";
+
 export function createInMemoryNativeSandboxWeightStore({ authority, state = null } = {}) {
   if (!authority?.descriptor) throw new Error("A Native sandbox authority is required.");
   const data = state ?? {
@@ -39,11 +46,19 @@ export function createInMemoryNativeSandboxWeightStore({ authority, state = null
       const review = data.reviews.get(reviewId);
       if (!review || review.status !== "pending" || review.version !== Number(expectedVersion)) throw conflict();
       authority.assertOutboxMessage(continuation);
-      data.weightEntries.set(weightEntry.id, structuredClone(weightEntry));
-      data.outbox.push(structuredClone(continuation));
+      const existingEntries = sameDayWeightEntries(data.weightEntries, weightEntry);
+      const changed = canonicalWeightWriteChanged(existingEntries, weightEntry);
+      const canonicalEntry = changed
+        ? prepareCanonicalWeightCorrection(weightEntry, existingEntries)
+        : canonicalWeightEntries(existingEntries).at(-1);
+      if (changed) {
+        deleteSameDayWeightEntries(data.weightEntries, weightEntry);
+        data.weightEntries.set(canonicalEntry.id, structuredClone(canonicalEntry));
+        data.outbox.push(structuredClone(continuation));
+      }
       const updated = { ...review, status: "confirmed", version: review.version + 1, confirmation: { confirmedAt }, updatedAt: confirmedAt };
       data.reviews.set(reviewId, updated);
-      return structuredClone({ review: updated, weightEntry });
+      return structuredClone({ review: updated, weightEntry: canonicalEntry, changed });
     },
     // Direct canonical write for the manual scalar Weight path (no Evidence
     // Review stage, mirroring production manual Weight). idempotencyKey
@@ -59,16 +74,22 @@ export function createInMemoryNativeSandboxWeightStore({ authority, state = null
         return structuredClone({ weightEntry: priorSubmission.weightEntry, changed: false });
       }
       authority.assertOutboxMessage(continuation);
-      const existing = data.weightEntries.get(weightEntry.id);
-      const unchanged = existing != null &&
-        existing.weight.value === weightEntry.weight.value &&
-        existing.weight.unit === weightEntry.weight.unit;
-      if (!unchanged) {
-        data.weightEntries.set(weightEntry.id, structuredClone(weightEntry));
+      const existingEntries = sameDayWeightEntries(data.weightEntries, weightEntry);
+      const changed = canonicalWeightWriteChanged(existingEntries, weightEntry);
+      const canonicalEntry = changed
+        ? prepareCanonicalWeightCorrection(weightEntry, existingEntries)
+        : canonicalWeightEntries(existingEntries).at(-1);
+      if (changed) {
+        deleteSameDayWeightEntries(data.weightEntries, weightEntry);
+        data.weightEntries.set(canonicalEntry.id, structuredClone(canonicalEntry));
         data.outbox.push(structuredClone(continuation));
       }
-      data.manualSubmissions.set(idempotencyKey, { submissionIdentity, weightEntry: structuredClone(weightEntry), confirmedAt });
-      return structuredClone({ weightEntry, changed: !unchanged });
+      data.manualSubmissions.set(idempotencyKey, {
+        submissionIdentity,
+        weightEntry: structuredClone(canonicalEntry),
+        confirmedAt,
+      });
+      return structuredClone({ weightEntry: canonicalEntry, changed });
     },
     async discard({ authority: descriptor, ownerUserId, reviewId, expectedVersion }) {
       assertAuthority(authority, descriptor, ownerUserId);
@@ -81,6 +102,21 @@ export function createInMemoryNativeSandboxWeightStore({ authority, state = null
       return Object.freeze({ discarded: true, reviewId });
     },
   });
+}
+
+function sameDayWeightEntries(entries, candidate) {
+  const date = canonicalWeightDate(candidate.measuredAt);
+  return [...entries.values()].filter((entry) =>
+    entry.userId === candidate.userId && canonicalWeightDate(entry.measuredAt) === date);
+}
+
+function deleteSameDayWeightEntries(entries, candidate) {
+  const date = canonicalWeightDate(candidate.measuredAt);
+  for (const [id, entry] of entries) {
+    if (entry.userId === candidate.userId && canonicalWeightDate(entry.measuredAt) === date) {
+      entries.delete(id);
+    }
+  }
 }
 
 function assertAuthority(authority, descriptor, ownerUserId) {

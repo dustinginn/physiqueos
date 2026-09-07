@@ -35,7 +35,7 @@ describe("Native sandbox worker to continuation boundary message shape", () => {
       topic: NATIVE_SANDBOX_WEIGHT_CONTINUATION_TOPIC,
       payload_version: "1",
       payload: {
-        weightEntryId: "native_sandbox_weight_manual_2026_08_31",
+        weightEntryId: "weight_2026_08_31",
         sandboxAuthority: authority.descriptor,
       },
       operation_id: null,
