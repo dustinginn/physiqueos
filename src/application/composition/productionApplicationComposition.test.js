@@ -150,6 +150,8 @@ describe("hydrateProductionTrainingExerciseRegistry — bounded Founder-created 
       if (text.includes("canonical_training_records")) {
         return {
           rows: [{
+            collection_name: "canonicalExerciseLibrary",
+            source_ordinal: 0,
             record_id: "bicep_curl_machine",
             payload: {
               id: "bicep_curl_machine",
@@ -182,7 +184,7 @@ describe("hydrateProductionTrainingExerciseRegistry — bounded Founder-created 
     // a commit path loads.
     const collectionQueries = queries.filter((query) => query.text.includes("collection_name"));
     expect(collectionQueries).toHaveLength(1);
-    expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", "canonicalExerciseLibrary"]);
+    expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", ["canonicalExerciseLibrary"]]);
   });
 
   it("coalesces concurrent cold-start registry reads into one deterministic provider load", async () => {

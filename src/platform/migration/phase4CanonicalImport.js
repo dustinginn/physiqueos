@@ -92,34 +92,34 @@ export async function loadCanonicalRuntime({
       isSingletonCollection(collection) ? null : [],
     ])
   );
-  for (const collection of selectedCollections) {
-    const table = assertKnownPhase4Collection(collection);
-    const result = await query(
-      `SELECT record_id,payload FROM physiqueos.${table}
-       WHERE owner_user_id=$1 AND collection_name=$2 ORDER BY source_ordinal,record_id`,
-      [ownerUserId, collection]
-    );
-    const payloads = result.rows.map((row) => row.payload);
-    runtime[collection] = isSingletonCollection(collection) ? payloads[0] ?? null : payloads;
-  }
-  const metadata = includeImportMetadata
-    ? await query(
+  const [collectionRows, metadata, applicationContext, runtimeMetadata] = await Promise.all([
+    loadCanonicalCollectionRows({ query, ownerUserId, collections: selectedCollections }),
+    includeImportMetadata
+      ? query(
         `SELECT report,source_sha256 FROM physiqueos.phase4_import_runs
          WHERE result='succeeded' ORDER BY completed_at DESC LIMIT 1`
       )
-    : { rows: [] };
-  const applicationContext = includeApplicationContext
-    ? await query(
+      : Promise.resolve({ rows: [] }),
+    includeApplicationContext
+      ? query(
         `SELECT operating_rhythm,adaptive_trust_profile,retired_milestones
            FROM physiqueos.canonical_application_context WHERE owner_user_id=$1`,
         [ownerUserId],
       )
-    : { rows: [] };
-  const runtimeMetadata = await query(
-    `SELECT runtime_version,revision,last_command_id,updated_at,imported_at
-       FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
-    [ownerUserId],
-  );
+      : Promise.resolve({ rows: [] }),
+    query(
+      `SELECT runtime_version,revision,last_command_id,updated_at,imported_at
+         FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`,
+      [ownerUserId],
+    ),
+  ]);
+  for (const row of collectionRows.rows) {
+    if (isSingletonCollection(row.collection_name)) {
+      runtime[row.collection_name] ??= row.payload;
+    } else {
+      runtime[row.collection_name].push(row.payload);
+    }
+  }
   const context = applicationContext.rows[0] ?? {};
   const canonicalMetadata = runtimeMetadata.rows[0] ?? {};
   const report = metadata.rows[0]?.report ?? {};
@@ -135,6 +135,28 @@ export async function loadCanonicalRuntime({
     milestones: context.retired_milestones ?? [],
     phase4Import: metadata.rows[0] ?? null,
   });
+}
+
+async function loadCanonicalCollectionRows({ query, ownerUserId, collections }) {
+  if (collections.length === 0) return { rows: [] };
+  const grouped = new Map();
+  for (const collection of collections) {
+    const table = assertKnownPhase4Collection(collection);
+    if (!grouped.has(table)) grouped.set(table, []);
+    grouped.get(table).push(collection);
+  }
+  const values = [ownerUserId];
+  const selections = [...grouped].map(([table, names], index) => {
+    values.push(names);
+    return `SELECT collection_name,source_ordinal,record_id,payload
+      FROM physiqueos.${table}
+      WHERE owner_user_id=$1 AND collection_name=ANY($${index + 2}::text[])`;
+  });
+  return query(
+    `${selections.join(" UNION ALL ")}
+     ORDER BY collection_name,source_ordinal,record_id`,
+    values,
+  );
 }
 
 function normalizeRuntimeCollections(collections) {

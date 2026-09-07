@@ -23,7 +23,7 @@ export default async function LiveGoalTransitionPage({ searchParams }) {
     sourceGoalId: "goal_visible_abs_at_rest",
   });
   const resumeDestination = getProductionGoalTransitionResumeDestination(
-    structuredClone(await loadApplicationCanonicalRuntime()),
+    structuredClone(runtime),
     draft.id
   );
   if (resumeDestination !== "/goals/transition") redirect(resumeDestination);

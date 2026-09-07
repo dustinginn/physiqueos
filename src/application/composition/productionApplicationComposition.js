@@ -167,6 +167,14 @@ export async function runProductionApplicationReadScope(callback, metadata = {},
   return getOrCreateProviderRuntime(env).readScope.run(callback, metadata);
 }
 
+export async function loadProductionApplicationScopedRuntime(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    return getFounderRuntimeStore();
+  }
+  const scope = getOrCreateProviderRuntime(env).readScope;
+  return scope.currentRuntime() ?? scope.readRuntime();
+}
+
 export function getProductionAsyncEvidenceIntakeService(env = process.env) {
   if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
     throw providerBuildAccessError();

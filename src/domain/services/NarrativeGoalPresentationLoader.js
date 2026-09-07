@@ -8,6 +8,13 @@ import {
 } from "./SupportingNarrativeGoalPreviewService";
 
 export async function getNarrativeGoalPresentation(goalKey) {
+  return FounderRepositories.runInReadScope(
+    () => getScopedNarrativeGoalPresentation(goalKey),
+    { readModel: `goal.narrative.${goalKey}` },
+  );
+}
+
+async function getScopedNarrativeGoalPresentation(goalKey) {
   if (goalKey === "visibleAbs") {
     return composeNarrativeGoalPreview({
       goalId: "goal_visible_abs_at_rest",

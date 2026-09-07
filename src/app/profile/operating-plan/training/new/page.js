@@ -7,10 +7,12 @@ import { activateTrainingProtocol } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function NewTrainingProtocolPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
   const context = await createTrainingProtocolBuilderService({ repositories: FounderRepositories }).getBuilderContext(user.id);
   if (context.activeProtocol) redirect("/profile/operating-plan?training=active");
 
   return <TrainingProtocolBuilderScreen action={activateTrainingProtocol} context={context} />;
+  }, { readModel: "route.training-protocol-new" });
 }

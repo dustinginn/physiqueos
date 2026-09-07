@@ -96,7 +96,6 @@ export function createEvidenceTimelineService({ repositories }) {
           date: analysis.createdAt,
           title: analysis.title,
           detail: formatTimelineDetail(analysis.summary),
-          metadata: typeof analysis.summary === "object" ? { structuredSummary: analysis.summary } : undefined,
           tone: "primary",
         })),
         ...dailyBriefings.map((dailyBriefing) => ({

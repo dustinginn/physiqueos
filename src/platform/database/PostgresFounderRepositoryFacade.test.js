@@ -112,7 +112,7 @@ describe("PostgreSQL Founder repository facade", () => {
     });
 
     const fullRuntimeReads = database.client.query.mock.calls.filter(([sql]) =>
-      String(sql).replace(/\s+/g, " ").includes("SELECT record_id,payload FROM physiqueos."));
+      String(sql).replace(/\s+/g, " ").includes("SELECT collection_name,source_ordinal,record_id,payload"));
     expect(fullRuntimeReads).toHaveLength(0);
     expect(database.runtime.evidenceReviews[0]).toMatchObject({
       status: "committing",
@@ -157,7 +157,7 @@ describe("PostgreSQL Founder repository facade", () => {
     const queries = database.client.query.mock.calls.map(([sql]) =>
       String(sql).replace(/\s+/g, " ").trim()
     );
-    expect(queries.filter((sql) => sql.includes("SELECT record_id,payload FROM physiqueos.")))
+    expect(queries.filter((sql) => sql.includes("SELECT collection_name,source_ordinal,record_id,payload")))
       .toHaveLength(0);
     expect(queries.filter((sql) => sql.includes("collection_name='evidenceReviews' AND record_id=$2 FOR UPDATE")))
       .toHaveLength(2);
@@ -285,10 +285,10 @@ describe("PostgreSQL Founder repository facade", () => {
       sql.includes("pg_advisory_xact_lock")
     );
     const runtimeLoadIndex = queries.findIndex((sql) =>
-      sql.includes("SELECT record_id,payload FROM physiqueos.")
+      sql.includes("SELECT collection_name,source_ordinal,record_id,payload")
     );
     const collectionLoads = queries.filter((sql) =>
-      sql.includes("SELECT record_id,payload FROM physiqueos.")
+      sql.includes("SELECT collection_name,source_ordinal,record_id,payload")
     );
     expect(lockIndex).toBeGreaterThanOrEqual(0);
     expect(runtimeLoadIndex).toBeGreaterThan(lockIndex);
@@ -360,21 +360,21 @@ describe("PostgreSQL Founder repository facade", () => {
     ]);
   });
 
-  it("reduces a provider-equivalent 20-way read fan-out from 840 queries and 15 waiters to one 42-query load", async () => {
+  it("reduces a provider-equivalent 20-way read fan-out from 80 queries and 75 waiters to one four-query load", async () => {
     const runtime = structuredClone(createPhase5SyntheticRuntime());
     const baseline = limitedCanonicalQuery(runtime, 5);
     await Promise.all(Array.from({ length: 20 }, () => loadCanonicalRuntime({ query: baseline.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID })));
-    expect(baseline.telemetry()).toEqual({ queryCount: 840, maxActive: 5, maxWaiting: 15, active: 0, waiting: 0 });
+    expect(baseline.telemetry()).toEqual({ queryCount: 80, maxActive: 5, maxWaiting: 75, active: 0, waiting: 0 });
 
     const repaired = limitedCanonicalQuery(runtime, 5);
     const scope = createPostgresFounderReadScope({
       loadRuntime: () => loadCanonicalRuntime({ query: repaired.query, ownerUserId: PHASE5_SYNTHETIC_OWNER_ID }),
     });
     await scope.run(() => Promise.all(Array.from({ length: 20 }, () => scope.readRepositories())));
-    expect(repaired.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(repaired.telemetry()).toEqual({ queryCount: 4, maxActive: 4, maxWaiting: 0, active: 0, waiting: 0 });
   });
 
-  it("shares one 42-query provider runtime across composition, principal, and a nested page read", async () => {
+  it("shares one four-query provider runtime across composition, principal, and a nested page read", async () => {
     const runtime = structuredClone(createPhase5SyntheticRuntime());
     const database = limitedCanonicalQuery(runtime, 5);
     const scope = createPostgresFounderReadScope({
@@ -404,10 +404,10 @@ describe("PostgreSQL Founder repository facade", () => {
     const first = await runRequest();
     expect(first.user.id).toBe(PHASE5_SYNTHETIC_OWNER_ID);
     expect(first.goals.length).toBeGreaterThan(0);
-    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(database.telemetry()).toEqual({ queryCount: 4, maxActive: 4, maxWaiting: 0, active: 0, waiting: 0 });
 
     await runRequest();
-    expect(database.telemetry()).toEqual({ queryCount: 84, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(database.telemetry()).toEqual({ queryCount: 8, maxActive: 4, maxWaiting: 0, active: 0, waiting: 0 });
   });
 
   it("isolates concurrent requests, releases rejected scopes, and never serves a stale cross-request snapshot", async () => {
@@ -462,7 +462,7 @@ describe("PostgreSQL Founder repository facade", () => {
     const report = await createProgressReportingService({ repositories: direct }).getProgressHub();
 
     expect(report.streams).toHaveLength(9);
-    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(database.telemetry()).toEqual({ queryCount: 4, maxActive: 4, maxWaiting: 0, active: 0, waiting: 0 });
     expect(diagnostics).toEqual([expect.objectContaining({
       readModel: "progress.getProgressHub",
       runtimeLoadCount: 1,
@@ -517,7 +517,7 @@ describe("PostgreSQL Founder repository facade", () => {
 
     await read(direct);
 
-    expect(database.telemetry()).toEqual({ queryCount: 42, maxActive: 1, maxWaiting: 0, active: 0, waiting: 0 });
+    expect(database.telemetry()).toEqual({ queryCount: 4, maxActive: 4, maxWaiting: 0, active: 0, waiting: 0 });
     expect(diagnostics).toEqual([expect.objectContaining({
       runtimeLoadCount: 1,
       poolAfter: expect.objectContaining({ waitingCount: 0 }),
@@ -552,6 +552,23 @@ function limitedCanonicalQuery(runtime, limit) {
 
 function canonicalRows(runtime, sql, values) {
   const normalized = String(sql).replace(/\s+/g, " ").trim();
+  if (normalized.includes("SELECT collection_name,source_ordinal,record_id,payload")) {
+    const collections = values.slice(1).flat();
+    const rows = collections.flatMap((collection) => {
+      const source = runtime[collection];
+      const records = source == null ? [] : Array.isArray(source) ? source : [source];
+      return records.map((payload, index) => ({
+        collection_name: collection,
+        source_ordinal: index,
+        record_id: id(payload, index),
+        payload: structuredClone(payload),
+      }));
+    });
+    rows.sort((left, right) => left.collection_name.localeCompare(right.collection_name)
+      || left.source_ordinal - right.source_ordinal
+      || left.record_id.localeCompare(right.record_id));
+    return { rows, rowCount: rows.length };
+  }
   if (normalized.includes("SELECT record_id,payload FROM physiqueos.")) {
     const source = runtime[values[1]];
     const records = source == null ? [] : Array.isArray(source) ? source : [source];
@@ -585,6 +602,23 @@ function fakeDatabase() {
       if (position < 0) return { rows: [], rowCount: 0 };
       runtime.evidenceReviews[position] = JSON.parse(values[8]);
       return { rows: [], rowCount: 1 };
+    }
+    if (normalized.includes("SELECT collection_name,source_ordinal,record_id,payload")) {
+      const collections = values.slice(1).flat();
+      const rows = collections.flatMap((collection) => {
+        const source = runtime[collection];
+        const records = source == null ? [] : Array.isArray(source) ? source : [source];
+        return records.map((payload, index) => ({
+          collection_name: collection,
+          source_ordinal: index,
+          record_id: id(payload, index),
+          payload: structuredClone(payload),
+        }));
+      });
+      rows.sort((left, right) => left.collection_name.localeCompare(right.collection_name)
+        || left.source_ordinal - right.source_ordinal
+        || left.record_id.localeCompare(right.record_id));
+      return { rows, rowCount: rows.length };
     }
     if (normalized.includes("SELECT record_id,payload FROM physiqueos.")) {
       const collection = values[1];

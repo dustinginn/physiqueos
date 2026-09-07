@@ -7,6 +7,7 @@ import { activateActivityProtocol } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function NewActivityProtocolPage() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
   const service = createActivityProtocolBuilderService({ repositories: FounderRepositories });
@@ -14,4 +15,5 @@ export default async function NewActivityProtocolPage() {
   if (context.activeProtocol) redirect("/profile/operating-plan?activity=active");
 
   return <ActivityProtocolBuilderScreen action={activateActivityProtocol} context={context} />;
+  }, { readModel: "route.activity-protocol-new" });
 }

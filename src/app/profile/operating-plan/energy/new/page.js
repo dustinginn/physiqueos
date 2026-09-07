@@ -5,6 +5,7 @@ import { createOperatingPlanEnergyStrategyService } from "../../../../../domain/
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
+  return FounderRepositories.runInReadScope(async () => {
   const user = await FounderRepositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
 
@@ -13,4 +14,5 @@ export default async function Page() {
   }).getActiveStrategy(user.id);
 
   redirect("/profile/operating-plan");
+  }, { readModel: "route.energy-strategy-new" });
 }
