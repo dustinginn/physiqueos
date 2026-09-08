@@ -17,6 +17,7 @@ struct PhotosHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: PhotosHistoryViewModel?
     @State private var isHistoryExpanded = false
+    @State private var selectedPhotoSet: PhotoSetRecord?
 
     static let historyPreviewLimit = 3
 
@@ -52,6 +53,9 @@ struct PhotosHistoryView: View {
             await viewModel?.load()
             await environment.founderPhotoMediaStore.loadManifestIfNeeded()
         }
+        .sheet(item: $selectedPhotoSet) { set in
+            PhotoEvidenceDetailSheet(set: set)
+        }
     }
 
     @ViewBuilder
@@ -77,6 +81,16 @@ struct PhotosHistoryView: View {
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
                 latestSetCard(displayed.latestSet)
+                if let set = displayed.latestSet, let briefingID = photoBriefingID(for: set) {
+                    NavigationLink(value: AppDestination.briefingDetail(briefingId: briefingID)) {
+                        Text("Read Photo Briefing")
+                            .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(PhysiqueOSTheme.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
                 historyCard(displayed.history)
                 PhotosDataSourcesFooterView(items: displayed.dataSources)
             }
@@ -104,37 +118,39 @@ struct PhotosHistoryView: View {
     private func latestSetCard(_ set: PhotoSetRecord?) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Latest Photo Set")
                 if let set {
-                    NavigationLink(value: set.destination) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                PhotoPoseThumbnailStrip(views: set.views)
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
+                    Button { selectedPhotoSet = set } label: {
+                        HStack(alignment: .top, spacing: 14) {
+                            if let first = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
+                                ProgressPhotoTile(
+                                    roleLabel: first.poseId.label,
+                                    source: environment.founderPhotoMediaStore.source(viewIdentity: first.id),
+                                    showsRoleLabel: false
+                                )
+                                .frame(width: 92, height: 118)
+                            }
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("LATEST PHOTO SET")
+                                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                        .foregroundStyle(PhysiqueOSTheme.accent)
+                                    Spacer(minLength: 4)
+                                    StatusChip(text: "\(set.views.count) views", color: .primary)
+                                }
+                                Text(TrainingDateFormatting.short(set.date))
+                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                Text(set.weightLabel)
+                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                Text("Compared against: \(set.comparisonAvailability)")
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Text("Open gallery →")
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                     .foregroundStyle(PhysiqueOSTheme.accent)
                             }
-                            Text(TrainingDateFormatting.short(set.date))
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("\(set.weightLabel) · \(set.views.count) views")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            Text("Compared against: \(set.comparisonAvailability)")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            // "Read Photo Briefing" — informational only,
-                            // not a button (see the type-level doc
-                            // comment for why the destination isn't built).
-                            Text("Photo briefing available for this set.")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                .italic()
                         }
-                        .padding(12)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
@@ -153,7 +169,20 @@ struct PhotosHistoryView: View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
         return CardContainer {
             PhotosDisclosureRow(isExpanded: $isHistoryExpanded) {
-                TrainingSectionHeaderView(title: "Uploaded Photos")
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Uploaded Photos")
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text("Tap any record to inspect the original image and comparison context.")
+                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                    Spacer(minLength: 8)
+                    Text(isHistoryExpanded ? "Close" : "Show All")
+                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
             } expanded: {
                 if history.isEmpty {
                     Text("No photo sets available for this period.")
@@ -162,7 +191,7 @@ struct PhotosHistoryView: View {
                 } else {
                     VStack(spacing: 8) {
                         ForEach(isHistoryExpanded ? history : preview) { set in
-                            NavigationLink(value: set.destination) {
+                            Button { selectedPhotoSet = set } label: {
                                 PhotoSetHistoryRow(set: set)
                             }
                             .buttonStyle(.plain)
@@ -171,6 +200,12 @@ struct PhotosHistoryView: View {
                 }
             }
         }
+    }
+
+    private func photoBriefingID(for set: PhotoSetRecord) -> String? {
+        environment.briefingSandboxStore.briefings.first(where: {
+            $0.photo?.eventDate == set.date
+        })?.id
     }
 }
 
@@ -192,15 +227,35 @@ private struct PhotoSetHistoryRow: View {
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text("View")
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
         }
-        .padding(10)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct PhotoEvidenceDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let set: PhotoSetRecord
+
+    var body: some View {
+        NavigationStack {
+            PhotoSetDetailView(setId: set.id)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Close") { dismiss() }
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 }
 

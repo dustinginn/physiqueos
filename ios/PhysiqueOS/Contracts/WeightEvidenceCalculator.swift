@@ -159,7 +159,8 @@ enum WeightEvidenceCalculator {
                 week: labelFormatter.string(from: week.key),
                 average: week.average,
                 weekOverWeek: week.weekOverWeek,
-                isBaseWeek: week.weekOverWeek == nil
+                isBaseWeek: week.weekOverWeek == nil,
+                entryCount: groups[week.key]?.count ?? 0
             )
         }
     }

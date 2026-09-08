@@ -84,6 +84,7 @@ struct WeightWeeklyAverage: Codable, Equatable, Identifiable {
     var average: Double
     var weekOverWeek: Double?
     var isBaseWeek: Bool
+    var entryCount: Int
 
     var id: String { week }
 }

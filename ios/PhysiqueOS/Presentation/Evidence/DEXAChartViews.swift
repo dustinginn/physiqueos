@@ -28,14 +28,24 @@ struct DEXATrendChartView: View {
             } else {
                 chart
                 if let selectedPoint, let value = selectedPoint.value {
-                    Text("\(TrainingDateFormatting.short(selectedPoint.date)): \(formatted(value))")
+                    Text("\(TrainingDateFormatting.short(selectedPoint.date))  /  \(series.title): \(formatted(value))")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 9)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(PhysiqueOSTheme.surfaceMuted)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                HStack {
+                    Text(TrainingDateFormatting.short(validPoints.first!.date))
+                    Spacer()
+                    if let latest = validPoints.last?.value { Text(formatted(latest)) }
+                    Spacer()
+                    Text(TrainingDateFormatting.short(validPoints.last!.date))
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
         }
     }
@@ -60,7 +70,7 @@ struct DEXATrendChartView: View {
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .frame(height: 120)
+        .frame(height: 180)
         .chartScrub { location, proxy, geometry in selectNearest(at: location, proxy: proxy, geometry: geometry) }
         .accessibilityLabel("\(series.title) trend over \(validPoints.count) scans")
     }

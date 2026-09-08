@@ -655,20 +655,10 @@ struct BriefingReadModel: Codable, Equatable, Identifiable {
     var evidenceWindow: BriefingEvidenceWindowReadModel
     var lifecycleState: BriefingArtifactLifecycleState
     var attribution: BriefingGoalAttribution
-    /// For `cadence == .event` (DEXA and Photo): the artifact genuinely
-    /// carries a persisted `goalConfidence` block (built by the same
-    /// `createBriefingGoalConfidenceBlockFromV2` finalizer every other
-    /// cadence uses), so this field is populated and decodable for
-    /// fixture/test/continuity purposes — but verified against source: both
-    /// the DEXA AND Photo Event Briefing screens check `hero.confidence`
-    /// (which the real narrative composer never sets for either) rather
-    /// than `narrative.goalConfidence`, so **no Confidence ring ever
-    /// renders on either real production or historical Event screen**.
-    /// This looks like an unwired real-product gap, not a deliberate
-    /// omission — Native deliberately does not "fix" it by rendering a
-    /// ring the real product doesn't show; neither `DEXABriefingSections`
-    /// nor `PhotoBriefingSections` render `BriefingConfidenceCard`. See
-    /// this task's final report.
+    /// The persisted `goalConfidence` block shared by all Briefing
+    /// cadences. The DEXA Event screen renders it in the hero, matching the
+    /// captured web experience. Photo Event currently keeps it as
+    /// continuity data but does not surface a confidence treatment.
     var confidence: BriefingConfidenceReadModel?
     var revisionProvenance: BriefingRevisionProvenance?
     var replacedHistory: [BriefingRevisionSnapshot]

@@ -9,10 +9,8 @@ import SwiftUI
 ///
 /// Deliberately does NOT render a Confidence card, a forecast section, or
 /// a Phase Review card — verified against source: this screen has no
-/// `PhaseReviewCard` at all (unlike DEXA), and Confidence is computed/
-/// persisted but never wired to render on the real screen either (same
-/// verified gap as DEXA — see `BriefingReadModel.confidence`'s doc
-/// comment).
+/// `PhaseReviewCard` at all (unlike DEXA), and Confidence is persisted but
+/// is not part of the captured Photo Event presentation.
 ///
 /// Authorized media is rendered through the same authenticated
 /// `ProgressPhotoTile` seam as Progress Photos Evidence. Tapping a tile
@@ -39,11 +37,14 @@ struct PhotoBriefingSections: View {
     }
 
     private var hero: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 10) {
+                IconBadge(systemImage: "wand.and.stars", color: .warning, size: .md, isCircular: false)
                 Text("PHOTO EVENT")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+            }
+            VStack(alignment: .leading, spacing: 18) {
                 Text(content.heroTitle)
                     .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -58,10 +59,10 @@ struct PhotoBriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
             VStack(alignment: .leading, spacing: 18) {
                 BriefingEditorialHeading(title: content.snapshotTitle)
-                HStack(spacing: 16) {
-                    BriefingStatItem(label: "Date", value: BriefingDateFormatting.shortDate(content.eventDate))
-                    BriefingStatItem(label: "Set", value: content.completionLabel)
-                    BriefingStatItem(label: "Weight", value: content.weightLabel)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    snapshotMetric("Date", BriefingDateFormatting.shortDate(content.eventDate))
+                    snapshotMetric("Set", content.completionLabel)
+                    snapshotMetric("Weight", content.weightLabel)
                 }
                 Text(content.poseLabels.joined(separator: " · "))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -119,6 +120,11 @@ struct PhotoBriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
             VStack(alignment: .leading, spacing: 18) {
                 BriefingEditorialHeading(title: content.progressTitle)
+                if !content.progressBody.isEmpty {
+                    Text(content.progressBody)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
                 comparisonList(content.ordinaryComparisons)
             }
         }
@@ -181,7 +187,7 @@ struct PhotoBriefingSections: View {
                             StatusChip(text: roleLabel, color: .primary)
                         }
                         Text(entry.poseId.label)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         Spacer(minLength: 8)
                         if let priorDate = priorItem?.captureDate ?? entry.priorDate {
@@ -190,6 +196,9 @@ struct PhotoBriefingSections: View {
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
+                    Text("Tap a photo to expand")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
                     HStack(spacing: 8) {
                         ProgressPhotoTile(
                             roleLabel: "Previous",
@@ -206,8 +215,26 @@ struct PhotoBriefingSections: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+                .padding(.vertical, 8)
             }
         }
+    }
+
+    private func snapshotMetric(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, minHeight: 74)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var interpretationCard: some View {

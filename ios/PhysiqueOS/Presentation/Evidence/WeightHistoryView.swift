@@ -146,7 +146,11 @@ struct WeightHistoryView: View {
         let preview = Array(weeks.prefix(Self.previewLimit))
         return CardContainer {
             EvidenceDisclosureRow(isExpanded: $isWeeklyAveragesExpanded) {
-                TrainingSectionHeaderView(title: "Weekly Averages")
+                evidenceSectionHeader(
+                    title: "Weekly Averages",
+                    subtitle: "Weekly trend smoothing for scale noise.",
+                    expanded: isWeeklyAveragesExpanded
+                )
             } expanded: {
                 if weeks.isEmpty {
                     Text("More history needed to compute weekly averages.")
@@ -167,7 +171,7 @@ struct WeightHistoryView: View {
         let preview = Array(history.prefix(Self.previewLimit))
         return CardContainer {
             EvidenceDisclosureRow(isExpanded: $isHistoryExpanded) {
-                TrainingSectionHeaderView(title: "Weight History")
+                evidenceSectionHeader(title: "Weight History", subtitle: nil, expanded: isHistoryExpanded)
             } expanded: {
                 if history.isEmpty {
                     Text("Weight history will appear as weigh-ins are logged or connected.")
@@ -181,6 +185,25 @@ struct WeightHistoryView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func evidenceSectionHeader(title: String, subtitle: String?, expanded: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(expanded ? "Close" : "Show All")
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
     }
 }
@@ -353,7 +376,7 @@ private struct WeeklyAverageRow: View {
     private var deltaText: String {
         guard let delta = week.weekOverWeek else { return "Base" }
         let sign = delta >= 0 ? "+" : ""
-        return String(format: "%@%.1f", sign, delta)
+        return String(format: "%@%.1f lb", sign, delta)
     }
 
     private var deltaColor: Color {
@@ -362,20 +385,30 @@ private struct WeeklyAverageRow: View {
     }
 
     var body: some View {
-        HStack {
-            Text(week.week)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Week of \(week.week)")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text("\(week.entryCount) \(week.entryCount == 1 ? "entry" : "entries")")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
             Spacer(minLength: 8)
-            Text(String(format: "%.1f", week.average))
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(deltaText)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(deltaColor)
-                .frame(width: 52, alignment: .trailing)
+            HStack(spacing: 14) {
+                Text(String(format: "%.1f lb", week.average))
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(deltaText)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(deltaColor)
+                    .frame(minWidth: 62, alignment: .trailing)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -397,7 +430,10 @@ private struct WeightHistoryRow: View {
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 }

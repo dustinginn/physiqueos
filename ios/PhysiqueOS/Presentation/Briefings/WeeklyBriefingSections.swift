@@ -39,7 +39,7 @@ struct WeeklyBriefingSections: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 if content.strategyPhaseLabel != nil || content.strategyWeekLabel != nil || content.strategyNextMilestone != nil {
                     Divider().overlay(PhysiqueOSTheme.divider)
-                    HStack(spacing: 14) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                         if let phase = content.strategyPhaseLabel { strategyItem("Strategy", phase) }
                         if let week = content.strategyWeekLabel { strategyItem("Week", week) }
                         if let milestone = content.strategyNextMilestone { strategyItem("Next", milestone) }
@@ -58,7 +58,10 @@ struct WeeklyBriefingSections: View {
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
         }
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func weightCard(_ weight: WeeklyWeightSection) -> some View {
@@ -107,10 +110,10 @@ struct WeeklyBriefingSections: View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
             VStack(alignment: .leading, spacing: 16) {
                 BriefingEditorialHeading(title: "Training")
-                HStack(spacing: 16) {
-                    BriefingStatItem(label: "Improving", value: "\(training.improvingCount)")
-                    BriefingStatItem(label: "Steady", value: "\(training.steadyCount)")
-                    BriefingStatItem(label: "Tracked", value: "\(training.comparableCategoryCount)")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    weeklyMetric("Improving", "\(training.improvingCount)", color: PhysiqueOSTheme.chartSuccess)
+                    weeklyMetric("Steady", "\(training.steadyCount)", color: PhysiqueOSTheme.chartEvidence)
+                    weeklyMetric("Tracked", "\(training.comparableCategoryCount)", color: PhysiqueOSTheme.chartEffort)
                 }
                 Text(training.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -129,10 +132,10 @@ struct WeeklyBriefingSections: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                HStack(spacing: 16) {
-                    BriefingStatItem(label: "Body Fat", value: body.bodyFatPercent)
-                    BriefingStatItem(label: "Lean Mass", value: body.leanMassLb)
-                    BriefingStatItem(label: "Fat Mass", value: body.fatMassLb)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    weeklyMetric("Body Fat", body.bodyFatPercent, color: PhysiqueOSTheme.accent)
+                    weeklyMetric("Lean Mass", body.leanMassLb, color: PhysiqueOSTheme.accent)
+                    weeklyMetric("Fat Mass", body.fatMassLb, color: PhysiqueOSTheme.accent)
                 }
                 Text(body.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -163,6 +166,25 @@ struct WeeklyBriefingSections: View {
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func weeklyMetric(_ label: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(color)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -187,10 +209,10 @@ struct WeeklyEnergyCard: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                HStack(spacing: 16) {
-                    BriefingStatItem(label: "Avg Intake", value: "\(section.averageIntakeKcal) kcal")
-                    BriefingStatItem(label: "Avg Expenditure", value: "\(section.averageExpenditureKcal) kcal")
-                    BriefingStatItem(label: "Avg Balance", value: "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
+                    energyMetric("Avg Expenditure", "\(section.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
+                    energyMetric("Avg Balance", "\(section.averageBalanceKcal >= 0 ? "+" : "")\(section.averageBalanceKcal) kcal", color: PhysiqueOSTheme.chartSuccess)
                 }
                 if let dailyBalances = section.dailyBalances, !dailyBalances.isEmpty {
                     chart(dailyBalances)
@@ -227,5 +249,20 @@ struct WeeklyEnergyCard: View {
             selectedDate = ChartCategoricalSelection.nearestPoint(matching: touchedDate, in: points, keyPath: \.date)?.date
         }
         .accessibilityLabel("Daily intake and expenditure across \(points.count) days")
+    }
+
+    private func energyMetric(_ label: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(color)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }

@@ -7,12 +7,9 @@ import SwiftUI
 /// Timeline" module) → Interpretation → Coach's Insight → optional
 /// read-only Phase Review → optional Goal Completion Handoff CTA.
 ///
-/// Deliberately does NOT render a Confidence card — verified against
-/// source: the real screen checks `hero.confidence`, which the real
-/// narrative composer never sets (Confidence instead lives, unrendered, at
-/// `narrative.goalConfidence`), so no Confidence ring ever appears on the
-/// real production or historical DEXA screen. See
-/// `BriefingReadModel.confidence`'s doc comment.
+/// The web DEXA Event capture includes the persisted goal-confidence block
+/// inside the hero, so Native renders that same score, band, movement, and
+/// primary reason alongside the headline metrics.
 ///
 /// Deliberately does NOT render a forecast section or any chart
 /// interaction — verified: no forecast fields are rendered on the real
@@ -21,6 +18,7 @@ import SwiftUI
 struct DEXABriefingSections: View {
     static let sectionInventory = ["Hero", "Current Scan", "What Measurably Changed", "Since Last Scan", "Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes", "Cut Timeline", "What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"]
     let content: DEXABriefingContent
+    let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
@@ -38,12 +36,34 @@ struct DEXABriefingSections: View {
     private var hero: some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
             VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 10) {
+                    IconBadge(systemImage: "scope", color: .primary, size: .md, isCircular: false)
+                    Text("DEXA EVENT BRIEFING")
+                        .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                }
                 Text(content.hero.title)
                     .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.hero.body)
                     .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let confidence {
+                    HStack(alignment: .center, spacing: 18) {
+                        ConfidenceRing(value: confidence.score, label: "", size: 112, lineWidth: 8)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(confidence.bandLabel.uppercased())
+                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            Text(confidence.movementLabel)
+                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text(confidence.primaryReason)
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(content.hero.results) { result in
                         VStack(alignment: .leading, spacing: 2) {
@@ -57,7 +77,8 @@ struct DEXABriefingSections: View {
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
-                        .padding(10)
+                        .padding(16)
+                        .frame(minHeight: 142, alignment: .topLeading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(PhysiqueOSTheme.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -89,19 +110,17 @@ struct DEXABriefingSections: View {
     private var snapshotCard: some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    BriefingEditorialHeading(title: "Current Scan")
-                    Spacer()
-                    Text(BriefingDateFormatting.shortDate(content.scanDate))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+                Text("SNAPSHOT")
+                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                BriefingEditorialHeading(title: "Current Scan")
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                    BriefingStatItem(label: "Interval", value: "\(content.daysBetweenScans) days")
-                    BriefingStatItem(label: "DEXA Weight", value: content.snapshot.weightLb)
-                    BriefingStatItem(label: "Body Fat", value: content.snapshot.bodyFatPercent)
-                    BriefingStatItem(label: "Fat Mass", value: content.snapshot.fatMassLb)
-                    BriefingStatItem(label: "Lean Tissue", value: content.snapshot.leanMassLb)
+                    snapshotMetric("Date", BriefingDateFormatting.shortDate(content.scanDate))
+                    snapshotMetric("Interval", "\(content.daysBetweenScans) days")
+                    snapshotMetric("DEXA Weight", content.snapshot.weightLb)
+                    snapshotMetric("Body Fat", content.snapshot.bodyFatPercent)
+                    snapshotMetric("Fat Mass", content.snapshot.fatMassLb)
+                    snapshotMetric("Lean Tissue", content.snapshot.leanMassLb)
                 }
                 if let rmr = content.snapshot.restingMetabolicRateKcal {
                     Text("Estimated RMR: \(rmr) cal/day")
@@ -133,24 +152,29 @@ struct DEXABriefingSections: View {
     }
 
     private func comparisonGroup(title: String, items: [DEXAComparisonMetric]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            VStack(spacing: 4) {
+            VStack(spacing: 10) {
                 ForEach(items) { item in
-                    HStack {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(item.label)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        Spacer(minLength: 8)
-                        Text("\(item.previous) → \(item.current)")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(item.delta)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(item.delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
+                        HStack(alignment: .bottom, spacing: 12) {
+                            comparisonValue("Previous", item.previous)
+                            Image(systemName: "arrow.right").foregroundStyle(PhysiqueOSTheme.textMuted)
+                            comparisonValue("Current", item.current)
+                            Spacer(minLength: 6)
+                            Text(item.delta)
+                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                .foregroundStyle(deltaColor(item.delta))
+                        }
                     }
+                    .padding(14)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(item.label): from \(item.previous) to \(item.current), a change of \(item.delta)")
                 }
@@ -163,20 +187,21 @@ struct DEXABriefingSections: View {
             Text(title.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            VStack(spacing: 4) {
+            VStack(spacing: 8) {
                 ForEach(items) { item in
-                    HStack {
+                    HStack(alignment: .center, spacing: 10) {
                         Text(item.region)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         Spacer(minLength: 8)
-                        Text("\(item.previous) → \(item.current)")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        comparisonValue("Previous", item.previous)
+                        Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(PhysiqueOSTheme.textMuted)
+                        comparisonValue("Current", item.current)
                         Text(item.delta)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(item.delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
+                            .foregroundStyle(deltaColor(item.delta))
                     }
+                    .padding(.vertical, 5)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(item.region): from \(item.previous) to \(item.current), a change of \(item.delta)")
                 }
@@ -262,14 +287,48 @@ struct DEXABriefingSections: View {
     }
 
     private func labeledParagraph(_ label: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(label.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.accent)
             Text(text)
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func snapshotMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func comparisonValue(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+    }
+
+    private func deltaColor(_ delta: String) -> Color {
+        delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort
     }
 
     private var coachInsightCard: some View {

@@ -197,14 +197,26 @@ struct DEXAHistoryView: View {
 
     private func coreTrendsCard(_ report: DEXAReportReadModel) -> some View {
         CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Core Trends")
-                DEXATrendChartView(series: report.bodyFatTrend, color: PhysiqueOSTheme.chartSuccess, selectedPointID: $selectedBodyFatPointID)
-                Divider().overlay(PhysiqueOSTheme.divider)
-                VStack(spacing: 14) {
-                    ForEach(report.coreTrends) { series in
-                        metricChart(series, namespace: "core", color: PhysiqueOSTheme.chartEvidence)
-                    }
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 4) {
+                    TrainingSectionHeaderView(title: "Core Trends")
+                    Text("Primary BodySpec trend lines for the selected timeline.")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                chartCard(
+                    report.bodyFatTrend,
+                    namespace: "core",
+                    color: PhysiqueOSTheme.chartSuccess,
+                    description: "Verified BodySpec scan history."
+                )
+                ForEach(report.coreTrends) { series in
+                    chartCard(
+                        series,
+                        namespace: "core",
+                        color: series.title.contains("Fat") ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.chartSuccess,
+                        description: "Structured values extracted from BodySpec reports."
+                    )
                 }
             }
         }
@@ -214,10 +226,10 @@ struct DEXAHistoryView: View {
         let preview = Array(report.supplementalDetails.prefix(Self.supplementalPreviewLimit))
         return CardContainer {
             DEXADisclosureRow(isExpanded: $isSupplementalExpanded) {
-                TrainingSectionHeaderView(title: "Supplemental Metrics")
+                drawerHeader(title: "Supplemental Metrics", subtitle: "Secondary calibration metrics from BodySpec.", expanded: isSupplementalExpanded)
             } expanded: {
                 VStack(alignment: .leading, spacing: 10) {
-                    VStack(spacing: 4) {
+                    VStack(spacing: 0) {
                         ForEach(isSupplementalExpanded ? report.supplementalDetails : preview) { row in
                             HStack {
                                 Text(row.label)
@@ -228,12 +240,21 @@ struct DEXAHistoryView: View {
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 11)
+                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
                         }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                     if isSupplementalExpanded {
                         VStack(spacing: 14) {
                             ForEach(report.supplementalTrends) { series in
-                                metricChart(series, namespace: "supplemental", color: PhysiqueOSTheme.chartEffort)
+                                chartCard(
+                                    series,
+                                    namespace: "supplemental",
+                                    color: PhysiqueOSTheme.chartEffort,
+                                    description: "Structured values extracted from BodySpec reports."
+                                )
                             }
                         }
                     }
@@ -246,11 +267,35 @@ struct DEXAHistoryView: View {
         let preview = Array(series.prefix(Self.regionalPreviewLimit))
         return CardContainer {
             DEXADisclosureRow(isExpanded: isExpanded) {
-                TrainingSectionHeaderView(title: title)
+                drawerHeader(title: title, subtitle: title.contains("Lean") ? "Regional lean tissue in pounds." : "Regional fat tissue in pounds.", expanded: isExpanded.wrappedValue)
             } expanded: {
                 VStack(spacing: 14) {
-                    ForEach(isExpanded.wrappedValue ? series : preview) { item in
-                        metricChart(item, namespace: namespace, color: PhysiqueOSTheme.accent)
+                    VStack(spacing: 0) {
+                        ForEach(isExpanded.wrappedValue ? series : preview) { item in
+                            HStack {
+                                Text(item.title)
+                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                Spacer(minLength: 8)
+                                Text(latestValue(item))
+                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 11)
+                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    if isExpanded.wrappedValue {
+                        ForEach(series) { item in
+                            chartCard(
+                                item,
+                                namespace: namespace,
+                                color: title.contains("Lean") ? PhysiqueOSTheme.chartEvidence : PhysiqueOSTheme.chartEffort,
+                                description: title.contains("Lean") ? "Regional lean tissue mass extracted from BodySpec reports." : "Regional fat tissue mass extracted from BodySpec reports."
+                            )
+                        }
                     }
                 }
             }
@@ -260,12 +305,15 @@ struct DEXAHistoryView: View {
     /// A titled, fully-interactive tap-and-drag chart for one secondary
     /// DEXA metric series — see `selectedMetricPointIDs`'s doc comment for
     /// why every series (not just Body Fat %) is interactive here.
-    private func metricChart(_ series: DEXAMetricSeries, namespace: String, color: Color) -> some View {
+    private func chartCard(_ series: DEXAMetricSeries, namespace: String, color: Color, description: String) -> some View {
         let key = "\(namespace)-\(series.title)"
         return VStack(alignment: .leading, spacing: 6) {
             Text(series.title)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(description)
+                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
             DEXATrendChartView(
                 series: series, color: color,
                 selectedPointID: Binding(
@@ -274,13 +322,41 @@ struct DEXAHistoryView: View {
                 )
             )
         }
+        .padding(16)
+        .background(PhysiqueOSTheme.surfaceElevated)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(PhysiqueOSTheme.divider, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func latestValue(_ series: DEXAMetricSeries) -> String {
+        guard let value = series.points.last(where: { $0.value != nil })?.value else { return "Unavailable" }
+        return series.unit.isEmpty ? String(format: "%.2f", value) : "\(String(format: "%.1f", value))\(series.unit)"
+    }
+
+    private func drawerHeader(title: String, subtitle: String?, expanded: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(expanded ? "Close" : "Show All")
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
     }
 
     private func historyCard(_ rows: [DEXAScanHistoryRow]) -> some View {
         let preview = Array(rows.prefix(Self.historyPreviewLimit))
         return CardContainer {
             DEXADisclosureRow(isExpanded: $isHistoryExpanded) {
-                TrainingSectionHeaderView(title: "Scan History")
+                drawerHeader(title: "Scan History", subtitle: nil, expanded: isHistoryExpanded)
             } expanded: {
                 if rows.isEmpty {
                     Text("No DEXA scans in this period.")
@@ -300,11 +376,11 @@ private struct DEXAScanHistoryRowView: View {
     let row: DEXAScanHistoryRow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(TrainingDateFormatting.short(row.date))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     Text(row.sourceLabel)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -312,22 +388,26 @@ private struct DEXAScanHistoryRowView: View {
                 }
                 Spacer(minLength: 8)
                 Text(row.bodyFatPercentage)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
             }
-            HStack(spacing: 12) {
-                Text("Fat \(row.fatMass)")
-                Text("Lean \(row.leanMass)")
-                Text("RMR \(row.restingMetabolicRate)")
+            HStack(spacing: 18) {
+                historyMetric(row.fatMass, suffix: " fat")
+                historyMetric(row.leanMass, suffix: " lean")
+                historyMetric(row.restingMetabolicRate, suffix: " RMR")
             }
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
+    }
+
+    private func historyMetric(_ value: String, suffix: String) -> some View {
+        Text("\(value)\(suffix)")
+            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+            .foregroundStyle(PhysiqueOSTheme.textSecondary)
     }
 }
 

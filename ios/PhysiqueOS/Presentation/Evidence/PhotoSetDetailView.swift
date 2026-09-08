@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Photo set/session detail (`.photoSetDetail(setId:)`) — a Native-only
-/// push destination replacing the web's `PhotoModal`
-/// (`ProgressPhotoGallery.jsx:202-271`), which has no URL of its own (see
-/// `PhotosReadModel.swift`'s doc comment). Mirrors the modal's own content
-/// and Previous/Next paging through every pose view in the session:
+/// Photo set/session detail (`.photoSetDetail(setId:)`) — the content of
+/// the web-style Photo Evidence sheet, which has no URL of its own. Mirrors
+/// the modal's own content and Previous/Next paging through every pose view
+/// in the session:
 ///
 /// per view — side-by-side Previous/Current comparison (or a single image
 /// when no prior comparison exists) → "Interpretation" → "Capture
@@ -67,16 +66,22 @@ struct PhotoSetDetailView: View {
     }
 
     private func setContent(_ set: PhotoSetRecord) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
-            header(for: set)
-            if !set.views.isEmpty {
+        Group {
+            if set.views.isEmpty {
+                Text("No confirmed views are available for this photo set.")
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            } else {
                 let clampedIndex = min(selectedViewIndex, set.views.count - 1)
-                viewPager(set: set, currentIndex: clampedIndex)
                 let view = set.views[clampedIndex]
+                VStack(alignment: .leading, spacing: 18) {
+                    header(for: set, view: view)
                 comparisonCard(view)
                 interpretationCard(view)
                 conditionsCard(view)
                 sourceHistoryCard(view)
+                    viewPager(set: set, currentIndex: clampedIndex)
+                }
             }
         }
         .onAppear {
@@ -89,54 +94,48 @@ struct PhotoSetDetailView: View {
         }
     }
 
-    private func header(for set: PhotoSetRecord) -> some View {
+    private func header(for set: PhotoSetRecord, view: PhotoViewRecord) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Photo Set")
-                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
+            Text("PROGRESS PHOTO EVIDENCE")
+                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
                 .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(TrainingDateFormatting.short(set.date))
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+            Text(view.poseId.label)
+                .physiqueOSFont(PhysiqueOSTypography.editorialSection)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text("\(set.weightLabel) · \(set.views.count) views")
+            Text(TrainingDateFormatting.short(set.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The Previous/Next paging control the web's own modal uses to cycle
-    /// through a session's other views.
+    /// The large footer control the web modal uses to cycle through the
+    /// other confirmed views in a session.
     private func viewPager(set: PhotoSetRecord, currentIndex: Int) -> some View {
-        let sortedViews = set.views
-        return HStack {
+        HStack(spacing: 12) {
             Button {
                 selectedViewIndex = max(0, currentIndex - 1)
             } label: {
-                Image(systemName: "chevron.left.circle.fill")
-                    .font(.system(size: 22))
+                Text("Previous")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .frame(maxWidth: .infinity, minHeight: 58)
+                    .background(PhysiqueOSTheme.surfaceElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .disabled(currentIndex == 0)
-            .foregroundStyle(currentIndex == 0 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.accent)
-
-            Spacer(minLength: 8)
-            VStack(spacing: 2) {
-                Text(sortedViews[currentIndex].poseId.label)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("\(currentIndex + 1) of \(sortedViews.count)")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            Spacer(minLength: 8)
+            .foregroundStyle(currentIndex == 0 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.textPrimary)
 
             Button {
-                selectedViewIndex = min(sortedViews.count - 1, currentIndex + 1)
+                selectedViewIndex = min(set.views.count - 1, currentIndex + 1)
             } label: {
-                Image(systemName: "chevron.right.circle.fill")
-                    .font(.system(size: 22))
+                Text("Next")
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                    .frame(maxWidth: .infinity, minHeight: 58)
+                    .background(PhysiqueOSTheme.surfaceElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
             }
-            .disabled(currentIndex == sortedViews.count - 1)
-            .foregroundStyle(currentIndex == sortedViews.count - 1 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.accent)
+            .disabled(currentIndex == set.views.count - 1)
+            .foregroundStyle(currentIndex == set.views.count - 1 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.textPrimary)
         }
     }
 
@@ -152,17 +151,42 @@ struct PhotoSetDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if view.hasComparisonImage {
                     HStack(spacing: 8) {
-                        ProgressPhotoTile(roleLabel: "Previous", source: previousSource(for: view), caption: view.comparedAgainst)
-                        ProgressPhotoTile(roleLabel: "Current", source: environment.founderPhotoMediaStore.source(viewIdentity: view.id))
+                        evidencePhoto(
+                            role: "Previous",
+                            date: view.comparedAgainst,
+                            source: previousSource(for: view)
+                        )
+                        evidencePhoto(
+                            role: "Current",
+                            date: TrainingDateFormatting.short(view.captureDate),
+                            source: environment.founderPhotoMediaStore.source(viewIdentity: view.id)
+                        )
                     }
                 } else {
-                    ProgressPhotoTile(roleLabel: "Current", source: environment.founderPhotoMediaStore.source(viewIdentity: view.id))
+                    evidencePhoto(
+                        role: "Current",
+                        date: TrainingDateFormatting.short(view.captureDate),
+                        source: environment.founderPhotoMediaStore.source(viewIdentity: view.id)
+                    )
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
         }
+    }
+
+    private func evidencePhoto(role: String, date: String, source: PhotoMediaSource) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ProgressPhotoTile(roleLabel: role, source: source, showsRoleLabel: false)
+            Text(date)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(role.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Server-owned presentation copy — fixtured verbatim, never

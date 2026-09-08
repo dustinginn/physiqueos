@@ -67,7 +67,7 @@ struct BriefingDetailView: View {
                     }
                 case .event:
                     if let dexa = briefing.dexa {
-                        DEXABriefingSections(content: dexa, onNavigate: onNavigate)
+                        DEXABriefingSections(content: dexa, confidence: briefing.confidence, onNavigate: onNavigate)
                     } else if let photo = briefing.photo {
                         PhotoBriefingSections(content: photo, onNavigate: onNavigate)
                     }

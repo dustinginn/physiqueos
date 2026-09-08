@@ -53,6 +53,10 @@ struct MidweekBriefingSections: View {
                 Text(text)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
             }
         }
     }
@@ -67,10 +71,10 @@ struct MidweekBriefingSections: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                HStack(spacing: 16) {
-                    BriefingStatItem(label: "Body Fat", value: body.bodyFatPercent)
-                    BriefingStatItem(label: "Lean Mass", value: body.leanMassLb)
-                    BriefingStatItem(label: "Fat Mass", value: body.fatMassLb)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    midweekMetric("Body Fat", body.bodyFatPercent)
+                    midweekMetric("Lean Mass", body.leanMassLb)
+                    midweekMetric("Fat Mass", body.fatMassLb)
                 }
                 Text(body.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -91,5 +95,20 @@ struct MidweekBriefingSections: View {
                 }
             }
         }
+    }
+
+    private func midweekMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }

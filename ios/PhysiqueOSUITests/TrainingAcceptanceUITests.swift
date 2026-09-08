@@ -92,6 +92,82 @@ final class TrainingAcceptanceUITests: XCTestCase {
         attachScreenshot("12-add-correct-workout-details")
     }
 
+    func testCorrectedEvidenceJourneys() throws {
+        continueAfterFailure = false
+        app.launch()
+
+        openEvidenceStream(named: "Weight")
+        assertText("Weekly Averages")
+        scrollToText("Weight History")
+        attachScreenshot("13-weight-evidence")
+        navigateBackToEvidenceHub()
+
+        openEvidenceStream(named: "DEXA")
+        assertText("DEXA")
+        scrollToText("Core Trends")
+        attachScreenshot("14-dexa-evidence")
+        navigateBackToEvidenceHub()
+
+        openEvidenceStream(named: "Photos")
+        assertText("Progress Photos")
+        let photoBriefing = app.buttons["Read Photo Briefing"]
+        XCTAssertTrue(photoBriefing.waitForExistence(timeout: 5), "Photo briefing action was missing.")
+        attachScreenshot("15-photo-evidence")
+
+        let latestPhotoSet = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "photo set")
+        ).firstMatch
+        XCTAssertTrue(latestPhotoSet.waitForExistence(timeout: 5), "Latest photo set was not actionable.")
+        latestPhotoSet.tap()
+        assertText("PROGRESS PHOTO EVIDENCE")
+        assertText("Front Relaxed")
+        attachScreenshot("16-photo-evidence-detail-sheet")
+        app.buttons["Close"].tap()
+        navigateBackToEvidenceHub()
+
+        openEvidenceStream(named: "Energy")
+        scrollToText("Weekly History")
+        assertText("Recent Daily Energy")
+        app.swipeUp()
+        attachScreenshot("17-energy-evidence")
+    }
+
+    func testBriefingParityJourneys() throws {
+        continueAfterFailure = false
+        app.launch()
+
+        let latestBriefing = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "DEXA Analysis Ready")
+        ).firstMatch
+        XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest DEXA briefing was not available from Home.")
+        latestBriefing.tap()
+        assertText("DEXA EVENT BRIEFING")
+        assertText("Two weeks into the surplus, the gain is real — and mostly lean.")
+        assertText("Current Scan")
+        attachScreenshot("18-dexa-event-briefing")
+        openBriefingHistory()
+
+        openBriefingFromHistory(containing: "Monthly Briefing · August 2026")
+        assertText("The month that started Build Lean Mass.")
+        attachScreenshot("19-monthly-briefing")
+        openBriefingHistory()
+
+        openBriefingFromHistory(containing: "Midweek Briefing")
+        assertText("Nothing here changes last week's plan.")
+        attachScreenshot("20-midweek-briefing")
+        openBriefingHistory()
+
+        openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
+        assertText("Two straight weeks of clean progression.")
+        attachScreenshot("21-weekly-briefing")
+        openBriefingHistory()
+
+        openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
+        assertText("PHOTO EVENT")
+        assertText("Four poses in, the visual story matches the scan.")
+        attachScreenshot("22-photo-event-briefing")
+    }
+
     private func openTrainingLanding() {
         let evidenceTab = app.tabBars.buttons["Evidence"]
         XCTAssertTrue(evidenceTab.waitForExistence(timeout: 5), "Evidence tab was not available.")
@@ -103,6 +179,46 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(trainingRow.waitForExistence(timeout: 5), "Training evidence row was not available.")
         trainingRow.tap()
         assertText("Latest Training Day")
+    }
+
+    private func openEvidenceStream(named name: String) {
+        let evidenceTab = app.tabBars.buttons["Evidence"]
+        XCTAssertTrue(evidenceTab.waitForExistence(timeout: 5), "Evidence tab was not available.")
+        evidenceTab.tap()
+
+        let row = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] %@", "\(name).")
+        ).firstMatch
+        for _ in 0..<12 where !row.exists || !row.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.exists && row.isHittable, "\(name) evidence row was not available.")
+        row.tap()
+    }
+
+    private func navigateBackToEvidenceHub() {
+        let back = app.navigationBars.buttons.firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "Evidence navigation back control was missing.")
+        back.tap()
+        assertText("All Evidence")
+    }
+
+    private func openBriefingHistory() {
+        let history = app.buttons["Briefing History"]
+        XCTAssertTrue(history.waitForExistence(timeout: 5), "Briefing History action was missing.")
+        history.tap()
+        assertText("Briefing History")
+    }
+
+    private func openBriefingFromHistory(containing text: String) {
+        let row = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", text)
+        ).firstMatch
+        for _ in 0..<16 where !row.exists || !row.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.exists && row.isHittable, "Briefing history row was not available: \(text)")
+        row.tap()
     }
 
     private func openReportingDisclosure() {

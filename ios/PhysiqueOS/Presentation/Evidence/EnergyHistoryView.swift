@@ -275,34 +275,46 @@ private struct EnergyWeekHistoryRow: View {
     let week: EnergyWeekRecord
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 Text("\(TrainingDateFormatting.short(week.weekStart)) – \(TrainingDateFormatting.short(week.weekEnd))")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Spacer(minLength: 8)
                 Text(week.partial ? "Partial" : "Complete")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
-            HStack(spacing: 12) {
-                Text("Intake \(EnergyEvidenceCalculator.formatCalories(week.averageIntake))")
-                    .foregroundStyle(PhysiqueOSTheme.energyIntake)
-                Text("Expenditure \(EnergyEvidenceCalculator.formatCalories(week.averageExpenditure))")
-                    .foregroundStyle(PhysiqueOSTheme.energyExpenditure)
-                Text("Balance \(EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance))")
-                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 10) {
+                    weekValue("Intake", EnergyEvidenceCalculator.formatCalories(week.averageIntake), color: PhysiqueOSTheme.energyIntake)
+                    weekValue("Balance", EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance), color: PhysiqueOSTheme.chartSuccess)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 10) {
+                    weekValue("Estimated expenditure", EnergyEvidenceCalculator.formatCalories(week.averageExpenditure), color: PhysiqueOSTheme.energyExpenditure)
+                    weekValue("Completed days", "\(week.completeDayCount)", color: PhysiqueOSTheme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            Text("\(week.completeDayCount) complete days")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
+    }
+
+    private func weekValue(_ label: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                .foregroundStyle(color)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

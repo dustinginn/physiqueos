@@ -105,6 +105,7 @@ final class WeightReadModelTests: XCTestCase {
         let report = try await api.fetchWeightReport(scope: .all)
         XCTAssertLessThanOrEqual(report.weeklyAverages.count, 6)
         XCTAssertFalse(report.weeklyAverages.isEmpty)
+        XCTAssertTrue(report.weeklyAverages.allSatisfy { $0.entryCount > 0 })
     }
 
     /// Exercises `WeightEvidenceCalculator` directly (not through the
