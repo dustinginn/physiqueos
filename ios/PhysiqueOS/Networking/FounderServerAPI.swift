@@ -221,6 +221,11 @@ actor FounderServerAPI {
     private func sendData(path: String, bearer: String) async throws -> Data {
         var request = request(path: path, method: "GET")
         request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        // The generic request builder asks for JSON. Photo delivery is a
+        // binary endpoint and must explicitly advertise the formats iOS can
+        // decode; leaving `application/json` here caused some proxies to
+        // negotiate an error body even though the manifest was valid.
+        request.setValue("image/heic,image/heif,image/jpeg,image/png,image/webp,image/*;q=0.9", forHTTPHeaderField: "Accept")
         let (data, response): (Data, HTTPURLResponse)
         do {
             (data, response) = try await transport.data(for: request)

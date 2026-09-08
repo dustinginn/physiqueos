@@ -74,12 +74,22 @@ struct ProgressPhotoTile: View {
                 .tint(PhysiqueOSTheme.accent)
                 .task { await environment.founderPhotoMediaStore.loadImage(viewIdentity: viewIdentity, mediaId: mediaId) }
         case .failed:
-            VStack(spacing: 6) {
-                Image(systemName: "photo.badge.exclamationmark")
-                Text("Photo unavailable")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+            Button {
+                Task {
+                    await environment.founderPhotoMediaStore.retryImage(
+                        viewIdentity: viewIdentity,
+                        mediaId: mediaId
+                    )
+                }
+            } label: {
+                VStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise.circle")
+                    Text("Retry photo")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                }
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
-            .foregroundStyle(PhysiqueOSTheme.textMuted)
+            .buttonStyle(.plain)
         }
     }
 }

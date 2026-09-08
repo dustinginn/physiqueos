@@ -433,6 +433,27 @@ final class FounderServerAPITests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(requests.last?.url?.path, "/api/v1/native/sandbox/photo-acceptance/media/media_1")
         XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
+        XCTAssertTrue(requests.last?.value(forHTTPHeaderField: "Accept")?.contains("image/jpeg") == true)
+    }
+
+    @MainActor
+    func testPhotoManifestCanRecoverAfterPairingWithoutRestartingTheApp() async throws {
+        let credentialStore = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, photoManifestJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: credentialStore, transport: transport)
+        let mediaStore = FounderPhotoMediaStore(api: api)
+
+        await mediaStore.loadManifestIfNeeded()
+        XCTAssertEqual(mediaStore.manifestState, .unavailable)
+
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        await mediaStore.loadManifestIfNeeded()
+
+        XCTAssertEqual(mediaStore.manifestState, .ready)
+        XCTAssertEqual(mediaStore.sessions.map(\.photoSessionId), ["session-1"])
     }
 
     @MainActor

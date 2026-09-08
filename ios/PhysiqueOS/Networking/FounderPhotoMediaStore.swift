@@ -20,7 +20,11 @@ final class FounderPhotoMediaStore {
     nonisolated init(api: FounderServerAPI) { self.api = api }
 
     func loadManifestIfNeeded() async {
-        guard manifestState == .idle else { return }
+        // `unavailable` is deliberately retryable. A common first-run path
+        // opens Photos before pairing has completed; making that transient
+        // auth failure terminal left every later photo as a placeholder for
+        // the lifetime of the app process.
+        guard manifestState != .loading, manifestState != .ready else { return }
         manifestState = .loading
         do {
             let manifest = try await api.readPhotoAcceptanceManifest()
@@ -125,5 +129,10 @@ final class FounderPhotoMediaStore {
         } catch {
             imageStates[viewIdentity] = .failed
         }
+    }
+
+    func retryImage(viewIdentity: String, mediaId: String) async {
+        imageStates[viewIdentity] = .idle
+        await loadImage(viewIdentity: viewIdentity, mediaId: mediaId)
     }
 }
