@@ -90,6 +90,7 @@ import { createProviderCanonicalUploadService } from "../media/ProviderCanonical
 import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
 import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
+import { createPostgresFounderPhotoAcceptanceStore } from "../../platform/database/PostgresFounderPhotoAcceptanceStore.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -134,6 +135,29 @@ export function getProductionFounderWeightSummaryReadService(env = process.env) 
       const composition = await getProductionApplicationComposition(env);
       return composition.repositories.weights.getLatestWeightEntry(userId);
     }, { readModel: "native.weight-summary.v1" }, env),
+  });
+}
+
+export function getProductionFounderPhotoAcceptanceDataAccess(
+  founderOwnerUserId,
+  env = process.env
+) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" ||
+      env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  if (runtime.ownerUserId !== founderOwnerUserId) {
+    throw Object.assign(new Error("Founder photo acceptance owner authority does not match."), {
+      code: "NATIVE_FOUNDER_PHOTO_ACCEPTANCE_AUTHORITY_INVALID",
+    });
+  }
+  return Object.freeze({
+    store: createPostgresFounderPhotoAcceptanceStore({
+      pool: runtime.pool,
+      founderOwnerUserId,
+    }),
+    authorizeProviderRead: (input) => runtime.objectProvider.authorizeRead(input),
   });
 }
 

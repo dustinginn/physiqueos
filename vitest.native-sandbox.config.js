@@ -5,6 +5,10 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/platform/sandbox/**/*.test.js",
+      "src/platform/auth/nativeFounderPhotoAcceptanceRuntime.test.js",
+      "src/platform/database/PostgresFounderPhotoAcceptanceStore.test.js",
+      "src/application/media/NativeFounderPhotoAcceptanceService.test.js",
+      "src/app/api/v1/native/sandbox/photo-acceptance/**/*.test.js",
       "src/platform/auth/FounderAuthService.test.js",
       "src/platform/auth/nativeFounderAuthRuntime.test.js",
       "src/platform/auth/requestAuthenticator.test.js",
