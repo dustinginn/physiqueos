@@ -2,7 +2,8 @@ import { GoalPhaseStatus, createGoalPhase, normalizeGoalPhaseCollection } from "
 
 const LEGACY_AUTHORED_GOAL_PHASE_FIELDS = ["id", "goalId", "name", "purpose", "status", "order", "startDate", "targetDate", "duration", "timingMode", "successCriteria", "guardrails", "transitionPolicy", "createdAt", "updatedAt"];
 const CANONICAL_LIFECYCLE_FIELDS = ["phaseId", "canonicalName", "startedAt", "plannedReviewAt", "completedAt", "supersededAt", "lastReviewedAt", "reviewState", "projectedNextPhaseStart", "projectedNextReviewAt", "completionCriteria", "reviewMilestone", "completionDecisionRequired", "completionDecisionId", "extensionCount", "latestExtensionDecisionId", "currentRecommendedReviewAt", "revision"];
-export const AUTHORED_GOAL_PHASE_FIELDS = Object.freeze([...LEGACY_AUTHORED_GOAL_PHASE_FIELDS, ...CANONICAL_LIFECYCLE_FIELDS]);
+const CANONICAL_EXECUTION_POLICY_FIELDS = ["monitoringCadence", "strategicReviewAnchor", "strategicReviewCadence", "automaticStrategyAdjustmentAllowed"];
+export const AUTHORED_GOAL_PHASE_FIELDS = Object.freeze([...LEGACY_AUTHORED_GOAL_PHASE_FIELDS, ...CANONICAL_LIFECYCLE_FIELDS, ...CANONICAL_EXECUTION_POLICY_FIELDS]);
 const ALLOWED = new Set(AUTHORED_GOAL_PHASE_FIELDS);
 
 export class AuthoredGoalPhasePersistenceError extends Error {
