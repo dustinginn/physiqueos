@@ -16,7 +16,7 @@ const typeIcons = {
   Workout: Activity,
 };
 
-export default function EvidenceTimelineScreen({ items }) {
+export default function EvidenceTimelineScreen({ items, hasMore = false, limit = 120, totalCount = items.length }) {
   return (
     <main className="min-h-screen bg-[#F7F8FA]">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-10">
@@ -71,6 +71,14 @@ export default function EvidenceTimelineScreen({ items }) {
             );
           })}
         </Card>
+        {hasMore ? (
+          <Link
+            className="mt-4 block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-indigo-600"
+            href={`/timeline?limit=${Math.min(1000, limit + 120)}`}
+          >
+            Load older history ({items.length} of {totalCount})
+          </Link>
+        ) : null}
       </div>
     </main>
   );

@@ -34,12 +34,37 @@ export function createEvidenceTimelineService({ repositories }) {
           repositories.evidencePackages?.listEvidencePackages(resolvedUserId) ?? [],
           repositories.canonicalEvidence?.listCanonicalEvidenceObjects(resolvedUserId) ?? [],
         ]);
-      const canonicalEvidenceItems = getCanonicalTimelineItems({
+      return createEvidenceTimelineItems({
+        analyses,
         canonicalEvidenceObjects,
+        checkIns,
+        dailyBriefings,
+        dexaScans,
         evidencePackages,
+        photos,
+        protocols,
+        weights,
       });
+    },
+  } });
+}
 
-      return [
+export function createEvidenceTimelineItems({
+  analyses = [],
+  canonicalEvidenceObjects = [],
+  checkIns = [],
+  dailyBriefings = [],
+  dexaScans = [],
+  evidencePackages = [],
+  photos = [],
+  protocols = [],
+  weights = [],
+} = {}) {
+  const canonicalEvidenceItems = getCanonicalTimelineItems({
+    canonicalEvidenceObjects,
+    evidencePackages,
+  });
+  return [
         ...canonicalEvidenceItems,
         ...getFailedIngestionTimelineItems(evidencePackages),
         ...weights.map((entry) => ({
@@ -112,8 +137,6 @@ export function createEvidenceTimelineService({ repositories }) {
       ]
         .filter((item) => item.date)
         .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    },
-  } });
 }
 
 export function formatTimelineDetail(value) {

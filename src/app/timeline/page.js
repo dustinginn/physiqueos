@@ -1,14 +1,11 @@
-import { FounderRepositories } from "../../data/repositories/founderRepositories";
-import { createEvidenceTimelineService } from "../../domain/services/EvidenceTimelineService";
+import { getProductionEvidenceTimelineReadService } from "../../application/composition/productionApplicationComposition";
 import EvidenceTimelineScreen from "../../screens/EvidenceTimelineScreen";
 
 export const dynamic = "force-dynamic";
 
-export default async function TimelinePage() {
-  const service = createEvidenceTimelineService({
-    repositories: FounderRepositories,
-  });
-  const items = await service.getTimeline();
+export default async function TimelinePage({ searchParams }) {
+  const query = await searchParams;
+  const page = await getProductionEvidenceTimelineReadService().getPage({ limit: query?.limit });
 
-  return <EvidenceTimelineScreen items={items} />;
+  return <EvidenceTimelineScreen {...page} />;
 }

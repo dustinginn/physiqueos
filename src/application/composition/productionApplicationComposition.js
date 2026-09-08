@@ -91,6 +91,9 @@ import { createFoundationPostgresTransactionRunner } from "../../platform/databa
 import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
 import { createPostgresFounderPhotoAcceptanceStore } from "../../platform/database/PostgresFounderPhotoAcceptanceStore.js";
+import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
+import { createPostgresEvidenceTimelineReadStore } from "../../platform/database/PostgresEvidenceTimelineReadStore.js";
+import { createEvidenceTimelineReadService } from "../timeline/EvidenceTimelineReadService.js";
 
 let activeRuntime;
 let providerRuntime;
@@ -173,6 +176,32 @@ export async function loadProductionApplicationScopedRuntime(env = process.env) 
   }
   const scope = getOrCreateProviderRuntime(env).readScope;
   return scope.currentRuntime() ?? scope.readRuntime();
+}
+
+export async function loadProductionBoundedFounderReadContext({
+  collections,
+  includeApplicationContext = false,
+  includeImportMetadata = false,
+} = {}, env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    const runtime = getFounderRuntimeStore();
+    return Object.freeze({
+      runtime,
+      repositories: createSeedRepositories(runtime),
+    });
+  }
+  const provider = getOrCreateProviderRuntime(env);
+  const runtime = await loadCanonicalRuntime({
+    query: (text, values) => provider.pool.query(text, values),
+    ownerUserId: provider.ownerUserId,
+    collections,
+    includeApplicationContext,
+    includeImportMetadata,
+  });
+  return Object.freeze({
+    runtime,
+    repositories: createSeedRepositories(runtime),
+  });
 }
 
 export function getProductionAsyncEvidenceIntakeService(env = process.env) {
@@ -383,6 +412,30 @@ export function getProductionBriefingNavigationReadService(env = process.env) {
     ? createProviderBriefingNavigationReadStore(env)
     : createRepositoryBriefingNavigationReadStore({ repositories: LegacyFounderRepositories, loadRuntime: getFounderRuntimeStore });
   return createBriefingNavigationReadService({ store });
+}
+
+export function getProductionEvidenceTimelineReadService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    const repositories = LegacyFounderRepositories;
+    return Object.freeze({
+      async getPage({ limit = 120 } = {}) {
+        const { createEvidenceTimelineService } = await import("../../domain/services/EvidenceTimelineService.js");
+        const items = await createEvidenceTimelineService({ repositories }).getTimeline();
+        const boundedLimit = Math.min(1000, Math.max(1, Number(limit) || 120));
+        return Object.freeze({ items: items.slice(0, boundedLimit), hasMore: items.length > boundedLimit, totalCount: items.length, limit: boundedLimit });
+      },
+    });
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createEvidenceTimelineReadService({
+    store: createPostgresEvidenceTimelineReadStore({
+      pool: runtime.pool,
+      ownerUserId: runtime.ownerUserId,
+      onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+        ? (event) => console.info("provider.timeline_read.complete", event)
+        : null,
+    }),
+  });
 }
 
 export function getProductionPhotoEventBriefingReadService(env = process.env) {

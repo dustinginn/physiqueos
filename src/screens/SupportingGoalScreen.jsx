@@ -51,19 +51,20 @@ const configs = {
   },
 };
 
-export async function getSupportingGoalDossier(goalKey) {
-  return FounderRepositories.runInReadScope(() => getSupportingGoalDossierWithinScope(goalKey), { readModel: "goals.supporting-dossier" });
+export async function getSupportingGoalDossier(goalKey, repositories = FounderRepositories) {
+  if (repositories !== FounderRepositories) return getSupportingGoalDossierWithinScope(goalKey, repositories);
+  return FounderRepositories.runInReadScope(() => getSupportingGoalDossierWithinScope(goalKey, repositories), { readModel: "goals.supporting-dossier" });
 }
 
-async function getSupportingGoalDossierWithinScope(goalKey) {
+async function getSupportingGoalDossierWithinScope(goalKey, repositories) {
   const resolvedGoalKey = configs[goalKey] ? goalKey : "maintenance";
   const config = configs[resolvedGoalKey];
-  const data = await getSupportingGoalData(config, resolvedGoalKey);
+  const data = await getSupportingGoalData(config, resolvedGoalKey, repositories);
   return { config, data, goalKey: resolvedGoalKey };
 }
 
-async function getSupportingGoalData(config, goalKey) {
-  const user = await FounderRepositories.users.getCurrentUser();
+async function getSupportingGoalData(config, goalKey, repositories) {
+  const user = await repositories.users.getCurrentUser();
   const userId = user?.id;
   const [
     goals,
@@ -75,14 +76,14 @@ async function getSupportingGoalData(config, goalKey) {
     analyses,
     canonicalEvidence,
   ] = await Promise.all([
-    FounderRepositories.goals.listGoals(userId),
-    FounderRepositories.dexaScans.listDEXAScans(userId),
-    FounderRepositories.weights.listWeightEntries(userId),
-    FounderRepositories.progressPhotos.listPhotos(userId),
-    FounderRepositories.protocols.listActiveProtocols(userId),
-    FounderRepositories.nutritionContext.getNutritionContext(userId),
-    FounderRepositories.analyses.listAnalyses(),
-    FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
+    repositories.goals.listGoals(userId),
+    repositories.dexaScans.listDEXAScans(userId),
+    repositories.weights.listWeightEntries(userId),
+    repositories.progressPhotos.listPhotos(userId),
+    repositories.protocols.listActiveProtocols(userId),
+    repositories.nutritionContext.getNutritionContext(userId),
+    repositories.analyses.listAnalyses(),
+    repositories.canonicalEvidence.listCanonicalEvidenceObjects(userId),
   ]);
   const sortedDEXA = sortByDate(dexaScans, "measuredAt");
   const sortedWeights = sortByDate(weightEntries, "measuredAt");

@@ -1,19 +1,18 @@
-import { FounderRepositories } from "../../../data/repositories/founderRepositories";
 import { createDailyBriefingService } from "../../../domain/services/DailyBriefingService";
 import DailyBriefingScreen from "../../../screens/DailyBriefingScreen";
-import { loadProductionApplicationScopedRuntime } from "../../../application/composition/productionApplicationComposition";
+import { loadProductionBoundedFounderReadContext } from "../../../application/composition/productionApplicationComposition";
 
 export const dynamic = "force-dynamic";
 
 export default async function DailyBriefingPage() {
-  const service = createDailyBriefingService({
-    repositories: FounderRepositories,
-    confidenceStoreResolver: loadProductionApplicationScopedRuntime,
+  const { repositories, runtime } = await loadProductionBoundedFounderReadContext({
+    collections: ["user", "dailyBriefings", "goals", "goalConfidenceSnapshots", "goalConfidenceHistory"],
   });
-  const briefing = await FounderRepositories.runInReadScope(
-    () => service.getPersistedDailyBriefing(),
-    { readModel: "briefing.daily.persisted" },
-  );
+  const service = createDailyBriefingService({
+    repositories,
+    confidenceStoreResolver: async () => runtime,
+  });
+  const briefing = await service.getPersistedDailyBriefing();
 
   if (!briefing) {
     return (
