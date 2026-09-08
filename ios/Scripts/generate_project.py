@@ -91,6 +91,7 @@ app_files = [
     ("Networking", "EvidenceLocalInterpretation.swift"),
     ("Networking", "FounderCredentialStore.swift"),
     ("Networking", "FounderServerAPI.swift"),
+    ("Networking", "FounderPhotoMediaStore.swift"),
     ("SharedUI", "PhysiqueOSTheme.swift"),
     ("SharedUI", "IconBadge.swift"),
     ("SharedUI", "CardContainer.swift"),

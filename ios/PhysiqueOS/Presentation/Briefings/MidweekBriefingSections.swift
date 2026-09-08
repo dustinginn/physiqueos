@@ -10,11 +10,12 @@ import SwiftUI
 /// Midweek never computes or refreshes it) — Native renders it exactly as
 /// received, same as every other cadence, with no special-cased logic.
 struct MidweekBriefingSections: View {
+    static let sectionInventory = ["Hero", "Goal Confidence", "Training", "Weight", "Energy", "Body Composition", "Coach's Take"]
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 28) {
             hero
             if let confidence { BriefingConfidenceCard(confidence: confidence) }
             if let energy = content.energy { WeeklyEnergyCard(section: energy) }
@@ -30,25 +31,25 @@ struct MidweekBriefingSections: View {
     }
 
     private var hero: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text(content.reportingRangeLabel.uppercased())
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                 Text(content.heroVerdict)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.heroSummary)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
     }
 
     private func narrativeCard(title: String, text: String) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading(title)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: title)
                 Text(text)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -57,9 +58,11 @@ struct MidweekBriefingSections: View {
     }
 
     private func bodyCompositionCard(_ body: WeeklyBodyCompositionSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Body Composition") {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    BriefingEditorialHeading(title: "Body Composition")
+                    Spacer()
                     Text(BriefingDateFormatting.shortDate(body.scanDate))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -77,9 +80,9 @@ struct MidweekBriefingSections: View {
     }
 
     private var coachTakeCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Coach's Take")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Coach's Take")
                 Text(content.coachTakeNarrative)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)

@@ -10,7 +10,7 @@ extension AppDestination {
     private enum CodingKeys: String, CodingKey { case id, parameters }
     private enum ParameterKeys: String, CodingKey {
         case goalId, phaseId, focus, checkInType, briefingId, priorityId, reviewId, sessionId, streamId, exerciseId
-        case strategyType, strategyId, protocolId, executionId, setId, category
+        case strategyType, strategyId, protocolId, executionId, setId, poseId, category
         case evidenceRecoveryType, occurrenceDateKey
     }
 
@@ -106,7 +106,10 @@ extension AppDestination {
             )
         case "native.photo-set-detail":
             let parameters = try container.nestedContainer(keyedBy: ParameterKeys.self, forKey: .parameters)
-            self = .photoSetDetail(setId: try parameters.decode(String.self, forKey: .setId))
+            self = .photoSetDetail(
+                setId: try parameters.decode(String.self, forKey: .setId),
+                poseId: try parameters.decodeIfPresent(PhotoPoseID.self, forKey: .poseId)
+            )
         case "native.operating-plan":
             self = .operatingPlan
         case "native.operating-plan.strategy":
@@ -188,7 +191,9 @@ extension AppDestination {
         case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
             try parameters.encode(type, forKey: .evidenceRecoveryType)
             try parameters.encode(occurrenceDateKey, forKey: .occurrenceDateKey)
-        case .photoSetDetail(let setId): try parameters.encode(setId, forKey: .setId)
+        case .photoSetDetail(let setId, let poseId):
+            try parameters.encode(setId, forKey: .setId)
+            try parameters.encodeIfPresent(poseId, forKey: .poseId)
         case .operatingPlanStrategy(let strategyType, let strategyId):
             try parameters.encode(strategyType, forKey: .strategyType)
             try parameters.encode(strategyId, forKey: .strategyId)

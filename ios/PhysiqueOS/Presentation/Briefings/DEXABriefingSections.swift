@@ -19,11 +19,12 @@ import SwiftUI
 /// screen, and the "Cut Timeline" point grid is static (no hover/tap), so
 /// this view does not reuse `ChartInteraction.swift`'s scrub gesture.
 struct DEXABriefingSections: View {
+    static let sectionInventory = ["Hero", "Current Scan", "What Measurably Changed", "Since Last Scan", "Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes", "Cut Timeline", "What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"]
     let content: DEXABriefingContent
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 30) {
             hero
             snapshotCard
             progressCard
@@ -35,13 +36,13 @@ struct DEXABriefingSections: View {
     }
 
     private var hero: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 18) {
                 Text(content.hero.title)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.hero.body)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(content.hero.results) { result in
@@ -86,14 +87,16 @@ struct DEXABriefingSections: View {
     }
 
     private var snapshotCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Current Scan") {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    BriefingEditorialHeading(title: "Current Scan")
+                    Spacer()
                     Text(BriefingDateFormatting.shortDate(content.scanDate))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                     BriefingStatItem(label: "Interval", value: "\(content.daysBetweenScans) days")
                     BriefingStatItem(label: "DEXA Weight", value: content.snapshot.weightLb)
                     BriefingStatItem(label: "Body Fat", value: content.snapshot.bodyFatPercent)
@@ -110,9 +113,9 @@ struct DEXABriefingSections: View {
     }
 
     private var progressCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 14) {
-                SectionHeading("What Measurably Changed")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 22) {
+                BriefingEditorialHeading(title: "What Measurably Changed")
 
                 comparisonGroup(title: "Since Last Scan", items: content.progress.headline)
                 if !content.progress.regionalFat.isEmpty {
@@ -237,9 +240,9 @@ struct DEXABriefingSections: View {
     }
 
     private var interpretationCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("What This Scan Means")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "What This Scan Means")
                 Text(content.interpretation.opening)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -270,9 +273,9 @@ struct DEXABriefingSections: View {
     }
 
     private var coachInsightCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Coach's Insight")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "Coach's Insight")
                 labeledParagraph("🎉 Biggest Win", content.coachInsight.biggestWin)
                 labeledParagraph("💪 Protect", content.coachInsight.protect)
                 labeledParagraph("👀 What to Watch", content.coachInsight.watch)
@@ -284,9 +287,9 @@ struct DEXABriefingSections: View {
     /// Always read-only — mirrors the historical replay route's real
     /// behavior exactly (see `DEXAPhaseReviewSummary`'s doc comment).
     private func phaseReviewCard(_ review: DEXAPhaseReviewSummary) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Phase Review")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Phase Review")
                 Text(review.title)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -314,9 +317,9 @@ struct DEXABriefingSections: View {
     }
 
     private func goalCompletionCard(_ handoff: DEXAGoalCompletionHandoff) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("One Qualified Check Remains")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "One Qualified Check Remains")
                 Text(handoff.questionText)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)

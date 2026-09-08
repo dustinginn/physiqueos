@@ -81,7 +81,7 @@ enum AppDestination: Hashable, Codable {
     /// server destination contract, the same "Native-only" treatment
     /// `manualWeighIn`/`evidenceIntake` already use, matching this port's
     /// Detail Navigation requirement (a real push instead of a web modal).
-    case photoSetDetail(setId: String)
+    case photoSetDetail(setId: String, poseId: PhotoPoseID? = nil)
     /// The web's own typed-destination registry currently maps
     /// `/log/training` (the Training Logger entry point) to the same
     /// `log` destination id as `/log` itself — Training Logger has no

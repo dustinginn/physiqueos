@@ -164,3 +164,45 @@ enum FounderServerError: Error, Sendable, Equatable, LocalizedError {
         }
     }
 }
+
+// MARK: - Founder photo visual-acceptance transport
+
+/// The deliberately narrow, Sandbox-only media manifest. The server owns
+/// the allowlist and returns opaque media identities plus authenticated
+/// proxy paths; Native never receives provider object keys or signed URLs.
+struct FounderPhotoAcceptanceManifest: Decodable, Sendable, Equatable {
+    let schemaVersion: String
+    let authority: FounderPhotoAcceptanceAuthority
+    let sessions: [FounderPhotoAcceptanceSession]
+}
+
+struct FounderPhotoAcceptanceAuthority: Decodable, Sendable, Equatable {
+    let kind: String
+    let sandboxAuthorityId: String
+}
+
+struct FounderPhotoAcceptanceSession: Decodable, Sendable, Equatable, Identifiable {
+    let photoSessionId: String
+    let captureDate: String
+    let photos: [FounderPhotoAcceptanceItem]
+    var id: String { photoSessionId }
+}
+
+struct FounderPhotoAcceptanceItem: Decodable, Sendable, Equatable, Identifiable {
+    struct Delivery: Decodable, Sendable, Equatable {
+        let kind: String
+        let path: String
+    }
+
+    let viewIdentity: String
+    let photoSessionId: String
+    let photoId: String
+    let mediaId: String
+    let poseId: PhotoPoseID
+    let captureDate: String
+    let contentType: String
+    let pixelWidth: Int?
+    let pixelHeight: Int?
+    let delivery: Delivery
+    var id: String { viewIdentity }
+}

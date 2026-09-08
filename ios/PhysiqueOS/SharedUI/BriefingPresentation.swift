@@ -78,6 +78,34 @@ struct BriefingCadenceBadge: View {
 
 // MARK: - Confidence card (server-owned — displays only, never computes)
 
+struct BriefingEditorialCard<Content: View>: View {
+    var tint: Color = PhysiqueOSTheme.accent
+    var background: Color = PhysiqueOSTheme.surfaceElevated
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3).fill(tint).frame(width: 3).padding(.vertical, 18)
+            }
+            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(tint.opacity(0.22), lineWidth: 1))
+    }
+}
+
+struct BriefingEditorialHeading: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+            .foregroundStyle(PhysiqueOSTheme.accent)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 /// Displays a persisted `BriefingConfidenceReadModel` verbatim. Native never
 /// derives `score`/`band`/`delta`/reasons here — every value is exactly
 /// what the fixture (a stand-in for the real server-computed artifact
@@ -86,9 +114,9 @@ struct BriefingConfidenceCard: View {
     let confidence: BriefingConfidenceReadModel
 
     var body: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Goal Confidence")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Goal Confidence")
                 HStack(alignment: .top, spacing: 14) {
                     ConfidenceRing(value: confidence.score, label: confidence.bandLabel, size: 76, lineWidth: 6)
                     VStack(alignment: .leading, spacing: 6) {
@@ -208,14 +236,14 @@ struct BriefingStatItem: View {
     let value: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.metricLabel)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
             Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.metricValue)
+                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                .lineLimit(1)
+                .minimumScaleFactor(0.72)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

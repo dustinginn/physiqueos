@@ -13,8 +13,15 @@ struct PhotoSetDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: PhotoSetDetailViewModel?
     @State private var selectedViewIndex = 0
+    @State private var didApplyInitialPose = false
     @State private var isSourceHistoryExpanded = false
     let setId: String
+    let initialPoseId: PhotoPoseID?
+
+    init(setId: String, initialPoseId: PhotoPoseID? = nil) {
+        self.setId = setId
+        self.initialPoseId = initialPoseId
+    }
 
     var body: some View {
         ScrollView {
@@ -29,6 +36,7 @@ struct PhotoSetDetailView: View {
         .task {
             if viewModel == nil { viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId) }
             await viewModel?.load()
+            await environment.founderPhotoMediaStore.loadManifestIfNeeded()
         }
     }
 
@@ -45,23 +53,39 @@ struct PhotoSetDetailView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
-            Text("No photo set found for this date.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
-        case .loaded(.some(let set)):
-            VStack(alignment: .leading, spacing: 16) {
-                header(for: set)
-                if !set.views.isEmpty {
-                    let clampedIndex = min(selectedViewIndex, set.views.count - 1)
-                    viewPager(set: set, currentIndex: clampedIndex)
-                    let view = set.views[clampedIndex]
-                    comparisonCard(view)
-                    interpretationCard(view)
-                    conditionsCard(view)
-                    sourceHistoryCard(view)
-                }
+            if let set = environment.founderPhotoMediaStore.projectedSetsByID[setId] {
+                setContent(set)
+            } else {
+                Text("No photo set found for this date.")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 300)
             }
+        case .loaded(.some(let set)):
+            setContent(set)
+        }
+    }
+
+    private func setContent(_ set: PhotoSetRecord) -> some View {
+        VStack(alignment: .leading, spacing: 24) {
+            header(for: set)
+            if !set.views.isEmpty {
+                let clampedIndex = min(selectedViewIndex, set.views.count - 1)
+                viewPager(set: set, currentIndex: clampedIndex)
+                let view = set.views[clampedIndex]
+                comparisonCard(view)
+                interpretationCard(view)
+                conditionsCard(view)
+                sourceHistoryCard(view)
+            }
+        }
+        .onAppear {
+            guard !didApplyInitialPose else { return }
+            if let initialPoseId,
+               let index = set.views.firstIndex(where: { $0.poseId == initialPoseId }) {
+                selectedViewIndex = index
+            }
+            didApplyInitialPose = true
         }
     }
 
@@ -76,7 +100,6 @@ struct PhotoSetDetailView: View {
             Text("\(set.weightLabel) · \(set.views.count) views")
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: set.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -121,20 +144,19 @@ struct PhotoSetDetailView: View {
     /// `ProgressPhotoGallery.jsx:238-244`'s literal 2-column layout; a
     /// single tile plus the exact empty-state string otherwise. Renders
     /// through the shared `ProgressPhotoTile` (`SharedUI/ProgressPhotoTile.swift`)
-    /// — the same component the Photo Event Briefing uses — so a later
-    /// real-photo pass changes one rendering seam, not two. No authorized
-    /// image media exists in this pass; both surfaces remain PENDING REAL
-    /// PHOTOS visual acceptance.
+    /// — the same component the Photo Event Briefing uses. The selected
+    /// pose comes from the destination's stable pose identity when a
+    /// Briefing preview opened this page, never from the preview's index.
     private func comparisonCard(_ view: PhotoViewRecord) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 10) {
                 if view.hasComparisonImage {
                     HStack(spacing: 8) {
-                        ProgressPhotoTile(roleLabel: "Previous", caption: view.comparedAgainst)
-                        ProgressPhotoTile(roleLabel: "Current")
+                        ProgressPhotoTile(roleLabel: "Previous", source: previousSource(for: view), caption: view.comparedAgainst)
+                        ProgressPhotoTile(roleLabel: "Current", source: environment.founderPhotoMediaStore.source(viewIdentity: view.id))
                     }
                 } else {
-                    ProgressPhotoTile(roleLabel: "Current")
+                    ProgressPhotoTile(roleLabel: "Current", source: environment.founderPhotoMediaStore.source(viewIdentity: view.id))
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -205,5 +227,12 @@ struct PhotoSetDetailView: View {
                 }
             }
         }
+    }
+
+    private func previousSource(for view: PhotoViewRecord) -> PhotoMediaSource {
+        guard let item = environment.founderPhotoMediaStore.itemsByViewIdentity.values.first(where: {
+            $0.poseId == view.poseId && TrainingDateFormatting.short($0.captureDate) == view.comparedAgainst
+        }) else { return .placeholder }
+        return environment.founderPhotoMediaStore.source(viewIdentity: item.viewIdentity)
     }
 }

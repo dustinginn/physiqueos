@@ -132,9 +132,9 @@ struct PhotoViewRecord: Codable, Equatable, Identifiable {
     var comparisonBullets: [String]
     /// Whether a side-by-side Previous/Current comparison image pair is
     /// available (`comparisonStatus == "comparable" |
-    /// "comparable_with_condition_differences"`) — no real photo assets
-    /// exist in this fixture-only pass (see `PhotoSetDetailView`'s doc
-    /// comment); this only gates which placeholder layout renders.
+    /// "comparable_with_condition_differences"`). This gates the paired
+    /// comparison layout independently of whether media is a fixture
+    /// placeholder or authenticated acceptance image.
     var hasComparisonImage: Bool
 }
 

@@ -11,12 +11,13 @@ import SwiftUI
 /// verified that's computed server-side but never rendered on the live
 /// screen.
 struct MonthlyBriefingSections: View {
+    static let sectionInventory = ["Hero", "Goal Confidence", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"]
     let content: MonthlyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 34) {
             hero
             if let confidence { BriefingConfidenceCard(confidence: confidence) }
             if let goalMilestone = content.goalMilestone { goalMilestoneCard(goalMilestone) }
@@ -24,26 +25,26 @@ struct MonthlyBriefingSections: View {
             energyEvolutionCard
             newBaselineCard
             if !content.whatChanged.isEmpty {
-                CardContainer(padding: .md) { BriefingNarrativeList(title: "What Changed", items: content.whatChanged, numbered: false) }
+                BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) { BriefingNarrativeList(title: "What Changed", items: content.whatChanged, numbered: false) }
             }
             if !content.definingMoments.isEmpty { definingMomentsCard }
             if !content.monthAhead.isEmpty {
-                CardContainer(padding: .md) { BriefingNarrativeList(title: "Month Ahead", items: content.monthAhead) }
+                BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) { BriefingNarrativeList(title: "Month Ahead", items: content.monthAhead) }
             }
         }
     }
 
     private var hero: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 18) {
                 Text(content.monthLabel.uppercased())
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                 Text(content.heroHeadline)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.heroBody)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 Text(content.heroGoalLabel)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -53,9 +54,9 @@ struct MonthlyBriefingSections: View {
     }
 
     private func goalMilestoneCard(_ milestone: MonthlyGoalMilestoneSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Goal Milestone")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Goal Milestone")
                 Text(milestone.title)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -79,28 +80,28 @@ struct MonthlyBriefingSections: View {
     }
 
     private var trainingProgressCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Training Progress")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "Training Progress")
                 if !content.trainingProgress.stats.isEmpty {
-                    HStack(spacing: 16) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) {
                         ForEach(content.trainingProgress.stats) { stat in
                             BriefingStatItem(label: stat.label, value: stat.value)
                         }
                     }
                 }
                 Text(content.trainingProgress.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
     }
 
     private var energyEvolutionCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Energy Evolution")
-                HStack(spacing: 16) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.energyExpenditure) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "Energy Evolution")
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) {
                     BriefingStatItem(label: "Avg Intake", value: "\(content.energyEvolution.averageIntakeKcal) kcal")
                     BriefingStatItem(label: "Avg Expenditure", value: "\(content.energyEvolution.averageExpenditureKcal) kcal")
                     BriefingStatItem(label: "Avg Balance", value: "\(content.energyEvolution.averageBalanceKcal >= 0 ? "+" : "")\(content.energyEvolution.averageBalanceKcal) kcal")
@@ -131,9 +132,11 @@ struct MonthlyBriefingSections: View {
     }
 
     private var newBaselineCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("New Baseline") {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    BriefingEditorialHeading(title: "New Baseline")
+                    Spacer()
                     Text(content.newBaseline.referenceDateLabel)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -151,10 +154,10 @@ struct MonthlyBriefingSections: View {
     }
 
     private var definingMomentsCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Defining Moments")
-                VStack(alignment: .leading, spacing: 6) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Defining Moments")
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(content.definingMoments) { moment in
                         HStack(alignment: .top) {
                             Text(moment.label)

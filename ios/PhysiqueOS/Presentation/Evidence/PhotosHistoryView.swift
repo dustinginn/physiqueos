@@ -8,19 +8,10 @@ import SwiftUI
 /// Latest Photo Set (hero card) → Uploaded Photos (collapsible history,
 /// preview 3) → Data Sources.
 ///
-/// No real image assets exist in this fixture-only pass — every photo is
-/// rendered as a labeled placeholder tile (pose name + silhouette glyph),
-/// not a fabricated image. This is a presentation-layer limitation of
-/// fixture mode, not a product simplification: the real comparison
-/// contract (pairing, dates, pose-matching, empty states) is faithfully
-/// modeled regardless of what fills the tile.
-///
-/// The web's "Read Photo Briefing" affordance is preserved as
-/// informational text, not a button — its destination
-/// (`/briefings/photo/[sessionId]`) is a Briefings-namespaced surface this
-/// task explicitly excludes (see `PhotosReadModel.swift`'s doc comment),
-/// and this task also explicitly forbids leaving a dead-end tappable
-/// control where the web has a real link.
+/// When the authenticated acceptance manifest is available, its exact
+/// session/pose identities replace only the fixture media projection; no
+/// interpretation or unrelated Founder data is requested. Fixture mode
+/// remains an honest labeled placeholder fallback.
 struct PhotosHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -59,6 +50,7 @@ struct PhotosHistoryView: View {
         .task {
             if viewModel == nil { viewModel = PhotosHistoryViewModel(api: environment.photosAPI) }
             await viewModel?.load()
+            await environment.founderPhotoMediaStore.loadManifestIfNeeded()
         }
     }
 
@@ -75,14 +67,18 @@ struct PhotosHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 16) {
-                header(for: landing)
-                TrainingScopeSelectorView(scope: landing.scope) { pillID in
+            let displayed = environment.founderPhotoMediaStore.projectedLanding(
+                from: landing,
+                scope: viewModel?.scope ?? PhotosScopeDefault.selection
+            ) ?? landing
+            VStack(alignment: .leading, spacing: 24) {
+                header(for: displayed)
+                TrainingScopeSelectorView(scope: displayed.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
-                latestSetCard(landing.latestSet)
-                historyCard(landing.history)
-                PhotosDataSourcesFooterView(items: landing.dataSources)
+                latestSetCard(displayed.latestSet)
+                historyCard(displayed.history)
+                PhotosDataSourcesFooterView(items: displayed.dataSources)
             }
         }
     }
@@ -113,7 +109,7 @@ struct PhotosHistoryView: View {
                     NavigationLink(value: set.destination) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                PhotoPoseThumbnailStrip(poses: set.views.map(\.poseId))
+                                PhotoPoseThumbnailStrip(views: set.views)
                                 Spacer(minLength: 8)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 13, weight: .semibold))
@@ -183,7 +179,7 @@ private struct PhotoSetHistoryRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            PhotoPoseThumbnailStrip(poses: set.views.map(\.poseId), compact: true)
+            PhotoPoseThumbnailStrip(views: set.views, compact: true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(set.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -194,7 +190,6 @@ private struct PhotoSetHistoryRow: View {
                 Text("Compared: \(set.comparisonAvailability)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
-                EvidenceScopeAttributionChip(attribution: set.attributedScope)
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
@@ -209,24 +204,24 @@ private struct PhotoSetHistoryRow: View {
     }
 }
 
-/// A row of small placeholder thumbnails, one per pose in the set — the
-/// closest faithful stand-in for the web's real photo thumbnail grid
-/// without real image assets (see this file's type-level doc comment).
+/// A row of small pose thumbnails. Each source is resolved by stable
+/// server-owned view identity; filtering never changes which pixels belong
+/// to a pose.
 struct PhotoPoseThumbnailStrip: View {
-    let poses: [PhotoPoseID]
+    @Environment(AppEnvironment.self) private var environment
+    let views: [PhotoViewRecord]
     var compact: Bool = false
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(poses.sorted { $0.order < $1.order }) { pose in
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(PhysiqueOSTheme.surfaceElevated)
+            ForEach(views.sorted { $0.poseId.order < $1.poseId.order }) { view in
+                ProgressPhotoTile(
+                    roleLabel: view.poseId.label,
+                    source: environment.founderPhotoMediaStore.source(viewIdentity: view.id),
+                    showsRoleLabel: false
+                )
                     .frame(width: compact ? 32 : 44, height: compact ? 42 : 58)
-                    .overlay(
-                        Image(systemName: "figure.stand")
-                            .font(.system(size: compact ? 12 : 16, weight: .medium))
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    )
+                    .clipped()
                     .accessibilityHidden(true)
             }
         }

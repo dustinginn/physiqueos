@@ -14,20 +14,18 @@ import SwiftUI
 /// verified gap as DEXA — see `BriefingReadModel.confidence`'s doc
 /// comment).
 ///
-/// No real photo media exists in this pass (see `ProgressPhotoTile`'s doc
-/// comment) — the real screen's full-screen pinch-zoom `PhotoViewer` modal
-/// is therefore not ported (nothing real to zoom into yet); tapping a
-/// photo tile instead pushes the existing Progress Photos Evidence detail
-/// screen (`.photoSetDetail(setId:)`) for this exact same canonical
-/// session, which already provides pose-to-pose paging — reusing existing
-/// navigation rather than building a second, redundant pager for
-/// placeholder content.
+/// Authorized media is rendered through the same authenticated
+/// `ProgressPhotoTile` seam as Progress Photos Evidence. Tapping a tile
+/// carries both the server-owned session and pose identity into that shared
+/// detail/pager, so a filtered or reordered grid cannot open the wrong image.
 struct PhotoBriefingSections: View {
+    static let sectionInventory = ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"]
+    @Environment(AppEnvironment.self) private var environment
     let content: PhotoBriefingContent
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 30) {
             hero
             snapshotCard
             progressCard
@@ -37,28 +35,29 @@ struct PhotoBriefingSections: View {
                 completionDecisionCard(experience.decision)
             }
         }
+        .task { await environment.founderPhotoMediaStore.loadManifestIfNeeded() }
     }
 
     private var hero: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 18) {
                 Text("PHOTO EVENT")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                 Text(content.heroTitle)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.heroBody)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
     }
 
     private var snapshotCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading(content.snapshotTitle)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: content.snapshotTitle)
                 HStack(spacing: 16) {
                     BriefingStatItem(label: "Date", value: BriefingDateFormatting.shortDate(content.eventDate))
                     BriefingStatItem(label: "Set", value: content.completionLabel)
@@ -78,10 +77,19 @@ struct PhotoBriefingSections: View {
     private var photoGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
             ForEach(content.activeViews) { view in
+                let item = environment.founderPhotoMediaStore.resolvedItem(
+                    setId: view.setId,
+                    captureDate: view.captureDate,
+                    poseId: view.poseId
+                )
                 Button {
-                    onNavigate(.photoSetDetail(setId: view.setId))
+                    onNavigate(.photoSetDetail(setId: item?.photoSessionId ?? view.setId, poseId: view.poseId))
                 } label: {
-                    ProgressPhotoTile(roleLabel: view.poseId.label)
+                    ProgressPhotoTile(
+                        roleLabel: view.poseId.label,
+                        source: item.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
+                        caption: item.map { BriefingDateFormatting.shortDate($0.captureDate) }
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(view.poseId.label) photo, open in Progress Photos")
@@ -96,9 +104,9 @@ struct PhotoBriefingSections: View {
         } else if !content.ordinaryComparisons.isEmpty {
             ordinaryComparisonsCard
         } else {
-            CardContainer(padding: .md) {
-                VStack(alignment: .leading, spacing: 8) {
-                    SectionHeading(content.progressTitle)
+            BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+                VStack(alignment: .leading, spacing: 16) {
+                    BriefingEditorialHeading(title: content.progressTitle)
                     Text(content.progressBody)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -108,9 +116,9 @@ struct PhotoBriefingSections: View {
     }
 
     private var ordinaryComparisonsCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading(content.progressTitle)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: content.progressTitle)
                 comparisonList(content.ordinaryComparisons)
             }
         }
@@ -122,25 +130,25 @@ struct PhotoBriefingSections: View {
     private func completionComparisonsCard(_ experience: PhotoCompletionExperience) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             if !experience.recentComparisons.isEmpty {
-                CardContainer(padding: .md) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        SectionHeading("Since Last Check-In")
+                BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        BriefingEditorialHeading(title: "Since Last Check-In")
                         comparisonList(experience.recentComparisons)
                     }
                 }
             }
             if !experience.journeyComparisons.isEmpty {
-                CardContainer(padding: .md) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        SectionHeading("From First Upload to Now")
+                BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        BriefingEditorialHeading(title: "From First Upload to Now")
                         comparisonList(experience.journeyComparisons)
                     }
                 }
             }
             if !experience.newBaselines.isEmpty {
-                CardContainer(padding: .md) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionHeading("New Baselines")
+                BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        BriefingEditorialHeading(title: "New Baselines")
                         ForEach(experience.newBaselines) { baseline in
                             Text("\(baseline.poseId.label): \(baseline.narrative)")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -155,6 +163,18 @@ struct PhotoBriefingSections: View {
     private func comparisonList(_ entries: [PhotoComparisonEntry]) -> some View {
         VStack(spacing: 10) {
             ForEach(entries) { entry in
+                let priorItem = entry.priorSetId.flatMap { setID in
+                    environment.founderPhotoMediaStore.resolvedItem(
+                        setId: setID,
+                        captureDate: entry.priorDate ?? "",
+                        poseId: entry.poseId
+                    )
+                }
+                let currentItem = environment.founderPhotoMediaStore.resolvedItem(
+                    setId: entry.currentSetId,
+                    captureDate: entry.currentDate,
+                    poseId: entry.poseId
+                )
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         if let roleLabel = entry.roleLabel {
@@ -164,15 +184,23 @@ struct PhotoBriefingSections: View {
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         Spacer(minLength: 8)
-                        if let priorDate = entry.priorDate {
-                            Text("\(BriefingDateFormatting.shortDate(priorDate)) → \(BriefingDateFormatting.shortDate(entry.currentDate))")
+                        if let priorDate = priorItem?.captureDate ?? entry.priorDate {
+                            Text("\(BriefingDateFormatting.shortDate(priorDate)) → \(BriefingDateFormatting.shortDate(currentItem?.captureDate ?? entry.currentDate))")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
                     HStack(spacing: 8) {
-                        ProgressPhotoTile(roleLabel: "Previous", caption: entry.priorDate.map(BriefingDateFormatting.shortDate))
-                        ProgressPhotoTile(roleLabel: "Current", caption: BriefingDateFormatting.shortDate(entry.currentDate))
+                        ProgressPhotoTile(
+                            roleLabel: "Previous",
+                            source: priorItem.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
+                            caption: priorItem.map { BriefingDateFormatting.shortDate($0.captureDate) } ?? entry.priorDate.map(BriefingDateFormatting.shortDate)
+                        )
+                        ProgressPhotoTile(
+                            roleLabel: "Current",
+                            source: currentItem.map { environment.founderPhotoMediaStore.source(viewIdentity: $0.viewIdentity) } ?? .placeholder,
+                            caption: BriefingDateFormatting.shortDate(currentItem?.captureDate ?? entry.currentDate)
+                        )
                     }
                     Text(entry.narrative)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -183,9 +211,9 @@ struct PhotoBriefingSections: View {
     }
 
     private var interpretationCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading(content.interpretationTitle)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: content.interpretationTitle)
                 ForEach(Array(content.interpretationParagraphs.enumerated()), id: \.offset) { _, paragraph in
                     Text(paragraph)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -196,9 +224,9 @@ struct PhotoBriefingSections: View {
     }
 
     private var coachInsightCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Coach's Insight")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Coach's Insight")
                 Text(content.coachInsightBody)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -215,7 +243,7 @@ struct PhotoBriefingSections: View {
     private func completionDecisionCard(_ decision: PhotoCompletionDecision) -> some View {
         switch decision.state {
         case .completed:
-            CardContainer(padding: .md) {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.seal.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
@@ -243,9 +271,9 @@ struct PhotoBriefingSections: View {
                 }
             }
         case .awaitingDecision:
-            CardContainer(padding: .md) {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
                 VStack(alignment: .leading, spacing: 10) {
-                    SectionHeading("Your Decision")
+                    BriefingEditorialHeading(title: "Your Decision")
                     if let question = decision.question {
                         Text(question)
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
@@ -259,9 +287,9 @@ struct PhotoBriefingSections: View {
                 }
             }
         case .retry:
-            CardContainer(padding: .md) {
+            BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
                 VStack(alignment: .leading, spacing: 10) {
-                    SectionHeading("Upload Again")
+                    BriefingEditorialHeading(title: "Upload Again")
                     if let question = decision.retryQuestion {
                         Text(question)
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)

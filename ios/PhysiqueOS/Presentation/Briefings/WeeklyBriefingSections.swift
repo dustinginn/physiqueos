@@ -7,12 +7,13 @@ import SwiftUI
 /// Goal/Phase card and no forecast section — verified neither exists on the
 /// real screen.
 struct WeeklyBriefingSections: View {
+    static let sectionInventory = ["Hero", "Goal Confidence", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"]
     let content: WeeklyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 28) {
             hero
             if let confidence { BriefingConfidenceCard(confidence: confidence) }
             if let energy = content.energy { WeeklyEnergyCard(section: energy) }
@@ -25,16 +26,16 @@ struct WeeklyBriefingSections: View {
     }
 
     private var hero: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text(content.reportingRangeLabel.uppercased())
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                 Text(content.heroHeadline)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.heroBody)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 if content.strategyPhaseLabel != nil || content.strategyWeekLabel != nil || content.strategyNextMilestone != nil {
                     Divider().overlay(PhysiqueOSTheme.divider)
@@ -61,9 +62,9 @@ struct WeeklyBriefingSections: View {
     }
 
     private func weightCard(_ weight: WeeklyWeightSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Weight")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Weight")
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(String(format: "%.1f lb", weight.averageWeightLb))
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
@@ -80,9 +81,9 @@ struct WeeklyBriefingSections: View {
     }
 
     private func photosCard(_ photos: WeeklyPhotosSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Photos")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Photos")
                 Text(photos.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -103,9 +104,9 @@ struct WeeklyBriefingSections: View {
     }
 
     private func trainingCard(_ training: WeeklyTrainingSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Training")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Training")
                 HStack(spacing: 16) {
                     BriefingStatItem(label: "Improving", value: "\(training.improvingCount)")
                     BriefingStatItem(label: "Steady", value: "\(training.steadyCount)")
@@ -119,9 +120,11 @@ struct WeeklyBriefingSections: View {
     }
 
     private func bodyCompositionCard(_ body: WeeklyBodyCompositionSection) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Body Composition") {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    BriefingEditorialHeading(title: "Body Composition")
+                    Spacer()
                     Text(BriefingDateFormatting.shortDate(body.scanDate))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -139,9 +142,9 @@ struct WeeklyBriefingSections: View {
     }
 
     private var coachTakeCard: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Coach's Take")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 16) {
+                BriefingEditorialHeading(title: "Coach's Take")
                 labeledParagraph("Biggest Takeaway", content.coachTake.biggestTakeaway)
                 labeledParagraph("My Recommendation", content.coachTake.recommendation)
                 if !content.coachTake.intoNextWeek.isEmpty {
@@ -175,9 +178,11 @@ struct WeeklyEnergyCard: View {
     @State private var selectedDate: String?
 
     var body: some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Energy") {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.energyExpenditure) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    BriefingEditorialHeading(title: "Energy")
+                    Spacer()
                     Text("\(section.pairedDayCount)/\(section.eligibleDayCount) days paired")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)

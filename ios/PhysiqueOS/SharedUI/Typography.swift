@@ -170,6 +170,12 @@ enum PhysiqueOSTypography {
     /// `text-2xl font-extrabold` (Tailwind default scale: 24px) — the
     /// "Uploading your evidence…" busy-state heading.
     static let uploadingHeading24 = Style(size: 24, weight: .heavy)
+    /// Long-form Briefing/article hierarchy, matching the current web's
+    /// 30px hero, 20px section title, 16px reading copy and 24px metrics.
+    static let editorialHero = Style(size: 30, weight: .black)
+    static let editorialSection = Style(size: 20, weight: .heavy)
+    static let editorialBody = Style(size: 16, weight: .medium)
+    static let editorialMetric = Style(size: 24, weight: .black)
     /// `text-lg font-black` (Tailwind default scale: 18px) — the weigh-in
     /// weight value itself.
     static let weighInValue18 = Style(size: 18, weight: .black)

@@ -83,8 +83,8 @@ struct AppDestinationRouterView: View {
             DEXAHistoryView()
         case .progressStream(let streamId) where streamId == "photos":
             PhotosHistoryView()
-        case .photoSetDetail(let setId):
-            PhotoSetDetailView(setId: setId)
+        case .photoSetDetail(let setId, let poseId):
+            PhotoSetDetailView(setId: setId, initialPoseId: poseId)
         case .progressStream(let streamId) where streamId == "energy":
             EnergyHistoryView()
         // The bare Training Library root (`/progress/training/library`,

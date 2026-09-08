@@ -29,8 +29,8 @@ struct BriefingDetailView: View {
     var body: some View {
         ScrollView {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
@@ -43,7 +43,7 @@ struct BriefingDetailView: View {
     @ViewBuilder
     private var content: some View {
         if let briefing {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 BriefingDetailHeader(onHome: onReturnToHome, onHistory: { onNavigate(.briefingList) })
 
                 if let provenance = briefing.revisionProvenance {

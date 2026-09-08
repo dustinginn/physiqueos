@@ -3,6 +3,18 @@ import XCTest
 
 @MainActor
 final class BriefingReadModelTests: XCTestCase {
+    func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
+        XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
+        XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Training", "Weight", "Energy", "Body Composition", "Coach's Take"])
+        XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
+        XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
+    }
+
+    func testMonthlyCompositionRemainsADistinctLongFormZineNotAWeeklyReskin() {
+        XCTAssertEqual(MonthlyBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"])
+        XCTAssertNotEqual(MonthlyBriefingSections.sectionInventory, WeeklyBriefingSections.sectionInventory)
+        XCTAssertGreaterThanOrEqual(MonthlyBriefingSections.sectionInventory.count, 9)
+    }
     private func makeStore() -> BriefingSandboxStore { BriefingSandboxStore() }
 
     // MARK: - Fixture decoding

@@ -121,10 +121,18 @@ final class PhotosReadModelTests: XCTestCase {
     func testDestinationRoutesThroughPhotoSetDetailCase() async throws {
         let landing = try await api.fetchPhotosLanding(scope: .all)
         let set = try XCTUnwrap(landing.history.first)
-        guard case .photoSetDetail(let setId) = set.destination else {
+        guard case .photoSetDetail(let setId, let poseId) = set.destination else {
             return XCTFail("Expected a .photoSetDetail destination.")
         }
         XCTAssertEqual(setId, set.id)
+        XCTAssertNil(poseId)
+    }
+
+    func testPhotoPreviewDestinationRoundTripsExactPoseIdentity() throws {
+        let destination = AppDestination.photoSetDetail(setId: "session-123", poseId: .backFlexed)
+        let encoded = try JSONEncoder().encode(destination)
+        let decoded = try JSONDecoder().decode(AppDestination.self, from: encoded)
+        XCTAssertEqual(decoded, destination)
     }
 
     // MARK: - Empty state

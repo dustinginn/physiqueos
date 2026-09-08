@@ -364,11 +364,119 @@ final class FounderServerAPITests: XCTestCase {
 
         XCTAssertEqual(resolved, fresh)
     }
+
+    func testPhotoManifestUsesTheAuthenticatedSandboxRouteAndStableViewIdentity() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, photoManifestJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+
+        let manifest = try await api.readPhotoAcceptanceManifest()
+
+        XCTAssertEqual(manifest.schemaVersion, "native-founder-photo-media-v1")
+        XCTAssertEqual(manifest.sessions.first?.photos.first?.viewIdentity, "session-1-front-relaxed")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.last?.url?.path, "/api/v1/native/sandbox/photo-acceptance/manifest")
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
+    }
+
+    func testPhotoManifestRefreshesExpiredAccessBeforeRetrying() async throws {
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .problem(401, code: "ACCESS_TOKEN_EXPIRED"),
+            .json(200, sessionJSON(access: "b", refresh: "s")),
+            .json(200, photoManifestJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+
+        _ = try await api.readPhotoAcceptanceManifest()
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/v1/native/sandbox/auth/pair",
+            "/api/v1/native/sandbox/photo-acceptance/manifest",
+            "/api/v1/native/sandbox/auth/refresh",
+            "/api/v1/native/sandbox/photo-acceptance/manifest",
+        ])
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "b", count: 43))")
+    }
+
+    func testPhotoMediaRejectsPathInjectionBeforeMakingARequest() async throws {
+        let transport = SequencedFounderTransport([])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+
+        await XCTAssertThrowsErrorAsync(try await api.readPhotoAcceptanceMedia(mediaId: "../founder-object")) { error in
+            XCTAssertEqual(error as? FounderServerError, .invalidResponse)
+        }
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testPhotoMediaUsesBearerAndReturnsOnlyImageBytes() async throws {
+        let bytes = Data([0xFF, 0xD8, 0xFF, 0xD9])
+        let store = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .data(200, mimeType: "image/jpeg", bytes),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: store, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+
+        let result = try await api.readPhotoAcceptanceMedia(mediaId: "media_1")
+
+        XCTAssertEqual(result, bytes)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.last?.url?.path, "/api/v1/native/sandbox/photo-acceptance/media/media_1")
+        XCTAssertEqual(requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer \(String(repeating: "a", count: 43))")
+    }
+
+    @MainActor
+    func testPhotoStoreMapsManifestSessionsByExactDateAndPoseWithoutWrongFallback() async throws {
+        let credentialStore = MemoryCredentialStore()
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, photoManifestJSON),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: credentialStore, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let mediaStore = FounderPhotoMediaStore(api: api)
+
+        await mediaStore.loadManifestIfNeeded()
+
+        XCTAssertEqual(mediaStore.sessions.map(\.captureDate), ["2026-07-18"])
+        XCTAssertNotNil(mediaStore.resolvedItem(setId: "fixture", captureDate: "2026-07-18", poseId: .frontRelaxed))
+        XCTAssertNil(mediaStore.resolvedItem(setId: "fixture", captureDate: "2026-07-18", poseId: .backFlexed))
+        XCTAssertEqual(mediaStore.projectedSetsByID["session-1"]?.views.first?.id, "session-1-front-relaxed")
+    }
+
+    @MainActor
+    func testPhotoStoreFailsClosedOnMismatchedServerViewIdentity() async throws {
+        let credentialStore = MemoryCredentialStore()
+        let invalidManifest = photoManifestJSON.replacingOccurrences(of: "session-1-front-relaxed", with: "wrong-view")
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, invalidManifest),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: credentialStore, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let mediaStore = FounderPhotoMediaStore(api: api)
+
+        await mediaStore.loadManifestIfNeeded()
+
+        XCTAssertEqual(mediaStore.manifestState, .unavailable)
+        XCTAssertTrue(mediaStore.itemsByViewIdentity.isEmpty)
+    }
 }
 
 private let testOrigin = URL(string: "https://example.invalid")!
 private let weightJSON = #"{"schemaVersion":"1","currentWeight":{"id":"weight-1","value":168.4,"unit":"lb","measurementDate":"2026-08-31"}}"#
 private let manualWeightResultJSON = #"{"schemaVersion":"1","id":"weight-manual-1","status":"confirmed","measurementDate":"2026-08-31","value":168.4,"unit":"lb"}"#
+private let photoManifestJSON = #"{"schemaVersion":"native-founder-photo-media-v1","authority":{"kind":"sandbox-founder-photo-acceptance","sandboxAuthorityId":"sandbox-1"},"sessions":[{"photoSessionId":"session-1","captureDate":"2026-07-18","photos":[{"viewIdentity":"session-1-front-relaxed","photoSessionId":"session-1","photoId":"photo-1","mediaId":"media_1","poseId":"front-relaxed","captureDate":"2026-07-18","contentType":"image/jpeg","pixelWidth":1200,"pixelHeight":1600,"delivery":{"kind":"authenticated_proxy","path":"/api/v1/native/sandbox/photo-acceptance/media/media_1"}}]}]}"#
 
 private func sessionJSON(access: Character, refresh: Character) -> String {
     let accessToken = String(repeating: String(access), count: 43)
@@ -402,6 +510,7 @@ private final class MemoryCredentialStore: FounderRefreshCredentialStore, @unche
 private actor SequencedFounderTransport: FounderHTTPTransport {
     enum Outcome: @unchecked Sendable {
         case json(Int, String)
+        case data(Int, mimeType: String, Data)
         case problem(Int, code: String)
         case failure(Error)
     }
@@ -420,6 +529,8 @@ private actor SequencedFounderTransport: FounderHTTPTransport {
         switch outcome {
         case .json(let status, let json):
             return (Data(json.utf8), response(status: status, request: request))
+        case .data(let status, let mimeType, let data):
+            return (data, response(status: status, request: request, mimeType: mimeType))
         case .problem(let status, let code):
             let json = """
             {"status":\(status),"code":"\(code)","title":"Request failed","detail":null}
@@ -430,8 +541,8 @@ private actor SequencedFounderTransport: FounderHTTPTransport {
         }
     }
 
-    private func response(status: Int, request: URLRequest) -> HTTPURLResponse {
-        HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+    private func response(status: Int, request: URLRequest, mimeType: String = "application/json") -> HTTPURLResponse {
+        HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": mimeType])!
     }
 }
 

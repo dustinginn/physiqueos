@@ -69,6 +69,17 @@ actor FounderServerAPI {
         }
     }
 
+    func readPhotoAcceptanceManifest() async throws -> FounderPhotoAcceptanceManifest {
+        try await authenticatedRead(path: "\(Self.sandboxRoutePrefix)/photo-acceptance/manifest")
+    }
+
+    func readPhotoAcceptanceMedia(mediaId: String) async throws -> Data {
+        guard !mediaId.isEmpty,
+              mediaId.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil
+        else { throw FounderServerError.invalidResponse }
+        return try await authenticatedData(path: "\(Self.sandboxRoutePrefix)/photo-acceptance/media/\(mediaId)")
+    }
+
     /// Writes canonical sandbox Weight directly from a Founder-entered
     /// scalar — the sandbox-only counterpart to the web's
     /// `saveDirectWeighIn`. No media, OCR, or candidate/review pipeline is
@@ -185,6 +196,44 @@ actor FounderServerAPI {
         var request = request(path: path, method: method)
         request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         return try await execute(request)
+    }
+
+    private func authenticatedRead<Response: Decodable>(path: String) async throws -> Response {
+        let token = try await validAccessToken()
+        do {
+            return try await send(path: path, method: "GET", bearer: token)
+        } catch FounderServerError.accessTokenExpired {
+            let refreshedToken = try await refreshAccessToken()
+            return try await send(path: path, method: "GET", bearer: refreshedToken)
+        }
+    }
+
+    private func authenticatedData(path: String) async throws -> Data {
+        let token = try await validAccessToken()
+        do {
+            return try await sendData(path: path, bearer: token)
+        } catch FounderServerError.accessTokenExpired {
+            let refreshedToken = try await refreshAccessToken()
+            return try await sendData(path: path, bearer: refreshedToken)
+        }
+    }
+
+    private func sendData(path: String, bearer: String) async throws -> Data {
+        var request = request(path: path, method: "GET")
+        request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        let (data, response): (Data, HTTPURLResponse)
+        do {
+            (data, response) = try await transport.data(for: request)
+        } catch {
+            throw FounderServerError.networkFailure
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw mapProblem(status: response.statusCode, data: data)
+        }
+        guard response.mimeType?.hasPrefix("image/") == true, !data.isEmpty else {
+            throw FounderServerError.invalidResponse
+        }
+        return data
     }
 
     private func sendMultipartWeightCandidate(

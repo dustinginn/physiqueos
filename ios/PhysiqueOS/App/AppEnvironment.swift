@@ -44,6 +44,7 @@ final class AppEnvironment {
     /// Deliberately isolated live transport proof. Existing product screens
     /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
+    let founderPhotoMediaStore: FounderPhotoMediaStore
 
     init(
         homeAPI: HomeAPI = FixtureHomeAPI(),
@@ -64,7 +65,8 @@ final class AppEnvironment {
         operatingPlanStore: OperatingPlanSandboxStore = OperatingPlanSandboxStore(),
         goalsSandboxStore: GoalsSandboxStore = GoalsSandboxStore(),
         briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
-        founderServerAPI: FounderServerAPI = FounderServerAPI()
+        founderServerAPI: FounderServerAPI = FounderServerAPI(),
+        founderPhotoMediaStore: FounderPhotoMediaStore? = nil
     ) {
         self.homeAPI = homeAPI
         self.goalsAPI = goalsAPI
@@ -85,5 +87,6 @@ final class AppEnvironment {
         self.goalsSandboxStore = goalsSandboxStore
         self.briefingSandboxStore = briefingSandboxStore
         self.founderServerAPI = founderServerAPI
+        self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
     }
 }
