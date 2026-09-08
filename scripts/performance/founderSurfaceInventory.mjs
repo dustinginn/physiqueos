@@ -4,6 +4,7 @@ export const FOUNDER_SURFACE_CASES = Object.freeze([
   surface("home", "Home", "/", "core-navigation"),
   surface("goals", "Goals landing", "/goals", "core-navigation"),
   surface("goals", "Build Lean Mass Goal", "/goals/build-lean-mass", "active-goal"),
+  surface("goals", "Build Lean Mass Goal editor", "/goals/goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass/edit", "bounded-runtime"),
   surface("goals", "Visible Abs completed Goal", "/goals/visible-abs", "completed-goal"),
   surface("goals", "Lean Mass supporting Goal", "/goals/lean-mass", "compatibility-runtime"),
   surface("goals", "Maintenance supporting Goal", "/goals/maintenance", "compatibility-runtime"),
@@ -12,6 +13,8 @@ export const FOUNDER_SURFACE_CASES = Object.freeze([
   surface("goals", "Goal transition review", "/goals/transition/review", "compatibility-runtime", { optional: true, benchmarkSafe: false }),
   surface("log", "Log landing", "/log", "core-navigation"),
   surface("log", "Training Logger", "/log/training", "core-navigation"),
+  surface("log", "Training exercise reconciliation", "/log/training/reconcile", "client-intake"),
+  surface("log", "Upload intake", "/log/upload", "client-intake"),
   surface("log", "Progress Photo intake", "/evidence/photos", "client-intake"),
   surface("log", "DEXA intake", "/evidence/dexa", "client-intake"),
   surface("evidence", "Evidence Hub", "/progress", "progress-hub"),
@@ -24,10 +27,12 @@ export const FOUNDER_SURFACE_CASES = Object.freeze([
     contexts("training", `Training report: ${reportId}`, `/progress/training/reporting/${reportId}`, "training-navigation")
   ),
   ...contexts("training", "Training Library", "/progress/training/library", "training-navigation"),
+  surface("training", "Training exercise detail: Bicep Curl Machine", "/progress/training/library/biceps/bicep-curl-machine?context=all", "training-navigation"),
   ...["cardio", "resistance", "chest", "back", "shoulders", "biceps", "triceps", "forearms", "quadriceps", "hamstrings", "glutes", "calves", "core"].flatMap((category) =>
     contexts("training", `Training Library category: ${category}`, `/progress/training/library/${category}`, "training-navigation")
   ),
   ...contexts("nutrition", "Nutrition Evidence", "/progress/nutrition", "progress-evidence"),
+  surface("nutrition", "Nutrition enrichment review", "/progress/nutrition/enrichment-review", "bounded-runtime"),
   ...["calories", "macros", "meals", "adherence", "consistency"].flatMap((reportId) =>
     contexts("nutrition", `Nutrition report: ${reportId}`, `/progress/nutrition/reporting/${reportId}`, reportId === "calories" || reportId === "macros" || reportId === "meals" ? "compatibility-runtime" : "compatibility-runtime")
   ),

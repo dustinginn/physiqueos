@@ -30,11 +30,8 @@ export function createGoalPhasePersistenceService({
   const tokens = new Map(); const locks = new Set();
   return Object.freeze({
     async getCapability({ founderUserId, sourceGoalId }) {
-      const persisted = await readPersistedStore(); const goal = findGoal(persisted, sourceGoalId); const reasons = [];
-      if (!goal) reasons.push("goal_not_found"); if (goal && goal.userId !== founderUserId) reasons.push("goal_owner_mismatch"); if (goal && (goal.status !== "active" || goal.primary !== true)) reasons.push("goal_not_editable");
-      const explicit = goal && Array.isArray(goal.phases) ? goal.phases : []; let aggregateValid = true;
-      try { normalizeGoalPhaseCollection(explicit, { goalId: sourceGoalId }); } catch { aggregateValid = false; reasons.push("phase_aggregate_invalid"); }
-      return deepFreeze({ available: reasons.length === 0, sourceGoalId, sourceRevision: goal ? sourceRevision(goal) : null, explicitPhaseCount: explicit.length, hasExplicitPhases: explicit.length > 0, aggregateValid, atomicCommitAvailable: true, staleWriteProtectionAvailable: true, reviewTokenAvailable: true, blockingReasons: reasons });
+      const persisted = await readPersistedStore();
+      return getGoalPhaseCapabilityFromGoal(findGoal(persisted, sourceGoalId), { founderUserId, sourceGoalId });
     },
 
     async createFinalReview({ founderUserId, sourceGoalId, expectedSourceRevision, originalPhaseFingerprint, proposedAuthoredPhases, draftId }) {
@@ -85,6 +82,17 @@ export function createGoalPhasePersistenceService({
 export const ProductionGoalPhasePersistenceService = createGoalPhasePersistenceService(
   createApplicationRuntimeBindings()
 );
+export function getGoalPhaseCapabilityFromGoal(goal, { founderUserId, sourceGoalId = goal?.id } = {}) {
+  const reasons = [];
+  if (!goal) reasons.push("goal_not_found");
+  if (goal && goal.userId !== founderUserId) reasons.push("goal_owner_mismatch");
+  if (goal && (goal.status !== "active" || goal.primary !== true)) reasons.push("goal_not_editable");
+  const explicit = goal && Array.isArray(goal.phases) ? goal.phases : [];
+  let aggregateValid = true;
+  try { normalizeGoalPhaseCollection(explicit, { goalId: sourceGoalId }); }
+  catch { aggregateValid = false; reasons.push("phase_aggregate_invalid"); }
+  return deepFreeze({ available: reasons.length === 0, sourceGoalId, sourceRevision: goal ? sourceRevision(goal) : null, explicitPhaseCount: explicit.length, hasExplicitPhases: explicit.length > 0, aggregateValid, atomicCommitAvailable: true, staleWriteProtectionAvailable: true, reviewTokenAvailable: true, blockingReasons: reasons });
+}
 export function phaseFingerprint(phases) { return goalPlanFingerprint(phases ?? []); }
 
 function validateLiveGoal(goal, userId, expectedRevision, expectedPhaseFingerprint) {

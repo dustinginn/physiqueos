@@ -39,6 +39,16 @@ describe("remaining production hotspot read boundaries", () => {
       expect(source, path.relative(process.cwd(), file)).not.toContain("loadProductionApplicationScopedRuntime");
     }
   });
+
+  it.each([
+    "src/app/goals/[goalId]/edit/page.js",
+    "src/app/progress/nutrition/enrichment-review/page.js",
+  ])("keeps additional production drill-down %s on bounded reads", (file) => {
+    const source = read(file);
+    expect(source).toContain("loadProductionBoundedFounderReadContext");
+    expect(source).not.toContain("FounderRepositories");
+    expect(source).not.toContain("loadApplicationCanonicalRuntime");
+  });
 });
 
 function walk(directory) {
