@@ -5,12 +5,10 @@ import SwiftUI
 /// (Weight Trend, DEXA Body Fat %, Nutrition Reporting's weekly trend
 /// charts, and Energy's own trend chart). Standardizes the touch equivalent
 /// of the web's pointer hover/scrub across all of them, per this task's
-/// "Evidence Graph Interaction Standardization" pass: a single
-/// `minimumDistance: 0` drag gesture over the chart's plot area reports the
-/// touch location on every change, so a single tap *and* a continuous
-/// horizontal drag both resolve through the same gesture — there is no
-/// separate "hold" step, matching how every chart in this codebase already
-/// treats a tap as drag distance zero.
+/// "Evidence Graph Interaction Standardization" pass. A zero-distance
+/// gesture recognizes taps, but only horizontal intent scrubs continuously;
+/// vertical and ambiguous diagonal intent remain available to the enclosing
+/// page scroll instead of making data-heavy Evidence pages feel stuck.
 ///
 /// This intentionally stops at gesture/geometry plumbing. Resolving
 /// "nearest observation" from a touch location is genuinely different per
@@ -25,17 +23,58 @@ import SwiftUI
 /// touch/geometry boilerplate is shared here.
 struct ChartScrubOverlay: ViewModifier {
     let onScrub: (CGPoint, ChartProxy, GeometryProxy) -> Void
+    @State private var intent: ChartGestureIntent = .pending
 
     func body(content: Content) -> some View {
         content.chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
+                    .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
-                            .onChanged { drag in onScrub(drag.location, proxy, geometry) }
+                            .onChanged { drag in
+                                intent = ChartGestureArbitration.intent(
+                                    horizontal: drag.translation.width,
+                                    vertical: drag.translation.height
+                                )
+                                if intent == .horizontal { onScrub(drag.location, proxy, geometry) }
+                            }
+                            .onEnded { drag in
+                                let finalIntent = ChartGestureArbitration.intent(
+                                    horizontal: drag.translation.width,
+                                    vertical: drag.translation.height
+                                )
+                                if finalIntent == .tap || finalIntent == .horizontal {
+                                    onScrub(drag.location, proxy, geometry)
+                                }
+                                intent = .pending
+                            }
                     )
             }
         }
+    }
+}
+
+enum ChartGestureIntent: Equatable { case pending, tap, horizontal, vertical, diagonal }
+
+/// Pure gesture arbitration shared by every Evidence chart. Vertical and
+/// ambiguous diagonal intent stays with the surrounding ScrollView;
+/// horizontal motion and taps inspect the chart.
+enum ChartGestureArbitration {
+    static let activationDistance: CGFloat = 8
+    static let directionalBias: CGFloat = 1.35
+
+    static func intent(horizontal: CGFloat, vertical: CGFloat) -> ChartGestureIntent {
+        let x = abs(horizontal), y = abs(vertical)
+        guard max(x, y) >= activationDistance else {
+            return x == 0 && y == 0 ? .tap : .pending
+        }
+        if x >= y * directionalBias { return .horizontal }
+        if y >= x * directionalBias { return .vertical }
+        return .diagonal
+    }
+
+    static func clampedPlotX(_ x: CGFloat, width: CGFloat) -> CGFloat {
+        min(max(0, x), max(0, width))
     }
 }
 
@@ -55,7 +94,8 @@ extension GeometryProxy {
     /// lookup needs, factored out to avoid re-deriving
     /// `geometry[proxy.plotAreaFrame]` in every chart file.
     func relativeX(in proxy: ChartProxy, at location: CGPoint) -> CGFloat {
-        location.x - self[proxy.plotAreaFrame].origin.x
+        guard let plotFrame = proxy.plotFrame else { return location.x }
+        return location.x - self[plotFrame].origin.x
     }
 }
 

@@ -25,6 +25,7 @@ struct TrainingLibraryRootView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task {
             if viewModel == nil { viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI) }
@@ -45,7 +46,7 @@ struct TrainingLibraryRootView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 TrainingLibraryHeaderView(
                     title: "Training Library",
                     breadcrumbs: [
@@ -53,7 +54,9 @@ struct TrainingLibraryRootView: View {
                     ],
                     summary: "Browse by muscle group and jump straight to exercises."
                 )
-                TrainingScopeSelectorView(scope: landing.scope)
+                TrainingScopeSelectorView(scope: landing.scope) { pillID in
+                    Task { await viewModel?.selectScope(pillID: pillID) }
+                }
                 browseCard(landing.trainingAreas)
             }
         }

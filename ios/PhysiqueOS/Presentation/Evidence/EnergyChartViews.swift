@@ -1,6 +1,14 @@
 import Charts
 import SwiftUI
 
+enum EnergyExpenditureBarTreatment: Equatable { case filled }
+
+enum EnergyChartPresentation {
+    /// Intentional Native enhancement retained from Build 14: expenditure
+    /// bars are solid blue rather than the web chart's outlined treatment.
+    static let expenditureBarTreatment: EnergyExpenditureBarTreatment = .filled
+}
+
 /// "Energy Over Time" — the live web's dual-series weekly trend
 /// (`EnergyOverTimeChart.jsx`): a solid amber Intake line, a dashed blue
 /// Estimated Expenditure line, and its own 1M/3M/6M/1Y/All range selector
@@ -144,7 +152,7 @@ struct EnergyWeeklyBarChartView: View {
                 }
                 if let expenditure = week.averageExpenditure {
                     BarMark(x: .value("Week", week.weekStart), y: .value("Value", expenditure))
-                        .foregroundStyle(PhysiqueOSTheme.energyExpenditure)
+                        .foregroundStyle(expenditureBarColor)
                         .position(by: .value("Series", "Expenditure"))
                 }
             }
@@ -162,6 +170,12 @@ struct EnergyWeeklyBarChartView: View {
         guard let nearest = ChartCategoricalSelection.nearestPoint(matching: touchedWeek, in: weeksAscending, keyPath: \.weekStart) else { return }
         selectedWeekID = nearest.id
     }
+
+    private var expenditureBarColor: Color {
+        switch EnergyChartPresentation.expenditureBarTreatment {
+        case .filled: PhysiqueOSTheme.energyExpenditure
+        }
+    }
 }
 
 /// Shared between both Energy charts — matches web's own duplicated
@@ -175,7 +189,7 @@ struct EnergySeriesLegend: View {
                 Text("Intake")
             }
             HStack(spacing: 4) {
-                RoundedRectangle(cornerRadius: 2).strokeBorder(PhysiqueOSTheme.energyExpenditure, lineWidth: 2).frame(width: 10, height: 10)
+                RoundedRectangle(cornerRadius: 2).fill(PhysiqueOSTheme.energyExpenditure).frame(width: 10, height: 10)
                 Text("Estimated expenditure")
             }
         }

@@ -89,7 +89,7 @@ struct DEXAHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 26) {
                 header(for: report)
                 TrainingScopeSelectorView(scope: report.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
@@ -159,7 +159,7 @@ struct DEXAHistoryView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 }
-                .padding(12)
+                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(PhysiqueOSTheme.surfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -322,9 +322,8 @@ private struct DEXAScanHistoryRowView: View {
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
             .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: row.attributedScope)
         }
-        .padding(12)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -7,6 +7,7 @@ import SwiftUI
 /// closely tied to Training Logger, which is explicitly out of scope.
 struct TodaysFocusCardView: View {
     let items: [PriorityOccurrence]
+    var completingIDs: Set<String> = []
     var onTap: (AppDestination) -> Void
     var onComplete: (PriorityOccurrence) -> Void
 
@@ -20,11 +21,11 @@ struct TodaysFocusCardView: View {
                 SectionHeading("Today's Priorities")
                 if useSingleColumn {
                     VStack(spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete) }
+                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
-                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete) }
+                        ForEach(items) { FocusTileView(item: $0, onTap: onTap, onComplete: onComplete, isCompleting: completingIDs.contains($0.id)) }
                     }
                 }
             }

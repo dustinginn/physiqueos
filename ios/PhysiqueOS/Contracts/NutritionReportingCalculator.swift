@@ -304,11 +304,19 @@ enum NutritionReportingCalculator {
             .map { group -> NutritionRecurringMeal in
                 let calorieValues = group.occurrences.compactMap { $0.meal.totals.calories }
                 let average = calorieValues.isEmpty ? nil : calorieValues.reduce(0, +) / Double(calorieValues.count)
+                func macroAverage(_ values: [Double]) -> Double? {
+                    values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+                }
                 let lastEaten = group.occurrences.map(\.date).max() ?? ""
                 return NutritionRecurringMeal(
                     id: "\(group.slot.rawValue):\(group.name)",
                     name: group.name, slot: group.slot,
-                    occurrenceCount: group.occurrences.count, averageCalories: average, lastEaten: lastEaten
+                    occurrenceCount: group.occurrences.count,
+                    averageCalories: average,
+                    averageProteinG: macroAverage(group.occurrences.compactMap { $0.meal.totals.proteinG }),
+                    averageCarbohydratesG: macroAverage(group.occurrences.compactMap { $0.meal.totals.carbsG }),
+                    averageFatG: macroAverage(group.occurrences.compactMap { $0.meal.totals.fatG }),
+                    lastEaten: lastEaten
                 )
             }
             .sorted { $0.occurrenceCount != $1.occurrenceCount ? $0.occurrenceCount > $1.occurrenceCount : $0.lastEaten > $1.lastEaten }
@@ -334,7 +342,24 @@ enum NutritionReportingCalculator {
             let meals = allMeals(days: week.days).map(\.meal)
             let calorieValues = meals.compactMap(\.totals.calories)
             let average = calorieValues.isEmpty ? nil : calorieValues.reduce(0, +) / Double(calorieValues.count)
-            return NutritionWeeklyMealRow(weekStart: week.weekStart, weekEnd: week.weekEnd, mealCount: meals.count, averageCaloriesPerMeal: average, loggedDayCount: week.days.count)
+            let slots: [NutritionMealSlot] = [.breakfast, .lunch, .dinner, .snacks]
+            let breakdown = slots.map { slot -> NutritionWeeklyMealSlotBreakdown in
+                let slotMeals = meals.filter { $0.slot == slot }
+                let values = slotMeals.compactMap(\.totals.calories)
+                return NutritionWeeklyMealSlotBreakdown(
+                    slot: slot,
+                    occurrenceCount: slotMeals.count,
+                    averageCalories: values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+                )
+            }
+            return NutritionWeeklyMealRow(
+                weekStart: week.weekStart,
+                weekEnd: week.weekEnd,
+                mealCount: meals.count,
+                averageCaloriesPerMeal: average,
+                loggedDayCount: week.days.count,
+                slots: breakdown
+            )
         }
     }
 

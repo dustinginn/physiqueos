@@ -83,7 +83,7 @@ struct NutritionReportingView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let report)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: report)
                 TrainingScopeSelectorView(scope: report.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
@@ -149,11 +149,11 @@ struct NutritionReportingView: View {
                                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                             Text(item.value)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
                         .background(PhysiqueOSTheme.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
@@ -172,7 +172,7 @@ struct NutritionReportingView: View {
                     TrainingSectionHeaderView(title: "Calories Over Time")
                     rangeSelector()
                     NutritionTrendChartView(
-                        points: report.weeklyTrend, color: PhysiqueOSTheme.chartEffort,
+                        points: report.weeklyTrend, color: PhysiqueOSTheme.nutritionCalories,
                         valueLabel: { "\(Int($0.rounded())) cal" },
                         emptyMessage: "No calorie evidence available in this period",
                         selectedWeekID: $selectedCaloriesWeek
@@ -387,7 +387,7 @@ struct NutritionReportingView: View {
             weeklyRowsCard(
                 title: "Weekly Meal Summary", rows: report.weeklyRows, isPresented: $isMealsWeeklySheetPresented,
                 emptyMessage: "No weekly meal evidence available.",
-                row: { row in NutritionWeeklyStatRow(range: "\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))", value: "\(row.mealCount) meals", detail: row.averageCaloriesPerMeal.map { "\(Int($0.rounded())) cal avg" } ?? "Pending") }
+                row: { row in NutritionWeeklyMealRowView(row: row) }
             )
             recurringMealsCard(report.recurringMeals)
             mealHistoryCard(report.historyGroups)

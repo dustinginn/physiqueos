@@ -29,6 +29,7 @@ struct TrainingDayView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task {
             if viewModel == nil { viewModel = TrainingDayViewModel(api: environment.trainingAPI, date: date) }
@@ -54,7 +55,7 @@ struct TrainingDayView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: day)
                 sessionsCard(day.sessions)
             }
@@ -72,7 +73,6 @@ struct TrainingDayView: View {
             Text(Self.formatSummary(day.summary))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

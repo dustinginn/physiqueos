@@ -118,6 +118,17 @@ final class SharedUITests: XCTestCase {
         XCTAssertNil(EvidenceDateParsing.date(fromLocalDateString: "not-a-date"))
     }
 
+    func testNutritionCaloriesUsesADistinctGreenIdentityFromCarbohydrates() {
+        let calories = UIColor(PhysiqueOSTheme.nutritionCalories)
+        let carbohydrates = UIColor(PhysiqueOSTheme.macroCarbohydrates)
+        XCTAssertNotEqual(calories, carbohydrates)
+
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        calories.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        XCTAssertGreaterThan(green, red)
+        XCTAssertGreaterThan(green, blue)
+    }
+
     // MARK: - Tab order and icons — see `AppTabTests` for the full,
     // corrected Home/Goals/Log/Evidence/You coverage (this file's own tab
     // assertions were superseded by that correction and removed here to

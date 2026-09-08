@@ -54,7 +54,7 @@ struct ActivityDayView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: day)
                 metricsCard(day)
             }
@@ -84,7 +84,6 @@ struct ActivityDayView: View {
             Text(day.protocolStatus)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

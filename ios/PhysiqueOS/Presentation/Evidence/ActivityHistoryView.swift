@@ -95,7 +95,7 @@ struct ActivityHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: landing)
                 TrainingScopeSelectorView(scope: landing.scope) { scopeID in
                     Task { await viewModel?.selectScope(pillID: scopeID) }

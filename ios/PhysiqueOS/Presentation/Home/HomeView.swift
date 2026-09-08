@@ -11,6 +11,7 @@ struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: HomeViewModel?
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
+    @State private var completingPriorityIDs: Set<String> = []
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -69,9 +70,14 @@ struct HomeView: View {
                 GoalsCardView(goals: home.goals, onTap: onNavigate)
 
                 if home.hasTodaysFocus {
-                    TodaysFocusCardView(items: home.todaysFocus, onTap: onNavigate) { occurrence in
-                        environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
-                        viewModel?.refreshTodaysFocus()
+                    TodaysFocusCardView(items: home.todaysFocus, completingIDs: completingPriorityIDs, onTap: onNavigate) { occurrence in
+                        completingPriorityIDs.insert(occurrence.id)
+                        Task { @MainActor in
+                            environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
+                            try? await Task.sleep(for: .milliseconds(500))
+                            viewModel?.refreshTodaysFocus()
+                            completingPriorityIDs.remove(occurrence.id)
+                        }
                     }
                 }
             }

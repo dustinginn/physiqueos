@@ -76,7 +76,7 @@ struct EnergyHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: report)
                 TrainingScopeSelectorView(scope: report.scope) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
@@ -135,7 +135,7 @@ struct EnergyHistoryView: View {
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
         }
-        .padding(12)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -287,17 +287,18 @@ private struct EnergyWeekHistoryRow: View {
             }
             HStack(spacing: 12) {
                 Text("Intake \(EnergyEvidenceCalculator.formatCalories(week.averageIntake))")
+                    .foregroundStyle(PhysiqueOSTheme.energyIntake)
                 Text("Expenditure \(EnergyEvidenceCalculator.formatCalories(week.averageExpenditure))")
+                    .foregroundStyle(PhysiqueOSTheme.energyExpenditure)
                 Text("Balance \(EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance))")
+                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
             Text("\(week.completeDayCount) complete days")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            EvidenceScopeAttributionChip(attribution: week.attributedScope)
         }
-        .padding(12)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -331,10 +332,10 @@ private struct EnergyDayHistoryRow: View {
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 4) {
-                dailyValue("Intake", EnergyEvidenceCalculator.formatCalories(day.calorieIntake))
-                dailyValue("Active calories", EnergyEvidenceCalculator.formatCalories(day.activeCalories))
-                dailyValue("Estimated expenditure", EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure))
-                dailyValue("Balance", EnergyEvidenceCalculator.formatSignedCalories(day.energyBalance))
+                dailyValue("Intake", EnergyEvidenceCalculator.formatCalories(day.calorieIntake), color: PhysiqueOSTheme.energyIntake)
+                dailyValue("Active calories", EnergyEvidenceCalculator.formatCalories(day.activeCalories), color: PhysiqueOSTheme.energyExpenditure)
+                dailyValue("Estimated expenditure", EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure), color: PhysiqueOSTheme.energyExpenditure)
+                dailyValue("Balance", EnergyEvidenceCalculator.formatSignedCalories(day.energyBalance), color: PhysiqueOSTheme.chartSuccess)
             }
             // "Nutrition Day"/"Activity" cross-links — visible iff the
             // corresponding evidence exists for this day (verified against
@@ -359,23 +360,22 @@ private struct EnergyDayHistoryRow: View {
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.accent)
             }
-            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
-        .padding(12)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 
-    private func dailyValue(_ label: String, _ value: String) -> some View {
+    private func dailyValue(_ label: String, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
             Text(value)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

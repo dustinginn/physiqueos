@@ -46,6 +46,7 @@ struct TrainingAreaView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task {
             if viewModel == nil { viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId) }
@@ -71,9 +72,11 @@ struct TrainingAreaView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let area)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 TrainingLibraryHeaderView(title: area.title, breadcrumbs: area.breadcrumbs)
-                TrainingScopeSelectorView(scope: area.scope)
+                TrainingScopeSelectorView(scope: area.scope) { pillID in
+                    Task { await viewModel?.selectScope(pillID: pillID) }
+                }
                 browseCard(area.exercises)
             }
         }

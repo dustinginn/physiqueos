@@ -960,6 +960,54 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertNil(report)
     }
 
+    func testTrainingReportingScopeChangesTheActualHistoryResults() async throws {
+        let allResult = try await api.fetchTrainingReporting(reportId: "history", scope: .all)
+        let visibleResult = try await api.fetchTrainingReporting(
+            reportId: "history",
+            scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs)
+        )
+        let all = try XCTUnwrap(allResult)
+        let visibleAbs = try XCTUnwrap(visibleResult)
+
+        XCTAssertNotEqual(all.historyDays?.map(\.date), visibleAbs.historyDays?.map(\.date))
+        XCTAssertTrue(visibleAbs.historyDays?.allSatisfy { $0.date <= "2026-07-18" } == true)
+    }
+
+    func testResistanceReportingScopeChangesRowsRollupsAndPRs() async throws {
+        let allResult = try await api.fetchTrainingReporting(reportId: "resistance", scope: .all)
+        let visibleResult = try await api.fetchTrainingReporting(
+            reportId: "resistance",
+            scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs)
+        )
+        let allReport = try XCTUnwrap(allResult)
+        let visibleReport = try XCTUnwrap(visibleResult)
+        let all = try XCTUnwrap(allReport.resistance)
+        let visibleAbs = try XCTUnwrap(visibleReport.resistance)
+
+        XCTAssertNotEqual(all.statusGroups.flatMap(\.items).map(\.id), visibleAbs.statusGroups.flatMap(\.items).map(\.id))
+        XCTAssertNotEqual(all.categoryRollups.map(\.id), visibleAbs.categoryRollups.map(\.id))
+        XCTAssertEqual(visibleAbs.recentPrs.map(\.label), ["Squat"])
+    }
+
+    func testTrainingLibraryHomeScopeChangesAreaExerciseCounts() async throws {
+        let all = try await api.fetchTrainingLanding(scope: .all)
+        let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
+
+        XCTAssertNotEqual(all.trainingAreas.map(\.exerciseCount), visibleAbs.trainingAreas.map(\.exerciseCount))
+        XCTAssertNotEqual(all.trainingDays.map(\.id), visibleAbs.trainingDays.map(\.id))
+    }
+
+    func testTrainingAreaScopeChangesTheDisplayedExerciseRows() async throws {
+        let all = try await api.fetchTrainingArea(areaId: "biceps", scope: .all)
+        let visibleAbs = try await api.fetchTrainingArea(
+            areaId: "biceps",
+            scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs)
+        )
+
+        XCTAssertNotEqual(all?.exercises.map(\.id), visibleAbs?.exercises.map(\.id))
+        XCTAssertTrue((visibleAbs?.exercises.count ?? 0) <= (all?.exercises.count ?? 0))
+    }
+
     /// Cardio/Volume/Frequency/Consistency are verified real current web
     /// behavior — an identical static "Foundation" placeholder, not a
     /// native shortcut for an unbuilt feature.
@@ -1097,13 +1145,13 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
     }
 
-    /// Unscoped landing fields (areas, current protocol) must NOT narrow
-    /// with scope — only `trainingDays` does, matching the real web's
-    /// `dateWindow`-only filtering.
-    func testNonHistoryLandingFieldsStayUnscopedAcrossSelection() async throws {
+    /// The protocol remains global, while visible Library counts narrow
+    /// because Build 14 places the active scope selector on that surface.
+    func testLibraryCountsNarrowButProtocolRemainsGlobalAcrossSelection() async throws {
         let all = try await api.fetchTrainingLanding(scope: .all)
         let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertEqual(all.trainingAreas.count, visibleAbs.trainingAreas.count)
+        XCTAssertNotEqual(all.trainingAreas.map(\.exerciseCount), visibleAbs.trainingAreas.map(\.exerciseCount))
         XCTAssertEqual(all.currentProtocol, visibleAbs.currentProtocol)
     }
 

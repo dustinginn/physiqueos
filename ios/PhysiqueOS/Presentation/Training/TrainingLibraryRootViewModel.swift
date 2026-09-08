@@ -11,6 +11,7 @@ final class TrainingLibraryRootViewModel {
 
     private(set) var state: LoadState = .loading
     private let api: TrainingAPI
+    private(set) var scope: EvidenceScopeSelection = TrainingScopeDefault.selection
 
     init(api: TrainingAPI) {
         self.api = api
@@ -18,9 +19,15 @@ final class TrainingLibraryRootViewModel {
 
     func load() async {
         do {
-            state = .loaded(try await api.fetchTrainingLanding())
+            state = .loaded(try await api.fetchTrainingLanding(scope: scope))
         } catch {
             state = .failed("Training Library could not be loaded.")
         }
+    }
+
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
+        await load()
     }
 }

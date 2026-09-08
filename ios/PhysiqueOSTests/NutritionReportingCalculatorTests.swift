@@ -154,6 +154,10 @@ final class NutritionReportingCalculatorTests: XCTestCase {
         XCTAssertEqual(recurring.count, 1)
         XCTAssertEqual(recurring.first?.occurrenceCount, 2)
         XCTAssertEqual(recurring.first?.slot, .breakfast)
+        XCTAssertEqual(recurring.first?.averageCalories, 500)
+        XCTAssertEqual(recurring.first?.averageProteinG, 40)
+        XCTAssertEqual(recurring.first?.averageCarbohydratesG, 50)
+        XCTAssertEqual(recurring.first?.averageFatG, 15)
     }
 
     func testHistoryGroupsAreNewestFirstWithMealsInCanonicalSlotOrder() {
@@ -163,6 +167,18 @@ final class NutritionReportingCalculatorTests: XCTestCase {
         ])
         let groups = NutritionReportingCalculator.historyGroups(days: [d])
         XCTAssertEqual(groups.first?.meals.map(\.slot), [.breakfast, .dinner])
+    }
+
+    func testWeeklyMealRowsPreservePerSlotCountsAndAverages() {
+        let d = day("a", "2026-08-16", calories: 2000, protein: 150, carbs: 200, fat: 70, meals: [
+            meal("m1", slot: .breakfast, calories: 500, protein: 40, carbs: 50, fat: 15, foodNames: ["Oatmeal"]),
+            meal("m2", slot: .dinner, calories: 700, protein: 60, carbs: 60, fat: 25, foodNames: ["Salmon"]),
+        ])
+        let row = NutritionReportingCalculator.weeklyMealRows(days: [d]).first
+        XCTAssertEqual(row?.slots.first { $0.slot == .breakfast }?.occurrenceCount, 1)
+        XCTAssertEqual(row?.slots.first { $0.slot == .breakfast }?.averageCalories, 500)
+        XCTAssertEqual(row?.slots.first { $0.slot == .dinner }?.averageCalories, 700)
+        XCTAssertEqual(row?.slots.first { $0.slot == .lunch }?.occurrenceCount, 0)
     }
 
     // MARK: - API integration: report dispatch, scope, navigation

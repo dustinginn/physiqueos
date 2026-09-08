@@ -64,4 +64,26 @@ final class ChartInteractionTests: XCTestCase {
         let staleSelection = ChartCategoricalSelection.nearestPoint(matching: "2026-06-20", in: filtered, keyPath: \.key)
         XCTAssertEqual(staleSelection?.label, "e")
     }
+
+    func testGestureArbitrationKeepsVerticalIntentForPageScrolling() {
+        XCTAssertEqual(ChartGestureArbitration.intent(horizontal: 3, vertical: 28), .vertical)
+    }
+
+    func testGestureArbitrationClaimsClearHorizontalScrubs() {
+        XCTAssertEqual(ChartGestureArbitration.intent(horizontal: 28, vertical: 3), .horizontal)
+    }
+
+    func testGestureArbitrationTreatsZeroMovementAsTap() {
+        XCTAssertEqual(ChartGestureArbitration.intent(horizontal: 0, vertical: 0), .tap)
+    }
+
+    func testGestureArbitrationDoesNotAggressivelyClaimDiagonalMovement() {
+        XCTAssertEqual(ChartGestureArbitration.intent(horizontal: 18, vertical: 16), .diagonal)
+    }
+
+    func testPlotCoordinatesClampAtBothEdges() {
+        XCTAssertEqual(ChartGestureArbitration.clampedPlotX(-15, width: 240), 0)
+        XCTAssertEqual(ChartGestureArbitration.clampedPlotX(120, width: 240), 120)
+        XCTAssertEqual(ChartGestureArbitration.clampedPlotX(300, width: 240), 240)
+    }
 }

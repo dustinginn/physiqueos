@@ -197,7 +197,11 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// Evidence vertical this session already established.
     var attributedScope: EvidenceScopeAttribution? = nil
 
-    var destination: AppDestination { .priorityDetail(priorityId: id) }
+    var destination: AppDestination {
+        executionItemId == "execution_morning_weigh_in"
+            ? .checkIn(checkInType: "morning")
+            : .priorityDetail(priorityId: id)
+    }
 }
 
 // MARK: - Completion / reconciliation records (the one real persisted state)

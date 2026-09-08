@@ -83,7 +83,7 @@ struct NutritionHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: landing)
                 TrainingScopeSelectorView(scope: landing.scope) { scopeID in
                     Task { await viewModel?.selectScope(pillID: scopeID) }
@@ -326,7 +326,7 @@ struct NutritionMacroGridView: View {
 
     private var tiles: [(label: String, value: String, color: Color)] {
         [
-            ("Calories", Self.formatWhole(totals.calories, unit: nil), PhysiqueOSTheme.chartEffort),
+            ("Calories", Self.formatWhole(totals.calories, unit: nil), PhysiqueOSTheme.nutritionCalories),
             ("Protein", Self.formatWhole(totals.proteinG, unit: "g"), PhysiqueOSTheme.macroProtein),
             ("Carbohydrates", Self.formatWhole(totals.carbsG, unit: "g"), PhysiqueOSTheme.macroCarbohydrates),
             ("Fat", Self.formatWhole(totals.fatG, unit: "g"), PhysiqueOSTheme.macroFat),

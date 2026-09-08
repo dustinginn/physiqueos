@@ -23,15 +23,22 @@ struct FocusTileView: View {
     let item: PriorityOccurrence
     var onTap: (AppDestination) -> Void
     var onComplete: (PriorityOccurrence) -> Void
+    var isCompleting: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
             Button { onTap(item.destination) } label: { rowBody }
                 .buttonStyle(.plain)
-            if item.completable, !item.completed {
+            if item.completable, !item.completed, !isCompleting {
                 Button { onComplete(item) } label: { completeButton }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Mark \(item.title) complete")
+            }
+            if isCompleting {
+                Circle().fill(PhysiqueOSTheme.chartSuccess)
+                    .overlay(Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white))
+                    .frame(width: 24, height: 24)
+                    .accessibilityLabel("Completed")
             }
         }
         .padding(10)

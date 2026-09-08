@@ -71,11 +71,11 @@ struct NutritionWeeklyMacroRowView: View {
                     let isSelected = macro == selectedMacro
                     Text("\(macro.label.prefix(1)) \(row.averages[macro].map { "\(Int($0.rounded()))g" } ?? "—")")
                         .physiqueOSFont(isSelected ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(isSelected ? PhysiqueOSTheme.textPrimary : PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(macroColorFor(macro).opacity(isSelected ? 1 : 0.72))
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 10)
     }
 }
 
@@ -94,14 +94,14 @@ struct NutritionDailyMacroRowView: View {
                     let isSelected = macro == selectedMacro
                     Text("\(macro.label.prefix(1)) \(row.macros[macro].map { "\(Int($0.rounded()))g" } ?? "—")")
                         .physiqueOSFont(isSelected ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(isSelected ? PhysiqueOSTheme.textPrimary : PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(macroColorFor(macro).opacity(isSelected ? 1 : 0.72))
                 }
             }
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.accent)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 10)
         .accessibilityElement(children: .combine)
     }
 }
@@ -111,7 +111,7 @@ struct NutritionRecurringMealRow: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(meal.name)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -119,6 +119,18 @@ struct NutritionRecurringMealRow: View {
                 Text("\(meal.slot.label) · Last \(TrainingDateFormatting.short(meal.lastEaten))")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
+                HStack(spacing: 6) {
+                    Text("\(meal.occurrenceCount) occurrences")
+                    Text("•")
+                    Text(meal.averageCalories.map { "\(Int($0.rounded())) cal average" } ?? "Calories pending")
+                }
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(mealSlotColorFor(meal.slot))
+                HStack(spacing: 10) {
+                    macroValue("P", meal.averageProteinG, color: PhysiqueOSTheme.macroProtein)
+                    macroValue("C", meal.averageCarbohydratesG, color: PhysiqueOSTheme.macroCarbohydrates)
+                    macroValue("F", meal.averageFatG, color: PhysiqueOSTheme.macroFat)
+                }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
@@ -130,8 +142,51 @@ struct NutritionRecurringMealRow: View {
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func macroValue(_ label: String, _ value: Double?, color: Color) -> some View {
+        Text("\(label) \(value.map { "\(Int($0.rounded()))g" } ?? "—")")
+            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+            .foregroundStyle(color)
+    }
+}
+
+struct NutritionWeeklyMealRowView: View {
+    let row: NutritionWeeklyMealRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Spacer(minLength: 8)
+                Text("\(row.mealCount) meals · \(row.loggedDayCount) days")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(row.slots) { slot in
+                    HStack(spacing: 6) {
+                        Text(slot.slot.glyph)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(slot.slot.label)
+                            Text(slot.averageCalories.map { "\(slot.occurrenceCount)× · \(Int($0.rounded())) cal avg" } ?? "No entries")
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        }
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(mealSlotColorFor(slot.slot))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(16)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
@@ -176,6 +231,14 @@ private func mealSlotColorFor(_ slot: NutritionMealSlot) -> Color {
     case .lunch: PhysiqueOSTheme.mealLunch
     case .dinner: PhysiqueOSTheme.mealDinner
     case .snacks: PhysiqueOSTheme.mealSnacks
+    }
+}
+
+private func macroColorFor(_ macro: NutritionMacroKey) -> Color {
+    switch macro {
+    case .protein: PhysiqueOSTheme.macroProtein
+    case .carbohydrates: PhysiqueOSTheme.macroCarbohydrates
+    case .fat: PhysiqueOSTheme.macroFat
     }
 }
 

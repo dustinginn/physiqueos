@@ -3,8 +3,8 @@ import SwiftUI
 /// `/progress/training/reporting/:reportId`, matching the current web
 /// hierarchy and behavior: Resistance and History have real content;
 /// Cardio, Volume, Frequency, and Consistency intentionally share the
-/// current Foundation placeholder. Goal/date scope remains the accepted
-/// inert fixture snapshot rather than fake client-side filtering.
+/// current Foundation placeholder. Goal/Phase scope re-queries the fixture
+/// read service so the report's underlying rows, PRs, and rollups change.
 struct TrainingReportingView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: TrainingReportingViewModel?
@@ -21,6 +21,7 @@ struct TrainingReportingView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task {
             if viewModel == nil {
@@ -54,9 +55,13 @@ struct TrainingReportingView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let report)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: report)
-                TrainingScopeSelectorView(scope: report.scope)
+                if report.placeholderBody == nil {
+                    TrainingScopeSelectorView(scope: report.scope) { pillID in
+                        Task { await viewModel?.selectScope(pillID: pillID) }
+                    }
+                }
                 if let placeholderBody = report.placeholderBody {
                     foundationCard(placeholderBody)
                 } else if let resistance = report.resistance {

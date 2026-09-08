@@ -20,6 +20,13 @@ final class DEXAReadModelTests: XCTestCase {
         XCTAssertFalse(report.dataSources.isEmpty)
     }
 
+    func testExpandedHistoryAddsEightClearlySyntheticScans() async throws {
+        let report = try await api.fetchDEXAReport(scope: .all)
+        XCTAssertEqual(report.history.count, 13)
+        XCTAssertEqual(report.history.filter { $0.id.hasPrefix("dexa-synthetic-") }.count, 8)
+        XCTAssertEqual(report.bodyFatTrend.points.count, report.history.count)
+    }
+
     func testLatestScanAndSummaryReflectTheMostRecentScopedScan() async throws {
         let report = try await api.fetchDEXAReport(scope: .all)
         XCTAssertEqual(report.latestScan?.date, "2026-08-30")
@@ -31,8 +38,9 @@ final class DEXAReadModelTests: XCTestCase {
 
     func testDeltaIsComputedFromTheLastTwoScopedScans() async throws {
         let report = try await api.fetchDEXAReport(scope: .all)
-        // 2026-08-16 BF 9.0 -> 2026-08-30 BF 9.4 => +0.4 pts
-        XCTAssertEqual(report.delta?.bodyFatPercentagePoints, "+0.4 pts")
+        // The expanded synthetic history adds an Aug 23 point between the
+        // existing scans, so the current delta is Aug 23 9.2 -> Aug 30 9.4.
+        XCTAssertEqual(report.delta?.bodyFatPercentagePoints, "+0.2 pts")
     }
 
     func testDeltaIsNilWithFewerThanTwoScopedScans() {
@@ -48,7 +56,7 @@ final class DEXAReadModelTests: XCTestCase {
 
     func testBodyFatTrendCarriesOnePointPerScopedScan() async throws {
         let report = try await api.fetchDEXAReport(scope: .all)
-        XCTAssertEqual(report.bodyFatTrend.points.count, 5)
+        XCTAssertEqual(report.bodyFatTrend.points.count, 13)
     }
 
     func testRegionalTrendsAreOrderedArmsLegsTrunkAndroidGynoid() async throws {
@@ -83,20 +91,21 @@ final class DEXAReadModelTests: XCTestCase {
     func testBuildLeanMassScopeExcludesVisibleAbsEraScans() async throws {
         let report = try await api.fetchDEXAReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         XCTAssertTrue(report.history.allSatisfy { $0.date >= "2026-07-19" })
-        XCTAssertEqual(report.history.count, 2)
+        XCTAssertEqual(report.history.count, 6)
     }
 
     func testVisibleAbsScopeExcludesBuildLeanMassEraScans() async throws {
         let report = try await api.fetchDEXAReport(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
         XCTAssertTrue(report.history.allSatisfy { $0.date >= "2026-05-24" && $0.date <= "2026-07-18" })
-        XCTAssertEqual(report.history.count, 3)
+        XCTAssertEqual(report.history.count, 7)
     }
 
     func testPhaseScopeNarrowsToOnePhase() async throws {
         let phase2 = try await api.fetchDEXAReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
-        XCTAssertEqual(phase2.history.count, 2)
+        XCTAssertEqual(phase2.history.count, 3)
         let phase1 = try await api.fetchDEXAReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
-        XCTAssertTrue(phase1.history.isEmpty)
+        XCTAssertEqual(phase1.history.count, 3)
+        XCTAssertTrue(phase1.history.allSatisfy { $0.date >= "2026-07-19" && $0.date <= "2026-08-15" })
     }
 
     func testScopeDefaultsToBuildLeanMass() async throws {

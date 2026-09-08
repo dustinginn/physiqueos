@@ -9,6 +9,10 @@ import XCTest
 final class EnergyReadModelTests: XCTestCase {
     private let api = FixtureEnergyAPI()
 
+    func testNativeWeeklyExpenditureBarsRemainFilledBlue() {
+        XCTAssertEqual(EnergyChartPresentation.expenditureBarTreatment, .filled)
+    }
+
     // MARK: - Fixture decoding integrity
 
     func testReportDecodesWithoutError() async throws {

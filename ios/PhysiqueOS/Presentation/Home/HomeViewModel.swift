@@ -43,8 +43,8 @@ final class HomeViewModel {
     func load(now: Date = Date()) async {
         do {
             var home = try await api.fetchHome()
-            home.todaysFocus = priorityStore.todaysPriorities(now: now)
-            home.goals = Self.projectPrimaryGoal(home.goals, from: goalsSandboxStore.hub.activeGoal)
+            home.todaysFocus = Self.visiblePriorities(priorityStore.todaysPriorities(now: now))
+            home.goals = Self.projectGoals(home.goals, from: goalsSandboxStore.hub.activeGoal)
             home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
             state = .loaded(home)
         } catch {
@@ -57,7 +57,7 @@ final class HomeViewModel {
     /// full re-fetch of the rest of Home.
     func refreshTodaysFocus(now: Date = Date()) {
         guard case .loaded(var home) = state else { return }
-        home.todaysFocus = priorityStore.todaysPriorities(now: now)
+        home.todaysFocus = Self.visiblePriorities(priorityStore.todaysPriorities(now: now))
         state = .loaded(home)
     }
 
@@ -68,13 +68,22 @@ final class HomeViewModel {
     /// fixture already renders it, since a brand-new transitioned goal
     /// has no evidence-derived numbers of its own yet and Home does not
     /// compute those independently.
-    private static func projectPrimaryGoal(_ goals: [HomeGoal], from activeGoal: GoalSummaryReadModel) -> [HomeGoal] {
+    nonisolated static func projectGoals(_ goals: [HomeGoal], from activeGoal: GoalSummaryReadModel) -> [HomeGoal] {
         guard let index = goals.firstIndex(where: { if case .primary = $0.presentation { true } else { false } }) else { return goals }
         var updated = goals
         updated[index].id = activeGoal.id
         updated[index].title = activeGoal.title
         updated[index].destination = activeGoal.destination
+        for candidateIndex in updated.indices {
+            if case .supporting = updated[candidateIndex].presentation {
+                updated[candidateIndex].destination = activeGoal.destination
+            }
+        }
         return updated
+    }
+
+    nonisolated static func visiblePriorities(_ priorities: [PriorityOccurrence]) -> [PriorityOccurrence] {
+        priorities.filter { !$0.completed }
     }
 
     /// Home shows exactly one Briefing card — whichever artifact

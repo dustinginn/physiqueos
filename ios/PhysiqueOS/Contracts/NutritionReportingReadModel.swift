@@ -263,6 +263,14 @@ struct NutritionWeeklyMealRow: Equatable, Identifiable {
     var mealCount: Int
     var averageCaloriesPerMeal: Double?
     var loggedDayCount: Int
+    var slots: [NutritionWeeklyMealSlotBreakdown]
+}
+
+struct NutritionWeeklyMealSlotBreakdown: Equatable, Identifiable {
+    var slot: NutritionMealSlot
+    var occurrenceCount: Int
+    var averageCalories: Double?
+    var id: String { slot.rawValue }
 }
 
 /// A repeated meal — same slot + same food signature (sorted, normalized
@@ -273,6 +281,9 @@ struct NutritionRecurringMeal: Equatable, Identifiable {
     var slot: NutritionMealSlot
     var occurrenceCount: Int
     var averageCalories: Double?
+    var averageProteinG: Double?
+    var averageCarbohydratesG: Double?
+    var averageFatG: Double?
     var lastEaten: String
 }
 

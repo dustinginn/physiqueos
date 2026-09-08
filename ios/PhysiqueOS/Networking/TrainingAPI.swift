@@ -13,13 +13,15 @@ protocol TrainingAPI: Sendable {
     /// matching real web behavior (verified for Nutrition's identical
     /// mechanism: `currentNutritionProtocol`/`nutritionLibrary`/
     /// `nutritionReportingLinks` stay global even when the day list is
-    /// date-scoped). The no-`scope` overload below (`.all`, Training's own
+    /// date-scoped). Native additionally re-scopes visible Library counts
+    /// because Build 14 exposes the same selector there; no visible control
+    /// is allowed to remain decorative. The no-`scope` overload below (`.all`, Training's own
     /// real default context) keeps every existing call site unchanged.
     func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel
     func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel?
     func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel?
     /// Fixture-backed for all 10 canonical areas (see `TrainingAreaReadModel`).
-    func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel?
+    func fetchTrainingArea(areaId: String, scope: EvidenceScopeSelection) async throws -> TrainingAreaReadModel?
     /// Mirrors `getExerciseDetailContent`/`getExerciseOccurrences`: `nil`
     /// for an unresolvable exercise id, otherwise every historical
     /// occurrence of that canonical exercise across every session
@@ -44,7 +46,7 @@ protocol TrainingAPI: Sendable {
     /// `reportingLinks` set (matching the web's `notFound()` guard),
     /// otherwise the report's content — real data for `resistance` and
     /// `history`, the identical static placeholder for the other four.
-    func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel?
+    func fetchTrainingReporting(reportId: String, scope: EvidenceScopeSelection) async throws -> TrainingReportingReadModel?
 }
 
 extension TrainingAPI {
@@ -59,6 +61,14 @@ extension TrainingAPI {
 
     func fetchTrainingExercise(exerciseId: String) async throws -> TrainingExerciseDetailReadModel? {
         try await fetchTrainingExercise(exerciseId: exerciseId, scope: TrainingScopeDefault.selection)
+    }
+
+    func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel? {
+        try await fetchTrainingArea(areaId: areaId, scope: TrainingScopeDefault.selection)
+    }
+
+    func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel? {
+        try await fetchTrainingReporting(reportId: reportId, scope: TrainingScopeDefault.selection)
     }
 }
 
@@ -168,6 +178,20 @@ struct FixtureTrainingAPI: TrainingAPI {
             return day
         }
         landing.trainingDays = EvidenceChronology.filter(attributedDays, scope: scope, date: \.date)
+        if scope != .all {
+            let scopedSessions = EvidenceChronology.filter(try loadFixture().sessions, scope: scope, date: \.date)
+            let ids = Set(scopedSessions.flatMap(\.exercises).compactMap(\.canonicalExerciseId))
+            landing.trainingAreas = landing.trainingAreas.map { area in
+                var area = area
+                let rows = (try? loadFixture().areas.first(where: { $0.id == area.id })?.exercises) ?? []
+                area.exerciseCount = rows.filter { row in row.canonicalExerciseId.map(ids.contains) ?? false }.count
+                return area
+            }
+            if let latest = landing.latestTrainingDay,
+               EvidenceChronology.filter([latest], scope: scope, date: \.date).isEmpty {
+                landing.latestTrainingDay = nil
+            }
+        }
         landing.scope = EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training")
         return landing
     }
@@ -184,8 +208,16 @@ struct FixtureTrainingAPI: TrainingAPI {
         return session
     }
 
-    func fetchTrainingArea(areaId: String) async throws -> TrainingAreaReadModel? {
-        try loadFixture().areas.first { $0.id == areaId }
+    func fetchTrainingArea(areaId: String, scope: EvidenceScopeSelection) async throws -> TrainingAreaReadModel? {
+        let fixture = try loadFixture()
+        guard var area = fixture.areas.first(where: { $0.id == areaId }) else { return nil }
+        let scopedSessions = EvidenceChronology.filter(fixture.sessions, scope: scope, date: \.date)
+        let ids = Set(scopedSessions.flatMap(\.exercises).compactMap(\.canonicalExerciseId))
+        if scope != .all {
+            area.exercises = area.exercises.filter { $0.canonicalExerciseId.map(ids.contains) ?? false }
+        }
+        area.scope = EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training")
+        return area
     }
 
     /// Mirrors the real web query chain exactly: resolve the route's
@@ -239,7 +271,9 @@ struct FixtureTrainingAPI: TrainingAPI {
             benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
             performanceRecords: TrainingPerformanceRecordsCalculator.recordsReadModel(
                 canonicalExerciseId: canonicalExerciseId,
-                events: fixture.trainingPerformanceEvents.filter(TrainingPerformanceEventValidator.isValid)
+                events: fixture.trainingPerformanceEvents
+                    .filter(TrainingPerformanceEventValidator.isValid)
+                    .filter { EvidenceChronology.matches($0.workoutDate, scope: scope) }
             ),
             lastSession: occurrences.first,
             history: Array(occurrences.prefix(10))
@@ -250,7 +284,7 @@ struct FixtureTrainingAPI: TrainingAPI {
     /// gates which ids are valid (the web's `notFound()` guard), then
     /// `resistance`/`history` get real content and every other id falls
     /// through to the identical static "Foundation" placeholder body.
-    func fetchTrainingReporting(reportId: String) async throws -> TrainingReportingReadModel? {
+    func fetchTrainingReporting(reportId: String, scope: EvidenceScopeSelection) async throws -> TrainingReportingReadModel? {
         let fixture = try loadFixture()
         guard let link = fixture.landing.reportingLinks.first(where: { $0.id == reportId }) else {
             return nil
@@ -263,9 +297,9 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: link.label,
                 summary: "Strength progression, PRs, and category momentum from training history.",
-                scope: fixture.landing.scope,
+                scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training"),
                 placeholderBody: nil,
-                resistance: Self.buildResistanceReport(fixture: fixture),
+                resistance: Self.buildResistanceReport(fixture: fixture, scope: scope),
                 historyDays: nil
             )
         case "history":
@@ -274,10 +308,10 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: "Training History",
                 summary: "Browse recent training days and open the sessions you want to review.",
-                scope: fixture.landing.scope,
+                scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training"),
                 placeholderBody: nil,
                 resistance: nil,
-                historyDays: fixture.days
+                historyDays: EvidenceChronology.filter(fixture.days, scope: scope, date: \.date)
             )
         default:
             return TrainingReportingReadModel(
@@ -285,7 +319,7 @@ struct FixtureTrainingAPI: TrainingAPI {
                 eyebrow: "Reporting",
                 title: link.label,
                 summary: link.detail,
-                scope: fixture.landing.scope,
+                scope: EvidenceChronology.scopeContext(selected: scope, allLabel: "All Training"),
                 placeholderBody: "This page is now a permanent destination. It will grow into graphs, trends, comparisons, goal impact, and historical analysis as more canonical training evidence accumulates.",
                 resistance: nil,
                 historyDays: nil
@@ -298,7 +332,7 @@ struct FixtureTrainingAPI: TrainingAPI {
     /// highlights, needs-attention, recent PRs, and category rollups reuse
     /// the same exercise/area destinations and durable PR events as the
     /// rest of Training; no client-side performance detection is invented.
-    private static func buildResistanceReport(fixture: TrainingFixtureFile) -> TrainingResistanceReportReadModel {
+    private static func buildResistanceReport(fixture: TrainingFixtureFile, scope: EvidenceScopeSelection) -> TrainingResistanceReportReadModel {
         let allExerciseRows = fixture.areas.flatMap(\.exercises)
         func row(exerciseId: String, detail: String?) -> TrainingReportingLinkRow? {
             guard let exercise = allExerciseRows.first(where: { $0.id == exerciseId }) else { return nil }
@@ -311,7 +345,10 @@ struct FixtureTrainingAPI: TrainingAPI {
             ("plateauing", "Plateauing", .warning),
             ("regressing", "Regressing", .danger),
         ]
-        let observations = fixture.reporting.resistance.exerciseObservations
+        let observations = fixture.reporting.resistance.exerciseObservations.filter { observation in
+            guard let date = observation.latestDate else { return scope == .all }
+            return EvidenceChronology.matches(date, scope: scope)
+        }
         let statusGroups = statusDefinitions.map { definition in
             TrainingResistanceStatusGroup(
                 label: definition.label,
@@ -366,23 +403,45 @@ struct FixtureTrainingAPI: TrainingAPI {
                 )
             }
 
-        let categoryById = Dictionary(
-            uniqueKeysWithValues: fixture.reporting.resistance.categoryObservations.map { ($0.areaId, $0) }
-        )
+        let categoryById = Dictionary(uniqueKeysWithValues: fixture.reporting.resistance.categoryObservations.map { ($0.areaId, $0) })
+        let scopedSessions = EvidenceChronology.filter(fixture.sessions, scope: scope, date: \.date)
         let categoryRollups = fixture.landing.trainingAreas.compactMap { area -> TrainingReportingLinkRow? in
             guard let observation = categoryById[area.id] else { return nil }
+            let canonicalIDs = Set(
+                fixture.areas.first(where: { $0.id == area.id })?.exercises.compactMap(\.canonicalExerciseId) ?? []
+            )
+            let matchingSessions = scopedSessions
+                .filter { session in session.exercises.contains { exercise in exercise.canonicalExerciseId.map(canonicalIDs.contains) ?? false } }
+                .sorted { $0.date > $1.date }
+            guard scope == .all || !matchingSessions.isEmpty else { return nil }
+
             var parts: [String] = []
-            if let latest = observation.latestTrainedAt {
+            let latest = scope == .all ? observation.latestTrainedAt : matchingSessions.first?.date
+            if let latest {
                 parts.append("Latest \(TrainingDateFormatting.short(latest))")
             }
-            parts.append("\(observation.exerciseCount) exercise\(observation.exerciseCount == 1 ? "" : "s")")
-            if let sets = observation.latestKnownSets, sets > 0 {
+            let scopedExercises = matchingSessions.flatMap(\.exercises).filter { exercise in
+                exercise.canonicalExerciseId.map(canonicalIDs.contains) ?? false
+            }
+            let scopedExerciseCount = Set(scopedExercises.compactMap(\.canonicalExerciseId)).count
+            let exerciseCount = scope == .all ? observation.exerciseCount : scopedExerciseCount
+            parts.append("\(exerciseCount) exercise\(exerciseCount == 1 ? "" : "s")")
+            let latestExercises = matchingSessions.first?.exercises.filter { exercise in
+                exercise.canonicalExerciseId.map(canonicalIDs.contains) ?? false
+            } ?? []
+            let scopedSets = latestExercises.reduce(0) { $0 + $1.sets.count }
+            let sets = scope == .all ? observation.latestKnownSets : scopedSets
+            if let sets, sets > 0 {
                 parts.append("\(sets) set\(sets == 1 ? "" : "s")")
             }
-            if let volume = observation.latestKnownVolume, volume > 0 {
+            let scopedVolume = latestExercises.flatMap(\.sets).reduce(0.0) { total, set in
+                total + ((set.weight ?? 0) * (set.reps ?? 0))
+            }
+            let volume = scope == .all ? observation.latestKnownVolume : scopedVolume
+            if let volume, volume > 0 {
                 parts.append("\(formatNumber(volume)) lb")
             }
-            parts.append(formatStatusCounts(observation.statusCounts))
+            if scope == .all { parts.append(formatStatusCounts(observation.statusCounts)) }
             return TrainingReportingLinkRow(
                 id: area.id,
                 label: area.label,

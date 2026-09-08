@@ -37,6 +37,7 @@ struct TrainingSessionDetailView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -69,7 +70,7 @@ struct TrainingSessionDetailView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let session)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: session)
                 summaryCard(for: session)
                 if !session.exercises.isEmpty {
@@ -91,7 +92,6 @@ struct TrainingSessionDetailView: View {
             Text("\(session.value) · \(Self.formatDate(session.date))")
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: session.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

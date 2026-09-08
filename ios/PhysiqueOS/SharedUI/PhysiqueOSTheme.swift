@@ -37,6 +37,7 @@ enum PhysiqueOSTheme {
     /// `src/app/globals.css`. Keeping these centralized preserves visual
     /// continuity across future Native Nutrition surfaces.
     static let macroProtein = Color(hex: 0xFB7185)
+    static let nutritionCalories = Color(hex: 0x4ADE80)
     static let macroCarbohydrates = Color(hex: 0xFBBF24)
     static let macroFat = Color(hex: 0x38BDF8)
     static let mealBreakfast = Color(hex: 0xFB923C)

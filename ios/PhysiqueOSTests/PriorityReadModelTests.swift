@@ -13,6 +13,13 @@ import XCTest
 /// is also a Sunday. 2026-08-29 (the "yesterday" used for Morning Check-In
 /// tests below) is a Saturday.
 final class PriorityReadModelTests: XCTestCase {
+    func testMorningWeighInRoutesToMorningCheckInInsteadOfGenericPriorityDetail() throws {
+        let store = try LoggingSandboxStore()
+        let occurrence = try XCTUnwrap(
+            store.todaysPriorities(now: date(2026, 8, 30)).first { $0.executionItemId == "execution_morning_weigh_in" }
+        )
+        XCTAssertEqual(occurrence.destination, .checkIn(checkInType: "morning"))
+    }
     private let catalog = PriorityCatalogLoader.loadExecutionItems()
 
     private func item(_ id: String) -> ExecutionItemFixture {

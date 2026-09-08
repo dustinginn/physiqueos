@@ -12,6 +12,7 @@ final class TrainingAreaViewModel {
     private(set) var state: LoadState = .loading
     private let api: TrainingAPI
     private let areaId: String
+    private(set) var scope: EvidenceScopeSelection = TrainingScopeDefault.selection
 
     init(api: TrainingAPI, areaId: String) {
         self.api = api
@@ -20,9 +21,15 @@ final class TrainingAreaViewModel {
 
     func load() async {
         do {
-            state = .loaded(try await api.fetchTrainingArea(areaId: areaId))
+            state = .loaded(try await api.fetchTrainingArea(areaId: areaId, scope: scope))
         } catch {
             state = .failed("This training area could not be loaded.")
         }
+    }
+
+    func selectScope(pillID: String) async {
+        guard let selection = EvidenceScopeSelection(pillID: pillID), selection != scope else { return }
+        scope = selection
+        await load()
     }
 }

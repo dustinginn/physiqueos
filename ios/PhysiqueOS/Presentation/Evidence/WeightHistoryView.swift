@@ -73,7 +73,7 @@ struct WeightHistoryView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: report)
                 TrainingScopeSelectorView(scope: report.scope) { scopeID in
                     Task { await viewModel?.selectScope(pillID: scopeID) }
@@ -119,7 +119,7 @@ struct WeightHistoryView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 }
-                .padding(12)
+                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(PhysiqueOSTheme.surfaceElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -391,7 +391,6 @@ private struct WeightHistoryRow: View {
                 Text(entry.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
-                EvidenceScopeAttributionChip(attribution: entry.attributedScope)
             }
             Spacer(minLength: 8)
             Text(entry.value)

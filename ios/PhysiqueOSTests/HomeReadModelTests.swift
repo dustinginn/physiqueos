@@ -162,6 +162,47 @@ final class HomeReadModelTests: XCTestCase {
         }
     }
 
+    func testHomeProjectsEverySupportingObjectiveToTheOwningActiveGoal() async throws {
+        let home = try Self.loadBundledFixture()
+        let hub = try await FixtureGoalsAPI().fetchGoalsHub()
+        let activeGoal = hub.activeGoal
+        let projected = HomeViewModel.projectGoals(home.goals, from: activeGoal)
+        let supporting = projected.filter { if case .supporting = $0.presentation { true } else { false } }
+
+        XCTAssertFalse(supporting.isEmpty)
+        XCTAssertTrue(supporting.allSatisfy { $0.destination == activeGoal.destination })
+        XCTAssertTrue(projected.allSatisfy { $0.destination == activeGoal.destination })
+    }
+
+    func testCompletedHomePrioritiesAreRemovedFromTheVisibleProjection() throws {
+        let completed = PriorityOccurrence(
+            id: "priority-completed",
+            executionItemId: "execution_foam_roll",
+            date: "2026-08-30",
+            title: "Foam roll",
+            subtitle: nil,
+            metadata: nil,
+            changeLabel: nil,
+            icon: .activity,
+            color: .primary,
+            urgency: .available,
+            completed: true,
+            completable: true,
+            actionLabel: nil,
+            completionContext: nil,
+            continueActionDestination: nil
+        )
+        var pending = completed
+        pending.id = "priority-pending"
+        pending.completed = false
+        let priorities = [completed, pending]
+
+        let visible = HomeViewModel.visiblePriorities(priorities)
+
+        XCTAssertEqual(visible.map(\.id), [pending.id])
+        XCTAssertFalse(visible.contains { $0.id == completed.id })
+    }
+
     // MARK: - Natural prose capitalization
 
     /// Mirrors the product rule in

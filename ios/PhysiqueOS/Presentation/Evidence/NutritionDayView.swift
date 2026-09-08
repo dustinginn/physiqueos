@@ -47,7 +47,7 @@ struct NutritionDayView: View {
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 header(for: day)
                 summaryCard(day)
                 totalsCard(day.totals)
@@ -67,7 +67,6 @@ struct NutritionDayView: View {
             Text(day.value)
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            EvidenceScopeAttributionChip(attribution: day.attributedScope)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
