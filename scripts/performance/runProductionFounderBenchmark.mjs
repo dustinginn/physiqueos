@@ -4,16 +4,18 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { load } from "js-yaml";
 
-const [context, appId, componentName = "web", batch = "core", outputPath = null] = process.argv.slice(2);
+const [context, appId, componentName = "web", batch = "core", outputPath = null, compatibilityRuntimeQueryCount = "42"] = process.argv.slice(2);
 if (!/^[A-Za-z0-9_-]+$/.test(context ?? "")) throw new Error("A safe doctl context name is required.");
 if (!/^[0-9a-f-]{36}$/.test(appId ?? "") || !/^[A-Za-z0-9_-]+$/.test(componentName)) throw new Error("A safe app and component identity is required.");
 if (!/^(?:core|training-reports|training-library|evidence|nutrition-landing|nutrition-primary|nutrition-secondary|nutrition-secondary-reports|nutrition-library|evidence-verticals|ancillary-evidence|media|ingress|details|details-home|details-training|details-evidence|details-briefings|details-profile)$/.test(batch)) throw new Error("A supported benchmark batch is required.");
+if (!/^(?:4|42)$/.test(compatibilityRuntimeQueryCount)) throw new Error("Compatibility runtime query count must be 4 or 42.");
 
 const root = path.resolve(import.meta.dirname, "../..");
 const inventory = fs.readFileSync(path.join(root, "scripts/performance/founderSurfaceInventory.mjs"), "utf8");
 const benchmark = fs.readFileSync(path.join(root, "scripts/performance/productionFounderBenchmark.mjs"), "utf8")
   .replace('from "./founderSurfaceInventory.mjs";', `from "data:text/javascript;base64,${Buffer.from(inventory).toString("base64")}";`)
-  .replace("__BENCHMARK_BATCH__", batch);
+  .replace("__BENCHMARK_BATCH__", batch)
+  .replace("__COMPATIBILITY_RUNTIME_QUERY_COUNT__", compatibilityRuntimeQueryCount);
 const encodedSource = gzipSync(Buffer.from(benchmark)).toString("base64");
 const config = load(fs.readFileSync(path.join(os.homedir(), "AppData", "Roaming", "doctl", "config.yaml"), "utf8"));
 const token = config?.["auth-contexts"]?.[context];

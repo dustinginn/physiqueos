@@ -10,6 +10,7 @@ import {
 const DIRECT_ORIGIN = "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app";
 const NGROK_ORIGIN = "https://float-departed-symphony.ngrok-free.dev";
 const BENCHMARK_BATCH = "__BENCHMARK_BATCH__";
+const COMPATIBILITY_RUNTIME_QUERY_COUNT = Number("__COMPATIBILITY_RUNTIME_QUERY_COUNT__");
 const MAX_DISCOVERED_CASES = 80;
 const cookiesByOrigin = new Map();
 let gateSecret = String(process.env.PHYSIQUEOS_ACCESS_GATE_SECRET ?? "").trim();
@@ -238,6 +239,16 @@ async function inspectDatabase() {
          FROM physiqueos.canonical_media_objects WHERE owner_user_id=$1 AND state='verified'`,
       [ownerUserId],
     );
+    const indexInventory = await pool.query(
+      `SELECT tablename,indexname,indexdef FROM pg_indexes
+        WHERE schemaname='physiqueos' AND tablename=ANY($1::text[])
+        ORDER BY tablename,indexname`,
+      [tables],
+    );
+    const [trainingPlan, nutritionPlan] = await Promise.all([
+      explainEvidenceType(pool, ownerUserId, "training"),
+      explainEvidenceType(pool, ownerUserId, "nutrition"),
+    ]);
     const collections = groups.flatMap((result) => result.rows.map((row) => ({ collection: row.collection_name, rows: Number(row.rows), payloadBytes: Number(row.payload_bytes) })));
     return {
       measurable: true,
@@ -247,12 +258,27 @@ async function inspectDatabase() {
       totalPayloadBytes: collections.reduce((sum, row) => sum + row.payloadBytes, 0),
       collections,
       media: { rows: Number(media.rows[0]?.rows ?? 0), sourceBytes: Number(media.rows[0]?.source_bytes ?? 0), catalogPayloadBytes: Number(media.rows[0]?.catalog_payload_bytes ?? 0) },
-      compatibilityRuntimeQueryCount: 42,
-      compatibilityRuntimeQueryExecution: "sequential",
+      indexes: indexInventory.rows.map((row) => ({ table: row.tablename, name: row.indexname, definition: row.indexdef })),
+      plans: { trainingEvidence: trainingPlan, nutritionEvidence: nutritionPlan },
+      compatibilityRuntimeQueryCount: COMPATIBILITY_RUNTIME_QUERY_COUNT,
+      compatibilityRuntimeQueryExecution: COMPATIBILITY_RUNTIME_QUERY_COUNT === 4 ? "one collection union plus concurrent metadata reads" : "sequential",
     };
   } finally {
     await pool.end();
   }
+}
+
+async function explainEvidenceType(pool, ownerUserId, evidenceType) {
+  const result = await pool.query(
+    `EXPLAIN (FORMAT JSON) SELECT record_id
+       FROM physiqueos.canonical_evidence_records
+       WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+         AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')=$2
+       ORDER BY record_id`,
+    [ownerUserId, evidenceType],
+  );
+  const plan = result.rows[0]?.["QUERY PLAN"]?.[0]?.Plan ?? {};
+  return Object.freeze({ nodeType: plan["Node Type"] ?? null, totalCost: plan["Total Cost"] ?? null, planRows: plan["Plan Rows"] ?? null });
 }
 
 function extractFounderLinks(html) {
