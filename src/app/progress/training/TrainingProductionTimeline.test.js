@@ -20,7 +20,7 @@ describe("production Training timeline port", () => {
     expect(landing).not.toContain("getTrainingTimelineReport");
     expect(landing).not.toContain("loadCanonicalRuntime");
     expect(library).toContain("getProductionTrainingNavigationReadService");
-    expect(library).toContain("getLibrary({ context, path })");
+    expect(library).toContain("getLibrary({ context, path, registryHydrated: true })");
     expect(library).not.toContain("getTrainingTimelineReport");
     expect(library).not.toContain("loadCanonicalRuntime");
     expect(library).toContain("<TrainingTimelineSelector");

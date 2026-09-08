@@ -61,6 +61,7 @@ function selectCases(batch) {
   if (batch === "nutrition-secondary-reports") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "nutrition" && ["adherence", "consistency"].some((report) => entry.label.includes(`Nutrition report: ${report}`)));
   if (batch === "nutrition-library") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "nutrition" && entry.label.startsWith("Nutrition Library:"));
   if (batch === "evidence-verticals") return FOUNDER_SURFACE_CASES.filter((entry) => ["activity", "weight", "dexa", "photos"].includes(entry.group));
+  if (batch === "ancillary-evidence") return FOUNDER_SURFACE_CASES.filter((entry) => ["Energy Evidence", "Protocols Evidence", "Recovery Evidence", "Health Metrics Evidence", "Progress Photo intake", "DEXA intake"].includes(entry.label));
   if (batch === "media") return FOUNDER_SURFACE_CASES.filter((entry) => ["/progress/dexa?context=all", "/progress/photos?context=all"].includes(entry.path));
   if (batch === "ingress") return FOUNDER_SURFACE_CASES.filter((entry) => REPRESENTATIVE_INGRESS_CASES.includes(entry.path));
   if (batch === "details") return FOUNDER_SURFACE_CASES.filter((entry) => [

@@ -7,7 +7,7 @@ import { load } from "js-yaml";
 const [context, appId, componentName = "web", batch = "core", outputPath = null] = process.argv.slice(2);
 if (!/^[A-Za-z0-9_-]+$/.test(context ?? "")) throw new Error("A safe doctl context name is required.");
 if (!/^[0-9a-f-]{36}$/.test(appId ?? "") || !/^[A-Za-z0-9_-]+$/.test(componentName)) throw new Error("A safe app and component identity is required.");
-if (!/^(?:core|training-reports|training-library|evidence|nutrition-landing|nutrition-primary|nutrition-secondary|nutrition-secondary-reports|nutrition-library|evidence-verticals|media|ingress|details|details-home|details-training|details-evidence|details-briefings|details-profile)$/.test(batch)) throw new Error("A supported benchmark batch is required.");
+if (!/^(?:core|training-reports|training-library|evidence|nutrition-landing|nutrition-primary|nutrition-secondary|nutrition-secondary-reports|nutrition-library|evidence-verticals|ancillary-evidence|media|ingress|details|details-home|details-training|details-evidence|details-briefings|details-profile)$/.test(batch)) throw new Error("A supported benchmark batch is required.");
 
 const root = path.resolve(import.meta.dirname, "../..");
 const inventory = fs.readFileSync(path.join(root, "scripts/performance/founderSurfaceInventory.mjs"), "utf8");
@@ -70,7 +70,7 @@ if (outputPath) {
 
 async function sendSource() {
   const send = (data) => socket.send(JSON.stringify({ op: "stdin", data }));
-  send("stty raw -echo\n");
+  send("stty -echo\r");
   await delay(500);
   send("base64 -d <<'PHYSIQUEOS_PERFORMANCE_SOURCE' | gzip -d | node --input-type=module\n");
   await delay(250);
@@ -80,7 +80,7 @@ async function sendSource() {
   }
   send("PHYSIQUEOS_PERFORMANCE_SOURCE\n");
   await delay(250);
-  send("stty sane\nexit\n");
+  send("stty echo\nexit\n");
 }
 
 function delay(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }

@@ -12,7 +12,13 @@ export const FOUNDER_SURFACE_CASES = Object.freeze([
   surface("goals", "Goal transition review", "/goals/transition/review", "compatibility-runtime", { optional: true, benchmarkSafe: false }),
   surface("log", "Log landing", "/log", "core-navigation"),
   surface("log", "Training Logger", "/log/training", "core-navigation"),
+  surface("log", "Progress Photo intake", "/evidence/photos", "client-intake"),
+  surface("log", "DEXA intake", "/evidence/dexa", "client-intake"),
   surface("evidence", "Evidence Hub", "/progress", "progress-hub"),
+  surface("evidence", "Energy Evidence", "/progress/energy", "compatibility-runtime"),
+  surface("evidence", "Protocols Evidence", "/progress/protocols", "compatibility-runtime"),
+  surface("evidence", "Recovery Evidence", "/progress/recovery", "compatibility-runtime"),
+  surface("evidence", "Health Metrics Evidence", "/progress/health-metrics", "compatibility-runtime"),
   ...contexts("training", "Training Evidence", "/progress/training", "training-navigation"),
   ...["resistance", "cardio", "volume", "frequency", "consistency", "history"].flatMap((reportId) =>
     contexts("training", `Training report: ${reportId}`, `/progress/training/reporting/${reportId}`, "training-navigation")
