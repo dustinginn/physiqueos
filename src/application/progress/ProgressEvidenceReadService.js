@@ -138,6 +138,47 @@ export function createProgressEvidenceReadService({ store } = {}) {
         });
       });
     },
+    getEnergy({ context, currentDate = new Date() } = {}) {
+      return store.run("progress.evidence.energy", async () => {
+        const [user, goals, dexaScans, nutritionContext, nutritionEvidence, activityEvidence] = await Promise.all([
+          store.getUser(),
+          store.listGoals(),
+          store.listDEXAScans(),
+          store.getNutritionContext(),
+          store.listCanonicalNutritionEvidenceObjects(),
+          store.listCanonicalActivityAndTrainingEvidenceObjects(),
+        ]);
+        const timeline = createEvidenceTimeline({
+          context,
+          currentDate,
+          goals,
+          label: "Energy",
+          source: "canonical_training_history",
+          user,
+        });
+        const nutritionPackages = nutritionEvidence.length ? [] : await store.listEvidencePackages();
+        const activityPackages = activityEvidence.length ? [] : nutritionPackages.length
+          ? nutritionPackages
+          : await store.listEvidencePackages();
+        const nutrition = createProviderNutritionEvidenceReports({
+          canonicalEvidenceObjects: nutritionEvidence,
+          evidencePackages: nutritionPackages,
+          goals,
+          nutritionContext,
+        }).globalReport;
+        const activity = createProviderActivityEvidenceReport({
+          canonicalEvidenceObjects: activityEvidence,
+          evidencePackages: activityPackages,
+          goals,
+        });
+        return Object.freeze({
+          activityDays: activity.activityHistory,
+          dexaScans,
+          nutritionDays: nutrition.nutritionDays,
+          timeline,
+        });
+      });
+    },
   });
 }
 

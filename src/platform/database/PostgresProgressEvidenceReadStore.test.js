@@ -6,6 +6,7 @@ describe("PostgreSQL Progress evidence read store", () => {
     ["progress.evidence.weight", ["getUser", "listGoals", "listWeightEntries", "listDEXAScans"], 4],
     ["progress.evidence.nutrition", ["getUser", "listGoals", "getNutritionContext", "listCanonicalNutritionEvidenceObjects"], 4],
     ["progress.evidence.activity", ["getUser", "listGoals", "listCanonicalActivityAndTrainingEvidenceObjects"], 3],
+    ["progress.evidence.energy", ["getUser", "listGoals", "listDEXAScans", "getNutritionContext", "listCanonicalNutritionEvidenceObjects", "listCanonicalActivityAndTrainingEvidenceObjects"], 6],
   ])("uses bounded queries for %s", async (readModel, methods, expectedQueries) => {
     const query = vi.fn(async () => ({ rows: [] }));
     const complete = vi.fn();

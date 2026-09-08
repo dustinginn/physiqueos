@@ -23,9 +23,29 @@ export async function getEnergyEvidenceReport({
     repositories.dexaScans.listDEXAScans(user?.id),
     getTrainingEvidenceContext({ context: contextId, currentDate, repositories }),
   ]);
-  const reconciliationInputs = {
-    nutritionDays: nutrition.report.nutritionDays,
+  return createProviderEnergyEvidenceReport({
     activityDays: activity.report.activityHistory,
+    contextId,
+    currentDate,
+    currentPath,
+    dexaScans,
+    nutritionDays: nutrition.report.nutritionDays,
+    timeline: baseTimeline,
+  });
+}
+
+export function createProviderEnergyEvidenceReport({
+  activityDays = [],
+  contextId = "build-lean-mass",
+  currentDate = new Date(),
+  currentPath = "/progress/energy",
+  dexaScans = [],
+  nutritionDays = [],
+  timeline: baseTimeline,
+} = {}) {
+  const reconciliationInputs = {
+    nutritionDays,
+    activityDays,
     dexaScans,
   };
   const allDays = reconcileEnergyDays(reconciliationInputs);

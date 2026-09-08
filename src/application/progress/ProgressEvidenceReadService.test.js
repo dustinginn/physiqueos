@@ -5,6 +5,7 @@ import { getActivityTimelineReport } from "../../domain/services/ActivityEvidenc
 import { getNutritionTimelineReport } from "../../domain/services/NutritionEvidenceContextService.js";
 import { getWeightTimelineReport } from "../../domain/services/WeightEvidenceContextService.js";
 import { getDEXATimelineReport } from "../../domain/services/DEXAEvidenceContextService.js";
+import { createProviderEnergyEvidenceReport, getEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
 import { createPhase5SyntheticRuntime } from "../../platform/migration/phase5SyntheticPackage.js";
 import { createRepositoryProgressEvidenceReadStore } from "../../platform/database/PostgresProgressEvidenceReadStore.js";
 import { createProgressEvidenceReadService } from "./ProgressEvidenceReadService.js";
@@ -19,6 +20,21 @@ describe("provider-native Progress evidence reads", () => {
       expect(await narrow.getDEXA({ context, currentDate })).toEqual(
         await getDEXATimelineReport({ context, currentDate, repositories: legacy })
       );
+    }
+  );
+
+  it.each(["all", "build-lean-mass", "visible-abs"])(
+    "keeps Energy output equivalent for %s",
+    async (context) => {
+      const currentDate = new Date("2026-08-29T12:00:00-07:00");
+      const { narrow, legacy } = services();
+      const input = await narrow.getEnergy({ context, currentDate });
+      expect(createProviderEnergyEvidenceReport({
+        ...input,
+        contextId: input.timeline.contextId,
+        currentDate,
+        timeline: input.timeline,
+      })).toEqual(await getEnergyEvidenceReport({ context, currentDate, repositories: legacy }));
     }
   );
 
@@ -78,13 +94,14 @@ describe("provider-native Progress evidence reads", () => {
       "src/app/progress/weight/page.js",
       "src/app/progress/nutrition/page.js",
       "src/app/progress/activity/page.js",
+      "src/app/progress/energy/page.js",
       "src/app/progress/nutrition/reporting/[reportId]/page.js",
       "src/app/progress/nutrition/library/[[...path]]/page.js",
       "src/app/progress/nutrition/day/[dayId]/page.js",
     ]) {
       const source = fs.readFileSync(route, "utf8");
       expect(source).toContain("getProductionProgressEvidenceReadService");
-      expect(source).not.toMatch(/getDEXATimelineReport|getWeightTimelineReport|getNutritionTimelineReport|getActivityTimelineReport|createProgressReportingService|FounderRepositories/);
+      expect(source).not.toMatch(/getDEXATimelineReport|getWeightTimelineReport|getNutritionTimelineReport|getActivityTimelineReport|getEnergyEvidenceReport|createProgressReportingService|FounderRepositories/);
     }
   });
 
