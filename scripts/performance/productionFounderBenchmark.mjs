@@ -56,7 +56,7 @@ try {
 function selectCases(batch) {
   if (batch === "core") return FOUNDER_SURFACE_CASES.filter((entry) => ["home", "goals", "log", "evidence", "briefings", "profile", "timeline"].includes(entry.group));
   if (batch === "training-reports") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "training" && (entry.label.startsWith("Training Evidence") || entry.label.includes("Training report:")));
-  if (batch === "training-library") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "training" && entry.label.includes("Training Library"));
+  if (batch === "training-library") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "training" && (entry.label.includes("Training Library") || entry.label.startsWith("Training exercise detail")));
   if (batch === "evidence") return FOUNDER_SURFACE_CASES.filter((entry) => ["nutrition", "activity", "weight", "dexa", "photos"].includes(entry.group));
   if (batch === "nutrition-landing") return FOUNDER_SURFACE_CASES.filter((entry) => entry.label.startsWith("Nutrition Evidence"));
   if (batch === "nutrition-primary") return FOUNDER_SURFACE_CASES.filter((entry) => entry.group === "nutrition" && ["calories", "macros", "meals"].some((report) => entry.label.includes(`Nutrition report: ${report}`)));
