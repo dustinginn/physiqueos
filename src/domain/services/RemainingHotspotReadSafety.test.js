@@ -28,4 +28,22 @@ describe("remaining production hotspot read boundaries", () => {
     expect(source).not.toContain('"evidencePackages"');
     expect(source).not.toContain('"analyses"');
   });
+
+  it("keeps every Founder Profile page off the broad compatibility repository facade", () => {
+    const root = path.join(process.cwd(), "src/app/profile");
+    const pages = walk(root).filter((file) => file.endsWith("page.js"));
+    expect(pages.length).toBeGreaterThan(10);
+    for (const file of pages) {
+      const source = fs.readFileSync(file, "utf8");
+      expect(source, path.relative(process.cwd(), file)).not.toContain("FounderRepositories");
+      expect(source, path.relative(process.cwd(), file)).not.toContain("loadProductionApplicationScopedRuntime");
+    }
+  });
 });
+
+function walk(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const resolved = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(resolved) : [resolved];
+  });
+}

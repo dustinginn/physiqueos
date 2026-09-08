@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { getFounderStoreRevision } from "../../data/repositories/FounderStoreUnitOfWork";
-import { createFounderRuntimeSemanticDigest } from "./FounderRuntimeSemanticDigest";
+import { createCoachingUpdatesSemanticDigest, createProgressPhotosScheduleSemanticDigest } from "./FounderRuntimeSemanticDigest";
 import { createCoachingUpdatesStrategyManagementService } from "./CoachingUpdatesStrategyManagementService";
 import { filterEligibleEventBriefingTypes, resolveCoachingUpdatesReadModel, resolveEventBriefingPreferencesFromStore } from "./CoachingUpdatesReadService";
 import { createProgressPhotosExecutionHydrationModel } from "./ProgressPhotosExecutionScheduleService";
@@ -13,6 +13,19 @@ afterEach(() => directories.splice(0).forEach((directory) =>
   fs.rmSync(directory, { recursive: true, force: true })));
 
 describe("Coaching Updates cross-owner strategy save", () => {
+  it("scopes semantic guards to editable dependencies while retaining the global revision fence", async () => {
+    const fixture = setup();
+    const request = command(fixture.live);
+    const digest = request.expectedSemanticDigest;
+    fixture.live.dailyBriefings = [{ id: "unrelated-publication" }];
+    expect(createCoachingUpdatesSemanticDigest(fixture.live)).toBe(digest);
+    fixture.live.revision += 1;
+    expect(await fixture.service.save(request)).toMatchObject({
+      outcome: "concurrency_conflict",
+      committed: false,
+    });
+  });
+
   it("atomically updates coaching, the canonical photo recurrence, and the canonical DEXA appointment", async () => {
     const fixture = setup();
     const before = protectedSnapshot(fixture.live);
@@ -124,7 +137,7 @@ function setup() {
 }
 
 function command(live) {
-  const digest = createFounderRuntimeSemanticDigest(live);
+  const digest = createCoachingUpdatesSemanticDigest(live);
   return {
     expectedRevision: getFounderStoreRevision(live),
     expectedSemanticDigest: digest,
@@ -146,7 +159,7 @@ function command(live) {
       protocolId: "photos",
       expectedCurrentVersionId: "photos-v1",
       expectedRevision: getFounderStoreRevision(live),
-      expectedSemanticDigest: digest,
+      expectedSemanticDigest: createProgressPhotosScheduleSemanticDigest(live),
       effectiveDate: "2026-08-08",
       recurrence: {
         frequency: "weekly", interval: 2, weekdays: ["sunday"],
@@ -188,7 +201,7 @@ function currentCommand(live, reminderEnabled) {
 
   return {
     expectedRevision: getFounderStoreRevision(live),
-    expectedSemanticDigest: createFounderRuntimeSemanticDigest(live),
+    expectedSemanticDigest: createCoachingUpdatesSemanticDigest(live),
     coaching: {
       protocolId: coachingRoot.id,
       expectedCurrentVersionId: coachingVersion.id,

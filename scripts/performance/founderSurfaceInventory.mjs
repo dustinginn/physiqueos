@@ -45,6 +45,13 @@ export const FOUNDER_SURFACE_CASES = Object.freeze([
   surface("profile", "You", "/profile", "core-navigation"),
   surface("profile", "Operating Plan", "/profile/operating-plan", "core-navigation"),
   surface("profile", "Operating Plan tracking", "/profile/operating-plan/tracking", "compatibility-runtime"),
+  surface("profile", "Morning weigh-in support editor", "/profile/operating-plan/tracking/morning-weigh-in", "bounded-runtime"),
+  surface("profile", "DEXA execution detail", "/profile/operating-plan/execution/dexa", "bounded-runtime"),
+  surface("profile", "DEXA execution editor", "/profile/operating-plan/execution/dexa?edit=1", "bounded-runtime"),
+  surface("profile", "New activity protocol", "/profile/operating-plan/activity/new", "bounded-runtime"),
+  surface("profile", "New energy strategy", "/profile/operating-plan/energy/new", "bounded-runtime"),
+  surface("profile", "New training protocol", "/profile/operating-plan/training/new", "bounded-runtime"),
+  surface("profile", "New supplement strategy", "/profile/operating-plan/supplements/new", "bounded-runtime"),
   surface("timeline", "History timeline", "/timeline", "compatibility-runtime"),
 ]);
 

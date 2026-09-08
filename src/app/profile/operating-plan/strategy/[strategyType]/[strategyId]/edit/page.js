@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../../../data/repositories/founderRepositories";
 import { createStrategyEditorModel } from "../../../../../../../domain/services/StrategyEditorService";
 import { createCoachingUpdatesReadService } from "../../../../../../../domain/services/CoachingUpdatesReadService";
 import { resolveCoachingUpdatesGoalCadencePolicy } from "../../../../../../../domain/services/CoachingUpdatesGoalCadencePolicyService";
 import { createCoachingUpdatesEditorModel } from "../../../../../../../domain/services/CoachingUpdatesEditorService";
-import { loadProductionApplicationScopedRuntime } from "../../../../../../../application/composition/productionApplicationComposition";
-import { createFounderRuntimeSemanticDigest } from "../../../../../../../domain/services/FounderRuntimeSemanticDigest";
+import { loadProductionBoundedFounderReadContext } from "../../../../../../../application/composition/productionApplicationComposition";
+import { createCoachingUpdatesSemanticDigest } from "../../../../../../../domain/services/FounderRuntimeSemanticDigest";
 import { getFounderStoreRevision } from "../../../../../../../data/repositories/FounderStoreUnitOfWork";
 import { createProgressPhotosExecutionHydrationModel } from "../../../../../../../domain/services/ProgressPhotosExecutionScheduleService";
 import { DEXA_APPOINTMENT_ID } from "../../../../../../../domain/services/DexaAppointmentManagementService";
@@ -17,22 +16,21 @@ export const dynamic = "force-dynamic";
 export default async function StrategyEditPage({ params }) {
   const { strategyId, strategyType } = await params;
   if (!["briefings", "nutrition", "training"].includes(strategyType)) notFound();
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
-  const protocol = await FounderRepositories.protocols.getProtocolById(strategyId);
+  const {repositories,runtime:store}=await loadProductionBoundedFounderReadContext({collections:["user","goals","protocols","protocolVersions","executionItems","reminders","dexaScans","progressPhotos","evidenceReviews"]});
+  const user = await repositories.users.getCurrentUser();
+  const protocol = await repositories.protocols.getProtocolById(strategyId);
   if (!protocol || protocol.userId !== user.id || protocol.status !== "active" ||
       (protocol.protocolType ?? protocol.category) !== strategyType) notFound();
-  const version = await FounderRepositories.protocolVersions.getCurrentVersion(protocol.id);
+  const version = await repositories.protocolVersions.getCurrentVersion(protocol.id);
   let model;
   let coachingContext;
   if (strategyType === "briefings") {
-    const store = await loadProductionApplicationScopedRuntime();
     const photoHydration = createProgressPhotosExecutionHydrationModel(store);
     const dexaItem = store.executionItems?.find((item) => item.id === DEXA_APPOINTMENT_ID);
     const [readModel, goal] = await Promise.all([
-      createCoachingUpdatesReadService({ repositories: FounderRepositories })
+      createCoachingUpdatesReadService({ repositories })
         .getCurrent({ protocolId: protocol.id, userId: user.id }),
-      FounderRepositories.goals.getActiveGoal(user.id),
+      repositories.goals.getActiveGoal(user.id),
     ]);
     model = createCoachingUpdatesEditorModel({
       readModel,
@@ -56,7 +54,7 @@ export default async function StrategyEditPage({ params }) {
     if (model) {
       coachingContext = {
         expectedRevision: getFounderStoreRevision(store),
-        expectedSemanticDigest: createFounderRuntimeSemanticDigest(store),
+        expectedSemanticDigest: createCoachingUpdatesSemanticDigest(store),
         photo: photoHydration.context,
         photoRecurrence: photoHydration.item.recurrence,
         dexaExpectedRevision: dexaItem.executionRevision ?? 1,
@@ -73,5 +71,4 @@ export default async function StrategyEditPage({ params }) {
     coachingContext,
   });
   return <StrategyEditorScreen action={action} model={model}/>;
-  }, { readModel: "route.strategy-edit" });
 }

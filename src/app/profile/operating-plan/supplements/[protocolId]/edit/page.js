@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../../data/repositories/founderRepositories";
+import { loadProductionBoundedFounderReadContext } from "../../../../../../application/composition/productionApplicationComposition";
 import SupplementStrategyEditorScreen from "../../../../../../screens/SupplementStrategyEditorScreen";
 import { saveSupplementStrategy } from "./actions";
 
@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSupplementPage({ params }) {
   const { protocolId } = await params;
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
+  const { repositories } = await loadProductionBoundedFounderReadContext({ collections: ["user", "goals", "protocols", "protocolVersions"] });
+  const user = await repositories.users.getCurrentUser();
   const [protocol, version, allGoals] = await Promise.all([
-    FounderRepositories.protocols.getProtocolById(protocolId),
-    FounderRepositories.protocolVersions.getCurrentVersion(protocolId),
-    FounderRepositories.goals.listGoals(user.id),
+    repositories.protocols.getProtocolById(protocolId),
+    repositories.protocolVersions.getCurrentVersion(protocolId),
+    repositories.goals.listGoals(user.id),
   ]);
   if (!protocol || protocol.userId !== user.id || protocol.category !== "supplement" || protocol.status !== "active" || !version) notFound();
   const goals = allGoals.filter((goal) => goal.status === "active" && protocol.relatedGoalIds?.includes(goal.id));
@@ -29,5 +29,4 @@ export default async function EditSupplementPage({ params }) {
       goalId: version.goalLinks?.[0]?.goalId ?? goals[0]?.id ?? "",
     }}
   />;
-  }, { readModel: "route.supplement-strategy-edit" });
 }

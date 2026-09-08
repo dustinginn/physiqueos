@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
+import { loadProductionBoundedFounderReadContext } from "../../../../../application/composition/productionApplicationComposition";
 import { createActivityProtocolBuilderService } from "../../../../../domain/services/ActivityProtocolBuilderService";
 import ActivityProtocolBuilderScreen from "../../../../../screens/ActivityProtocolBuilderScreen";
 import { activateActivityProtocol } from "./actions";
@@ -7,13 +7,12 @@ import { activateActivityProtocol } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function NewActivityProtocolPage() {
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
+  const { repositories } = await loadProductionBoundedFounderReadContext({ collections: ["user", "goals", "operatingPlan", "canonicalEvidenceObjects", "protocols", "protocolVersions"] });
+  const user = await repositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
-  const service = createActivityProtocolBuilderService({ repositories: FounderRepositories });
+  const service = createActivityProtocolBuilderService({ repositories });
   const context = await service.getBuilderContext(user.id);
   if (context.activeProtocol) redirect("/profile/operating-plan?activity=active");
 
   return <ActivityProtocolBuilderScreen action={activateActivityProtocol} context={context} />;
-  }, { readModel: "route.activity-protocol-new" });
 }

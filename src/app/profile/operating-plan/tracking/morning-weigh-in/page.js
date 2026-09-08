@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
+import { loadProductionBoundedFounderReadContext } from "../../../../../application/composition/productionApplicationComposition";
 import { createRecurringSupportHydrationModel } from "../../../../../domain/services/RecurringSupportManagementService";
 import { resolveMorningWeighInSupport } from "../../../../../domain/services/TrackingSupportService";
 import RecurringSupportEditorScreen from "../../../../../screens/RecurringSupportEditorScreen";
@@ -8,12 +8,12 @@ import { saveMorningWeighInSupport } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function MorningWeighInSupportPage() {
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
+  const { repositories } = await loadProductionBoundedFounderReadContext({ collections: ["user", "executionItems", "protocols", "reminders"] });
+  const user = await repositories.users.getCurrentUser();
   const [executionItems, protocols, reminders] = await Promise.all([
-    FounderRepositories.executionItems.listExecutionItems(user.id),
-    FounderRepositories.protocols.listProtocols(user.id),
-    FounderRepositories.reminders.listReminders(user.id),
+    repositories.executionItems.listExecutionItems(user.id),
+    repositories.protocols.listProtocols(user.id),
+    repositories.reminders.listReminders(user.id),
   ]);
   const support = resolveMorningWeighInSupport({ executionItems, protocols, reminders, userId: user.id });
   if (!support) notFound();
@@ -33,5 +33,4 @@ export default async function MorningWeighInSupportPage() {
       protocol={support.protocol}
     />
   );
-  }, { readModel: "route.morning-weigh-in-support" });
 }

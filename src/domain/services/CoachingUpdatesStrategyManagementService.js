@@ -3,7 +3,7 @@ import {
   createFounderStoreUnitOfWork,
   getFounderStoreRevision,
 } from "../../data/repositories/FounderStoreUnitOfWork.js";
-import { createFounderRuntimeSemanticDigest } from "./FounderRuntimeSemanticDigest.js";
+import { createCoachingUpdatesSemanticDigest } from "./FounderRuntimeSemanticDigest.js";
 import {
   CoachingUpdatesTransactionOutcome,
   applyPreparedCoachingUpdatesTransaction,
@@ -45,7 +45,7 @@ export function createCoachingUpdatesStrategyManagementService({
   return {
     async save(command = {}) {
       if (getFounderStoreRevision(liveStore) !== Number(command.expectedRevision) ||
-          createFounderRuntimeSemanticDigest(liveStore) !== command.expectedSemanticDigest) {
+          createCoachingUpdatesSemanticDigest(liveStore) !== command.expectedSemanticDigest) {
         return failure(CoachingUpdatesStrategyOutcome.CONCURRENCY_CONFLICT, "The plan changed while you were editing. Reload and try again.");
       }
       const unit = createUnitOfWork({ filePath: runtimeStorePath, liveStore, now, stageFrom: liveStore });

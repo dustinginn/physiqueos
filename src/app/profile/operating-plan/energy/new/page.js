@@ -1,18 +1,17 @@
 import { redirect } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
+import { loadProductionBoundedFounderReadContext } from "../../../../../application/composition/productionApplicationComposition";
 import { createOperatingPlanEnergyStrategyService } from "../../../../../domain/services/OperatingPlanEnergyStrategyService";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
+  const { repositories } = await loadProductionBoundedFounderReadContext({ collections: ["user", "goals", "protocols"] });
+  const user = await repositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
 
   await createOperatingPlanEnergyStrategyService({
-    repositories: FounderRepositories,
+    repositories,
   }).getActiveStrategy(user.id);
 
   redirect("/profile/operating-plan");
-  }, { readModel: "route.energy-strategy-new" });
 }

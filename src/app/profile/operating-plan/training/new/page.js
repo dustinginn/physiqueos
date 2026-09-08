@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { FounderRepositories } from "../../../../../data/repositories/founderRepositories";
+import { loadProductionBoundedFounderReadContext } from "../../../../../application/composition/productionApplicationComposition";
 import { createTrainingProtocolBuilderService } from "../../../../../domain/services/TrainingProtocolBuilderService";
 import TrainingProtocolBuilderScreen from "../../../../../screens/TrainingProtocolBuilderScreen";
 import { activateTrainingProtocol } from "./actions";
@@ -7,12 +7,11 @@ import { activateTrainingProtocol } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function NewTrainingProtocolPage() {
-  return FounderRepositories.runInReadScope(async () => {
-  const user = await FounderRepositories.users.getCurrentUser();
+  const { repositories } = await loadProductionBoundedFounderReadContext({ collections: ["user", "goals", "protocols", "protocolVersions"] });
+  const user = await repositories.users.getCurrentUser();
   if (!user) redirect("/profile/operating-plan");
-  const context = await createTrainingProtocolBuilderService({ repositories: FounderRepositories }).getBuilderContext(user.id);
+  const context = await createTrainingProtocolBuilderService({ repositories }).getBuilderContext(user.id);
   if (context.activeProtocol) redirect("/profile/operating-plan?training=active");
 
   return <TrainingProtocolBuilderScreen action={activateTrainingProtocol} context={context} />;
-  }, { readModel: "route.training-protocol-new" });
 }

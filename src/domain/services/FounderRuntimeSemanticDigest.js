@@ -7,6 +7,32 @@ export function createFounderRuntimeSemanticDigest(value) {
     .toUpperCase();
 }
 
+const COACHING_UPDATES_CONCURRENCY_COLLECTIONS = Object.freeze([
+  "dexaScans",
+  "evidenceReviews",
+  "executionItems",
+  "goals",
+  "protocolVersions",
+  "protocols",
+  "reminders",
+  "progressPhotos",
+]);
+
+export function createCoachingUpdatesSemanticDigest(value) {
+  return createFounderRuntimeSemanticDigest(Object.fromEntries(
+    COACHING_UPDATES_CONCURRENCY_COLLECTIONS.map((key) => [key, value?.[key] ?? null]),
+  ));
+}
+
+export function createProgressPhotosScheduleSemanticDigest(value) {
+  return createFounderRuntimeSemanticDigest({
+    executionItems: value?.executionItems ?? null,
+    protocolVersions: value?.protocolVersions ?? null,
+    protocols: value?.protocols ?? null,
+    reminders: value?.reminders ?? null,
+  });
+}
+
 export function createFounderRuntimeFileHash(raw) {
   return createHash("sha256").update(raw).digest("hex").toUpperCase();
 }

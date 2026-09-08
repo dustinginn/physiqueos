@@ -6,7 +6,7 @@ import {
 } from "../../data/repositories/FounderStoreUnitOfWork.js";
 import {
   createFounderRuntimeFileHash,
-  createFounderRuntimeSemanticDigest,
+  createProgressPhotosScheduleSemanticDigest,
 } from "./FounderRuntimeSemanticDigest.js";
 import {
   applyPreparedActiveProtocolSuccessor,
@@ -163,7 +163,7 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
       expectedCurrentVersionId: version.id,
       expectedRevision: baseline?.revision ?? getFounderStoreRevision(store),
       expectedSemanticDigest:
-        baseline?.semanticDigest ?? createFounderRuntimeSemanticDigest(store),
+        baseline?.semanticDigest ?? createProgressPhotosScheduleSemanticDigest(store),
       expectedLastCommitId: baseline?.lastCommitId ?? store.lastCommitId ?? null,
       expectedFileHash: baseline?.fileHash ?? null,
     },
@@ -213,7 +213,7 @@ export function readProgressPhotosPersistedBaseline(runtimeStorePath) {
   return Object.freeze({
     store,
     fileHash: createFounderRuntimeFileHash(raw),
-    semanticDigest: createFounderRuntimeSemanticDigest(store),
+    semanticDigest: createProgressPhotosScheduleSemanticDigest(store),
     revision: getFounderStoreRevision(store),
     lastCommitId: store.lastCommitId ?? null,
   });
@@ -229,7 +229,7 @@ export function prepareProgressPhotosScheduleSuccessor(store, command, timestamp
     return rejected("not_found", "The active Progress Photos schedule is unavailable.");
   }
   if (getFounderStoreRevision(store) !== Number(command.expectedRevision)
-      || createFounderRuntimeSemanticDigest(store) !== command.expectedSemanticDigest) {
+      || createProgressPhotosScheduleSemanticDigest(store) !== command.expectedSemanticDigest) {
     return rejected("version_conflict", "The Progress Photos schedule changed while editing.");
   }
   let recurrence;
@@ -393,7 +393,7 @@ function validateCommandBaseline(baseline, command) {
 function persistedBaselineMatches(current, fresh, expected) {
   return (
     getFounderStoreRevision(current) === expected.revision &&
-    createFounderRuntimeSemanticDigest(current) === expected.semanticDigest &&
+    createProgressPhotosScheduleSemanticDigest(current) === expected.semanticDigest &&
     fresh.revision === expected.revision &&
     fresh.semanticDigest === expected.semanticDigest &&
     fresh.lastCommitId === expected.lastCommitId &&
