@@ -9,8 +9,10 @@ import {
 
 const DIRECT_ORIGIN = "https://physiqueos-foundation-staging-a9or4.ondigitalocean.app";
 const NGROK_ORIGIN = "https://float-departed-symphony.ngrok-free.dev";
-const BENCHMARK_BATCH = "__BENCHMARK_BATCH__";
-const COMPATIBILITY_RUNTIME_QUERY_COUNT = Number("__COMPATIBILITY_RUNTIME_QUERY_COUNT__");
+const BENCHMARK_BATCH = process.argv[2] ?? "__BENCHMARK_BATCH__";
+const COMPATIBILITY_RUNTIME_QUERY_COUNT = Number(
+  process.argv[3] ?? "__COMPATIBILITY_RUNTIME_QUERY_COUNT__",
+);
 const MAX_DISCOVERED_CASES = 80;
 const cookiesByOrigin = new Map();
 let gateSecret = String(process.env.PHYSIQUEOS_ACCESS_GATE_SECRET ?? "").trim();

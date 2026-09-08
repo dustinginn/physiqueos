@@ -1,6 +1,6 @@
 # PhysiqueOS app-wide Founder performance audit
 
-Status: baseline route matrix substantially complete; coherent optimization batches are in local validation and have not been published.
+Status: baseline route matrix substantially complete; coherent optimization batches have passed local validation and have not been published. Production acceptance remains open until authenticated deployment-console access is restored.
 
 ## Verified production parent and isolation
 
@@ -10,6 +10,7 @@ Status: baseline route matrix substantially complete; coherent optimization batc
 | Active deployment | `bacbcbd5-50cb-40e2-8427-de36c4f5fdb4` (`ACTIVE`, `9/9`) |
 | Provider-reported source commit | `07f8ef8dd642288735a6f3d4729b14709f1fd775` |
 | Source branch | `combined-app-platform-cutover` |
+| Current maintained parent after rebase | `bb8fbd65e359445858cbbff8446a6efa348ea203` |
 | Fresh performance branch | `codex/app-wide-performance-20260907` |
 | Fresh worktree | `.worktrees/codex-app-wide-performance-20260907` |
 | Canonical production owner | `user_founder_001` |
@@ -17,11 +18,11 @@ Status: baseline route matrix substantially complete; coherent optimization batc
 
 The deployed environment still reports the older `PHYSIQUEOS_GIT_SHA=2d1fed23...` and `PHYSIQUEOS_BUILD_ID=manual-weight-2d1fed23-20260905`. DigitalOcean's immutable deployment metadata is the source-of-truth serving commit. The stale environment labels are pre-existing operations metadata debt and are not treated as source-lineage evidence in this audit.
 
-The original checkout was 88 commits behind the deployment branch and contained unrelated WP2-C changes. It has not been edited. The fetched Native branch (`5fec8c75`) is divergent from the production lineage; its unmerged commits are inventoried separately and will be rechecked before publication.
+The original checkout was 88 commits behind the deployment branch and contained unrelated WP2-C changes. It has not been edited. While the audit was running, the maintained branch advanced by two canonical Training-registry commits. The performance branch was rebased onto that exact new tip and preserves its fresh-deploy exercise-identity contract. The fetched Native branch (`5fec8c75`) is divergent from the production lineage; its unmerged commits are inventoried separately and will be rechecked before publication.
 
 ## Complete surface inventory
 
-Source enumeration found 87 App Router page patterns. Sixty-four are production-capable page patterns, including the Founder gate; 23 are preview, fixture, simulator, or laboratory-only surfaces. The repeatable benchmark expands normal Founder pages into 119 explicit route/filter cases and discovers dynamic detail links from rendered production output.
+Source enumeration found 87 App Router page patterns. Sixty-four are production-capable page patterns, including the Founder gate; 23 are preview, fixture, simulator, or laboratory-only surfaces. The repeatable benchmark expands normal Founder pages into 125 explicit route/filter cases and discovers 20 classes of dynamic detail links from rendered production output.
 
 | Domain | Production page patterns and common interactions | Explicit benchmark variants | Current read architecture |
 | --- | --- | ---: | --- |
@@ -137,6 +138,28 @@ The deployed compatibility loader performs 42 sequential provider queries for a 
 6. Timeline items no longer serialize the complete structured analysis summary after deriving the display string. The screen never consumed that metadata; it was the dominant source of the 2.28 MB response.
 7. Training Library routes explicitly tell the service when canonical exercise identity hydration already occurred before path classification, eliminating the duplicate provider read while retaining fresh-deploy visibility for `Bicep Curl Machine` and all Founder-created identities.
 8. Runtime-dependent Operating Plan editors reuse the active request snapshot rather than bypassing request-local deduplication.
+9. Energy Evidence now uses a six-query owner-scoped provider store for only User, Goal, DEXA, Nutrition, Activity, and Training inputs. Its existing centralized Energy semantics are reused as a pure projection rather than composing every Progress vertical.
+10. Confidence analysis detail now performs one exact owner-scoped analysis lookup instead of reconstructing all canonical collections.
+
+## Local validation gate
+
+| Gate | Result |
+| --- | --- |
+| Focused touched-path tests | 38 passed |
+| Phase 3 | 17 files / 122 passed |
+| Phase 4 | 13 files / 74 passed |
+| Phase 5 | 10 files / 25 passed |
+| Phase 6 Training | 16 files / 142 passed |
+| Full Phase 6 | 50 files / 481 passed; five pre-existing failures reproduced on untouched `07f8ef8d` |
+| Migration safety | 128 files / 1,212 passed; one artifact-collector environment failure/timeout also reproduced on untouched `07f8ef8d` |
+| Production build | Next.js webpack production build passed |
+| ESLint | 0 errors; two pre-existing `<img>` warnings |
+| Diff integrity | `git diff --check` passed |
+| Focused secret scan | Passed; no credential patterns in branch diff |
+
+An unrestricted all-unit invocation is not an acceptance gate in this repository: it launches mutually incompatible fixture/worktree suites together and exhausted the local Node heap. The phase-specific suites above are the maintained validation boundaries and completed without a new optimized-path failure.
+
+The original App Platform console token expired after the baseline captures, and the remaining valid CLI context has database metadata access but not application-console access. The signed-in browser console had independently expired as well. No post-deployment measurement will be represented as complete until the Founder restores that existing login and the exact deployed commit is measured.
 
 ## Baseline artifacts
 
@@ -146,4 +169,4 @@ Generated benchmark JSON is intentionally ignored under `.tmp/performance/`. The
 - `scripts/performance/productionFounderBenchmark.mjs`
 - `scripts/performance/runProductionFounderBenchmark.mjs`
 
-Remaining baseline batches: discovered dynamic details and the direct-vs-ngrok ingress sample. The core figures above predate output-file support and will be repeated after publication from the exact deployed build; all later batches have preserved JSON artifacts.
+Remaining baseline gaps are limited to ancillary/profile dynamic details, protected media samples, and the direct-vs-ngrok ingress sample that lost console access after the main matrix was captured. The core figures above predate output-file support and will be repeated after publication from the exact deployed build; all later completed batches have preserved JSON artifacts.
