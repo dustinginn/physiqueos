@@ -295,7 +295,7 @@ enum EvidenceLocalInterpretation {
         name: String,
         catalog: [TrainingLoggerCatalogExercise]
     ) -> TrainingLoggerCatalogExercise? {
-        catalog.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        catalog.first { ExerciseSearchMatching.isCanonicalMatch(name, $0.name) }
     }
 
     /// Splits a trailing parenthetical off an exercise heading as its

@@ -709,7 +709,7 @@ final class LoggingSandboxTests: XCTestCase {
         let id = try await reviewID(store)
         let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
 
-        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Pull Ups"])
+        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Pull-Ups"])
         XCTAssertEqual(exercises.map { $0.sets.count }, [4, 4])
         XCTAssertEqual(exercises[0].sets[0].reps, "12")
         XCTAssertEqual(exercises[0].sets[0].load, "50")
@@ -717,8 +717,8 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(exercises[1].sets[0].load, "60")
         XCTAssertTrue(exercises[0].isProvisional)
         XCTAssertNil(exercises[0].canonicalExerciseId)
-        XCTAssertTrue(exercises[1].isProvisional)
-        XCTAssertNil(exercises[1].canonicalExerciseId)
+        XCTAssertFalse(exercises[1].isProvisional)
+        XCTAssertEqual(exercises[1].canonicalExerciseId, "pull_up")
     }
 
     /// Spider Curls is a genuinely catalogued Training Logger exercise
@@ -740,7 +740,7 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertTrue(exercises[0].isProvisional)
         XCTAssertNil(exercises[0].canonicalExerciseId)
         XCTAssertFalse(exercises[1].isProvisional)
-        XCTAssertEqual(exercises[1].canonicalExerciseId, "spider-curls")
+        XCTAssertEqual(exercises[1].canonicalExerciseId, "spider_curl")
     }
 
     /// A known exercise flanked by two different unrecognized exercises:
@@ -759,7 +759,7 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertEqual(exercises.map(\.name), ["Lat Pulldown", "Zercher Squats", "Copenhagen Planks"])
         XCTAssertEqual(exercises.map { $0.sets.count }, [3, 3, 3])
         XCTAssertFalse(exercises[0].isProvisional)
-        XCTAssertEqual(exercises[0].canonicalExerciseId, "lat-pulldown")
+        XCTAssertEqual(exercises[0].canonicalExerciseId, "lat_pulldown")
         XCTAssertTrue(exercises[1].isProvisional)
         XCTAssertTrue(exercises[2].isProvisional)
         XCTAssertEqual(exercises[0].sets[0].reps, "10")
@@ -774,9 +774,9 @@ final class LoggingSandboxTests: XCTestCase {
     func testVariantMatrixPreservesOccurrenceIdentityAcrossKnownAndUnknownCombinations() async throws {
         struct Case { let details: String; let name: String; let canonicalId: String?; let isProvisional: Bool; let variant: String? }
         let cases: [Case] = [
-            .init(details: "Spider curls\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: nil),
-            .init(details: "Spider curls (Slow Eccentric)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: "Slow Eccentric"),
-            .init(details: "Spider curls (Paused)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider-curls", isProvisional: false, variant: "Paused"),
+            .init(details: "Spider curls\n12r 40p x4", name: "Spider Curls", canonicalId: "spider_curl", isProvisional: false, variant: nil),
+            .init(details: "Spider curls (Slow Eccentric)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider_curl", isProvisional: false, variant: "Slow Eccentric"),
+            .init(details: "Spider curls (Paused)\n12r 40p x4", name: "Spider Curls", canonicalId: "spider_curl", isProvisional: false, variant: "Paused"),
             .init(details: "Zercher squats\n8r 135p x3", name: "Zercher Squats", canonicalId: nil, isProvisional: true, variant: nil),
             .init(details: "Zercher squats (Pause at Knee)\n8r 135p x3", name: "Zercher Squats", canonicalId: nil, isProvisional: true, variant: "Pause at Knee"),
         ]
@@ -808,7 +808,7 @@ final class LoggingSandboxTests: XCTestCase {
         let exerciseId = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.id)
         XCTAssertTrue(try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.isProvisional))
 
-        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "spider-curls" })
+        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "spider_curl" })
         store.updateReviewItem(reviewId: id, itemId: itemId) { item in
             guard let index = item.exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
             item.exercises[index].canonicalExerciseId = catalogExercise.canonicalExerciseId
@@ -816,7 +816,7 @@ final class LoggingSandboxTests: XCTestCase {
             item.exercises[index].isProvisional = false
         }
         let matched = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
-        XCTAssertEqual(matched.canonicalExerciseId, "spider-curls")
+        XCTAssertEqual(matched.canonicalExerciseId, "spider_curl")
         XCTAssertEqual(matched.name, "Spider Curls")
         XCTAssertFalse(matched.isProvisional)
         XCTAssertEqual(matched.sets.count, 4)
@@ -838,7 +838,7 @@ final class LoggingSandboxTests: XCTestCase {
         let id = try await reviewID(store)
         let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
 
-        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Pull Ups", "Bicep Curls"])
+        XCTAssertEqual(exercises.map(\.name), ["Bicep Curls", "Pull-Ups", "Bicep Curls"])
         XCTAssertEqual(exercises.map { $0.sets.count }, [4, 4, 3])
         XCTAssertEqual(exercises[0].sets[0].load, "50")
         XCTAssertEqual(exercises[2].sets[0].load, "55")
@@ -861,10 +861,10 @@ final class LoggingSandboxTests: XCTestCase {
         let id = try await reviewID(store)
         let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
 
-        XCTAssertEqual(exercises.map(\.name), ["Pull Ups", "Lat Pulldown", "Cable Fly", "Romanian Deadlift"])
+        XCTAssertEqual(exercises.map(\.name), ["Pull-Ups", "Lat Pulldown", "Cable Fly", "Romanian Deadlifts"])
         XCTAssertEqual(exercises.map { $0.sets.count }, [3, 3, 3, 3])
-        XCTAssertEqual(exercises.map(\.isProvisional), [true, false, false, false])
-        XCTAssertEqual(exercises.map(\.canonicalExerciseId), [nil, "lat-pulldown", "cable-fly", "romanian-deadlift"])
+        XCTAssertEqual(exercises.map(\.isProvisional), [false, false, false, false])
+        XCTAssertEqual(exercises.map(\.canonicalExerciseId), ["pull_up", "lat_pulldown", "cable_fly", "romanian_deadlift"])
     }
 
     /// Boundary preservation must hold symmetrically regardless of which
@@ -905,7 +905,7 @@ final class LoggingSandboxTests: XCTestCase {
         XCTAssertNotEqual(exercises[0].id, exercises[1].id, "two same-named occurrences must not collide on a name-derived id")
 
         let firstId = exercises[0].id
-        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "spider-curls" })
+        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "spider_curl" })
         store.updateReviewItem(reviewId: id, itemId: itemId) { item in
             guard let index = item.exercises.firstIndex(where: { $0.id == firstId }) else { return }
             item.exercises[index].canonicalExerciseId = catalogExercise.canonicalExerciseId
@@ -933,7 +933,7 @@ final class LoggingSandboxTests: XCTestCase {
 
         store.updateReviewItem(reviewId: id, itemId: itemId) { item in
             guard let index = item.exercises.firstIndex(where: { $0.id == secondOccurrenceId }) else { return }
-            item.exercises[index].canonicalExerciseId = "lat-pulldown"
+            item.exercises[index].canonicalExerciseId = "lat_pulldown"
             item.exercises[index].name = "Lat Pulldown"
             item.exercises[index].isProvisional = false
         }
@@ -966,13 +966,13 @@ final class LoggingSandboxTests: XCTestCase {
                 item.exercises[index].isProvisional = false
             }
         }
-        match("lat-pulldown", "Lat Pulldown")
-        match("cable-fly", "Cable Fly")
+        match("lat_pulldown", "Lat Pulldown")
+        match("cable_fly", "Cable Fly")
 
         let exercises = try XCTUnwrap(store.review(id: id)?.items.first?.exercises)
         XCTAssertEqual(exercises.count, 1)
         XCTAssertEqual(exercises[0].id, exerciseId)
-        XCTAssertEqual(exercises[0].canonicalExerciseId, "cable-fly")
+        XCTAssertEqual(exercises[0].canonicalExerciseId, "cable_fly")
         XCTAssertEqual(exercises[0].name, "Cable Fly")
         XCTAssertEqual(exercises[0].sets.count, 3)
     }
@@ -1028,7 +1028,7 @@ final class LoggingSandboxTests: XCTestCase {
 
         XCTAssertEqual(exercises[0].name, "Spider Curls")
         XCTAssertEqual(exercises[0].variant, "Slow Eccentric")
-        XCTAssertEqual(exercises[0].canonicalExerciseId, "spider-curls")
+        XCTAssertEqual(exercises[0].canonicalExerciseId, "spider_curl")
         XCTAssertEqual(exercises[0].sets.count, 4)
 
         // The directive arrives after sets already began, so it must be
@@ -1053,7 +1053,7 @@ final class LoggingSandboxTests: XCTestCase {
 
         XCTAssertEqual(exercises.map(\.name), ["Spider Curls", "Spider Curls"])
         XCTAssertEqual(exercises.map(\.variant), ["Slow Eccentric", "Paused"])
-        XCTAssertEqual(exercises.map(\.canonicalExerciseId), ["spider-curls", "spider-curls"])
+        XCTAssertEqual(exercises.map(\.canonicalExerciseId), ["spider_curl", "spider_curl"])
         XCTAssertEqual(exercises.map { $0.sets.count }, [4, 3])
         XCTAssertNotEqual(exercises[0].id, exercises[1].id)
     }
@@ -1098,7 +1098,7 @@ final class LoggingSandboxTests: XCTestCase {
         let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
 
         XCTAssertEqual(exercise.name, "Spider Curls")
-        XCTAssertEqual(exercise.canonicalExerciseId, "spider-curls")
+        XCTAssertEqual(exercise.canonicalExerciseId, "spider_curl")
         XCTAssertFalse(exercise.isProvisional)
         XCTAssertEqual(exercise.variant, "Static Hold")
     }
@@ -1115,9 +1115,9 @@ final class LoggingSandboxTests: XCTestCase {
         let id = try await reviewID(store)
         let exercise = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
 
-        XCTAssertEqual(exercise.name, "Pull Ups")
-        XCTAssertNil(exercise.canonicalExerciseId)
-        XCTAssertTrue(exercise.isProvisional)
+        XCTAssertEqual(exercise.name, "Pull-Ups")
+        XCTAssertEqual(exercise.canonicalExerciseId, "pull_up")
+        XCTAssertFalse(exercise.isProvisional)
         XCTAssertEqual(exercise.variant, "Neutral Grip")
     }
 
@@ -1134,7 +1134,7 @@ final class LoggingSandboxTests: XCTestCase {
         let itemId = try XCTUnwrap(store.review(id: id)?.items.first?.id)
         let exerciseId = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first?.id)
 
-        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "lat-pulldown" })
+        let catalogExercise = try XCTUnwrap(TrainingExerciseCatalogLoader.loadExercises().first { $0.canonicalExerciseId == "lat_pulldown" })
         store.updateReviewItem(reviewId: id, itemId: itemId) { item in
             guard let index = item.exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
             item.exercises[index].canonicalExerciseId = catalogExercise.canonicalExerciseId
@@ -1143,7 +1143,7 @@ final class LoggingSandboxTests: XCTestCase {
         }
         let matched = try XCTUnwrap(store.review(id: id)?.items.first?.exercises.first)
         XCTAssertEqual(matched.name, "Lat Pulldown")
-        XCTAssertEqual(matched.canonicalExerciseId, "lat-pulldown")
+        XCTAssertEqual(matched.canonicalExerciseId, "lat_pulldown")
         XCTAssertFalse(matched.isProvisional)
         XCTAssertEqual(matched.variant, "Neutral Grip")
     }
@@ -1220,7 +1220,7 @@ final class LoggingSandboxTests: XCTestCase {
         let catalog = try await configuration().exercises
 
         let searchOnly = ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: nil, query: "curl")
-        XCTAssertEqual(searchOnly.map(\.name), ["Spider Curls"])
+        XCTAssertEqual(searchOnly.map(\.name), ["EZ Bar Curls", "Forearm Curls", "Lying Leg Curls", "Seated Leg Curl", "Spider Curls"])
 
         let areaOnly = ExercisePickerFiltering.filtered(catalog: catalog, selectedAreaId: "chest", query: "")
         XCTAssertEqual(Set(areaOnly.map(\.areaId)), ["chest"])

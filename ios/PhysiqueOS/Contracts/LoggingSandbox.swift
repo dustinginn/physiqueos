@@ -646,8 +646,18 @@ enum ExerciseSearchMatching {
         return normalize(exerciseName).contains(normalizedQuery)
     }
 
+    static func isCanonicalMatch(_ candidate: String, _ exerciseName: String) -> Bool {
+        let lhs = normalize(candidate)
+        let rhs = normalize(exerciseName)
+        return lhs == rhs || singularized(lhs) == singularized(rhs)
+    }
+
     private static func normalize(_ value: String) -> String {
         value.lowercased().replacingOccurrences(of: #"[^a-z0-9]+"#, with: "", options: .regularExpression)
+    }
+
+    private static func singularized(_ value: String) -> String {
+        value.hasSuffix("s") ? String(value.dropLast()) : value
     }
 }
 

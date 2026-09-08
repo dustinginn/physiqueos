@@ -12,13 +12,7 @@ struct FixtureTrainingLoggerAPI: TrainingLoggerAPI {
     }
 
     func fetchConfiguration() async throws -> TrainingLoggerConfiguration {
-        guard let url = bundle.url(forResource: "TrainingLoggerFixture", withExtension: "json") else {
-            throw TrainingLoggerAPIError.fixtureMissing
-        }
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(TrainingLoggerConfiguration.self, from: data)
+        try TrainingExerciseCatalogLoader.loadConfiguration(bundle: bundle)
     }
 }
 

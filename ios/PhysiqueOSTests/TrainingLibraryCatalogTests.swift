@@ -69,6 +69,26 @@ final class TrainingLibraryCatalogTests: XCTestCase {
         XCTAssertEqual(seen.count, 54)
     }
 
+    func testLoggerAndLibraryUseTheSameCanonicalCatalog() async throws {
+        let logger = try await FixtureTrainingLoggerAPI().fetchConfiguration()
+        XCTAssertEqual(logger.exercises.count, 54)
+        XCTAssertEqual(Set(logger.exercises.map(\.canonicalExerciseId)).count, 54)
+
+        var libraryIDs = Set<String>()
+        for areaID in Self.expectedAreaCounts.keys {
+            let fetchedArea = try await api.fetchTrainingArea(areaId: areaID)
+            let area = try XCTUnwrap(fetchedArea)
+            libraryIDs.formUnion(area.exercises.compactMap(\.canonicalExerciseId))
+            for row in area.exercises {
+                let canonicalID = try XCTUnwrap(row.canonicalExerciseId)
+                let loggerRow = try XCTUnwrap(logger.exercises.first { $0.canonicalExerciseId == canonicalID })
+                XCTAssertEqual(loggerRow.name, row.label)
+                XCTAssertEqual(loggerRow.areaId, areaID)
+            }
+        }
+        XCTAssertEqual(Set(logger.exercises.map(\.canonicalExerciseId)), libraryIDs)
+    }
+
     /// `landing.trainingAreas[].exerciseCount` (the global, unscoped Library
     /// nav count) must always agree with the actual per-area catalog size —
     /// this is exactly the kind of drift the Founder's "exists in history,

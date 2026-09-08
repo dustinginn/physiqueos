@@ -37,17 +37,17 @@ final class TrainingLoggerTests: XCTestCase {
         let draft = draft(areas: ["chest", "shoulders"])
         let normal = draft.pickerExercises(in: config.exercises, browseAll: false, query: "")
         XCTAssertTrue(normal.allSatisfy(\.previouslyPerformed))
-        XCTAssertFalse(normal.map(\.name).contains("Dumbbell Lateral Raise"))
+        XCTAssertFalse(normal.map(\.name).contains("Lateral Raise"))
         let broad = draft.pickerExercises(in: config.exercises, browseAll: true, query: "")
         let firstRegistryOnly = try XCTUnwrap(broad.firstIndex(where: { !$0.previouslyPerformed }))
         XCTAssertTrue(broad[..<firstRegistryOnly].allSatisfy(\.previouslyPerformed))
-        XCTAssertEqual(draft.pickerExercises(in: config.exercises, browseAll: true, query: "lateral").map(\.name), ["Dumbbell Lateral Raise"])
+        XCTAssertEqual(draft.pickerExercises(in: config.exercises, browseAll: true, query: "lateral").map(\.name), ["Lateral Raise", "Lateral Raises Machine"])
     }
 
     func testExerciseSelectionPresentationTracksSelectedStateCountAndCTA() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
         var draft = draft()
         var presentation = TrainingLoggerSelectionPresentation(draft: draft)
         XCTAssertEqual(presentation.selectedCount, 0)
@@ -56,7 +56,7 @@ final class TrainingLoggerTests: XCTestCase {
         draft.addExercise(bench)
         draft.addExercise(fly)
         XCTAssertTrue(draft.exercises.contains { $0.canonicalExerciseId == bench.canonicalExerciseId })
-        XCTAssertFalse(draft.exercises.contains { $0.canonicalExerciseId == "push-ups" })
+        XCTAssertFalse(draft.exercises.contains { $0.canonicalExerciseId == "pushup" })
         presentation = TrainingLoggerSelectionPresentation(draft: draft)
         XCTAssertEqual(presentation.selectedCount, 2)
         XCTAssertEqual(presentation.startTitle, "Start logging · 2 selected")
@@ -67,7 +67,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testAddingExerciseReusesExactPreviousPerformanceAndPrepopulatesSets() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
         var draft = draft()
         draft.addExercise(bench)
         let exercise = try XCTUnwrap(draft.exercises.first)
@@ -81,7 +81,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testLiveAndPastWorkoutPresentationUseOperationalIdentity() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
         var live = draft()
         live.addExercise(bench)
         var livePresentation = TrainingLoggerWorkoutPresentation(live)
@@ -103,7 +103,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testCompletionAchievementRequiresActualImprovementAgainstComparableHistory() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
         var draft = draft()
         draft.addExercise(bench)
         draft.exercises[0].sets[0].isCompleted = true
@@ -121,7 +121,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testPreviousPerformanceIsStrictlyBeforePastWorkoutDate() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
         var draft = draft(mode: .past, date: "2026-08-22")
         draft.addExercise(bench)
         XCTAssertNil(draft.exercises.first?.previousPerformance, "Future sessions must not prepopulate a past workout.")
@@ -130,7 +130,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testVariantComparisonIsolationUsesVariantHistoryOnly() async throws {
         let config = try await configuration()
-        let spider = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "spider-curls" })
+        let spider = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "spider_curl" })
         let variant = try XCTUnwrap(config.variants.first { $0.key == "slow_eccentric" })
         var draft = draft(areas: ["biceps"])
         draft.addExercise(spider)
@@ -145,7 +145,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testProgressionSuggestionAppearsOnlyForExplicitExactComparableContext() async throws {
         let config = try await configuration()
-        let pushdown = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-triceps-pushdown" })
+        let pushdown = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_pushdown" })
         let variant = try XCTUnwrap(config.variants.first)
         var draft = draft(areas: ["triceps"])
         draft.addExercise(pushdown)
@@ -164,8 +164,8 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testSupersetComparisonIsolationUsesCanonicalPartnerIdentity() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
         var draft = draft()
         draft.addExercise(bench)
         draft.addExercise(fly)
@@ -173,7 +173,7 @@ final class TrainingLoggerTests: XCTestCase {
         let flyId = draft.exercises[1].id
         draft.setSuperset(firstId: benchId, secondId: flyId, catalog: config.exercises)
         XCTAssertEqual(draft.relationships.count, 1)
-        XCTAssertEqual(draft.relationshipContext(for: benchId)?.partnerCanonicalExerciseIds, ["cable-fly"])
+        XCTAssertEqual(draft.relationshipContext(for: benchId)?.partnerCanonicalExerciseIds, ["cable_fly"])
         XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-08-20")
         XCTAssertEqual(draft.exercises[1].previousPerformance?.workoutDate, "2026-08-20")
         draft.removeSuperset(containing: benchId, catalog: config.exercises)
@@ -183,7 +183,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testSetEditingAddingAndRemovingRemainCompactAndOrdered() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
         var draft = draft()
         draft.addExercise(bench)
         let id = draft.exercises[0].id
@@ -201,8 +201,8 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testActiveAndPastWorkoutsAddExercisesWithoutLosingSetEditsOrCreatingDuplicates() async throws {
         let config = try await configuration()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
         for mode in [TrainingLoggerMode.live, .past] {
             var draft = draft(mode: mode)
             draft.addExercise(bench)
@@ -225,8 +225,8 @@ final class TrainingLoggerTests: XCTestCase {
     func testNumericFocusOrderSkipsInapplicableFieldsAcrossMeasurementTypes() async throws {
         let config = try await configuration()
         var draft = draft(areas: ["chest", "core"])
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" }))
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "push-ups" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "pushup" }))
         draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "plank" }))
         let targets = TrainingLoggerNumericFocusOrder.targets(for: draft)
         XCTAssertEqual(targets.filter { $0.exerciseId == draft.exercises[0].id }.map(\.kind), [.reps, .load, .reps, .load, .reps, .load])
@@ -338,8 +338,8 @@ final class TrainingLoggerTests: XCTestCase {
     func testMixedGymVisitPreservesStrengthDetailAndSeparateCardioOwnership() async throws {
         let config = try await configuration()
         var draft = draft()
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
         draft.addExercise(bench)
         draft.addExercise(fly)
         let benchID = draft.exercises[0].id
@@ -368,7 +368,7 @@ final class TrainingLoggerTests: XCTestCase {
 
     func testBodyweightAndTimedSetsPreserveTheirMeasurementSemantics() async throws {
         let config = try await configuration()
-        let pushups = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "push-ups" })
+        let pushups = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "pushup" })
         let plank = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "plank" })
         var draft = draft(areas: ["chest", "core"])
         draft.addExercise(pushups)
@@ -384,8 +384,8 @@ final class TrainingLoggerTests: XCTestCase {
     func testExerciseRemovalAlsoRemovesRelationshipAndOrderingCanChange() async throws {
         let config = try await configuration()
         var draft = draft()
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" }))
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" }))
         let first = draft.exercises[0].id
         let second = draft.exercises[1].id
         draft.setSuperset(firstId: first, secondId: second, catalog: config.exercises)
@@ -399,17 +399,17 @@ final class TrainingLoggerTests: XCTestCase {
     func testSubstitutionIsAtomicAndRejectsDuplicateCanonicalIdentity() async throws {
         let config = try await configuration()
         var draft = draft(areas: ["chest", "back"])
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
-        let lat = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "lat-pulldown" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
+        let lat = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "lat_pulldown" })
         draft.addExercise(bench)
         draft.addExercise(fly)
         let firstId = draft.exercises[0].id
         draft.swapExercise(id: firstId, with: lat)
-        XCTAssertEqual(draft.exercises[0].canonicalExerciseId, "lat-pulldown")
+        XCTAssertEqual(draft.exercises[0].canonicalExerciseId, "lat_pulldown")
         XCTAssertEqual(draft.exercises[0].sets.first?.load, 110)
         draft.swapExercise(id: firstId, with: fly)
-        XCTAssertEqual(draft.exercises[0].canonicalExerciseId, "lat-pulldown", "A duplicate canonical exercise must not be created.")
+        XCTAssertEqual(draft.exercises[0].canonicalExerciseId, "lat_pulldown", "A duplicate canonical exercise must not be created.")
     }
 
     func testNewExerciseIsProvisionalAndNeverClaimsCanonicalSuccess() {
@@ -426,8 +426,8 @@ final class TrainingLoggerTests: XCTestCase {
     func testDraftRoundTripPreservesPastDateVariantSupersetAndSetEdits() async throws {
         let config = try await configuration()
         var draft = draft(mode: .past, date: "2026-08-28")
-        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" })
-        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" })
+        let bench = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        let fly = try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" })
         draft.addExercise(bench)
         draft.addExercise(fly)
         draft.applyVariant(config.variants[1], to: draft.exercises[0].id, catalog: config.exercises)
@@ -460,8 +460,8 @@ final class TrainingLoggerTests: XCTestCase {
     func testSummaryCountsOnlyCompletedSetsAndRealContext() async throws {
         let config = try await configuration()
         var draft = draft()
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench-press" }))
-        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable-fly" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "bench_press" }))
+        draft.addExercise(try XCTUnwrap(config.exercises.first { $0.canonicalExerciseId == "cable_fly" }))
         draft.exercises[0].sets[0].isCompleted = true
         draft.exercises[1].sets[0].isCompleted = true
         draft.applyVariant(config.variants[0], to: draft.exercises[0].id, catalog: config.exercises)
