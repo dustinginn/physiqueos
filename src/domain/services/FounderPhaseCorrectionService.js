@@ -3,12 +3,10 @@ import {
   CanonicalGoalPhaseStatus,
   PhaseReviewState,
   createCanonicalGoalPhase,
-  isActivePhaseStatus,
-  normalizeCanonicalGoalPhases,
-  resolveCanonicalPhaseReviewState,
 } from "../models/canonicalGoalPhase";
 import { createPhaseReviewMilestone, isPhaseReviewMilestone } from
   "../models/phaseReviewMilestone";
+import { resolveCanonicalGoalPhaseChronology } from "./CanonicalGoalPhaseChronologyService.js";
 
 export const FOUNDER_PHASE_CORRECTION_VERSION = "founder_build_lean_mass_phase_repair_v1";
 export const FOUNDER_PHASE_1_STARTED_AT = "2026-07-19";
@@ -93,18 +91,14 @@ function isRepairableFounderPhaseState(first, second) {
 
 export function resolveCommittedPhaseContext(goal, { asOf = new Date() } = {}) {
   const projectedGoal = projectFounderBuildLeanMassPhaseCorrection(goal);
-  const phases = normalizeCanonicalGoalPhases(projectedGoal?.phases ?? [], {
-    goalId: projectedGoal?.id,
-  });
-  const activePhase = phases.find((phase) => isActivePhaseStatus(phase.status)) ?? null;
-  const plannedPhases = phases.filter((phase) => phase.status === CanonicalGoalPhaseStatus.PLANNED);
+  const chronology = resolveCanonicalGoalPhaseChronology(projectedGoal, { asOf });
+  const phases = chronology.phases;
+  const activePhase = chronology.effectivePhase;
+  const plannedPhases = chronology.plannedPhases;
   return Object.freeze({
     goal: Object.freeze(projectedGoal),
     phases,
-    activePhase: activePhase ? Object.freeze({
-      ...activePhase,
-      effectiveReviewState: resolveCanonicalPhaseReviewState(activePhase, { asOf }),
-    }) : null,
+    activePhase,
     plannedPhases,
   });
 }

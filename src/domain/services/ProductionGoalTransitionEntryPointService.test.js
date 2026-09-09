@@ -76,7 +76,7 @@ describe("ProductionGoalTransitionEntryPointService", () => {
   it.each([
     ["no active primary", eligible({ goals: [] })],
     ["multiple active primaries", eligible({ goals: [primary(), primary({ id: "other" })] })],
-    ["target already exists", eligible({ goals: [primary(), { id: "target", title: "Build Lean Mass" }] })],
+    ["target already exists", eligible({ goals: [primary(), { id: "target", title: "Build Lean Mass", type: "build_lean_mass" }] })],
     ["source completed", eligible({ goals: [primary({ completedAt: "2026-07-20T00:00:00Z" })] })],
     ["consumed transition", eligible({ goalTransitionDrafts: [goalDraft({ consumed: true, status: "consumed" })] })],
     ["duplicate live transitions", eligible({

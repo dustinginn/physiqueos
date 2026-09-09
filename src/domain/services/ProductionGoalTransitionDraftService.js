@@ -23,7 +23,7 @@ export function createProductionGoalTransitionDraftService({
         throw new Error("Visible Abs is no longer the active primary goal.");
       }
       if ((store.goals ?? []).some(
-        (goal) => goal.type === "build_lean_mass" || /build lean mass/i.test(goal.title ?? "")
+        (goal) => goal.type === "build_lean_mass"
       )) {
         throw new Error("Build Lean Mass already exists.");
       }

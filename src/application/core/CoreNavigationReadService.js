@@ -12,6 +12,8 @@ import { MORNING_EVIDENCE_RECOVERY_STATUSES } from "../../domain/services/Mornin
 import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
+import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
+import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -25,6 +27,7 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   ]),
   goals: Object.freeze([
     "user", "goals", "goalTransitionDrafts", "goalProtocolTransitionDrafts",
+    "operatingPlan",
     "weightEntries", "dexaScans", "protocols", "nutritionContext", "progressPhotos",
     "dailyBriefings", "analyses", "canonicalEvidenceObjects",
     "goalConfidenceSnapshots", "goalConfidenceHistory", "goalConfidenceContinuitySeeds",
@@ -100,7 +103,9 @@ export function createCoreNavigationReadService({
           .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
           .slice(0, 120);
         return Object.freeze({
-          goalContext: projectGoalContext((runtime.goals ?? []).find((goal) => goal.status === "active") ?? null, initialDate),
+          goalContext: projectGoalContext(selectCanonicalActiveGoal(runtime.goals ?? [], {
+            ownerUserId: runtime.user?.id,
+          }), initialDate),
           initialCanonicalExercises: canonicalExercises,
           initialDate,
           initialHistorySessions: historySessions,
@@ -291,17 +296,19 @@ function projectTrainingHistorySession(record) {
 
 function projectGoalContext(goal, date) {
   if (!goal) return null;
-  const phases = goal.phasePlan?.phases ?? goal.phases ?? goal.phaseTimeline ?? [];
-  const phase = phases.find((candidate) =>
-    (!candidate.startDate || candidate.startDate <= date) &&
-    (!candidate.endDate || date <= candidate.endDate)
-  ) ?? goal.currentPhase ?? null;
+  const phaseGoal = Array.isArray(goal.phases)
+    ? goal
+    : { ...goal, phases: goal.phasePlan?.phases ?? goal.phaseTimeline ?? [] };
+  const phase = phaseGoal.phases.length
+    ? resolveCanonicalGoalPhaseChronology(phaseGoal, { asOf: date }).effectivePhase
+    : goal.currentPhase ?? null;
   return {
     id: goal.id,
     title: goal.title,
     type: goal.type,
     strategy: goal.strategy?.type ?? goal.strategy ?? null,
     phase: phase ? {
+      id: phase.id ?? phase.phaseId ?? null,
       type: phase.type ?? null,
       label: phase.label ?? phase.name ?? phase.title ?? null,
       name: phase.name ?? null,

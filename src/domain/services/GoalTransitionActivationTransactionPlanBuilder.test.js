@@ -146,6 +146,27 @@ describe("GoalTransitionActivationTransactionPlanBuilder", () => {
     expect(validateGoalTransitionActivationPlan(plan)).toBe(true);
   });
 
+  it("persists transition-created supporting objective ownership and legacy Goal compatibility identity", () => {
+    const input = validationResult();
+    input.validatedGoalDraft.value.supportingObjectives = [{
+      id: "objective_strength",
+      title: "Maintain Strength Baseline",
+      accepted: true,
+    }];
+    input.transitionIdentity.targetGoalDraftId = "goal-canonical-build";
+
+    const target = operations(build(input), T.CREATE_TARGET_GOAL)[0];
+
+    expect(target.payload).toMatchObject({
+      legacyGoalIds: ["target-build-lean-mass"],
+      supportingObjectives: [{
+        id: "objective_strength",
+        title: "Maintain Strength Baseline",
+        owningGoalId: "goal-canonical-build",
+      }],
+    });
+  });
+
   it("consumes both drafts after target activation and before final invariants", () => {
     const plan = build();
     const goal = operations(plan, "CONSUME_GOAL_TRANSITION_DRAFT");

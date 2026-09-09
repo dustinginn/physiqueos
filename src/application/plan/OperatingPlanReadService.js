@@ -6,6 +6,7 @@ import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupp
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { describeEnergyStrategyIdentity } from "../../domain/presentation/strategyIdentityPresentation.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
+import { resolveCanonicalGoalRelationships } from "../../domain/services/CanonicalGoalRelationshipService.js";
 
 export function createOperatingPlanReadService({ repositories } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "operating-plan", service: Object.freeze({
@@ -14,7 +15,7 @@ export function createOperatingPlanReadService({ repositories } = {}) {
       const activity = createActivityProtocolBuilderService({ repositories });
       const training = createTrainingProtocolBuilderService({ repositories });
       const energy = createOperatingPlanEnergyStrategyService({ repositories });
-      const [protocols, reminders, nutritionContext, activityContext, trainingContext, energyStrategy, executionItems] = await Promise.all([
+      const [protocols, reminders, nutritionContext, activityContext, trainingContext, energyStrategy, executionItems, goals, operatingPlan] = await Promise.all([
         repositories.protocols.listProtocols(actor.userId),
         repositories.reminders.listReminders(actor.userId),
         repositories.nutritionContext.getNutritionContext(actor.userId),
@@ -22,6 +23,8 @@ export function createOperatingPlanReadService({ repositories } = {}) {
         training.getBuilderContext(actor.userId),
         energy.getActiveStrategy(actor.userId),
         repositories.executionItems.listExecutionItems(actor.userId),
+        repositories.goals.listGoals(actor.userId),
+        repositories.operatingPlan.getOperatingPlan(actor.userId),
       ]);
       return Object.freeze({
         sections: Object.freeze(buildOperatingPlan({ energyStrategy, executionItems, nutritionContext, protocols, reminders, trainingProtocol: trainingContext.currentVersion })),
@@ -29,6 +32,11 @@ export function createOperatingPlanReadService({ repositories } = {}) {
           activity: String(activityContext.currentVersion?.version ?? "1"),
           training: String(trainingContext.currentVersion?.version ?? "1"),
           energy: String(energyStrategy?.version ?? "1"),
+        }),
+        relationshipContext: resolveCanonicalGoalRelationships({
+          goals,
+          operatingPlan,
+          ownerUserId: actor.userId,
         }),
       });
     },

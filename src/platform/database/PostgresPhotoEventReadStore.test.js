@@ -68,7 +68,7 @@ function fakePool() {
     ] };
     if (sql.includes("canonical_goal_records")) return { rows: [
       row("goals", "active-goal", {
-        id: "active-goal", userId: "user_founder_001", primary: true,
+        id: "active-goal", userId: "user_founder_001", primary: true, status: "active",
       }),
     ] };
     if (sql.includes("canonical_execution_records")) return { rows: [] };

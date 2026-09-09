@@ -3,6 +3,7 @@ import { normalizeTrainingContextId } from "../../navigation/trainingTimelineNav
 import { EVIDENCE_CONTEXT_WINDOWS } from "./EvidenceContextWindows";
 import { createProgressReportingService } from "./ProgressReportingService";
 import { runRepositoryReadScope } from "../../application/read-models/RepositoryReadScope";
+import { selectCanonicalActiveGoal } from "./CanonicalGoalRelationshipService.js";
 
 export async function getTrainingEvidenceContext({
   context,
@@ -22,9 +23,7 @@ export function createTrainingEvidenceContext({
   goals = [],
   user = null,
 } = {}) {
-  const activeGoal = goals.find(
-    (goal) => goal.status === "active" && goal.type === "build_lean_mass"
-  );
+  const activeGoal = selectCanonicalActiveGoal(goals, { ownerUserId: user?.id ?? null });
   const completedGoal = goals.find(
     (goal) => goal.id === "goal_visible_abs_at_rest" && goal.status === "completed"
   );

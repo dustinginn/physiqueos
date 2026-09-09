@@ -1,4 +1,5 @@
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
+import { resolveCanonicalGoalRelationships } from "./CanonicalGoalRelationshipService.js";
 
 export function createYouProfileService({ repositories }) {
   return scopeRepositoryReadService({ repositories, namespace: "profile", service: {
@@ -20,6 +21,7 @@ export function createYouProfileService({ repositories }) {
         weights,
         dexaScans,
         progressPhotos,
+        operatingPlan,
       ] = await Promise.all([
         repositories.goals.listGoals(resolvedUserId),
         repositories.protocols.listProtocols(resolvedUserId),
@@ -28,11 +30,17 @@ export function createYouProfileService({ repositories }) {
         repositories.weights.listWeightEntries(resolvedUserId),
         repositories.dexaScans.listDEXAScans(resolvedUserId),
         repositories.progressPhotos?.listPhotos(resolvedUserId) ?? [],
+        repositories.operatingPlan?.getOperatingPlan?.(resolvedUserId) ?? null,
       ]);
 
       const activeProtocols = protocols.filter((protocol) => protocol.status === "active");
-      const primaryGoal = goals.find((goal) => goal.primary);
-      const supportingGoals = goals.filter((goal) => !goal.primary && goal.status === "active");
+      const goalRelationships = resolveCanonicalGoalRelationships({
+        goals,
+        operatingPlan,
+        ownerUserId: resolvedUserId,
+      });
+      const primaryGoal = goals.find((goal) => goal.id === goalRelationships.activeGoalId) ?? null;
+      const supportingGoals = goalRelationships.supportingObjectives;
       const activeReminders = reminders.filter((reminder) => reminder.active);
       const connectedSources = [
         weights.length > 0 && "Weight",
@@ -47,7 +55,7 @@ export function createYouProfileService({ repositories }) {
           title: "PhysiqueOS understands your operating system.",
           summary:
             "Your goals, evidence, protocols, integrations, and preferences are connected into one daily operating model.",
-          goals: goals.filter((goal) => goal.primary && goal.status === "active").length,
+          goals: primaryGoal ? 1 : 0,
           evidenceSources: connectedSources.length,
           activeProtocols: activeProtocols.length,
           connectedIntegrations: getConnectedIntegrationCount({ dexaScans }),
@@ -56,6 +64,7 @@ export function createYouProfileService({ repositories }) {
         goals: {
           primary: primaryGoal,
           supporting: supportingGoals,
+          relationships: goalRelationships,
           href: "/goals",
         },
         operatingPlan: getOperatingPlanSummary({ reminders }),

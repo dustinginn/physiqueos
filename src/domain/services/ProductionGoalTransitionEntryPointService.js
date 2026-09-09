@@ -84,8 +84,7 @@ function entry(label, mode, transitionId) {
 }
 
 function isBuildLeanMassGoal(goal) {
-  return goal.type === "build_lean_mass"
-    || /build lean mass/i.test(goal.title ?? goal.name ?? "");
+  return goal.type === "build_lean_mass";
 }
 
 function newestFirst(left, right) {

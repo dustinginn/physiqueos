@@ -60,12 +60,43 @@ export function resolveActiveOperatingPlanEnergyStrategy({
 
   const protocol = matches[0];
   if (!protocol) return null;
+  return projectEnergyStrategy(protocol, activeGoal.id);
+}
 
+export function resolveOperatingPlanEnergyStrategyAt({
+  goals = [],
+  protocols = [],
+  userId,
+  goalId,
+  phaseId = null,
+  asOf = new Date(),
+} = {}) {
+  const goal = goals.find((item) => item.userId === userId && item.id === goalId) ?? null;
+  if (!goal) return null;
+  const cutoff = timestamp(asOf);
+  const matches = protocols.filter((protocol) =>
+    protocol.userId === userId &&
+    (protocol.protocolType === "energy" || protocol.category === "energy") &&
+    protocolSupportsGoal(protocol, goal.id) &&
+    recognizedMode(protocol.effectiveStrategy?.mode) &&
+    (!phaseId || (protocol.phaseId ?? protocol.effectiveStrategy?.phaseId) === phaseId) &&
+    effectiveTimestamp(protocol) <= cutoff
+  ).sort((left, right) =>
+    effectiveTimestamp(right) - effectiveTimestamp(left) || String(right.id).localeCompare(String(left.id))
+  );
+  if (!matches.length) return null;
+  const winnerTime = effectiveTimestamp(matches[0]);
+  if (matches.length > 1 && effectiveTimestamp(matches[1]) === winnerTime) {
+    throw new Error(`Multiple Energy Strategies are effective for goal ${goal.id}${phaseId ? ` phase ${phaseId}` : ""}.`);
+  }
+  return projectEnergyStrategy(matches[0], goal.id);
+}
+
+function projectEnergyStrategy(protocol, goalId) {
   const selectedPace = recognizedMode(protocol.effectiveStrategy.mode);
-
   return Object.freeze({
     isConfigured: true,
-    goalId: activeGoal.id,
+    goalId,
     protocolId: protocol.id,
     protocolVersionId: protocol.currentVersionId ?? null,
     status: protocol.status,
@@ -91,6 +122,17 @@ export function resolveActiveOperatingPlanEnergyStrategy({
         }
       : null,
   });
+}
+
+function effectiveTimestamp(protocol) {
+  return timestamp(protocol.activatedAt ?? protocol.effectiveAt ?? protocol.startDate ?? "0001-01-01");
+}
+
+function timestamp(value) {
+  if (value instanceof Date) return value.getTime();
+  const parsed = Date.parse(String(value ?? ""));
+  if (!Number.isFinite(parsed)) throw new TypeError("Energy Strategy effective time must be valid.");
+  return parsed;
 }
 
 function protocolSupportsGoal(protocol, goalId) {

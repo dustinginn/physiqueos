@@ -2,6 +2,7 @@ import { ConfidencePublisherRegistry } from
   "../confidence/ConfidencePublisherRegistry";
 import { resolveActiveGoalConfidencePresentation } from
   "./ActiveGoalConfidencePresentationReadService";
+import { selectCanonicalActiveGoal } from "./CanonicalGoalRelationshipService.js";
 
 export const CONFIDENCE_NON_PUBLISHERS = Object.freeze([
   "daily", "energy", "training", "nutrition", "activity", "weight",
@@ -12,9 +13,9 @@ export function diagnoseGoalConfidenceArchitecture(store, {
   dailyBriefing = null,
   homeConfidence = null,
 } = {}) {
-  const activeGoal = (store.goals ?? []).find(
-    (goal) => goal.primary && goal.status === "active"
-  ) ?? (store.goals ?? []).find((goal) => goal.status === "active") ?? null;
+  const activeGoal = selectCanonicalActiveGoal(store.goals ?? [], {
+    ownerUserId: store.user?.id ?? null,
+  });
   const canonical = resolveActiveGoalConfidencePresentation({
     activeGoal,
     store,

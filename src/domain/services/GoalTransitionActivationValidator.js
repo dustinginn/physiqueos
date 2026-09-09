@@ -326,7 +326,7 @@ function validateGoalState({ state, goals, goalDraft, issue }) {
       entityType: "goal", entityId: SOURCE_GOAL_ID,
     });
   }
-  const targetGoals = goals.filter((goal) => goal.type === TARGET_TYPE || /build lean mass/i.test(goal.title ?? ""));
+  const targetGoals = goals.filter((goal) => goal.type === TARGET_TYPE);
   if (targetGoals.some((goal) => goal.primary === true && goal.status === "active")) {
     issue("TARGET_GOAL_ALREADY_ACTIVE", "goal", {
       entityType: "goal", entityId: targetGoals.find((goal) => goal.status === "active")?.id,

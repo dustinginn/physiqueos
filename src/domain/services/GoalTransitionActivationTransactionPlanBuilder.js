@@ -278,6 +278,11 @@ export function buildGoalTransitionActivationTransactionPlan({
       guardrails: structuredClone(goalDraft.guardrails ?? []),
       progressMeasurement: structuredClone(goalDraft.evidenceStrategy),
       coachingCadenceReference: structuredClone(goalDraft.briefingCadence),
+      supportingObjectives: structuredClone((goalDraft.supportingObjectives ?? []).map((objective) => ({
+        ...objective,
+        owningGoalId: targetGoalId,
+      }))),
+      legacyGoalIds: [goalDraft.primaryObjective.id].filter((id) => id && id !== targetGoalId),
       sourceGoalId,
       createdFromTransitionId: input.transitionIdentity.goalTransitionDraftId,
       activationMetadata: { state: "prepared", activateOnlyAfterInvariantValidation: true },

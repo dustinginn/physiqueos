@@ -19,6 +19,7 @@ export async function getNarrativeGoalPresentation(goalKey) {
     collections: [
       "user", "goals", "dexaScans", "weightEntries", "progressPhotos",
       "protocols", "nutritionContext", "canonicalEvidenceObjects",
+      "operatingPlan",
     ],
   });
   return getScopedNarrativeGoalPresentation(goalKey, repositories);
@@ -35,7 +36,11 @@ async function getScopedNarrativeGoalPresentation(goalKey, repositories) {
   const dossier = await getSupportingGoalDossier(goalKey, repositories);
   const user = await repositories.users.getCurrentUser();
   const goals = await repositories.goals.listGoals(user?.id);
-  const goalStartDate = resolveSupportingGoalStartDate(goals, goalKey);
+  const operatingPlan = await repositories.operatingPlan?.getOperatingPlan?.(user?.id) ?? null;
+  const goalStartDate = resolveSupportingGoalStartDate(goals, goalKey, {
+    operatingPlan,
+    ownerUserId: user?.id ?? null,
+  });
 
   return composeSupportingNarrativeGoalPreview({
     goalKey,

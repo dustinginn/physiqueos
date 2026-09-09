@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   createOperatingPlanEnergyStrategyService,
   resolveActiveOperatingPlanEnergyStrategy,
+  resolveOperatingPlanEnergyStrategyAt,
 } from "./OperatingPlanEnergyStrategyService";
 import { buildOperatingPlan } from "../../screens/OperatingPlanScreen";
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
@@ -112,6 +113,35 @@ describe("Operating Plan active Energy Strategy resolver", () => {
       phaseId: "phase-2", phaseStrategyId: "strategy-2",
       caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
       activityExpenditureTarget: { value: 800, unit: "kcal/day" } });
+  });
+
+  it("keeps Phase-specific Energy Strategy history recoverable after the next Phase starts", () => {
+    const phaseOne = energy({
+      id: "phase-one-energy",
+      status: "superseded",
+      phaseId: "phase-1",
+      phaseStrategyId: "strategy-1",
+      activatedAt: "2026-07-01T12:00:00.000Z",
+    });
+    const phaseTwo = energy({
+      id: "phase-two-energy",
+      phaseId: "phase-2",
+      phaseStrategyId: "strategy-2",
+      activatedAt: "2026-08-01T12:00:00.000Z",
+      effectiveStrategy: {
+        mode: "Phase Execution",
+        caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+        activityExpenditureTarget: { value: 800, unit: "kcal/day" },
+      },
+    });
+    expect(resolveOperatingPlanEnergyStrategyAt({
+      goals: [activeGoal], protocols: [phaseOne, phaseTwo], userId,
+      goalId: activeGoal.id, phaseId: "phase-1", asOf: "2026-08-20",
+    }).protocolId).toBe("phase-one-energy");
+    expect(resolveOperatingPlanEnergyStrategyAt({
+      goals: [activeGoal], protocols: [phaseOne, phaseTwo], userId,
+      goalId: activeGoal.id, phaseId: "phase-2", asOf: "2026-08-20",
+    }).protocolId).toBe("phase-two-energy");
   });
 
   it.each(["planned", "archived", "paused", "superseded"])(

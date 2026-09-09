@@ -1,6 +1,7 @@
 import path from "node:path";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers.js";
 import { normalizeLegacyMediaPath } from "../../application/media/ProviderMediaReferenceResolver.js";
+import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 
 const GOAL_ID = "goal_visible_abs_at_rest";
 const COMPLETION_DATE = "2026-07-18";
@@ -76,7 +77,8 @@ export function createPostgresCompletedGoalReadStore({
 
         return Object.freeze({
           goals: Object.freeze(goals),
-          currentGoal: goals.find((goal) => goal.status === "active" && goal.primary) ?? null,
+          // SQL already scoped the payloads to ownerUserId.
+          currentGoal: selectCanonicalActiveGoal(goals),
           dexaScans: Object.freeze(payloads("dexa")),
           progressPhotos: Object.freeze(progressPhotos),
           briefings: Object.freeze(briefings),

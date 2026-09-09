@@ -1,4 +1,5 @@
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
+import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 
 export function createPostgresPhotoEventReadStore({
   pool,
@@ -107,7 +108,7 @@ export function createPostgresPhotoEventReadStore({
         const legacyPhotos = byCollection(evidenceRows, "progressPhotos");
         const dexaScans = byCollection(evidenceRows, "dexaScans");
         const goals = byCollection(goalRows, "goals");
-        const goal = goals.find((item) => item.userId === ownerUserId && item.primary) ?? null;
+        const goal = selectCanonicalActiveGoal(goals);
         const analyses = byCollection(confidenceRows, "analyses");
         const artifacts = payloads(briefingRows);
         const metadata = metadataRows[0] ?? {};

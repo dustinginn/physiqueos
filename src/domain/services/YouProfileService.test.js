@@ -5,7 +5,7 @@ describe("YouProfileService active Goal count", () => {
   it.each([
     [[], 0, "0 active"],
     [[goal("one", "active")], 1, "1 active"],
-    [[goal("one", "active"), goal("two", "active", true), goal("done", "completed")], 2, "2 active"],
+    [[goal("one", "active"), goal("supporting", "active", false), goal("done", "completed")], 1, "1 active"],
   ])("reads canonical Goal records without mutation", async (goals, expectedCount, expectedLabel) => {
     const repositories = fixtureRepositories(goals);
     const before = structuredClone(goals);
@@ -27,6 +27,26 @@ describe("YouProfileService active Goal count", () => {
     }).getYouProfile();
 
     expect(profile.operatingStatus.goals).toBe(1);
+  });
+
+  it("projects only supporting objectives explicitly owned by the canonical Goal", async () => {
+    const repositories = fixtureRepositories([
+      goal("primary", "active", true),
+      goal("owned-supporting", "active", false),
+      goal("unowned-supporting", "active", false),
+    ]);
+    repositories.operatingPlan = {
+      getOperatingPlan: vi.fn(async () => ({
+        primaryGoalId: "primary",
+        supportingObjectiveIds: ["owned-supporting"],
+      })),
+    };
+
+    const profile = await createYouProfileService({ repositories }).getYouProfile();
+
+    expect(profile.goals.supporting).toEqual([
+      expect.objectContaining({ id: "owned-supporting", owningGoalId: "primary" }),
+    ]);
   });
 });
 

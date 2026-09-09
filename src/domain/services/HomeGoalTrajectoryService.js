@@ -1,6 +1,7 @@
 import { expectedPhaseReviewDate, PHASE_DATE_ARITHMETIC_CONVENTION } from "./GoalPhaseTimelineIntegrityService";
 import { isActivePhaseStatus, isPlannedPhaseStatus } from "../models/canonicalGoalPhase";
 import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
+import { resolveCanonicalGoalPhaseChronology } from "./CanonicalGoalPhaseChronologyService.js";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -12,10 +13,18 @@ export function resolveHomeGoalTrajectory({ activeGoal, phases, currentDate = ne
   }
 
   const ordered = [...explicitPhases].sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
-  const active = ordered.filter((phase) => isActivePhaseStatus(phase.status));
-  const blockingReasons = active.length === 1 ? [] : [active.length ? "MULTIPLE_ACTIVE_PHASES" : "ACTIVE_PHASE_MISSING"];
   const today = localDate(currentDate, timeZone);
-  const activePhase = active.length === 1 ? phaseSummary(active[0], today) : null;
+  const committedActive = ordered.filter((phase) => isActivePhaseStatus(phase.status));
+  const chronology = committedActive.length <= 1
+    ? resolveCanonicalGoalPhaseChronology({ ...correctedGoal, phases: ordered }, { asOf: today })
+    : null;
+  const active = committedActive.length === 1 ? committedActive : [];
+  const blockingReasons = committedActive.length === 1
+    ? []
+    : [committedActive.length ? "MULTIPLE_ACTIVE_PHASES" : "ACTIVE_PHASE_MISSING"];
+  const activePhase = chronology?.effectivePhase
+    ? phaseSummary(chronology.effectivePhase, today)
+    : active.length === 1 ? phaseSummary(active[0], today) : null;
   const targetDescription = correctedGoal.target?.description ?? null;
   const journeyStartDate = validDate(correctedGoal.timeline?.startDate) ? correctedGoal.timeline.startDate : null;
   const overallTargetDate = validDate(correctedGoal.target?.targetDate)

@@ -8,6 +8,7 @@ import { resolveActiveGoalConfidencePresentation } from "../../domain/services/A
 import { resolveCommittedPhaseContext } from "../../domain/services/FounderPhaseCorrectionService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
+import { resolveCanonicalGoalRelationships } from "../../domain/services/CanonicalGoalRelationshipService.js";
 
 const COMPLETED_GOAL_ID = "goal_visible_abs_at_rest";
 
@@ -15,7 +16,7 @@ export function createGoalsHubReadService({ repositories, readRuntimeStore } = {
   return scopeRepositoryReadService({ repositories, namespace: "goals", service: Object.freeze({
     async getGoalsHub({ principal } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
-      const [goals, activeGoal, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext, analyses, canonicalEvidence, briefings] = await Promise.all([
+      const [goals, activeGoal, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext, analyses, canonicalEvidence, briefings, operatingPlan] = await Promise.all([
         repositories.goals.listGoals(actor.userId),
         repositories.goals.getActiveGoal(actor.userId),
         repositories.dexaScans.listDEXAScans(actor.userId),
@@ -26,6 +27,7 @@ export function createGoalsHubReadService({ repositories, readRuntimeStore } = {
         repositories.analyses.listAnalyses(),
         repositories.canonicalEvidence.listCanonicalEvidenceObjects(actor.userId),
         repositories.dailyBriefings.listDailyBriefings(actor.userId),
+        repositories.operatingPlan?.getOperatingPlan?.(actor.userId) ?? null,
       ]);
       const trainingPerformance = createTrainingPerformanceIntelligenceReport({ canonicalObjects: canonicalEvidence });
       const evaluations = GoalEvaluationService.getGoalEvaluations({ goals, dexaScans, weightEntries, progressPhotos, protocols, nutritionContext, photoAnalyses: analyses, trainingPerformance });
@@ -55,6 +57,11 @@ export function createGoalsHubReadService({ repositories, readRuntimeStore } = {
           href: "/goals/visible-abs",
         }] : []),
         transitionEntry: safelyGetProductionGoalTransitionEntryPointState(structuredClone(runtimeStore)),
+        relationshipContext: resolveCanonicalGoalRelationships({
+          goals,
+          operatingPlan,
+          ownerUserId: actor.userId,
+        }),
       });
     },
   }) });

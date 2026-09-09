@@ -1,4 +1,5 @@
 import { resolveHomeGoalTrajectory } from "./HomeGoalTrajectoryService";
+import { resolveCanonicalGoalRelationships } from "./CanonicalGoalRelationshipService.js";
 
 const BUILD_LEAN_MASS_TYPE = "build_lean_mass";
 
@@ -47,9 +48,15 @@ export function deriveHomeActiveChapterPresentation({
     delta: overallGoalConfidence.delta,
     evidenceCutoff: overallGoalConfidence.evidenceCutoff,
   } : null;
+  const relationships = resolveCanonicalGoalRelationships({
+    goals: goals.some((goal) => goal.id === activeGoal.id) ? goals : [activeGoal, ...goals],
+    operatingPlan,
+    ownerUserId: activeGoal.userId,
+  });
 
   return {
     activeGoalId: activeGoal.id,
+    supportingObjectives: relationships.supportingObjectives,
     hero: {
       confidence: presentedConfidence,
       confidenceState: presentedConfidenceState,

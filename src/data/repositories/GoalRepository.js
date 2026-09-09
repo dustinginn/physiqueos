@@ -7,7 +7,13 @@ export function createGoalRepository(goals = [], options = {}) {
     },
 
     async getActiveGoal(userId) {
-      return goals.find((goal) => goal.userId === userId && goal.primary) ?? null;
+      const matches = goals.filter((goal) =>
+        goal.userId === userId && goal.primary === true && goal.status === "active"
+      );
+      if (matches.length > 1) {
+        throw new Error("Multiple active primary Goals prevent canonical Goal resolution.");
+      }
+      return matches[0] ?? null;
     },
 
     async getGoalById(goalId) {

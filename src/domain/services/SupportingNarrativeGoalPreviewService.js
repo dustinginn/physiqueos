@@ -1,3 +1,9 @@
+import {
+  resolveCanonicalGoal,
+  resolveCanonicalGoalRelationships,
+  selectCanonicalActiveGoal,
+} from "./CanonicalGoalRelationshipService.js";
+
 const GOALS={
   maintenance:{id:"goal_maintain_8_9_body_fat",key:"maintenance",productionHref:"/goals/maintenance"},
   leanMass:{id:"goal_preserve_lean_mass",key:"leanMass",productionHref:"/goals/lean-mass"},
@@ -41,10 +47,20 @@ export function resolveLeanMassGoalStartDate(goals=[]){
   return resolveSupportingGoalStartDate(goals,"leanMass");
 }
 
-export function resolveSupportingGoalStartDate(goals=[],goalKey){
+export function resolveSupportingGoalStartDate(goals=[],goalKey,{
+  operatingPlan=null,
+  ownerUserId=null,
+}={}){
   const definition=GOALS[goalKey];
-  const supportingGoal=goals.find((goal)=>goal.id===definition?.id||(goalKey==="leanMass"&&goal.metricKey==="leanMass")||(goalKey==="maintenance"&&goal.metricKey==="bodyFatPercentage"&&!goal.primary));
-  const activePrimaryGoal=goals.find((goal)=>goal.primary&&goal.status==="active");
+  if(!definition)return null;
+  const relationships=resolveCanonicalGoalRelationships({goals,operatingPlan,ownerUserId});
+  const relationshipGoal=relationships.supportingObjectives.find((goal)=>goal.id===definition.id)??null;
+  const supportingGoal=relationshipGoal??resolveCanonicalGoal({
+    goals,
+    goalId:definition.id,
+    ownerUserId,
+  })?.goal??null;
+  const activePrimaryGoal=selectCanonicalActiveGoal(goals,{ownerUserId});
   return toDateKey(supportingGoal?.startDate)||toDateKey(activePrimaryGoal?.startDate)||null;
 }
 

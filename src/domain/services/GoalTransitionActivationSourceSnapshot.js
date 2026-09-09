@@ -628,7 +628,6 @@ function validateLifecycleState({ blockingReasons, sourceState, transitionIdenti
   const targetConflict = sourceState.goals.some(
     (goal) => goal.id === transitionIdentity.targetGoalDraftId
       || goal.type === "build_lean_mass"
-      || /build lean mass/i.test(goal.title ?? "")
   );
   addMismatch(
     blockingReasons,

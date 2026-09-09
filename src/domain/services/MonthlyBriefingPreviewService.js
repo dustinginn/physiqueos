@@ -9,6 +9,7 @@ import {
   resolveCanonicalGoalCompletion,
   resolveMonthlyDexaBaselineRoles,
 } from "./MonthlyBaselineRoleResolver";
+import { selectCanonicalActiveGoal } from "./CanonicalGoalRelationshipService.js";
 
 const PREVIEW_ID = "monthly_briefing_preview_2026_07_01";
 const PREVIEW_WINDOW = {
@@ -1933,9 +1934,7 @@ export function createMonthlyBriefingPreviewService({ repositories }) {
         repositories.trainingPerformanceEvents?.listTrainingPerformanceEvents() ?? [],
       ]);
 
-      const activeGoal = goals.find(
-        (goal) => goal.status === "active" && goal.type === "build_lean_mass"
-      ) ?? goals.find((goal) => goal.primary && goal.status === "active") ?? null;
+      const activeGoal = selectCanonicalActiveGoal(goals, { ownerUserId: userId });
       const previewWindow = orchestration.previewWindow ?? PREVIEW_WINDOW;
       const monthlyGoal = orchestration.goal ?? resolveMonthlyGoalContext({
         activeGoal,

@@ -1,11 +1,12 @@
 import { FounderRepositories } from "../../data/repositories/founderRepositories";
+import { selectCanonicalActiveGoal } from "./CanonicalGoalRelationshipService.js";
 
 export async function getBuildLeanMassGoalPresentation() {
   const user = await FounderRepositories.users.getCurrentUser();
   const goals = await FounderRepositories.goals.listGoals(user?.id);
-  const goal = goals.find((item) => item.type === "build_lean_mass" && item.status === "active");
+  const goal = selectCanonicalActiveGoal(goals, { ownerUserId: user?.id ?? null });
 
-  if (!goal) {
+  if (!goal || goal.type !== "build_lean_mass") {
     throw new Error("The active Build Lean Mass goal is unavailable.");
   }
 

@@ -1,5 +1,7 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
+import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
+import { resolveCanonicalGoalPhaseChronology } from "../../domain/services/CanonicalGoalPhaseChronologyService.js";
 
 export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplete = null } = {}) {
   if (!pool?.query || !ownerUserId) throw new Error("Active Goal storage requires a PostgreSQL pool and owner.");
@@ -25,8 +27,12 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
       const startedAt = performance.now();
       try {
         const goals = await list("goals");
-        const goal = goals.find((item) => item.status === "active" && item.type === "build_lean_mass") ?? null;
-        const activePhaseStart = goal?.phases?.find((phase) => phase.status === "active")?.startDate ?? "0001-01-01";
+        // The record store query is already owner-bound; legacy payloads need not
+        // duplicate ownerUserId inside the JSON document.
+        const goal = selectCanonicalActiveGoal(goals);
+        const activePhaseStart = goal
+          ? resolveCanonicalGoalPhaseChronology(goal).currentPhase?.startDate ?? "0001-01-01"
+          : "0001-01-01";
         const [users, dexaScans, protocols, phaseStrategies, weightEntries, goalConfidenceSnapshots, goalConfidenceHistory, evidenceRows] = await Promise.all([
           list("user"),
           list("dexaScans"),
