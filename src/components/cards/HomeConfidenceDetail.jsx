@@ -27,10 +27,10 @@ export default function HomeConfidenceDetail({ confidence, detail }) {
   }
 
   return <>
-    <button aria-label={`View why goal confidence is ${confidence} percent`} className="group justify-self-end rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--primary)] active:scale-[0.97]" onClick={showDetail} type="button">
-      <ConfidenceRing label="Goal" size={82} value={confidence} />
+    <button aria-label={`View why Goal Confidence is ${confidence} percent, ${detail.qualitativeLevel}`} className="group justify-self-end rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--primary)] active:scale-[0.97]" onClick={showDetail} type="button">
+      <ConfidenceRing label={detail.qualitativeLevel} size={82} value={confidence} />
     </button>
-    <FloatingSheet description="The evidence currently supporting and limiting the overall trajectory." onOpenChange={changeOpen} open={open} title={`Why confidence is ${confidence}%`}>
+    <FloatingSheet description="The evidence currently supporting and limiting the overall trajectory." onOpenChange={changeOpen} open={open} title={`Why Confidence is ${confidence}%`}>
       <HomeConfidenceDetailBody detail={detail} />
     </FloatingSheet>
   </>;
@@ -41,9 +41,9 @@ export default function HomeConfidenceDetail({ confidence, detail }) {
 // assert on what the modal actually renders rather than only on the presentation-model output.
 export function HomeConfidenceDetailBody({ detail }) {
   return <div className="space-y-4 px-1 py-2" data-testid="home-confidence-detail">
-    <p className="text-sm font-extrabold text-[var(--text-primary)]">Current confidence: {detail.qualitativeLevel}</p>
-    <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports confidence" />
-    <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits confidence" />
+    <p className="text-sm font-extrabold text-[var(--text-primary)]">Current Confidence: {detail.qualitativeLevel}</p>
+    <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports Confidence" />
+    <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits Confidence" />
     <DetailGroup icon={RefreshCw} items={detail.movementFactors} title="What changed" />
     <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What PI needs next" />
     {detail.evidenceContextNote && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.evidenceContextNote}</p>}

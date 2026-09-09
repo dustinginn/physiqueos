@@ -10,11 +10,11 @@ describe("Home phase-aware visual hierarchy", () => {
     const detail = read("src/components/cards/HomeConfidenceDetail.jsx");
     expect(hero).not.toContain("confidenceNarrative &&");
     expect(hero).not.toContain("<ProgressBar");
-    expect(detail).toContain("<button aria-label={`View why goal confidence is ${confidence} percent`}");
+    expect(detail).toContain("<button aria-label={`View why Goal Confidence is ${confidence} percent, ${detail.qualitativeLevel}`}");
     expect(detail).toContain("<FloatingSheet");
-    expect(detail).toContain("What supports confidence");
-    expect(detail).toContain("What limits confidence");
-    expect(detail).toContain("What will make confidence clearer");
+    expect(detail).toContain("What supports Confidence");
+    expect(detail).toContain("What limits Confidence");
+    expect(detail).toContain("What PI needs next");
     expect(detail).not.toMatch(/rawProgress|score formula|evidenceId/);
   });
 

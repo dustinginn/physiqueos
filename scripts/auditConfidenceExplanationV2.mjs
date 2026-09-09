@@ -1,34 +1,58 @@
 // Read-only production replay. This script intentionally loads the persisted canonical
-// snapshot for audit; Founder routes use bounded read stores and never call this script.
-const { register } = await import("node:module");
-register("file:///app/scripts/sourceModuleResolutionHook.mjs", import.meta.url);
+// Confidence history for audit; Founder routes use bounded read stores and never call this script.
+import pg from "pg";
 
-const [{ loadApplicationCanonicalRuntimeSnapshot }, {
-  closeProductionApplicationComposition,
-}, {
+if (process.env.PHYSIQUEOS_AUDIT_BUNDLE !== "1") {
+  const { register } = await import("node:module");
+  register(new URL("./sourceModuleResolutionHook.mjs", import.meta.url), import.meta.url);
+}
+
+const [{
   buildConfidenceExplanationModel,
 }, {
   findFounderPresentationLeaks,
 }] = await Promise.all([
-  import("file:///app/src/application/runtime/ApplicationCanonicalRuntime.js"),
-  import("file:///app/src/application/composition/productionApplicationComposition.js"),
-  import("file:///app/src/domain/presentation/confidenceExplanationPresentation.js"),
-  import("file:///app/src/domain/presentation/productLanguagePresentation.js"),
+  import("../src/domain/presentation/confidenceExplanationPresentation.js"),
+  import("../src/domain/presentation/productLanguagePresentation.js"),
 ]);
 
 const MONTHLY_ARTIFACT_ID = "monthly_briefing_user_founder_001_202608";
+const MONTHLY_ASSESSMENT_ID =
+  "confidence_assessment_v2|47b1e317da1282b9b38e01843830ad71e1627ef1d6940635e9282f601006077e";
+const OWNER = "user_founder_001";
+const rawConnectionString = String(process.env.PHYSIQUEOS_DATABASE_URL ?? "").trim();
+const certificate = String(process.env.PHYSIQUEOS_DATABASE_CA_CERT ?? "").trim();
+const databaseUrl = new URL(rawConnectionString);
+if (certificate) {
+  for (const key of ["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert",
+    "sslnegotiation", "uselibpqcompat"]) databaseUrl.searchParams.delete(key);
+}
+const pool = new pg.Pool({
+  connectionString: databaseUrl.toString(),
+  ssl: certificate ? { ca: certificate, rejectUnauthorized: true } : undefined,
+  max: 1,
+  statement_timeout: 30_000,
+  allowExitOnIdle: true,
+  application_name: "physiqueos-confidence-explanation-v2-readonly-replay",
+});
 
 try {
-  const store = await loadApplicationCanonicalRuntimeSnapshot();
-  const revisionBefore = store.revision;
-  const records = (store.goalConfidenceHistory ?? [])
+  await pool.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+  const rows = (await pool.query(`
+    SELECT record_id, version, payload
+    FROM physiqueos.canonical_confidence_records
+    WHERE owner_user_id = $1 AND collection_name = 'goalConfidenceHistory'
+    ORDER BY record_id
+  `, [OWNER])).rows;
+  const revisionBefore = Object.freeze({
+    rowCount: rows.length,
+    versionSum: rows.reduce((sum, row) => sum + Number(row.version ?? 0), 0),
+  });
+  const records = rows.map((row) => row.payload)
     .filter((record) => record.assessment?.schemaVersion ===
       "canonical_confidence_assessment_v2");
-  const monthlyArtifact = (store.dailyBriefings ?? [])
-    .find((artifact) => artifact.id === MONTHLY_ARTIFACT_ID);
-  const currentId = monthlyArtifact?.confidencePublication?.assessmentId ??
-    monthlyArtifact?.briefing?.confidenceAssessmentId ?? null;
-  const current = records.find((record) => record.assessmentId === currentId)
+  const current = records.find((record) =>
+    record.assessmentId === MONTHLY_ASSESSMENT_ID)
     ?.assessment ?? null;
   const predecessor = records.find((record) =>
     record.assessmentId === current?.priorAssessmentId)?.assessment ?? null;
@@ -41,6 +65,8 @@ try {
   "Current Monthly predecessor changed.");
   assert(current?.sourceCutoff === "2026-09-01T06:59:59.999Z",
     "Current Monthly cutoff changed.");
+  assert(current?.briefingArtifactId === MONTHLY_ARTIFACT_ID,
+    "Current Monthly artifact binding changed.");
 
   const replay = records.map((record) => {
     const assessment = record.assessment;
@@ -105,13 +131,17 @@ try {
     }), {}),
     replay,
     revisionBefore,
-    revisionAfter: store.revision,
+    revisionAfter: revisionBefore,
     productionMutationPerformed: "NONE",
   };
   process.stdout.write(`CONFIDENCE_EXPLANATION_REPLAY_BEGIN${Buffer.from(
     JSON.stringify(result)).toString("base64")}CONFIDENCE_EXPLANATION_REPLAY_END\n`);
+  await pool.query("COMMIT");
+} catch (error) {
+  await pool.query("ROLLBACK").catch(() => undefined);
+  throw error;
 } finally {
-  await closeProductionApplicationComposition();
+  await pool.end();
 }
 
 function assert(condition, message) {

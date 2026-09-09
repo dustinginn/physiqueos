@@ -23,7 +23,7 @@ describe("Home active chapter components", () => {
     }));
 
     expect(html).toContain("lucide-dumbbell");
-    expect(html).toContain("View why goal confidence is 39 percent");
+    expect(html).toContain("View why Goal Confidence is 39 percent, Early confidence");
     expect(html).toContain("4 weeks remaining");
     expect(html).toContain("Planned review: August 17");
     expect(html).not.toMatch(/Maintenance Calibration|Calibration in progress|Projected Finish|Days Remaining|Unavailable/);
