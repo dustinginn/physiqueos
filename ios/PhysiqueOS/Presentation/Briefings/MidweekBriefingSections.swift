@@ -10,19 +10,22 @@ import SwiftUI
 /// Midweek never computes or refreshes it) — Native renders it exactly as
 /// received, same as every other cadence, with no special-cased logic.
 struct MidweekBriefingSections: View {
-    static let sectionInventory = ["Hero", "Goal Confidence", "Training", "Weight", "Energy", "Body Composition", "Coach's Take"]
+    static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"]
     let content: MidweekBriefingContent
     let confidence: BriefingConfidenceReadModel?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let confidence { BriefingConfidenceCard(confidence: confidence) }
             if let energy = content.energy { WeeklyEnergyCard(section: energy) }
-            if let weightContextNarrative = content.weightContextNarrative {
+            if let weight = content.weight {
+                weeklyWeightCard(weight)
+            } else if let weightContextNarrative = content.weightContextNarrative {
                 narrativeCard(title: "Weight Context", text: weightContextNarrative)
             }
-            if let trainingResponseNarrative = content.trainingResponseNarrative {
+            if let training = content.training {
+                MidweekTrainingCard(training: training)
+            } else if let trainingResponseNarrative = content.trainingResponseNarrative {
                 narrativeCard(title: "Training Response", text: trainingResponseNarrative)
             }
             if let bodyComposition = content.bodyComposition { bodyCompositionCard(bodyComposition) }
@@ -31,19 +34,13 @@ struct MidweekBriefingSections: View {
     }
 
     private var hero: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(content.reportingRangeLabel.uppercased())
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Text(content.heroVerdict)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(content.heroSummary)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
+        BriefingLeadCard(
+            eyebrow: "MIDWEEK BRIEFING",
+            rangeLabel: content.reportingRangeLabel,
+            headline: content.heroVerdict,
+            narrative: content.heroSummary,
+            confidence: confidence
+        )
     }
 
     private func narrativeCard(title: String, text: String) -> some View {
@@ -51,12 +48,31 @@ struct MidweekBriefingSections: View {
             VStack(alignment: .leading, spacing: 16) {
                 BriefingEditorialHeading(title: title)
                 Text(text)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(PhysiqueOSTheme.surfaceMuted)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }
+    }
+
+    private func weeklyWeightCard(_ weight: WeeklyWeightSection) -> some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEvidence) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "Weight Context")
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(String(format: "%.1f lb", weight.averageWeightLb))
+                        .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(String(format: "%@%.1f lb", weight.changeLb >= 0 ? "+" : "", weight.changeLb))
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                        .foregroundStyle(PhysiqueOSTheme.chartEvidence)
+                }
+                Text(weight.narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
     }
@@ -84,17 +100,12 @@ struct MidweekBriefingSections: View {
     }
 
     private var coachTakeCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Coach's Take")
-                Text(content.coachTakeNarrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if !content.prioritiesThroughSunday.isEmpty {
-                    BriefingNarrativeList(title: "Priorities Through Sunday", items: content.prioritiesThroughSunday)
-                }
-            }
-        }
+        BriefingCoachFinale(
+            takeaway: content.coachTakeNarrative,
+            recommendation: "Keep the current plan intact until the complete week can be reviewed.",
+            actionTitle: "Through Sunday",
+            actions: content.prioritiesThroughSunday
+        )
     }
 
     private func midweekMetric(_ label: String, _ value: String) -> some View {
@@ -110,5 +121,44 @@ struct MidweekBriefingSections: View {
         .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+private struct MidweekTrainingCard: View {
+    let training: WeeklyTrainingSection
+
+    var body: some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 18) {
+                BriefingEditorialHeading(title: "Training Response")
+                Text(training.headline ?? "The early-week response is holding.")
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(training.narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if let highlights = training.highlights {
+                    ForEach(highlights.prefix(2)) { highlight in
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(highlight.exerciseName)
+                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                Text(highlight.detail)
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            }
+                            Spacer()
+                            Text(highlight.delta)
+                                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        }
+                        .padding(14)
+                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            }
+        }
     }
 }

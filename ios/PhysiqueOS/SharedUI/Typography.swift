@@ -1,5 +1,38 @@
 import SwiftUI
 
+/// Keeps canonical labels and grammatical prose deliberately separate.
+/// Callers must opt into the context they are rendering; a title-cased
+/// domain name is never transformed and leaked into a sentence by a
+/// blanket `.capitalized` operation.
+enum PresentationLanguage {
+    static func displayName(_ canonicalName: String) -> String { canonicalName }
+
+    static func proseName(_ canonicalName: String) -> String {
+        switch canonicalName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "build lean mass": "build lean mass"
+        case "lean mass build": "lean mass phase"
+        case "visible abs", "visible abs at rest": "visible abs"
+        case "establish maintenance": "maintenance phase"
+        default: String(canonicalName.prefix(1)).lowercased() + String(canonicalName.dropFirst())
+        }
+    }
+
+    static func goalPhrase(_ canonicalName: String) -> String {
+        switch canonicalName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "build lean mass": "your goal to build lean mass"
+        case "visible abs", "visible abs at rest": "your visible abs goal"
+        default: "your \(proseName(canonicalName)) goal"
+        }
+    }
+
+    static func displayName(fromIdentifier identifier: String) -> String {
+        identifier
+            .split(separator: "-")
+            .map { word in String(word.prefix(1)).uppercased() + String(word.dropFirst()) }
+            .joined(separator: " ")
+    }
+}
+
 /// PhysiqueOS's native typography, source-derived from the web application.
 ///
 /// The web app (`src/app/layout.js`) loads **Plus Jakarta Sans** as a
@@ -176,6 +209,13 @@ enum PhysiqueOSTypography {
     static let editorialSection = Style(size: 20, weight: .heavy)
     static let editorialBody = Style(size: 16, weight: .medium)
     static let editorialMetric = Style(size: 24, weight: .black)
+    /// Briefing-specific supporting hierarchy. These intentionally sit
+    /// above the compact operational-card styles without changing Logger,
+    /// Nutrition, or other accepted dense surfaces.
+    static let briefingBody = Style(size: 16, weight: .medium)
+    static let briefingSupporting = Style(size: 14, weight: .medium)
+    static let briefingLabel = Style(size: 12, weight: .heavy, trackingEm: 0.08, uppercase: true)
+    static let briefingSecondaryValue = Style(size: 15, weight: .semibold)
     /// `text-lg font-black` (Tailwind default scale: 18px) — the weigh-in
     /// weight value itself.
     static let weighInValue18 = Style(size: 18, weight: .black)

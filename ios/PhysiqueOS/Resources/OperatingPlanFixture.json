@@ -145,7 +145,7 @@
       "strategyId": "strategy_fixture_energy",
       "title": "Lean Mass Build Energy Strategy",
       "purpose": "A controlled surplus supporting the current lean-mass build while training and recovery evidence accumulate.",
-      "goal": "Your Build Lean Mass goal",
+      "goal": "Your lean mass goal",
       "startedDate": "Started Aug 16, 2026",
       "status": "Active",
       "fields": [
@@ -185,7 +185,7 @@
       "strategyId": "strategy_fixture_nutrition",
       "title": "Macro Strategy",
       "purpose": "Macro targets translating the current strategy into daily protein, carbohydrate, and fat.",
-      "goal": "Your Build Lean Mass goal",
+      "goal": "Your lean mass goal",
       "startedDate": "Started Aug 16, 2026",
       "status": "Active",
       "fields": [
@@ -202,7 +202,7 @@
       "strategyId": "strategy_fixture_training",
       "title": "Build Lean Mass Training",
       "purpose": "Weekly structure and progression intent supporting the current lean-mass build.",
-      "goal": "Your Build Lean Mass goal",
+      "goal": "Your lean mass goal",
       "startedDate": "Started Aug 16, 2026",
       "status": "Active",
       "fields": [
@@ -219,7 +219,7 @@
       "strategyId": "strategy_fixture_coaching",
       "title": "Wednesday and Sunday Coaching",
       "purpose": "Turn current evidence into timely coaching without returning to routine daily briefings.",
-      "goal": "Your Build Lean Mass goal",
+      "goal": "Your lean mass goal",
       "startedDate": "Started Jul 19, 2026",
       "status": "Active",
       "fields": [

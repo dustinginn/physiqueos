@@ -8,6 +8,51 @@ import SwiftUI
 /// `UIAppFonts`-registered font is genuinely available to these assertions
 /// — this is not a mock or a fixture stand-in.
 final class SharedUITests: XCTestCase {
+    func testPresentationLanguageSeparatesNamedLabelsFromNaturalProse() {
+        XCTAssertEqual(PresentationLanguage.displayName("Build Lean Mass"), "Build Lean Mass")
+        XCTAssertEqual(PresentationLanguage.displayName("Lean Mass Build"), "Lean Mass Build")
+        XCTAssertEqual(PresentationLanguage.proseName("Build Lean Mass"), "build lean mass")
+        XCTAssertEqual(PresentationLanguage.proseName("Lean Mass Build"), "lean mass phase")
+        XCTAssertEqual(PresentationLanguage.goalPhrase("Build Lean Mass"), "your goal to build lean mass")
+        XCTAssertFalse(PresentationLanguage.goalPhrase("Build Lean Mass").contains("Build Lean Mass"))
+    }
+
+    func testAcceptanceFixtureProseDoesNotLeakCanonicalTitleCasing() throws {
+        let proseKeys: Set<String> = [
+            "body", "narrative", "summary", "opening", "phaseMeaning",
+            "biggestTakeaway", "biggestWin", "questionText", "coachInsightBody",
+            "nextGoalTitle", "purpose", "goal",
+        ]
+        let forbidden = ["Build Lean Mass", "Lean Mass Build", "Visible Abs at Rest", "Establish Maintenance"]
+
+        func inspect(_ value: Any, path: String) {
+            if let dictionary = value as? [String: Any] {
+                for (key, child) in dictionary {
+                    if proseKeys.contains(key), let text = child as? String {
+                        for phrase in forbidden {
+                            XCTAssertFalse(text.contains(phrase), "Canonical display name leaked into prose at \(path).\(key): \(phrase)")
+                        }
+                    }
+                    inspect(child, path: "\(path).\(key)")
+                }
+            } else if let array = value as? [Any] {
+                for (index, child) in array.enumerated() {
+                    inspect(child, path: "\(path)[\(index)]")
+                }
+            }
+        }
+
+        for resource in ["BriefingsFixture", "GoalsFixture", "OperatingPlanFixture"] {
+            let url = try XCTUnwrap(Bundle.main.url(forResource: resource, withExtension: "json"))
+            let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
+            inspect(json, path: resource)
+        }
+    }
+
+    func testSharedConfidencePresentationUsesExactLabelAcrossHomeAndEveryBriefing() {
+        XCTAssertEqual(ConfidenceRing.presentationLabel, "CONFIDENCE")
+        XCTAssertFalse(ConfidenceRing.presentationLabel.contains("GOAL"))
+    }
 
     // MARK: - Plus Jakarta Sans is registered and actually resolves
 

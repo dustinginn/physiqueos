@@ -130,7 +130,7 @@ final class EnergyReadModelTests: XCTestCase {
     func testBuildLeanMassScopeExcludesVisibleAbsEraDays() async throws {
         let report = try await api.fetchEnergyReport(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         XCTAssertTrue(report.dailyHistory.allSatisfy { $0.date >= "2026-07-19" })
-        XCTAssertEqual(report.dailyHistory.count, 11)
+        XCTAssertEqual(report.dailyHistory.count, 32)
     }
 
     /// Build Lean Mass Phase 1 ("Establish Maintenance", 2026-07-19...
@@ -139,11 +139,11 @@ final class EnergyReadModelTests: XCTestCase {
     /// the other's filtered view.
     func testPhaseScopeNarrowsToOnePhase() async throws {
         let phase1 = try await api.fetchEnergyReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
-        XCTAssertEqual(phase1.dailyHistory.count, 5)
+        XCTAssertEqual(phase1.dailyHistory.count, 17)
         XCTAssertTrue(phase1.dailyHistory.allSatisfy { $0.date >= "2026-07-19" && $0.date <= "2026-08-15" })
 
         let phase2 = try await api.fetchEnergyReport(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
-        XCTAssertEqual(phase2.dailyHistory.count, 6)
+        XCTAssertEqual(phase2.dailyHistory.count, 15)
         XCTAssertTrue(phase2.dailyHistory.allSatisfy { $0.date >= "2026-08-16" })
     }
 

@@ -100,9 +100,11 @@ final class DEXABriefingTests: XCTestCase {
     func testRegionalFatAndLeanMetricsAreLiveAndNonEmpty() throws {
         let store = makeStore()
         let progress = try XCTUnwrap(store.briefing(id: "dexa_event_dexa-fixture-005")?.dexa?.progress)
-        XCTAssertEqual(progress.regionalFat.count, 3)
-        XCTAssertEqual(progress.regionalLean.count, 3)
+        XCTAssertEqual(progress.regionalFat.count, 5)
+        XCTAssertEqual(progress.regionalLean.count, 5)
         XCTAssertEqual(progress.regionalFat.first { $0.region == "Trunk" }?.delta, "+0.5 lb")
+        XCTAssertEqual(progress.regionalFat.first { $0.region == "Android" }?.delta, "+0.1 lb")
+        XCTAssertEqual(progress.regionalLean.first { $0.region == "Gynoid" }?.delta, "+0.2 lb")
     }
 
     func testCutTimelineUsesThePhaseBaselineNotTheImmediatePriorScanWhenTheyDiffer() throws {

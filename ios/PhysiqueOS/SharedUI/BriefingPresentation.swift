@@ -81,6 +81,7 @@ struct BriefingCadenceBadge: View {
 struct BriefingEditorialCard<Content: View>: View {
     var tint: Color = PhysiqueOSTheme.accent
     var background: Color = PhysiqueOSTheme.surfaceElevated
+    var showsAccentBar = false
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -90,7 +91,9 @@ struct BriefingEditorialCard<Content: View>: View {
             .background(background)
             .clipShape(RoundedRectangle(cornerRadius: 22))
             .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3).fill(tint).frame(width: 3).padding(.vertical, 18)
+                if showsAccentBar {
+                    RoundedRectangle(cornerRadius: 3).fill(tint).frame(width: 3).padding(.vertical, 18)
+                }
             }
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(tint.opacity(0.22), lineWidth: 1))
     }
@@ -106,6 +109,74 @@ struct BriefingEditorialHeading: View {
     }
 }
 
+/// One integrated opening composition for recurring Briefings. The live
+/// web lead places Confidence, editorial headline, narrative, and strategy
+/// context inside a single zine-style card; keeping those elements here
+/// prevents cadence screens from reintroducing a duplicate hero card.
+struct BriefingLeadCard: View {
+    let eyebrow: String
+    let rangeLabel: String
+    let headline: String
+    let narrative: String
+    let confidence: BriefingConfidenceReadModel?
+    var footerItems: [(String, String)] = []
+
+    var body: some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top) {
+                    Text(eyebrow)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                    Spacer(minLength: 12)
+                    Text(rangeLabel)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .multilineTextAlignment(.trailing)
+                }
+                if let confidence {
+                    HStack(alignment: .center, spacing: 18) {
+                        ConfidenceRing(value: confidence.score, size: 112, lineWidth: 8)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(confidence.bandLabel)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            Text(confidence.movementLabel)
+                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text(confidence.primaryReason)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        }
+                    }
+                }
+                Divider().overlay(PhysiqueOSTheme.divider)
+                Text(headline)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !footerItems.isEmpty {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    HStack(alignment: .top, spacing: 18) {
+                        ForEach(Array(footerItems.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.0)
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Text(item.1)
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Displays a persisted `BriefingConfidenceReadModel` verbatim. Native never
 /// derives `score`/`band`/`delta`/reasons here — every value is exactly
 /// what the fixture (a stand-in for the real server-computed artifact
@@ -118,13 +189,13 @@ struct BriefingConfidenceCard: View {
             VStack(alignment: .leading, spacing: 16) {
                 BriefingEditorialHeading(title: "Goal Confidence")
                 HStack(alignment: .top, spacing: 14) {
-                    ConfidenceRing(value: confidence.score, label: confidence.bandLabel, size: 76, lineWidth: 6)
+                    ConfidenceRing(value: confidence.score, size: 92, lineWidth: 7)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(confidence.movementLabel)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         Text(confidence.primaryReason)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     }
                 }
@@ -152,10 +223,74 @@ struct BriefingConfidenceCard: View {
                 HStack(alignment: .top, spacing: 6) {
                     Circle().fill(tint).frame(width: 5, height: 5).padding(.top, 6)
                     Text(item)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
+        }
+    }
+}
+
+/// Saturated purple finale shared by Weekly and Midweek. It mirrors the
+/// web's visual cadence: distinct emoji-led sections, separators, and
+/// numbered actions rather than a stack of generic inset cards.
+struct BriefingCoachFinale: View {
+    let takeaway: String
+    let recommendation: String
+    let actionTitle: String
+    let actions: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Text("COACH'S TAKE")
+                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                .foregroundStyle(.white.opacity(0.82))
+            finaleSection("💡 Biggest Takeaway", takeaway)
+            Divider().overlay(Color.white.opacity(0.22))
+            finaleSection("🧠 My Recommendation", recommendation)
+            if !actions.isEmpty {
+                Divider().overlay(Color.white.opacity(0.22))
+                Text("🎯 \(actionTitle)")
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 13) {
+                    ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(index + 1)")
+                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                .foregroundStyle(Color(hex: 0xDDD6FE))
+                                .frame(width: 28, height: 28)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Circle())
+                            Text(action)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                                .foregroundStyle(.white.opacity(0.94))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(26)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color(hex: 0x6D28D9), Color(hex: 0x4338CA)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.white.opacity(0.16)))
+    }
+
+    private func finaleSection(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                .foregroundStyle(.white)
+            Text(text)
+                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                .foregroundStyle(.white.opacity(0.92))
         }
     }
 }

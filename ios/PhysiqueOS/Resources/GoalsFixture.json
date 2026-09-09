@@ -292,7 +292,7 @@
       ],
       "unlocked": {
         "title": "Build Lean Mass",
-        "body": "Completing the cut while preserving lean mass created the foundation for the current Build Lean Mass journey.",
+        "body": "Completing the cut while preserving lean mass created the foundation for your current goal to build lean mass.",
         "destination": {
           "id": "goal.detail",
           "parameters": {
@@ -308,7 +308,7 @@
       "title": "Maintain Strength Baseline",
       "status": "Maintaining",
       "detail": "Strength holding steady",
-      "narrative": "Working sets across major lifts have held within 5% of their Establish Maintenance baseline through the current Build Lean Mass phase, confirming training load is being preserved rather than traded away for the lean-mass build."
+      "narrative": "Working sets across major lifts have held within 5% of their maintenance baseline through the current lean mass phase, confirming training load is being preserved rather than traded away for the lean-mass build."
     },
     {
       "id": "goal_preserve_lean_mass",

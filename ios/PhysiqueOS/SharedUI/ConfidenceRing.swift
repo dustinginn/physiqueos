@@ -7,8 +7,8 @@ import SwiftUI
 /// "native only animates presentation" — Confidence is briefing-driven and
 /// server-owned; native must not recompute it).
 struct ConfidenceRing: View {
+    static let presentationLabel = "CONFIDENCE"
     let value: Int
-    var label: String = "Goal"
     var size: CGFloat = 82
     var lineWidth: CGFloat = 6
 
@@ -34,7 +34,7 @@ struct ConfidenceRing: View {
                 Text("\(value)%")
                     .font(.system(size: PhysiqueOSTypography.confidenceValueFontSize(ringDiameter: size), weight: .bold))
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(label.uppercased())
+                Text(Self.presentationLabel)
                     .font(.system(size: labelFontSize, weight: .bold))
                     .tracking(labelFontSize * 0.035)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -51,7 +51,7 @@ struct ConfidenceRing: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label) confidence")
+        .accessibilityLabel("Confidence")
         .accessibilityValue("\(value) percent")
     }
 }

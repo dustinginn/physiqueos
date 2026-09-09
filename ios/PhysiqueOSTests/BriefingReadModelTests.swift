@@ -4,16 +4,16 @@ import XCTest
 @MainActor
 final class BriefingReadModelTests: XCTestCase {
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
-        XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
-        XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Training", "Weight", "Energy", "Body Composition", "Coach's Take"])
+        XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
+        XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
         XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
         XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
     }
 
     func testMonthlyCompositionRemainsADistinctLongFormZineNotAWeeklyReskin() {
-        XCTAssertEqual(MonthlyBriefingSections.sectionInventory, ["Hero", "Goal Confidence", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"])
+        XCTAssertEqual(MonthlyBriefingSections.sectionInventory, ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"])
         XCTAssertNotEqual(MonthlyBriefingSections.sectionInventory, WeeklyBriefingSections.sectionInventory)
-        XCTAssertGreaterThanOrEqual(MonthlyBriefingSections.sectionInventory.count, 9)
+        XCTAssertGreaterThanOrEqual(MonthlyBriefingSections.sectionInventory.count, 8)
     }
     private func makeStore() -> BriefingSandboxStore { BriefingSandboxStore() }
 
@@ -68,6 +68,15 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertNil(ordinaryWeek.weekly?.bodyComposition)
     }
 
+    func testFounderAcceptanceWeekCarriesExerciseLevelTrainingAndDailyEnergyEvidence() throws {
+        let weekly = try XCTUnwrap(makeStore().briefing(id: "weekly_briefing_2026-08-23_2026-08-29")?.weekly)
+        XCTAssertEqual(weekly.energy?.dailyBalances?.count, 7)
+        XCTAssertEqual(weekly.training?.trainingDayCount, 4)
+        XCTAssertGreaterThanOrEqual(weekly.training?.highlights?.count ?? 0, 3)
+        XCTAssertTrue(weekly.training?.highlights?.contains(where: { $0.exerciseName == "Lat Pulldown" && $0.delta == "+280 lb" }) == true)
+        XCTAssertGreaterThanOrEqual(weekly.training?.priorityGroups?.count ?? 0, 4)
+    }
+
     func testWeeklyHasNoStandaloneGoalOrPhaseCardFields() throws {
         // WeeklyBriefingContent's own field set is the contract here: there
         // is no `goalCard`/`phaseCard` property to decode into — verified
@@ -99,6 +108,13 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertEqual(midweekConfidence.delta, 0)
     }
 
+    func testFounderAcceptanceMidweekCarriesDailyEnergyWeightAndTrainingInsteadOfNarrativeOnly() throws {
+        let midweek = try XCTUnwrap(makeStore().briefing(id: "midweek_briefing_2026-08-30_2026-09-01")?.midweek)
+        XCTAssertEqual(midweek.energy?.dailyBalances?.count, 3)
+        XCTAssertEqual(midweek.weight?.averageWeightLb, 171.2)
+        XCTAssertEqual(midweek.training?.highlights?.first?.canonicalExerciseId, "lat-pulldown")
+    }
+
     // MARK: - Monthly content: verified section list, no Strategy section
 
     func testMonthlyContentDecodesEveryRenderedSection() throws {
@@ -110,6 +126,17 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertFalse(monthly.whatChanged.isEmpty)
         XCTAssertFalse(monthly.definingMoments.isEmpty)
         XCTAssertFalse(monthly.monthAhead.isEmpty)
+    }
+
+    func testFounderAcceptanceMonthCarriesRichTypedEditorialModules() throws {
+        let monthly = try XCTUnwrap(makeStore().briefing(id: "monthly_briefing_2026-08")?.monthly)
+        XCTAssertGreaterThanOrEqual(monthly.trainingProgress.highlights?.count ?? 0, 3)
+        XCTAssertNotNil(monthly.trainingProgress.whyItMatters)
+        XCTAssertTrue(monthly.energyEvolution.weeks.allSatisfy { $0.averageBalanceKcal != nil })
+        XCTAssertNotNil(monthly.energyEvolution.insight)
+        XCTAssertEqual(monthly.whatChangedSections?.map(\.domain), ["training", "calories", "weight", "photos"])
+        XCTAssertEqual(monthly.definingMomentDetails?.count, 4)
+        XCTAssertEqual(monthly.monthAheadActions?.map(\.domain), ["training", "calories", "weight", "photos", "dexa"])
     }
 
     func testMonthlyNewBaselineReferencesThePriorGoalsClosingDEXANotAnArbitraryDate() throws {

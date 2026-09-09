@@ -130,7 +130,7 @@ private struct BriefingHistoryRow: View {
     }
 
     private var attributionLabel: String? {
-        guard let phaseName = briefing.attribution.phaseName else { return briefing.attribution.goalTitle }
-        return "\(briefing.attribution.goalTitle) · \(phaseName)"
+        guard let phaseName = briefing.attribution.phaseName else { return PresentationLanguage.displayName(briefing.attribution.goalTitle) }
+        return "\(PresentationLanguage.displayName(briefing.attribution.goalTitle)) · \(PresentationLanguage.displayName(phaseName))"
     }
 }

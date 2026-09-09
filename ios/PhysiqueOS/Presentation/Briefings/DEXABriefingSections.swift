@@ -50,7 +50,7 @@ struct DEXABriefingSections: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 if let confidence {
                     HStack(alignment: .center, spacing: 18) {
-                        ConfidenceRing(value: confidence.score, label: "", size: 112, lineWidth: 8)
+                        ConfidenceRing(value: confidence.score, size: 112, lineWidth: 8)
                         VStack(alignment: .leading, spacing: 7) {
                             Text(confidence.bandLabel.uppercased())
                                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
@@ -66,19 +66,19 @@ struct DEXABriefingSections: View {
                 }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(content.hero.results) { result in
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 7) {
                             Text("\(result.emoji) \(result.label)")
-                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                             Text(result.value)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             Text(result.context)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
                         .padding(16)
-                        .frame(minHeight: 142, alignment: .topLeading)
+                        .frame(minHeight: 156, alignment: .topLeading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(PhysiqueOSTheme.surfaceElevated)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -154,25 +154,28 @@ struct DEXABriefingSections: View {
     private func comparisonGroup(title: String, items: [DEXAComparisonMetric]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            VStack(spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(items) { item in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text(item.label)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        HStack(alignment: .bottom, spacing: 12) {
+                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        Text(item.delta)
+                            .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                            .foregroundStyle(deltaColor(item.delta))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                        HStack(alignment: .center, spacing: 7) {
                             comparisonValue("Previous", item.previous)
-                            Image(systemName: "arrow.right").foregroundStyle(PhysiqueOSTheme.textMuted)
-                            comparisonValue("Current", item.current)
-                            Spacer(minLength: 6)
-                            Text(item.delta)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                            Image(systemName: directionSymbol(item.delta))
                                 .foregroundStyle(deltaColor(item.delta))
+                            comparisonValue("Current", item.current)
                         }
                     }
                     .padding(14)
+                    .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
                     .background(PhysiqueOSTheme.surfaceMuted)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .accessibilityElement(children: .combine)
@@ -185,27 +188,38 @@ struct DEXABriefingSections: View {
     private func regionalGroup(title: String, items: [DEXARegionalChangeMetric]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title.uppercased())
+                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 13) {
+                GridRow {
+                    Text("Metric")
+                    Text("Previous")
+                    Text("")
+                    Text("Current")
+                    Text("Delta")
+                }
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            VStack(spacing: 8) {
                 ForEach(items) { item in
-                    HStack(alignment: .center, spacing: 10) {
+                    GridRow {
                         Text(item.region)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        Spacer(minLength: 8)
-                        comparisonValue("Previous", item.previous)
-                        Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(PhysiqueOSTheme.textMuted)
-                        comparisonValue("Current", item.current)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text(item.previous)
+                        Image(systemName: directionSymbol(item.delta))
+                            .foregroundStyle(deltaColor(item.delta))
+                        Text(item.current)
                         Text(item.delta)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                             .foregroundStyle(deltaColor(item.delta))
                     }
-                    .padding(.vertical, 5)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(item.region): from \(item.previous) to \(item.current), a change of \(item.delta)")
                 }
             }
+            .padding(14)
+            .background(PhysiqueOSTheme.surfaceMuted)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
 
@@ -213,49 +227,52 @@ struct DEXABriefingSections: View {
     /// point grid, no hover/tap/tooltip, so this deliberately does not use
     /// `ChartInteraction.swift`'s scrub gesture.
     private func cutTimelineModule(_ timeline: DEXACutTimeline) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 6) {
                 Text(timeline.timelineLabel.uppercased())
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 if timeline.isSimulated { StatusChip(text: "Simulated", color: .warning) }
                 Spacer(minLength: 0)
-                Text("\(timeline.elapsedDays) days")
+                Text("\(timeline.elapsedDays) days · \(timeline.scans.count) canonical scans")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
+            HStack {
+                Text(BriefingDateFormatting.shortDate(timeline.baselineDate))
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                Spacer()
+                Text(BriefingDateFormatting.shortDate(timeline.currentDate))
+            }
+            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+            .foregroundStyle(PhysiqueOSTheme.textMuted)
             ForEach(timeline.metrics) { metric in
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(metric.label)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         Spacer(minLength: 8)
                         Text(metric.delta)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                             .foregroundStyle(metric.delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(metric.points) { point in
-                                VStack(spacing: 2) {
-                                    Text(BriefingDateFormatting.shortDate(point.date))
-                                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                    Text(point.value)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                }
-                                .padding(8)
-                                .background(PhysiqueOSTheme.surfaceMuted)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(metric.points.first?.value ?? "—")
+                        Spacer()
+                        Text(metric.points.last?.value ?? "—")
                     }
+                    .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .padding(12)
+                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
             Text(timeline.summary)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
         }
         .padding(12)
@@ -328,7 +345,15 @@ struct DEXABriefingSections: View {
     }
 
     private func deltaColor(_ delta: String) -> Color {
-        delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort
+        if delta.hasPrefix("-") { return PhysiqueOSTheme.chartSuccess }
+        if delta.hasPrefix("0") || delta.hasPrefix("No") { return PhysiqueOSTheme.textMuted }
+        return PhysiqueOSTheme.chartEffort
+    }
+
+    private func directionSymbol(_ delta: String) -> String {
+        if delta.hasPrefix("-") { return "arrow.down" }
+        if delta.hasPrefix("0") || delta.hasPrefix("No") { return "arrow.right" }
+        return "arrow.up"
     }
 
     private var coachInsightCard: some View {

@@ -213,6 +213,32 @@ struct WeeklyTrainingSection: Codable, Equatable {
     var improvingCount: Int
     var steadyCount: Int
     var narrative: String
+    var headline: String? = nil
+    var trainingDayCount: Int? = nil
+    var plateauingCount: Int? = nil
+    var insufficientCount: Int? = nil
+    var highlights: [BriefingTrainingHighlight]? = nil
+    var priorityGroups: [BriefingTrainingPriorityGroup]? = nil
+}
+
+struct BriefingTrainingHighlight: Codable, Equatable, Identifiable {
+    var id: String { canonicalExerciseId }
+    var canonicalExerciseId: String
+    var exerciseName: String
+    var recordType: String
+    var headline: String
+    var detail: String
+    var delta: String
+    var tone: String
+}
+
+struct BriefingTrainingPriorityGroup: Codable, Equatable, Identifiable {
+    var id: String { areaId }
+    var areaId: String
+    var label: String
+    var statusLabel: String
+    var comparableExerciseCount: Int
+    var tone: String
 }
 
 struct WeeklyBodyCompositionSection: Codable, Equatable {
@@ -263,6 +289,8 @@ struct MidweekBriefingContent: Codable, Equatable {
     var energy: WeeklyEnergySection?
     var weightContextNarrative: String?
     var trainingResponseNarrative: String?
+    var weight: WeeklyWeightSection? = nil
+    var training: WeeklyTrainingSection? = nil
     var bodyComposition: WeeklyBodyCompositionSection?
     var coachTakeNarrative: String
     /// "Priorities Through Sunday" — verified plain, non-navigable
@@ -288,6 +316,9 @@ struct MonthlyGoalMilestoneSection: Codable, Equatable {
 struct MonthlyTrainingProgressSection: Codable, Equatable {
     var narrative: String
     var stats: [BriefingStat]
+    var headline: String? = nil
+    var highlights: [BriefingTrainingHighlight]? = nil
+    var whyItMatters: String? = nil
 }
 
 struct BriefingStat: Codable, Equatable, Identifiable {
@@ -305,11 +336,18 @@ struct MonthlyEnergyEvolutionSection: Codable, Equatable {
         var weekLabel: String
         var averageIntakeKcal: Int
         var averageExpenditureKcal: Int
+        var averageBalanceKcal: Int? = nil
+        var coverageLabel: String? = nil
     }
     var weeks: [WeekBar]
     var averageIntakeKcal: Int
     var averageExpenditureKcal: Int
     var averageBalanceKcal: Int
+    var headline: String? = nil
+    var phaseLabel: String? = nil
+    var phaseDateLabel: String? = nil
+    var narrative: String? = nil
+    var insight: String? = nil
 }
 
 /// `NewBaseline` — verified this refers to the DEXA scan that closes the
@@ -325,6 +363,33 @@ struct MonthlyNewBaselineSection: Codable, Equatable {
     var leanMassLb: String
     var fatMassLb: String
     var narrative: String
+    var headline: String? = nil
+    var interpretation: String? = nil
+}
+
+struct MonthlyChangeSection: Codable, Equatable, Identifiable {
+    var id: String { domain }
+    var domain: String
+    var title: String
+    var headline: String
+    var narrative: String
+    var tone: String
+}
+
+struct MonthlyDefiningMoment: Codable, Equatable, Identifiable {
+    var id: String { "\(dateLabel)-\(title)" }
+    var dateLabel: String
+    var title: String
+    var narrative: String
+    var icon: String
+}
+
+struct MonthlyActionCard: Codable, Equatable, Identifiable {
+    var id: String { domain }
+    var domain: String
+    var title: String
+    var narrative: String
+    var icon: String
 }
 
 struct MonthlyBriefingContent: Codable, Equatable {
@@ -339,6 +404,10 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var whatChanged: [String]
     var definingMoments: [BriefingStat]
     var monthAhead: [String]
+    var whatChangedSections: [MonthlyChangeSection]? = nil
+    var definingMomentDetails: [MonthlyDefiningMoment]? = nil
+    var monthAheadIntroduction: String? = nil
+    var monthAheadActions: [MonthlyActionCard]? = nil
 }
 
 // MARK: - DEXA Event content (verified section list: Hero [title/body/

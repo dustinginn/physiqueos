@@ -7,7 +7,7 @@ import SwiftUI
 /// Goal/Phase card and no forecast section — verified neither exists on the
 /// real screen.
 struct WeeklyBriefingSections: View {
-    static let sectionInventory = ["Hero", "Goal Confidence", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"]
+    static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"]
     let content: WeeklyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -15,7 +15,6 @@ struct WeeklyBriefingSections: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             hero
-            if let confidence { BriefingConfidenceCard(confidence: confidence) }
             if let energy = content.energy { WeeklyEnergyCard(section: energy) }
             if let weight = content.weight { weightCard(weight) }
             if let photos = content.photos { photosCard(photos) }
@@ -26,58 +25,39 @@ struct WeeklyBriefingSections: View {
     }
 
     private var hero: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(content.reportingRangeLabel.uppercased())
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Text(content.heroHeadline)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(content.heroBody)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if content.strategyPhaseLabel != nil || content.strategyWeekLabel != nil || content.strategyNextMilestone != nil {
-                    Divider().overlay(PhysiqueOSTheme.divider)
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        if let phase = content.strategyPhaseLabel { strategyItem("Strategy", phase) }
-                        if let week = content.strategyWeekLabel { strategyItem("Week", week) }
-                        if let milestone = content.strategyNextMilestone { strategyItem("Next", milestone) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func strategyItem(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        BriefingLeadCard(
+            eyebrow: "WEEKLY BRIEFING",
+            rangeLabel: "\(content.periodLabel)\n\(content.reportingRangeLabel)",
+            headline: content.heroHeadline,
+            narrative: content.heroBody,
+            confidence: confidence,
+            footerItems: [
+                content.strategyPhaseLabel.map { ("Strategy", $0) },
+                content.strategyWeekLabel.map { ("Week", $0) },
+                content.strategyNextMilestone.map { ("Next", $0) }
+            ].compactMap { $0 }
+        )
     }
 
     private func weightCard(_ weight: WeeklyWeightSection) -> some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Weight")
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEvidence) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 10) {
+                    IconBadge(systemImage: "scalemass.fill", color: .evidence, size: .sm)
+                    Text("WEIGHT CONTEXT")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.chartEvidence)
+                }
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(String(format: "%.1f lb", weight.averageWeightLb))
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
+                        .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     Text(String(format: "%@%.1f lb this week", weight.changeLb >= 0 ? "+" : "", weight.changeLb))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(weight.changeLb <= 0 ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                        .foregroundStyle(PhysiqueOSTheme.chartEvidence)
                 }
                 Text(weight.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
@@ -107,18 +87,101 @@ struct WeeklyBriefingSections: View {
     }
 
     private func trainingCard(_ training: WeeklyTrainingSection) -> some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Training")
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    weeklyMetric("Improving", "\(training.improvingCount)", color: PhysiqueOSTheme.chartSuccess)
-                    weeklyMetric("Steady", "\(training.steadyCount)", color: PhysiqueOSTheme.chartEvidence)
-                    weeklyMetric("Tracked", "\(training.comparableCategoryCount)", color: PhysiqueOSTheme.chartEffort)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 10) {
+                    IconBadge(systemImage: "dumbbell.fill", color: .success, size: .sm)
+                    Text("TRAINING RESPONSE")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                 }
+                Text(training.headline ?? "Training kept moving forward.")
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(training.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(trainingCoverage(training))
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                if let highlights = training.highlights, !highlights.isEmpty {
+                    VStack(spacing: 12) {
+                        ForEach(highlights) { highlight in trainingHighlight(highlight) }
+                    }
+                }
+                if let groups = training.priorityGroups, !groups.isEmpty {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    Text("PRIORITY MUSCLE GROUPS")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    VStack(spacing: 10) {
+                        ForEach(groups) { group in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(group.label)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text("\(group.comparableExerciseCount) exercises reviewed")
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                                Spacer()
+                                Text(group.statusLabel)
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                    .foregroundStyle(toneColor(group.tone))
+                            }
+                            .padding(14)
+                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    private func trainingCoverage(_ training: WeeklyTrainingSection) -> String {
+        var parts = ["\(training.trainingDayCount ?? 0) training days", "\(training.comparableCategoryCount) areas reviewed", "\(training.improvingCount) improving", "\(training.steadyCount) steady"]
+        if let plateauing = training.plateauingCount { parts.append("\(plateauing) plateauing") }
+        if let insufficient = training.insufficientCount { parts.append("\(insufficient) building evidence") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func trainingHighlight(_ highlight: BriefingTrainingHighlight) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(highlight.exerciseName)
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(highlight.recordType)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(toneColor(highlight.tone))
+                }
+                Spacer(minLength: 8)
+                Text(highlight.delta)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                    .foregroundStyle(toneColor(highlight.tone))
+            }
+            Text(highlight.headline)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(highlight.detail)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .padding(16)
+        .background(toneColor(highlight.tone).opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(toneColor(highlight.tone).opacity(0.24)))
+    }
+
+    private func toneColor(_ tone: String) -> Color {
+        switch tone.lowercased() {
+        case "success", "improving": PhysiqueOSTheme.chartSuccess
+        case "evidence", "steady": PhysiqueOSTheme.chartEvidence
+        case "warning", "plateauing": PhysiqueOSTheme.chartEffort
+        default: PhysiqueOSTheme.accent
         }
     }
 
@@ -145,31 +208,12 @@ struct WeeklyBriefingSections: View {
     }
 
     private var coachTakeCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Coach's Take")
-                labeledParagraph("Biggest Takeaway", content.coachTake.biggestTakeaway)
-                labeledParagraph("My Recommendation", content.coachTake.recommendation)
-                if !content.coachTake.intoNextWeek.isEmpty {
-                    BriefingNarrativeList(title: "Into Next Week", items: content.coachTake.intoNextWeek)
-                }
-            }
-        }
-    }
-
-    private func labeledParagraph(_ label: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(text)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        BriefingCoachFinale(
+            takeaway: content.coachTake.biggestTakeaway,
+            recommendation: content.coachTake.recommendation,
+            actionTitle: "Into Next Week",
+            actions: content.coachTake.intoNextWeek
+        )
     }
 
     private func weeklyMetric(_ label: String, _ value: String, color: Color) -> some View {
@@ -201,14 +245,26 @@ struct WeeklyEnergyCard: View {
 
     var body: some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.energyExpenditure) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    BriefingEditorialHeading(title: "Energy")
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 10) {
+                    IconBadge(systemImage: "bolt.fill", color: .warning, size: .sm)
+                    Text("ENERGY BALANCE")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.energyIntake)
                     Spacer()
                     Text("\(section.pairedDayCount)/\(section.eligibleDayCount) days paired")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
+                Text("Calories need more context.")
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(balanceStatement)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                    .foregroundStyle(balanceColor)
+                Text(section.narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     energyMetric("Avg Intake", "\(section.averageIntakeKcal) kcal", color: PhysiqueOSTheme.energyIntake)
                     energyMetric("Avg Expenditure", "\(section.averageExpenditureKcal) kcal", color: PhysiqueOSTheme.energyExpenditure)
@@ -218,31 +274,43 @@ struct WeeklyEnergyCard: View {
                     chart(dailyBalances)
                     EnergySeriesLegend()
                 }
-                Text(section.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
         }
+    }
+
+    private var balanceStatement: String {
+        let balance = section.averageBalanceKcal
+        if abs(balance) <= 100 { return "About even day to day" }
+        return balance > 0 ? "A controlled daily surplus" : "A consistent daily deficit"
+    }
+
+    private var balanceColor: Color {
+        abs(section.averageBalanceKcal) <= 100 ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.energyIntake
     }
 
     private func chart(_ points: [BriefingDailyEnergyPoint]) -> some View {
         Chart {
             ForEach(points) { point in
                 if let intake = point.intakeKcal {
-                    LineMark(x: .value("Day", point.date), y: .value("Intake", intake), series: .value("Series", "Intake"))
+                    BarMark(x: .value("Day", point.date), y: .value("Intake", intake))
+                        .position(by: .value("Series", "Intake"))
                         .foregroundStyle(PhysiqueOSTheme.energyIntake)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
                 }
                 if let expenditure = point.expenditureKcal {
-                    LineMark(x: .value("Day", point.date), y: .value("Expenditure", expenditure), series: .value("Series", "Expenditure"))
+                    BarMark(x: .value("Day", point.date), y: .value("Expenditure", expenditure))
+                        .position(by: .value("Series", "Expenditure"))
                         .foregroundStyle(PhysiqueOSTheme.energyExpenditure)
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: [6, 4]))
+                }
+                if !point.hasPairedData {
+                    RuleMark(x: .value("Missing", point.date))
+                        .foregroundStyle(PhysiqueOSTheme.textMuted.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 4]))
                 }
             }
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .frame(height: 130)
+        .frame(height: 180)
         .chartScrub { location, proxy, geometry in
             let relativeX = geometry.relativeX(in: proxy, at: location)
             let touchedDate: String? = proxy.value(atX: relativeX)

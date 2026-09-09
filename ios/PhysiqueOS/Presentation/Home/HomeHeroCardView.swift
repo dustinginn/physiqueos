@@ -57,7 +57,7 @@ struct HomeHeroCardView: View {
     private var confidenceSlot: some View {
         if let confidence = hero.confidence, hero.confidenceDetail != nil {
             Button(action: onOpenConfidenceDetail) {
-                ConfidenceRing(value: confidence, label: "Goal")
+                ConfidenceRing(value: confidence)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("View why goal confidence is \(confidence) percent")
