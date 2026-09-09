@@ -1,6 +1,6 @@
 # Confidence V2 Explanation and Briefing Narrative Audit
 
-Status: Founder-approved implementation in production acceptance
+Status: Implementation complete and accepted in production
 
 Audit date: September 9, 2026
 
@@ -607,7 +607,8 @@ The existing versioned `confidence.v1` application read model now returns the sa
 
 ### Local validation
 
-- shared explanation, vocabulary, Home, Goal, Weekly, Midweek, Monthly, DEXA Event, Photo Event, Daily, read-store, and invariant coverage: 80/80 passing in the final focused run
+- shared explanation, vocabulary, Home, Goal, Weekly, Midweek, Monthly, DEXA Event, Photo Event, Daily, read-store, and invariant coverage: 134/134 passing before publication
+- post-acceptance Home casing correction: 20/20 directly affected component/presentation tests passing; the unrelated phase-accent source assertion in `HomePhaseAwareVisualHierarchy.test.js` still fails exactly because the existing implementation now uses `tintedPhase`, not the stale `highlightedPhase` literal
 - Phase 3: 139/139 passing with the ignored read-only Founder fixture linked into the clean worktree
 - Phase 4: 75/75 passing
 - Phase 5: 25/25 passing
@@ -621,3 +622,77 @@ The existing versioned `confidence.v1` application read model now returns the sa
 - Overall Goal Confidence parity: its source-label and frozen-facade spy failures reproduce on the exact untouched parent; the directly changed product-casing expectation now requires `Confidence`
 
 The ignored runtime-store and migration-control hard links used for read-only fixture tests did not modify the underlying files. Phase 4/5 hash validation confirmed the runtime stayed byte-identical at revision 142 and SHA-256 `A2993575ED675F3D240CB147BF5980C19EB4D195BB4023ABA54EB5DAB441779E`.
+
+## Production publication and acceptance
+
+Publication preserved the maintained lineage and the parallel Native workstream:
+
+| Item | Final value |
+| --- | --- |
+| Feature branch | `origin/codex/confidence-explanation-v2-implementation-20260909` |
+| Maintained branch | `origin/combined-app-platform-cutover` |
+| Core implementation commit | `1d59ea96cdfe77298bef23e9f9a667ca0d18e724` |
+| Production-found casing correction | `48fdec5293db0d369b607dc663389e2b649bd800` |
+| Final deployment | `2ad94a88-72a8-4ce7-999c-ef6eea581250` |
+| Final web source | `48fdec5293db0d369b607dc663389e2b649bd800` |
+| Final worker source | `48fdec5293db0d369b607dc663389e2b649bd800` |
+| Build identity | `confidence-casing-48fdec52-20260909` |
+| Primary origin | `https://physiqueos.dustinginn.com` |
+
+The DigitalOcean spec had `deploy_on_push` unset, so both coherent releases were started explicitly after their source commits reached the maintained branch. Each deployment retained one `apps-s-1vcpu-1gb-fixed` web instance and one `apps-s-1vcpu-1gb-fixed` worker, unchanged secrets, unchanged ingress, unchanged PostgreSQL/object-storage bindings, and unchanged Founder/Native owner separation. No partial exploratory commit was deployed.
+
+### Deterministic historical replay
+
+The final production replay ran in a PostgreSQL `REPEATABLE READ READ ONLY` transaction and selected only the Founder-owned `goalConfidenceHistory` collection. It did not load the compatibility runtime or unrelated canonical collections.
+
+- 19 persisted V2 assessments replayed
+- one valid historical increase
+- zero valid historical decreases
+- two retained defective Monthly decrease records, including 57 / Developing, remained non-authoritative audit history
+- accepted August Monthly remained assessment `confidence_assessment_v2|47b1e317da1282b9b38e01843830ad71e1627ef1d6940635e9282f601006077e`
+- score remained 62; band remained Moderate; movement remained no meaningful change
+- predecessor remained the Aug 23–29 Weekly assessment at 62 / Moderate
+- source cutoff remained `2026-09-01T06:59:59.999Z`
+- zero generated presentation leaks across all 19 assessments
+- read snapshot remained 21 history rows with version sum 153 before and after
+- production mutation performed: none
+
+All 19 historical records report typed `partial` provenance degradation because older persisted assessments do not carry complete factor-level source references. This does not produce guessed prose: mapped canonical factors render normally, unknown factors are omitted, and the presentation boundary retains the diagnostic warning. No record degraded to an insufficient score-only explanation during acceptance.
+
+### Authenticated custom-domain acceptance
+
+The final sweep authenticated through the production Founder gate inside the deployed web component, fetched the custom domain, discarded its bounded session afterward, removed non-rendered script/style payloads, and scanned the resulting Founder-visible strings. No write action, PI execution, artifact replacement, or Confidence publication occurred.
+
+| Surface | Baseline first/repeat ms | Final first/repeat ms | Final bytes | Result |
+| --- | ---: | ---: | ---: | --- |
+| Home | 1,640 / 1,014 | 1,527 / 1,067 | 65,361 | PASS |
+| Goals | 1,004 / 850 | 991 / 1,097 | 28,443 | PASS |
+| Active Goal | 427 / 167 | 637 / 246 | 68,007 | PASS |
+| Weekly | 983 / 1,111 | 1,191 / 927 | 75,874 | PASS |
+| Midweek | 188 / 132 | 208 / 222 | 64,964 | PASS |
+| Monthly | 233 / 200 | 187 / 244 | 98,495 | PASS |
+| DEXA Event | 449 / 354 | 485 / 270 | 133,962 | PASS |
+| Photo Event | 281 / 292 | 219 / 137 | 66,361 | PASS |
+| Home Confidence detail | zero added backend requests | client-local | no added response | PASS |
+
+Every measured request returned HTTP 200. Every cold and repeat request remained below the 3-second hard ceiling. The pure explanation projection added no provider query, PI rerun, model call, compatibility-runtime load, or object-storage request. The timing spread is consistent with ordinary shared-host/database variance; the highest final observation was 1,527 ms on Home.
+
+Rendered semantic acceptance confirmed:
+
+- Home: `62% · Moderate` plus the approved concise feasible/on-path, Training-supportive, Energy/Recovery/follow-up-check explanation
+- active Goal: Moderate, canonical support and limits, held movement, and next DEXA under the four approved headings
+- Weekly: the third independent period of Training support, feasible/on-path Goal, mixed broader evidence, and pending direct confirmation
+- Midweek: explicit partial-week restraint and no fabricated completed-week change
+- Monthly: two independent weekly Training periods; unresolved Energy, Recovery, agreement, and direct confirmation; feasible/on-path/no contradiction; next follow-up DEXA; no Photo or Weight scoring claim
+- DEXA Event: historical 59 / Moderate, trustworthy Aug 15 baseline evidence, no durable-response claim, and explicit non-replacement of current Confidence
+- Photo Event: matched historical 62 / Moderate context, no successor/current-snapshot claim, and no invented Photo causality
+
+The rendered-string sweep found zero snake-case factors, camel-case implementation tokens, raw canonical/user/schema IDs, raw publisher/artifact IDs, provider terms, or known factor codes. A manual casing pass found one pre-final issue—lowercase `confidence` in the reused detail headings and a Home ring labeled `Goal`—and the shared component was corrected before final acceptance. The final sweep found zero lowercase product-casing leaks and verified `What supports Confidence`, `What limits Confidence`, `What changed`, and `What PI needs next`.
+
+The public liveness endpoint returned HTTP 200 with build `confidence-casing-48fdec52-20260909`; DigitalOcean reported the final deployment ACTIVE for both web and worker. The acceptance query observed zero waiting active database connections and zero local pool waiters. The acceptance reads did not cause a runtime restart or provider-authority drift.
+
+No Native route, Swift reasoning, sandbox auth, sandbox database, worker behavior, outbox continuation, manual Weight path, API integration, or device-pairing behavior changed. The existing `confidence.v1` server read contract now carries the shared structured explanation semantics for future Native use.
+
+Remaining explanation debt is limited to missing factor-level source references in older persisted assessments. The implementation already fails closed for that debt, records typed warnings, and never leaks or guesses a backend factor label. No score, history, or artifact rewrite is justified.
+
+Incremental infrastructure cost: **$0**.
