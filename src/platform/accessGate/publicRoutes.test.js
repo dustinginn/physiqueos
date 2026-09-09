@@ -7,6 +7,7 @@ import {
   COMBINED_CUTOVER_HANDOFF_ROUTE_PATH_PREFIX,
   PRODUCTION_MIGRATION_DRY_RUN_ROUTE_PATH,
   SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH,
+  NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH,
   NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX,
 } from "./publicRoutes.js";
 
@@ -143,6 +144,15 @@ describe("publicRoutes.isPublicPath", () => {
       "/api/v1/operations/simplified-provider-migrations-extra",
       `${SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH}/short`,
       `${SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH}/simplified-preimport-command-0001/extra`,
+    ]) expect(isPublicPath(candidate)).toBe(false);
+  });
+
+  it("allows only the exact machine-authenticated Nutrition aggregate repair route", () => {
+    expect(isPublicPath(NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH)).toBe(true);
+    for (const candidate of [
+      "/api/v1/operations/nutrition-day-aggregate-repair",
+      `${NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH}-extra`,
+      `${NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH}/nested`,
     ]) expect(isPublicPath(candidate)).toBe(false);
   });
 });

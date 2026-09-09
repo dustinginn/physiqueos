@@ -45,6 +45,12 @@ const PRODUCTION_MIGRATION_DRY_RUN_OPERATION_ID = /^[A-Za-z0-9._:-]{8,160}$/;
 export const SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH = "/api/v1/operations/simplified-provider-migrations";
 const SIMPLIFIED_PROVIDER_MIGRATION_COMMAND_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
 
+// Bounded canonical Nutrition aggregate repair is a machine-to-provider operation.
+// The exact route remains protected by the operations bearer token in its route
+// handler; this exemption only prevents the browser-session gate from making that
+// independent machine credential impossible to use.
+export const NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH = "/api/v1/operations/nutrition-day-aggregate-repairs";
+
 const PUBLIC_EXACT_PATHS = new Set([
   "/api/v1/health/live",
   "/api/v1/health/ready",
@@ -77,5 +83,6 @@ export function isPublicPath(pathname) {
   if (pathname.startsWith(`${SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH}/`)) {
     return SIMPLIFIED_PROVIDER_MIGRATION_COMMAND_ID.test(pathname.slice(SIMPLIFIED_PROVIDER_MIGRATION_ROUTE_PATH.length + 1));
   }
+  if (pathname === NUTRITION_DAY_AGGREGATE_REPAIR_ROUTE_PATH) return true;
   return false;
 }
