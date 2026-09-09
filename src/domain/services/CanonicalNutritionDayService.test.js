@@ -124,7 +124,7 @@ describe("canonical NutritionDay revision semantics", () => {
     const first = confirm([], packageFor("package-a", nutrition("nutrition-a", {
       daily_totals: totals(2300, 150, 240, 70),
       meals: [
-        meal("Breakfast", 450, 40, 45, 12),
+        meal("Breakfast", null, 40, 45, 12),
         meal("Lunch", 600, 45, 60, 18),
         meal("Dinner", 750, 50, 80, 25),
         meal("Snacks", 400, 15, 55, 15),
@@ -167,8 +167,25 @@ describe("canonical NutritionDay revision semantics", () => {
     const current = selectActiveCanonicalNutritionDays(second, { date }).records[0];
 
     expect(current.payload.meals.map((item) => item.name)).toContain("Late Snack");
-    expect(current.payload.daily_totals.calories).toBe(2200);
+    expect(current.payload.daily_totals.calories).toBe(2450);
     expect(current.nutritionRevision.disposition).toBe("additive");
+  });
+
+  it("rejects a materially conflicting full-day summary before canonical persistence", () => {
+    const conflicting = packageFor("package-conflict", nutrition("nutrition-conflict", {
+      daily_totals: totals(1205, 86, 114, 55),
+      metadata: { date, daily_totals_scope: "full_day_summary" },
+      meals: [
+        meal("Breakfast", 585, 33, 64, 23),
+        meal("Lunch", 620, 53, 50, 32),
+        meal("Dinner", 1584, 78, 139, 77),
+        meal("Snacks", 1131, 20, 131, 60),
+      ],
+    }));
+
+    expect(() => confirm([], conflicting, "review-conflict")).toThrowError(
+      expect.objectContaining({ code: "NUTRITION_DAILY_TOTALS_CONFLICT" })
+    );
   });
 
   it("requires a bounded review choice before ambiguous canonical mutation", () => {

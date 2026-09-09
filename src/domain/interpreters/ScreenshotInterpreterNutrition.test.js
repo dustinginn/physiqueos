@@ -92,10 +92,10 @@ describe("screenshot NutritionDay reconciliation", () => {
 
     const nutritionDay = result.evidence_objects[0];
     expect(nutritionDay.daily_totals).toEqual(expect.objectContaining({
-      calories: 2280,
+      calories: 2281,
       protein_g: 189,
-      carbs_g: 185,
-      fat_g: 83,
+      carbs_g: 184,
+      fat_g: 82,
     }));
     expect(nutritionDay.metadata).toEqual(expect.objectContaining({
       daily_totals_scope: "full_day_summary",
@@ -103,8 +103,8 @@ describe("screenshot NutritionDay reconciliation", () => {
     }));
     expect(nutritionDay.macro_percentages).toEqual(expect.objectContaining({
       protein: expect.objectContaining({ grams: 189, percent_of_calories: 34 }),
-      carbohydrates: expect.objectContaining({ grams: 185, percent_of_calories: 33 }),
-      fat: expect.objectContaining({ grams: 83, percent_of_calories: 33 }),
+      carbohydrates: expect.objectContaining({ grams: 184, percent_of_calories: 33 }),
+      fat: expect.objectContaining({ grams: 82, percent_of_calories: 33 }),
     }));
     expect(nutritionDay.nutrients.map(({ name, total, provenance_ref }) => ({
       name, total, provenance_ref,
@@ -114,6 +114,18 @@ describe("screenshot NutritionDay reconciliation", () => {
       { name: "Carbohydrates", total: 185, provenance_ref: "IMG_1804.jpeg" },
       { name: "Fat", total: 83, provenance_ref: "IMG_1804.jpeg" },
     ]);
+    expect(nutritionDay.metadata.daily_totals_reconciliation).toEqual(
+      expect.objectContaining({
+        authoritative_source: "canonical_meal_sums",
+        source_daily_totals: expect.objectContaining({
+          calories: 2280,
+          protein_g: 189,
+          carbs_g: 185,
+          fat_g: 83,
+        }),
+        status: "reconciled",
+      })
+    );
     expect(nutritionDay.meals.map(({ name, totals }) => ({
       name,
       calories: totals.calories,
@@ -127,7 +139,67 @@ describe("screenshot NutritionDay reconciliation", () => {
       { name: "Snacks", calories: 553, protein_g: 8, carbs_g: 83, fat_g: 23 },
     ]);
   });
+
+  it("derives the complete day from split meal screenshots without a daily summary", () => {
+    const result = normalizeScreenshotEvidencePackageForTest({
+      evidence_objects: [
+        sep5MealCandidate("nutrition-a", "IMG_A", [
+          ["Breakfast", 585, 33, 64, 23],
+          ["Lunch", 620, 53, 50, 32],
+        ]),
+        sep5MealCandidate("nutrition-b", "IMG_B", [
+          ["Dinner", 1584, 78, 139, 77],
+          ["Snacks", 1131, 20, 131, 60],
+        ]),
+      ],
+    }, {
+      expectedEvidenceType: "nutrition",
+      normalizedScreenshots: [
+        { fileName: "nutrition-meals-a.png" },
+        { fileName: "nutrition-meals-b.png" },
+      ],
+    });
+
+    expect(result.evidence_objects).toHaveLength(1);
+    expect(result.evidence_objects[0].daily_totals).toEqual(expect.objectContaining({
+      calories: 3920,
+      protein_g: 184,
+      carbs_g: 384,
+      fat_g: 192,
+    }));
+    expect(result.evidence_objects[0].meals).toHaveLength(4);
+  });
 });
+
+function sep5MealCandidate(id, ref, mealRows) {
+  const meals = mealRows.map(([name, calories, protein_g, carbs_g, fat_g]) => ({
+    id: name.toLowerCase(),
+    name,
+    totals: { calories, protein_g, carbs_g, fat_g },
+    foods: [],
+    provenance_ref: ref,
+  }));
+  return {
+    id,
+    evidence_type: "nutrition",
+    observed_at: "2026-09-05",
+    daily_totals: meals.reduce((totals, meal) => ({
+      calories: totals.calories + meal.totals.calories,
+      protein_g: totals.protein_g + meal.totals.protein_g,
+      carbs_g: totals.carbs_g + meal.totals.carbs_g,
+      fat_g: totals.fat_g + meal.totals.fat_g,
+    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }),
+    meals,
+    metadata: {
+      date: "2026-09-05",
+      daily_totals_scope: "partial_meal_subtotal",
+      daily_totals_source_artifact_refs: [ref],
+    },
+    provenance: { source_artifact_refs: [ref] },
+    source: { source_artifact_refs: [ref] },
+    quality: { status: "complete", limitations: [] },
+  };
+}
 
 function august6NutritionCandidates() {
   const totals = (calories, protein_g, carbs_g, fat_g) => ({

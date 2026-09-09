@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  applyNutritionDayMealAggregation,
   NUTRITION_RECONCILIATION_TOLERANCE,
   NutritionDailyTotalsScope,
 } from "../models/nutritionDayEvidence";
@@ -243,7 +244,22 @@ export function createCanonicalNutritionDayRecord({
 } = {}) {
   const candidate = structuredClone(evidenceObject);
   const relationship = candidate.reconciliation?.nutrition ?? {};
-  const canonicalCandidate = withoutCanonicalReconciliation(candidate);
+  const canonicalCandidate = applyNutritionDayMealAggregation(
+    withoutCanonicalReconciliation(candidate)
+  );
+  const replayCandidate = {
+    ...canonicalCandidate,
+    reconciliation: candidate.reconciliation,
+  };
+  if (canonicalCandidate.metadata?.daily_totals_reconciliation?.status ===
+    "needs_review") {
+    const fields = canonicalCandidate.metadata.daily_totals_reconciliation
+      .conflicting_fields.join(", ");
+    throw new CanonicalNutritionDayError(
+      "NUTRITION_DAILY_TOTALS_CONFLICT",
+      `The supplied daily Nutrition summary conflicts with complete canonical meal totals for: ${fields}.`
+    );
+  }
   const assessment = existingObject
     ? assessNutritionDisposition({
         existingPayload: existingObject.payload,
@@ -259,7 +275,7 @@ export function createCanonicalNutritionDayRecord({
     assessment.replacementScope;
 
   if (existingObject && isExactAcceptedSourceReplay({
-    evidenceObject: candidate,
+    evidenceObject: replayCandidate,
     evidencePackage,
     existingObject,
   })) {
@@ -389,7 +405,10 @@ export function isExactAcceptedSourceReplay({
     existingObject.nutritionRevision?.sourceReviewId !== expectedReviewId &&
     !(existingObject.provenance?.evidence_review_ids ?? [])
       .includes(expectedReviewId)) return false;
-  return createNutritionSemanticFingerprint(evidenceObject, {
+  const canonicalEvidenceObject = applyNutritionDayMealAggregation(
+    withoutCanonicalReconciliation(evidenceObject)
+  );
+  return createNutritionSemanticFingerprint(canonicalEvidenceObject, {
     replacementScope:
       existingObject.nutritionRevision?.replacementScope ?? "legacy_active_day",
   }) === getCanonicalNutritionSemanticFingerprint(existingObject);
@@ -454,7 +473,7 @@ export function projectNutritionCanonicalUpdate({
 } = {}) {
   if (disposition === NutritionCanonicalDisposition.ADDITIVE) {
     const meals = [...(existing.meals ?? []), ...(incoming.meals ?? [])];
-    return {
+    return applyNutritionDayMealAggregation({
       ...existing,
       captured_at: incoming.captured_at ?? existing.captured_at,
       meals,
@@ -467,14 +486,14 @@ export function projectNutritionCanonicalUpdate({
       ),
       provenance: mergePayloadProvenance(existing.provenance, incoming.provenance),
       source: mergeSource(existing.source, incoming.source),
-    };
+    });
   }
   if (replacementScope === "full_day") {
-    return {
+    return applyNutritionDayMealAggregation({
       ...incoming,
       provenance: mergePayloadProvenance(existing.provenance, incoming.provenance),
       source: mergeSource(existing.source, incoming.source),
-    };
+    });
   }
   const replacementKeys = new Set(mealKeys(incoming));
   const meals = [
@@ -487,7 +506,7 @@ export function projectNutritionCanonicalUpdate({
     existing,
     projectedMeals: meals,
   });
-  return {
+  return applyNutritionDayMealAggregation({
     ...existing,
     captured_at: incoming.captured_at ?? existing.captured_at,
     daily_totals: projection.dailyTotals,
@@ -502,7 +521,7 @@ export function projectNutritionCanonicalUpdate({
     ),
     provenance: mergePayloadProvenance(existing.provenance, incoming.provenance),
     source: mergeSource(existing.source, incoming.source),
-  };
+  });
 }
 
 function projectMealScopedDailyTotals({ existing = {}, projectedMeals = [] }) {

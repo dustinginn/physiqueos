@@ -4,6 +4,16 @@ export const NutritionDailyTotalsScope = Object.freeze({
   PARTIAL_MEAL_SUBTOTAL: "partial_meal_subtotal",
   UNKNOWN: "unknown",
 });
+export const NUTRITION_DAILY_TOTAL_FIELDS = Object.freeze([
+  "calories",
+  "protein_g",
+  "carbs_g",
+  "fat_g",
+  "fiber_g",
+  "sugar_g",
+  "sodium_mg",
+  "cholesterol_mg",
+]);
 export const NUTRITION_RECONCILIATION_TOLERANCE = {
   calories: 25,
   protein_g: 2,
@@ -66,7 +76,7 @@ export function createNutritionDayEvidenceObject({
   source = {},
   targets = {},
 }) {
-  return {
+  return applyNutritionDayMealAggregation({
     id,
     evidence_type: "nutrition",
     observed_at: date,
@@ -86,6 +96,8 @@ export function createNutritionDayEvidenceObject({
       ),
       daily_totals_source_artifact_refs:
         metadata.daily_totals_source_artifact_refs ?? [],
+      daily_totals_reconciliation:
+        metadata.daily_totals_reconciliation ?? null,
       meal_count: metadata.meal_count ?? meals.length,
       food_count: metadata.food_count ?? countFoods(meals),
       goal_set: metadata.goal_set ?? hasNutritionGoals({ goalStatus, targets }),
@@ -115,7 +127,7 @@ export function createNutritionDayEvidenceObject({
         source.source_artifact_refs ??
         [],
     },
-  };
+  });
 }
 
 export function createNutritionDayEvidenceFromText({
@@ -177,13 +189,19 @@ export function parseDailyNutritionTotals(text) {
 
 export function reconcileNutritionDayEvidence({
   dailyTotals = {},
+  dailyTotalsScope = NutritionDailyTotalsScope.UNKNOWN,
   meals = [],
   tolerance = NUTRITION_RECONCILIATION_TOLERANCE,
 } = {}) {
   const normalizedMeals = normalizeMeals(meals);
-  const mealSums = sumNutritionTotals(normalizedMeals.map((meal) => meal.totals));
+  // A field is meal-owned only when every canonical meal supplies a numeric
+  // value. This prevents a known subset from being represented as a full-day
+  // aggregate while still allowing other fully covered fields to be derived.
+  const mealSums = sumCompleteNutritionTotals(
+    normalizedMeals.map((meal) => meal.totals)
+  );
   const differences = Object.fromEntries(
-    Object.keys(NUTRITION_RECONCILIATION_TOLERANCE).map((key) => [
+    NUTRITION_DAILY_TOTAL_FIELDS.map((key) => [
       key,
       finiteDifference(dailyTotals[key], mealSums[key]),
     ])
@@ -191,25 +209,87 @@ export function reconcileNutritionDayEvidence({
   const comparableKeys = Object.keys(differences).filter(
     (key) => differences[key] !== null
   );
-  const withinTolerance =
-    comparableKeys.length > 0 &&
-    comparableKeys.every(
-      (key) => Math.abs(differences[key]) <= (tolerance[key] ?? 0)
-    );
+  const conflictingKeys = comparableKeys.filter(
+    (key) => Math.abs(differences[key]) > (tolerance[key] ?? 0)
+  );
+  const computedFields = NUTRITION_DAILY_TOTAL_FIELDS.filter(
+    (key) => mealSums[key] !== null
+  );
+  const preservedSourceFields = NUTRITION_DAILY_TOTAL_FIELDS.filter(
+    (key) => mealSums[key] === null && finiteNumber(dailyTotals[key]) !== null
+  );
+  const canonicalTotals = Object.fromEntries(
+    NUTRITION_DAILY_TOTAL_FIELDS.map((key) => [
+      key,
+      mealSums[key] ?? finiteNumber(dailyTotals[key]),
+    ])
+  );
+  const materialConflicts = dailyTotalsScope ===
+    NutritionDailyTotalsScope.PARTIAL_MEAL_SUBTOTAL
+    ? []
+    : conflictingKeys;
 
   return {
-    authoritative_source: hasMeaningfulTotals(dailyTotals)
-      ? "daily_totals"
-      : "meal_sums",
+    authoritative_source:
+      computedFields.length > 0 && preservedSourceFields.length > 0
+        ? "canonical_meal_sums_with_source_fallback"
+        : computedFields.length > 0
+          ? "canonical_meal_sums"
+          : "source_daily_totals",
     status:
-      comparableKeys.length === 0
-        ? "not_comparable"
-        : withinTolerance
+      materialConflicts.length > 0
+        ? "needs_review"
+        : comparableKeys.length > 0
           ? "reconciled"
-          : "needs_review",
+          : computedFields.length > 0
+            ? "derived_from_meals"
+            : "not_comparable",
+    canonical_totals: canonicalTotals,
+    computed_fields: computedFields,
+    conflicting_fields: materialConflicts,
+    daily_totals_scope: normalizeDailyTotalsScope(dailyTotalsScope),
     tolerance: { ...tolerance },
     meal_sums: mealSums,
     differences,
+    preserved_source_fields: preservedSourceFields,
+    source_discrepant_fields: conflictingKeys,
+    source_daily_totals: Object.fromEntries(
+      NUTRITION_DAILY_TOTAL_FIELDS.map((key) => [key, finiteNumber(dailyTotals[key])])
+    ),
+  };
+}
+
+export function applyNutritionDayMealAggregation(evidenceObject = {}) {
+  const sourceDailyTotals =
+    evidenceObject.metadata?.daily_totals_reconciliation?.source_daily_totals ??
+    evidenceObject.daily_totals ?? {};
+  const reconciliation = reconcileNutritionDayEvidence({
+    dailyTotals: sourceDailyTotals,
+    dailyTotalsScope: evidenceObject.metadata?.daily_totals_scope,
+    meals: evidenceObject.meals,
+  });
+  const dailyTotals = {
+    ...DEFAULT_TOTALS,
+    ...withoutEmptyValues(reconciliation.canonical_totals),
+  };
+
+  return {
+    ...evidenceObject,
+    daily_totals: dailyTotals,
+    goal_status: alignNutritionGoalStatus(
+      evidenceObject.goal_status,
+      dailyTotals,
+      reconciliation.computed_fields
+    ),
+    macro_percentages: alignNutritionMacroGrams(
+      evidenceObject.macro_percentages,
+      dailyTotals,
+      reconciliation.computed_fields
+    ),
+    metadata: {
+      ...(evidenceObject.metadata ?? {}),
+      daily_totals_reconciliation: reconciliation,
+    },
   };
 }
 
@@ -362,15 +442,52 @@ function normalizeFoods(foods, mealId = "meal") {
   });
 }
 
-function sumNutritionTotals(totals = []) {
+function sumCompleteNutritionTotals(totals = []) {
   return Object.fromEntries(
-    Object.keys(DEFAULT_TOTALS).map((key) => {
-      const values = totals
-        .map((entry) => finiteNumber(entry?.[key]))
-        .filter((value) => value !== null);
-      return [key, values.length ? values.reduce((sum, value) => sum + value, 0) : null];
+    NUTRITION_DAILY_TOTAL_FIELDS.map((key) => {
+      const values = totals.map((entry) => finiteNumber(entry?.[key]));
+      const complete = values.length > 0 && values.every((value) => value !== null);
+      return [key, complete ? values.reduce((sum, value) => sum + value, 0) : null];
     })
   );
+}
+
+function alignNutritionGoalStatus(goalStatus = {}, dailyTotals = {}, computedFields = []) {
+  const computed = new Set(computedFields);
+  return Object.fromEntries(
+    Object.entries(normalizeGoalStatus(goalStatus, { dailyTotals })).map(
+      ([key, status]) => {
+        if (!computed.has(key)) return [key, status];
+        const actual = dailyTotals[key];
+        const goal = finiteNumber(status.goal);
+        return [key, {
+          ...status,
+          actual,
+          difference: goal === null ? null : actual - goal,
+        }];
+      }
+    )
+  );
+}
+
+function alignNutritionMacroGrams(
+  macroPercentages = {},
+  dailyTotals = {},
+  computedFields = []
+) {
+  const normalized = normalizeMacroPercentages(macroPercentages);
+  const computed = new Set(computedFields);
+  const fields = {
+    protein: "protein_g",
+    carbohydrates: "carbs_g",
+    fat: "fat_g",
+  };
+  return Object.fromEntries(Object.entries(normalized).map(([macro, values]) => {
+    const field = fields[macro];
+    return [macro, computed.has(field)
+      ? { ...values, grams: dailyTotals[field] }
+      : values];
+  }));
 }
 
 function finiteDifference(authoritative, compared) {
