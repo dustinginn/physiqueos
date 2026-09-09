@@ -203,18 +203,32 @@ struct PhotosHistoryView: View {
     }
 
     private func photoBriefingID(for set: PhotoSetRecord) -> String? {
-        environment.briefingSandboxStore.briefings.first(where: {
-            $0.photo?.eventDate == set.date
-        })?.id
+        let photoBriefings = environment.briefingSandboxStore.briefings.filter { $0.photo != nil }
+        if let exact = photoBriefings.first(where: { $0.photo?.eventDate == set.date }) { return exact.id }
+        // The acceptance manifest can project an authorized Founder
+        // session whose server date differs from the isolated fixture's
+        // synthetic event date. The Latest Photo Set action still routes
+        // to the latest canonical Photo Event artifact; the media store
+        // resolves that artifact back onto the same manifest session by
+        // stable pose identity.
+        return photoBriefings.max(by: { ($0.photo?.eventDate ?? "") < ($1.photo?.eventDate ?? "") })?.id
     }
 }
 
 private struct PhotoSetHistoryRow: View {
+    @Environment(AppEnvironment.self) private var environment
     let set: PhotoSetRecord
 
     var body: some View {
         HStack(spacing: 10) {
-            PhotoPoseThumbnailStrip(views: set.views, compact: true)
+            if let representative = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
+                ProgressPhotoTile(
+                    roleLabel: representative.poseId.label,
+                    source: environment.founderPhotoMediaStore.source(viewIdentity: representative.id),
+                    showsRoleLabel: false
+                )
+                .frame(width: 68, height: 82)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(set.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -222,7 +236,7 @@ private struct PhotoSetHistoryRow: View {
                 Text(set.weightLabel)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Text("Compared: \(set.comparisonAvailability)")
+                Text("\(set.views.count) views · Compared against: \(set.comparisonAvailability)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }

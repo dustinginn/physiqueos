@@ -138,7 +138,7 @@ final class TrainingLoggerViewModel {
     }
 
     func areaLabel(_ id: String) -> String {
-        configuration?.areas.first(where: { $0.id == id })?.label ?? id.capitalized
+        configuration?.areas.first(where: { $0.id == id })?.label ?? PresentationLanguage.displayName(fromIdentifier: id)
     }
 
     func isSelected(_ exercise: TrainingLoggerCatalogExercise) -> Bool {

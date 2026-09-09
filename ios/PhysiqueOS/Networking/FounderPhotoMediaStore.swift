@@ -72,10 +72,53 @@ final class FounderPhotoMediaStore {
         return source(viewIdentity: item.viewIdentity)
     }
 
+    /// Resolves a comparison as a pair so the prior photo cannot collapse
+    /// onto the same acceptance session as the current photo when fixture
+    /// dates and allowlisted Founder-session dates use different calendars.
+    /// Exact stable identity/date still wins. Otherwise the current view
+    /// uses the newest authorized session and the prior view uses the
+    /// closest earlier authorized session carrying that same pose.
+    func resolvedComparisonItems(
+        priorSetId: String?,
+        priorDate: String?,
+        currentSetId: String,
+        currentDate: String,
+        poseId: PhotoPoseID
+    ) -> (prior: FounderPhotoAcceptanceItem?, current: FounderPhotoAcceptanceItem?) {
+        let current = resolvedItem(setId: currentSetId, captureDate: currentDate, poseId: poseId)
+        let priorExact = priorSetId.flatMap { setId in
+            resolvedItemExact(setId: setId, captureDate: priorDate ?? "", poseId: poseId)
+        }
+        guard priorExact == nil, let current else { return (priorExact, current) }
+        let earlier = sessions
+            .filter { $0.captureDate < current.captureDate }
+            .reversed()
+            .lazy
+            .compactMap { $0.photos.first(where: { $0.poseId == poseId }) }
+            .first
+        return (earlier, current)
+    }
+
+    private func resolvedItemExact(setId: String, captureDate: String, poseId: PhotoPoseID) -> FounderPhotoAcceptanceItem? {
+        if let exactIdentity = itemsByViewIdentity["\(setId)-\(poseId.rawValue)"] { return exactIdentity }
+        return sessions.first(where: { $0.captureDate == captureDate })?.photos.first(where: { $0.poseId == poseId })
+    }
+
     func projectedLanding(from fixture: PhotosLandingReadModel, scope: EvidenceScopeSelection) -> PhotosLandingReadModel? {
         guard manifestState == .ready else { return nil }
+        let fixtureSets = ([fixture.latestSet].compactMap { $0 } + fixture.history)
+        let weightByExactDate = Dictionary(
+            fixtureSets.map { ($0.date, $0.weightLabel) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let history = projectedSetsByID.values
             .filter { EvidenceChronology.matches($0.date, scope: scope) }
+            .map { set in
+                guard let weight = weightByExactDate[set.date] else { return set }
+                var enriched = set
+                enriched.weightLabel = weight
+                return enriched
+            }
             .sorted { $0.date > $1.date }
         var result = fixture
         result.subtitle = "Authenticated Founder photos for visual acceptance. No new interpretation was generated."
@@ -104,11 +147,12 @@ final class FounderPhotoMediaStore {
                 )
             }
             for photo in session.photos { previousDateByPose[photo.poseId] = session.captureDate }
+            let priorComparisonDate = views.first(where: \.hasComparisonImage)?.comparedAgainst
             return PhotoSetRecord(
                 id: session.photoSessionId,
                 date: session.captureDate,
                 weightLabel: "Weight not exposed",
-                comparisonAvailability: "\(views.filter(\.hasComparisonImage).count)/\(views.count) poses have prior comparisons",
+                comparisonAvailability: priorComparisonDate ?? "No prior matching session",
                 views: views,
                 attributedScope: EvidenceChronology.attribution(forOccurrenceDate: session.captureDate)
             )

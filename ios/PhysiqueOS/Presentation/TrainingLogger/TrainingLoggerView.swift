@@ -291,7 +291,7 @@ struct TrainingLoggerView: View {
     private func exercisePicker(_ viewModel: TrainingLoggerViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             let adding = viewModel.draft?.isAddingExercises == true
-            stepHeader(viewModel, step: adding ? "Active workout" : "2 of 3", title: adding ? "Add exercises" : "Choose exercises", subtitle: "Performed exercises first")
+            stepHeader(viewModel, step: adding ? "Active workout" : "2 of 3", title: adding ? "Add exercises" : "Choose exercises", subtitle: "All eligible exercises · performed exercises first")
 
             TextField("Search exercises", text: Binding(
                 get: { viewModel.searchText },
@@ -305,7 +305,7 @@ struct TrainingLoggerView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(viewModel.isBrowsingAllExercises ? "Exercise registry" : "Previously performed")
+                    Text("Eligible exercises")
                         .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                     Spacer()
@@ -335,8 +335,8 @@ struct TrainingLoggerView: View {
                 viewModel.isBrowsingAllExercises.toggle()
             } label: {
                 Label(
-                    viewModel.isBrowsingAllExercises ? "Show performed exercises" : "Add New Exercise",
-                    systemImage: viewModel.isBrowsingAllExercises ? "clock.arrow.circlepath" : "plus.circle"
+                    viewModel.isBrowsingAllExercises ? "Hide new exercise form" : "Create New Exercise",
+                    systemImage: viewModel.isBrowsingAllExercises ? "minus.circle" : "plus.circle"
                 )
             }
             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)

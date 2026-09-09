@@ -65,10 +65,10 @@ struct PhotoBriefingSections: View {
                     snapshotMetric("Weight", content.weightLabel)
                 }
                 Text(content.poseLabels.joined(separator: " · "))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 Text(content.conditionsSummary)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
                 photoGrid
             }
@@ -109,7 +109,7 @@ struct PhotoBriefingSections: View {
                 VStack(alignment: .leading, spacing: 16) {
                     BriefingEditorialHeading(title: content.progressTitle)
                     Text(content.progressBody)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
@@ -122,7 +122,7 @@ struct PhotoBriefingSections: View {
                 BriefingEditorialHeading(title: content.progressTitle)
                 if !content.progressBody.isEmpty {
                     Text(content.progressBody)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
                 comparisonList(content.ordinaryComparisons)
@@ -157,7 +157,7 @@ struct PhotoBriefingSections: View {
                         BriefingEditorialHeading(title: "New Baselines")
                         ForEach(experience.newBaselines) { baseline in
                             Text("\(baseline.poseId.label): \(baseline.narrative)")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
                     }
@@ -169,18 +169,15 @@ struct PhotoBriefingSections: View {
     private func comparisonList(_ entries: [PhotoComparisonEntry]) -> some View {
         VStack(spacing: 10) {
             ForEach(entries) { entry in
-                let priorItem = entry.priorSetId.flatMap { setID in
-                    environment.founderPhotoMediaStore.resolvedItem(
-                        setId: setID,
-                        captureDate: entry.priorDate ?? "",
-                        poseId: entry.poseId
-                    )
-                }
-                let currentItem = environment.founderPhotoMediaStore.resolvedItem(
-                    setId: entry.currentSetId,
-                    captureDate: entry.currentDate,
+                let resolved = environment.founderPhotoMediaStore.resolvedComparisonItems(
+                    priorSetId: entry.priorSetId,
+                    priorDate: entry.priorDate,
+                    currentSetId: entry.currentSetId,
+                    currentDate: entry.currentDate,
                     poseId: entry.poseId
                 )
+                let priorItem = resolved.prior
+                let currentItem = resolved.current
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         if let roleLabel = entry.roleLabel {
@@ -212,7 +209,7 @@ struct PhotoBriefingSections: View {
                         )
                     }
                     Text(entry.narrative)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
                 .padding(.vertical, 8)
@@ -243,7 +240,7 @@ struct PhotoBriefingSections: View {
                 BriefingEditorialHeading(title: content.interpretationTitle)
                 ForEach(Array(content.interpretationParagraphs.enumerated()), id: \.offset) { _, paragraph in
                     Text(paragraph)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
@@ -255,7 +252,7 @@ struct PhotoBriefingSections: View {
             VStack(alignment: .leading, spacing: 16) {
                 BriefingEditorialHeading(title: "Coach's Insight")
                 Text(content.coachInsightBody)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                 // Verified real behavior: only shown when there is no
                 // completion-experience module below it.
@@ -280,7 +277,7 @@ struct PhotoBriefingSections: View {
                     }
                     if let title = decision.nextGoalTitle {
                         Text(title)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     if let label = decision.nextGoalActionLabel {
@@ -303,7 +300,7 @@ struct PhotoBriefingSections: View {
                     BriefingEditorialHeading(title: "Your Decision")
                     if let question = decision.question {
                         Text(question)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     if let keepOpenLabel = decision.keepOpenActionLabel, let destination = decision.keepOpenDestination {
@@ -319,7 +316,7 @@ struct PhotoBriefingSections: View {
                     BriefingEditorialHeading(title: "Upload Again")
                     if let question = decision.retryQuestion {
                         Text(question)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     if let label = decision.retryActionLabel, let destination = decision.retryDestination {

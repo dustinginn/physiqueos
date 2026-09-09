@@ -476,6 +476,32 @@ final class FounderServerAPITests: XCTestCase {
     }
 
     @MainActor
+    func testPhotoBriefingComparisonUsesDistinctAuthorizedHistoricalSessionWhenFixtureDatesDiffer() async throws {
+        let credentialStore = MemoryCredentialStore()
+        let manifest = #"{"schemaVersion":"native-founder-photo-media-v1","authority":{"kind":"sandbox-founder-photo-acceptance","sandboxAuthorityId":"sandbox-1"},"sessions":[{"photoSessionId":"session-old","captureDate":"2026-08-08","photos":[{"viewIdentity":"session-old-front-relaxed","photoSessionId":"session-old","photoId":"photo-old","mediaId":"media_old","poseId":"front-relaxed","captureDate":"2026-08-08","contentType":"image/jpeg","pixelWidth":1200,"pixelHeight":1600,"delivery":{"kind":"authenticated_proxy","path":"/api/v1/native/sandbox/photo-acceptance/media/media_old"}}]},{"photoSessionId":"session-new","captureDate":"2026-08-22","photos":[{"viewIdentity":"session-new-front-relaxed","photoSessionId":"session-new","photoId":"photo-new","mediaId":"media_new","poseId":"front-relaxed","captureDate":"2026-08-22","contentType":"image/jpeg","pixelWidth":1200,"pixelHeight":1600,"delivery":{"kind":"authenticated_proxy","path":"/api/v1/native/sandbox/photo-acceptance/media/media_new"}}]}]}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, manifest),
+        ])
+        let api = FounderServerAPI(baseURL: testOrigin, credentialStore: credentialStore, transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Test iPhone")
+        let mediaStore = FounderPhotoMediaStore(api: api)
+        await mediaStore.loadManifestIfNeeded()
+
+        let pair = mediaStore.resolvedComparisonItems(
+            priorSetId: "photo-set-fixture-004",
+            priorDate: "2026-08-16",
+            currentSetId: "photo-set-fixture-005",
+            currentDate: "2026-08-30",
+            poseId: .frontRelaxed
+        )
+
+        XCTAssertEqual(pair.current?.photoSessionId, "session-new")
+        XCTAssertEqual(pair.prior?.photoSessionId, "session-old")
+        XCTAssertNotEqual(pair.prior?.viewIdentity, pair.current?.viewIdentity)
+    }
+
+    @MainActor
     func testPhotoStoreFailsClosedOnMismatchedServerViewIdentity() async throws {
         let credentialStore = MemoryCredentialStore()
         let invalidManifest = photoManifestJSON.replacingOccurrences(of: "session-1-front-relaxed", with: "wrong-view")

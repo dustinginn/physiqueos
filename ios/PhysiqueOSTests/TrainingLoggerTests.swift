@@ -8,6 +8,27 @@ final class TrainingLoggerTests: XCTestCase {
         try await api.fetchConfiguration()
     }
 
+    func testEveryLibraryEligibleExerciseIsSelectableInLoggerForSameTrainingArea() async throws {
+        let config = try await configuration()
+        for area in config.areas {
+            var draft = TrainingLoggerDraft.fresh(mode: .live, workoutDate: "2026-09-08")
+            draft.selectedAreaIds = [area.id]
+            let pickerIDs = Set(draft.pickerExercises(in: config.exercises, browseAll: false, query: "").map(\.canonicalExerciseId))
+            let canonicalIDs = Set(config.exercises.filter { $0.areaId == area.id }.map(\.canonicalExerciseId))
+            XCTAssertEqual(pickerIDs, canonicalIDs, "Logger and Library diverged for \(area.label)")
+        }
+    }
+
+    func testShouldersColdStartShowsFullCanonicalLibrarySelection() async throws {
+        let config = try await configuration()
+        var draft = TrainingLoggerDraft.fresh(mode: .live, workoutDate: "2026-09-08")
+        draft.selectedAreaIds = ["shoulders"]
+        let names = draft.pickerExercises(in: config.exercises, browseAll: false, query: "").map(\.name)
+        XCTAssertEqual(names.count, 8)
+        XCTAssertTrue(names.contains("Shoulder Press Machine"))
+        XCTAssertTrue(names.contains("Face Pull"))
+    }
+
     private func draft(
         mode: TrainingLoggerMode = .live,
         date: String = "2026-08-30",
@@ -32,12 +53,13 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(draft.selectedAreaIds, ["back"])
     }
 
-    func testNormalPickerOnlyShowsPerformedExercisesAndPrioritizesThemInBroadBrowse() async throws {
+    func testPickerShowsAllEligibleExercisesAndPrioritizesPreviouslyPerformedOnColdStart() async throws {
         let config = try await configuration()
         let draft = draft(areas: ["chest", "shoulders"])
         let normal = draft.pickerExercises(in: config.exercises, browseAll: false, query: "")
-        XCTAssertTrue(normal.allSatisfy(\.previouslyPerformed))
-        XCTAssertFalse(normal.map(\.name).contains("Lateral Raise"))
+        XCTAssertTrue(normal.map(\.name).contains("Lateral Raise"))
+        let firstUnperformed = try XCTUnwrap(normal.firstIndex(where: { !$0.previouslyPerformed }))
+        XCTAssertTrue(normal[..<firstUnperformed].allSatisfy(\.previouslyPerformed))
         let broad = draft.pickerExercises(in: config.exercises, browseAll: true, query: "")
         let firstRegistryOnly = try XCTUnwrap(broad.firstIndex(where: { !$0.previouslyPerformed }))
         XCTAssertTrue(broad[..<firstRegistryOnly].allSatisfy(\.previouslyPerformed))

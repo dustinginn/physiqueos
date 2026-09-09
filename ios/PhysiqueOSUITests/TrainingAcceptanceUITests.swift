@@ -43,7 +43,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         scrollToText("Category Rollups")
         assertText("Details")
 
-        navigateBack()
+        swipeBackToTrainingLanding()
         openReportingDisclosure()
         tapText("History")
         assertText("Training History")
@@ -126,9 +126,10 @@ final class TrainingAcceptanceUITests: XCTestCase {
         navigateBackToEvidenceHub()
 
         openEvidenceStream(named: "Energy")
-        scrollToText("Weekly History")
+        assertText("Weekly History")
         assertText("Recent Daily Energy")
-        app.swipeUp()
+        app.scrollViews.firstMatch.swipeUp(velocity: .fast)
+        app.scrollViews.firstMatch.swipeUp(velocity: .fast)
         attachScreenshot("17-energy-evidence")
     }
 
@@ -145,11 +146,23 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("Two weeks into the surplus, the gain is real — and mostly lean.")
         assertText("Current Scan")
         attachScreenshot("18-dexa-event-briefing")
+        scrollToText("What Measurably Changed")
+        attachScreenshot("18b-dexa-what-measurably-changed")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Monthly Briefing · August 2026")
-        assertText("The month that started Build Lean Mass.")
-        attachScreenshot("19-monthly-briefing")
+        assertText("August established the starting line for building muscle.")
+        attachScreenshot("19-monthly-opening")
+        scrollToText("TRAINING PROGRESS")
+        attachScreenshot("19b-monthly-training")
+        scrollToText("ENERGY EVOLUTION")
+        attachScreenshot("19c-monthly-energy-evolution")
+        scrollToText("NEW BASELINE")
+        attachScreenshot("19d-monthly-new-baseline")
+        scrollToText("DEFINING MOMENTS")
+        attachScreenshot("19e-monthly-defining-moments")
+        scrollToText("MONTH AHEAD")
+        attachScreenshot("19f-monthly-month-ahead")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Midweek Briefing")
@@ -159,13 +172,39 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
         openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
         assertText("Two straight weeks of clean progression.")
-        attachScreenshot("21-weekly-briefing")
+        scrollToText("ENERGY BALANCE")
+        attachScreenshot("21-weekly-energy")
+        scrollToText("TRAINING RESPONSE")
+        attachScreenshot("21b-weekly-training")
+        scrollToText("COACH'S TAKE")
+        attachScreenshot("21c-coachs-take")
         openBriefingHistory()
 
         openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
         assertText("PHOTO EVENT")
         assertText("Four poses in, the visual story matches the scan.")
-        attachScreenshot("22-photo-event-briefing")
+        scrollToText("What Changed")
+        attachScreenshot("22-photo-event-comparison")
+    }
+
+    func testFounderCorrectionHomeConfidenceAndLoggerShoulders() throws {
+        continueAfterFailure = false
+        app.launch()
+
+        assertText("CONFIDENCE")
+        attachScreenshot("23-home-confidence")
+
+        app.tabBars.buttons["Log"].tap()
+        let logger = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Training Logger")).firstMatch
+        XCTAssertTrue(logger.waitForExistence(timeout: 5), "Training Logger was not available from Log.")
+        logger.tap()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        assertText("Choose exercises")
+        assertButtonLabel(containing: "Shoulder Press Machine")
+        assertButtonLabel(containing: "Face Pull")
+        attachScreenshot("24-logger-shoulders-canonical-catalog")
     }
 
     private func openTrainingLanding() {
@@ -272,6 +311,22 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 3), "Navigation back control was missing.")
         back.tap()
         assertText("Latest Training Day")
+    }
+
+    private func swipeBackToTrainingLanding() {
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5))
+        let destination = app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+        edge.press(forDuration: 0.12, thenDragTo: destination, withVelocity: .slow, thenHoldForDuration: 0.12)
+        assertText("Latest Training Day")
+    }
+
+    @discardableResult
+    private func assertButtonLabel(containing text: String, timeout: TimeInterval = 5) -> XCUIElement {
+        let element = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", text)
+        ).firstMatch
+        XCTAssertTrue(element.waitForExistence(timeout: timeout), "Missing actionable label: \(text)")
+        return element
     }
 
     private func attachScreenshot(_ name: String) {

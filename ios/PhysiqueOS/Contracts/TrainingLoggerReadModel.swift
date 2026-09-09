@@ -349,7 +349,7 @@ extension TrainingLoggerDraft {
 
     func pickerExercises(
         in catalog: [TrainingLoggerCatalogExercise],
-        browseAll: Bool,
+        browseAll _: Bool,
         query: String,
         includeAllAreas: Bool = false
     ) -> [TrainingLoggerCatalogExercise] {
@@ -357,7 +357,6 @@ extension TrainingLoggerDraft {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return catalog
             .filter { includeAllAreas || selected.contains($0.areaId) }
-            .filter { browseAll || $0.previouslyPerformed }
             .filter { normalizedQuery.isEmpty || $0.name.lowercased().contains(normalizedQuery) }
             .sorted {
                 if $0.previouslyPerformed != $1.previouslyPerformed { return $0.previouslyPerformed && !$1.previouslyPerformed }
