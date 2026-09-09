@@ -220,6 +220,25 @@ describe("Confidence V2 shared explanation model", () => {
       /predecessor|assessment window|partial-week evidence|completed-week change|signal agreement/i
     );
   });
+
+  it("keeps the next DEXA question in held and detail copy without a duplicate uncertainty", () => {
+    const model = buildConfidenceExplanationModel({
+      assessment: acceptedMonthly({
+        remainingUncertainty: {
+          status: "material",
+          items: [
+            { id: "energy-question", kind: "energy_calibration_uncertain", materiality: "moderate" },
+            { id: "recovery-question", kind: "recovery_evidence_missing", materiality: "moderate" },
+          ],
+        },
+      }),
+    });
+    const detail = confidenceExplanationDetailFromModel(model);
+    expect(model.movementExplanation.text).toContain("calories, recovery, and body composition");
+    expect(detail.limitingFactors).toContain(
+      "We need another body-composition check before we can confirm that the early progress is turning into lean-mass gain."
+    );
+  });
 });
 
 function acceptedMonthly(overrides = {}) {

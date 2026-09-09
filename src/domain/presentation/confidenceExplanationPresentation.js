@@ -299,6 +299,7 @@ export function buildConfidenceExplanationModel({
     assessment,
     supportingFactors,
     limitingFactors,
+    nextDecisiveEvidence,
   );
   const evidenceContextNote = explainEvidenceContext(assessment);
   const hasStructuredLineage = supportingFactors.length > 0 ||
@@ -378,7 +379,7 @@ export function confidenceExplanationDetailFromModel(model) {
     limitingFactors.push("Recovery is still a blind spot because we do not have enough information yet.");
   }
   if (tokens.has("direct_confirmation_pending") || tokens.has("objective_uncertain") ||
-      tokens.has("trajectory_measurement_pending")) {
+      tokens.has("trajectory_measurement_pending") || tokens.has("follow_up_dexa")) {
     limitingFactors.push("We need another body-composition check before we can confirm that the early progress is turning into lean-mass gain.");
   }
   if (!limitingFactors.length) {
@@ -508,7 +509,8 @@ function collectNextEvidence(assessment, warnings) {
   }];
 }
 
-function explainMovement(assessment, supportingFactors, limitingFactors) {
+function explainMovement(assessment, supportingFactors, limitingFactors,
+  nextDecisiveEvidence = []) {
   const prior = assessment.priorPercentage;
   const current = assessment.currentPercentage;
   const rationaleCode = assessment.narrativeExplanation?.movementRationaleCode ??
@@ -525,13 +527,15 @@ function explainMovement(assessment, supportingFactors, limitingFactors) {
   } else if (prior == null) {
     text = `Confidence starts at ${current}%.`;
   } else {
-    const tokens = new Set([...supportingFactors, ...limitingFactors]
+    const tokens = new Set([...supportingFactors, ...limitingFactors,
+      ...nextDecisiveEvidence]
       .map((item) => item.semanticToken));
     const openQuestions = listClauses([
       tokens.has("energy_calibration_uncertain") && "calories",
       tokens.has("recovery_coverage_incomplete") && "recovery",
       (tokens.has("direct_confirmation_pending") || tokens.has("objective_uncertain") ||
-        tokens.has("trajectory_measurement_pending")) && "body composition",
+        tokens.has("trajectory_measurement_pending") || tokens.has("follow_up_dexa")) &&
+        "body composition",
     ]);
     text = tokens.has("training_progression_support")
       ? `Confidence stayed at ${current}%. Training continued to support the plan, but the bigger questions around ${openQuestions} are still unresolved.`
