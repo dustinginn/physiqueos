@@ -194,7 +194,7 @@ struct DEXABriefingSections: View {
                     comparisonColumnHeader("Metric", width: nil, alignment: .leading)
                     comparisonColumnHeader("Previous", width: 58, alignment: .trailing)
                     comparisonColumnHeader("", width: 18, alignment: .center)
-                    comparisonColumnHeader("Current", width: 58, alignment: .trailing)
+                    comparisonColumnHeader("Current", width: 58, alignment: .leading)
                     comparisonColumnHeader("Delta", width: 62, alignment: .trailing)
                 }
                 .padding(.bottom, 8)
@@ -211,7 +211,7 @@ struct DEXABriefingSections: View {
                             .frame(width: 18)
                             .foregroundStyle(deltaColor(item.delta))
                         Text(item.current)
-                            .frame(width: 58, alignment: .trailing)
+                            .frame(width: 58, alignment: .leading)
                         Text(item.delta)
                             .frame(width: 62, alignment: .trailing)
                             .foregroundStyle(deltaColor(item.delta))
