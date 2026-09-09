@@ -113,6 +113,21 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertEqual(midweek.energy?.dailyBalances?.count, 3)
         XCTAssertEqual(midweek.weight?.averageWeightLb, 171.2)
         XCTAssertEqual(midweek.training?.highlights?.first?.canonicalExerciseId, "lat-pulldown")
+        XCTAssertEqual(midweek.training?.highlights?.count, 3)
+        XCTAssertEqual(midweek.training?.highlights?.map(\.performanceValue), ["3,620 lb volume", "14 reps at 50 lb", "3,480 lb volume"])
+        XCTAssertEqual(midweek.training?.priorityGroups?.map(\.areaId), ["back", "shoulders", "chest"])
+    }
+
+    func testFounderAcceptanceMidweekTrainingIsBackedByDatedCanonicalSessions() async throws {
+        let api = FixtureTrainingAPI()
+        let fetchedPull = try await api.fetchTrainingSession(sessionId: "session-fixture-012")
+        let fetchedPush = try await api.fetchTrainingSession(sessionId: "session-fixture-013")
+        let pull = try XCTUnwrap(fetchedPull)
+        let push = try XCTUnwrap(fetchedPush)
+        XCTAssertTrue(pull.date.hasPrefix("2026-08-31"))
+        XCTAssertTrue(push.date.hasPrefix("2026-09-01"))
+        XCTAssertEqual(pull.exercises.map(\.canonicalExerciseId), ["lat_pulldown", "seated_cable_row", "face_pull"])
+        XCTAssertEqual(push.exercises.map(\.canonicalExerciseId), ["bench_press", "cable_fly", "overhead_triceps_extension"])
     }
 
     // MARK: - Monthly content: verified section list, no Strategy section
@@ -137,6 +152,32 @@ final class BriefingReadModelTests: XCTestCase {
         XCTAssertEqual(monthly.whatChangedSections?.map(\.domain), ["training", "calories", "weight", "photos"])
         XCTAssertEqual(monthly.definingMomentDetails?.count, 4)
         XCTAssertEqual(monthly.monthAheadActions?.map(\.domain), ["training", "calories", "weight", "photos", "dexa"])
+        XCTAssertTrue(monthly.trainingProgress.highlights?.allSatisfy { $0.performanceValue != nil } == true)
+    }
+
+    func testMonthlyAndRecurringTrainingKeepDistinctPresentationCompositions() {
+        XCTAssertEqual(MonthlyBriefingSections.trainingPresentationStyle, "gold-featured-lift")
+        XCTAssertEqual(BriefingTrainingResponseCard.presentationStyle, "neutral-outlined-highlights")
+    }
+
+    func testMonthlyOpeningRestoresThreeEvidenceFeatureCards() throws {
+        let monthly = try XCTUnwrap(makeStore().briefing(id: "monthly_briefing_2026-08")?.monthly)
+        XCTAssertEqual(MonthlyBriefingSections.leadFeatureDomains, ["Training", "New Baseline", "Calories"])
+        XCTAssertFalse(monthly.trainingProgress.narrative.isEmpty)
+        XCTAssertFalse(monthly.newBaseline.referenceDateLabel.isEmpty)
+        XCTAssertFalse(monthly.energyEvolution.weeks.isEmpty)
+    }
+
+    func testDEXAEvidenceSincePriorScanUsesThreeSymmetricalColumns() {
+        XCTAssertEqual(DEXAHistoryView.sincePriorScanColumnLabels, ["Body Fat", "Fat Mass", "Lean Mass"])
+    }
+
+    func testDEXAEventUsesSemanticHeroGridAndOneAlignedComparisonTreatment() {
+        XCTAssertEqual(DEXABriefingSections.heroMetricPresentationStyle, "semantic-two-by-two")
+        XCTAssertEqual(
+            DEXABriefingSections.inlineComparisonSectionTitles,
+            ["Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes"]
+        )
     }
 
     func testMonthlyNewBaselineReferencesThePriorGoalsClosingDEXANotAnArbitraryDate() throws {

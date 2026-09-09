@@ -87,102 +87,7 @@ struct WeeklyBriefingSections: View {
     }
 
     private func trainingCard(_ training: WeeklyTrainingSection) -> some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 10) {
-                    IconBadge(systemImage: "dumbbell.fill", color: .success, size: .sm)
-                    Text("TRAINING RESPONSE")
-                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                }
-                Text(training.headline ?? "Training kept moving forward.")
-                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(training.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Text(trainingCoverage(training))
-                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                if let highlights = training.highlights, !highlights.isEmpty {
-                    VStack(spacing: 12) {
-                        ForEach(highlights) { highlight in trainingHighlight(highlight) }
-                    }
-                }
-                if let groups = training.priorityGroups, !groups.isEmpty {
-                    Divider().overlay(PhysiqueOSTheme.divider)
-                    Text("PRIORITY MUSCLE GROUPS")
-                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    VStack(spacing: 10) {
-                        ForEach(groups) { group in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(group.label)
-                                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text("\(group.comparableExerciseCount) exercises reviewed")
-                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                }
-                                Spacer()
-                                Text(group.statusLabel)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                    .foregroundStyle(toneColor(group.tone))
-                            }
-                            .padding(14)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func trainingCoverage(_ training: WeeklyTrainingSection) -> String {
-        var parts = ["\(training.trainingDayCount ?? 0) training days", "\(training.comparableCategoryCount) areas reviewed", "\(training.improvingCount) improving", "\(training.steadyCount) steady"]
-        if let plateauing = training.plateauingCount { parts.append("\(plateauing) plateauing") }
-        if let insufficient = training.insufficientCount { parts.append("\(insufficient) building evidence") }
-        return parts.joined(separator: " · ")
-    }
-
-    private func trainingHighlight(_ highlight: BriefingTrainingHighlight) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(highlight.exerciseName)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(highlight.recordType)
-                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                        .foregroundStyle(toneColor(highlight.tone))
-                }
-                Spacer(minLength: 8)
-                Text(highlight.delta)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                    .foregroundStyle(toneColor(highlight.tone))
-            }
-            Text(highlight.headline)
-                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(highlight.detail)
-                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .padding(16)
-        .background(toneColor(highlight.tone).opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(toneColor(highlight.tone).opacity(0.24)))
-    }
-
-    private func toneColor(_ tone: String) -> Color {
-        switch tone.lowercased() {
-        case "success", "improving": PhysiqueOSTheme.chartSuccess
-        case "evidence", "steady": PhysiqueOSTheme.chartEvidence
-        case "warning", "plateauing": PhysiqueOSTheme.chartEffort
-        default: PhysiqueOSTheme.accent
-        }
+        BriefingTrainingResponseCard(training: training)
     }
 
     private func bodyCompositionCard(_ body: WeeklyBodyCompositionSection) -> some View {
@@ -229,6 +134,129 @@ struct WeeklyBriefingSections: View {
         .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+/// The recurring Briefing Training composition shared only by Weekly and
+/// Midweek. Exercise cards stay neutral and use color as a thin signal,
+/// matching the live web's trophy / exercise / record / output hierarchy.
+struct BriefingTrainingResponseCard: View {
+    static let presentationStyle = "neutral-outlined-highlights"
+    let training: WeeklyTrainingSection
+
+    var body: some View {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 10) {
+                    IconBadge(systemImage: "dumbbell.fill", color: .success, size: .sm)
+                    Text("TRAINING RESPONSE")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        .accessibilityIdentifier("briefing.trainingResponse")
+                }
+                Text(training.headline ?? "Training kept moving forward.")
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(training.narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(coverage)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+
+                if let highlights = training.highlights, !highlights.isEmpty {
+                    HStack(spacing: 7) {
+                        Text("🔥 HIGHLIGHTS")
+                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                            .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        Rectangle().fill(PhysiqueOSTheme.chartSuccess.opacity(0.45)).frame(height: 1)
+                    }
+                    VStack(spacing: 12) {
+                        ForEach(highlights) { highlight in highlightCard(highlight) }
+                    }
+                }
+
+                if let groups = training.priorityGroups, !groups.isEmpty {
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    Text("🎯 PRIORITY MUSCLE GROUPS")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    VStack(spacing: 0) {
+                        ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                            if index > 0 { Divider().overlay(PhysiqueOSTheme.divider) }
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Circle().fill(toneColor(group.tone)).frame(width: 7, height: 7)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(group.label)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text("\(group.comparableExerciseCount) exercises reviewed")
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                }
+                                Spacer(minLength: 8)
+                                Text(group.statusLabel)
+                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                    .foregroundStyle(toneColor(group.tone))
+                            }
+                            .padding(.vertical, 12)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var coverage: String {
+        var parts = ["\(training.trainingDayCount ?? 0) training days", "\(training.comparableCategoryCount) areas reviewed", "\(training.improvingCount) improving", "\(training.steadyCount) steady"]
+        if let plateauing = training.plateauingCount { parts.append("\(plateauing) plateauing") }
+        if let insufficient = training.insufficientCount { parts.append("\(insufficient) building evidence") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func highlightCard(_ highlight: BriefingTrainingHighlight) -> some View {
+        let color = toneColor(highlight.tone)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(color)
+                    .frame(width: 34, height: 34)
+                    .background(color.opacity(0.13))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(highlight.exerciseName)
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(highlight.recordType)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(color)
+                }
+            }
+            Text(highlight.performanceValue ?? highlight.headline)
+                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text("▲  \(highlight.delta)")
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(color)
+            Text(highlight.detail)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.62))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(color.opacity(0.58), lineWidth: 1))
+    }
+
+    private func toneColor(_ tone: String) -> Color {
+        switch tone.lowercased() {
+        case "success", "improving": PhysiqueOSTheme.chartSuccess
+        case "evidence", "steady": PhysiqueOSTheme.chartEvidence
+        case "warning", "plateauing": PhysiqueOSTheme.chartEffort
+        default: PhysiqueOSTheme.accent
+        }
     }
 }
 

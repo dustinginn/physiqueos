@@ -226,6 +226,10 @@ struct BriefingTrainingHighlight: Codable, Equatable, Identifiable {
     var canonicalExerciseId: String
     var exerciseName: String
     var recordType: String
+    /// The prominent output value shown by the web highlight treatment
+    /// (for example session volume or reps at load). Kept distinct from
+    /// `delta`, which describes movement from the prior comparison.
+    var performanceValue: String? = nil
     var headline: String
     var detail: String
     var delta: String

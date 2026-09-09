@@ -100,12 +100,12 @@ final class TrainingReadModelTests: XCTestCase {
 
     // MARK: - Latest Training Day content
 
-    func testLatestTrainingDayShowsBothOfThatDaysSessionsNewestFirst() async throws {
+    func testLatestTrainingDayShowsTheNewestSyntheticAcceptanceSession() async throws {
         let landing = try await api.fetchTrainingLanding()
         let latest = try XCTUnwrap(landing.latestTrainingDay)
-        XCTAssertEqual(latest.date, "2026-08-28")
-        XCTAssertEqual(latest.sessions.map(\.id), ["session-fixture-011"])
-        XCTAssertEqual(latest.daySummary, "Biceps · Triceps · Quads")
+        XCTAssertEqual(latest.date, "2026-09-01")
+        XCTAssertEqual(latest.sessions.map(\.id), ["session-fixture-013"])
+        XCTAssertEqual(latest.daySummary, "Chest · Triceps")
     }
 
     func testEveryLatestDaySessionCarriesATrainingSessionDestination() async throws {
@@ -637,46 +637,44 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(areaCrumb.destination, .trainingExercise(exerciseId: "chest"))
     }
 
-    /// Bench Press has exactly one historical occurrence, and it's inside
-    /// a superset — `getCurrentExerciseBenchmark` must isolate it from any
-    /// (nonexistent) standalone comparison rather than silently comparing
-    /// across relationship contexts.
-    func testBenchPressBenchmarkIsolatesTheSupersetOccurrence() async throws {
+    /// The enriched acceptance history adds a current standalone Bench Press
+    /// session while retaining the earlier superset evidence. The benchmark
+    /// compares like-for-like standalone occurrences and never crosses the
+    /// relationship boundary.
+    func testBenchPressBenchmarkUsesLatestStandaloneOccurrenceWithoutLosingSupersetHistory() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
         let unwrapped = try XCTUnwrap(exercise)
-        // Two total occurrences now (2026-07-28 standalone, 2026-08-26
-        // superset) — history shows both, but isolation still correctly
-        // excludes the standalone one from the benchmark's "comparable"
-        // set since it shares no relationship context with the latest.
-        XCTAssertEqual(unwrapped.history.count, 2)
+        XCTAssertEqual(unwrapped.history.count, 3)
         let benchmark = try XCTUnwrap(unwrapped.benchmark)
-        XCTAssertEqual(benchmark.comparison, "No comparable prior superset session.")
+        XCTAssertEqual(benchmark.comparison, "Last session established a new best.")
         XCTAssertEqual(benchmark.workingWeight, "155 lb")
+        XCTAssertEqual(unwrapped.history.first { $0.sessionId == "session-fixture-001" }?.relationship?.relationshipType, "superset")
     }
 
-    /// Overhead Triceps Extension's one occurrence carries a "Static Hold"
-    /// variant — isolated the same way, by variant key this time.
-    func testOverheadTricepsExtensionBenchmarkIsolatesTheVariantOccurrence() async throws {
+    /// A current standard occurrence is compared only with the earlier
+    /// standard occurrence; the historical Static Hold variant remains a
+    /// separate context in the same canonical exercise history.
+    func testOverheadTricepsExtensionBenchmarkKeepsVariantContextsSeparate() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "overhead-triceps-extension")
         let unwrapped = try XCTUnwrap(exercise)
         let benchmark = try XCTUnwrap(unwrapped.benchmark)
-        XCTAssertEqual(benchmark.comparison, "No comparable prior variant session.")
+        XCTAssertEqual(benchmark.comparison, "Last session matched your current best.")
+        XCTAssertEqual(unwrapped.history.first { $0.sessionId == "session-fixture-001" }?.exercise.executionVariant?.label, "Static Hold")
     }
 
-    /// Lat Pulldown has two standalone occurrences at different loads
-    /// (100/110/120 lb on 2026-08-17, then 110/120/130 lb on 2026-08-24) —
-    /// this is the multi-session "new best" path, and history must show
-    /// both, newest first.
-    func testLatPulldownShowsTwoOccurrencesNewestFirstWithANewBest() async throws {
+    /// The enriched Midweek universe adds a third, higher-volume session.
+    /// Its load is below the prior 130 lb peak, so the latest-session
+    /// benchmark must say so without dropping the earlier occurrences.
+    func testLatPulldownShowsEnrichedOccurrencesNewestFirst() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "lat-pulldown")
         let unwrapped = try XCTUnwrap(exercise)
         XCTAssertEqual(unwrapped.history.map(\.sessionDate), unwrapped.history.map(\.sessionDate).sorted(by: >))
-        XCTAssertEqual(unwrapped.history.count, 2)
-        XCTAssertEqual(unwrapped.history.first?.sessionId, "session-fixture-002")
+        XCTAssertEqual(unwrapped.history.count, 3)
+        XCTAssertEqual(unwrapped.history.first?.sessionId, "session-fixture-012")
         XCTAssertEqual(unwrapped.history.last?.sessionId, "session-fixture-005")
         let benchmark = try XCTUnwrap(unwrapped.benchmark)
-        XCTAssertEqual(benchmark.comparison, "Last session established a new best.")
-        XCTAssertEqual(benchmark.workingWeight, "130 lb")
+        XCTAssertEqual(benchmark.comparison, "Last session finished below your current best.")
+        XCTAssertEqual(benchmark.workingWeight, "120 lb")
         XCTAssertEqual(benchmark.bestSet, "8 x 130 lb")
     }
 
@@ -712,7 +710,7 @@ final class TrainingReadModelTests: XCTestCase {
     func testExerciseHistoryCarriesVariantSemantics() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "overhead-triceps-extension")
         let unwrapped = try XCTUnwrap(exercise)
-        let occurrence = try XCTUnwrap(unwrapped.lastSession)
+        let occurrence = try XCTUnwrap(unwrapped.history.first { $0.sessionId == "session-fixture-001" })
         XCTAssertEqual(occurrence.exercise.executionVariant?.label, "Static Hold")
         XCTAssertEqual(occurrence.exercise.occurrenceLabel, "Overhead Triceps Extension · Static Hold")
         XCTAssertNil(occurrence.relationship)
@@ -721,7 +719,7 @@ final class TrainingReadModelTests: XCTestCase {
     func testExerciseHistoryCarriesSupersetSemantics() async throws {
         let exercise = try await api.fetchTrainingExercise(exerciseId: "bench-press")
         let unwrapped = try XCTUnwrap(exercise)
-        let occurrence = try XCTUnwrap(unwrapped.lastSession)
+        let occurrence = try XCTUnwrap(unwrapped.history.first { $0.sessionId == "session-fixture-001" })
         let relationship = try XCTUnwrap(occurrence.relationship)
         XCTAssertEqual(relationship.relationshipType, "superset")
         XCTAssertEqual(relationship.partnerNames, ["Cable Fly"])
@@ -1062,6 +1060,7 @@ final class TrainingReadModelTests: XCTestCase {
         XCTAssertEqual(unwrapped.title, "Training History")
         let days = try XCTUnwrap(unwrapped.historyDays)
         XCTAssertEqual(days.map(\.date), [
+            "2026-09-01", "2026-08-31",
             "2026-08-28", "2026-08-26", "2026-08-24", "2026-08-22", "2026-08-19",
             "2026-08-17", "2026-08-08", "2026-07-28", "2026-07-05", "2026-06-10",
         ])
@@ -1135,11 +1134,11 @@ final class TrainingReadModelTests: XCTestCase {
         let all = try await api.fetchTrainingLanding(scope: .all)
         let buildLeanMass = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass))
         let visibleAbs = try await api.fetchTrainingLanding(scope: .goal(goalId: EvidenceCanonicalGoalID.visibleAbs))
-        // 10 fixture days span Visible Abs (2), Build Lean Mass Phase 1 (2),
-        // and Phase 2 (6) — both Goal filters must genuinely narrow, not
-        // just relabel the same 10-day set.
-        XCTAssertEqual(all.trainingDays.count, 10)
-        XCTAssertEqual(buildLeanMass.trainingDays.count, 8)
+        // 12 fixture days span Visible Abs (2), Build Lean Mass Phase 1 (2),
+        // and Phase 2 (8) — both Goal filters must genuinely narrow, not
+        // just relabel the same 12-day set.
+        XCTAssertEqual(all.trainingDays.count, 12)
+        XCTAssertEqual(buildLeanMass.trainingDays.count, 10)
         XCTAssertEqual(visibleAbs.trainingDays.count, 2)
         XCTAssertEqual(visibleAbs.trainingDays.map(\.date).sorted(), ["2026-06-10", "2026-07-05"])
         XCTAssertEqual(buildLeanMass.scope.options.filter(\.selected).map(\.id), ["goal:\(EvidenceCanonicalGoalID.buildLeanMass)"])
@@ -1172,7 +1171,7 @@ final class TrainingReadModelTests: XCTestCase {
     func testPhaseScopeNarrowsTrainingDaysToOnePhase() async throws {
         let leanMassBuild = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-lean-mass-build"))
         let establishMaintenance = try await api.fetchTrainingLanding(scope: .phase(goalId: EvidenceCanonicalGoalID.buildLeanMass, phaseId: "phase-establish-maintenance"))
-        XCTAssertEqual(leanMassBuild.trainingDays.count, 6)
+        XCTAssertEqual(leanMassBuild.trainingDays.count, 8)
         XCTAssertEqual(establishMaintenance.trainingDays.count, 2)
         XCTAssertEqual(establishMaintenance.trainingDays.map(\.date).sorted(), ["2026-07-28", "2026-08-08"])
     }

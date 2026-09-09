@@ -20,6 +20,7 @@ import SwiftUI
 /// (`/profile/operating-plan/execution/dexa`, the Operating Plan
 /// vertical's territory, not Evidence's).
 struct DEXAHistoryView: View {
+    static let sincePriorScanColumnLabels = ["Body Fat", "Fat Mass", "Lean Mass"]
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DEXAHistoryViewModel?
@@ -173,26 +174,31 @@ struct DEXAHistoryView: View {
     /// itself (not the separate DEXA Event Briefing comparison story).
     private func deltaRow(_ delta: DEXADelta) -> some View {
         CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 14) {
                 TrainingSectionHeaderView(title: "Since Prior Scan")
-                HStack(spacing: 16) {
-                    deltaItem("Body Fat", delta.bodyFatPercentagePoints)
-                    deltaItem("Fat Mass", delta.fatMassPounds)
-                    deltaItem("Lean Mass", delta.leanMassPounds)
+                HStack(spacing: 0) {
+                    deltaItem("Body Fat", delta.bodyFatPercentagePoints, color: PhysiqueOSTheme.chartSuccess)
+                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
+                    deltaItem("Fat Mass", delta.fatMassPounds, color: PhysiqueOSTheme.chartEffort)
+                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
+                    deltaItem("Lean Mass", delta.leanMassPounds, color: PhysiqueOSTheme.chartEvidence)
                 }
             }
         }
     }
 
-    private func deltaItem(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func deltaItem(_ label: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .center, spacing: 5) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
             Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(value.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(value == "0.0 lb" || value == "0.0 pts" ? PhysiqueOSTheme.textMuted : color)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     private func coreTrendsCard(_ report: DEXAReportReadModel) -> some View {

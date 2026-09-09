@@ -483,10 +483,9 @@ struct TrainingLoggerView: View {
             }
             validation(viewModel)
         }
-        .confirmationDialog(
+        .alert(
             "Cancel this workout?",
-            isPresented: $showingCancelWorkoutConfirmation,
-            titleVisibility: .visible
+            isPresented: $showingCancelWorkoutConfirmation
         ) {
             Button("Cancel Workout", role: .destructive) {
                 viewModel.cancelWorkout()

@@ -24,29 +24,29 @@
       "dateRangeLabel": "Complete history"
     },
     "latestTrainingDay": {
-      "date": "2026-08-28",
-      "label": "Friday, August 28",
-      "daySummary": "Biceps \u00b7 Triceps \u00b7 Quads",
+      "date": "2026-09-01",
+      "label": "Tuesday, September 1",
+      "daySummary": "Chest \u00b7 Triceps",
       "destination": {
         "id": "progress.stream",
         "parameters": {
-          "streamId": "training/day/2026-08-28"
+          "streamId": "training/day/2026-09-01"
         }
       },
       "sessions": [
         {
-          "id": "session-fixture-011",
-          "label": "Arms Superset Day",
-          "value": "330 active cal",
-          "detail": "6:00 AM\u20136:40 AM \u00b7 40 min \u00b7 330 active cal \u00b7 EZ Bar Curls, Cable Rope Pushdowns, Spider Curls, Bulgarian Split Squat",
-          "date": "2026-08-28T06:00:00-07:00",
+          "id": "session-fixture-013",
+          "label": "Push Progression",
+          "value": "405 active cal",
+          "detail": "6:05 AM\u20136:55 AM \u00b7 50 min \u00b7 405 active cal \u00b7 Bench Press, Cable Fly, Overhead Triceps Extension",
+          "date": "2026-09-01T06:05:00-07:00",
           "sourceEvidence": [
             "Typed evidence"
           ],
           "destination": {
             "id": "training.session",
             "parameters": {
-              "sessionId": "session-fixture-011"
+              "sessionId": "session-fixture-013"
             }
           }
         }
@@ -234,6 +234,28 @@
     ],
     "trainingDays": [
       {
+        "date": "2026-09-01",
+        "label": "Tuesday, September 1",
+        "summary": "Chest \u00b7 Triceps",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-09-01"
+          }
+        }
+      },
+      {
+        "date": "2026-08-31",
+        "label": "Monday, August 31",
+        "summary": "Back \u00b7 Shoulders",
+        "destination": {
+          "id": "progress.stream",
+          "parameters": {
+            "streamId": "training/day/2026-08-31"
+          }
+        }
+      },
+      {
         "date": "2026-08-28",
         "label": "Friday, August 28",
         "summary": "Biceps \u00b7 Triceps \u00b7 Quads",
@@ -416,6 +438,68 @@
     ]
   },
   "days": [
+    {
+      "date": "2026-09-01",
+      "label": "Tuesday, September 1",
+      "summary": {
+        "bodyAreas": ["Chest", "Triceps"],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-013",
+          "activityType": "Push Progression",
+          "title": "Push Progression",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": ["Chest", "Triceps"],
+          "durationSeconds": 3000,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 405,
+          "detail": "Chest, Triceps \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": { "sessionId": "session-fixture-013" }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-08-31",
+      "label": "Monday, August 31",
+      "summary": {
+        "bodyAreas": ["Back", "Shoulders"],
+        "sessionCount": 1,
+        "strengthSessions": 1,
+        "exerciseCount": 3,
+        "hasWalking": false,
+        "hasCardio": false
+      },
+      "sessions": [
+        {
+          "id": "session-fixture-012",
+          "activityType": "Pull Progression",
+          "title": "Pull Progression",
+          "kind": "strength",
+          "exerciseCount": 3,
+          "bodyAreas": ["Back", "Shoulders"],
+          "durationSeconds": 2820,
+          "distance": null,
+          "distanceUnit": null,
+          "activeCalories": 390,
+          "detail": "Back, Shoulders \u00b7 3 exercises",
+          "destination": {
+            "id": "training.session",
+            "parameters": { "sessionId": "session-fixture-012" }
+          }
+        }
+      ]
+    },
     {
       "date": "2026-08-28",
       "label": "Friday, August 28",
@@ -829,6 +913,91 @@
     }
   ],
   "sessions": [
+    {
+      "id": "session-fixture-013",
+      "label": "Push Progression",
+      "value": "405 active cal",
+      "detail": "6:05 AM\u20136:55 AM \u00b7 50 min \u00b7 405 active cal \u00b7 Bench Press, Cable Fly, Overhead Triceps Extension",
+      "date": "2026-09-01T06:05:00-07:00",
+      "sourceEvidence": ["Typed evidence"],
+      "exercises": [
+        {
+          "id": "press-013",
+          "name": "Bench Press",
+          "canonicalExerciseId": "bench_press",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 8, "weight": 135, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 8, "weight": 145, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 8, "weight": 155, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "fly-013",
+          "name": "Cable Fly",
+          "canonicalExerciseId": "cable_fly",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 35, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 35, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "triceps-013",
+          "name": "Overhead Triceps Extension",
+          "canonicalExerciseId": "overhead_triceps_extension",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 45, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 10, "weight": 45, "weight_unit": "lb" }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
+    {
+      "id": "session-fixture-012",
+      "label": "Pull Progression",
+      "value": "390 active cal",
+      "detail": "5:50 AM\u20136:37 AM \u00b7 47 min \u00b7 390 active cal \u00b7 Lat Pulldown, Seated Cable Row, Face Pull",
+      "date": "2026-08-31T05:50:00-07:00",
+      "sourceEvidence": ["Typed evidence"],
+      "exercises": [
+        {
+          "id": "pulldown-012",
+          "name": "Lat Pulldown",
+          "canonicalExerciseId": "lat_pulldown",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 10, "weight": 110, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 10, "weight": 120, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 11, "weight": 120, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "row-012",
+          "name": "Seated Cable Row",
+          "canonicalExerciseId": "seated_cable_row",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 105, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 105, "weight_unit": "lb" }
+          ]
+        },
+        {
+          "id": "facepull-012",
+          "name": "Face Pull",
+          "canonicalExerciseId": "face_pull",
+          "executionVariant": null,
+          "sets": [
+            { "set_number": 1, "reps": 12, "weight": 50, "weight_unit": "lb" },
+            { "set_number": 2, "reps": 12, "weight": 50, "weight_unit": "lb" },
+            { "set_number": 3, "reps": 14, "weight": 50, "weight_unit": "lb" }
+          ]
+        }
+      ],
+      "exerciseRelationshipGroups": []
+    },
     {
       "id": "session-fixture-006",
       "label": "Shoulder & Arms Training",

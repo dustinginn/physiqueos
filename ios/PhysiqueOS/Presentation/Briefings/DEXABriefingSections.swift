@@ -17,6 +17,8 @@ import SwiftUI
 /// this view does not reuse `ChartInteraction.swift`'s scrub gesture.
 struct DEXABriefingSections: View {
     static let sectionInventory = ["Hero", "Current Scan", "What Measurably Changed", "Since Last Scan", "Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes", "Cut Timeline", "What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"]
+    static let heroMetricPresentationStyle = "semantic-two-by-two"
+    static let inlineComparisonSectionTitles = ["Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes"]
     let content: DEXABriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -66,24 +68,7 @@ struct DEXABriefingSections: View {
                 }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(content.hero.results) { result in
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("\(result.emoji) \(result.label)")
-                                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text(result.value)
-                                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(result.context)
-                                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                        .padding(16)
-                        .frame(minHeight: 156, alignment: .topLeading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(result.label): \(result.value), \(result.context)")
+                        heroMetric(result)
                     }
                 }
                 if !content.hero.milestones.isEmpty {
@@ -144,7 +129,7 @@ struct DEXABriefingSections: View {
                     regionalGroup(title: "Measured Lean Tissue Change", items: content.progress.regionalLean)
                 }
                 if !content.progress.supplemental.isEmpty {
-                    comparisonGroup(title: "Other Notable Changes", items: content.progress.supplemental)
+                    supplementalGroup(title: "Other Notable Changes", items: content.progress.supplemental)
                 }
                 cutTimelineModule(content.progress.timeline)
             }
@@ -186,41 +171,66 @@ struct DEXABriefingSections: View {
     }
 
     private func regionalGroup(title: String, items: [DEXARegionalChangeMetric]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        comparisonRows(
+            title: title,
+            items: items.map { DEXAInlineComparisonRow(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) }
+        )
+    }
+
+    private func supplementalGroup(title: String, items: [DEXAComparisonMetric]) -> some View {
+        comparisonRows(
+            title: title,
+            items: items.map { DEXAInlineComparisonRow(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) }
+        )
+    }
+
+    private func comparisonRows(title: String, items: [DEXAInlineComparisonRow]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 13) {
-                GridRow {
-                    Text("Metric")
-                    Text("Previous")
-                    Text("")
-                    Text("Current")
-                    Text("Delta")
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    comparisonColumnHeader("Metric", width: nil, alignment: .leading)
+                    comparisonColumnHeader("Previous", width: 58, alignment: .trailing)
+                    comparisonColumnHeader("", width: 18, alignment: .center)
+                    comparisonColumnHeader("Current", width: 58, alignment: .trailing)
+                    comparisonColumnHeader("Delta", width: 62, alignment: .trailing)
                 }
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                ForEach(items) { item in
-                    GridRow {
-                        Text(item.region)
+                .padding(.bottom, 8)
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    if index > 0 { Divider().overlay(PhysiqueOSTheme.divider) }
+                    HStack(spacing: 6) {
+                        Text(item.label)
                             .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Text(item.previous)
+                            .frame(width: 58, alignment: .trailing)
                         Image(systemName: directionSymbol(item.delta))
+                            .frame(width: 18)
                             .foregroundStyle(deltaColor(item.delta))
                         Text(item.current)
+                            .frame(width: 58, alignment: .trailing)
                         Text(item.delta)
+                            .frame(width: 62, alignment: .trailing)
                             .foregroundStyle(deltaColor(item.delta))
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                    .padding(.vertical, 12)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.region): from \(item.previous) to \(item.current), a change of \(item.delta)")
+                    .accessibilityLabel("\(item.label): from \(item.previous) to \(item.current), a change of \(item.delta)")
                 }
             }
-            .padding(14)
-            .background(PhysiqueOSTheme.surfaceMuted)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
+    }
+
+    private func comparisonColumnHeader(_ text: String, width: CGFloat?, alignment: Alignment) -> some View {
+        Text(text)
+            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
+            .foregroundStyle(PhysiqueOSTheme.textMuted)
+            .frame(width: width, alignment: alignment)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)
     }
 
     /// Verified non-interactive on the real screen — a static per-scan
@@ -333,6 +343,45 @@ struct DEXABriefingSections: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
+    private func heroMetric(_ result: DEXAHeroResult) -> some View {
+        let tint = heroMetricColor(result.label)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(result.emoji)
+                    .font(.system(size: 18))
+                    .frame(width: 36, height: 36)
+                    .background(tint.opacity(0.16))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                Text(result.label)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                    .foregroundStyle(tint)
+            }
+            Text(result.value)
+                .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .lineLimit(1)
+            Text(result.context)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
+        .background(tint.opacity(0.09))
+        .clipShape(RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(tint.opacity(0.42), lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(result.label): \(result.value), \(result.context)")
+    }
+
+    private func heroMetricColor(_ label: String) -> Color {
+        let normalized = label.lowercased()
+        if normalized.contains("lean") { return PhysiqueOSTheme.chartEvidence }
+        if normalized.contains("body fat") { return PhysiqueOSTheme.chartEffort }
+        if normalized.contains("fat mass") { return PhysiqueOSTheme.macroProtein }
+        if normalized.contains("weight") { return PhysiqueOSTheme.accent }
+        return PhysiqueOSTheme.chartSuccess
+    }
+
     private func comparisonValue(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
@@ -420,4 +469,11 @@ struct DEXABriefingSections: View {
             }
         }
     }
+}
+
+private struct DEXAInlineComparisonRow {
+    let label: String
+    let previous: String
+    let current: String
+    let delta: String
 }

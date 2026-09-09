@@ -104,6 +104,8 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
         openEvidenceStream(named: "DEXA")
         assertText("DEXA")
+        scrollToText("Since Prior Scan")
+        attachScreenshot("14a-dexa-since-prior-scan")
         scrollToText("Core Trends")
         attachScreenshot("14-dexa-evidence")
         navigateBackToEvidenceHub()
@@ -159,6 +161,8 @@ final class TrainingAcceptanceUITests: XCTestCase {
         attachScreenshot("19c-monthly-energy-evolution")
         scrollToText("NEW BASELINE")
         attachScreenshot("19d-monthly-new-baseline")
+        scrollToText("WHAT CHANGED")
+        attachScreenshot("19d2-monthly-what-changed")
         scrollToText("DEFINING MOMENTS")
         attachScreenshot("19e-monthly-defining-moments")
         scrollToText("MONTH AHEAD")
@@ -174,7 +178,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("Two straight weeks of clean progression.")
         scrollToText("ENERGY BALANCE")
         attachScreenshot("21-weekly-energy")
-        scrollToText("TRAINING RESPONSE")
+        scrollToElement(identifier: "briefing.trainingResponse", maxSwipes: 30)
         attachScreenshot("21b-weekly-training")
         scrollToText("COACH'S TAKE")
         attachScreenshot("21c-coachs-take")
@@ -185,6 +189,23 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("Four poses in, the visual story matches the scan.")
         scrollToText("What Changed")
         attachScreenshot("22-photo-event-comparison")
+    }
+
+    func testFounderCorrectionMidweekTrainingResponseJourney() throws {
+        continueAfterFailure = false
+        app.launch()
+
+        let latestBriefing = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "DEXA Analysis Ready")
+        ).firstMatch
+        XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest Briefing was not available from Home.")
+        latestBriefing.tap()
+        openBriefingHistory()
+        openBriefingFromHistory(containing: "Midweek Briefing")
+        assertText("Nothing here changes last week's plan.")
+        scrollToElement(identifier: "briefing.trainingResponse", maxSwipes: 30)
+        assertText("3,620 lb volume")
+        attachScreenshot("20b-midweek-training")
     }
 
     func testFounderCorrectionHomeConfidenceAndLoggerShoulders() throws {
@@ -205,6 +226,20 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertButtonLabel(containing: "Shoulder Press Machine")
         assertButtonLabel(containing: "Face Pull")
         attachScreenshot("24-logger-shoulders-canonical-catalog")
+
+        tapButton(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+        tapButton(identifier: "trainingLogger.cancelWorkout")
+        let alert = app.alerts["Cancel this workout?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3), "Cancel Workout did not use a centered system alert.")
+        XCTAssertTrue(alert.buttons["Cancel Workout"].exists, "The destructive confirmation action was missing.")
+        XCTAssertTrue(alert.buttons["Keep Workout"].exists, "The safe dismissal action was missing.")
+        attachScreenshot("25-logger-cancel-workout-alert")
+        alert.buttons["Keep Workout"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 3),
+            "Dismissing the alert did not preserve the in-progress workout."
+        )
     }
 
     private func openTrainingLanding() {
@@ -283,6 +318,18 @@ final class TrainingAcceptanceUITests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(element.exists && element.isHittable, "Could not scroll to visible text: \(text)")
+        return element
+    }
+
+    @discardableResult
+    private func scrollToElement(identifier: String, maxSwipes: Int = 12) -> XCUIElement {
+        let element = app.descendants(matching: .any)[identifier]
+        for _ in 0..<maxSwipes where !element.exists || !element.isHittable {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.82))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.20))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0.02)
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "Could not scroll to visible element: \(identifier)")
         return element
     }
 

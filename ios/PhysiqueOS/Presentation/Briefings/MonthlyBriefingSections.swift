@@ -12,6 +12,8 @@ import SwiftUI
 /// screen.
 struct MonthlyBriefingSections: View {
     static let sectionInventory = ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"]
+    static let leadFeatureDomains = ["Training", "New Baseline", "Calories"]
+    static let trainingPresentationStyle = "gold-featured-lift"
     let content: MonthlyBriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
@@ -36,8 +38,35 @@ struct MonthlyBriefingSections: View {
             headline: content.heroHeadline,
             narrative: content.heroBody,
             confidence: confidence,
+            features: monthlyLeadFeatures,
             footerItems: [("Goal & phase", content.heroGoalLabel)]
         )
+    }
+
+    private var monthlyLeadFeatures: [BriefingLeadFeature] {
+        [
+            BriefingLeadFeature(
+                icon: "dumbbell.fill",
+                label: "Training",
+                value: "Early momentum",
+                detail: content.trainingProgress.headline ?? content.trainingProgress.narrative,
+                tone: .effort
+            ),
+            BriefingLeadFeature(
+                icon: "scope",
+                label: "New Baseline",
+                value: content.newBaseline.bodyFatPercent + " body fat",
+                detail: "Future scans can be compared with the \(content.newBaseline.referenceDateLabel) baseline.",
+                tone: .primary
+            ),
+            BriefingLeadFeature(
+                icon: "bolt.fill",
+                label: "Calories",
+                value: signedCalories(content.energyEvolution.averageBalanceKcal) + " average balance",
+                detail: content.energyEvolution.phaseLabel ?? "The month established a repeatable energy pattern.",
+                tone: .evidence
+            )
+        ]
     }
 
     private func goalMilestoneCard(_ milestone: MonthlyGoalMilestoneSection) -> some View {
@@ -68,7 +97,7 @@ struct MonthlyBriefingSections: View {
 
     private var trainingProgressCard: some View {
         BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
                 editorialLabel("Training Progress", icon: "dumbbell.fill", color: PhysiqueOSTheme.chartEffort)
                 Text(content.trainingProgress.headline ?? content.trainingProgress.narrative)
                     .physiqueOSFont(PhysiqueOSTypography.editorialSection)
@@ -77,33 +106,12 @@ struct MonthlyBriefingSections: View {
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 if let highlights = content.trainingProgress.highlights, !highlights.isEmpty {
-                    VStack(spacing: 12) {
-                        ForEach(highlights) { highlight in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(highlight.exerciseName)
-                                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                        Text(highlight.recordType)
-                                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                            .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                                    }
-                                    Spacer()
-                                    Text(highlight.delta)
-                                        .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                                }
-                                Text(highlight.headline)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text(highlight.detail)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    monthlyFeaturedLift(highlights[0])
+                    if highlights.count > 1 {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                            ForEach(Array(highlights.dropFirst())) { highlight in
+                                monthlySupportingLift(highlight)
                             }
-                            .padding(16)
-                            .background(PhysiqueOSTheme.chartSuccess.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                     }
                 }
@@ -115,9 +123,9 @@ struct MonthlyBriefingSections: View {
     }
 
     private var energyEvolutionCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.energyExpenditure) {
-            VStack(alignment: .leading, spacing: 18) {
-                editorialLabel("Energy Evolution", icon: "bolt.fill", color: PhysiqueOSTheme.energyExpenditure)
+        BriefingEditorialCard(tint: PhysiqueOSTheme.monthlyEnergy, background: PhysiqueOSTheme.surfaceElevated) {
+            VStack(alignment: .leading, spacing: 22) {
+                editorialLabel("Energy Evolution", icon: "bolt.fill", color: PhysiqueOSTheme.monthlyEnergy)
                 Text(content.energyEvolution.headline ?? "How did energy change across the month?")
                     .physiqueOSFont(PhysiqueOSTypography.editorialHero)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
@@ -140,11 +148,11 @@ struct MonthlyBriefingSections: View {
                     monthlyMetric("Avg Balance", signedCalories(content.energyEvolution.averageBalanceKcal), color: PhysiqueOSTheme.chartSuccess)
                     monthlyMetric("Balance Magnitude", "\(abs(content.energyEvolution.averageBalanceKcal)) kcal/day", color: PhysiqueOSTheme.accent)
                 }
-                EnergySeriesLegend()
-                staticWeeklyBarChart
                 if let insight = content.energyEvolution.insight {
-                    callout(title: "What It Shows", text: insight, color: PhysiqueOSTheme.energyIntake)
+                    callout(title: "What It Shows", text: insight, color: PhysiqueOSTheme.monthlyEnergy)
                 }
+                monthlyEnergyLegend
+                staticWeeklyBarChart
             }
         }
     }
@@ -154,7 +162,7 @@ struct MonthlyBriefingSections: View {
     private var staticWeeklyBarChart: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach(content.energyEvolution.weeks) { week in
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Chart {
                         BarMark(x: .value("Series", "Intake"), y: .value("Value", week.averageIntakeKcal))
                             .foregroundStyle(PhysiqueOSTheme.energyIntake)
@@ -163,13 +171,13 @@ struct MonthlyBriefingSections: View {
                     }
                     .chartXAxis(.hidden)
                     .chartYAxis(.hidden)
-                    .frame(height: 92)
+                    .frame(height: 112)
                     Text(week.weekLabel)
                         .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     Text(week.averageBalanceKcal.map(signedCalories) ?? signedCalories(week.averageIntakeKcal - week.averageExpenditureKcal))
                         .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                        .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                        .foregroundStyle(PhysiqueOSTheme.monthlyEnergy)
                     if let coverage = week.coverageLabel {
                         Text(coverage)
                             .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
@@ -177,8 +185,9 @@ struct MonthlyBriefingSections: View {
                     }
                 }
                 .padding(12)
-                .background(PhysiqueOSTheme.surfaceMuted)
+                .background(PhysiqueOSTheme.surfaceAccent.opacity(0.48))
                 .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.monthlyEnergy.opacity(0.20)))
             }
         }
         .accessibilityLabel("Weekly average intake and expenditure across \(content.energyEvolution.weeks.count) weeks")
@@ -250,29 +259,18 @@ struct MonthlyBriefingSections: View {
     }
 
     private var whatChangedCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
+        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
             VStack(alignment: .leading, spacing: 18) {
                 editorialLabel("What Changed", icon: "sparkles", color: PhysiqueOSTheme.accent)
                 Text("\(content.monthLabel.split(separator: " ").first ?? "This month") changed how progress should be judged.")
                     .physiqueOSFont(PhysiqueOSTypography.editorialSection)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                ForEach(changeSections) { item in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(item.title.uppercased())
-                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                            .foregroundStyle(color(for: item.tone))
-                        Text(item.headline)
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(item.narrative)
-                            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                VStack(spacing: 3) {
+                    ForEach(changeSections) { item in
+                        monthlyChangePanel(item)
                     }
-                    .padding(16)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(color(for: item.tone).opacity(0.24)))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .padding(.horizontal, -22)
             }
         }
     }
@@ -335,6 +333,129 @@ struct MonthlyBriefingSections: View {
         .background(PhysiqueOSTheme.surfaceMuted)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(color.opacity(0.22), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func monthlyFeaturedLift(_ highlight: BriefingTrainingHighlight) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                    .frame(width: 40, height: 40)
+                    .background(PhysiqueOSTheme.chartEffort.opacity(0.16))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("FEATURED LIFT")
+                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                    Text(highlight.exerciseName)
+                        .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(highlight.recordType)
+                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
+            }
+            Text(highlight.performanceValue ?? highlight.headline)
+                .physiqueOSFont(PhysiqueOSTypography.editorialHero)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text("▲  \(highlight.delta)")
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+            Text(highlight.detail)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.chartEffort.opacity(0.09))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.chartEffort.opacity(0.48)))
+    }
+
+    private func monthlySupportingLift(_ highlight: BriefingTrainingHighlight) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "trophy")
+                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+            Text(highlight.exerciseName)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(highlight.recordType)
+                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+            Text(highlight.performanceValue ?? highlight.headline)
+                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            Text(highlight.delta)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+            Text(highlight.detail)
+                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 210, alignment: .topLeading)
+        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(PhysiqueOSTheme.chartEffort.opacity(0.34)))
+    }
+
+    private var monthlyEnergyLegend: some View {
+        HStack(spacing: 16) {
+            monthlyLegendItem("Intake", color: PhysiqueOSTheme.energyIntake)
+            monthlyLegendItem("Estimated expenditure", color: PhysiqueOSTheme.energyExpenditure)
+            monthlyLegendItem("Balance", color: PhysiqueOSTheme.monthlyEnergy)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func monthlyLegendItem(_ label: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 11, height: 11)
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
+        }
+    }
+
+    private func monthlyChangePanel(_ item: MonthlyChangeSection) -> some View {
+        let tint = color(for: item.tone)
+        return HStack(alignment: .top, spacing: 14) {
+            Rectangle().fill(tint).frame(width: 4)
+            Image(systemName: changeIcon(for: item.domain))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 36)
+                .background(tint.opacity(0.13))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.title)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                    .foregroundStyle(tint)
+                Text(item.headline)
+                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
+                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                Text(item.narrative)
+                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            .padding(.vertical, 18)
+            .padding(.trailing, 18)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.07))
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 16, topTrailingRadius: 16))
+    }
+
+    private func changeIcon(for domain: String) -> String {
+        switch domain {
+        case "training": "dumbbell.fill"
+        case "calories": "bolt.fill"
+        case "weight": "scalemass.fill"
+        case "photos": "camera.fill"
+        case "dexa": "scope"
+        default: "sparkles"
+        }
     }
 
     private func monthlySpotlight(icon: String, label: String, value: String, color: Color) -> some View {

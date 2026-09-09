@@ -65,6 +65,10 @@ enum PhysiqueOSTheme {
     /// reader sees "energy" semantics here, not "effort"/"evidence" ones.
     static let energyIntake = Color(hex: 0xFBBF24)
     static let energyExpenditure = Color(hex: 0x60A5FA)
+    /// Monthly Briefing's dedicated Energy Evolution identity. The live
+    /// editorial treatment is cyan rather than the blue used for the
+    /// ordinary estimated-expenditure series.
+    static let monthlyEnergy = Color(hex: 0x22D3EE)
 }
 
 /// Semantic color slots mirroring `IconBadge.jsx`'s `colors` map, so icon

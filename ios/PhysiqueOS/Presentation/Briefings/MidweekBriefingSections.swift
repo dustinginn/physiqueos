@@ -24,7 +24,7 @@ struct MidweekBriefingSections: View {
                 narrativeCard(title: "Weight Context", text: weightContextNarrative)
             }
             if let training = content.training {
-                MidweekTrainingCard(training: training)
+                BriefingTrainingResponseCard(training: training)
             } else if let trainingResponseNarrative = content.trainingResponseNarrative {
                 narrativeCard(title: "Training Response", text: trainingResponseNarrative)
             }
@@ -121,44 +121,5 @@ struct MidweekBriefingSections: View {
         .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceMuted)
         .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-private struct MidweekTrainingCard: View {
-    let training: WeeklyTrainingSection
-
-    var body: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 18) {
-                BriefingEditorialHeading(title: "Training Response")
-                Text(training.headline ?? "The early-week response is holding.")
-                    .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(training.narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if let highlights = training.highlights {
-                    ForEach(highlights.prefix(2)) { highlight in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(highlight.exerciseName)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text(highlight.detail)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            }
-                            Spacer()
-                            Text(highlight.delta)
-                                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                        }
-                        .padding(14)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                }
-            }
-        }
     }
 }

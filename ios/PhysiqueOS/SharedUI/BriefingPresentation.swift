@@ -119,6 +119,7 @@ struct BriefingLeadCard: View {
     let headline: String
     let narrative: String
     let confidence: BriefingConfidenceReadModel?
+    var features: [BriefingLeadFeature] = []
     var footerItems: [(String, String)] = []
 
     var body: some View {
@@ -157,6 +158,39 @@ struct BriefingLeadCard: View {
                 Text(narrative)
                     .physiqueOSFont(PhysiqueOSTypography.briefingBody)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                if !features.isEmpty {
+                    VStack(spacing: 10) {
+                        ForEach(features) { feature in
+                            HStack(alignment: .top, spacing: 13) {
+                                Image(systemName: feature.icon)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(feature.tone.foreground)
+                                    .frame(width: 38, height: 38)
+                                    .background(feature.tone.background)
+                                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(feature.label)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
+                                        .foregroundStyle(feature.tone.foreground)
+                                    Text(feature.value)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text(feature.detail)
+                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(feature.tone.foreground.opacity(0.07))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(feature.tone.foreground.opacity(0.25))
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                }
                 if !footerItems.isEmpty {
                     Divider().overlay(PhysiqueOSTheme.divider)
                     HStack(alignment: .top, spacing: 18) {
@@ -175,6 +209,15 @@ struct BriefingLeadCard: View {
             }
         }
     }
+}
+
+struct BriefingLeadFeature: Identifiable {
+    var id: String { label }
+    let icon: String
+    let label: String
+    let value: String
+    let detail: String
+    let tone: HomeColorToken
 }
 
 /// Displays a persisted `BriefingConfidenceReadModel` verbatim. Native never
