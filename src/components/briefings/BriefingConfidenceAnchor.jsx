@@ -4,6 +4,7 @@ import {
   canonicalConfidenceExplanation,
 } from "../../domain/services/CanonicalConfidencePresentationInvariant";
 import { translateConfidenceProse } from "../../domain/presentation/confidenceExplanationPresentation";
+import { confidenceBandLabel } from "../../domain/presentation/productLanguagePresentation";
 
 export default function BriefingConfidenceAnchor({
   animate = false,
@@ -35,7 +36,7 @@ export default function BriefingConfidenceAnchor({
       />}
       <div>
         <p className="text-[10px] font-black uppercase tracking-[.1em] text-[var(--text-muted)]">
-          {bandLabel(canonicalConfidence.band)} confidence
+          {confidenceBandLabel(canonicalConfidence.band)} Confidence
         </p>
         <p className="mt-1 text-sm font-black text-[var(--text-primary)]">
           {movementLabel(canonicalConfidence)}
@@ -51,7 +52,7 @@ export default function BriefingConfidenceAnchor({
 export function movementLabel(confidence) {
   if (confidence.movementDirection === "increased") return `▲ +${Math.abs(confidence.delta)}`;
   if (confidence.movementDirection === "decreased") return `▼ −${Math.abs(confidence.delta)}`;
-  if (confidence.movementDirection === "held") return "— No change";
+  if (confidence.movementDirection === "held") return "— No meaningful change";
   if (confidence.movementDirection === "initial") return "Initial assessment";
   return "Movement unavailable";
 }
@@ -60,6 +61,4 @@ export function confidenceHeadline(confidence) {
   return translateConfidenceProse(canonicalConfidenceExplanation(confidence));
 }
 
-function bandLabel(value) {
-  return String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+function bandLabel(value) { return confidenceBandLabel(value); }

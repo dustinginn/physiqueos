@@ -15,6 +15,7 @@ import ProgressLineChart from "../components/progress/ProgressLineChart";
 import Card from "../components/ui/Card";
 import ConfidenceRing from "../components/ui/ConfidenceRing";
 import IconBadge from "../components/ui/IconBadge";
+import { productLabel } from "../domain/presentation/productLanguagePresentation";
 
 export default function DailyBriefingScreen({
   backHref = "/",
@@ -222,14 +223,15 @@ function formatBriefingDate(value) {
 function HeroConfidenceSection({ confidence, hero, reasons }) {
   const available = confidence?.canonicalSeries === true &&
     Number.isFinite(confidence.value);
+  const currentChapterLabel = productLabel(hero.currentChapter, { fallback: null });
   return (
     <Card className="overflow-hidden border-[var(--divider)] bg-gradient-to-br from-[color-mix(in_srgb,var(--primary)_10%,var(--surface-elevated))] via-[var(--surface-elevated)] to-[var(--surface-muted)] motion-safe:animate-[briefing-card-enter_420ms_ease-out]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <Badge tone="primary">{hero.primaryGoal}</Badge>
-          {hero.currentChapter && (
+          {currentChapterLabel && (
             <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-              {hero.currentChapter.replaceAll("_", " ")}
+              {currentChapterLabel}
             </p>
           )}
           <h2 className="mt-3 text-2xl font-extrabold leading-tight text-slate-950">
@@ -281,7 +283,7 @@ function formatConfidenceMovement(confidence) {
   if (confidence.movementDirection === "decreased") {
     return `Decreased -${Math.abs(confidence.delta)}`;
   }
-  if (confidence.movementDirection === "held") return "No change";
+  if (confidence.movementDirection === "held") return "No meaningful change";
   if (confidence.movementDirection === "initial") return "Initial assessment";
   return "Movement unavailable";
 }

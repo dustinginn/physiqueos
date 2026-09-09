@@ -1,6 +1,6 @@
 # Confidence V2 Explanation and Briefing Narrative Audit
 
-Status: Founder review required before semantic implementation
+Status: Founder-approved implementation in production acceptance
 
 Audit date: September 9, 2026
 
@@ -369,9 +369,9 @@ Projection rules:
 - fail closed when source lineage is unavailable
 - expose one DTO to web and Native; let surfaces choose depth, not semantics
 
-## Proposed representative outputs for Founder review
+## Founder-approved representative semantic targets
 
-These are read-only proposed presentations. They have not replaced persisted copy.
+These targets are now produced deterministically at render time from the bound canonical assessment. Persisted historical copy and assessment authority remain unchanged.
 
 ### Home concise output
 
@@ -497,9 +497,9 @@ Recommended post-approval contract:
 
 The audit made no Native, sandbox, auth, worker, Weight, outbox, or API-integration change.
 
-## Founder decisions required
+## Founder-approved decisions
 
-Implementation should not begin until the Founder decides:
+On September 9, 2026, the Founder approved the shared four-question model, casing boundary, render-derived artifact strategy, fail-closed behavior, and the following implementation decisions:
 
 1. Approve or revise the proposed four-question explanation model: support, limits, movement, next decisive evidence.
 2. Approve the Home one-sentence compression and tap-for-detail depth.
@@ -561,3 +561,63 @@ Not performed by design:
 - no paid service or infrastructure change
 
 Incremental infrastructure cost: **$0**.
+
+## Implementation architecture and acceptance record
+
+Implementation worktree: `C:\Users\dusti\Documents\GitHub\physiqueos\.worktrees\confidence-explanation-v2-implementation-20260909`
+
+Implementation branch: `codex/confidence-explanation-v2-implementation-20260909`
+
+Exact implementation parent: `0259133ffd0b9638b915154c4226d884aded3e96`
+
+The implementation adds one render-time boundary:
+
+```text
+persisted canonical Confidence assessment
+  → factor-code normalization with original lineage retained
+  → shared structured explanation model
+  → centralized product-language and casing validation
+  → cadence/surface projection
+  → Founder web or the versioned Confidence read-model contract
+```
+
+The shared DTO contains score, band, movement and magnitude, summary, bounded supporting and limiting factors, a movement explanation, bounded next decisive evidence, optional evidence and historical context, assessment identity, cutoff, publisher, provenance references, and typed degradation warnings. Canonical codes and source IDs remain available for machine lineage but are never interpolated into Founder-facing strings.
+
+### Centralized presentation vocabulary and invariant
+
+`productLanguagePresentation.js` owns product noun casing, Confidence band and movement labels, dynamic factor-prefix normalization, and the Founder-facing token-leak scanner. `confidenceExplanationPresentation.js` owns factor semantics, uncertainty-versus-contradiction language, support-versus-context classification, deterministic cadence emphasis, historical disclaimers, and fail-closed explanation output.
+
+The invariant is systemic: an internal label must pass through a known semantic presentation token before it can become Founder-facing prose. Unknown factors are omitted with a typed diagnostic; unknown product labels render no label. Snake case, implementation-style camel case, raw canonical/user IDs, schema labels, publisher/artifact IDs, and known internal factor tokens are denied in presentation strings. The Daily Briefing chapter label was moved to the same vocabulary boundary rather than continuing its local underscore replacement.
+
+### Render-derived artifact strategy
+
+No canonical Confidence assessment, score, artifact, or historical narrative was rewritten. Home, Daily, Goals, active Goal detail, Weekly, Midweek, Monthly, DEXA Event, and Photo Event derive the explanation from the exact canonical assessment at render time. Historical briefing and event routes resolve the artifact-bound assessment by exact ID. Existing persisted prose remains audit history and does not become a second explanation authority.
+
+### Bounded read architecture
+
+- Home, Daily, Goals, and active Goal reuse the canonical assessment already present in their bounded read context; explanation adds zero provider reads.
+- Monthly, historical Weekly/Midweek, and DEXA history load one exact `goalConfidenceHistory` record in parallel with existing artifact context reads.
+- the current Weekly route performs one exact assessment lookup after bounded artifact discovery because the assessment ID is owned by the artifact.
+- Photo Event resolves its exact assessment and referenced media concurrently.
+- no render route invokes PI, Interpretation, Forecast, Narrative generation, OpenAI, the broad compatibility runtime, or a full Confidence-history scan.
+
+### Native/API implications
+
+The existing versioned `confidence.v1` application read model now returns the same server-owned structured explanation through `resolveActiveGoalConfidencePresentation`. Native can render its own layout depth from `summary`, `supportingFactors`, `limitingFactors`, `movementExplanation`, and `nextDecisiveEvidence` without implementing Confidence reasoning in Swift. Machine codes remain separate from presentation text. No Native route, sandbox authentication, sandbox database, worker, outbox, manual Weight path, API integration, or device-pairing behavior changed.
+
+### Local validation
+
+- shared explanation, vocabulary, Home, Goal, Weekly, Midweek, Monthly, DEXA Event, Photo Event, Daily, read-store, and invariant coverage: 80/80 passing in the final focused run
+- Phase 3: 139/139 passing with the ignored read-only Founder fixture linked into the clean worktree
+- Phase 4: 75/75 passing
+- Phase 5: 25/25 passing
+- Phase 4 and Phase 5 full validators: passing, including isolated smoke, production build, persistence-isolation hash checks, and diff checks
+- production build: passing
+- ESLint: zero errors; two unchanged `<img>` optimization warnings outside this implementation
+- provider worker artifact collector: 4/4 passing
+- migration safety: 1,202/1,213 passing; all 11 failures reproduce on the exact untouched production parent and are stale assertions that bounded provider-read routes must contain the superseded `FounderRepositories.runInReadScope` call
+- NarrativeEngine: 20/22 passing; both failures reproduce on the exact untouched parent and are stale expectations for an already-emitted attainability factor and the already-current `monitor_closely` decision
+- Monthly Founder integration: its single async-repository fixture failure reproduces on the exact untouched parent
+- Overall Goal Confidence parity: its source-label and frozen-facade spy failures reproduce on the exact untouched parent; the directly changed product-casing expectation now requires `Confidence`
+
+The ignored runtime-store and migration-control hard links used for read-only fixture tests did not modify the underlying files. Phase 4/5 hash validation confirmed the runtime stayed byte-identical at revision 142 and SHA-256 `A2993575ED675F3D240CB147BF5980C19EB4D195BB4023ABA54EB5DAB441779E`.

@@ -67,6 +67,7 @@ export function deriveHomeActiveChapterPresentation({
         clarifyingFactors: trajectory.confidence.clarifyingFactors,
         uncertaintyStatement: trajectory.confidence.uncertaintyStatement,
       },
+      confidenceSummary: overallGoalConfidence?.explanationModel?.summary ?? null,
       confidenceAssessmentId: overallGoalConfidence?.assessmentId ?? null,
       confidenceSource: overallGoalConfidence?.source ?? null,
       mode: "phase_trajectory",

@@ -79,6 +79,7 @@ export function mapGoalSummary(summary, evaluation, sourceGoal, canonicalConfide
       band: canonicalConfidence.band,
       source: canonicalConfidence.source,
       explanation: canonicalConfidence.explanation ?? canonicalConfidence.rationale ?? null,
+      explanationModel: canonicalConfidence.goalExplanationModel ?? null,
     } : null,
     goalType: sourceGoal?.type ?? sourceGoal?.goalType ?? null,
     navigation,

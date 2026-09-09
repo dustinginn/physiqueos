@@ -140,6 +140,11 @@ function GoalNavigationCardContent({ goal, primary, showChevron = true }) {
               {goal.phase.name} · {goal.phase.reviewState === "due" ? "Review due" : `Planned review ${formatDate(goal.phase.plannedReviewAt)}`}
             </p>
           )}
+          {goal.confidence?.explanationModel?.summary && (
+            <p className="mt-2 text-xs font-semibold leading-5 text-slate-600" data-testid="goal-confidence-summary">
+              {goal.confidence.explanationModel.summary}
+            </p>
+          )}
         </div>
         {showChevron && (
           <ChevronRight

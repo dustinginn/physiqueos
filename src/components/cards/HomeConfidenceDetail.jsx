@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, HelpCircle, TrendingUp } from "lucide-react";
+import { CheckCircle2, HelpCircle, RefreshCw, TrendingUp } from "lucide-react";
 import ConfidenceRing from "../ui/ConfidenceRing";
 import FloatingSheet from "../ui/FloatingSheet";
 
@@ -44,7 +44,10 @@ export function HomeConfidenceDetailBody({ detail }) {
     <p className="text-sm font-extrabold text-[var(--text-primary)]">Current confidence: {detail.qualitativeLevel}</p>
     <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports confidence" />
     <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits confidence" />
-    <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What will make confidence clearer" />
+    <DetailGroup icon={RefreshCw} items={detail.movementFactors} title="What changed" />
+    <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What PI needs next" />
+    {detail.evidenceContextNote && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.evidenceContextNote}</p>}
+    {detail.historicalContext && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.historicalContext}</p>}
     {detail.uncertaintyStatement && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.uncertaintyStatement}</p>}
   </div>;
 }

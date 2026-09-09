@@ -1,4 +1,6 @@
 import { createProviderMediaReferenceResolver } from "../media/ProviderMediaReferenceResolver.js";
+import { projectConfidenceExplanationForSurface } from
+  "../../domain/presentation/confidenceExplanationPresentation.js";
 
 const MEDIA_FIELDS = new Set([
   "imageHref",
@@ -17,10 +19,23 @@ export function createPhotoEventBriefingReadService({ store } = {}) {
       const input = await store.load({ sessionId });
       if (!input.artifact?.briefing?.photoEventNarrative) return null;
       const resolver = createProviderMediaReferenceResolver(input.mediaObjects);
+      const narrative = resolveNarrativeMedia(
+        input.artifact.briefing.photoEventNarrative, resolver);
+      const confidence = projectConfidenceExplanationForSurface(
+        narrative.goalConfidence,
+        {
+          assessment: input.confidenceAssessment,
+          surface: "photo_event",
+          historicalContext: {
+            matchedOnly: input.artifact.confidencePublication?.confidenceMode === "matched-only",
+            eventDate: narrative.eventDate ?? input.artifact.evidenceCutoff,
+          },
+        }
+      );
       return Object.freeze({
         artifactId: input.artifact.id,
         completion: input.goal?.completion ?? null,
-        narrative: resolveNarrativeMedia(input.artifact.briefing.photoEventNarrative, resolver),
+        narrative: Object.freeze({ ...narrative, goalConfidence: confidence }),
       });
     },
   });

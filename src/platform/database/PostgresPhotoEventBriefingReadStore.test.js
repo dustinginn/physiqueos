@@ -19,4 +19,24 @@ describe("PostgreSQL Photo Event briefing read store", () => {
     expect(mediaCall[1][2]).toContain("evidence/uploads/front.jpg");
     expect(mediaCall[1][3]).toEqual(["front.jpg"]);
   });
+
+  it("loads only the Photo Event's matched Confidence assessment", async () => {
+    const query = vi.fn(async (sql) => ({ rows: sql.includes("canonical_briefing_records")
+      ? [{ payload: { confidencePublication: { assessmentId: "assessment-one" },
+          briefing: { photoEventNarrative: { activeViews: [] } } } }]
+      : sql.includes("goalConfidenceHistory")
+        ? [{ payload: { assessment: { id: "assessment-one" } } }]
+        : [] }));
+    const result = await createPostgresPhotoEventBriefingReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+      ownerUserId: "owner",
+    }).load({ sessionId: "photo-session" });
+    expect(result.confidenceAssessment).toEqual({ id: "assessment-one" });
+    expect(query).toHaveBeenCalledTimes(4);
+    const confidenceCall = query.mock.calls.find(([sql]) =>
+      sql.includes("goalConfidenceHistory"));
+    expect(confidenceCall[1]).toEqual([
+      "owner", "goal_confidence_history_v2|assessment-one",
+    ]);
+  });
 });

@@ -31,13 +31,17 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
   const context = async ({ artifact, query }) => {
     const records = createPhase4CanonicalRecordStore({ query });
     const list = (collection) => records.list({ ownerUserId, collection });
-    const [users, goals, phaseReviewDecisions, dexaScans, workItems, metadata] = await Promise.all([
+    const assessmentId = confidenceAssessmentId(artifact);
+    const [users, goals, phaseReviewDecisions, dexaScans, workItems, metadata,
+      confidenceHistory] = await Promise.all([
       list("user"),
       list("goals"),
       list("phaseReviewDecisions"),
       list("dexaScans"),
       list("briefingReconciliationWorkItems"),
       query(`SELECT revision FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1`, [ownerUserId]),
+      assessmentId ? records.get({ ownerUserId, collection: "goalConfidenceHistory",
+        recordId: `goal_confidence_history_v2|${assessmentId}` }) : null,
     ]);
     return Object.freeze({
       artifact,
@@ -46,6 +50,7 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
       phaseReviewDecisions,
       dexaScans,
       workItems,
+      confidenceAssessment: confidenceHistory?.assessment ?? null,
       revision: Number(metadata.rows[0]?.revision ?? 0),
     });
   };
@@ -81,6 +86,16 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
       const records = createPhase4CanonicalRecordStore({ query });
       return records.get({ ownerUserId, collection: "analyses", recordId: input.analysisId });
     }),
+    getConfidenceAssessment: tracked("confidence.explanation-assessment", async ({ input, query }) => {
+      if (!input.assessmentId) return null;
+      const records = createPhase4CanonicalRecordStore({ query });
+      const history = await records.get({
+        ownerUserId,
+        collection: "goalConfidenceHistory",
+        recordId: `goal_confidence_history_v2|${input.assessmentId}`,
+      });
+      return history?.assessment ?? null;
+    }),
   });
 }
 
@@ -95,6 +110,8 @@ export function createRepositoryBriefingNavigationReadStore({ repositories, load
       phaseReviewDecisions: runtime.phaseReviewDecisions ?? [],
       dexaScans: runtime.dexaScans ?? [],
       workItems: runtime.briefingReconciliationWorkItems ?? [],
+      confidenceAssessment: (runtime.goalConfidenceHistory ?? []).find((item) =>
+        item.assessmentId === confidenceAssessmentId(artifact))?.assessment ?? null,
       revision: Number(runtime.revision ?? 0),
     });
   };
@@ -125,5 +142,20 @@ export function createRepositoryBriefingNavigationReadStore({ repositories, load
     getAnalysis({ analysisId }) {
       return repositories.analyses.getAnalysisById(analysisId);
     },
+    async getConfidenceAssessment({ assessmentId }) {
+      const runtime = await loadRuntime();
+      return (runtime.goalConfidenceHistory ?? []).find((item) =>
+        item.assessmentId === assessmentId)?.assessment ?? null;
+    },
   });
+}
+
+function confidenceAssessmentId(artifact) {
+  return artifact?.confidencePublication?.assessmentId ??
+    artifact?.briefing?.confidenceAssessmentId ??
+    artifact?.briefing?.goalConfidence?.assessmentId ??
+    artifact?.briefing?.weeklyNarrative?.goalConfidence?.assessmentId ??
+    artifact?.briefing?.monthlyPresentation?.hero?.confidence?.assessmentId ??
+    artifact?.briefing?.dexaEventNarrative?.goalConfidence?.assessmentId ??
+    artifact?.briefing?.photoEventNarrative?.goalConfidence?.assessmentId ?? null;
 }

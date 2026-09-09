@@ -57,4 +57,27 @@ describe("PostgresBriefingNavigationReadStore", () => {
       compatibilityRuntimeLoadCount: 0,
     }));
   });
+
+  it("loads only the assessment referenced by a briefing", async () => {
+    const query = vi.fn(async (sql, values) => {
+      if (sql.includes("canonical_briefing_records")) return { rows: [{
+        payload: { id: "monthly", briefing: { confidenceAssessmentId: "assessment-one" } },
+        version: 1,
+      }] };
+      if (values?.[2] === "goal_confidence_history_v2|assessment-one") {
+        return { rows: [{ payload: { assessment: { id: "assessment-one" } }, version: 1 }] };
+      }
+      if (sql.includes("canonical_runtime_metadata")) return { rows: [{ revision: 1 }] };
+      return { rows: [] };
+    });
+    const result = await createPostgresBriefingNavigationReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+      ownerUserId: "owner",
+    }).getArtifact({ artifactId: "monthly" });
+    expect(result.confidenceAssessment).toEqual({ id: "assessment-one" });
+    const confidenceCall = query.mock.calls.find(([, values]) =>
+      values?.includes("goal_confidence_history_v2|assessment-one"));
+    expect(confidenceCall).toBeDefined();
+    expect(confidenceCall[0]).toContain("record_id=$3");
+  });
 });

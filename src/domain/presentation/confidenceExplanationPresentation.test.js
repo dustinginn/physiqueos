@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildConfidenceExplanationDetail,
@@ -264,11 +263,22 @@ describe("confidenceExplanationPresentation", () => {
   });
 
   it("against the real production assessment shape: renders cleanly, with no internal vocabulary, no [object Object]", () => {
-    const store = JSON.parse(fs.readFileSync("private/founder/runtime-store.json", "utf8"));
-    const record = store.goalConfidenceHistory.find((item) =>
-      item.assessment?.remainingUncertainty?.items?.length > 0);
-    expect(record).toBeDefined();
-    const assessment = record.assessment;
+    const assessment = {
+      confidenceBand: "moderate",
+      movement: "no_meaningful_change",
+      narrativeExplanation: {
+        text: "Confidence remained stable because Training progression remains supportive.",
+        movementRationaleCode: "forecast_change_not_material",
+      },
+      remainingUncertainty: { items: [
+        { kind: "measurement_pending", materiality: "high" },
+        { kind: "energy_calibration_uncertain", materiality: "moderate" },
+        { kind: "recovery_evidence_missing", materiality: "moderate" },
+      ] },
+      nextConfidenceBuildingEvidence: {
+        status: "identified", evidenceCapability: "dexa_body_composition",
+      },
+    };
     const detail = buildConfidenceExplanationDetail({
       qualitativeLevel: assessment.confidenceBand,
       narrativeText: assessment.narrativeExplanation?.text ?? "",

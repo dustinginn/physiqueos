@@ -60,7 +60,7 @@ describe("Weekly canonical confidence integration", () => {
 
   it("presents every movement state in text and explains movement plainly", () => {
     expect(movementLabel(canonical)).toBe("▲ +14");
-    expect(movementLabel({ movementDirection: "held" })).toBe("— No change");
+    expect(movementLabel({ movementDirection: "held" })).toBe("— No meaningful change");
     expect(movementLabel({ movementDirection: "decreased", delta: -4 })).toBe("▼ −4");
     expect(movementLabel({ movementDirection: "initial" })).toBe("Initial assessment");
     expect(movementLabel({ movementDirection: "unknown" })).toBe("Movement unavailable");

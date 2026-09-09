@@ -17,5 +17,8 @@ export function createBriefingNavigationReadService({ store } = {}) {
     getAnalysis({ analysisId } = {}) {
       return store.getAnalysis({ analysisId });
     },
+    getConfidenceAssessment({ assessmentId } = {}) {
+      return store.getConfidenceAssessment?.({ assessmentId }) ?? null;
+    },
   });
 }

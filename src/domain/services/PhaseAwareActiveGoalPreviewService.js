@@ -2,6 +2,8 @@ import { FounderRepositories } from "../../data/repositories/founderRepositories
 import { resolveHomeGoalTrajectory } from "./HomeGoalTrajectoryService";
 import { createGoalTrainingProgress } from "./GoalTrainingProgressService";
 import { resolveActiveGoalConfidencePresentation } from "./ActiveGoalConfidencePresentationReadService";
+import { confidenceExplanationDetailFromModel } from
+  "../presentation/confidenceExplanationPresentation";
 import { createTrainingPerformanceIntelligenceReport } from "./TrainingPerformanceIntelligenceService";
 import { loadApplicationCanonicalRuntime } from "../../application/runtime/ApplicationCanonicalRuntime";
 import { projectFounderBuildLeanMassPhaseCorrection } from "./FounderPhaseCorrectionService";
@@ -95,7 +97,7 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   if(trainingProgress?.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
   turningPoints.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.title.localeCompare(b.title));
   return {
-    hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% confidence`, confidenceBand: overallGoalConfidence.label, confidenceDetail: overallGoalConfidence.explanation, confidenceSource: overallGoalConfidence.source, confidenceMovement: overallGoalConfidence.movement, confidenceDelta: overallGoalConfidence.delta, confidenceAssessmentId: overallGoalConfidence.assessmentId, editHref: `/goals/${goal.id}/edit` },
+    hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% Confidence`, confidenceBand: overallGoalConfidence.label, confidenceDetail: overallGoalConfidence.explanation, confidenceExplanation: confidenceExplanationDetailFromModel(overallGoalConfidence.goalExplanationModel), confidenceSource: overallGoalConfidence.source, confidenceMovement: overallGoalConfidence.movement, confidenceDelta: overallGoalConfidence.delta, confidenceAssessmentId: overallGoalConfidence.assessmentId, editHref: `/goals/${goal.id}/edit` },
     journey: trajectory.phases.map((phase) => phaseCard(phase)),
     currentPhase: { title: active.phaseName, purpose: active.purpose,
       progress: active.progress.presentationLabel, review: phaseNarrative.review,

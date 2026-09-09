@@ -3,18 +3,30 @@ import { getProductionBriefingNavigationReadService } from "../../../../applicat
 import { projectPersistedMonthlyPresentationForRendering } from "../../../../domain/services/MonthlyPersistedArtifactCompatibilityService";
 import MonthlyBriefingScreen from "../../../../screens/MonthlyBriefingScreen";
 import { createBriefingReconciliationPresentation } from "../../../../domain/services/BriefingReconciliationPresentationService";
+import { projectConfidenceExplanationForSurface } from
+  "../../../../domain/presentation/confidenceExplanationPresentation";
 
 export const dynamic = "force-dynamic";
 
 export default async function MonthlyBriefingArtifactPage({ params }) {
   const { artifactId } = await params;
-  const { artifact, user, workItems } = await getProductionBriefingNavigationReadService().getArtifact({ artifactId });
+  const { artifact, user, workItems, confidenceAssessment } = await getProductionBriefingNavigationReadService().getArtifact({ artifactId });
   if (!isReadableMonthlyArtifact(artifact, user?.id)) {
     return <MonthlyUnavailableState />;
   }
-  const presentation = projectPersistedMonthlyPresentationForRendering(
+  const compatiblePresentation = projectPersistedMonthlyPresentationForRendering(
     artifact.briefing.monthlyPresentation
   );
+  const presentation = {
+    ...compatiblePresentation,
+    hero: {
+      ...compatiblePresentation.hero,
+      confidence: projectConfidenceExplanationForSurface(
+        compatiblePresentation.hero?.confidence,
+        { assessment: confidenceAssessment, surface: "monthly" }
+      ),
+    },
+  };
   const reconciliation = createBriefingReconciliationPresentation({
     publicationRootId: artifact.id,
     workItems,

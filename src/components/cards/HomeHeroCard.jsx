@@ -8,7 +8,7 @@ import HomeConfidenceDetail from "./HomeConfidenceDetail";
 const goalIcons = { dumbbell: Dumbbell, target: Target };
 const metricIcons = { calendar: Calendar, phase: Compass };
 
-export default function HomeHeroCard({ actionHref, actionLabel, confidence, confidenceDetail, confidenceState, daysRemaining, goalIcon = "target", goalLabel, headline, mode = "active", phaseTone = "neutral", plannedReviewDate, primaryTimeline, projectedFinish, schedulerMessage, supportLine, supportingMetrics = [] }) {
+export default function HomeHeroCard({ actionHref, actionLabel, confidence, confidenceDetail, confidenceState, confidenceSummary = null, daysRemaining, goalIcon = "target", goalLabel, headline, mode = "active", phaseTone = "neutral", plannedReviewDate, primaryTimeline, projectedFinish, schedulerMessage, supportLine, supportingMetrics = [] }) {
   const GoalIcon = goalIcons[goalIcon] ?? Target;
   const phaseGreen = mode === "phase_trajectory" && phaseTone === "green";
 
@@ -40,6 +40,7 @@ export default function HomeHeroCard({ actionHref, actionLabel, confidence, conf
           </div>
         )}
       </div>
+      {confidenceSummary && <p className="mt-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-[11px] font-semibold leading-4 text-[var(--text-secondary)]" data-testid="home-confidence-summary">{confidenceSummary}</p>}
       {mode === "phase_trajectory" ? null : mode === "terminal" ? (
         <Link className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white" href={actionHref}>
           <span>{actionLabel}</span>

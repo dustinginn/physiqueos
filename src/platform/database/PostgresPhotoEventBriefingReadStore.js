@@ -40,8 +40,11 @@ export function createPostgresPhotoEventBriefingReadStore({ pool, ownerUserId, o
         ]);
         const briefing = briefings[0];
         const goal = goals[0];
-        const lookup = collectMediaLookup(briefing?.payload?.briefing?.photoEventNarrative);
-        const mediaObjects = await query(
+        const artifact = briefing?.payload;
+        const lookup = collectMediaLookup(artifact?.briefing?.photoEventNarrative);
+        const assessmentId = artifact?.confidencePublication?.assessmentId ??
+          artifact?.briefing?.photoEventNarrative?.goalConfidence?.assessmentId ?? null;
+        const [mediaObjects, confidenceRows] = await Promise.all([query(
           `SELECT id,evidence_record_id,original_filename,sha256,provenance,state
              FROM physiqueos.canonical_media_objects
             WHERE owner_user_id=$1 AND state='verified'
@@ -50,11 +53,17 @@ export function createPostgresPhotoEventBriefingReadStore({ pool, ownerUserId, o
                 OR lower(coalesce(original_filename,''))=ANY($4::text[]))
             ORDER BY id`,
           [ownerUserId, lookup.objectIds, lookup.sourcePaths, lookup.basenames],
-        );
+        ), assessmentId ? query(
+          `SELECT payload FROM physiqueos.canonical_confidence_records
+            WHERE owner_user_id=$1 AND collection_name='goalConfidenceHistory'
+              AND record_id=$2 LIMIT 1`,
+          [ownerUserId, `goal_confidence_history_v2|${assessmentId}`],
+        ) : []]);
         return Object.freeze({
           artifact: briefing ? Object.freeze({ ...briefing.payload, version: Number(briefing.version) }) : null,
           goal: goal ? Object.freeze({ ...goal.payload, version: Number(goal.version) }) : null,
           mediaObjects: Object.freeze(mediaObjects.map((row) => Object.freeze(row))),
+          confidenceAssessment: confidenceRows[0]?.payload?.assessment ?? null,
         });
       } finally {
         onComplete?.({

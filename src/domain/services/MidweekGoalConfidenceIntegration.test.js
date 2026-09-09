@@ -51,7 +51,7 @@ describe("Midweek canonical confidence integration", () => {
     expect(source).toContain("animate={false}");
     expect(source).toContain("Goal confidence ${canonicalConfidence.score} percent");
     expect(source).toContain("▲ +");
-    expect(source).toContain("— No change");
+    expect(source).toContain("— No meaningful change");
     expect(source).toContain("▼ −");
     expect(source).toContain("Initial assessment");
     expect(source).toContain("Movement unavailable");

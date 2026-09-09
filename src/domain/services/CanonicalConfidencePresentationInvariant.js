@@ -5,10 +5,23 @@ export function assertCanonicalConfidencePresentation(confidence) {
   if (!confidence) return confidence;
   const primary = normalize(confidence.primaryReason);
   const presentation = normalize(confidence.presentationExplanation);
-  if (primary && presentation && primary !== presentation) {
-    throw invariantError("MIXED_SOURCE", "Confidence presentation cannot replace the canonical published explanation.");
+  const structured = normalize(confidence.explanationModel?.summary);
+  if (confidence.explanationModel && (
+    confidence.explanationModel.score !== confidence.score ||
+    confidence.explanationModel.band !== confidence.band ||
+    normalizedMovement(confidence.explanationModel.movement) !==
+      confidence.movementDirection
+  )) {
+    throw invariantError("STRUCTURED_IDENTITY_MISMATCH",
+      "The shared Confidence explanation must describe the displayed assessment.");
   }
-  const explanation = primary || presentation;
+  if (structured && presentation && structured !== presentation) {
+    throw invariantError("MIXED_SOURCE", "Confidence presentation must use the shared structured explanation.");
+  }
+  if (!structured && primary && presentation && primary !== presentation) {
+    throw invariantError("MIXED_SOURCE", "Legacy Confidence presentation cannot replace its published explanation.");
+  }
+  const explanation = structured || presentation || primary;
   if (!explanation) {
     throw invariantError("MISSING_EXPLANATION", "Canonical published confidence requires its published explanation.");
   }
@@ -39,11 +52,17 @@ export function assertCanonicalConfidencePresentation(confidence) {
 
 export function canonicalConfidenceExplanation(confidence) {
   const canonical = assertCanonicalConfidencePresentation(confidence);
-  return normalize(canonical?.primaryReason) || normalize(canonical?.presentationExplanation);
+  return normalize(canonical?.explanationModel?.summary) ||
+    normalize(canonical?.presentationExplanation) || normalize(canonical?.primaryReason);
 }
 
 function normalize(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizedMovement(value) {
+  return ({ increase: "increased", decrease: "decreased",
+    no_meaningful_change: "held" })[value] ?? value;
 }
 
 function invariantError(code, message) {

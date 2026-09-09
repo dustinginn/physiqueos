@@ -20,12 +20,19 @@ const COACHING = Object.freeze({
   strategy_review_recommended: "Review the current strategy before relying on it for success.",
 });
 
+import { confidenceSemanticCode } from "../presentation/productLanguagePresentation";
+
 const FACTORS = Object.freeze({
   objective_ahead: "Measured progress is ahead of the expected trajectory.",
   objective_on_track: "Measured progress is consistent with the expected trajectory.",
   objective_uncertain: "The primary outcome remains uncertain.",
   objective_behind: "Measured progress is below the expected trajectory.",
   objective_contradicted: "The current result conflicts with the expected trajectory.",
+  objective_feasible: "The objective remains feasible.",
+  attainability_ahead: "The Goal is ahead of its expected path.",
+  attainability_on_expected_trajectory: "The Goal remains on its expected path.",
+  attainability_quantitative_progress_unavailable:
+    "A direct progress comparison is not available yet.",
   guardrails_clear: "The accepted boundaries remain clear.",
   guardrails_watch: "An accepted boundary requires continued observation.",
   guardrails_pressured: "An accepted boundary is materially pressured.",
@@ -79,17 +86,18 @@ export function coachingText(direction) {
 }
 
 export function factorText(code) {
-  if (FACTORS[code]) return FACTORS[code];
-  if (code.startsWith("milestone_supported:")) {
+  const semanticCode = confidenceSemanticCode(code);
+  if (FACTORS[semanticCode]) return FACTORS[semanticCode];
+  if (semanticCode === "milestone_supported") {
     return "A planned checkpoint has been supported.";
   }
-  if (code.startsWith("milestone_due_unresolved:")) {
+  if (semanticCode === "milestone_due_unresolved") {
     return "A planned checkpoint is due and remains unresolved.";
   }
-  if (code.startsWith("milestone_overdue_unresolved:")) {
+  if (semanticCode === "milestone_overdue_unresolved") {
     return "A required checkpoint is overdue and unresolved.";
   }
-  if (code.startsWith("milestone_contradicted:")) {
+  if (semanticCode === "milestone_contradicted") {
     return "A planned checkpoint has a contradicting result.";
   }
   return null;

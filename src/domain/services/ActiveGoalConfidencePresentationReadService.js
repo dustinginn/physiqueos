@@ -3,7 +3,12 @@ import {
 } from "../confidence/CanonicalConfidenceReadService";
 import { assertCanonicalConfidencePresentation } from "./CanonicalConfidencePresentationInvariant";
 import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
-import { buildConfidenceExplanationDetail } from "../presentation/confidenceExplanationPresentation";
+import {
+  buildConfidenceExplanationModel,
+  buildConfidenceExplanationDetail,
+  confidenceExplanationDetailFromModel,
+} from "../presentation/confidenceExplanationPresentation";
+import { confidenceBandLabel } from "../presentation/productLanguagePresentation";
 
 export const ACTIVE_GOAL_CONFIDENCE_PRESENTATION_VERSION =
   "active_goal_confidence_presentation_v2";
@@ -34,6 +39,30 @@ export function resolveActiveGoalConfidencePresentation({
   }
   const presentationMovement = ({ increase: "increased", decrease: "decreased",
     no_meaningful_change: "held" })[assessment.movement] ?? assessment.movement;
+  const explanationModel = buildConfidenceExplanationModel({
+    assessment,
+    surface: "home",
+  });
+  const goalExplanationModel = buildConfidenceExplanationModel({
+    assessment,
+    surface: "goal",
+  });
+  const primaryReason = explanationModel?.summary ??
+    assessment.narrativeExplanation?.text ?? null;
+  const explanationDetail = explanationModel
+    ? confidenceExplanationDetailFromModel(explanationModel)
+    : buildConfidenceExplanationDetail({
+        qualitativeLevel: confidenceBandLabel(assessment.confidenceBand),
+        narrativeText: assessment.narrativeExplanation?.text ?? "",
+        movement: assessment.movement,
+        movementRationaleCode:
+          assessment.narrativeExplanation?.movementRationaleCode ?? null,
+        uncertaintyReduction:
+          assessment.narrativeExplanation?.uncertaintyReduction ?? null,
+        remainingUncertaintyItems: assessment.remainingUncertainty?.items ?? [],
+        nextConfidenceBuildingEvidence:
+          assessment.nextConfidenceBuildingEvidence ?? null,
+      });
   const presentation = {
     status: v1Compatibility ? "canonical" : canonical.status,
     source: v1Compatibility ? "canonical_pi_snapshot" : canonical.source,
@@ -44,7 +73,7 @@ export function resolveActiveGoalConfidencePresentation({
     numericValue: assessment.currentPercentage,
     percentageLabel: `${assessment.currentPercentage}%`,
     band: assessment.confidenceBand,
-    label: title(assessment.confidenceBand),
+    label: confidenceBandLabel(assessment.confidenceBand),
     assessmentId: assessment.id,
     snapshotId: canonical.snapshot?.id ?? null,
     goalId: assessment.goalId,
@@ -60,20 +89,16 @@ export function resolveActiveGoalConfidencePresentation({
     delta: assessment.priorPercentage == null ? null :
       assessment.currentPercentage - assessment.priorPercentage,
     priorScore: assessment.priorPercentage,
-    primaryReason: assessment.narrativeExplanation?.text ?? null,
-    explanation: assessment.narrativeExplanation?.text ?? null,
-    supportingContributors: [],
-    limitingContributors: [],
+    primaryReason,
+    presentationExplanation: explanationModel?.summary ?? null,
+    canonicalNarrativeExplanation: assessment.narrativeExplanation?.text ?? null,
+    explanation: primaryReason,
+    explanationModel,
+    goalExplanationModel,
+    supportingContributors: explanationModel?.supportingFactors ?? [],
+    limitingContributors: explanationModel?.limitingFactors ?? [],
     unresolvedUncertainty: assessment.remainingUncertainty?.items ?? [],
-    explanationDetail: buildConfidenceExplanationDetail({
-      qualitativeLevel: title(assessment.confidenceBand),
-      narrativeText: assessment.narrativeExplanation?.text ?? "",
-      movement: assessment.movement,
-      movementRationaleCode: assessment.narrativeExplanation?.movementRationaleCode ?? null,
-      uncertaintyReduction: assessment.narrativeExplanation?.uncertaintyReduction ?? null,
-      remainingUncertaintyItems: assessment.remainingUncertainty?.items ?? [],
-      nextConfidenceBuildingEvidence: assessment.nextConfidenceBuildingEvidence ?? null,
-    }),
+    explanationDetail,
     evidenceCutoff: assessment.sourceCutoff,
     assessmentTimestamp: assessment.publicationTimestamp,
     publicationTimestamp: assessment.publicationTimestamp,
@@ -101,15 +126,13 @@ function unavailable(goal, phase, reason) {
     movement: null, movementDirection: null, movementMagnitude: null,
     delta: null, priorScore: null, primaryReason: null, explanation: null,
     supportingContributors: [], limitingContributors: [],
-    unresolvedUncertainty: [], explanationDetail: null, evidenceCutoff: null,
+    unresolvedUncertainty: [], explanationDetail: null, explanationModel: null,
+    goalExplanationModel: null, canonicalNarrativeExplanation: null,
+    presentationExplanation: null, evidenceCutoff: null,
     assessmentTimestamp: null, publicationTimestamp: null,
     originatingPublisher: null, originatingArtifactId: null,
     goalContractId: null, goalContractVersion: null,
     modelVersion: null, piVersion: null, fallbackReason: reason,
     provenance: null,
   });
-}
-function title(value) {
-  return String(value ?? "unknown").replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

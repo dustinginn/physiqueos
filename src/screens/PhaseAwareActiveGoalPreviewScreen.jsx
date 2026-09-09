@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, ArrowLeft, ArrowRight, CheckCircle2, Dumbbell, Gauge, ScanLine, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { resolvePhasePresentationToken } from "../domain/presentation/phasePresentationTokens";
+import { HomeConfidenceDetailBody } from "../components/cards/HomeConfidenceDetail";
 
 export default function PhaseAwareActiveGoalPreviewScreen({ preview }) {
   return <main className="app-surface mx-auto min-h-screen w-full max-w-[393px] overflow-x-hidden"><div className="px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-10">
@@ -9,6 +10,8 @@ export default function PhaseAwareActiveGoalPreviewScreen({ preview }) {
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.15em] text-violet-700 dark:text-violet-300">{preview.hero.status}</p><h1 className="mt-3 break-words text-[32px] font-black leading-none text-[var(--text-primary)]">{preview.hero.title}</h1></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-700 dark:text-violet-300"><Dumbbell size={24}/></span></div>
       <p className="mt-5 text-base font-extrabold leading-6 text-[var(--text-primary)]">{preview.hero.destination}</p><div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-violet-300/30 pt-4 dark:border-white/10"><span className="inline-flex min-w-0 items-center gap-2 text-xs font-black text-[var(--text-secondary)]"><Gauge size={16} className="shrink-0 text-violet-600 dark:text-violet-300"/><span className="min-w-0 break-words">{preview.hero.confidence} · {preview.hero.confidenceBand}</span></span><Link className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-black text-[var(--primary)]" href={preview.hero.editHref}>Edit Goal</Link></div>
     </section>
+
+    {preview.hero.confidenceExplanation&&<Section eyebrow="Confidence" title="Why this Confidence fits this Goal"><HomeConfidenceDetailBody detail={preview.hero.confidenceExplanation}/></Section>}
 
     <Section eyebrow="The path" title="Your Journey"><div className="mt-5 space-y-3">{preview.journey.map((phase)=><PhaseCard key={phase.name} phase={phase}/>)}</div></Section>
     <AccentSection color={preview.currentPhase.color} eyebrow="Where you are" icon={<Activity size={20}/>} title="Current Phase"><h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">{preview.currentPhase.title}</h3><p className="mt-2 text-sm font-semibold leading-6 text-[var(--text-secondary)]">{preview.currentPhase.purpose}</p><div className="mt-5 grid grid-cols-2 gap-3"><Metric label="Goal progress" value={preview.currentPhase.progress}/><Metric label="Strategic review" value={preview.currentPhase.review}/></div><Subhead title="Evidence in view"/><p className="text-sm font-medium leading-6 text-[var(--text-secondary)]">{preview.currentPhase.evidence}</p><Subhead title="What's next"/><p className="text-sm font-medium leading-6 text-[var(--text-secondary)]">{preview.currentPhase.readiness}</p></AccentSection>
