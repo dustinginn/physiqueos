@@ -17,7 +17,8 @@ try {
   $closure=Get-Phase7BWP2CDependencyManifest $PSScriptRoot
   foreach($file in $closure.files){[IO.File]::Copy((Join-Path $PSScriptRoot $file.name),(Join-Path $source $file.name))}
   # The actual launcher is exercised. Only its downstream Baseline collector is
-  # replaced at the synthetic OS boundary so the test never inspects a real VM.
+  # replaced at this synthetic OS boundary; actual producer output is exercised
+  # separately by the collector suite rather than fabricated here.
   $stub=@'
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][ValidateSet('Baseline')][string]$Operation,
@@ -27,7 +28,7 @@ param([Parameter(Mandatory=$true)][ValidateSet('Baseline')][string]$Operation,
 $global:phase7bBaselineHandoffInvocationCount++
 $global:phase7bBaselineHandoffArguments=[pscustomobject]@{operation=$Operation;guest=$ExpectedGuestIdentitySha256;manifest=$ExpectedToolingManifestSha256;approved=$FounderPreparationApproved.IsPresent}
 if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest){throw 'SYNTHETIC_WRONG_GUEST'}
-[pscustomobject]@{classification='PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED';pass=$true;wp2cExecuted=$false}|ConvertTo-Json -Compress
+[pscustomobject]@{classification='SYNTHETIC_BASELINE_BOUNDARY_REACHED';pass=$true;wp2cExecuted=$false}|ConvertTo-Json -Compress
 '@
   [IO.File]::WriteAllText((Join-Path $source 'phase7bInspectWorkPackage2CGuestPreparation.ps1'),$stub,(New-Object Text.UTF8Encoding($false)))
   $manifest=Get-Phase7BWP2CDependencyManifest $source
@@ -81,6 +82,12 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
   Check ($text -match "Get-ExecutionPolicy -Scope Process" -and $text -match "-ceq 'Bypass'") 'launcher requires process-only bypass'
   Check (@([regex]::Matches($text,"phase7bInspectWorkPackage2CGuestPreparation\.ps1")).Count -eq 1 -and $text -match '-Operation Baseline') 'launcher invokes Baseline entry exactly once'
   Check ($text -notmatch '(?i)Restore|AGE-SECRET-KEY|Invoke-WebRequest|Invoke-RestMethod|Get-Clipboard|Set-Clipboard|\\\\[A-Za-z0-9]|New-PSDrive') 'launcher has no restore secret network clipboard share path'
+  $inspectorText=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'phase7bInspectWorkPackage2CGuestPreparation.ps1') -Raw
+  $tokenIndex=$inspectorText.IndexOf('$text=ConvertTo-Phase7BWP2CPreparationReturnText $baseline')
+  $markerIndex=$inspectorText.IndexOf("classification='PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED'")
+  $outputIndex=$inspectorText.IndexOf('for($offset=0;$offset -lt $text.Length;', $markerIndex)
+  Check ($tokenIndex -ge 0 -and $markerIndex -gt $tokenIndex -and $outputIndex -gt $markerIndex -and
+    @([regex]::Matches($inspectorText,'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED')).Count -eq 1) 'actual producer validates token before one marker and token output'
 
   $batchPath=Join-Path $PSScriptRoot 'b.cmd'
   $batchBytes=[IO.File]::ReadAllBytes($batchPath)
@@ -114,7 +121,7 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
     $output=@(& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved)
     Check ($global:phase7bBaselineHandoffInvocationCount -eq 1) 'actual launcher invokes synthetic Baseline boundary exactly once'
     Check ($global:phase7bBaselineHandoffArguments.operation -ceq 'Baseline' -and $global:phase7bBaselineHandoffArguments.guest -ceq ('c'*64) -and $global:phase7bBaselineHandoffArguments.manifest -ceq $binding.toolingManifestSha256 -and $global:phase7bBaselineHandoffArguments.approved) 'actual launcher forwards exact immutable pins and approval'
-    Check (($output -join "`n") -match 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED') 'source-produced WP2CP1 Baseline behavior remains downstream'
+    Check (($output -join "`n") -match 'SYNTHETIC_BASELINE_BOUNDARY_REACHED') 'launcher reaches the isolated synthetic Baseline boundary exactly once'
     function Get-CimInstance {param($ClassName,$Filter,$ErrorAction);@()}
     Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'zero tooling volumes rejected'
     function Get-CimInstance {param($ClassName,$Filter,$ErrorAction);@([pscustomobject]@{DeviceID='Q:';VolumeName='P7B_C_TOOLS'},[pscustomobject]@{DeviceID='R:';VolumeName='P7B_C_TOOLS'})}
@@ -122,7 +129,7 @@ if($ExpectedGuestIdentitySha256 -cne $global:phase7bBaselineHandoffExpectedGuest
     $batchMedia=Join-Path $media 'b.cmd';$savedBatch=[IO.File]::ReadAllBytes($batchMedia)
     Remove-Item -LiteralPath $batchMedia
     $missingOutput=@(& "$env:SystemRoot\System32\cmd.exe" /d /c 'Q:\b 2>&1');$missingExit=$LASTEXITCODE
-    Check ($missingExit -ne 0 -and ($missingOutput -join "`n") -notmatch 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED') 'drive without b.cmd fails before Baseline'
+    Check ($missingExit -ne 0 -and ($missingOutput -join "`n") -notmatch 'SYNTHETIC_BASELINE_BOUNDARY_REACHED') 'drive without b.cmd fails before Baseline'
     function Get-CimInstance {param($ClassName,$Filter,$ErrorAction);[pscustomobject]@{DeviceID='Q:';VolumeName='P7B_C_TOOLS'}}
     Reject {& 'Q:\phase7bRunWorkPackage2CGuestBaseline.ps1' -FounderPreparationApproved} 'missing b.cmd violates exact bound manifest closure'
     [IO.File]::WriteAllBytes($batchMedia,$savedBatch)

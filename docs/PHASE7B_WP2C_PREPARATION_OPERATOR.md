@@ -262,8 +262,12 @@ modified, wrong-guest or wrong-tooling binding/media stops before Baseline.
 The command reads only guest identity, marker, repository HEAD, Git/OS/Tools and
 offline HGFS state; it neither installs tooling nor writes guest evidence.
 
-Capture only its WP2CP1 block using host Snipping Tool. Text actions -> select/copy
-only that block. Preserve a host Notepad copy. No real vault/secret in the picture.
+Require exactly one `PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED` result,
+followed by exactly one WP2CP1 block. The classification is emitted only after
+the Baseline document and complete token have validated. Using host Snipping Tool
+Text Actions, select/copy only the WP2CP1 block; the classification line is not
+part of the token. Preserve a host Notepad copy. No real vault/secret is in the
+picture.
 Guest shell, after a successful baseline:
 
 ```powershell

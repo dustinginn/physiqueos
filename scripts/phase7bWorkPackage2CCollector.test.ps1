@@ -5,6 +5,7 @@ if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion -lt [v
 Import-Module (Join-Path $PSScriptRoot 'phase7bIsolatedGuestContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CContract.psm1')
 Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CGuest.psm1')
+Import-Module (Join-Path $PSScriptRoot 'phase7bWorkPackage2CMedia.psm1')
 $guestModule=Get-Module phase7bWorkPackage2CGuest
 $contractModule=Get-Module phase7bWorkPackage2CContract
 $fixed=Get-Phase7BIsolatedGuestContract
@@ -28,6 +29,7 @@ $fixture=@{
   reads=New-Object 'Collections.Generic.List[string]';nativeCalls=0;installedChecks=0
   hgfsExit=0;hgfsFolders=@();driver=@([pscustomobject]@{Name='vmhgfs';State='Running'})
   tools=@([pscustomobject]@{Status='Running'});networkDisks=@();networkConnections=@();psDrives=@()
+  opticalDevice='E:';bindingPresent=$true;baselineMutationCalls=0;encoderFailure=$false
 }
 $fixture.marker.schemaVersion=1
 $bindings=[pscustomobject]@{
@@ -42,6 +44,16 @@ $bindings=[pscustomobject]@{
 $plan=[pscustomobject]@{schemaVersion=1;kind='wp2c-preparation-observation-plan';bindings=$bindings}
 $fixture.plan=$plan;$fixture.planPath='C:\synthetic-only\observation-plan.json'
 $fixture.planHash=Get-Phase7BWP2CObjectHash $plan
+$fixture.baselineBinding=[pscustomobject][ordered]@{
+  schemaVersion=1;kind='wp2c-guest-baseline-binding';classification='PHASE7B_WP2C_GUEST_BASELINE_BINDING_NONEXECUTABLE'
+  applicationCommit=$fixed.applicationCommit;environmentId=$fixed.environmentId;preparedStateId=('wp2c-prepared-'+('a'*32))
+  operation='Baseline';toolingCommit=('b'*40);toolingManifestSha256=Get-Phase7BWP2CObjectHash $sourceManifest
+  guestIdentitySha256=$bindings.guestIdentitySha256;semanticVm=[pscustomobject][ordered]@{mode='wp2c-semantic-vmx-v2';sha256=('d'*64)}
+  parentBridge=[pscustomobject][ordered]@{sha256=('e'*64);bytes=[int64]6119};founderPreparationApprovalRequired=$true
+  nonExecutable=$true;preparationOnly=$true;restoreAuthorized=$false;wp2cExecutionAuthorized=$false;laterMigrationAuthorized=$false
+}
+Assert-Phase7BWP2CBaselineBinding $fixture.baselineBinding
+$fixture.sourceManifest=$sourceManifest
 
 # Mock filesystem metadata in BOTH defining module scopes, keeping the actual
 # containment/reparse algorithm intact. Unknown content reads throw, not fall
@@ -81,7 +93,7 @@ $filesystemMocks={
       'Win32_OperatingSystem' {[pscustomobject]@{BuildNumber='26200';Caption='Microsoft Windows 11 Enterprise Evaluation'}}
       'SoftwareLicensingProduct' {[pscustomobject]@{PartialProductKey='synthetic';Name='Windows synthetic';LicenseStatus=1;GracePeriodRemaining=10080}}
       'Win32_LogicalDisk' {
-        if($Filter -ceq 'DriveType=5'){[pscustomobject]@{DeviceID='E:';VolumeName='P7B_C_TOOLS'}}
+        if($Filter -ceq 'DriveType=5'){[pscustomobject]@{DeviceID=$s.opticalDevice;VolumeName='P7B_C_TOOLS'}}
         else{[pscustomobject]@{DeviceID='C:';DriveType=3;FileSystem='NTFS';ProviderName=$null;FreeSpace=100GB};$s.networkDisks}
       }
       'Win32_SystemDriver' {if($Filter -cne "Name='vmhgfs'"){throw 'UNEXPECTED_DRIVER_QUERY'};$s.driver}
@@ -156,6 +168,40 @@ function Invoke-SyntheticPreparationInspector {
   }
 }
 
+# Execute the ACTUAL public Baseline inspector from a disposable optical-looking
+# drive. Only machine, filesystem and immutable-media reads are substituted. The
+# real Baseline collector, encoder and output ordering execute unchanged.
+function Invoke-SyntheticBaselineInspector {
+  param([string]$ExpectedGuest=$bindings.guestIdentitySha256,
+    [string]$ExpectedManifest=$fixture.baselineBinding.toolingManifestSha256)
+  $lines=New-Object 'Collections.Generic.List[string]';$message='';$trace=''
+  try {
+    & $guestModule {
+      param($Guest,$Manifest)
+      $s=$global:phase7bSyntheticCollectorFixture
+      function Import-Module {param($Name);if([IO.Path]::GetFileName($Name) -notin @('phase7bIsolatedGuestContract.psm1','phase7bWorkPackage2Contract.psm1','phase7bWorkPackage2CContract.psm1','phase7bWorkPackage2CGuest.psm1','phase7bWorkPackage2CMedia.psm1')){throw 'UNEXPECTED_BASELINE_IMPORT'}}
+      function Test-Path {
+        param($LiteralPath,$PathType,$ErrorAction)
+        if($LiteralPath -ceq ($s.opticalDevice+'\wp2c-baseline-binding.json')){return [bool]$s.bindingPresent}
+        if($LiteralPath -in $s.missing){return $false}
+        if($PathType -eq 'Container' -and $LiteralPath -in $s.files){return $false}
+        $true
+      }
+      function Get-Phase7BWP2CDependencyManifest {param($SourceDirectory);if($SourceDirectory -cne ($s.opticalDevice+'\')){throw 'UNEXPECTED_BASELINE_MANIFEST_ROOT'};$s.sourceManifest}
+      function Read-Phase7BWP2CBaselineBinding {param($ToolingRoot,$ExpectedSha256);if(-not $s.bindingPresent -or $ToolingRoot -cne ($s.opticalDevice+'\')){throw 'UNEXPECTED_BASELINE_BINDING'};[pscustomobject]@{document=$s.baselineBinding}}
+      function Get-Phase7BWP2CToolingMediaFileNames {param($ToolingRoot,$Manifest);if($ToolingRoot -cne ($s.opticalDevice+'\')){throw 'UNEXPECTED_BASELINE_FILE_SET_ROOT'};@($Manifest.files.name)+@('age.exe','age-keygen.exe','wp2c-tooling-manifest.json','wp2c-baseline-binding.json')}
+      function Assert-Phase7BWP2CExactFileSet {param($Root,$Names);if($Root -cne ($s.opticalDevice+'\') -or @($Names).Count -ne 18){throw 'UNEXPECTED_BASELINE_FILE_SET'}}
+      function Get-Phase7BWP2CIdentity {param($LiteralPath);if($LiteralPath -cne 'C:\Program Files\Git\cmd\git.exe'){throw 'UNEXPECTED_BASELINE_BINARY'};[pscustomobject]@{sha256='8'*64;bytes=4097}}
+      function ConvertTo-Phase7BWP2CPreparationReturnText {param($Document);if($s.encoderFailure){throw 'SYNTHETIC_BASELINE_ENCODING_FAILURE'};phase7bWorkPackage2CMedia\ConvertTo-Phase7BWP2CPreparationReturnText $Document}
+      function New-Item {$s.baselineMutationCalls++;throw 'SYNTHETIC_BASELINE_MUTATION'}
+      function Set-Content {$s.baselineMutationCalls++;throw 'SYNTHETIC_BASELINE_MUTATION'}
+      function Out-File {$s.baselineMutationCalls++;throw 'SYNTHETIC_BASELINE_MUTATION'}
+      & $s.baselineInspector -Operation Baseline -ExpectedGuestIdentitySha256 $Guest -ExpectedToolingManifestSha256 $Manifest -FounderPreparationApproved
+    } $ExpectedGuest $ExpectedManifest | ForEach-Object {[void]$lines.Add([string]$_)}
+  } catch {$message=$_.Exception.Message;$trace=$_.ScriptStackTrace}
+  [pscustomobject]@{lines=@($lines);message=$message;trace=$trace}
+}
+
 try {
   Check ($fixed.repositoryRoot -ceq 'C:\Users\dusti\Documents\GitHub\physiqueos' -and $fixed.isolatedRoot -ceq 'C:\Phase7B\isolated\379bb303') 'actual published separate roots'
   if($ReproducePublishedDefect){
@@ -191,6 +237,49 @@ try {
     $report=(Invoke-SyntheticPreparationInspector)|ConvertFrom-Json
     Check ($report.kind -ceq 'wp2c-guest-preparation-observation' -and $report.observation.pathOwnershipPass) 'actual preparation inspector passes separate roots'
     foreach($name in @('wp2cExecuted','packetDecrypted','executionClaimCreated','authorizationConsumed','reportPersisted')){Check ($report.$name -ceq $false) ('inspector nonmutation '+$name)}
+
+    $baselineDrive=@('Q','R','S','T','U')|Where-Object {-not (Microsoft.PowerShell.Management\Get-PSDrive -Name $_ -ErrorAction SilentlyContinue)}|Select-Object -First 1
+    if(-not $baselineDrive){throw 'SYNTHETIC_BASELINE_DRIVE_UNAVAILABLE'}
+    & "$env:SystemRoot\System32\subst.exe" ($baselineDrive+':') $PSScriptRoot
+    if($LASTEXITCODE -ne 0){throw 'SYNTHETIC_BASELINE_DRIVE_CREATE'}
+    $fixture.opticalDevice=$baselineDrive+':'
+    $fixture.baselineInspector=$fixture.opticalDevice+'\phase7bInspectWorkPackage2CGuestPreparation.ps1'
+    try {
+      $positive=Invoke-SyntheticBaselineInspector
+      Check ($positive.message -ceq '') ('actual Baseline producer succeeds: '+$positive.message+' '+$positive.trace)
+      $markerLines=@($positive.lines|Where-Object {$_ -match 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED'})
+      Check ($markerLines.Count -eq 1) 'actual Baseline producer emits exactly one collected marker'
+      $marker=$markerLines[0]|ConvertFrom-Json
+      Check ($marker.classification -ceq 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED' -and $marker.pass -ceq $true -and
+        $marker.kind -ceq 'wp2c-guest-preparation-baseline' -and $marker.mutationPerformed -ceq $false -and $marker.wp2cExecuted -ceq $false) 'actual collected marker is narrow nonexecuting PASS'
+      $markerIndex=[array]::IndexOf([string[]]$positive.lines,[string]$markerLines[0])
+      $tokenText=@($positive.lines|Select-Object -Skip ($markerIndex+1))-join ''
+      Check ($markerIndex -eq 0 -and @([regex]::Matches(($positive.lines-join "`n"),'WP2CP1:')).Count -eq 1) 'validated marker precedes exactly one token block'
+      $decoded=ConvertFrom-Phase7BWP2CPreparationReturnText $tokenText
+      Assert-Phase7BWP2CPreparationBaseline $decoded
+      Check ($decoded.guestIdentitySha256 -ceq $bindings.guestIdentitySha256 -and $decoded.mutationPerformed -ceq $false) 'host parser accepts actual producer token without marker contamination'
+      Check ($fixture.baselineMutationCalls -eq 0) 'actual Baseline producer performs no durable mutation'
+
+      function Check-BaselineFailure($Result,[string]$Label){
+        Check ($Result.message -ne '') ($Label+' fails')
+        Check (@($Result.lines|Where-Object {$_ -match 'PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED|WP2CP1:'}).Count -eq 0) ($Label+' emits no marker or token')
+      }
+      Check-BaselineFailure (Invoke-SyntheticBaselineInspector -ExpectedGuest ('f'*64)) 'wrong guest'
+      Check-BaselineFailure (Invoke-SyntheticBaselineInspector -ExpectedManifest ('f'*64)) 'wrong manifest pin'
+      $fixture.bindingPresent=$false;Check-BaselineFailure (Invoke-SyntheticBaselineInspector) 'missing binding';$fixture.bindingPresent=$true
+      $savedGuest=$fixture.baselineBinding.guestIdentitySha256;$fixture.baselineBinding.guestIdentitySha256='f'*64
+      Check-BaselineFailure (Invoke-SyntheticBaselineInspector) 'wrong binding';$fixture.baselineBinding.guestIdentitySha256=$savedGuest
+      $savedManifest=$fixture.sourceManifest;$fixture.sourceManifest=Clone $sourceManifest;$fixture.sourceManifest.files[0].sha256='f'*64
+      Check-BaselineFailure (Invoke-SyntheticBaselineInspector) 'wrong tooling content';$fixture.sourceManifest=$savedManifest
+      $fixture.encoderFailure=$true;Check-BaselineFailure (Invoke-SyntheticBaselineInspector) 'failed token encoding';$fixture.encoderFailure=$false
+      $savedSchema=$fixture.marker.schemaVersion;$fixture.marker.schemaVersion=2
+      Check-BaselineFailure (Invoke-SyntheticBaselineInspector) 'malformed Baseline collection';$fixture.marker.schemaVersion=$savedSchema
+      Check ($fixture.baselineMutationCalls -eq 0) 'failed Baseline cases perform no durable mutation'
+    } finally {
+      & "$env:SystemRoot\System32\subst.exe" ($baselineDrive+':') /D
+      if($LASTEXITCODE -ne 0){throw 'SYNTHETIC_BASELINE_DRIVE_REMOVE'}
+      $fixture.opticalDevice='E:';$fixture.bindingPresent=$true;$fixture.encoderFailure=$false
+    }
 
     if($HgfsRegression){
       # Run the ACTUAL installer, replacing only unrelated machine/media checks.

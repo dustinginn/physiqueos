@@ -29,14 +29,17 @@ if($Operation -in @('Baseline','Install')){
   Assert-Phase7BWP2CExactFileSet $PSScriptRoot (Get-Phase7BWP2CToolingMediaFileNames $PSScriptRoot $manifest)
 }
 if($Operation -ceq 'Baseline'){
+  Assert-Phase7BWP2C ($null -ne $baselineBinding) 'BASELINE_BINDING_REQUIRED'
   Assert-Phase7BWP2C ((Get-Phase7BWP2CObjectHash $manifest) -ceq $ExpectedToolingManifestSha256) 'PREPARATION_TOOLING_MANIFEST'
-  if($null -ne $baselineBinding){
-    Assert-Phase7BWP2C ($baselineBinding.operation -ceq 'Baseline' -and
-      $baselineBinding.toolingManifestSha256 -ceq $ExpectedToolingManifestSha256 -and
-      $baselineBinding.guestIdentitySha256 -ceq $ExpectedGuestIdentitySha256) 'BASELINE_BINDING_ARGUMENTS'
-  }
+  Assert-Phase7BWP2C ($baselineBinding.operation -ceq 'Baseline' -and
+    $baselineBinding.toolingManifestSha256 -ceq $ExpectedToolingManifestSha256 -and
+    $baselineBinding.guestIdentitySha256 -ceq $ExpectedGuestIdentitySha256) 'BASELINE_BINDING_ARGUMENTS'
   $baseline=Get-Phase7BWP2CGuestPreparationBaseline $ExpectedGuestIdentitySha256
   $text=ConvertTo-Phase7BWP2CPreparationReturnText $baseline
+  [pscustomobject][ordered]@{
+    classification='PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED'
+    pass=$true;kind=$baseline.kind;mutationPerformed=$false;wp2cExecuted=$false
+  }|ConvertTo-Json -Compress
   for($offset=0;$offset -lt $text.Length;$offset+=80){Write-Output $text.Substring($offset,[math]::Min(80,$text.Length-$offset))}
   return
 }

@@ -320,6 +320,13 @@ host/bridge-bound, avoiding a self-hash cycle. Later preparation evidence uses
 lineage schema 3 to preserve original initialization, semantic bridge and current
 baseline-handoff identities separately.
 
+The actual Baseline producer constructs and validates the complete nonsecret
+WP2CP1 token before emitting exactly one
+`PHASE7B_WP2C_GUEST_PREPARATION_BASELINE_COLLECTED` classification, followed by
+the token block. Failed collection emits neither the classification nor a partial
+token. The Founder captures only the WP2CP1 envelope, so the classification never
+enters token parsing.
+
 Bridge-only resumed modes require exact `VmBindingPath`/`VmBindingSha256`; after a
 baseline handoff they instead require exact `BaselineHandoffPath`/
 `BaselineHandoffSha256`. Parent or original tooling cannot satisfy the selected
