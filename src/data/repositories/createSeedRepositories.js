@@ -102,7 +102,7 @@ export function createSeedRepositories(seedPack, options = {}) {
     }, { allowStagedMutations: options.allowStagedMutations === true }),
     canonicalEvidence: createCanonicalEvidenceRepository(
       seedPack.canonicalEvidenceObjects ?? [],
-      { ...options, evidencePackages }
+      { ...options, evidencePackages, goals: seedPack.goals ?? [] }
     ),
   };
 }

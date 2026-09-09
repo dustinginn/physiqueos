@@ -5,6 +5,7 @@ import {
 import {
   selectActiveCanonicalNutritionDays,
 } from "./CanonicalNutritionDayService";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 
 const EMPTY_SUMMARY = "Nothing logged yet";
 
@@ -57,13 +58,22 @@ export function composeLoggedTodaySummary({
       nutritionSelection.diagnostics);
   }
   const nutrition = nutritionSelection.records.map(unwrapCanonicalObject);
+  const activitySelection = selectActiveCanonicalActivityDays(
+    canonicalObjects,
+    { date: dateKey }
+  );
+  if (activitySelection.diagnostics.length > 0) {
+    console.warn("[LoggedToday] Multiple active ActivityDays detected.",
+      activitySelection.diagnostics);
+  }
+  const activity = activitySelection.records.map(unwrapCanonicalObject);
 
   return Object.freeze({
     dateKey,
     rows: Object.freeze([
       composeTrainingRow(activeNonNutrition.filter((record) => record.evidence_type === "training")),
       composeNutritionRow(nutrition),
-      composeActivityRow(activeNonNutrition.filter((record) => record.evidence_type === "activity_day")),
+      composeActivityRow(activity),
     ]),
   });
 }

@@ -72,6 +72,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         reconciliation = reconcileConfirmedEvidencePackage({
           evidencePackage,
           existingCanonicalObjects: candidate.canonicalEvidenceObjects ?? [],
+          goals: candidate.goals ?? [],
           userId,
         });
         if (reconciliation.changedObjects.length === 0) return;
@@ -79,8 +80,10 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
           candidate.canonicalEvidenceObjects,
           reconciliation.changedObjects
         );
+        const semanticChanges = reconciliation.semanticChangedObjects ??
+          reconciliation.changedObjects;
         for (const record of enableEnergyConfidenceEnqueue
-          ? reconciliation.changedObjects.filter(isEnergySource)
+          ? semanticChanges.filter(isEnergySource)
           : []) {
           const date = sourceDate(record);
           const counterpart = findCounterpart(
@@ -102,7 +105,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
           );
         }
         for (const rmr of enableEnergyConfidenceEnqueue
-          ? reconciliation.changedObjects.filter(isRmrSource)
+          ? semanticChanges.filter(isRmrSource)
           : []) {
           for (const date of boundedRmrAffectedDates(
             candidate.canonicalEvidenceObjects,
@@ -143,7 +146,7 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         }
         briefingReconciliation = briefingCoordinator
           .stageCanonicalEvidenceChanges(candidate, {
-            canonicalChanges: reconciliation.changedObjects,
+            canonicalChanges: semanticChanges,
             confirmedAt: evidencePackage.review_metadata?.confirmedAt ??
               now().toISOString(),
             sourceEvidencePackageId: evidencePackage.package_id ?? null,
@@ -323,7 +326,10 @@ export function createPILowerLevelCanonicalEvidenceCommitService({
         return sourceResult(
           error?.code === FounderStoreUnitOfWorkErrorCode.REVISION_CONFLICT ||
           error?.code === FounderStoreUnitOfWorkErrorCode.VALIDATION_FAILED ||
-          error?.cause?.code === "NUTRITION_REVISION_STALE"
+          error?.code === "NUTRITION_REVISION_STALE" ||
+          error?.code === "ACTIVITY_REVISION_STALE" ||
+          error?.cause?.code === "NUTRITION_REVISION_STALE" ||
+          error?.cause?.code === "ACTIVITY_REVISION_STALE"
             ? PILowerLevelSourceCommitOutcome.BASELINE_CONFLICT
             : PILowerLevelSourceCommitOutcome.PERSISTENCE_FAILURE,
           reconciliation,
@@ -417,6 +423,9 @@ function sourceChangeType(record) {
     : record.evidence_type === "nutrition" &&
         Number(record.nutritionRevision?.revision) > 1
       ? "canonical_revision"
+    : record.evidence_type === "activity_day" &&
+        Number(record.activityRevision?.revision) > 1
+      ? "canonical_revision"
     : record.payload?.correctsEvidenceId || record.payload?.supersedesEvidenceId
       ? "correction"
       : "canonical_commit";
@@ -425,6 +434,9 @@ function sourceSemanticFingerprint(record) {
   return record.evidence_type === "nutrition" &&
     record.nutritionRevision?.semanticFingerprint
     ? record.nutritionRevision.semanticFingerprint
+    : record.evidence_type === "activity_day" &&
+        record.activityRevision?.semanticFingerprint
+      ? record.activityRevision.semanticFingerprint
     : createPISemanticFingerprint(semanticRecord(record));
 }
 function semanticRecord(record) {

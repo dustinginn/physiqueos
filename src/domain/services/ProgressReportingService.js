@@ -42,6 +42,7 @@ import {
   selectActiveCanonicalNutritionDays,
   selectNutritionDayPayloads,
 } from "./CanonicalNutritionDayService";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
 import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
@@ -1359,11 +1360,25 @@ export function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePa
   const selectedNutritionIds = new Set(
     nutritionSelection.records.map((record) => record.canonicalId)
   );
+  const activitySelection = selectActiveCanonicalActivityDays(
+    canonicalEvidenceObjects
+  );
+  if (activitySelection.diagnostics.length > 0) {
+    console.warn("[ProgressReporting] Multiple active ActivityDays detected.",
+      activitySelection.diagnostics);
+  }
+  const selectedActivityIds = new Set(
+    activitySelection.records.map((record) => record.canonicalId)
+  );
   const canonicalPayloads = canonicalEvidenceObjects
     .filter(isActiveCanonicalObject)
     .filter((canonicalObject) =>
       !isNutritionDay(canonicalObject.payload ?? canonicalObject) ||
       selectedNutritionIds.has(canonicalObject.canonicalId)
+    )
+    .filter((canonicalObject) =>
+      !isActivityDay(canonicalObject.payload ?? canonicalObject) ||
+      selectedActivityIds.has(canonicalObject.canonicalId)
     )
     .map((canonicalObject) =>
       decorateCanonicalPayload(canonicalObject.payload ?? canonicalObject, canonicalObject)

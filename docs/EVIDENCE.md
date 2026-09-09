@@ -331,6 +331,37 @@ is the future publication-dependency input; it excludes upload IDs and repositor
 metadata while including canonical totals, meal/food structure, and replacement
 scope.
 
+## Canonical Activity Day revisions
+
+Activity has one active canonical day per owner and intended local calendar
+date. Its stable identity is `activity_day|<date>`. A canonical Activity Day is
+the daily aggregate; workouts and source artifacts remain distinct evidence and
+are referenced rather than collapsed into the day identity.
+
+Activity source authority is centralized and preserves the established order:
+direct Apple Health/HealthKit evidence, Apple Fitness evidence, manual or typed
+evidence, then voice evidence. A lower-authority source may fill missing fields
+but cannot replace a populated higher-authority total. An explicit correction
+may replace the current value only at the same or higher source-authority level.
+
+Each active record exposes `activityRevision` with a monotonic revision,
+semantic fingerprint, source class, and accepted source identity.
+`activityRevisionHistory` preserves prior canonical payloads and provenance.
+Exact retries do nothing. A fresh source that reports the same canonical values
+adds provenance without advancing the semantic revision or scheduling duplicate
+Energy/Briefing continuation work. A real correction advances once.
+
+Nutrition and Activity use the evidence's explicit intended local date when
+present. Timestamp-only evidence is assigned with the declared source/user time
+zone, defaulting to the Founder product time zone. Creation and ingestion time
+never substitute for the evidence date.
+
+New canonical Nutrition and Activity evidence captures Goal/Phase attribution
+through the shared canonical Goal/Phase chronology service. Persisted
+attribution is frozen across later corrections and Goal transitions. Legacy
+records without attribution may use the shared effective-date fallback at read
+or reconciliation boundaries; they are not rewritten in place.
+
 ---
 
 # Diagnostics Modes

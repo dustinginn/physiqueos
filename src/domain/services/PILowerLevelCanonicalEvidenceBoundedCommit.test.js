@@ -7,6 +7,8 @@ import {
   createShallowWritableFounderRuntime,
   detachBoundedFounderCollections,
 } from "../../platform/database/BoundedFounderRuntimeMutation.js";
+import { prepareNutritionEvidencePackageForReview } from "./CanonicalNutritionDayService";
+import { prepareActivityEvidencePackageForReview } from "./CanonicalActivityDayService";
 
 describe("provider-bounded lower-level canonical evidence commit", () => {
   it.each([
@@ -133,6 +135,183 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
     expect(result).not.toHaveProperty("candidate");
     expect(fixture.store.unrelatedLargeReadProjection).toHaveLength(20_000);
   });
+
+  it("stages continuation once for a real Activity change and not for same-value provenance", async () => {
+    const fixture = boundedFixture();
+    const staged = [];
+    const service = createPILowerLevelCanonicalEvidenceCommitService({
+      mutateCanonicalRuntime: fixture.mutateCanonicalRuntime,
+      enqueueCoordinator: {
+        stageEnergySourceChange(candidate, input) {
+          staged.push(input);
+          const workId = `work-${staged.length}`;
+          candidate.piEnergyConfidenceWorkItems.push({
+            id: workId,
+            sourceCommitLinks: [{ commitId: "pending_source_commit" }],
+          });
+          return { outcome: "enqueued", workId };
+        },
+      },
+      briefingCoordinator: {
+        stageCanonicalEvidenceChanges(_candidate, { canonicalChanges }) {
+          return { changed: canonicalChanges.length > 0, workItemIds: [] };
+        },
+        stampSourceCommit() {},
+      },
+      now: () => new Date("2026-08-29T12:00:00.000Z"),
+    });
+    const first = evidencePackage(evidence("activity_day", {
+      daily_activity: { move_calories: 700 },
+    }));
+    const sameValue = {
+      ...evidencePackage(evidence("activity_day", {
+        id: "activity-second-source",
+        daily_activity: { move_calories: 700 },
+      })),
+      package_id: "package_activity_second_source",
+    };
+    const correction = {
+      ...evidencePackage(evidence("activity_day", {
+        id: "activity-correction",
+        daily_activity: { move_calories: 740 },
+        source: { modality: "correction" },
+      })),
+      package_id: "package_activity_correction",
+    };
+
+    await service.commitConfirmedEvidencePackage(first, "user_founder_001");
+    const provenanceOnly = await service.commitConfirmedEvidencePackage(
+      prepareActivityEvidencePackageForReview({
+        canonicalObjects: fixture.store.canonicalEvidenceObjects,
+        evidencePackage: sameValue,
+        reviewId: "review_activity_second_source",
+      }),
+      "user_founder_001"
+    );
+    await service.commitConfirmedEvidencePackage(
+      prepareActivityEvidencePackageForReview({
+        canonicalObjects: fixture.store.canonicalEvidenceObjects,
+        evidencePackage: correction,
+        reviewId: "review_activity_correction",
+      }),
+      "user_founder_001"
+    );
+
+    expect(staged).toHaveLength(2);
+    expect(provenanceOnly.outcome).toBe(
+      PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED
+    );
+    const current = fixture.store.canonicalEvidenceObjects.find(
+      (item) => item.evidence_type === "activity_day"
+    );
+    expect(current.activityRevision.revision).toBe(2);
+    expect(current.activityRevisionHistory).toHaveLength(1);
+    expect(current.provenance.evidence_package_ids).toEqual([
+      first.package_id,
+      sameValue.package_id,
+      correction.package_id,
+    ]);
+    expect(staged.at(-1).sourceSemanticFingerprint).toBe(
+      current.activityRevision.semanticFingerprint
+    );
+  });
+
+  it("does not stage duplicate continuation for a same-value Nutrition submission", async () => {
+    const fixture = boundedFixture();
+    const staged = [];
+    const service = createPILowerLevelCanonicalEvidenceCommitService({
+      mutateCanonicalRuntime: fixture.mutateCanonicalRuntime,
+      enqueueCoordinator: continuationSpy(staged),
+      briefingCoordinator: briefingSpy(),
+      now: () => new Date("2026-08-29T12:00:00.000Z"),
+    });
+    const first = evidencePackage(evidence("nutrition", {
+      daily_totals: { calories: 2350, protein_g: 190 },
+      metadata: { daily_totals_scope: "full_day_summary" },
+    }));
+    await service.commitConfirmedEvidencePackage(first, "user_founder_001");
+    const second = {
+      ...first,
+      package_id: "package_nutrition_second_source",
+      evidence_objects: [{
+        ...first.evidence_objects[0],
+        id: "nutrition-second-source",
+      }],
+    };
+    const prepared = prepareNutritionEvidencePackageForReview({
+      canonicalObjects: fixture.store.canonicalEvidenceObjects,
+      evidencePackage: second,
+      reviewId: "review_nutrition_second_source",
+    });
+    const result = await service.commitConfirmedEvidencePackage(
+      prepared,
+      "user_founder_001"
+    );
+
+    expect(staged).toHaveLength(1);
+    expect(result.outcome).toBe(
+      PILowerLevelSourceCommitOutcome.SOURCE_COMMITTED_WORK_MATCHED
+    );
+    const current = fixture.store.canonicalEvidenceObjects.find(
+      (item) => item.evidence_type === "nutrition"
+    );
+    expect(current.nutritionRevision.revision).toBe(1);
+    expect(current.provenance.evidence_package_ids).toEqual([
+      first.package_id,
+      second.package_id,
+    ]);
+  });
+
+  it("fails a stale Activity review closed at the canonical commit boundary", async () => {
+    const fixture = boundedFixture();
+    const service = createPILowerLevelCanonicalEvidenceCommitService({
+      mutateCanonicalRuntime: fixture.mutateCanonicalRuntime,
+      enableEnergyConfidenceEnqueue: false,
+      now: () => new Date("2026-08-29T12:00:00.000Z"),
+    });
+    const first = evidencePackage(evidence("activity_day", {
+      daily_activity: { move_calories: 700 },
+    }));
+    await service.commitConfirmedEvidencePackage(first, "user_founder_001");
+    const stale = prepareActivityEvidencePackageForReview({
+      canonicalObjects: fixture.store.canonicalEvidenceObjects,
+      evidencePackage: {
+        ...first,
+        package_id: "package_activity_stale",
+        evidence_objects: [evidence("activity_day", {
+          id: "activity-stale",
+          daily_activity: { move_calories: 710 },
+          source: { modality: "correction" },
+        })],
+      },
+      reviewId: "review_activity_stale",
+    });
+    const current = prepareActivityEvidencePackageForReview({
+      canonicalObjects: fixture.store.canonicalEvidenceObjects,
+      evidencePackage: {
+        ...first,
+        package_id: "package_activity_current",
+        evidence_objects: [evidence("activity_day", {
+          id: "activity-current",
+          daily_activity: { move_calories: 725 },
+          source: { modality: "correction" },
+        })],
+      },
+      reviewId: "review_activity_current",
+    });
+    await service.commitConfirmedEvidencePackage(current, "user_founder_001");
+    const before = structuredClone(fixture.store);
+
+    const rejected = await service.commitConfirmedEvidencePackage(
+      stale,
+      "user_founder_001"
+    );
+
+    expect(rejected.outcome).toBe(
+      PILowerLevelSourceCommitOutcome.BASELINE_CONFLICT
+    );
+    expect(fixture.store).toEqual(before);
+  });
 });
 
 function boundedFixture({
@@ -215,5 +394,28 @@ function evidencePackage(evidenceObject) {
       confirmedAt: "2026-08-29T12:00:00.000Z",
     },
     evidence_objects: [evidenceObject],
+  };
+}
+
+function continuationSpy(staged) {
+  return {
+    stageEnergySourceChange(candidate, input) {
+      staged.push(input);
+      const workId = `work-${staged.length}`;
+      candidate.piEnergyConfidenceWorkItems.push({
+        id: workId,
+        sourceCommitLinks: [{ commitId: "pending_source_commit" }],
+      });
+      return { outcome: "enqueued", workId };
+    },
+  };
+}
+
+function briefingSpy() {
+  return {
+    stageCanonicalEvidenceChanges(_candidate, { canonicalChanges }) {
+      return { changed: canonicalChanges.length > 0, workItemIds: [] };
+    },
+    stampSourceCommit() {},
   };
 }

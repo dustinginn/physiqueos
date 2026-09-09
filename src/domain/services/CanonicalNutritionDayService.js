@@ -4,6 +4,7 @@ import {
   NUTRITION_RECONCILIATION_TOLERANCE,
   NutritionDailyTotalsScope,
 } from "../models/nutritionDayEvidence";
+import { resolveCanonicalEvidenceLocalDate } from "./CanonicalEvidenceDateService";
 
 export const NUTRITION_DAY_REVISION_SCHEMA_VERSION =
   "canonical-nutrition-day-revision-v1";
@@ -238,6 +239,7 @@ export function createCanonicalNutritionDayRecord({
   evidenceObject,
   evidencePackage,
   existingObject = null,
+  goalPhaseAttribution = null,
   now = new Date().toISOString(),
   requireExpectedPriorFingerprint = false,
   userId,
@@ -247,6 +249,11 @@ export function createCanonicalNutritionDayRecord({
   const canonicalCandidate = applyNutritionDayMealAggregation(
     withoutCanonicalReconciliation(candidate)
   );
+  const intendedDate = nutritionDate(canonicalCandidate);
+  if (!intendedDate) {
+    throw new TypeError("Canonical Nutrition Day requires an intended local date.");
+  }
+  canonicalCandidate.observed_at = intendedDate;
   const replayCandidate = {
     ...canonicalCandidate,
     reconciliation: candidate.reconciliation,
@@ -333,10 +340,16 @@ export function createCanonicalNutritionDayRecord({
   const priorFingerprint = existingObject
     ? getCanonicalNutritionSemanticFingerprint(existingObject)
     : null;
-  const semanticFingerprint = createNutritionSemanticFingerprint(payload, {
+  const candidateSemanticFingerprint = createNutritionSemanticFingerprint(payload, {
     replacementScope,
   });
-  const semanticChanged = priorFingerprint !== semanticFingerprint;
+  const semanticChanged = !existingObject || nutritionRecordHasSemanticChange(
+    { payload },
+    existingObject
+  );
+  const semanticFingerprint = semanticChanged
+    ? candidateSemanticFingerprint
+    : priorFingerprint;
   const priorRevision = existingObject?.nutritionRevision?.revision ??
     (existingObject ? 1 : 0);
   const revision = semanticChanged ? priorRevision + 1 : priorRevision || 1;
@@ -346,6 +359,8 @@ export function createCanonicalNutritionDayRecord({
   if (existingObject && semanticChanged) {
     history.push(createRevisionSnapshot(existingObject));
   }
+  const attribution = existingObject?.goalPhaseAttribution ??
+    goalPhaseAttribution ?? null;
 
   return {
     canonicalId,
@@ -360,19 +375,33 @@ export function createCanonicalNutritionDayRecord({
       semanticFingerprint,
       priorSemanticFingerprint: semanticChanged ? priorFingerprint :
         existingObject?.nutritionRevision?.priorSemanticFingerprint ?? null,
-      disposition,
-      replacementScope,
-      replacementReason: existingObject
+      disposition: semanticChanged ? disposition :
+        existingObject?.nutritionRevision?.disposition ?? disposition,
+      replacementScope: semanticChanged ? replacementScope :
+        existingObject?.nutritionRevision?.replacementScope ?? replacementScope,
+      replacementReason: !semanticChanged
+        ? existingObject?.nutritionRevision?.replacementReason ?? null
+        : existingObject
         ? relationship.replacementReason ?? "confirmed_same_date_nutrition"
         : "initial_canonical_nutrition_day",
       replacedAt: existingObject && semanticChanged ? now :
         existingObject?.nutritionRevision?.replacedAt ?? null,
-      sourceEvidencePackageId:
-        evidencePackage?.package_id ?? evidencePackage?.id ?? null,
-      sourceEvidenceObjectId: evidenceObject.id ?? null,
-      sourceReviewId,
+      sourceEvidencePackageId: semanticChanged
+        ? evidencePackage?.package_id ?? evidencePackage?.id ?? null
+        : existingObject?.nutritionRevision?.sourceEvidencePackageId ?? null,
+      sourceEvidenceObjectId: semanticChanged
+        ? evidenceObject.id ?? null
+        : existingObject?.nutritionRevision?.sourceEvidenceObjectId ?? null,
+      sourceReviewId: semanticChanged
+        ? sourceReviewId
+        : existingObject?.nutritionRevision?.sourceReviewId ?? null,
     },
     nutritionRevisionHistory: history,
+    ...(attribution ? {
+      goalId: attribution.goalId,
+      phaseId: attribution.phaseId,
+      goalPhaseAttribution: attribution,
+    } : {}),
     payload,
     provenance: {
       ...canonicalProvenance,
@@ -688,8 +717,16 @@ function mealKeys(payload = {}) {
 }
 
 function nutritionDate(payload = {}) {
-  return String(payload.observed_at ?? payload.date ?? payload.metadata?.date ?? "")
-    .slice(0, 10);
+  return resolveCanonicalEvidenceLocalDate(payload);
+}
+
+export function nutritionRecordHasSemanticChange(record = {}, prior = null) {
+  if (!prior) return true;
+  return createNutritionSemanticFingerprint(record.payload ?? record, {
+    replacementScope: "canonical_day_state",
+  }) !== createNutritionSemanticFingerprint(prior.payload ?? prior, {
+    replacementScope: "canonical_day_state",
+  });
 }
 
 function isNutritionPayload(payload = {}) {

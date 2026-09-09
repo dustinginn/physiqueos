@@ -11,6 +11,9 @@ import {
 import {
   prepareNutritionEvidencePackageForReview,
 } from "../../../../domain/services/CanonicalNutritionDayService";
+import {
+  prepareActivityEvidencePackageForReview,
+} from "../../../../domain/services/CanonicalActivityDayService";
 import { resolveEvidenceReviewReprocessEligibility } from "../../../../domain/services/EvidenceReviewReprocessEligibility";
 import {
   getProductionEvidenceReviewReadService,
@@ -50,11 +53,15 @@ export default async function EvidenceReviewPage({ params, searchParams }) {
     : null;
   const canonicalObjects = read.canonicalObjects;
   const persistedPackage = read.evidencePackage;
-  const interpretedEvidence = prepareNutritionEvidencePackageForReview({
+  const interpretedEvidence = prepareActivityEvidencePackageForReview({
     canonicalObjects,
-    evidencePackage: repairPendingReviewExerciseIdentities(
-      review.interpretedEvidence
-    ),
+    evidencePackage: prepareNutritionEvidencePackageForReview({
+      canonicalObjects,
+      evidencePackage: repairPendingReviewExerciseIdentities(
+        review.interpretedEvidence
+      ),
+      reviewId,
+    }),
     reviewId,
   });
   const presentedReview = { ...review, interpretedEvidence };

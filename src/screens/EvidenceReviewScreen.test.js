@@ -160,6 +160,7 @@ describe("EvidenceReviewScreen selection interaction", () => {
 
   it("presents a bounded same-date Nutrition replacement decision", () => {
     expect(page).toContain("prepareNutritionEvidencePackageForReview");
+    expect(page).toContain("prepareActivityEvidencePackageForReview");
     expect(screen).toContain("Update this Nutrition Day");
     expect(screen).toContain("Replace existing");
     expect(screen).toContain("Add as a distinct meal");

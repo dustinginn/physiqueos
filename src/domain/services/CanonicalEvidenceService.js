@@ -13,13 +13,25 @@ import {
   createCanonicalNutritionDayRecord,
   getNutritionDayLogicalKey,
   getStableNutritionDayCanonicalId,
+  nutritionRecordHasSemanticChange,
   selectActiveCanonicalNutritionDays,
 } from "./CanonicalNutritionDayService";
+import {
+  activityRecordHasSemanticChange,
+  createCanonicalActivityDayRecord,
+  getStableActivityDayCanonicalId,
+  selectActiveCanonicalActivityDays,
+} from "./CanonicalActivityDayService";
+import { resolveCanonicalEvidenceLocalDate } from "./CanonicalEvidenceDateService";
+import {
+  resolveCanonicalEvidenceGoalPhaseAttribution,
+} from "./CanonicalEvidenceGoalPhaseAttributionService";
 
 export function reconcileEvidencePackageIntoCanonicalHistory({
   evidencePackage,
   existingCanonicalObjects = [],
-  requireExpectedNutritionFingerprint = false,
+  goals = [],
+  requireExpectedDayFingerprint = false,
   userId,
 } = {}) {
   const canonicalById = new Map(
@@ -38,11 +50,11 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
     if (isNutritionDay(evidenceObject)) {
       const selection = selectActiveCanonicalNutritionDays(
         [...canonicalById.values()],
-        { date: getDateKey(evidenceObject.observed_at), userId }
+        { date: resolveCanonicalEvidenceLocalDate(evidenceObject), userId }
       );
       if (selection.diagnostics.length > 0) {
         throw new Error(
-          `Nutrition canonical invariant failed for ${getDateKey(evidenceObject.observed_at)}: multiple active days require explicit historical repair.`
+          `Nutrition canonical invariant failed for ${resolveCanonicalEvidenceLocalDate(evidenceObject)}: multiple active days require explicit historical repair.`
         );
       }
       const existingObject = selection.records[0] ?? null;
@@ -58,7 +70,50 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
         evidenceObject,
         evidencePackage,
         existingObject,
-        requireExpectedPriorFingerprint: requireExpectedNutritionFingerprint,
+        goalPhaseAttribution: resolveCanonicalEvidenceGoalPhaseAttribution({
+          evidenceObject,
+          existingObject,
+          goals,
+          userId,
+        }),
+        requireExpectedPriorFingerprint: requireExpectedDayFingerprint,
+        userId,
+      });
+      canonicalById.set(canonicalId, canonicalObject);
+      matchedCanonicalIds.add(canonicalId);
+      return;
+    }
+    if (isActivityDay(evidenceObject)) {
+      const date = resolveCanonicalEvidenceLocalDate(evidenceObject);
+      const selection = selectActiveCanonicalActivityDays(
+        [...canonicalById.values()],
+        { date, userId }
+      );
+      if (selection.diagnostics.length > 0) {
+        throw new Error(
+          `Activity canonical invariant failed for ${date}: multiple active days require explicit historical repair.`
+        );
+      }
+      const existingObject = selection.records[0] ?? null;
+      const canonicalId = existingObject?.canonicalId ??
+        getStableActivityDayCanonicalId(evidenceObject);
+      const canonicalObject = createCanonicalActivityDayRecord({
+        canonicalId,
+        canonicalProvenance: mergeCanonicalProvenance({
+          existingObject,
+          evidenceObject,
+          evidencePackage,
+        }),
+        evidenceObject,
+        evidencePackage,
+        existingObject,
+        goalPhaseAttribution: resolveCanonicalEvidenceGoalPhaseAttribution({
+          evidenceObject,
+          existingObject,
+          goals,
+          userId,
+        }),
+        requireExpectedPriorFingerprint: requireExpectedDayFingerprint,
         userId,
       });
       canonicalById.set(canonicalId, canonicalObject);
@@ -137,6 +192,7 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
 export function reconcileConfirmedEvidencePackage({
   evidencePackage,
   existingCanonicalObjects = [],
+  goals = [],
   userId,
   mutationReason = "evidence_review_confirmation",
 } = {}) {
@@ -162,7 +218,8 @@ export function reconcileConfirmedEvidencePackage({
   const reconciledById = new Map(reconcileEvidencePackageIntoCanonicalHistory({
     evidencePackage: scopedEvidencePackage,
     existingCanonicalObjects: scopedExistingObjects,
-    requireExpectedNutritionFingerprint: true,
+    goals,
+    requireExpectedDayFingerprint: true,
     userId,
   }).map((candidate) => [candidate.canonicalId,
     preserveUnchangedCanonicalObject(
@@ -199,9 +256,17 @@ export function reconcileConfirmedEvidencePackage({
   const changedObjects = reconciledObjects.filter(
     (object) => !canonicalRecordsEqual(existingById.get(object.canonicalId), object)
   );
+  const semanticChangedObjects = changedObjects.filter((object) => {
+    const prior = existingById.get(object.canonicalId);
+    const payload = object.payload ?? object;
+    if (isActivityDay(payload)) return activityRecordHasSemanticChange(object, prior);
+    if (isNutritionDay(payload)) return nutritionRecordHasSemanticChange(object, prior);
+    return true;
+  });
 
   return {
     changedObjects,
+    semanticChangedObjects,
     scope,
     report: {
       addedCanonicalIds: changedObjects
@@ -280,7 +345,7 @@ export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
   if (explicitCanonicalId) return explicitCanonicalId;
 
   if (isActivityDay(evidenceObject)) {
-    return ["activity_day", getDateKey(evidenceObject.observed_at)].join("|");
+    return getStableActivityDayCanonicalId(evidenceObject);
   }
 
   if (isNutritionDay(evidenceObject)) {
@@ -466,10 +531,6 @@ function backfillKnownTrainingExerciseDetails(evidenceObject = {}) {
 function chooseRicherCanonicalPayload(existingPayload, candidate, options = {}) {
   if (!existingPayload) return candidate;
 
-  if (isActivityDay(existingPayload) && isActivityDay(candidate)) {
-    return mergeActivityDayPayload(existingPayload, candidate);
-  }
-
   if (isCompatibleTrainingPayload(existingPayload, candidate)) {
     return mergeTrainingPayload(existingPayload, candidate, options);
   }
@@ -484,80 +545,6 @@ function chooseRicherCanonicalPayload(existingPayload, candidate, options = {}) 
   return {
     ...existingPayload,
     provenance: mergeObjectProvenance(existingPayload.provenance, candidate.provenance),
-  };
-}
-
-function mergeActivityDayPayload(existingPayload = {}, candidate = {}) {
-  const preferred = choosePreferredActivityDaySource(existingPayload, candidate);
-  const secondary = preferred === candidate ? existingPayload : candidate;
-
-  return {
-    ...secondary,
-    ...preferred,
-    metadata: {
-      ...(secondary.metadata ?? {}),
-      ...(preferred.metadata ?? {}),
-    },
-    daily_activity: mergeActivityDayDailyActivity(
-      secondary.daily_activity,
-      preferred.daily_activity
-    ),
-    derived_metrics: {
-      ...(secondary.derived_metrics ?? {}),
-      ...(preferred.derived_metrics ?? {}),
-    },
-    references: {
-      training_session_ids: uniqueStrings([
-        ...(secondary.references?.training_session_ids ?? []),
-        ...(preferred.references?.training_session_ids ?? []),
-      ]),
-    },
-    provenance: mergeObjectProvenance(secondary.provenance, preferred.provenance),
-  };
-}
-
-function choosePreferredActivityDaySource(left = {}, right = {}) {
-  const leftRank = getActivitySourceAuthorityRank(left);
-  const rightRank = getActivitySourceAuthorityRank(right);
-
-  if (rightRank !== leftRank) return rightRank > leftRank ? right : left;
-
-  return getEvidenceRichnessScore(right) >= getEvidenceRichnessScore(left)
-    ? right
-    : left;
-}
-
-function getActivitySourceAuthorityRank(activityDay = {}) {
-  const source = `${activityDay.source?.application ?? ""} ${activityDay.source?.integration ?? ""} ${activityDay.source?.modality ?? ""}`.toLowerCase();
-
-  if (/apple health|healthkit|direct/.test(source)) return 4;
-  if (/apple fitness/.test(source)) return 3;
-  if (/manual|correction|typed/.test(source)) return 2;
-  if (/voice/.test(source)) return 1;
-
-  return 0;
-}
-
-function mergeActivityDayDailyActivity(first = {}, second = {}) {
-  return {
-    move_calories: second.move_calories ?? first.move_calories ?? null,
-    move_goal: second.move_goal ?? first.move_goal ?? null,
-    exercise_minutes: second.exercise_minutes ?? first.exercise_minutes ?? null,
-    exercise_goal: second.exercise_goal ?? first.exercise_goal ?? null,
-    stand_hours: second.stand_hours ?? first.stand_hours ?? null,
-    stand_goal: second.stand_goal ?? first.stand_goal ?? null,
-    total_calories_burned:
-      second.total_calories_burned ?? first.total_calories_burned ?? null,
-    ring_completion: {
-      move:
-        second.ring_completion?.move ?? first.ring_completion?.move ?? null,
-      exercise:
-        second.ring_completion?.exercise ??
-        first.ring_completion?.exercise ??
-        null,
-      stand:
-        second.ring_completion?.stand ?? first.ring_completion?.stand ?? null,
-    },
   };
 }
 

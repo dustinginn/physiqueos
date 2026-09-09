@@ -1,5 +1,6 @@
 import { getProgressPhotoCategoryLabel } from "../models/progressPhotoPoseVocabulary";
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 
 export function createEvidenceTimelineService({ repositories }) {
@@ -225,8 +226,16 @@ function getCanonicalTimelineItems({ canonicalEvidenceObjects = [], evidencePack
 
 function getCanonicalPayloads({ canonicalEvidenceObjects = [], evidencePackages = [] } = {}) {
   if (canonicalEvidenceObjects.length > 0) {
+    const selectedActivityIds = new Set(
+      selectActiveCanonicalActivityDays(canonicalEvidenceObjects).records
+        .map((record) => record.canonicalId)
+    );
     return canonicalEvidenceObjects
       .filter(isActiveCanonicalObject)
+      .filter((object) =>
+        !isActivityDay(object.payload ?? object) ||
+        selectedActivityIds.has(object.canonicalId)
+      )
       .map((object) => object.payload ?? object);
   }
 

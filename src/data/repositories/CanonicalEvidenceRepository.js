@@ -7,6 +7,7 @@ import {
   createRecoveryEvidenceRecord,
 } from "../../domain/models/RecoveryEvidenceModel";
 import { getNutritionDayLogicalKey } from "../../domain/services/CanonicalNutritionDayService";
+import { getActivityDayLogicalKey } from "../../domain/services/CanonicalActivityDayService";
 
 export const RECOVERY_EVIDENCE_WINDOW_LIMIT = 64;
 
@@ -24,6 +25,7 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
         reconcileEvidencePackageIntoCanonicalHistory({
           evidencePackage,
           existingCanonicalObjects: objects,
+          goals: options.goals ?? [],
           userId: userId ?? evidencePackage.userId,
         }),
       canonicalEvidenceObjects
@@ -79,6 +81,7 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
       const result = reconcileConfirmedEvidencePackage({
         evidencePackage,
         existingCanonicalObjects: canonicalEvidenceObjects,
+        goals: options.goals ?? [],
         userId,
       });
 
@@ -154,6 +157,10 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
         canonicalEvidenceObjects,
         evidenceObjects
       );
+      assertNoSecondActiveActivityDay(
+        canonicalEvidenceObjects,
+        evidenceObjects
+      );
       let changed = false;
       evidenceObjects.forEach((evidenceObject) => {
         const existingIndex = canonicalEvidenceObjects.findIndex(
@@ -174,6 +181,41 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
       if (changed) options.onChange?.();
 
       return evidenceObjects;
+  }
+}
+
+function assertNoSecondActiveActivityDay(existing = [], incoming = []) {
+  assertNoSecondActiveDay(existing, incoming, {
+    evidenceType: "activity_day",
+    label: "ActivityDay",
+    logicalKey: getActivityDayLogicalKey,
+  });
+}
+
+function assertNoSecondActiveDay(existing, incoming, {
+  evidenceType,
+  label,
+  logicalKey,
+}) {
+  for (const record of incoming) {
+    const payload = record.payload ?? record;
+    if (
+      payload.evidence_type !== evidenceType ||
+      record.quality?.status === "superseded" ||
+      record.quality?.supersededBy
+    ) continue;
+    const dayKey = logicalKey(record);
+    const conflict = existing.find((candidate) =>
+      candidate.canonicalId !== record.canonicalId &&
+      (!record.userId || !candidate.userId || candidate.userId === record.userId) &&
+      (candidate.payload ?? candidate).evidence_type === evidenceType &&
+      candidate.quality?.status !== "superseded" &&
+      !candidate.quality?.supersededBy &&
+      logicalKey(candidate) === dayKey
+    );
+    if (conflict) {
+      throw new Error(`Cannot persist a second active canonical ${label} for ${dayKey}.`);
+    }
   }
 }
 

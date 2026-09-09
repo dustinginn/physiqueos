@@ -100,6 +100,41 @@ describe("EnergyDailyReconciliationService", () => {
     expect(row.calorieIntake).toBe(2450);
   });
 
+  it("uses only the latest explicit Activity revision for a date", () => {
+    const [row] = reconcileEnergyDays({
+      activityDays: [
+        { id: "old", date: "2026-07-23", activeCalories: 500,
+          _canonicalActivityRevision: { revision: 1 } },
+        { id: "current", date: "2026-07-23", activeCalories: 725,
+          _canonicalActivityRevision: { revision: 2 } },
+      ],
+    });
+
+    expect(row.activityDayId).toBe("current");
+    expect(row.activeCalories).toBe(725);
+  });
+
+  it("distinguishes a recorded zero from a missing Activity day", () => {
+    const rows = reconcileEnergyDays({
+      calendarDates: ["2026-07-22", "2026-07-23"],
+      activityDays: [
+        { id: "rest-day", date: "2026-07-23", activeCalories: 0 },
+      ],
+    });
+
+    expect(rows[0]).toMatchObject({
+      date: "2026-07-22",
+      activityDayId: null,
+      activeCalories: null,
+    });
+    expect(rows[1]).toMatchObject({
+      date: "2026-07-23",
+      activityDayId: "rest-day",
+      activeCalories: 0,
+      completeness: "activity-only",
+    });
+  });
+
   it.each([
     [
       "nutrition-only",

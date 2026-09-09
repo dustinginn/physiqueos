@@ -1,6 +1,11 @@
 import { selectNutritionDayPayloads } from "./CanonicalNutritionDayService";
+import { selectActivityDayPayloads } from "./CanonicalActivityDayService";
+import {
+  DEFAULT_EVIDENCE_TIME_ZONE,
+  resolveCanonicalEvidenceLocalDate,
+} from "./CanonicalEvidenceDateService";
 
-const DEFAULT_TIME_ZONE = "America/Los_Angeles";
+const DEFAULT_TIME_ZONE = DEFAULT_EVIDENCE_TIME_ZONE;
 
 export function reconcileEnergyDays({
   activityDays = [],
@@ -30,7 +35,7 @@ export function reconcileEnergyDays({
     byDate.set(date, row);
   });
 
-  activityDays.forEach((day) => {
+  selectActivityDayPayloads(activityDays).forEach((day) => {
     const date = getCanonicalLocalDate(day.date ?? day.observed_at, timeZone);
     if (!date) return;
     const row = byDate.get(date) ?? createEmptyRow(date);
@@ -83,21 +88,12 @@ export function createHistoricalRmrIndex(
 }
 
 export function getCanonicalLocalDate(value, timeZone = DEFAULT_TIME_ZONE) {
-  if (value == null) return null;
-  const text = String(value);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(date);
-  const part = (type) => parts.find((item) => item.type === type)?.value;
-
-  return `${part("year")}-${part("month")}-${part("day")}`;
+  return resolveCanonicalEvidenceLocalDate(
+    typeof value === "object" && !(value instanceof Date)
+      ? value
+      : { observed_at: value },
+    { timeZone }
+  );
 }
 
 function createEmptyRow(date) {

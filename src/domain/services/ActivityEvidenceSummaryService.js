@@ -1,12 +1,14 @@
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 
 export function createActivityEvidenceSummary({ canonicalObjects = [], now = new Date() } = {}) {
   const today = dateKey(now);
   const start = addDays(today, -6);
-  const days = canonicalObjects
-    .filter(isActiveCanonicalEvidenceObject)
+  const selected = selectActiveCanonicalActivityDays(
+    canonicalObjects.filter(isActiveCanonicalEvidenceObject)
+  );
+  const days = selected.records
     .map((object) => object.payload ?? object)
-    .filter((object) => object.evidence_type === "activity_day")
     .filter((object) => object.observed_at >= start && object.observed_at <= today)
     .sort((left, right) => left.observed_at.localeCompare(right.observed_at));
   const knownCalories = days

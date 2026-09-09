@@ -5,6 +5,7 @@ import {
   reconcileConfirmedEvidencePackage,
 } from "./CanonicalEvidenceService";
 import { prepareNutritionEvidencePackageForReview } from "./CanonicalNutritionDayService";
+import { prepareActivityEvidencePackageForReview } from "./CanonicalActivityDayService";
 
 const userId = "founder";
 const nutrition = (overrides = {}) => ({
@@ -129,6 +130,97 @@ describe("scoped canonical confirmation reconciliation", () => {
 
     await expect(repository.upsertCanonicalEvidenceObjects([second]))
       .rejects.toThrow(/second active canonical NutritionDay/i);
+  });
+
+  it("blocks raw persistence of a second active same-date ActivityDay", async () => {
+    const activityPayload = {
+      id: "activity-a",
+      evidence_type: "activity_day",
+      observed_at: "2026-07-12",
+      daily_activity: { move_calories: 700 },
+    };
+    const first = canonical("legacy-activity-a", activityPayload);
+    const repository = createCanonicalEvidenceRepository([first]);
+    const second = canonical("legacy-activity-b", {
+      ...activityPayload,
+      id: "activity-b",
+    });
+
+    await expect(repository.upsertCanonicalEvidenceObjects([second]))
+      .rejects.toThrow(/second active canonical ActivityDay/i);
+  });
+
+  it("attaches Package 3 Goal/Phase chronology once and freezes it on correction", () => {
+    const goal = {
+      id: "goal-build",
+      userId,
+      primary: true,
+      status: "active",
+      phases: [{
+        id: "phase-build",
+        goalId: "goal-build",
+        name: "Build",
+        purpose: "Build",
+        order: 0,
+        status: "active",
+        startDate: "2026-07-01",
+        startedAt: "2026-07-01",
+        plannedReviewAt: "2026-08-01",
+        reviewState: "scheduled",
+        completionDecisionRequired: true,
+        revision: 1,
+      }],
+    };
+    const packageValue = evidencePackage([nutrition(), {
+      id: "activity-12",
+      evidence_type: "activity_day",
+      observed_at: "2026-07-12",
+      daily_activity: { move_calories: 700 },
+      provenance: { source_artifact_refs: ["activity.png"] },
+    }]);
+    const first = reconcileConfirmedEvidencePackage({
+      evidencePackage: packageValue,
+      existingCanonicalObjects: [],
+      goals: [goal],
+      userId,
+    });
+
+    expect(first.changedObjects).toHaveLength(2);
+    expect(first.changedObjects).toEqual([
+      expect.objectContaining({
+        goalId: "goal-build",
+        phaseId: "phase-build",
+      }),
+      expect.objectContaining({
+        goalId: "goal-build",
+        phaseId: "phase-build",
+      }),
+    ]);
+
+    const activityRecord = first.changedObjects.find(
+      (item) => item.evidence_type === "activity_day"
+    );
+    const correctionPackage = evidencePackage([{
+        ...activityRecord.payload,
+        id: "activity-correction",
+        source: { modality: "correction" },
+        daily_activity: { move_calories: 725 },
+      }]);
+    const correction = reconcileConfirmedEvidencePackage({
+      evidencePackage: prepareActivityEvidencePackageForReview({
+        canonicalObjects: first.changedObjects,
+        evidencePackage: correctionPackage,
+        reviewId: "activity-correction-review",
+      }),
+      existingCanonicalObjects: first.changedObjects,
+      goals: [{ ...goal, id: "goal-new", phases: [] }],
+      userId,
+    });
+    expect(correction.changedObjects[0]).toMatchObject({
+      goalId: "goal-build",
+      phaseId: "phase-build",
+      goalPhaseAttribution: { source: "legacy_effective_date_fallback" },
+    });
   });
 
   it("exposes broad reconciliation only as an explicit maintenance command with a report", async () => {

@@ -4,7 +4,9 @@ import { reconcileEnergyDays } from "./EnergyDailyReconciliationService";
 import { composeLoggedTodaySummary } from "./LoggedTodayService";
 import { getCanonicalPayloads } from "./ProgressReportingService";
 import {
+  createCanonicalNutritionDayRecord,
   createNutritionSemanticFingerprint,
+  getStableNutritionDayCanonicalId,
   prepareNutritionEvidencePackageForReview,
   selectActiveCanonicalNutritionDays,
 } from "./CanonicalNutritionDayService";
@@ -13,6 +15,25 @@ const userId = "founder";
 const date = "2026-08-08";
 
 describe("canonical NutritionDay revision semantics", () => {
+  it("uses the intended owner-local date instead of UTC creation date", () => {
+    const evidenceObject = {
+      id: "nutrition-timezone",
+      evidence_type: "nutrition",
+      observed_at: "2026-08-09T01:30:00.000Z",
+      metadata: { time_zone: "America/Los_Angeles" },
+      daily_totals: { calories: 2300 },
+    };
+    expect(getStableNutritionDayCanonicalId(evidenceObject))
+      .toBe("nutrition|2026-08-08|nutrition-day");
+    expect(createCanonicalNutritionDayRecord({
+      canonicalId: getStableNutritionDayCanonicalId(evidenceObject),
+      canonicalProvenance: {},
+      evidenceObject,
+      evidencePackage: { package_id: "timezone-package" },
+      userId,
+    }).payload.observed_at).toBe("2026-08-08");
+  });
+
   it("replaces a newer full-day package in one stable lineage", () => {
     const first = confirm([], fullDayPackage("package-a", "nutrition-a", 400, 2200), "review-a");
     const original = first[0];
