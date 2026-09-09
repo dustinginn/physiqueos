@@ -4,7 +4,12 @@ import { createEvidenceReviewService } from "../../domain/services/EvidenceRevie
 import { resolvePhotoSessionGoalRelationship } from "../../domain/services/PhotoSessionMetadataService.js";
 import { WorkerMessageError } from "./DurableOutboxWorker.js";
 
-export function createEvidenceIntakeInterpretationWorkerHandler({ store, loadArtifact, now = () => new Date() } = {}) {
+export function createEvidenceIntakeInterpretationWorkerHandler({
+  store,
+  loadArtifact,
+  now = () => new Date(),
+  readCanonicalExerciseRegistry = null,
+} = {}) {
   if (!store?.claimInterpretation || typeof loadArtifact !== "function") {
     throw new Error("Evidence intake worker requires receipt and provider media storage.");
   }
@@ -19,6 +24,10 @@ export function createEvidenceIntakeInterpretationWorkerHandler({ store, loadArt
     if (!claimed || claimed.outcome === "completed" || claimed.outcome === "claimed_elsewhere") return claimed;
     const receipt = claimed.receipt;
     try {
+      // Interpretation uses synchronous identity resolution. Refresh the bounded provider
+      // registry before the first interpretation in a fresh worker process so an exact
+      // Founder-created exercise cannot be misclassified as provisional.
+      await readCanonicalExerciseRegistry?.();
       const context = await store.loadPhotoSessionContext(receipt.effectiveDate);
       const result = await interpretEvidenceIntakeStoredArtifacts({
         capturedAt: receipt.createdAt,

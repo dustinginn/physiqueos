@@ -116,6 +116,56 @@ describe("Training Library corrected taxonomy", () => {
     expect(source).not.toContain('"Adductors"');
   });
 
+  it("includes active canonical exercises with no history and overlays history without duplicates", () => {
+    const report = {
+      canonicalExercises: [
+        {
+          canonicalExerciseId: "bicep_curl_machine",
+          label: "Bicep Curl Machine",
+          primaryMuscleGroupId: "biceps",
+          primaryMuscleGroups: ["Biceps"],
+          regionLabel: "Upper Body",
+        },
+        {
+          canonicalExerciseId: "dumbbell_front_raise",
+          label: "Dumbbell Front Raise",
+          primaryMuscleGroupId: "shoulders",
+          primaryMuscleGroups: ["Shoulders"],
+          regionLabel: "Upper Body",
+        },
+      ],
+      trainingBreakdowns: {
+        resistance: [{
+          label: "Upper Body",
+          movementFamilies: [{
+            label: "Elbow Flexion",
+            exercises: [{
+              canonicalExerciseId: "bicep_curl_machine",
+              label: "Bicep Curl Machine",
+              sets: [{ reps: 12, weight: 120, weight_unit: "lb" }],
+            }],
+          }],
+        }],
+      },
+    };
+
+    const biceps = getExercisesForFlatTrainingGroup({ groupSlug: "biceps", report });
+    const shoulders = getExercisesForFlatTrainingGroup({ groupSlug: "shoulders", report });
+
+    expect(biceps).toHaveLength(1);
+    expect(biceps[0]).toMatchObject({
+      canonicalExerciseId: "bicep_curl_machine",
+      sets: [{ reps: 12, weight: 120, weight_unit: "lb" }],
+    });
+    expect(shoulders).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "dumbbell_front_raise",
+        label: "Dumbbell Front Raise",
+        sets: [],
+      }),
+    ]);
+  });
+
   it("uses canonical IDs for canonical aggregation and routes without fabricating historical IDs", () => {
     const canonical = {
       canonicalExerciseId: "sumo_squat_machine",

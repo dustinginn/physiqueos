@@ -94,6 +94,30 @@ describe("Founder-created canonical exercise resolution on a fresh process", () 
     expect(exerciseIds).toContain("bicep_curl_machine");
   });
 
+  it("projects an active canonical exercise into Library browse before it has history", async () => {
+    registerRuntimeTrainingExercises([]);
+    const store = navigationStore([]);
+    const service = createTrainingNavigationReadService({
+      store,
+      readCanonicalExerciseRegistry: async () => {
+        registerRuntimeTrainingExercises([founderCreatedExercise]);
+        return [founderCreatedExercise];
+      },
+    });
+
+    const result = await service.getLibrary({ context: "all", path: ["biceps"] });
+
+    expect(result.report.canonicalExercises).toEqual([
+      expect.objectContaining({
+        canonicalExerciseId: "bicep_curl_machine",
+        label: "Bicep Curl Machine",
+        primaryMuscleGroupId: "biceps",
+      }),
+    ]);
+    expect(result.report.trainingBreakdowns.resistance).toEqual([]);
+    expect(store.listCanonicalTrainingEvidenceObjects).toHaveBeenCalledOnce();
+  });
+
   it("does not require a prior canonical write in the same process to become visible", async () => {
     registerRuntimeTrainingExercises([]);
     const store = navigationStore([bicepSession()]);
@@ -282,9 +306,12 @@ describe("provider-native Training navigation", () => {
       expect(narrow.report.trainingBreakdowns).toEqual(
         legacy.report.trainingBreakdowns
       );
-      expect(renderLibrary(narrow, ["biceps"])).toEqual(
-        renderLibrary(legacy, ["biceps"])
-      );
+      expect(narrow.report.canonicalExercises).toEqual(expect.any(Array));
+      const narrowMarkup = renderLibrary(narrow, ["biceps"]);
+      const legacyMarkup = renderLibrary(legacy, ["biceps"]);
+      expect(narrowMarkup).toContain("Synthetic Curl");
+      expect(legacyMarkup).toContain("Synthetic Curl");
+      expect(narrowMarkup.match(/Synthetic Curl/g)).toHaveLength(1);
       expect(narrow.report).not.toHaveProperty("latestTrainingDay");
       expect(narrow.report).not.toHaveProperty("trainingLibrary");
       expect(narrow.report).not.toHaveProperty("resistancePerformance");

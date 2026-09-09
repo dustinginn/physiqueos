@@ -179,12 +179,12 @@ describe("hydrateProductionTrainingExerciseRegistry — bounded Founder-created 
     const identities = listCanonicalTrainingExerciseIdentities();
     expect(identities.some((identity) => identity.id === "bicep_curl_machine" && identity.name === "Bicep Curl Machine")).toBe(true);
 
-    // Bounded: exactly one collection query (canonicalExerciseLibrary) plus the mandatory
-    // single-row runtime-metadata lookup -- never the ~39-collection full canonical runtime
-    // a commit path loads.
+    // Bounded: exactly one collection query (canonicalExerciseLibrary), with no runtime
+    // metadata or ~39-collection compatibility-runtime reconstruction.
     const collectionQueries = queries.filter((query) => query.text.includes("collection_name"));
     expect(collectionQueries).toHaveLength(1);
-    expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", ["canonicalExerciseLibrary"]]);
+    expect(collectionQueries[0].values).toEqual(["phase5-synthetic-user", "canonicalExerciseLibrary"]);
+    expect(queries).toHaveLength(1);
   });
 
   it("coalesces concurrent cold-start registry reads into one deterministic provider load", async () => {

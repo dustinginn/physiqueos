@@ -1,5 +1,10 @@
+import fs from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createEvidenceIntakeInterpretationWorkerHandler } from "./EvidenceIntakeInterpretationWorker.js";
+
+const { interpretEvidenceIntakeStoredArtifacts } = await import(
+  "../../domain/services/EvidenceIntakeService.js"
+);
 
 vi.mock("../../domain/services/EvidenceIntakeService.js", () => ({
   interpretEvidenceIntakeStoredArtifacts: vi.fn(async ({ submissionId, userId }) => ({
@@ -23,13 +28,52 @@ describe("Evidence intake background interpretation", () => {
   it("post-completion replay performs no interpretation or staging", async () => {
     const completeInterpretation = vi.fn();
     const loadArtifact = vi.fn();
+    const readCanonicalExerciseRegistry = vi.fn();
     const handler = createEvidenceIntakeInterpretationWorkerHandler({
       store: fixtureStore({ claimInterpretation: async () => ({ outcome: "completed", receipt: receipt() }), completeInterpretation }),
       loadArtifact,
+      readCanonicalExerciseRegistry,
     });
     await expect(handler(message())).resolves.toMatchObject({ outcome: "completed" });
     expect(loadArtifact).not.toHaveBeenCalled();
     expect(completeInterpretation).not.toHaveBeenCalled();
+    expect(readCanonicalExerciseRegistry).not.toHaveBeenCalled();
+  });
+
+  it("hydrates the bounded canonical registry before a fresh-process interpretation", async () => {
+    const order = [];
+    interpretEvidenceIntakeStoredArtifacts.mockImplementationOnce(async ({ submissionId, userId }) => {
+      order.push("interpret");
+      return {
+        evidencePackage: {
+          package_id: `${submissionId}_images`,
+          userId,
+          evidence_objects: [],
+          provenance: {},
+        },
+      };
+    });
+    const handler = createEvidenceIntakeInterpretationWorkerHandler({
+      store: fixtureStore(),
+      loadArtifact: vi.fn(async () => ({})),
+      readCanonicalExerciseRegistry: vi.fn(async () => order.push("registry")),
+    });
+
+    await handler(message());
+
+    expect(order).toEqual(["registry", "interpret"]);
+  });
+
+  it("wires the production worker to the bounded canonicalExerciseLibrary store", () => {
+    const source = fs.readFileSync("scripts/runFoundationWorker.mjs", "utf8");
+    const intakeHandler = source.slice(
+      source.indexOf("[EVIDENCE_INTAKE_INTERPRETATION_TOPIC]"),
+      source.indexOf("PROVIDER_MIGRATION_DRY_RUN_ENABLED")
+    );
+    expect(source).toContain("createPhase4CanonicalRecordStore");
+    expect(intakeHandler).toContain('collection: "canonicalExerciseLibrary"');
+    expect(intakeHandler).toContain("hydrateCanonicalTrainingExerciseRegistry");
+    expect(intakeHandler).not.toContain("loadCanonicalRuntime");
   });
 
   it("durably records interpretation failure without creating package/review state", async () => {

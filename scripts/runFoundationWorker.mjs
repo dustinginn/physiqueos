@@ -2,6 +2,7 @@ import { createUuidV7 } from "../src/contracts/v1/identifiers.js";
 import { register } from "node:module";
 import { readDatabaseConfig } from "../src/platform/database/config.js";
 import { createPostgresPool } from "../src/platform/database/pool.js";
+import { createPhase4CanonicalRecordStore } from "../src/platform/database/Phase4CanonicalRecordStore.js";
 import { createFoundationPostgresAdapters } from "../src/platform/database/foundationPostgresComposition.js";
 import { createDurableOutboxWorker, WorkerMessageError } from "../src/platform/jobs/DurableOutboxWorker.js";
 import { runWorkerLoop } from "../src/platform/jobs/workerLoop.js";
@@ -27,12 +28,14 @@ const [{ EVIDENCE_INTAKE_INTERPRETATION_TOPIC },
   { createEvidenceIntakeInterpretationWorkerHandler },
   { createPostgresEvidenceIntakeStore },
   { createProviderEvidenceIntakeArtifactLoader },
+  { hydrateCanonicalTrainingExerciseRegistry },
   { createNativeSandboxWorkerComposition, inspectNativeSandboxIntelligenceIsolation },
   { getNativeSandboxApplicationComposition }] = await Promise.all([
   import("../src/domain/services/EvidenceIntakeBackgroundWork.js"),
   import("../src/platform/jobs/EvidenceIntakeInterpretationWorker.js"),
   import("../src/platform/database/PostgresEvidenceIntakeStore.js"),
   import("../src/application/evidence/AsyncEvidenceIntakeService.js"),
+  import("../src/application/training/CanonicalExerciseRegistryReadService.js"),
   import("../src/platform/sandbox/NativeSandboxWorkerComposition.js"),
   import("../src/application/composition/nativeSandboxApplicationComposition.js"),
 ]);
@@ -55,6 +58,11 @@ const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1
   : null;
 const ownerUserId = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID")
+  : null;
+const canonicalExerciseRegistryStore = ownerUserId
+  ? createPhase4CanonicalRecordStore({
+      query: (text, values) => pool.query(text, values),
+    })
   : null;
 const compatibilityDatabaseName = compatibilityMode
   ? required(process.env.PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME, "PHYSIQUEOS_COMPATIBILITY_DATABASE_NAME")
@@ -129,6 +137,13 @@ const handlers = Object.freeze({
         pool,
         objectProvider: evidenceIntakeObjectProvider,
       }),
+      readCanonicalExerciseRegistry: async () =>
+        hydrateCanonicalTrainingExerciseRegistry(
+          await canonicalExerciseRegistryStore.list({
+            ownerUserId,
+            collection: "canonicalExerciseLibrary",
+          })
+        ),
     }),
   } : {}),
   ...(process.env.PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED === "1" ? {

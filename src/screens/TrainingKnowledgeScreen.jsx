@@ -1063,7 +1063,7 @@ function getFlatTrainingExerciseCounts(report) {
 
 export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
   const regions = report.trainingBreakdowns?.resistance ?? [];
-  const exercises = regions.flatMap((region) =>
+  const historicalExercises = regions.flatMap((region) =>
     (region.movementFamilies ?? region.muscleGroups ?? []).flatMap((family) =>
       (family.exercises ?? []).map((exercise) =>
         withPrimaryTrainingNavigationCategory({
@@ -1074,6 +1074,13 @@ export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
       )
     )
   );
+  const canonicalExercises = (report.canonicalExercises ?? []).map((exercise) =>
+    withPrimaryTrainingNavigationCategory({
+      ...exercise,
+      sets: [],
+    })
+  );
+  const exercises = [...canonicalExercises, ...historicalExercises];
   const matches = exercises.filter((exercise) =>
     exerciseBelongsToFlatTrainingGroup({ exercise, groupSlug })
   );
@@ -1090,6 +1097,7 @@ export function getExercisesForFlatTrainingGroup({ groupSlug, report }) {
 
     exercisesBySlug.set(key, {
       ...current,
+      ...exercise,
       sets: [...(current.sets ?? []), ...(exercise.sets ?? [])],
     });
   });

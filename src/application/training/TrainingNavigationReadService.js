@@ -11,6 +11,9 @@ import {
 } from "../../domain/services/TrainingEvidenceContextService.js";
 import { createTrainingLibraryExerciseRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExerciseIdentity.js";
+import {
+  readCurrentCanonicalTrainingExerciseRegistry,
+} from "./CanonicalExerciseRegistryReadService.js";
 
 export function createTrainingNavigationReadService({
   store,
@@ -25,7 +28,9 @@ export function createTrainingNavigationReadService({
   // Production injects one canonical registry access path. All Training reads enter it,
   // including Day and Session, so no caller or page-order side effect owns hydration.
   async function ensureCanonicalExerciseRegistry() {
-    if (readRegistry) await readRegistry();
+    return readRegistry
+      ? readRegistry()
+      : readCurrentCanonicalTrainingExerciseRegistry();
   }
 
   return Object.freeze({
@@ -125,7 +130,9 @@ export function createTrainingNavigationReadService({
     },
     getLibrary({ context, currentDate = new Date(), path = [], registryHydrated = false } = {}) {
       return store.run("training.navigation.library", async () => {
-        if (!registryHydrated) await ensureCanonicalExerciseRegistry();
+        const canonicalExercises = registryHydrated
+          ? readCurrentCanonicalTrainingExerciseRegistry()
+          : await ensureCanonicalExerciseRegistry();
         const [user, goals, canonicalEvidenceObjects] = await Promise.all([
           store.getUser(),
           store.listGoals(),
@@ -163,6 +170,9 @@ export function createTrainingNavigationReadService({
         return Object.freeze({
           timeline,
           report: Object.freeze({
+            canonicalExercises: projectCanonicalExerciseRegistry(
+              canonicalExercises
+            ),
             entries: activityEntries,
             trainingDays: activityTrainingDays,
             trainingBreakdowns: timeline.goalScoped
@@ -217,6 +227,19 @@ export function createTrainingNavigationReadService({
       });
     },
   });
+}
+
+function projectCanonicalExerciseRegistry(exercises = []) {
+  return Object.freeze(exercises.map((exercise) => Object.freeze({
+    canonicalExerciseId: exercise.id,
+    familyLabel: exercise.movement_pattern ?? null,
+    label: exercise.name,
+    primaryMuscleGroupId: exercise.primary_muscle_group_id ?? null,
+    primaryMuscleGroups: Object.freeze([
+      ...(exercise.primary_muscle_groups ?? []),
+    ]),
+    regionLabel: exercise.body_region ?? null,
+  })));
 }
 
 export function findSession(report = {}, sessionId) {

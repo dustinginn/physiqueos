@@ -17,11 +17,13 @@ import {
 import { loadCanonicalRuntime } from "../../platform/migration/phase4CanonicalImport.js";
 import {
   listCanonicalTrainingExerciseIdentities,
-  registerRuntimeTrainingExercises,
 } from "../../domain/models/trainingExerciseIdentity.js";
-import { validateTrainingNavigationTaxonomy } from "../../navigation/trainingNavigationMapping.js";
+import {
+  hydrateCanonicalTrainingExerciseRegistry,
+} from "../training/CanonicalExerciseRegistryReadService.js";
 import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
+import { createPhase4CanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
 import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
 import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
@@ -315,17 +317,15 @@ export async function readProductionTrainingExerciseRegistry(env = process.env) 
   const runtime = getOrCreateProviderRuntime(env);
   if (!productionTrainingExerciseRegistryRead) {
     productionTrainingExerciseRegistryRead = (async () => {
-      const canonicalRuntime = await loadCanonicalRuntime({
+      const registryStore = createPhase4CanonicalRecordStore({
         query: (text, values) => runtime.pool.query(text, values),
-        ownerUserId: runtime.ownerUserId,
-        collections: ["canonicalExerciseLibrary"],
-        includeApplicationContext: false,
-        includeImportMetadata: false,
       });
-      const canonicalExercises = registerRuntimeTrainingExercises(
-        canonicalRuntime.canonicalExerciseLibrary ?? []
+      const canonicalExercises = hydrateCanonicalTrainingExerciseRegistry(
+        await registryStore.list({
+          ownerUserId: runtime.ownerUserId,
+          collection: "canonicalExerciseLibrary",
+        })
       );
-      assertCanonicalTrainingNavigationTaxonomy(canonicalExercises);
       return Object.freeze([...canonicalExercises]);
     })().finally(() => {
       productionTrainingExerciseRegistryRead = undefined;
@@ -536,28 +536,6 @@ export async function closeProductionApplicationComposition() {
   productionTrainingExerciseRegistryRead = undefined;
   current?.objectProvider?.close?.();
   await current?.pool?.end?.();
-}
-
-function assertCanonicalTrainingNavigationTaxonomy(canonicalExercises) {
-  const registrations = canonicalExercises.map((exercise) => ({
-    canonicalExerciseId: exercise.id,
-    familyLabel: exercise.movement_pattern,
-    label: exercise.name,
-    primaryMuscleGroupId: exercise.primary_muscle_group_id,
-    primaryMuscleGroups: exercise.primary_muscle_groups,
-    regionLabel: exercise.body_region,
-  }));
-  const result = validateTrainingNavigationTaxonomy(registrations, {
-    browsableCanonicalIds: canonicalExercises.map((exercise) => exercise.id),
-  });
-  if (result.valid) return;
-  throw Object.assign(
-    new Error("The canonical Training exercise registry has invalid Library taxonomy."),
-    {
-      code: "CANONICAL_EXERCISE_TAXONOMY_INVALID",
-      diagnostics: result,
-    }
-  );
 }
 
 function createLegacyComposition({ controlStore }) {
