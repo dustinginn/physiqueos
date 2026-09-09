@@ -16,6 +16,10 @@ describe("Founder product-language presentation boundary", () => {
     expect(productLabel("recovery")).toBe("Recovery");
     expect(productLabel("dexa")).toBe("DEXA");
     expect(confidenceBandLabel("moderate")).toBe("Moderate");
+    expect(productLabel("goal", { context: "narrative" })).toBe("goal");
+    expect(productLabel("phase", { context: "narrative" })).toBe("phase");
+    expect(productLabel("build_lean_mass", { context: "narrative" })).toBe("Build Lean Mass");
+    expect(confidenceBandLabel("moderate", { context: "narrative" })).toBe("moderate");
   });
 
   it("normalizes separators and identity suffixes before presentation", () => {
@@ -27,7 +31,7 @@ describe("Founder product-language presentation boundary", () => {
 
   it("detects backend tokens without rejecting natural product prose", () => {
     expect(findFounderPresentationLeaks({
-      summary: "The Goal remains feasible. Training and Energy remain in view.",
+      summary: "The goal remains realistic. Training is moving forward, while energy still needs attention.",
       supportingFactors: [], limitingFactors: [], nextDecisiveEvidence: [],
     })).toEqual([]);
     expect(findFounderPresentationLeaks({
@@ -35,6 +39,18 @@ describe("Founder product-language presentation boundary", () => {
       supportingFactors: [], limitingFactors: [], nextDecisiveEvidence: [],
     }).map((item) => item.token)).toEqual(expect.arrayContaining([
       "build_lean_mass", "energyCalibration", "user_founder_001",
+    ]));
+  });
+
+  it("rejects scoring-engine language and domain casing in narrative", () => {
+    const leaks = findFounderPresentationLeaks({
+      summary: "The Goal stayed on path.",
+      supportingFactors: [{ text: "This compares with the predecessor." }],
+      limitingFactors: [{ text: "Signal agreement held." }],
+      nextDecisiveEvidence: [],
+    }).map((item) => item.token);
+    expect(leaks).toEqual(expect.arrayContaining([
+      "The Goal", "predecessor", "Signal agreement",
     ]));
   });
 });

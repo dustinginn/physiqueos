@@ -14,7 +14,7 @@ describe("Home phase-aware visual hierarchy", () => {
     expect(detail).toContain("<FloatingSheet");
     expect(detail).toContain("What supports Confidence");
     expect(detail).toContain("What limits Confidence");
-    expect(detail).toContain("What PI needs next");
+    expect(detail).toContain("What we need next");
     expect(detail).not.toMatch(/rawProgress|score formula|evidenceId/);
   });
 

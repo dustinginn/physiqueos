@@ -30,6 +30,8 @@ describe("HomeConfidenceDetailBody — final rendered explanation output", () =>
     expect(html).toContain("Training has continued moving forward");
     expect(html).toContain("There hasn&#x27;t yet been enough direct body-composition evidence");
     expect(html).toContain("DEXA");
+    expect(html).toContain("What we need next");
+    expect(html).not.toContain("What PI needs next");
     // Bottom summary paragraph is suppressed — nothing left over to duplicate supports/limits/clearer.
     expect(html).not.toMatch(/rounded-xl bg-\[var\(--surface-muted\)\] p-3/);
   });

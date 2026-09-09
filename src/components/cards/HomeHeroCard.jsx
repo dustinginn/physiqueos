@@ -11,6 +11,9 @@ const metricIcons = { calendar: Calendar, phase: Compass };
 export default function HomeHeroCard({ actionHref, actionLabel, confidence, confidenceDetail, confidenceState, confidenceSummary = null, daysRemaining, goalIcon = "target", goalLabel, headline, mode = "active", phaseTone = "neutral", plannedReviewDate, primaryTimeline, projectedFinish, schedulerMessage, supportLine, supportingMetrics = [] }) {
   const GoalIcon = goalIcons[goalIcon] ?? Target;
   const phaseGreen = mode === "phase_trajectory" && phaseTone === "green";
+  const trajectorySummary = mode === "phase_trajectory"
+    ? (confidenceSummary ?? supportLine)
+    : supportLine;
 
   return (
     <Card as="section" data-testid="home-hero" padding="sm" className={`overflow-hidden bg-gradient-to-br ${phaseGreen ? "from-emerald-500/[.09] to-[var(--surface-elevated)]" : "from-[color-mix(in_srgb,var(--primary)_7%,var(--surface-elevated))] to-[var(--surface-elevated)]"}`}>
@@ -24,7 +27,7 @@ export default function HomeHeroCard({ actionHref, actionLabel, confidence, conf
           <h1 className="mt-1.5 text-[18px] font-extrabold leading-[1.15] text-[var(--text-primary)]">{headline}</h1>
           {mode === "phase_trajectory" && <p className={`mt-1.5 text-[15px] font-extrabold leading-5 ${phaseGreen ? "text-emerald-700 dark:text-emerald-300" : "text-[var(--primary)]"}`}>{primaryTimeline}</p>}
           {mode === "phase_trajectory" && plannedReviewDate && <p className="mt-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">Planned review: {formatDate(plannedReviewDate)}</p>}
-          <p className="mt-1.5 text-[12px] font-medium leading-4 text-[var(--text-secondary)]">{supportLine}</p>
+          <p className="mt-1.5 text-[12px] font-medium leading-4 text-[var(--text-secondary)]" data-testid={mode === "phase_trajectory" ? "home-trajectory-summary" : undefined}>{trajectorySummary}</p>
         </div>
         {mode === "calibration" ? (
           <div className="flex h-[82px] w-[82px] flex-col items-center justify-center rounded-full border-[6px] border-amber-200 text-center dark:border-amber-300/20">
@@ -40,7 +43,7 @@ export default function HomeHeroCard({ actionHref, actionLabel, confidence, conf
           </div>
         )}
       </div>
-      {confidenceSummary && <p className="mt-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-[11px] font-semibold leading-4 text-[var(--text-secondary)]" data-testid="home-confidence-summary">{confidenceSummary}</p>}
+      {confidenceSummary && mode !== "phase_trajectory" && <p className="mt-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-[11px] font-semibold leading-4 text-[var(--text-secondary)]" data-testid="home-confidence-summary">{confidenceSummary}</p>}
       {mode === "phase_trajectory" ? null : mode === "terminal" ? (
         <Link className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white" href={actionHref}>
           <span>{actionLabel}</span>

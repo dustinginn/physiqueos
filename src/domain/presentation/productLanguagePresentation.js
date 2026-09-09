@@ -46,6 +46,24 @@ const PRODUCT_LABELS = Object.freeze({
   weight_update: "Weight update",
 });
 
+const NARRATIVE_LABELS = Object.freeze({
+  confidence: "confidence",
+  developing: "developing",
+  energy: "energy",
+  goal: "goal",
+  guardrail: "guardrail",
+  high: "high",
+  low: "low",
+  moderate: "moderate",
+  phase: "phase",
+  recovery: "recovery",
+  strategy: "strategy",
+  training: "training",
+  very_high: "very high",
+  very_low: "very low",
+  weight: "weight",
+});
+
 const BAND_LABELS = Object.freeze({
   very_low: "Very Low",
   low: "Low",
@@ -65,11 +83,17 @@ const MOVEMENT_LABELS = Object.freeze({
   initial: "Initial assessment",
 });
 
-export function productLabel(token, { fallback = null } = {}) {
+export function productLabel(token, { context = "label", fallback = null } = {}) {
+  if (context === "narrative") {
+    return NARRATIVE_LABELS[token] ?? PRODUCT_LABELS[token] ?? fallback;
+  }
   return PRODUCT_LABELS[token] ?? fallback;
 }
 
-export function confidenceBandLabel(value) {
+export function confidenceBandLabel(value, { context = "label" } = {}) {
+  if (context === "narrative") {
+    return NARRATIVE_LABELS[value] ?? "available";
+  }
   return BAND_LABELS[value] ?? "Confidence available";
 }
 
@@ -119,6 +143,10 @@ export const FOUNDER_PRESENTATION_DENYLIST = Object.freeze([
   /\b(?:goal|phase|training|energy|recovery|photo|dexa)_[A-Za-z0-9_]+\b/u,
   /\b(?:provider-authoritative|postgres-canonical)\b/iu,
   /\b[a-z]+[A-Z][A-Za-z0-9]*\b/u,
+  /\b(?:predecessor|supportive domain signal|signal agreement|assessment window|direct outcome confirmation|material contradiction|materially more conclusive|independent weekly periods|coverage limited|durability period|semantic band|forecast uncertain|movement ceiling|bounded target|partial-week evidence|completed-week change)\b/iu,
+  /\b(?:[Tt]he|[Tt]his|[Cc]urrent)\s+(?:Goal|Phase|Guardrail|Strategy)\b/u,
+  /\b(?:Energy calibration|Recovery coverage)\b/u,
+  /\bConfidence remains (?:Very Low|Low|Developing|Moderate|High|Very High)\b/u,
 ]);
 
 export function findFounderPresentationLeaks(value) {

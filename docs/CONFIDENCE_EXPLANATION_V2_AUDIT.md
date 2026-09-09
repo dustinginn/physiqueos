@@ -562,6 +562,34 @@ Not performed by design:
 
 Incremental infrastructure cost: **$0**.
 
+## Coaching narrative polish — 2026-09-09
+
+The Founder accepted the V2 factor lineage and requested a presentation-only coaching pass. The canonical assessment contract, score calculation, band, movement, predecessor, cutoff, publisher, authority, and historical matching rules remain unchanged. The accepted Monthly assessment is still 62 / Moderate, no meaningful change, preceded by the Aug 23–29 Weekly assessment at 62 / Moderate.
+
+### Coaching projection architecture
+
+The presentation flow is now:
+
+```text
+canonical Confidence assessment
+  → complete machine-readable factor lineage
+  → semantic factor tokens
+  → prioritized coaching conclusions
+  → surface-depth narrative
+```
+
+The model retains every bounded structured factor for diagnostics and Native/API use. Founder presentation no longer prints that list verbatim. The shared detail projection groups related factors into at most two support conclusions and three limiting conclusions, then adds one movement explanation and one next-step recommendation. Evidence-quality metadata and other non-actionable engine details remain available internally but are omitted from coaching copy.
+
+Home now renders one trajectory paragraph. When the canonical Confidence projection is available, that paragraph replaces the phase-purpose helper instead of adding a second Confidence block. The tappable wheel remains the route to the grouped detail sheet.
+
+Briefing and event summaries remain deterministic projections of the artifact-bound assessment. Midweek explains what is visible so far, whether to change anything now, and what the full week must show. Weekly reviews the completed week and next action. Monthly summarizes conviction without replaying the full briefing. DEXA and Photo Events explain what the event taught us, whether Confidence changed, and that historical context does not replace today's reading. Photo copy cannot claim causality when Photos did not participate.
+
+### Natural-language casing boundary
+
+`productLanguagePresentation.js` now distinguishes label context from narrative context. Product names and headings retain approved casing (`Build Lean Mass`, `Monthly Briefing`, `DEXA Event`, `What supports Confidence`), while ordinary prose uses natural casing (`the goal`, `this phase`, `the guardrail`, `confidence is moderate`). The shared presentation scanner also rejects scoring-engine phrases such as `predecessor`, `signal agreement`, `assessment window`, `partial-week evidence`, and `direct outcome confirmation`, along with capitalized domain-object leakage such as `the Goal`.
+
+This is a central presentation invariant, not a screen-specific replacement layer. Native continues to consume the same server-owned structured model and presentation strings; no coaching reasoning was added to Swift and sandbox isolation is unchanged.
+
 ## Implementation architecture and acceptance record
 
 Implementation worktree: `C:\Users\dusti\Documents\GitHub\physiqueos\.worktrees\confidence-explanation-v2-implementation-20260909`

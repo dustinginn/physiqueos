@@ -19,6 +19,7 @@ describe("Home active chapter components", () => {
       primaryTimeline: "4 weeks remaining",
       plannedReviewDate: "2026-08-17",
       supportLine: "We're establishing the baseline.",
+      confidenceSummary: "Training is moving in the right direction and the plan remains on track. Calories and recovery still need more consistency.",
       supportingMetrics: [],
     }));
 
@@ -26,6 +27,10 @@ describe("Home active chapter components", () => {
     expect(html).toContain("View why Goal Confidence is 39 percent, Early confidence");
     expect(html).toContain("4 weeks remaining");
     expect(html).toContain("Planned review: August 17");
+    expect(html).toContain('data-testid="home-trajectory-summary"');
+    expect(html).toContain("Training is moving in the right direction");
+    expect(html).not.toContain("We&#x27;re establishing the baseline.");
+    expect(html).not.toContain('data-testid="home-confidence-summary"');
     expect(html).not.toMatch(/Maintenance Calibration|Calibration in progress|Projected Finish|Days Remaining|Unavailable/);
   });
 

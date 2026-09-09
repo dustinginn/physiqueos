@@ -21,35 +21,35 @@ export const CONFIDENCE_EXPLANATION_PRESENTATION_VERSION =
 const FACTOR_PRESENTATION = Object.freeze({
   objective_feasible: {
     role: "support", semanticToken: "objective_feasible",
-    text: "The objective remains feasible.", priority: 20,
+    text: "The goal still looks realistic.", priority: 20,
   },
   objective_ahead: {
     role: "support", semanticToken: "objective_ahead",
-    text: "Measured progress is ahead of the expected trajectory.", priority: 18,
+    text: "Measured progress is ahead of plan.", priority: 18,
   },
   objective_on_track: {
     role: "support", semanticToken: "objective_on_track",
-    text: "Measured progress is consistent with the expected trajectory.", priority: 18,
+    text: "Measured progress is on track.", priority: 18,
   },
   attainability_ahead: {
     role: "support", semanticToken: "trajectory_ahead",
-    text: "The Goal is ahead of its expected path.", priority: 19,
+    text: "The goal is ahead of its expected path.", priority: 19,
   },
   attainability_on_expected_trajectory: {
     role: "support", semanticToken: "trajectory_on_path",
-    text: "The Goal remains on its expected path.", priority: 19,
+    text: "The goal remains on track.", priority: 19,
   },
   quality_robust: {
     role: "support", semanticToken: "quality_robust",
-    text: "The available evidence is robust.", priority: 12,
+    text: "The available information is reliable.", priority: 12,
   },
   quality_adequate: {
     role: "support", semanticToken: "quality_adequate",
-    text: "The available evidence is trustworthy enough for this assessment.", priority: 11,
+    text: "The available information is reliable enough to guide the plan.", priority: 11,
   },
   guardrails_clear: {
     role: "support", semanticToken: "guardrails_clear",
-    text: "The required Guardrails remain clear.", priority: 15,
+    text: "The required guardrails remain clear.", priority: 15,
   },
   milestone_supported: {
     role: "support", semanticToken: "milestone_supported",
@@ -57,73 +57,73 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   agreement_strong_convergence: {
     role: "support", semanticToken: "agreement_strong",
-    text: "The available signals have strong agreement.", priority: 17,
+    text: "The results point clearly in the same direction.", priority: 17,
   },
   agreement_moderate_convergence: {
     role: "support", semanticToken: "agreement_moderate",
-    text: "The available signals have moderate agreement.", priority: 16,
+    text: "Most of the results point in the same direction.", priority: 16,
   },
   strategy_confirmed: {
     role: "support", semanticToken: "strategy_confirmed",
-    text: "The current strategy is supported across the expected responses.", priority: 15,
+    text: "The current plan is producing the responses we expected.", priority: 15,
   },
   strategy_directionally_supported: {
     role: "support", semanticToken: "strategy_supported",
-    text: "The current strategy is directionally supported, but not fully confirmed.", priority: 14,
+    text: "The current plan is moving in the right direction, but it needs more time.", priority: 14,
   },
   objective_uncertain: {
     role: "limit", semanticToken: "objective_uncertain",
-    text: "Direct outcome confirmation remains pending.", priority: 20,
+    text: "We still need a direct body-composition check to confirm the result.", priority: 20,
     isContradiction: false,
   },
   objective_behind: {
     role: "limit", semanticToken: "objective_behind",
-    text: "Measured progress is behind the expected trajectory.", priority: 22,
+    text: "Measured progress is behind plan.", priority: 22,
     isContradiction: true,
   },
   objective_contradicted: {
     role: "limit", semanticToken: "objective_contradicted",
-    text: "A measured result materially conflicts with the expected trajectory.", priority: 24,
+    text: "A measured result points away from the expected path.", priority: 24,
     isContradiction: true,
   },
   objective_at_risk: {
     role: "limit", semanticToken: "objective_at_risk",
-    text: "The objective is at risk against its expected trajectory.", priority: 23,
+    text: "The goal is at risk of falling off track.", priority: 23,
     isContradiction: true,
   },
   objective_unlikely: {
     role: "limit", semanticToken: "objective_unlikely",
-    text: "The current evidence makes the objective unlikely on the expected trajectory.", priority: 24,
+    text: "The current results make the goal unlikely on the expected timeline.", priority: 24,
     isContradiction: true,
   },
   agreement_mixed: {
     role: "limit", semanticToken: "agreement_mixed",
-    text: "The available signals remain mixed.", priority: 16,
+    text: "The results do not all point in the same direction yet.", priority: 16,
     isContradiction: false,
   },
   agreement_conflicting: {
     role: "limit", semanticToken: "agreement_conflicting",
-    text: "Material evidence conflicts with another signal.", priority: 23,
+    text: "Two important results point in different directions.", priority: 23,
     isContradiction: true,
   },
   agreement_insufficient: {
     role: "limit", semanticToken: "agreement_insufficient",
-    text: "There is not enough signal coverage to establish agreement yet.", priority: 16,
+    text: "We do not have enough information to see a clear pattern yet.", priority: 16,
     isContradiction: false,
   },
   guardrails_watch: {
     role: "limit", semanticToken: "guardrails_watch",
-    text: "The body-composition Guardrail remains under observation.", priority: 15,
+    text: "The body-composition guardrail still needs watching.", priority: 15,
     isContradiction: false,
   },
   guardrails_pressured: {
     role: "limit", semanticToken: "guardrails_pressured",
-    text: "A required Guardrail is materially pressured.", priority: 22,
+    text: "A required guardrail is under pressure.", priority: 22,
     isContradiction: true,
   },
   guardrails_violated: {
     role: "limit", semanticToken: "guardrails_violated",
-    text: "A required Guardrail has been crossed.", priority: 24,
+    text: "A required guardrail has been crossed.", priority: 24,
     isContradiction: true,
   },
   strategy_still_calibrating: {
@@ -133,22 +133,22 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   strategy_mixed: {
     role: "limit", semanticToken: "strategy_mixed",
-    text: "The current strategy has both supporting and conflicting signals.", priority: 19,
+    text: "Some results support the current plan while others raise questions.", priority: 19,
     isContradiction: true,
   },
   strategy_contradicted: {
     role: "limit", semanticToken: "strategy_contradicted",
-    text: "Material evidence contradicts the current strategy.", priority: 24,
+    text: "An important result conflicts with the current plan.", priority: 24,
     isContradiction: true,
   },
   quality_limited: {
     role: "limit", semanticToken: "quality_limited",
-    text: "Evidence quality remains limited.", priority: 14,
+    text: "The available information is still limited.", priority: 14,
     isContradiction: false,
   },
   quality_insufficient: {
     role: "limit", semanticToken: "quality_insufficient",
-    text: "Evidence quality is not sufficient for precise causal conclusions.", priority: 18,
+    text: "We do not have enough reliable information to explain the result yet.", priority: 18,
     isContradiction: false,
   },
   attainability_quantitative_progress_unavailable: {
@@ -158,22 +158,22 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   attainability_positive_but_behind: {
     role: "limit", semanticToken: "trajectory_positive_but_behind",
-    text: "Progress is positive but remains behind the expected pace.", priority: 20,
+    text: "Progress is moving forward but remains behind plan.", priority: 20,
     isContradiction: false,
   },
   attainability_stalled: {
     role: "limit", semanticToken: "trajectory_stalled",
-    text: "Measured progress has stalled against the expected pace.", priority: 22,
+    text: "Measured progress has stalled.", priority: 22,
     isContradiction: true,
   },
   attainability_regressing: {
     role: "limit", semanticToken: "trajectory_regressing",
-    text: "Measured progress is moving away from the expected trajectory.", priority: 24,
+    text: "Measured progress is moving away from the expected path.", priority: 24,
     isContradiction: true,
   },
   attainability_unassessable: {
     role: "limit", semanticToken: "trajectory_measurement_pending",
-    text: "There is not enough comparable outcome evidence to assess pace.", priority: 15,
+    text: "We do not have enough comparable results to judge the pace yet.", priority: 15,
     isContradiction: false,
   },
   attainability_authorized_expected_trajectory_unavailable: {
@@ -183,12 +183,12 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   attainability_goal_progress_unavailable: {
     role: "limit", semanticToken: "trajectory_measurement_pending",
-    text: "Comparable Goal progress is not available yet.", priority: 15,
+    text: "Comparable goal progress is not available yet.", priority: 15,
     isContradiction: false,
   },
   attainability_phase_progress_baseline_unavailable: {
     role: "limit", semanticToken: "trajectory_measurement_pending",
-    text: "A comparable Phase baseline is not available yet.", priority: 15,
+    text: "A comparable phase baseline is not available yet.", priority: 15,
     isContradiction: false,
   },
   attainability_completion_timing_not_firm: {
@@ -198,12 +198,12 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   attainability_remaining_gap_exceeds_authorized_expected_envelope: {
     role: "limit", semanticToken: "trajectory_behind",
-    text: "The remaining gap exceeds the expected progress envelope.", priority: 22,
+    text: "The remaining gap is larger than the plan allows for.", priority: 22,
     isContradiction: true,
   },
   milestone_contradicted: {
     role: "limit", semanticToken: "milestone_contradicted",
-    text: "A planned checkpoint has a contradicting result.", priority: 23,
+    text: "A planned checkpoint produced a result that points away from the plan.", priority: 23,
     isContradiction: true,
   },
   milestone_due_unresolved: {
@@ -228,7 +228,7 @@ const FACTOR_PRESENTATION = Object.freeze({
   },
   timeline_not_started: {
     role: "limit", semanticToken: "timeline_not_started",
-    text: "The assessment window has not started yet.", priority: 13,
+    text: "It is too early to evaluate this period.", priority: 13,
     isContradiction: false,
   },
 });
@@ -240,11 +240,11 @@ const UNCERTAINTY_PRESENTATION = Object.freeze({
   },
   energy_calibration_uncertain: {
     semanticToken: "energy_calibration_uncertain",
-    text: "Energy calibration remains uncertain because the current evidence is not conclusive yet.",
+    text: "Calories still need more consistency before we can tell whether this intake is right.",
   },
   recovery_evidence_missing: {
     semanticToken: "recovery_coverage_incomplete",
-    text: "Recovery evidence remains insufficient for this assessment window.",
+    text: "Recovery is still a blind spot because we do not have enough information yet.",
   },
   coverage_limited: {
     semanticToken: "coverage_limited",
@@ -272,11 +272,11 @@ const UNCERTAINTY_PRESENTATION = Object.freeze({
   },
   unresolved_guardrail_risk: {
     semanticToken: "guardrail_uncertain",
-    text: "A Guardrail question remains unresolved.",
+    text: "A guardrail question remains unresolved.",
   },
   signal_conflict: {
     semanticToken: "signal_conflict",
-    text: "Material evidence conflicts with another signal.",
+    text: "Two important results point in different directions.",
     isContradiction: true,
   },
 });
@@ -307,7 +307,7 @@ export function buildConfidenceExplanationModel({
     ? surfaceSummary({ assessment, evidenceContextNote, historicalContext,
         limitingFactors, movementExplanation, nextDecisiveEvidence,
         supportingFactors, surface })
-    : `Confidence remains ${confidenceBandLabel(assessment.confidenceBand)}, but the current assessment does not contain enough structured factor detail to explain the drivers precisely.`;
+    : `Confidence is ${confidenceBandLabel(assessment.confidenceBand, { context: "narrative" })}, but this assessment does not include enough detail to explain why.`;
   const model = {
     schemaVersion: CONFIDENCE_EXPLANATION_PRESENTATION_VERSION,
     score: assessment.currentPercentage,
@@ -354,14 +354,46 @@ export function projectConfidenceExplanationForSurface(confidence, {
 
 export function confidenceExplanationDetailFromModel(model) {
   if (!model) return null;
+  const tokens = factorTokens(model);
+  const trainingPeriods = model.supportingFactors.find((item) =>
+    item.semanticToken === "training_progression_support")?.periodCount ?? 0;
+  const supportingFactors = [];
+  if (tokens.has("training_progression_support")) {
+    supportingFactors.push(trainingPeriods >= 2
+      ? "Training has been consistently strong for the last few weeks."
+      : "Training is moving in the right direction.");
+  }
+  if (tokens.has("objective_feasible") || tokens.has("trajectory_on_path") ||
+      tokens.has("objective_on_track")) {
+    supportingFactors.push("The goal still looks realistic, and nothing we're seeing suggests the plan is off track.");
+  }
+  if (!supportingFactors.length && model.supportingFactors[0]?.text) {
+    supportingFactors.push(model.supportingFactors[0].text);
+  }
+  const limitingFactors = [];
+  if (tokens.has("energy_calibration_uncertain")) {
+    limitingFactors.push("Calories still need more consistency before we can tell whether this intake is right.");
+  }
+  if (tokens.has("recovery_coverage_incomplete")) {
+    limitingFactors.push("Recovery is still a blind spot because we do not have enough information yet.");
+  }
+  if (tokens.has("direct_confirmation_pending") || tokens.has("objective_uncertain") ||
+      tokens.has("trajectory_measurement_pending")) {
+    limitingFactors.push("We need another body-composition check before we can confirm that the early progress is turning into lean-mass gain.");
+  }
+  if (!limitingFactors.length) {
+    const contradiction = model.limitingFactors.find((item) => item.isContradiction);
+    const firstLimit = contradiction ?? model.limitingFactors[0];
+    if (firstLimit?.text) limitingFactors.push(firstLimit.text);
+  }
   return Object.freeze({
     qualitativeLevel: model.bandLabel,
     summary: model.summary,
-    supportingFactors: model.supportingFactors.map((item) => item.text),
-    limitingFactors: model.limitingFactors.map((item) => item.text),
+    supportingFactors: supportingFactors.slice(0, 2),
+    limitingFactors: limitingFactors.slice(0, 3),
     movementFactors: [model.movementExplanation.text].filter(Boolean),
     clarifyingFactors: model.nextDecisiveEvidence.map((item) => item.text),
-    evidenceContextNote: model.evidenceContextNote ?? "",
+    evidenceContextNote: "",
     historicalContext: model.historicalContext?.text ?? "",
     uncertaintyStatement: model.degradation.status === "insufficient" ? model.summary : "",
   });
@@ -409,10 +441,10 @@ function addDurabilitySupport(assessment, output) {
   const count = Number(signal?.independentPeriodCount ?? durability.independentPeriodCount ?? 0);
   const persistence = signal?.persistence ?? durability.persistence ?? "emerging";
   const text = count >= 2
-    ? `Training progression has supported the plan across ${count} independent weekly periods.`
+    ? "Training has been consistently strong for the last few weeks."
     : persistence === "emerging"
-      ? "Training progression is supportive, though the signal is still emerging."
-      : "Training progression supports the current plan.";
+      ? "Training is moving in the right direction, but we need more time to see whether it holds."
+      : "Training is moving in the right direction.";
   output.unshift({
     code: "training_progression",
     semanticToken: "training_progression_support",
@@ -424,6 +456,7 @@ function addDurabilitySupport(assessment, output) {
     sourceRefs: [],
     lineageStatus: signal?.lineageAvailable === false
       ? "canonical_summary_only" : "canonical_durability",
+    periodCount: count,
   });
 }
 
@@ -465,7 +498,7 @@ function collectNextEvidence(assessment, warnings) {
     semanticToken: "follow_up_dexa",
     capability: next.evidenceCapability,
     eventType: next.expectedEventType ?? null,
-    text: "A consistently prepared follow-up DEXA can test whether the lean-mass response is durable while the body-fat Guardrail remains controlled.",
+    text: "Your next consistently prepared DEXA will be the most useful check. It should tell us whether the early training progress is translating into measurable lean-mass gain without pushing body fat outside the guardrail.",
     priority: 25,
     sourceRefs: [],
     uncertaintyRefs: [...new Set(next.uncertaintyRefs ?? [])],
@@ -483,16 +516,26 @@ function explainMovement(assessment, supportingFactors, limitingFactors) {
   let text;
   if (assessment.movement === "increase") {
     const strengthenedBy = supportingFactors[0]?.text ??
-      "The structured evidence materially strengthened the assessment.";
-    text = `${strengthenedBy} Confidence increased from ${prior}% to ${current}%.`;
+      "The latest results gave us more reason to trust the plan.";
+    text = `Confidence increased from ${prior}% to ${current}%. ${strengthenedBy}`;
   } else if (assessment.movement === "decrease") {
     const weakenedBy = limitingFactors[0]?.text ??
-      "The structured evidence materially weakened the assessment.";
-    text = `${weakenedBy} Confidence decreased from ${prior}% to ${current}%.`;
+      "The latest results raised a meaningful concern about the plan.";
+    text = `Confidence decreased from ${prior}% to ${current}%. ${weakenedBy}`;
   } else if (prior == null) {
-    text = `This is the initial ${current}% Confidence assessment.`;
+    text = `Confidence starts at ${current}%.`;
   } else {
-    text = `Nothing material changed versus the predecessor; Confidence held ${prior}% → ${current}%.`;
+    const tokens = new Set([...supportingFactors, ...limitingFactors]
+      .map((item) => item.semanticToken));
+    const openQuestions = listClauses([
+      tokens.has("energy_calibration_uncertain") && "calories",
+      tokens.has("recovery_coverage_incomplete") && "recovery",
+      (tokens.has("direct_confirmation_pending") || tokens.has("objective_uncertain") ||
+        tokens.has("trajectory_measurement_pending")) && "body composition",
+    ]);
+    text = tokens.has("training_progression_support")
+      ? `Confidence stayed at ${current}%. Training continued to support the plan, but the bigger questions around ${openQuestions} are still unresolved.`
+      : `Confidence stayed at ${current}%. The open questions have not changed enough to move it.`;
   }
   return {
     direction: assessment.movement,
@@ -509,12 +552,12 @@ function explainEvidenceContext(assessment) {
   const hasDexa = descriptors.some((item) => item.capability === "dexa_body_composition");
   const hasWeight = descriptors.some((item) => item.capability === "body_weight_trend");
   if (hasDexa && hasWeight) {
-    return "DEXA establishes the body-composition decision baseline. Weight remains monitoring context rather than direct outcome confirmation.";
+    return "DEXA gives us the body-composition baseline. Weight helps us monitor the trend, but it cannot confirm the result by itself.";
   }
   if (hasDexa) {
-    return "DEXA establishes the body-composition decision baseline; it does not by itself prove a durable response.";
+    return "DEXA gives us the body-composition baseline, but one scan cannot prove a lasting response.";
   }
-  if (hasWeight) return "Weight is monitoring context rather than direct outcome confirmation.";
+  if (hasWeight) return "Weight helps us monitor the trend, but it cannot confirm the result by itself.";
   return null;
 }
 
@@ -528,7 +571,6 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
   const onPath = tokens.has("trajectory_on_path") || tokens.has("objective_on_track");
   const energy = tokens.has("energy_calibration_uncertain");
   const recovery = tokens.has("recovery_coverage_incomplete");
-  const mixed = tokens.has("agreement_mixed");
   const pending = tokens.has("direct_confirmation_pending") ||
     tokens.has("objective_uncertain") || tokens.has("trajectory_measurement_pending");
   const held = assessment.movement === "no_meaningful_change";
@@ -536,89 +578,69 @@ function surfaceSummary({ assessment, evidenceContextNote, historicalContext,
   const nextDexa = nextDecisiveEvidence.some((item) => item.semanticToken === "follow_up_dexa");
   if (surface === "photo_event" && historicalContext?.matchedOnly) {
     const date = formatDate(historicalContext.eventDate ?? assessment.sourceCutoff);
-    return `This Photo Event is paired with the Confidence assessment that existed at its ${date} cutoff. The matched historical event did not publish a successor assessment and did not replace current Confidence. The event does not retain enough participating Photo factor lineage to claim that Photos moved the score.`;
+    return `These photos gave us a visual checkpoint for ${date}, but they were not used to change confidence. This reflects what we knew at that point in time and does not replace today's reading.`;
   }
   if (surface === "dexa_event") {
     const date = formatDate(historicalContext?.eventDate ?? assessment.sourceCutoff);
-    const trustworthy = tokens.has("quality_adequate") || tokens.has("quality_robust");
-    const support = onPath
-      ? `provided ${trustworthy ? "trustworthy " : ""}body-composition evidence consistent with the expected trajectory`
-      : `provided ${trustworthy ? "trustworthy " : ""}body-composition evidence`;
-    const response = objectiveResponseLabel(assessment);
-    const unresolved = listClauses([
-      tokens.has("strategy_calibrating") && "strategy calibration",
-      tokens.has("guardrails_watch") && "Guardrail status",
-      recovery && "Recovery coverage",
-    ]);
+    const result = onPath
+      ? `The ${date} DEXA gave us a reliable body-composition baseline and showed that the plan was still on track.`
+      : `The ${date} DEXA gave us a reliable body-composition baseline.`;
     const eventEffect = assessment.movement === "increase"
-      ? `${movementExplanation.text} The scan materially strengthened the assessment rather than only establishing a baseline.`
+      ? `${movementExplanation.text} The scan gave us new evidence that the plan was working.`
       : assessment.movement === "decrease"
-        ? `${movementExplanation.text} The scan materially weakened the assessment rather than only adding monitoring context.`
-        : `It did not raise Confidence because it established the next decision baseline rather than proving a durable ${response} response; ${unresolved} still required observation.`;
-    return `The ${date} DEXA ${support}. ${eventEffect} This historical event assessment does not replace today's Confidence.`;
+        ? `${movementExplanation.text} The scan raised a new concern that needed attention.`
+        : "It did not change confidence because one scan could not yet show a lasting lean-mass response.";
+    return `${result} ${eventEffect} This reflects what we knew at that point in time and does not replace today's confidence.`;
   }
   if (surface === "monthly" && held && training) {
-    return `Training progression is the strongest supportive domain signal, repeating across ${trainingPeriodCount(assessment)} independent weekly periods. Confidence held because ${listClauses([
-      energy && "Energy calibration",
-      recovery && "Recovery coverage",
-      mixed && "signal agreement",
-      pending && "direct outcome confirmation",
-    ])} did not become materially more conclusive. It did not fall because ${listClauses([
-      feasible && "the objective remained feasible",
-      onPath && "the trajectory stayed on path",
-      noContradiction && "no material contradiction emerged",
-    ])}. ${nextDexa ? "A consistently prepared follow-up DEXA is the next major test." : "The next decisive evidence remains identified in the assessment."}`;
+    const consistencyNeeds = [energy && "calories", recovery && "recovery"].filter(Boolean);
+    const sentences = [
+      "Training is moving in the right direction, but it is still too early to raise confidence.",
+      `This month brought encouraging progress in the gym${consistencyNeeds.length ? `, while ${listClauses(consistencyNeeds)} still ${consistencyNeeds.length === 1 ? "needs" : "need"} more consistency` : ""}${pending ? " and we do not yet have enough body-composition evidence to confirm that the plan is adding muscle the way we want" : ""}.`,
+      `${onPath || feasible || noContradiction ? "Nothing this month suggests the plan is off track, so " : ""}confidence stays at ${assessment.currentPercentage}%.`,
+      nextDexa
+        ? "Your next DEXA will be the most important check on whether the early progress is turning into measurable lean-mass gain."
+        : "Keep the plan steady while we collect the next useful result.",
+    ];
+    return sentences.join(" ");
   }
   if (surface === "weekly" && held && training) {
-    return `Training supported the plan for ${ordinalPeriod(trainingPeriodCount(assessment))} independent week, while ${listClauses([
-      feasible && "the objective remained feasible",
-      onPath && "the Goal stayed on its expected path",
-    ])}. Confidence held because ${listClauses([
-      mixed && "the broader evidence remained mixed",
-      pending && "direct body-composition confirmation was still pending",
-    ])}.`;
+    const openQuestions = [
+      energy && "calories",
+      recovery && "recovery",
+      pending && "the next body-composition check",
+    ].filter(Boolean);
+    return `Training moved forward again this week, and the goal still looks realistic. ${openQuestions.length ? `${capitalize(listClauses(openQuestions))} ${openQuestions.length === 1 ? "is" : "are"} still ${openQuestions.length === 1 ? "an open question" : "the open questions"}, so ` : ""}confidence stays at ${assessment.currentPercentage}%. Keep the plan steady and continue collecting the information we need.`;
   }
   if (surface === "midweek") {
-    return `Confidence remains ${confidenceBandLabel(assessment.confidenceBand)}. Partial-week evidence is useful context, but it does not by itself establish a completed-week change. ${movementExplanation.text}`;
+    if (training) {
+      return "Things are moving in the right direction. Training is strong, but it is still early in the week. Keep the plan steady and let the full week show whether that progress is holding.";
+    }
+    return "It is still early in the week, so keep the plan steady for now. Let the full week show whether the current pattern is holding before making a change.";
   }
   if (surface === "home" && feasible && onPath) {
-    return `The Goal remains feasible and on its expected path. ${training ? "Training is supportive, but " : ""}${listClauses([
-      energy && "Energy calibration",
-      recovery && "Recovery coverage",
-      nextDexa && "a follow-up body-composition check",
-    ])} ${energy || recovery || nextDexa ? "are not conclusive yet." : "The assessment remains appropriately bounded."}`;
+    const consistencyNeeds = [energy && "calories", recovery && "recovery"].filter(Boolean);
+    return `${training ? "Training is moving in the right direction and " : ""}the plan remains on track. ${consistencyNeeds.length ? `${capitalize(listClauses(consistencyNeeds))} still ${consistencyNeeds.length === 1 ? "needs" : "need"} more consistency` : "We still need more time"}${nextDexa ? ", and the next body-composition check will tell us whether that progress is translating into measurable lean-mass gain" : " before we know whether the progress is holding"}.`;
   }
   if (surface === "goal") {
-    return `${feasible ? "The Goal remains feasible" : `Confidence remains ${confidenceBandLabel(assessment.confidenceBand)}`}${onPath ? " and on its expected path" : ""}. ${training ? "Training progression is the strongest supportive signal. " : ""}${movementExplanation.text}${nextDexa ? " A consistently prepared follow-up DEXA is the next decisive evidence." : ""}`;
+    return `${training ? "Training is moving in the right direction, and " : ""}${feasible ? "the goal still looks realistic" : `confidence is ${confidenceBandLabel(assessment.confidenceBand, { context: "narrative" })}`}${onPath ? ". The plan remains on track" : ""}. ${movementExplanation.text}${nextDexa ? " Your next DEXA is the key decision point." : ""}`;
   }
   return `${movementExplanation.text} ${supportingFactors[0]?.text ?? ""} ${limitingFactors[0]?.text ?? ""} ${nextDecisiveEvidence[0]?.text ?? ""} ${evidenceContextNote ?? ""}`
     .replace(/\s+/gu, " ").trim();
 }
 
 function historicalContextText(context) {
-  if (!context?.matchedOnly) return "This explanation is bound to its historical assessment.";
-  return "This matched historical assessment did not replace current Confidence.";
+  if (!context?.matchedOnly) return "This explanation reflects what was known at that point in time.";
+  return "This historical reading does not replace today's confidence.";
 }
 
-function trainingPeriodCount(assessment) {
-  const signal = (assessment.evidenceDurability?.signals ?? [])
-    .find((item) => item.capability === "training_progression");
-  return Math.max(1, Number(signal?.independentPeriodCount ??
-    assessment.evidenceDurability?.independentPeriodCount ?? 1));
+function factorTokens(model) {
+  return new Set([...model.supportingFactors, ...model.limitingFactors,
+    ...model.nextDecisiveEvidence].map((item) => item.semanticToken));
 }
 
-function objectiveResponseLabel(assessment) {
-  const boundary = JSON.stringify(
-    assessment.nextConfidenceBuildingEvidence?.decisionBoundary ?? ""
-  ).toLowerCase();
-  return boundary.includes("lean_mass") || boundary.includes("lean mass")
-    ? "lean-mass" : "Goal";
-}
-
-function ordinalPeriod(count) {
-  if (count === 2) return "a second";
-  if (count === 3) return "a third";
-  return "another";
+function capitalize(value) {
+  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
 }
 
 function listClauses(values) {

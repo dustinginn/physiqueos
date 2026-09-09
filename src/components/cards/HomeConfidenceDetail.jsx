@@ -45,7 +45,7 @@ export function HomeConfidenceDetailBody({ detail }) {
     <DetailGroup icon={CheckCircle2} items={detail.supportingFactors} title="What supports Confidence" />
     <DetailGroup icon={HelpCircle} items={detail.limitingFactors} title="What limits Confidence" />
     <DetailGroup icon={RefreshCw} items={detail.movementFactors} title="What changed" />
-    <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What PI needs next" />
+    <DetailGroup icon={TrendingUp} items={detail.clarifyingFactors} title="What we need next" />
     {detail.evidenceContextNote && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.evidenceContextNote}</p>}
     {detail.historicalContext && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.historicalContext}</p>}
     {detail.uncertaintyStatement && <p className="rounded-xl bg-[var(--surface-muted)] p-3 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{detail.uncertaintyStatement}</p>}
