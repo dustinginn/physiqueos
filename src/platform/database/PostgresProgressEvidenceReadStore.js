@@ -1,5 +1,6 @@
 import { createPhase4CanonicalRecordStore } from "./Phase4CanonicalRecordStore.js";
 import { canonicalWeightEntries } from "../../domain/weight/canonicalWeight.js";
+import { selectValidDexaScans } from "../../domain/services/DEXAReadModelAdapter.js";
 
 export function createPostgresProgressEvidenceReadStore({
   pool,
@@ -64,7 +65,28 @@ export function createPostgresProgressEvidenceReadStore({
     },
     listGoals: () => list("goals"),
     listWeightEntries: async () => canonicalWeightEntries(await list("weightEntries")),
-    listDEXAScans: () => list("dexaScans"),
+    listDEXAScans: async () => selectValidDexaScans(await list("dexaScans")),
+    async listDEXAMediaObjects({ normalizedPaths = [], references = [], sourceIds = [] } = {}) {
+      queryCount += 1;
+      const result = await pool.query(
+        `SELECT id,evidence_record_id,original_filename,sha256,provenance,state
+           FROM physiqueos.canonical_media_objects AS media
+          WHERE owner_user_id=$1 AND state='verified' AND content_type='application/pdf'
+            AND (
+              evidence_record_id=ANY($2::text[])
+              OR lower(original_filename)=ANY($3::text[])
+              OR EXISTS (
+                SELECT 1 FROM unnest($3::text[]) AS source(reference)
+                 WHERE right(lower(media.original_filename),length(source.reference)+1)
+                   IN ('-' || source.reference,'_' || source.reference)
+              )
+              OR lower(provenance->>'sourceRelativePath')=ANY($4::text[])
+            )
+          ORDER BY id`,
+        [ownerUserId, sourceIds, references, normalizedPaths],
+      );
+      return tracked(result.rows.map((row) => Object.freeze(row)));
+    },
     async getNutritionContext() {
       const contexts = await list("nutritionContext");
       return contexts.at(-1) ?? null;
@@ -102,6 +124,7 @@ export function createRepositoryProgressEvidenceReadStore({ repositories } = {})
     listGoals: async () => repositories.goals.listGoals(await userId()),
     listWeightEntries: async () => repositories.weights.listWeightEntries(await userId()),
     listDEXAScans: async () => repositories.dexaScans.listDEXAScans(await userId()),
+    listDEXAMediaObjects: async () => null,
     getNutritionContext: async () => repositories.nutritionContext.getNutritionContext(await userId()),
     listEvidencePackages: async () => repositories.evidencePackages?.listEvidencePackages(await userId()) ?? [],
     listCanonicalNutritionEvidenceObjects: async () =>

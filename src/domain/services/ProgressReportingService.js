@@ -43,6 +43,7 @@ import {
   selectNutritionDayPayloads,
 } from "./CanonicalNutritionDayService";
 import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers";
+import { selectValidDexaScans } from "./DEXAReadModelAdapter";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
@@ -711,9 +712,10 @@ function summaryChange(label, first, last) {
 }
 
 export function buildDEXAReport({ dexaScans, goals }) {
-  const latest = dexaScans.at(-1);
-  const previous = dexaScans.at(-2);
-  const values = dexaScans.map((scan) => ({
+  const canonicalScans = selectValidDexaScans(dexaScans);
+  const latest = canonicalScans.at(-1);
+  const previous = canonicalScans.at(-2);
+  const values = canonicalScans.map((scan) => ({
     id: scan.id,
     date: scan.measuredAt,
     bodyFatPercentage: scan.bodyFatPercentage,
@@ -739,7 +741,7 @@ export function buildDEXAReport({ dexaScans, goals }) {
       ? {
           date: latest.measuredAt,
           sourceFileId: latest.sourceFileId,
-          sourceHref: getPrivateEvidenceHref(`private/founder/dexa/${latest.sourceFileId}`),
+          sourceHref: getDEXASourceHref(latest.sourceFileId),
         }
       : null,
     summary: [
@@ -795,7 +797,7 @@ export function buildDEXAReport({ dexaScans, goals }) {
       createMetricChart(values, "rmr", "RMR", " kcal"),
       createMetricChart(values, "androidGynoidRatio", "A/G Ratio", ""),
     ].filter((chart) => chart.points.length > 1),
-    regionalMassCharts: getRegionalMassCharts(dexaScans),
+    regionalMassCharts: getRegionalMassCharts(canonicalScans),
     latestRegional: latest?.regionalAssessment ?? null,
     latestMuscleBalance: latest?.muscleBalance ?? null,
     latestDetails: latest
@@ -814,7 +816,7 @@ export function buildDEXAReport({ dexaScans, goals }) {
     history: values
       .map((scan) => ({
         ...scan,
-        sourceHref: getPrivateEvidenceHref(`private/founder/dexa/${scan.sourceFileId}`),
+        sourceHref: getDEXASourceHref(scan.sourceFileId),
       }))
       .slice()
       .reverse(),
@@ -3098,6 +3100,14 @@ function getPrivateEvidenceHref(relativePath) {
   if (String(relativePath).startsWith("media://")) return null;
 
   return `/api/private-evidence/${String(relativePath).replace(/^private\//, "")}`;
+}
+
+function getDEXASourceHref(sourceFileId) {
+  if (!sourceFileId) return null;
+  if (parsePrivateMediaReference(sourceFileId) || String(sourceFileId).startsWith("media://")) {
+    return getPrivateEvidenceHref(sourceFileId);
+  }
+  return getPrivateEvidenceHref(`private/founder/dexa/${sourceFileId}`);
 }
 
 function deriveProgressPhotosFromEvidencePackages({

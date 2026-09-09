@@ -23,7 +23,10 @@ export function createProviderMediaReferenceResolver(mediaObjects = []) {
     const normalized = normalizeLegacyMediaPath(reference);
     const exact = unique(index.byPath.get(normalized));
     if (exact) return exact;
-    return unique(index.byBasename.get(normalized ? path.posix.basename(normalized) : null));
+    const basename = normalized ? path.posix.basename(normalized) : null;
+    const basenameMatch = unique(index.byBasename.get(basename));
+    if (basenameMatch) return basenameMatch;
+    return uniqueSuffixMatch(index.byBasename, basename);
   };
   return Object.freeze({
     resolveObjectId,
@@ -88,4 +91,14 @@ function add(index, key, value) {
 
 function unique(values) {
   return values?.size === 1 ? [...values][0] : null;
+}
+
+function uniqueSuffixMatch(index, basename) {
+  if (!basename) return null;
+  const matches = new Set();
+  for (const [candidate, ids] of index) {
+    if (!candidate.endsWith(`-${basename}`) && !candidate.endsWith(`_${basename}`)) continue;
+    for (const id of ids) matches.add(id);
+  }
+  return unique(matches);
 }

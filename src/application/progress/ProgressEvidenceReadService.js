@@ -6,6 +6,10 @@ import {
 } from "../../domain/services/ProgressReportingService.js";
 import { createTrainingEvidenceContext } from "../../domain/services/TrainingEvidenceContextService.js";
 import { getDEXAScanWindow } from "../../domain/services/DEXAEvidenceContextService.js";
+import {
+  createDEXAMediaLookup,
+  resolveProviderDEXAScanMedia,
+} from "./DEXAMediaResolutionService.js";
 
 export function createProgressEvidenceReadService({ store } = {}) {
   if (!store?.run) throw new Error("Progress evidence requires a read store.");
@@ -13,11 +17,15 @@ export function createProgressEvidenceReadService({ store } = {}) {
   return Object.freeze({
     getDEXA({ context, currentDate = new Date() } = {}) {
       return store.run("progress.evidence.dexa", async () => {
-        const [user, goals, scans] = await Promise.all([
+        const [user, goals, rawScans] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listDEXAScans(),
         ]);
+        const mediaObjects = store.listDEXAMediaObjects
+          ? await store.listDEXAMediaObjects(createDEXAMediaLookup(rawScans))
+          : null;
+        const scans = resolveProviderDEXAScanMedia({ scans: rawScans, mediaObjects });
         const timeline = createEvidenceTimeline({
           context,
           currentDate,

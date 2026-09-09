@@ -12,7 +12,8 @@ const route = fs.readFileSync(
 
 describe("production DEXA Evidence Context presentation", () => {
   it("inserts the canonical selector without changing the DEXA shell", () => {
-    expect(route).toContain("getDEXATimelineReport");
+    expect(route).toContain("getProductionProgressEvidenceReadService");
+    expect(route).not.toContain("getDEXATimelineReport");
     expect(screen).toContain('ariaLabel="DEXA evidence context"');
     expect(screen).toContain('currentPath="/progress/dexa"');
     expect(screen).toContain("max-w-[393px]");

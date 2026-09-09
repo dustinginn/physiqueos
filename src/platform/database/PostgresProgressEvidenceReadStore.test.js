@@ -3,6 +3,7 @@ import { createPostgresProgressEvidenceReadStore } from "./PostgresProgressEvide
 
 describe("PostgreSQL Progress evidence read store", () => {
   it.each([
+    ["progress.evidence.dexa", ["getUser", "listGoals", "listDEXAScans", "listDEXAMediaObjects"], 4],
     ["progress.evidence.weight", ["getUser", "listGoals", "listWeightEntries", "listDEXAScans"], 4],
     ["progress.evidence.nutrition", ["getUser", "listGoals", "getNutritionContext", "listCanonicalNutritionEvidenceObjects"], 4],
     ["progress.evidence.activity", ["getUser", "listGoals", "listCanonicalActivityAndTrainingEvidenceObjects"], 3],
@@ -44,5 +45,29 @@ describe("PostgreSQL Progress evidence read store", () => {
     expect(sql).toContain("IN ('activity_day','training')");
     expect(sql).not.toMatch(/photo_session|dexa|analyses|briefing/);
     expect(sql).not.toContain("loadCanonicalRuntime");
+  });
+
+  it("bounds DEXA media lookup to scan identities and legacy source references", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresProgressEvidenceReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 },
+      ownerUserId: "owner-one",
+    });
+    await store.listDEXAMediaObjects({
+      normalizedPaths: ["dexa/report.pdf"],
+      references: ["report.pdf"],
+      sourceIds: ["dexa-one"],
+    });
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("canonical_media_objects"), [
+      "owner-one",
+      ["dexa-one"],
+      ["report.pdf"],
+      ["dexa/report.pdf"],
+    ]);
+    const sql = query.mock.calls[0][0];
+    expect(sql).toContain("owner_user_id=$1 AND state='verified'");
+    expect(sql).toContain("content_type='application/pdf'");
+    expect(sql).not.toContain("SELECT *");
   });
 });

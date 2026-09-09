@@ -117,6 +117,49 @@ describe("provider-native Progress evidence reads", () => {
 
     expect(buildDEXAReport({ dexaScans: [partial, complete], goals: [] }).delta).toBeNull();
   });
+
+  it("ranks Aug 15 latest, excludes superseded revisions, and emits private opaque PDF links", async () => {
+    const mediaId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
+    const scan = (overrides = {}) => ({
+      id: "july",
+      measuredAt: "2026-07-18",
+      totalMass: { value: 167.4, unit: "lb" },
+      bodyFatPercentage: 7.7,
+      fatMass: { value: 12.8, unit: "lb" },
+      leanMass: { value: 147.5, unit: "lb" },
+      boneMineralContent: { value: 7.1, unit: "lb" },
+      restingMetabolicRate: { value: 1794, unit: "kcal/day" },
+      sourceFileId: "july.pdf",
+      ...overrides,
+    });
+    const store = {
+      run: (_name, callback) => callback(),
+      getUser: vi.fn(async () => ({ id: "user_founder_001" })),
+      listGoals: vi.fn(async () => []),
+      listDEXAScans: vi.fn(async () => [
+        scan({ id: "august", measuredAt: "2026-08-15", sourceFileId: "august.pdf" }),
+        scan(),
+        scan({ id: "partial", measuredAt: "2026-06-20", canonicalLifecycleStatus: "superseded" }),
+      ]),
+      listDEXAMediaObjects: vi.fn(async () => [{
+        id: mediaId,
+        evidence_record_id: "august",
+        original_filename: "august.pdf",
+        provenance: { sourceRelativePath: "dexa/uploads/august.pdf" },
+        sha256: "a".repeat(64),
+        state: "verified",
+      }]),
+    };
+    const result = await createProgressEvidenceReadService({ store }).getDEXA({ context: "all" });
+
+    expect(result.report.latestScan).toMatchObject({
+      date: "2026-08-15",
+      sourceHref: `/api/private-evidence/media/${mediaId}`,
+    });
+    expect(result.report.history.map((item) => item.date)).toEqual(["2026-08-15", "2026-07-18"]);
+    expect(result.report.history[1].sourceHref).toBeNull();
+    expect(JSON.stringify(result)).not.toMatch(/\/api\/private-evidence\/founder\/dexa/);
+  });
 });
 
 function services() {

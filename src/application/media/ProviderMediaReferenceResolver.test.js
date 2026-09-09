@@ -29,4 +29,25 @@ describe("provider media reference resolution", () => {
       .toContain("media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57");
     expect(resolver.resolveHref({ reference: "private/founder/unknown/front.jpg" })).toBeNull();
   });
+
+  it("resolves a uniquely prefixed upload filename and fails closed when the suffix is ambiguous", () => {
+    const uploaded = object({
+      original_filename: "evidence_submission_20260718144114116-1-7-18-26-DEXA.pdf",
+      provenance: { sourceRelativePath: "evidence/uploads/evidence_submission_20260718144114116-1-7-18-26-DEXA.pdf" },
+    });
+    expect(createProviderMediaReferenceResolver([uploaded]).resolveHref({ reference: "7-18-26-DEXA.pdf" }))
+      .toBe("/api/private-evidence/media/media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57");
+
+    const duplicateSuffix = object({
+      id: "media-2fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e58",
+      original_filename: "other-7-18-26-DEXA.pdf",
+      provenance: { sourceRelativePath: "dexa/uploads/other-7-18-26-DEXA.pdf" },
+      sha256: "b".repeat(64),
+    });
+    expect(createProviderMediaReferenceResolver([uploaded, duplicateSuffix]).resolveHref({ reference: "7-18-26-DEXA.pdf" }))
+      .toBeNull();
+    expect(createProviderMediaReferenceResolver([
+      object({ original_filename: "not7-18-26-DEXA.pdf", provenance: { sourceRelativePath: "dexa/not7-18-26-DEXA.pdf" } }),
+    ]).resolveHref({ reference: "7-18-26-DEXA.pdf" })).toBeNull();
+  });
 });

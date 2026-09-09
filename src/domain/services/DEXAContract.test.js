@@ -58,4 +58,10 @@ describe("DEXA contract and read model", () => {
     const superseded = validScan({ id: "bad", measuredAt: "2026-06-20", canonicalLifecycleStatus: "superseded" });
     expect(selectValidDexaScans([older, superseded, current]).map((scan) => scan.id)).toEqual(["current"]);
   });
+
+  it("uses measured chronology even when record and revision ordering disagree", () => {
+    const july = validScan({ id: "z-july", measuredAt: "2026-07-18", updatedAt: "2026-09-01T00:00:00.000Z" });
+    const august = validScan({ id: "a-august", measuredAt: "2026-08-15", updatedAt: "2026-08-15T00:00:00.000Z" });
+    expect(selectValidDexaScans([august, july]).map((scan) => scan.id)).toEqual(["z-july", "a-august"]);
+  });
 });
