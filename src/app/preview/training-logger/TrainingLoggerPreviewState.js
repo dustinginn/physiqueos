@@ -32,6 +32,7 @@ import {
 } from "../../../domain/services/TrainingLoggerSuggestionService";
 import { createClientDraftId } from "../../../lib/clientDraftId";
 import {
+  APPLE_HEALTH_MATCH_STATES,
   APPLE_HEALTH_RECONCILIATION_FIXTURES,
   APPLE_WORKOUT_CANONICAL_OWNER_TYPES,
   canFinalizeAppleHealthReconciliation,
@@ -59,6 +60,11 @@ export const TRAINING_LOGGER_MODES = Object.freeze({
 export const TRAINING_LOGGER_EXERCISE_SCOPES = Object.freeze({
   ALL_CANONICAL: "all_canonical",
   PERFORMED_HISTORY: "performed_history",
+});
+
+export const TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS = Object.freeze({
+  PLANNING: "planning",
+  ACTIVE_SESSION: "active_session",
 });
 
 export const TRAINING_LOGGER_STEPS = Object.freeze({
@@ -237,9 +243,15 @@ export function listTrainingLoggerExercises({
   exerciseLibrary = null,
   performedExerciseIds = [],
   search = "",
+  selectionContext = TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.PLANNING,
   scope = TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
 } = {}) {
-  const selected = new Set(categories.map((category) => category.toLowerCase()));
+  const selected = new Set(
+    (selectionContext === TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.ACTIVE_SESSION
+      ? []
+      : categories
+    ).map((category) => category.toLowerCase())
+  );
   const query = String(search).trim().toLowerCase();
   const canonicalExercises = Array.isArray(exerciseLibrary) && exerciseLibrary.length > 0
     ? exerciseLibrary
@@ -861,6 +873,14 @@ export function finalizeTrainingLoggerReconciliation(draft) {
     ...draft,
     reconciliation: finalizeAppleHealthReconciliation(draft.reconciliation),
   };
+}
+
+export function canAutomaticallyAdvanceTrainingLoggerReconciliation(draft) {
+  const reconciliation = draft?.reconciliation;
+  return reconciliation?.matchState === APPLE_HEALTH_MATCH_STATES.STRONG &&
+    reconciliation.strengthCandidateIds?.length === 1 &&
+    reconciliation.selectedStrengthSourceId === reconciliation.strengthCandidateIds[0] &&
+    canFinalizeAppleHealthReconciliation(reconciliation);
 }
 
 export function buildEvidenceReviewHandoff(draft) {

@@ -158,6 +158,26 @@ describe("production Training Logger integration", () => {
     expect(reviewActionsSource).toContain('authoritative.review_metadata?.origin === "training_logger"');
   });
 
+  it("bypasses the reconciliation screen only for a deterministic Apple Health match", () => {
+    const prepareBody = clientSource.match(
+      /async function prepareAppleEvidence\(\) \{[\s\S]*?\n  \}\n\n  async function retryAppleEvidenceInterpretation/
+    )?.[0] ?? "";
+    expect(prepareBody).toContain("canAutomaticallyAdvanceTrainingLoggerReconciliation");
+    expect(prepareBody).toContain("finalizeTrainingLoggerReconciliation(reconciledDraft)");
+    expect(prepareBody).toContain("await navigateToEvidenceReview(");
+    expect(prepareBody).toContain("TRAINING_LOGGER_STEPS.RECONCILIATION");
+  });
+
+  it("treats setup categories as planning context and opens active Add Exercise across areas", () => {
+    const picker = clientSource.match(
+      /function ExerciseSelectionScreen[\s\S]*?\n}\n\nfunction CreateNewExerciseForm/
+    )?.[0] ?? "";
+    expect(picker).toContain("TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.ACTIVE_SESSION");
+    expect(picker).toContain("TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.PLANNING");
+    expect(picker).toContain("Search all eligible exercises across every Training Area.");
+    expect(picker).toContain('swappingExercise || adding ? "Browse all exercises"');
+  });
+
   it("retains the final two-line active Logger heading correction", () => {
     expect(clientSource).toContain('>Training Logger</h1>');
     expect(clientSource).toContain("formatWorkoutContext(draft)");

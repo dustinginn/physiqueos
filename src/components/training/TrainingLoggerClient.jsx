@@ -35,6 +35,7 @@ import {
   assignTrainingVariant,
   buildEvidenceReviewHandoff,
   buildTrainingWorkoutSummary,
+  canAutomaticallyAdvanceTrainingLoggerReconciliation,
   canContinueFromReconciliation,
   canFinishTrainingLoggerDraft,
   continueWithoutAppleHealthMatch,
@@ -65,6 +66,7 @@ import {
   toggleTrainingCategory,
   TRAINING_LOGGER_CATEGORY_SUGGESTION,
   TRAINING_LOGGER_EXERCISE_SCOPES,
+  TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS,
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_STEPS,
   TRAINING_LOGGER_VARIANT_OPTIONS,
@@ -205,6 +207,7 @@ export default function TrainingLoggerClient({
 
   async function prepareAppleEvidence() {
     if (submitting) return;
+    let reconciliationFallbackDraft = null;
     setSubmitting(true);
     setSubmissionError(null);
     try {
@@ -220,12 +223,26 @@ export default function TrainingLoggerClient({
       if (!response.ok || !result.reconciliation) {
         throw new Error(result.error ?? "Apple Health evidence could not be prepared.");
       }
-      setEvidencePackageId(result.evidencePackageId ?? null);
-      setDraft((current) => goToTrainingLoggerStep(
-        attachProductionAppleHealthReconciliation(current, result.reconciliation),
+      const packageId = result.evidencePackageId ?? null;
+      const reconciledDraft = attachProductionAppleHealthReconciliation(
+        draft,
+        result.reconciliation
+      );
+      reconciliationFallbackDraft = goToTrainingLoggerStep(
+        reconciledDraft,
         TRAINING_LOGGER_STEPS.RECONCILIATION
-      ));
+      );
+      setEvidencePackageId(packageId);
+      if (canAutomaticallyAdvanceTrainingLoggerReconciliation(reconciledDraft)) {
+        await navigateToEvidenceReview(
+          finalizeTrainingLoggerReconciliation(reconciledDraft),
+          packageId
+        );
+        return;
+      }
+      setDraft(reconciliationFallbackDraft);
     } catch (error) {
+      if (reconciliationFallbackDraft) setDraft(reconciliationFallbackDraft);
       setSubmissionError(error?.message ?? "Apple Health evidence could not be prepared.");
     } finally {
       setSubmitting(false);
@@ -273,24 +290,31 @@ export default function TrainingLoggerClient({
     setSubmissionError(null);
     try {
       const finalized = finalizeTrainingLoggerReconciliation(draft);
-      const response = await fetch("/log/training/reconcile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          draft: serializeTrainingLoggerRecoveryDraft(finalized),
-          evidencePackageId: evidencePackageId ?? finalized.reconciliation?.batchId ?? null,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.reviewUrl) {
-        throw new Error(result.error ?? "Evidence Review could not be prepared.");
-      }
-      discardTrainingLoggerRecoveryDraft(window.localStorage);
-      window.location.assign(result.reviewUrl);
+      await navigateToEvidenceReview(
+        finalized,
+        evidencePackageId ?? finalized.reconciliation?.batchId ?? null
+      );
     } catch (error) {
       setSubmissionError(error?.message ?? "Evidence Review could not be prepared.");
       setSubmitting(false);
     }
+  }
+
+  async function navigateToEvidenceReview(finalizedDraft, packageId) {
+    const response = await fetch("/log/training/reconcile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        draft: serializeTrainingLoggerRecoveryDraft(finalizedDraft),
+        evidencePackageId: packageId,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.reviewUrl) {
+      throw new Error(result.error ?? "Evidence Review could not be prepared.");
+    }
+    discardTrainingLoggerRecoveryDraft(window.localStorage);
+    window.location.assign(result.reviewUrl);
   }
 
   return (
@@ -758,6 +782,9 @@ function ExerciseSelectionScreen({
     exerciseLibrary,
     performedExerciseIds: draft.productionContext?.performedExerciseIds,
     search,
+    selectionContext: adding || Boolean(swappingExercise)
+      ? TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.ACTIVE_SESSION
+      : TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.PLANNING,
     scope: production && !broadCatalog
       ? TRAINING_LOGGER_EXERCISE_SCOPES.PERFORMED_HISTORY
       : TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
@@ -781,7 +808,9 @@ function ExerciseSelectionScreen({
             ? "Choose an existing canonical exercise or create a genuinely new one."
             : "Choose from your performed exercise history first."
           : broadCatalog
-            ? `Search all available exercises for ${draft.selectedCategories.join(" + ")}.`
+            ? adding
+              ? "Search all eligible exercises across every Training Area."
+              : `Search all available exercises for ${draft.selectedCategories.join(" + ")}.`
             : adding
               ? "Choose from exercises you have performed before, or add a new exercise."
               : `Your performed exercises for ${draft.selectedCategories.join(" + ")}.`}
@@ -877,7 +906,7 @@ function ExerciseSelectionScreen({
           type="button"
         >
           <CirclePlus aria-hidden="true" size={18} />
-          {swappingExercise ? "Browse all exercises" : "Add new exercise"}
+          {swappingExercise || adding ? "Browse all exercises" : "Add new exercise"}
         </button>
       )}
 

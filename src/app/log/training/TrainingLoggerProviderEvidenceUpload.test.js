@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     uploadedAt: value.capturedAt,
   })),
   listCanonicalEvidenceObjects: vi.fn(),
+  listReviews: vi.fn(),
   getEvidencePackageById: vi.fn(),
   reinterpretEvidenceIntakeSubmissionFromStoredArtifacts: vi.fn(),
   processEvidenceIntakeSubmission: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock("../../../data/repositories/founderRepositories", () => ({
       getEvidencePackageById: mocks.getEvidencePackageById,
       saveEvidencePackage: mocks.saveEvidencePackage,
     },
-    evidenceReviews: { listReviews: vi.fn(async () => []) },
+    evidenceReviews: { listReviews: mocks.listReviews },
   },
 }));
 vi.mock("../../../domain/services/EvidenceIntakeService", () => ({
@@ -69,6 +70,7 @@ describe("Training Logger provider Apple Health evidence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listCanonicalEvidenceObjects.mockResolvedValue([]);
+    mocks.listReviews.mockResolvedValue([]);
     mocks.getEvidencePackageById.mockResolvedValue(null);
     mocks.createEvidenceReviewService.mockReturnValue({ stage: mocks.stage });
     mocks.createApplicationStoredArtifactLoader.mockImplementation(({ userId }) =>
@@ -260,6 +262,38 @@ describe("Training Logger provider Apple Health evidence", () => {
       userId: "founder",
     }));
     expect(mocks.listCanonicalEvidenceObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the existing Logger review instead of duplicating a staged session", async () => {
+    const finalized = draft({
+      reconciliation: {
+        finalized: true,
+        matchState: "strong_match",
+        selectedStrengthSourceId: "strength_one",
+        strengthCandidateIds: ["strength_one"],
+      },
+    });
+    mocks.listReviews.mockResolvedValue([{
+      id: "review_existing",
+      status: "pending",
+      interpretedEvidence: { package_id: "training_logger_submission_draft" },
+    }]);
+
+    const response = await PUT(new Request("http://localhost/log/training/reconcile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ draft: finalized, evidencePackageId: "batch_one" }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      reviewId: "review_existing",
+      reviewUrl: "/evidence/review/review_existing",
+      reused: true,
+    });
+    expect(mocks.buildTrainingLoggerEvidencePackage).not.toHaveBeenCalled();
+    expect(mocks.saveEvidencePackage).not.toHaveBeenCalled();
+    expect(mocks.stage).not.toHaveBeenCalled();
   });
 });
 

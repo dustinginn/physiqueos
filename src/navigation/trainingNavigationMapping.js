@@ -173,6 +173,17 @@ export function resolvePrimaryTrainingNavigationCategory(exercise = {}) {
   const canonicalExercise = getCanonicalTrainingExerciseIdentityById(
     canonicalExerciseId
   );
+  const canonicalRegion = slugify(
+    canonicalExercise?.body_region ?? exercise.regionLabel
+  );
+  if (canonicalExerciseId && REGION_NAVIGATION_CATEGORIES[canonicalRegion]) {
+    return {
+      confidence: "high",
+      primaryNavigationCategory: REGION_NAVIGATION_CATEGORIES[canonicalRegion],
+      source: "canonical_region_mapping",
+    };
+  }
+
   const canonicalPrimaryMuscleSlugs = (
     canonicalExercise?.primary_muscle_groups?.length
       ? canonicalExercise.primary_muscle_groups
@@ -193,17 +204,6 @@ export function resolvePrimaryTrainingNavigationCategory(exercise = {}) {
       primaryNavigationCategory:
         REGION_NAVIGATION_CATEGORIES[canonicalPrimaryMuscleGroup],
       source: "canonical_primary_muscle_mapping",
-    };
-  }
-
-  const canonicalRegion = slugify(
-    canonicalExercise?.body_region ?? exercise.regionLabel
-  );
-  if (canonicalExerciseId && REGION_NAVIGATION_CATEGORIES[canonicalRegion]) {
-    return {
-      confidence: "high",
-      primaryNavigationCategory: REGION_NAVIGATION_CATEGORIES[canonicalRegion],
-      source: "canonical_region_mapping",
     };
   }
 

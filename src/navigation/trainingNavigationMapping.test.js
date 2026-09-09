@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { FOUNDER_ALPHA_TRAINING_EXERCISES } from "../domain/models/trainingExerciseIdentity";
+import {
+  FOUNDER_ALPHA_TRAINING_EXERCISES,
+  resolveTrainingExerciseOccurrenceIdentity,
+} from "../domain/models/trainingExerciseIdentity";
 import {
   resolvePrimaryTrainingNavigationCategory,
   validateTrainingNavigationTaxonomy,
@@ -17,6 +20,53 @@ function browseExercise(exercise) {
 }
 
 describe("Training Library primary browse taxonomy", () => {
+  it.each([
+    ["Pull-Ups", "back", "biceps"],
+    ["Seated Cable Rows", "back", "biceps"],
+    ["Incline Bench Press", "chest", "triceps"],
+    ["Incline Dumbbell Press", "chest", "triceps"],
+    ["Shoulder Press Machine", "shoulders", "triceps"],
+  ])("gives canonical region ownership to %s", (name, expectedCategory, priorIncorrectCategory) => {
+    const exercise = FOUNDER_ALPHA_TRAINING_EXERCISES.find(
+      (candidate) => candidate.name === name
+    );
+    expect(exercise).toBeDefined();
+
+    const resolution = resolvePrimaryTrainingNavigationCategory(
+      browseExercise(exercise)
+    );
+
+    expect(resolution).toEqual({
+      confidence: "high",
+      primaryNavigationCategory: expectedCategory,
+      source: "canonical_region_mapping",
+    });
+    expect(resolution.primaryNavigationCategory).not.toBe(priorIncorrectCategory);
+  });
+
+  it.each([
+    ["pull_up", "Pull-Up", "Pull-Ups", "back"],
+    ["seated_cable_row", "Seater cable row", "Seated Cable Rows", "back"],
+    ["incline_bench_press", "Barbell Incline Bench Press", "Incline Bench Press", "chest"],
+    ["incline_dumbbell_press", "Incline DB Press", "Incline Dumbbell Press", "chest"],
+    ["shoulder_press_machine", "Machine Shoulder Press", "Shoulder Press Machine", "shoulders"],
+  ])("preserves historical %s identity while inheriting its canonical area", (id, historicalName, canonicalName, area) => {
+    const identity = resolveTrainingExerciseOccurrenceIdentity({
+      canonicalExerciseId: id,
+      name: historicalName,
+    });
+
+    expect(identity).toMatchObject({
+      canonicalExerciseId: id,
+      canonicalExerciseName: canonicalName,
+      resolutionStatus: "resolved_high_confidence",
+    });
+    expect(resolvePrimaryTrainingNavigationCategory({
+      canonicalExerciseId: identity.canonicalExerciseId,
+      label: historicalName,
+    }).primaryNavigationCategory).toBe(area);
+  });
+
   it.each([
     ["Glute Squats", "glutes"],
     ["Lying Leg Curls", "hamstrings"],

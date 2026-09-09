@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addProvisionalTrainingExercise,
+  canAutomaticallyAdvanceTrainingLoggerReconciliation,
   canFinishTrainingLoggerDraft,
   canCreateNewTrainingLoggerExercise,
   addTrainingExercise,
@@ -8,6 +9,8 @@ import {
   assignTrainingVariant,
   createTrainingLoggerProductionDraft,
   createTrainingSuperset,
+  finalizeTrainingLoggerReconciliation,
+  finishTrainingLoggerDraft,
   hydrateTrainingLoggerProductionDraft,
   initializeTrainingLoggerMode,
   listTrainingLoggerCategories,
@@ -19,6 +22,7 @@ import {
   toggleTrainingSetCompletion,
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_EXERCISE_SCOPES,
+  TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS,
   updateTrainingSet,
   updateWorkoutContext,
 } from "../../preview/training-logger/TrainingLoggerPreviewState";
@@ -113,6 +117,132 @@ describe("production Training Logger state", () => {
       performedExerciseIds,
       scope: TRAINING_LOGGER_EXERCISE_SCOPES.ALL_CANONICAL,
     }).map((exercise) => exercise.id)).toEqual(["spider_curl", "forearm_curl"]);
+  });
+
+  it.each([
+    ["pull_up", "Pull-Ups", "Back", "Biceps"],
+    ["seated_cable_row", "Seated Cable Rows", "Back", "Biceps"],
+    ["incline_bench_press", "Incline Bench Press", "Chest", "Triceps"],
+    ["incline_dumbbell_press", "Incline Dumbbell Press", "Chest", "Triceps"],
+    ["shoulder_press_machine", "Shoulder Press Machine", "Shoulders", "Triceps"],
+  ])("shares canonical Library and Logger eligibility for %s", (id, name, category, priorIncorrectCategory) => {
+    expect(listTrainingLoggerExercises({ categories: [category] })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id, name })])
+    );
+    expect(listTrainingLoggerExercises({
+      categories: [priorIncorrectCategory],
+      search: name,
+    })).toEqual([]);
+  });
+
+  it("keeps planning filters useful while an active session can add across every canonical area", () => {
+    const exerciseLibrary = [
+      canonicalExercise("shoulder_press_machine", "Shoulder Press Machine", "Shoulders", ["Front Delts", "Triceps"]),
+      canonicalExercise("incline_bench_press", "Incline Bench Press", "Chest", ["Upper Chest", "Triceps"]),
+      canonicalExercise("pull_up", "Pull-Ups", "Back", ["Lats", "Biceps"]),
+    ];
+    let draft = createTrainingLoggerProductionDraft({ exerciseLibrary, workoutDate: "2026-08-10" });
+    draft = { ...draft, selectedCategories: ["Shoulders"] };
+
+    expect(listTrainingLoggerExercises({
+      categories: draft.selectedCategories,
+      exerciseLibrary,
+      selectionContext: TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.PLANNING,
+    }).map((exercise) => exercise.id)).toEqual(["shoulder_press_machine"]);
+    expect(listTrainingLoggerExercises({
+      categories: draft.selectedCategories,
+      exerciseLibrary,
+      selectionContext: TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS.ACTIVE_SESSION,
+    }).map((exercise) => exercise.id)).toEqual([
+      "shoulder_press_machine", "incline_bench_press", "pull_up",
+    ]);
+
+    draft = addTrainingExercise(draft, "shoulder_press_machine");
+    draft = addTrainingExercise(draft, "incline_bench_press");
+    expect(draft.selectedCategories).toEqual(["Shoulders"]);
+    expect(draft.exercises).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        canonicalExerciseId: "incline_bench_press",
+        bodyRegion: "Chest",
+      }),
+    ]));
+    expect(new Set(draft.exercises.map((exercise) => exercise.canonicalExerciseId)).size)
+      .toBe(2);
+    for (const exercise of draft.exercises) {
+      for (const set of exercise.sets) {
+        draft = updateTrainingSet(draft, exercise.id, set.id, {
+          load: exercise.bodyRegion === "Chest" ? 115 : 90,
+          reps: 8,
+        });
+      }
+    }
+    expect(canFinishTrainingLoggerDraft(draft)).toBe(true);
+    expect(finishTrainingLoggerDraft(draft)).toMatchObject({
+      selectedCategories: ["Shoulders"],
+      step: "summary",
+    });
+  });
+
+  it("allows a multi-area workout to add an exercise from a third unselected area", () => {
+    const exerciseLibrary = [
+      canonicalExercise("shoulder_press_machine", "Shoulder Press Machine", "Shoulders", ["Front Delts"]),
+      canonicalExercise("incline_bench_press", "Incline Bench Press", "Chest", ["Upper Chest"]),
+      canonicalExercise("pull_up", "Pull-Ups", "Back", ["Lats"]),
+    ];
+    let draft = createTrainingLoggerProductionDraft({ exerciseLibrary, workoutDate: "2026-08-10" });
+    draft = { ...draft, selectedCategories: ["Shoulders", "Chest"] };
+    draft = addTrainingExercise(draft, "shoulder_press_machine");
+    draft = addTrainingExercise(draft, "incline_bench_press");
+    draft = addTrainingExercise(draft, "pull_up");
+    draft = addTrainingExercise(draft, "pull_up");
+
+    expect(draft.selectedCategories).toEqual(["Shoulders", "Chest"]);
+    expect(draft.exercises).toHaveLength(3);
+    expect(draft.exercises.at(-1)).toMatchObject({
+      canonicalExerciseId: "pull_up",
+      bodyRegion: "Back",
+    });
+  });
+
+  it("auto-advances only the deterministic one-strength Apple Health case", () => {
+    const base = createTrainingLoggerProductionDraft({ workoutDate: "2026-08-10" });
+    const deterministic = {
+      ...base,
+      reconciliation: {
+        matchState: "strong_match",
+        strengthCandidateIds: ["strength_one"],
+        selectedStrengthSourceId: "strength_one",
+        continueWithoutStrength: false,
+        normalizedEvidence: [],
+        additionalEvidenceActions: [],
+        proposedCanonicalRecords: [],
+        finalized: false,
+      },
+    };
+    const ambiguous = {
+      ...deterministic,
+      reconciliation: {
+        ...deterministic.reconciliation,
+        matchState: "multiple_matches",
+        strengthCandidateIds: ["strength_one", "strength_two"],
+        selectedStrengthSourceId: null,
+      },
+    };
+    const noMatch = {
+      ...deterministic,
+      reconciliation: {
+        ...deterministic.reconciliation,
+        matchState: "no_match",
+        strengthCandidateIds: [],
+        selectedStrengthSourceId: null,
+      },
+    };
+
+    expect(canAutomaticallyAdvanceTrainingLoggerReconciliation(deterministic)).toBe(true);
+    expect(finalizeTrainingLoggerReconciliation(deterministic).reconciliation.finalized)
+      .toBe(true);
+    expect(canAutomaticallyAdvanceTrainingLoggerReconciliation(ambiguous)).toBe(false);
+    expect(canAutomaticallyAdvanceTrainingLoggerReconciliation(noMatch)).toBe(false);
   });
 
   it("adds an unperformed canonical exercise without duplicating its identity", () => {
@@ -393,6 +523,15 @@ describe("production Training Logger state", () => {
     expect(unchanged).toBe(draft);
   });
 });
+
+function canonicalExercise(id, name, bodyRegion, primaryMuscleGroups) {
+  return {
+    id,
+    name,
+    body_region: bodyRegion,
+    primary_muscle_groups: primaryMuscleGroups,
+  };
+}
 
 function history(date, { load, reps, variant = null }) {
   return {
