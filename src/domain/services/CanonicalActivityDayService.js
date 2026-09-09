@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadModel";
 import { resolveCanonicalEvidenceLocalDate } from "./CanonicalEvidenceDateService";
+
+export { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadModel";
 
 export const ACTIVITY_DAY_REVISION_SCHEMA_VERSION =
   "canonical-activity-day-revision-v1";
@@ -189,46 +192,6 @@ export function createCanonicalActivityDayRecord({
   };
 }
 
-export function selectActiveCanonicalActivityDays(
-  canonicalObjects = [],
-  { date = null, userId = null } = {}
-) {
-  const groups = new Map();
-  canonicalObjects
-    .filter((record) => {
-      const payload = record.payload ?? record;
-      return payload.evidence_type === "activity_day" &&
-        isActive(record) &&
-        (!userId || !record.userId || record.userId === userId) &&
-        (!date || resolveCanonicalEvidenceLocalDate(payload) === date);
-    })
-    .forEach((record) => {
-      const key = getActivityDayLogicalKey(record);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(record);
-    });
-  const diagnostics = [];
-  const records = [];
-  for (const [logicalDayKey, candidates] of groups.entries()) {
-    const ordered = [...candidates].sort(compareCanonicalActivityAuthority);
-    records.push(ordered.at(-1));
-    if (ordered.length > 1) {
-      diagnostics.push(Object.freeze({
-        code: "ACTIVITY_ACTIVE_DAY_DUPLICATE",
-        logicalDayKey,
-        canonicalIds: ordered.map((item) => item.canonicalId).sort(),
-      }));
-    }
-  }
-  return Object.freeze({
-    diagnostics: Object.freeze(diagnostics),
-    records: Object.freeze(records.sort((left, right) =>
-      resolveCanonicalEvidenceLocalDate(left)
-        .localeCompare(resolveCanonicalEvidenceLocalDate(right))
-    )),
-  });
-}
-
 export function selectActivityDayPayloads(days = []) {
   const groups = new Map();
   for (const day of days) {
@@ -350,16 +313,6 @@ function createRevisionSnapshot(record) {
   };
 }
 
-function compareCanonicalActivityAuthority(left, right) {
-  const revisionDelta = (left.activityRevision?.revision ?? 0) -
-    (right.activityRevision?.revision ?? 0);
-  if (revisionDelta) return revisionDelta;
-  const timeDelta = String(left.updatedAt ?? left.createdAt ?? "")
-    .localeCompare(String(right.updatedAt ?? right.createdAt ?? ""));
-  if (timeDelta) return timeDelta;
-  return String(left.canonicalId ?? "").localeCompare(String(right.canonicalId ?? ""));
-}
-
 function compareActivityPayloadAuthority(left, right) {
   const revisionDelta = (left._canonicalActivityRevision?.revision ?? 0) -
     (right._canonicalActivityRevision?.revision ?? 0);
@@ -380,12 +333,6 @@ function mergePayloadProvenance(left = {}, right = {}) {
       ...(right.source_artifact_refs ?? []),
     ]),
   };
-}
-
-function isActive(record) {
-  return record.quality?.status !== "superseded" &&
-    !record.quality?.supersededBy &&
-    record.payload?.quality?.status !== "superseded";
 }
 
 function semanticObject(value = {}) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ActivityCanonicalSourceClass,
+  createActivitySemanticFingerprint,
   createCanonicalActivityDayRecord,
   getActivityDayLogicalKey,
   getStableActivityDayCanonicalId,
@@ -11,6 +12,22 @@ import {
 const owner = "user_founder_001";
 
 describe("canonical Activity Day integrity", () => {
+  it("preserves the persisted SHA-256 semantic fingerprint across field ordering", () => {
+    const canonicalOrder = activity({
+      daily_activity: { move_calories: 700, exercise_minutes: 45 },
+    });
+    const reordered = activity({
+      daily_activity: { exercise_minutes: 45, move_calories: 700 },
+    });
+
+    expect(createActivitySemanticFingerprint(canonicalOrder)).toBe(
+      "sha256_fb738b24f2a0e740e4a009afa43344f1b13ebc95576ba04916586f75a2cf186e"
+    );
+    expect(createActivitySemanticFingerprint(reordered)).toBe(
+      createActivitySemanticFingerprint(canonicalOrder)
+    );
+  });
+
   it("uses the intended owner-local calendar date for stable same-day identity", () => {
     const evidence = activity({
       observed_at: "2026-08-27T01:30:00.000Z",

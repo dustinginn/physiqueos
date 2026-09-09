@@ -1,5 +1,5 @@
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
-import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
+import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadModel";
 
 export function createActivityEvidenceSummary({ canonicalObjects = [], now = new Date() } = {}) {
   const today = dateKey(now);
