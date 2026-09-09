@@ -24,9 +24,14 @@ import {
   resolveMorningWeighInSupport,
 } from "./TrackingSupportService";
 import { scopeRepositoryReadService } from "../../application/read-models/RepositoryReadScope";
-import { isReminderOccurrenceCompleted } from "./ReminderOccurrenceCompletion.js";
-
-const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
+import {
+  isReminderOccurrenceCompleted,
+  resolvePriorityExecutionContract,
+} from "./ReminderOccurrenceCompletion.js";
+import {
+  resolveCanonicalGoalRelationships,
+  selectCanonicalActiveGoal,
+} from "./CanonicalGoalRelationshipService.js";
 
 export function createPriorityDetailService({ repositories, now = () => new Date() }) {
   return scopeRepositoryReadService({ repositories, namespace: "priority-detail", service: {
@@ -77,8 +82,9 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           reminders: [reminder],
           userId: resolvedUserId,
         });
+        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
         return support
-          ? createMorningWeighInPriorityDetail({ goals, operatingPlan, support })
+          ? withExecutionContract(createMorningWeighInPriorityDetail({ goals, operatingPlan, support }), reminder, occurrenceDate)
           : null;
       }
 
@@ -107,7 +113,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             timeZone,
           });
 
-          return protocol.category === "recovery"
+          const detail = protocol.category === "recovery"
             ? createNonDosingSupportPriorityDetail({
                 executionItem: match.executionItem,
                 goals,
@@ -130,41 +136,52 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
+          return withExecutionContract(detail, reminder, projection.localDate);
         }
 
-        return createLegacyReminderOnlyProtocolPriorityDetail({
+        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
+        return withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
           reminder,
           protocol,
           goals,
           operatingPlan,
           operatingRhythm,
-          occurrenceDate: getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone)),
+          occurrenceDate,
           timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
-        });
+        }), reminder, occurrenceDate);
       }
 
       if (reminder?.linkedEvidenceType === "progress_photo") {
-        return createProgressPhotoPriorityDetail({
+        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
+        return withExecutionContract(createProgressPhotoPriorityDetail({
           executionItem: executionItems.find((item) => item.id === "execution_progress_photos"),
           reminder,
           goals,
           operatingPlan,
-        });
+        }), reminder, occurrenceDate);
       }
 
       if (reminder) {
-        return createReminderPriorityDetail({
+        const occurrenceDate = getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone));
+        return withExecutionContract(createReminderPriorityDetail({
           reminder,
           goals,
           operatingPlan,
-          occurrenceDate: getLocalDateKey(now(), resolveLocalTimeZone(user?.timeZone ?? user?.timezone)),
+          occurrenceDate,
           timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
-        });
+        }), reminder, occurrenceDate);
       }
 
       return createFallbackPriorityDetail(priorityId, goals);
     },
   }});
+}
+
+function withExecutionContract(detail, reminder, occurrenceDate) {
+  return detail ? {
+    ...detail,
+    executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate }),
+  } : null;
 }
 
 function createExecutionPriorityDetail({
@@ -879,7 +896,7 @@ function createReminderPriorityDetail({ reminder, goals, operatingPlan, occurren
 }
 
 function createFallbackPriorityDetail(priorityId, goals) {
-  const primaryGoal = goals.find((goal) => goal.id === PRIMARY_GOAL_ID);
+  const primaryGoal = selectCanonicalActiveGoal(goals);
 
   return {
     id: priorityId,
@@ -961,14 +978,20 @@ function getPreparationItems(protocol) {
 
 function getRelatedGoalItems({ protocol, goals, operatingPlan }) {
   const currentGoalIds = protocol.currentGoalIds ?? [];
-  const primaryGoal =
-    goals.find((goal) => currentGoalIds.includes(goal.id) && goal.status !== "completed") ??
-    goals.find((goal) => goal.id === operatingPlan?.primaryGoalId && goal.status !== "completed");
+  const ownerUserId = protocol.userId ?? goals.find((goal) => currentGoalIds.includes(goal.id))?.userId ?? null;
+  const relationships = resolveCanonicalGoalRelationships({ goals, operatingPlan, ownerUserId });
+  const primaryGoal = goals.find((goal) =>
+    goal.id === relationships.operatingPlanGoalId && goal.status !== "completed"
+  ) ?? goals.find((goal) => currentGoalIds.includes(goal.id) && goal.status !== "completed");
   const relatedGoals = goals.filter((goal) =>
     protocol.relatedGoalIds?.includes(goal.id)
   );
+  const supportingIds = new Set(relationships.supportingObjectives.map((goal) => goal.id));
   const guardrails = relatedGoals.filter(
-    (goal) => goal.id !== primaryGoal?.id && /8[-–]9%|guardrail/i.test(`${goal.title} ${goal.type}`)
+    (goal) => goal.id !== primaryGoal?.id && supportingIds.has(goal.id) && isGoalGuardrail(goal)
+  );
+  const supporting = relatedGoals.filter((goal) =>
+    goal.id !== primaryGoal?.id && supportingIds.has(goal.id) && !isGoalGuardrail(goal)
   );
   const items = [];
 
@@ -986,7 +1009,21 @@ function getRelatedGoalItems({ protocol, goals, operatingPlan }) {
     });
   }
 
+  if (supporting.length > 0) {
+    items.push({
+      label: "Supporting Objective",
+      detail: supporting.map((goal) => formatGoalTitle(goal.title)).join(", "),
+    });
+  }
+
   return items;
+}
+
+function isGoalGuardrail(goal) {
+  return goal.relationshipRole === "guardrail"
+    || goal.role === "guardrail"
+    || goal.metricKey === "bodyFatPercentage"
+    || (goal.targetRange && goal.unit === "%");
 }
 
 function getCurrentProtocolWeek(protocol, now = new Date()) {

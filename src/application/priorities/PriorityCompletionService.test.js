@@ -14,6 +14,13 @@ describe("PriorityCompletionService", () => {
     }).complete({ priorityId: "reminder" });
     expect(result.status).toBe("completed");
     expect(result.completion.completedAt).toBe("2026-08-31T12:00:00.000Z");
+    expect(result.completion.completionHistory).toEqual([
+      expect.objectContaining({
+        id: "reminder:2026-08-31",
+        occurrenceDate: "2026-08-31",
+        satisfactionType: "manual_priority_completion",
+      }),
+    ]);
     expect(mutateCanonicalRuntime).toHaveBeenCalledWith(expect.objectContaining({
       allowedCollections: ["reminders"],
       readCollections: ["reminders"],
@@ -98,5 +105,71 @@ describe("PriorityCompletionService", () => {
 
     expect(result.status).toBe("completed");
     expect(candidate.reminders[0].completedAt).toBe("2026-08-31T16:00:00.000Z");
+    expect(candidate.reminders[0].completionHistory).toEqual([
+      expect.objectContaining({ id: "reminder:2026-08-31" }),
+    ]);
+  });
+
+  it("preserves earlier occurrence history when a later day completes", async () => {
+    let candidate;
+    const mutateCanonicalRuntime = async (options) => {
+      candidate = {
+        reminders: [{
+          id: "reminder",
+          active: true,
+          completedAt: "2026-08-30T16:00:00Z",
+          completionHistory: [{
+            id: "reminder:2026-08-30",
+            occurrenceDate: "2026-08-30",
+            completedAt: "2026-08-30T16:00:00Z",
+          }],
+        }],
+      };
+      return { result: await options.mutate(candidate), changedCollections: ["reminders"] };
+    };
+
+    await createPriorityCompletionService({
+      mutateCanonicalRuntime,
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31" });
+
+    expect(candidate.reminders[0].completionHistory.map((item) => item.id)).toEqual([
+      "reminder:2026-08-30",
+      "reminder:2026-08-31",
+    ]);
+  });
+
+  it("serializes concurrent same-occurrence completion into one canonical history record", async () => {
+    let state = { reminders: [{ id: "reminder", active: true }] };
+    let queue = Promise.resolve();
+    const mutateCanonicalRuntime = (options) => {
+      const operation = queue.then(async () => {
+        const candidate = structuredClone(state);
+        const before = JSON.stringify(candidate);
+        const result = await options.mutate(candidate);
+        state = candidate;
+        return {
+          result,
+          changedCollections: before === JSON.stringify(candidate) ? [] : ["reminders"],
+        };
+      });
+      queue = operation.then(() => undefined, () => undefined);
+      return operation;
+    };
+    const service = createPriorityCompletionService({
+      mutateCanonicalRuntime,
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    });
+
+    const results = await Promise.all([
+      service.complete({ priorityId: "reminder", occurrenceDate: "2026-08-31" }),
+      service.complete({ priorityId: "reminder", occurrenceDate: "2026-08-31" }),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual([
+      "already_completed",
+      "completed",
+    ]);
+    expect(state.reminders[0].completionHistory).toHaveLength(1);
   });
 });

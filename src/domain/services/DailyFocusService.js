@@ -24,6 +24,11 @@ import {
   MORNING_WEIGH_IN_REMINDER_ID,
   resolveMorningWeighInSupport,
 } from "./TrackingSupportService";
+import {
+  createPriorityOccurrenceKey as createCanonicalPriorityOccurrenceKey,
+  isReminderOccurrenceCompleted,
+  resolvePriorityExecutionContract,
+} from "./ReminderOccurrenceCompletion.js";
 
 const DAY_NAMES = [
   "sunday",
@@ -322,7 +327,7 @@ export function getPreviousDayIncompletePrioritySelection({
 }
 
 export function createPriorityOccurrenceKey(priorityId, occurrenceDate) {
-  return `${String(priorityId ?? "").trim()}:${String(occurrenceDate ?? "").trim()}`;
+  return createCanonicalPriorityOccurrenceKey(priorityId, occurrenceDate);
 }
 
 function getPreviousDayPriorityExclusionReason({
@@ -413,22 +418,9 @@ function getReconciliationsForDate(checkIns, date) {
 }
 
 function hasDatedReminderCompletion(reminder, date, timeZone) {
-  if (getLocalDateKey(reminder.completedAt, timeZone) === date) return true;
-
-  const history = Array.isArray(reminder.completionHistory)
-    ? reminder.completionHistory
-    : reminder.completionHistory
-      ? [reminder.completionHistory]
-      : [];
-
-  return history.some((entry) => {
-    const explicitDate =
-      entry.occurrenceDate ??
-      entry.occurrence_date ??
-      entry.evidenceDate ??
-      entry.evidence_date;
-    if (explicitDate) return String(explicitDate).slice(0, 10) === date;
-    return getLocalDateKey(entry.completedAt, timeZone) === date;
+  return isReminderOccurrenceCompleted(reminder, {
+    occurrenceDate: date,
+    timeZone,
   });
 }
 
@@ -452,7 +444,7 @@ function getPersistentReminderItems({
         reminderAppliesToday(reminder, dayName, today)
     )
     .map((reminder) => {
-      const completed = isSameLocalDate(reminder.completedAt, today);
+      const completed = isReminderOccurrenceCompleted(reminder, { occurrenceDate: today });
       const state = getPriorityState(reminder.schedule?.timeOfDay);
 
       if (completed) return null;
@@ -462,12 +454,13 @@ function getPersistentReminderItems({
         label: reminder.title,
         subtitle: state.label,
         metadata: formatReminderMetadata(reminder),
-        href: `/priorities/${reminder.id}`,
+        href: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }).destination,
         icon: getReminderIcon(reminder),
         color: getReminderColor(reminder),
         completed,
         completable: true,
         completionId: reminder.id,
+        executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
         state: state.name,
         priority: state.priorityOffset + 18,
       };
@@ -508,6 +501,7 @@ function getMorningWeightItem({ checkIns, executionItems, latestWeight, now, pro
     session: getSessionTimeBlock(timing),
     state: state.name,
     priority: state.priorityOffset + 10,
+    executionContract: resolvePriorityExecutionContract({ reminder: support.reminder, occurrenceDate: today }),
   };
 }
 
@@ -609,6 +603,7 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       session: timeBlock,
       state: state.name,
       priority: state.priorityOffset + 12,
+      executionContract: resolvePriorityExecutionContract({ reminder, occurrenceDate: today }),
     };
   });
 }
@@ -753,10 +748,7 @@ function getExecutionBackedProtocolItems({
       ) {
         return null;
       }
-      if (
-        reminder?.completedAt &&
-        getLocalDateKey(reminder.completedAt, timeZone) === today
-      ) {
+      if (projection.occurrenceCompleted) {
         return null;
       }
 
@@ -820,6 +812,9 @@ function getExecutionBackedProtocolItems({
               dose: doseText,
               protocolId,
             }
+          : null,
+        executionContract: reminder
+          ? resolvePriorityExecutionContract({ reminder, occurrenceDate: today })
           : null,
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,
@@ -1208,7 +1203,7 @@ function classifyReminderOccurrence({
   const reconciledState = getReconciliationState({ checkIns, date, reminderId: reminder.id });
 
   if (reconciledState) return reconciledState;
-  if (isSameLocalDate(reminder.completedAt, date)) return "completed";
+  if (isReminderOccurrenceCompleted(reminder, { occurrenceDate: date })) return "completed";
   if (
     hasEvidenceForReminderOccurrence({
       checkIns,

@@ -135,6 +135,13 @@ describe("Morning priority reconciliation server boundary", () => {
         note: "Leave this incomplete.",
       }),
     ]);
+    expect(await repositories.reminders.getReminderById("one")).toMatchObject({
+      completionHistory: [expect.objectContaining({
+        id: "one:2026-07-28",
+        occurrenceDate: "2026-07-28",
+        satisfactionType: "morning_check_in_reconciliation",
+      })],
+    });
   });
 
   it.each([

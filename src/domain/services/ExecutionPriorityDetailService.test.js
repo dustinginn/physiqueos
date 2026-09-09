@@ -164,9 +164,24 @@ describe("Execution-backed priority detail", () => {
       unit: "mg",
     });
   });
+
+  it("uses the canonical active Goal in an unavailable-priority fallback", async () => {
+    const detail = await service({
+      executionItems: [],
+      protocol: null,
+      reminderRecord: null,
+      goals: [
+        { id: "goal-old", userId: "user", primary: false, status: "completed", title: "Old Goal" },
+        { id: "goal-current", userId: "user", primary: true, status: "active", title: "Current Goal" },
+      ],
+    }).getPriorityDetail("unknown-priority");
+
+    expect(JSON.stringify(detail)).toContain("This priority supports current Goal.");
+    expect(JSON.stringify(detail)).not.toContain("Old Goal");
+  });
 });
 
-function service({ executionItems, protocol: protocolRecord, reminderRecord = reminder }) {
+function service({ executionItems, protocol: protocolRecord, reminderRecord = reminder, goals = [] }) {
   const repositories = {
     users: {
       getCurrentUser: async () => ({
@@ -175,13 +190,13 @@ function service({ executionItems, protocol: protocolRecord, reminderRecord = re
       }),
     },
     goals: {
-      listGoals: async () => [],
+      listGoals: async () => goals,
     },
     reminders: {
       getReminderById: async () => reminderRecord,
     },
     protocols: {
-      listProtocols: async () => [protocolRecord],
+      listProtocols: async () => [protocolRecord].filter(Boolean),
     },
     executionItems: {
       listExecutionItems: async () => executionItems,

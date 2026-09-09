@@ -28,14 +28,33 @@ export function createReminderRepository(reminders = [], options = {}) {
       return reminder;
     },
 
-    async completeReminder(reminderId, completedAt = new Date().toISOString()) {
+    async completeReminder(reminderId, completedAt = new Date().toISOString(), {
+      occurrenceDate = String(completedAt).slice(0, 10),
+      satisfactionType = "manual_priority_completion",
+    } = {}) {
       const reminderIndex = reminders.findIndex((item) => item.id === reminderId);
 
       if (reminderIndex < 0) return null;
 
+      const completionId = `${reminderId}:${occurrenceDate}`;
+      const history = Array.isArray(reminders[reminderIndex].completionHistory)
+        ? reminders[reminderIndex].completionHistory
+        : reminders[reminderIndex].completionHistory
+          ? [reminders[reminderIndex].completionHistory]
+          : [];
+      if (history.some((item) => item.id === completionId)) {
+        return reminders[reminderIndex];
+      }
+
       reminders[reminderIndex] = {
         ...reminders[reminderIndex],
         completedAt,
+        completionHistory: [...history, {
+          id: completionId,
+          occurrenceDate,
+          completedAt,
+          satisfactionType,
+        }],
       };
 
       options.onChange?.();

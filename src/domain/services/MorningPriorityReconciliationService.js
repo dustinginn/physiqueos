@@ -1,9 +1,9 @@
 import { createDailyCheckIn } from "../models/dailyCheckIn";
 import { getPreviousLocalDayWindow } from "../utils/localDate";
 import {
-  createPriorityOccurrenceKey,
   getPreviousDayIncompletePrioritySelection,
 } from "./DailyFocusService";
+import { createPriorityOccurrenceKey } from "./ReminderOccurrenceCompletion.js";
 import {
   MORNING_RECONCILIATION_ITEM_KINDS,
   createMorningEvidenceRecoverySelection,
@@ -151,7 +151,11 @@ export function createMorningPriorityReconciliationService({
         if (submission.disposition === "completed") {
           await repositories.reminders.completeReminder(
             submission.priorityId,
-            `${submission.occurrenceDate}T20:00:00`
+            `${submission.occurrenceDate}T20:00:00`,
+            {
+              occurrenceDate: submission.occurrenceDate,
+              satisfactionType: "morning_check_in_reconciliation",
+            },
           );
         }
       }

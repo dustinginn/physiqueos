@@ -1,6 +1,8 @@
 import { createReminderRepository } from "../../data/repositories/ReminderRepository.js";
 import {
   isReminderOccurrenceCompleted,
+  createPriorityOccurrenceKey,
+  resolvePriorityExecutionContract,
   resolveReminderOccurrenceDate,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 
@@ -37,11 +39,13 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
             return Object.freeze({
               status: "already_completed",
               occurrenceDate: effectiveOccurrenceDate,
+              occurrenceKey: createPriorityOccurrenceKey(priorityId, effectiveOccurrenceDate),
+              execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate: effectiveOccurrenceDate }),
               reminder: current,
             });
           }
-          const result = effectiveOccurrenceDate && dose && protocolId
-            ? await reminders.completeReminderFromEvidence(priorityId, {
+          if (effectiveOccurrenceDate && dose && protocolId) {
+            await reminders.completeReminderFromEvidence(priorityId, {
                 id: `${priorityId}:${effectiveOccurrenceDate}`,
                 completedAt,
                 evidenceDate: effectiveOccurrenceDate,
@@ -49,11 +53,18 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
                 protocolId,
                 satisfactionType: "scheduled_protocol_execution",
                 canonicalEvidenceId: null,
-              })
-            : await reminders.completeReminder(priorityId, completedAt);
+            });
+          } else {
+            await reminders.completeReminder(priorityId, completedAt, {
+              occurrenceDate: effectiveOccurrenceDate,
+            });
+          }
+          const result = await reminders.getReminderById(priorityId);
           return Object.freeze({
             status: "completed",
             occurrenceDate: effectiveOccurrenceDate,
+            occurrenceKey: createPriorityOccurrenceKey(priorityId, effectiveOccurrenceDate),
+            execution: resolvePriorityExecutionContract({ reminder: result, occurrenceDate: effectiveOccurrenceDate }),
             reminder: result,
           });
         },
@@ -62,6 +73,8 @@ export function createPriorityCompletionService({ mutateCanonicalRuntime, now = 
         ...committed,
         status: committed.result.status,
         occurrenceDate: committed.result.occurrenceDate,
+        occurrenceKey: committed.result.occurrenceKey,
+        execution: committed.result.execution,
         completion: committed.result.reminder,
       });
     },

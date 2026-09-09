@@ -40,3 +40,35 @@ export function isReminderOccurrenceCompleted(reminder, {
     return getLocalDateKey(entry?.completedAt, resolvedTimeZone) === occurrenceDate;
   });
 }
+
+export function createPriorityOccurrenceKey(priorityId, occurrenceDate) {
+  const id = String(priorityId ?? "").trim();
+  const date = String(occurrenceDate ?? "").trim();
+  if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new TypeError("Priority occurrence identity requires a priority ID and intended calendar date.");
+  }
+  return `${id}:${date}`;
+}
+
+export function resolvePriorityExecutionContract({ reminder, occurrenceDate } = {}) {
+  if (!reminder?.id) throw new TypeError("Priority execution requires a canonical reminder ID.");
+  const identity = {
+    priorityId: reminder.id,
+    occurrenceDate,
+    occurrenceKey: createPriorityOccurrenceKey(reminder.id, occurrenceDate),
+  };
+  if (reminder.id === "reminder_morning_weight" || reminder.linkedEvidenceType === "weight") {
+    return Object.freeze({ ...identity, workflow: "morning_check_in", destination: "/check-in/morning" });
+  }
+  if (reminder.linkedEvidenceType === "progress_photo") {
+    return Object.freeze({ ...identity, workflow: "progress_photos", destination: "/evidence/photos" });
+  }
+  if (reminder.linkedEvidenceType === "dexa") {
+    return Object.freeze({ ...identity, workflow: "dexa_evidence", destination: "/evidence/dexa" });
+  }
+  return Object.freeze({
+    ...identity,
+    workflow: "priority_detail",
+    destination: `/priorities/${encodeURIComponent(reminder.id)}`,
+  });
+}
