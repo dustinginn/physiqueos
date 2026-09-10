@@ -31,7 +31,6 @@ export function createNativeProductionContractRuntime({ founderAuthService, owne
     now,
   });
 }
-
 export async function getProductionNativeContractRuntime(env = process.env) {
   if (runtime) return runtime;
   const composition = await getProductionApplicationComposition(env);
@@ -62,4 +61,3 @@ export function resetProductionNativeContractRuntimeForTests() {
   if (process.env.NODE_ENV === "production") throw new Error("The Native production contract runtime cannot be reset in production.");
   runtime = undefined;
 }
-

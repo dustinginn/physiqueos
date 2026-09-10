@@ -94,4 +94,3 @@ HealthKit sends a recomputed canonical day for additions, source corrections, an
 5. Keep Sandbox credentials, URLs, and data stores separate throughout.
 
 This manifest is a technical readiness contract. It does not itself enable Founder data in Native or authorize a production write acceptance.
-

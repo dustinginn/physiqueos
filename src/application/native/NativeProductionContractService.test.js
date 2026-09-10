@@ -48,7 +48,6 @@ function fixture(overrides = {}) {
   });
   return { executeCommand, openMedia, readers, service };
 }
-
 describe("Native production contract boundary", () => {
   it("publishes a Founder-production profile without provider or database implementation identity", async () => {
     const result = await fixture().service.profile({ request: request() });
@@ -121,4 +120,3 @@ describe("Native production contract boundary", () => {
 function request() {
   return new Request("https://physiqueos.example/api/v1/native/read/home", { headers: { authorization: `Bearer ${"x".repeat(43)}` } });
 }
-
