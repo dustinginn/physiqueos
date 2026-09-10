@@ -70,14 +70,17 @@ describe("inactive Founder authentication lifecycle", () => {
       pairingCredential: expect.any(String),
     });
     expect(result.pairingCredential).toHaveLength(43);
-    expect(identity.createRecoveryCredential).toHaveBeenCalledWith(expect.objectContaining({
-      userId: "user", expiresAt: NOW, credentialHash: expect.any(String),
+    expect(identity.createDevice).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", platform: "founder-web", displayName: "Founder web pairing issuer",
     }));
-    expect(identity.consumeRecoveryCredential).toHaveBeenCalledWith(expect.objectContaining({ at: NOW }));
-    expect(identity.createPairingCredentialWithRecoveryIssuer).toHaveBeenCalledWith(expect.objectContaining({
-      userId: "user", issuedBySessionId: null, expiresAt: new Date("2026-08-11T12:10:00.000Z"),
+    expect(identity.createSession).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", authenticatedAt: NOW, idleExpiresAt: new Date("2026-08-11T12:10:00.000Z"),
     }));
-    const storedPairing = identity.createPairingCredentialWithRecoveryIssuer.mock.calls[0][0];
+    expect(identity.createPairingCredential).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", issuedBySessionId: expect.any(String), expiresAt: new Date("2026-08-11T12:10:00.000Z"),
+    }));
+    expect(identity.revokeDevice).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", at: NOW }));
+    const storedPairing = identity.createPairingCredential.mock.calls[0][0];
     expect(storedPairing.credentialHash).not.toContain(result.pairingCredential);
     expect(identity.recordSecurityEvent).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user",
@@ -97,8 +100,8 @@ describe("inactive Founder authentication lifecycle", () => {
     await expect(serviceFor(identity).issuePairingCredentialFromFounderWeb(input)).rejects.toMatchObject({
       status: 403, code: "FOUNDER_PRODUCTION_AUTHORITY_UNAVAILABLE",
     });
-    expect(identity.createRecoveryCredential).not.toHaveBeenCalled();
-    expect(identity.createPairingCredentialWithRecoveryIssuer).not.toHaveBeenCalled();
+    expect(identity.createDevice).not.toHaveBeenCalled();
+    expect(identity.createPairingCredential).not.toHaveBeenCalled();
   });
 
   it("fails closed when the configured production owner does not exist", async () => {
@@ -106,7 +109,7 @@ describe("inactive Founder authentication lifecycle", () => {
     await expect(serviceFor(identity).issuePairingCredentialFromFounderWeb({
       userId: "other-user", authority: "founder-production",
     })).rejects.toMatchObject({ status: 403, code: "FOUNDER_PRODUCTION_AUTHORITY_UNAVAILABLE" });
-    expect(identity.createPairingCredentialWithRecoveryIssuer).not.toHaveBeenCalled();
+    expect(identity.createPairingCredential).not.toHaveBeenCalled();
   });
 
   it("issues one ten-minute pairing credential from the correct live recovery authority without creating a session", async () => {

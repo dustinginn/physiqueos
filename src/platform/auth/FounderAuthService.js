@@ -54,33 +54,41 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
 
       const now = clock();
       const expiresAt = new Date(now.getTime() + PAIRING_LIFETIME_MS);
-      const issuerId = createId();
+      const issuerDeviceId = createId();
+      const issuerSessionId = createId();
       const pairingCredentialId = createId();
       const pairingCredential = createSecret();
 
-      // The existing schema requires every pairing credential to have either a
-      // live-session issuer or a recovery-style one-time issuer. Founder web
-      // sessions are intentionally stateless, so create an internal issuer
-      // grant and consume it immediately in this same transaction. Its secret
-      // is never returned or logged and cannot become recovery authority.
-      const internalIssuerSecret = createSecret();
-      await transaction.identity.createRecoveryCredential({
-        id: issuerId,
+      // Production Founder web sessions are stateless, while the production
+      // pairing schema requires a session issuer. Represent this web
+      // authorization with a credential-free internal session, bind the
+      // pairing row to it, and revoke it in the same transaction. The issuer
+      // can never authenticate and the short-lived pairing remains the only
+      // secret returned to the authenticated Founder.
+      await transaction.identity.createDevice({
+        id: issuerDeviceId,
         userId,
-        credentialHash: hash(internalIssuerSecret),
-        hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH,
-        expiresAt: now,
+        platform: "founder-web",
+        displayName: "Founder web pairing issuer",
       });
-      await transaction.identity.consumeRecoveryCredential({ id: issuerId, at: now });
-      await transaction.identity.createPairingCredentialWithRecoveryIssuer({
+      await transaction.identity.createSession({
+        id: issuerSessionId,
+        userId,
+        deviceId: issuerDeviceId,
+        authenticatedAt: now,
+        idleExpiresAt: expiresAt,
+        absoluteExpiresAt: expiresAt,
+        refreshFamilyId: createId(),
+      });
+      await transaction.identity.createPairingCredential({
         id: pairingCredentialId,
         userId,
-        issuedBySessionId: null,
-        issuedByRecoveryCredentialId: issuerId,
+        issuedBySessionId: issuerSessionId,
         credentialHash: hash(pairingCredential),
         hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH,
         expiresAt,
       });
+      await transaction.identity.revokeDevice({ deviceId: issuerDeviceId, userId, at: now });
       await transaction.identity.recordSecurityEvent({
         id: createId(),
         userId,
@@ -91,6 +99,8 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
           authority: FOUNDER_PRODUCTION_AUTHORITY,
           channel: "founder_web_session",
           pairingCredentialId,
+          issuerDeviceId,
+          issuerSessionId,
           expiresAt: expiresAt.toISOString(),
         },
       });
