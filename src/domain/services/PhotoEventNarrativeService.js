@@ -79,6 +79,19 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
     photoSessionId: session.id,
     eventDate: session.captureDate,
     generatedAt,
+    evidenceBinding: {
+      photoSessionId: session.id,
+      sessionRevision: Number(session.revision ?? 1),
+      photos: session.views.map((view) => ({
+        photoId: view.canonicalPhotoId ?? view.canonicalViewId,
+        poseId: view.poseId,
+        mediaReference: view.imageReference ?? null,
+        priorPhotoSessionId: view.comparison?.previousSessionId ?? null,
+        priorPhotoId: view.comparison?.previousCanonicalViewId ?? null,
+        priorMediaReference: view.comparison?.previousImageReference ?? null,
+      })).sort((left, right) =>
+        `${left.poseId}|${left.photoId}`.localeCompare(`${right.poseId}|${right.photoId}`)),
+    },
     sourceMode: "canonical_photo_session",
     completion: session.completionLabel,
     activeViews,
@@ -206,8 +219,9 @@ export function createPhotoEventNarrativeService({
       });
       const photoEventContext=loadInputs
         ? composePhotoEventContext({ activeGoal: goal, goals, executionItems, dexaScans,
-          evidenceDate: session.captureDate })
-        : await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate});
+          evidenceDate: session.captureDate, evidenceAttribution: session })
+        : await resolvePhotoEventContext({repositories,userId,evidenceDate:session.captureDate,
+          evidenceAttribution: session});
       const publicationContext=createPhotoEventPublicationContext({
         goal,
         photoEventContext,

@@ -63,7 +63,7 @@ async function providerMediaResponse(pathParts) {
     if (!upstream.ok || !upstream.body) return new NextResponse("Not found", { status: 404 });
     return new NextResponse(upstream.body, {
       headers: {
-        "Cache-Control": "private, max-age=86400, immutable",
+        "Cache-Control": "private, no-store",
         "Content-Type": upstream.headers.get("content-type") ?? "application/octet-stream",
         ...(upstream.headers.get("content-length") ? { "Content-Length": upstream.headers.get("content-length") } : {}),
         "X-Content-Type-Options": "nosniff",

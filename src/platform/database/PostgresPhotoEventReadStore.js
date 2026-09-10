@@ -17,8 +17,6 @@ export function createPostgresPhotoEventReadStore({
         error.code = "PHOTO_EVENT_OWNER_MISMATCH";
         throw error;
       }
-      const eventDate = sessionDate(sessionId);
-      const windowStart = shiftDate(eventDate, -6);
       let queryCount = 0;
       let rowCount = 0;
       let payloadBytes = 0;
@@ -36,6 +34,24 @@ export function createPostgresPhotoEventReadStore({
       }));
 
       try {
+        const sessionRows = await query(
+          `SELECT record_id,payload,version
+             FROM physiqueos.canonical_evidence_records
+            WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+              AND COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='photo_session'
+              AND (record_id=$2 OR payload->>'canonicalId'=$2
+                OR payload#>>'{payload,sessionId}'=$2)
+            ORDER BY version DESC,record_id LIMIT 1`,
+          [ownerUserId, sessionId],
+        );
+        const canonicalSession = payloads(sessionRows)[0] ?? null;
+        if (!canonicalSession) {
+          const error = new Error("Canonical Photo Session is unavailable.");
+          error.code = "PHOTO_EVENT_SESSION_UNAVAILABLE";
+          throw error;
+        }
+        const eventDate = canonicalSessionDate(canonicalSession);
+        const windowStart = shiftDate(eventDate, -6);
         const [evidenceRows, weightRows, goalRows, executionRows,
           confidenceRows, briefingRows, metadataRows] = await Promise.all([
           query(
@@ -108,7 +124,10 @@ export function createPostgresPhotoEventReadStore({
         const legacyPhotos = byCollection(evidenceRows, "progressPhotos");
         const dexaScans = byCollection(evidenceRows, "dexaScans");
         const goals = byCollection(goalRows, "goals");
-        const goal = selectCanonicalActiveGoal(goals);
+        const persistedGoalId = canonicalSession.goalId ??
+          canonicalSession.goalPhaseAttribution?.goalId ?? null;
+        const goal = goals.find((item) => item.id === persistedGoalId) ??
+          selectCanonicalActiveGoal(goals);
         const analyses = byCollection(confidenceRows, "analyses");
         const artifacts = payloads(briefingRows);
         const metadata = metadataRows[0] ?? {};
@@ -134,6 +153,7 @@ export function createPostgresPhotoEventReadStore({
           legacyPhotos,
           weights: canonicalWeightEntries(payloads(weightRows)),
           analyses,
+          canonicalSession,
           goal,
           goals,
           executionItems: payloads(executionRows),
@@ -161,14 +181,17 @@ export function createPostgresPhotoEventReadStore({
   });
 }
 
-function sessionDate(sessionId) {
-  const match = String(sessionId ?? "").match(/(\d{4}-\d{2}-\d{2})(?!.*\d{4}-\d{2}-\d{2})/);
-  if (!match) {
+function canonicalSessionDate(session) {
+  const date = String(
+    session?.payload?.captureDate ?? session?.payload?.observed_at ??
+    session?.captureDate ?? session?.lastObservedAt ?? ""
+  ).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     const error = new Error("Canonical PhotoSession identity has no effective date.");
     error.code = "PHOTO_EVENT_SESSION_DATE_REQUIRED";
     throw error;
   }
-  return match[1];
+  return date;
 }
 
 function shiftDate(value, days) {

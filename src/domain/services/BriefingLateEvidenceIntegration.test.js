@@ -341,6 +341,11 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       canonicalId: photoSessionId,
       evidence_type: "photo_session",
       lastObservedAt: "2026-08-08",
+      payload: { sessionId: photoSessionId },
+      provenance: {
+        evidence_package_ids: ["photo-package"],
+        contributing_evidence_object_ids: ["photo-session-object"],
+      },
       quality: { status: "active" },
     }];
     const confidence = [{ id: "confidence-current", score: 59 }];
@@ -351,6 +356,7 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       interpretedEvidence: {
         package_id: "photo-package",
         evidence_objects: [{
+          id: "photo-session-object",
           evidence_type: "photo_session",
           observed_at: "2026-08-08",
         }],
@@ -389,6 +395,9 @@ describe("late-evidence confirmation and recovery finalization integration", () 
       },
       dailyBriefings: {
         listDailyBriefings: async () => state.dailyBriefings,
+      },
+      canonicalEvidence: {
+        listCanonicalEvidenceObjects: async () => canonicalEvidenceObjects,
       },
       evidenceReviews: {
         getReviewById: async () => state.review,

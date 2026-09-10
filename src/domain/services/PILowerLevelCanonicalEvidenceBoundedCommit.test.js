@@ -17,7 +17,7 @@ describe("provider-bounded lower-level canonical evidence commit", () => {
     ["Activity", evidence("activity_day", { daily_activity: { move_calories: 700 } })],
     ["Weight", evidence("weight", { value: 169.1, unit: "lb" })],
     ["Progress Photo", evidence("progress_photo", { angle: "front" })],
-    ["DEXA", evidence("dexa", { body_fat_percent: 14.2 })],
+    ["DEXA", dexaEvidence()],
   ])("commits and replays %s through one bounded provider mutation", async (_label, evidenceObject) => {
     const fixture = boundedFixture();
     const packageValue = evidencePackage(evidenceObject);
@@ -382,6 +382,21 @@ function evidence(evidenceType, values = {}) {
     provenance: { source_artifact_refs: [`${evidenceType}.png`] },
     ...values,
   };
+}
+
+function dexaEvidence() {
+  return evidence("dexa", {
+    measuredAt: "2026-08-26",
+    totalMass: { value: 170, unit: "lb" },
+    bodyFatPercentage: 14,
+    fatMass: { value: 23.8, unit: "lb" },
+    leanMass: { value: 139.2, unit: "lb" },
+    boneMineralContent: { value: 7, unit: "lb" },
+    provenance: {
+      extraction_engine: "test-fixture",
+      source_artifact_refs: ["dexa.pdf"],
+    },
+  });
 }
 
 function evidencePackage(evidenceObject) {

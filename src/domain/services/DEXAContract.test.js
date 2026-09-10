@@ -46,6 +46,25 @@ describe("DEXA contract and read model", () => {
     });
   });
 
+  it("carries canonical revision and frozen Goal/Phase attribution into the compatibility read model", () => {
+    expect(toDexaReadModel(validScan(), {
+      canonicalId: "canonical-dexa",
+      dexaRevision: { revision: 2, semanticFingerprint: "sha256_value" },
+      goalPhaseAttribution: {
+        goalId: "goal-at-scan",
+        phaseId: "phase-at-scan",
+        source: "persisted_artifact",
+      },
+      userId: "founder",
+    })).toMatchObject({
+      canonicalId: "canonical-dexa",
+      dexaRevision: { revision: 2 },
+      goalId: "goal-at-scan",
+      phaseId: "phase-at-scan",
+      relatedGoalIds: ["goal-at-scan"],
+    });
+  });
+
   it("rejects invalid optional values without requiring absent optional values", () => {
     expect(validateDexaScan(validScan()).valid).toBe(true);
     expect(validateDexaScan(validScan({ visceralAdiposeTissue: { mass: { value: -1, unit: "lb" } } })).valid).toBe(false);

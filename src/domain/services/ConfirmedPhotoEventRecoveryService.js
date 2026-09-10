@@ -28,8 +28,25 @@ export function createConfirmedPhotoEventRecoveryService({
       }
       const photoObject = (review.interpretedEvidence?.evidence_objects ?? []).find((item) => item.evidence_type === "photo_session" && item.removed !== true);
       if (!photoObject) return blocked("photo_session_unavailable", "The confirmed review has no PhotoSession.");
-      const date = String(photoObject.observed_at).slice(0, 10);
-      const sessionId = `photo_session_${userId}_${date}`;
+      const packageId = review.interpretedEvidence?.package_id ??
+        review.interpretedEvidence?.id ?? null;
+      const canonicalObjects = await repositories.canonicalEvidence
+        .listCanonicalEvidenceObjects(userId);
+      const canonicalSession = canonicalObjects.find((item) =>
+        item.evidence_type === "photo_session" &&
+        item.quality?.status !== "superseded" &&
+        ((item.provenance?.evidence_package_ids ?? []).includes(packageId) ||
+          (item.provenance?.contributing_evidence_object_ids ?? [])
+            .includes(photoObject.id))
+      );
+      const sessionId = canonicalSession?.payload?.sessionId ??
+        canonicalSession?.canonicalId ?? null;
+      if (!sessionId) {
+        return blocked(
+          "canonical_photo_session_unavailable",
+          "The confirmed review is not bound to a canonical Photo Session."
+        );
+      }
       const artifactId = `event_briefing_progress_photo_${sessionId}`;
       const artifacts = await repositories.dailyBriefings.listDailyBriefings(userId);
       const existing = artifacts.find((item) => item.id === artifactId) ?? null;

@@ -26,6 +26,19 @@ import { resolveCanonicalEvidenceLocalDate } from "./CanonicalEvidenceDateServic
 import {
   resolveCanonicalEvidenceGoalPhaseAttribution,
 } from "./CanonicalEvidenceGoalPhaseAttributionService";
+import {
+  createCanonicalDexaScanRecord,
+  dexaRecordHasSemanticChange,
+  getDexaLogicalScanKey,
+  getStableDexaCanonicalId,
+  isDexaEvidence,
+  selectActiveCanonicalDexaScans,
+} from "./CanonicalDexaScanService";
+import {
+  getPhotoSessionLogicalKey,
+  getStablePhotoSessionId,
+  selectActiveCanonicalPhotoSessions,
+} from "./CanonicalPhotoSessionIdentityService";
 
 export function reconcileEvidencePackageIntoCanonicalHistory({
   evidencePackage,
@@ -47,6 +60,41 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
   const matchedCanonicalIds = new Set();
 
   (evidencePackage?.evidence_objects ?? []).forEach((evidenceObject) => {
+    if (isDexaEvidence(evidenceObject)) {
+      const selection = selectActiveCanonicalDexaScans(
+        [...canonicalById.values()],
+        { date: String(evidenceObject.measuredAt ?? evidenceObject.observed_at ?? "").slice(0, 10), userId }
+      );
+      if (selection.diagnostics.length > 0) {
+        throw new Error(
+          `DEXA canonical invariant failed for ${evidenceObject.measuredAt ?? evidenceObject.observed_at}: multiple active scans require explicit historical repair.`
+        );
+      }
+      const existingObject = selection.records[0] ?? null;
+      const canonicalId = existingObject?.canonicalId ??
+        getStableDexaCanonicalId(evidenceObject, userId);
+      const canonicalObject = createCanonicalDexaScanRecord({
+        canonicalId,
+        canonicalProvenance: mergeCanonicalProvenance({
+          existingObject,
+          evidenceObject,
+          evidencePackage,
+        }),
+        evidenceObject,
+        evidencePackage,
+        existingObject,
+        goalPhaseAttribution: resolveCanonicalEvidenceGoalPhaseAttribution({
+          evidenceObject,
+          existingObject,
+          goals,
+          userId,
+        }),
+        userId,
+      });
+      canonicalById.set(canonicalId, canonicalObject);
+      matchedCanonicalIds.add(canonicalId);
+      return;
+    }
     if (isNutritionDay(evidenceObject)) {
       const selection = selectActiveCanonicalNutritionDays(
         [...canonicalById.values()],
@@ -120,7 +168,38 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
       matchedCanonicalIds.add(canonicalId);
       return;
     }
-    const canonicalId = getCanonicalEvidenceIdentity(evidenceObject);
+    if (isPhotoSession(evidenceObject)) {
+      const captureDate = resolveCanonicalEvidenceLocalDate(evidenceObject);
+      const selection = selectActiveCanonicalPhotoSessions(
+        [...canonicalById.values()],
+        { captureDate, userId }
+      );
+      if (selection.diagnostics.length > 0) {
+        throw new Error(
+          `Photo Session canonical invariant failed for ${captureDate}: multiple active sessions require explicit historical repair.`
+        );
+      }
+      const existingObject = selection.records[0] ?? null;
+      const canonicalId = existingObject?.canonicalId ??
+        getStablePhotoSessionId({ userId, captureDate });
+      const canonicalObject = createCanonicalEvidenceObject({
+        canonicalId,
+        evidenceObject,
+        evidencePackage,
+        existingObject,
+        goalPhaseAttribution: resolveCanonicalEvidenceGoalPhaseAttribution({
+          evidenceObject,
+          existingObject,
+          goals,
+          userId,
+        }),
+        userId,
+      });
+      canonicalById.set(canonicalId, canonicalObject);
+      matchedCanonicalIds.add(canonicalId);
+      return;
+    }
+    const canonicalId = getCanonicalEvidenceIdentity(evidenceObject, userId);
     const correctionTargetObject = getCorrectionTargetCanonicalObject({
       canonicalById,
       evidenceObject,
@@ -166,6 +245,12 @@ export function reconcileEvidencePackageIntoCanonicalHistory({
       evidenceObject,
       evidencePackage,
       existingObject: mergedExistingObject,
+      goalPhaseAttribution: resolveCanonicalEvidenceGoalPhaseAttribution({
+        evidenceObject,
+        existingObject: mergedExistingObject,
+        goals,
+        userId,
+      }),
       userId,
     });
 
@@ -228,13 +313,25 @@ export function reconcileConfirmedEvidencePackage({
     )]
   ));
   scopedEvidencePackage.evidence_objects.forEach((object) => {
-    const incomingId = getCanonicalEvidenceIdentity(object);
+    const incomingId = getCanonicalEvidenceIdentity(object, userId);
     const resolvedIncomingId = isNutritionDay(object)
       ? [...reconciledById.values()].find((candidate) =>
           candidate.quality?.status !== "superseded" &&
           isNutritionDay(candidate.payload) &&
           getNutritionDayLogicalKey(candidate) === getNutritionDayLogicalKey(object)
         )?.canonicalId ?? incomingId
+      : isDexaEvidence(object)
+        ? [...reconciledById.values()].find((candidate) =>
+            isDexaEvidence(candidate) &&
+            getDexaLogicalScanKey(candidate) ===
+              getDexaLogicalScanKey({ payload: object, userId })
+          )?.canonicalId ?? incomingId
+      : isPhotoSession(object)
+        ? [...reconciledById.values()].find((candidate) =>
+            candidate.evidence_type === "photo_session" &&
+            getPhotoSessionLogicalKey(candidate, userId) ===
+              getPhotoSessionLogicalKey(object, userId)
+          )?.canonicalId ?? incomingId
       : incomingId;
     uniqueStrings([
       object.reconciliation?.supersedes_canonical_id,
@@ -261,6 +358,7 @@ export function reconcileConfirmedEvidencePackage({
     const payload = object.payload ?? object;
     if (isActivityDay(payload)) return activityRecordHasSemanticChange(object, prior);
     if (isNutritionDay(payload)) return nutritionRecordHasSemanticChange(object, prior);
+    if (isDexaEvidence(payload)) return dexaRecordHasSemanticChange(object, prior);
     return true;
   });
 
@@ -293,7 +391,8 @@ export function buildCanonicalReconciliationScope({
     (object) => object.removed !== true
   );
   const incomingCanonicalIdentities = uniqueStrings(
-    incomingObjects.map(getCanonicalEvidenceIdentity)
+    incomingObjects.map((object) => getCanonicalEvidenceIdentity(object,
+      object.userId ?? evidencePackage?.userId))
   );
   const directlyRelated = new Set();
   const superseded = new Set();
@@ -302,7 +401,8 @@ export function buildCanonicalReconciliationScope({
   );
 
   incomingObjects.forEach((object) => {
-    const incomingId = getCanonicalEvidenceIdentity(object);
+    const incomingId = getCanonicalEvidenceIdentity(
+      object, object.userId ?? evidencePackage?.userId);
     if (canonicalById.has(incomingId)) directlyRelated.add(incomingId);
 
     const explicitIds = getExplicitCanonicalRelationshipIds(object, evidencePackage);
@@ -338,7 +438,26 @@ export function buildCanonicalReconciliationScope({
   };
 }
 
-export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
+export function getCanonicalEvidenceIdentity(evidenceObject = {}, userId = null) {
+  if (isDexaEvidence(evidenceObject)) {
+    return getStableDexaCanonicalId(
+      evidenceObject,
+      userId ?? evidenceObject.userId
+    ) ?? [
+      "dexa_scan",
+      getDateKey(evidenceObject.observed_at ?? evidenceObject.measuredAt),
+      evidenceObject.id,
+    ].join("|");
+  }
+
+  if (isPhotoSession(evidenceObject)) {
+    return getStablePhotoSessionId({
+      userId: userId ?? evidenceObject.userId,
+      captureDate: evidenceObject.observed_at ?? evidenceObject.captureDate,
+    }) ?? ["photo_session", getDateKey(evidenceObject.observed_at),
+      evidenceObject.id].join("|");
+  }
+
   const explicitCanonicalId = String(
     evidenceObject.reconciliation?.canonical_id ?? ""
   ).trim();
@@ -356,18 +475,6 @@ export function getCanonicalEvidenceIdentity(evidenceObject = {}) {
     return getWorkoutDuplicateIdentityKey(evidenceObject);
   }
 
-  if (isPhotoSession(evidenceObject)) {
-    return [
-      "photo_session",
-      getDateKey(evidenceObject.observed_at),
-      ...uniqueStrings(
-        evidenceObject.provenance?.source_artifact_refs ??
-          evidenceObject.source?.source_artifact_refs ??
-          []
-      ),
-    ].join("|");
-  }
-
   return [
     evidenceObject.evidence_type ?? "evidence",
     getDateKey(evidenceObject.observed_at),
@@ -380,6 +487,7 @@ function createCanonicalEvidenceObject({
   evidenceObject,
   evidencePackage,
   existingObject,
+  goalPhaseAttribution = null,
   userId,
 }) {
   const candidate = normalizeCanonicalPayload(evidenceObject);
@@ -393,6 +501,8 @@ function createCanonicalEvidenceObject({
     evidencePackage,
   });
   const now = new Date().toISOString();
+  const attribution = existingObject?.goalPhaseAttribution ??
+    goalPhaseAttribution ?? null;
 
   return {
     canonicalId,
@@ -400,6 +510,11 @@ function createCanonicalEvidenceObject({
     evidence_type: payload.evidence_type,
     firstObservedAt: existingObject?.firstObservedAt ?? payload.observed_at ?? null,
     lastObservedAt: payload.observed_at ?? existingObject?.lastObservedAt ?? null,
+    ...(attribution ? {
+      goalId: attribution.goalId,
+      phaseId: attribution.phaseId,
+      goalPhaseAttribution: attribution,
+    } : {}),
     payload,
     provenance: canonicalProvenance,
     quality: {
@@ -659,7 +774,9 @@ function findCompatibleCanonicalObjects(canonicalById, evidenceObject) {
   if (
     !isTrainingSession(evidenceObject) &&
     !isActivityDay(evidenceObject) &&
-    !isNutritionDay(evidenceObject)
+    !isNutritionDay(evidenceObject) &&
+    !isDexaEvidence(evidenceObject) &&
+    !isPhotoSession(evidenceObject)
   ) {
     return [];
   }
@@ -671,6 +788,17 @@ function findCompatibleCanonicalObjects(canonicalById, evidenceObject) {
           getNutritionDayLogicalKey(evidenceObject)
       : isTrainingSession(evidenceObject)
       ? isCompatibleTrainingPayload(canonicalObject.payload, evidenceObject)
+      : isDexaEvidence(evidenceObject)
+      ? isDexaEvidence(canonicalObject.payload) &&
+        getDexaLogicalScanKey(canonicalObject) ===
+          getDexaLogicalScanKey({ payload: evidenceObject, userId: canonicalObject.userId })
+      : isPhotoSession(evidenceObject)
+      ? canonicalObject.evidence_type === "photo_session" &&
+        getPhotoSessionLogicalKey(canonicalObject) ===
+          getPhotoSessionLogicalKey({
+            payload: evidenceObject,
+            userId: canonicalObject.userId,
+          })
       : isCompatibleActivityDayPayload(canonicalObject.payload, evidenceObject)
   );
 }

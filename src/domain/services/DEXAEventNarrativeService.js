@@ -89,6 +89,7 @@ export function composeDEXAEventNarrative({ scan, priorScan, phaseBaselineScan =
 
   const narrative = {
     eventId, artifactId: eventId, scanId: scan.id, priorScanId: priorScan.id, scanDate, priorScanDate, daysBetweenScans, generatedAt,
+    evidenceBinding: createDexaEvidenceBinding(scan, priorScan),
     version: DEXA_EVENT_VERSION, presentationVersion: DEXA_PRESENTATION_VERSION, preview,
     semanticGoalType,
     context: context ? publicContext(context) : null,
@@ -199,6 +200,7 @@ function composeFirstDEXAEventNarrative({
     priorScanDate: null,
     daysBetweenScans: 0,
     generatedAt,
+    evidenceBinding: createDexaEvidenceBinding(scan, null),
     version: DEXA_EVENT_VERSION,
     presentationVersion: DEXA_PRESENTATION_VERSION,
     preview,
@@ -355,6 +357,7 @@ function composeGoalAwareDEXAEventNarrative({
     priorScanDate,
     daysBetweenScans,
     generatedAt,
+    evidenceBinding: createDexaEvidenceBinding(scan, priorScan),
     version: DEXA_EVENT_VERSION,
     presentationVersion: DEXA_PRESENTATION_VERSION,
     preview,
@@ -695,9 +698,7 @@ export function createDEXAEventNarrativeService({
     },
     getByScanId: async ({ userId, scanId }) => {
       const existing = (await repositories.dailyBriefings.listDailyBriefings(userId)).find((item) => item.id === `dexa_event_${scanId}` && item.preview !== true) ?? null;
-      if (!existing) return null;
-      const scans = await repositories.dexaScans.listDEXAScans(userId);
-      return hydratePersistedDEXASupplemental(existing, scans);
+      return existing;
     },
   };
 }
@@ -717,6 +718,22 @@ export function hydratePersistedDEXASupplemental(artifact, scans = []) {
   ].filter(Boolean);
   if (supplemental.length === 0) return artifact;
   return { ...artifact, briefing: { ...artifact.briefing, dexaEventNarrative: { ...narrative, progress: { ...narrative.progress, supplemental } } } };
+}
+
+function createDexaEvidenceBinding(scan, priorScan) {
+  const bind = (value) => value ? {
+    scanId: value.id,
+    revision: Number(value.dexaRevision?.revision ?? 1),
+    measuredAt: dateKey(value.measuredAt ?? value.date),
+    sourceFileId: value.sourceFileId ?? null,
+    totalMass: mass(value.totalMass),
+    bodyFatPercentage: number(value.bodyFatPercentage),
+    fatMass: mass(value.fatMass),
+    leanMass: mass(value.leanMass),
+    boneMineralContent: mass(value.boneMineralContent),
+    restingMetabolicRate: mass(value.restingMetabolicRate),
+  } : null;
+  return Object.freeze({ current: bind(scan), prior: bind(priorScan) });
 }
 
 export function resolveDEXAPhaseBaseline({ scans = [], scan, priorScan, goal, previewBaselineScanId = null, userId }) {

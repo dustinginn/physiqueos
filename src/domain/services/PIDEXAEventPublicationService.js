@@ -143,6 +143,10 @@ function validateCommand(command) {
   if (command.artifact?.trigger?.evidenceId !== command.canonicalDEXAId) {
     return "Canonical DEXA identity differs from the Event trigger.";
   }
+  if (command.artifact?.briefing?.dexaEventNarrative?.evidenceBinding
+    ?.current?.scanId !== command.canonicalDEXAId) {
+    return "DEXA Event evidence binding differs from the Event trigger.";
+  }
   return null;
 }
 function classifyEvent(existing, command) {
@@ -187,7 +191,26 @@ function eventConfidenceId(artifact) {
 function sameEvent(left, right) {
   return left.id === right.id &&
     left.trigger?.evidenceId === right.trigger?.evidenceId &&
-    eventConfidenceId(left) === eventConfidenceId(right);
+    eventConfidenceId(left) === eventConfidenceId(right) &&
+    stableDexaBinding(left) === stableDexaBinding(right);
+}
+function stableDexaBinding(artifact) {
+  const narrative = artifact.briefing?.dexaEventNarrative ?? {};
+  return JSON.stringify(narrative.evidenceBinding ?? {
+    current: {
+      scanId: narrative.scanId ?? artifact.trigger?.evidenceId,
+      measuredAt: narrative.scanDate ?? narrative.snapshot?.scanDate ?? null,
+      totalMass: narrative.snapshot?.weight ?? null,
+      bodyFatPercentage: narrative.snapshot?.bodyFat ?? null,
+      fatMass: narrative.snapshot?.fatMass ?? null,
+      leanMass: narrative.snapshot?.leanMass ?? null,
+      restingMetabolicRate: narrative.snapshot?.rmr ?? null,
+    },
+    prior: narrative.priorScanId ? {
+      scanId: narrative.priorScanId,
+      measuredAt: narrative.priorScanDate ?? null,
+    } : null,
+  });
 }
 function capture(filePath, readText) {
   const raw = readText(filePath);

@@ -13,10 +13,10 @@ describe("PostgresPhotoEventReadStore", () => {
 
     const result = await store.loadInputs({
       userId: "user_founder_001",
-      sessionId: "photo_session_user_founder_001_2026-08-22",
+      sessionId: "opaque-session-id",
     });
 
-    expect(pool.query).toHaveBeenCalledTimes(7);
+    expect(pool.query).toHaveBeenCalledTimes(8);
     expect(result.canonicalObjects.map((item) => item.id)).toEqual([
       "photo-session", "training-support",
     ]);
@@ -28,12 +28,12 @@ describe("PostgresPhotoEventReadStore", () => {
     });
     expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
       readModel: "photo-event",
-      queryCount: 7,
+      queryCount: 8,
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 2, idleCount: 2, waitingCount: 0 },
     }));
     const evidenceQuery = pool.query.mock.calls.find(([sql]) =>
-      sql.includes("canonical_evidence_records"));
+      sql.includes("canonical_evidence_records") && sql.includes("occurrence_date BETWEEN"));
     expect(evidenceQuery[1]).toEqual([
       "user_founder_001", "2026-08-16", "2026-08-22",
     ]);
@@ -54,6 +54,20 @@ describe("PostgresPhotoEventReadStore", () => {
 
 function fakePool() {
   const query = vi.fn(async (sql) => {
+    if (sql.includes("payload#>>'{payload,sessionId}'")) return { rows: [{
+      record_id: "opaque-session-id",
+      payload: {
+        canonicalId: "opaque-session-id",
+        goalId: "active-goal",
+        phaseId: "phase-at-capture",
+        payload: {
+          evidence_type: "photo_session",
+          sessionId: "opaque-session-id",
+          captureDate: "2026-08-22",
+        },
+      },
+      version: 2,
+    }] };
     if (sql.includes("canonical_evidence_records")) return { rows: [
       row("canonicalEvidenceObjects", "photo-session", {
         id: "photo-session", evidence_type: "photo_session",

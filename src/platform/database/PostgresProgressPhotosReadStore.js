@@ -97,13 +97,32 @@ export function createPostgresProgressPhotosReadStore({ pool, ownerUserId, onCom
         ORDER BY record_id`,
       [ownerUserId],
     ),
-    async listMediaObjects() {
+    async listMediaObjects({
+      objectIds = [],
+      normalizedPaths = [],
+      basenames = [],
+      sourceHashes = [],
+      sourceIds = [],
+    } = {}) {
       return (await query(
         `SELECT id,evidence_record_id,original_filename,sha256,provenance,state
            FROM physiqueos.canonical_media_objects
           WHERE owner_user_id=$1 AND state='verified'
+            AND content_type LIKE 'image/%'
+            AND (
+              id=ANY($2::text[])
+              OR evidence_record_id=ANY($3::text[])
+              OR lower(sha256)=ANY($4::text[])
+              OR lower(replace(coalesce(provenance->>'sourceRelativePath',''),'\\','/'))=ANY($5::text[])
+              OR lower(original_filename)=ANY($6::text[])
+              OR EXISTS (
+                SELECT 1 FROM unnest($6::text[]) AS source(reference)
+                 WHERE right(lower(original_filename),length(source.reference)+1)
+                   IN ('-' || source.reference,'_' || source.reference)
+              )
+            )
           ORDER BY id`,
-        [ownerUserId],
+        [ownerUserId, objectIds, sourceIds, sourceHashes, normalizedPaths, basenames],
       )).map((row) => Object.freeze(row));
     },
   });

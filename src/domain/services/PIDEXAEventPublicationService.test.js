@@ -105,6 +105,22 @@ describe("PI DEXA Event publication", () => {
     expect(read(fixture).dailyBriefings).toHaveLength(1);
     expect(fixture.liveStore.goalConfidenceHistory).toEqual([]);
   });
+
+  it("rejects a create retry when the bound DEXA revision changed", async () => {
+    const fixture = setup();
+    let baseline = fixture.service.captureBaseline();
+    await fixture.service.publish(command(fixture, baseline));
+    baseline = fixture.service.captureBaseline();
+    const changed = command(fixture, baseline, {
+      confidenceMode: "matched-only",
+      confidencePublicationCommand: null,
+    });
+    changed.artifact.briefing.dexaEventNarrative.evidenceBinding.current.revision = 2;
+    await expect(fixture.service.publish(changed)).resolves.toMatchObject({
+      status: "dexa_event_conflict",
+      committed: false,
+    });
+  });
 });
 
 function setup(unitOfWorkOptions = {}) {
@@ -153,10 +169,16 @@ function command(fixture, baseline, overrides = {}) {
     artifactType: "event",
     cadence: "event",
     trigger: { evidenceType: "dexa", evidenceId: "dexa_august_15" },
-    briefing: { dexaEventNarrative: { goalConfidence: {
-      assessmentId: fixture.assessment.id,
-      score: fixture.assessment.score.current,
-    } } },
+    briefing: { dexaEventNarrative: {
+      evidenceBinding: {
+        current: { scanId: "dexa_august_15", revision: 1, measuredAt: "2026-08-15" },
+        prior: null,
+      },
+      goalConfidence: {
+        assessmentId: fixture.assessment.id,
+        score: fixture.assessment.score.current,
+      },
+    } },
   };
   return {
     schemaVersion: "pi_dexa_event_publication_v1",

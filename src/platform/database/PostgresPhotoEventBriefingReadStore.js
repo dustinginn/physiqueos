@@ -19,8 +19,7 @@ export function createPostgresPhotoEventBriefingReadStore({ pool, ownerUserId, o
       };
       try {
         const eventId = `event_briefing_progress_photo_${sessionId}`;
-        const [briefings, goals] = await Promise.all([
-          query(
+        const briefings = await query(
             `SELECT record_id,payload,version
                FROM physiqueos.canonical_briefing_records
               WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
@@ -28,19 +27,21 @@ export function createPostgresPhotoEventBriefingReadStore({ pool, ownerUserId, o
               ORDER BY CASE WHEN record_id=$2 THEN 0 ELSE 1 END,updated_at DESC
               LIMIT 1`,
             [ownerUserId, eventId, sessionId],
-          ),
-          query(
+          );
+        const briefing = briefings[0];
+        const artifact = briefing?.payload;
+        const goalId = artifact?.briefing?.photoEventNarrative?.context
+          ?.activeGoal?.id ?? artifact?.briefing?.photoEventNarrative?.goalId ??
+          artifact?.briefing?.photoEventNarrative?.goalConfidence?.goalId ?? null;
+        const goals = goalId ? await query(
             `SELECT record_id,payload,version
                FROM physiqueos.canonical_goal_records
               WHERE owner_user_id=$1 AND collection_name='goals'
-                AND (record_id='goal_visible_abs_at_rest' OR payload->>'id'='goal_visible_abs_at_rest')
+                AND (record_id=$2 OR payload->>'id'=$2)
               ORDER BY record_id LIMIT 1`,
-            [ownerUserId],
-          ),
-        ]);
-        const briefing = briefings[0];
+            [ownerUserId, goalId],
+          ) : [];
         const goal = goals[0];
-        const artifact = briefing?.payload;
         const lookup = collectMediaLookup(artifact?.briefing?.photoEventNarrative);
         const assessmentId = artifact?.confidencePublication?.assessmentId ??
           artifact?.briefing?.photoEventNarrative?.goalConfidence?.assessmentId ?? null;

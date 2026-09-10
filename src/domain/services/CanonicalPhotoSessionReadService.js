@@ -32,7 +32,9 @@ export function createPhotoSessionReadModels({ canonicalObjects = [], legacyPhot
   const ownedSourceIds = new Set(canonicalSessions.flatMap((session)=>[...(session.inactiveSourceReferences??[]),...session.views.flatMap((view)=>view.provenance?.sourceIds??[])]));
   const canonicalAssetKeys = new Set([...canonicalSessions.flatMap((session)=>session.views.map((view)=>stableAssetKey(view.imageReference,[]))),...legacyPhotos.filter((photo)=>ownedSourceIds.has(photo.id)).map((photo)=>stableAssetKey(photo.imagePath,[]))]);
   const legacySessions = buildLegacySessions(legacyPhotos.filter((photo) => !canonicalAssetKeys.has(stableAssetKey(photo.imagePath,[])) && isUsableLegacyPhoto(photo)), weights, analyses);
-  return finalizeComparisons([...canonicalSessions, ...legacySessions].sort((left, right) => right.captureDate.localeCompare(left.captureDate)));
+  return finalizeComparisons([...canonicalSessions, ...legacySessions].sort((left, right) =>
+    right.captureDate.localeCompare(left.captureDate) ||
+    String(left.id).localeCompare(String(right.id))));
 }
 
 export function createPhotoSessionLandingSummary({ canonicalObjects = [], legacyPhotos = [] } = {}) {
@@ -158,6 +160,10 @@ function buildCanonicalSession(object, context) {
   return {
     id: object.canonicalId,
     photoSessionId: object.canonicalId,
+    revision: Number(object.photoSessionRevision?.revision ?? object.version ?? 1),
+    goalId: object.goalId ?? object.goalPhaseAttribution?.goalId ?? null,
+    phaseId: object.phaseId ?? object.goalPhaseAttribution?.phaseId ?? null,
+    goalPhaseAttribution: object.goalPhaseAttribution ?? null,
     hasStableSessionIdentity: payload.sessionId === object.canonicalId,
     captureDate,
     date: formatDate(captureDate),
@@ -385,7 +391,17 @@ function uniqueActivePhotos(photos, legacyPhotos=[]) {
   photos.filter((photo) => photo.active !== false && !INACTIVE.has(photo.status)).forEach((photo) => { const direct=photo.storage_path??photo.imagePath;const matched=legacyPhotos.find((item)=>direct&&item.imagePath===direct)||legacyPhotos.find((item)=>(photo.sourceIds??[]).includes(item.id));const hydrated=getProgressPhotoCategoryId(photo)==="unknown"&&matched?{...photo,view:matched.view,pose:matched.pose}:photo;const pose = getProgressPhotoCategoryId(hydrated); if (pose !== "unknown" && !byPose.has(pose)) byPose.set(pose, hydrated); });
   return [...byPose.values()];
 }
-function comparePoses(left, right) { return POSE_ORDER.indexOf(getProgressPhotoCategoryId(left)) - POSE_ORDER.indexOf(getProgressPhotoCategoryId(right)); }
+function comparePoses(left, right) {
+  const leftPose = getProgressPhotoCategoryId(left);
+  const rightPose = getProgressPhotoCategoryId(right);
+  const leftOrder = POSE_ORDER.indexOf(leftPose);
+  const rightOrder = POSE_ORDER.indexOf(rightPose);
+  return (leftOrder < 0 ? POSE_ORDER.length : leftOrder) -
+    (rightOrder < 0 ? POSE_ORDER.length : rightOrder) ||
+    leftPose.localeCompare(rightPose) ||
+    String(left.canonicalPhotoId ?? left.id).localeCompare(
+      String(right.canonicalPhotoId ?? right.id));
+}
 function normalizeConditions(conditions = {}) { return Object.fromEntries(Object.entries(conditions ?? {}).map(([key, value]) => [key, value && typeof value === "object" && "value" in value ? value.value : value])); }
 function conditionTags(conditions) { const tags=[]; if(conditions.postWorkout===true)tags.push("Post-workout");if(conditions.morning===false)tags.push("Not morning");if(conditions.fasted===false)tags.push("Not fasted");if(conditions.pump==="unknown"||conditions.pump==null)tags.push("Pump unknown");if(typeof conditions.lighting==="string"&&conditions.lighting!=="unknown")tags.push(`Lighting ${conditions.lighting.replaceAll("_"," ")}`);if(typeof conditions.location==="string"&&conditions.location!=="unknown")tags.push(`Location ${conditions.location.replaceAll("_"," ")}`);return tags; }
 function compareConditions(current, prior) { if(!prior)return[];return Object.keys(current).filter((key)=>current[key]!==undefined&&prior[key]!==undefined&&current[key]!==prior[key]).map((key)=>`${key.replaceAll(/([A-Z])/g," $1").toLowerCase()}: current ${formatCondition(current[key])}; previous ${formatCondition(prior[key])}`); }

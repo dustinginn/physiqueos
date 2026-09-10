@@ -36,7 +36,14 @@ export function createCanonicalPhotoSession({ photos = [], ...data } = {}) {
       duplicateRetrySourceReferences.push(...(photo.sourceIds ?? []));
       return;
     }
-    if (poseId !== "unknown" && !activePhotoIdsByPose[poseId]) {
+    if (poseId !== "unknown") {
+      if (activePhotoIdsByPose[poseId]) {
+        const error = new Error(
+          `Photo Session contains more than one active ${poseId} photo.`
+        );
+        error.code = "PHOTO_SESSION_DUPLICATE_ACTIVE_POSE";
+        throw error;
+      }
       activePhotoIdsByPose[poseId] = photo.canonicalPhotoId ?? photo.id;
     }
   });

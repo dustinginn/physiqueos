@@ -34,6 +34,9 @@ describe("provider-native Progress Photos reads", () => {
     expect(store.run).toHaveBeenCalledWith("progress.photos", expect.any(Function));
     expect(store.getPhotoInputs).toHaveBeenCalledOnce();
     expect(store.listMediaObjects).toHaveBeenCalledOnce();
+    expect(store.listMediaObjects).toHaveBeenCalledWith({
+      objectIds: [], normalizedPaths: [], basenames: [], sourceHashes: [], sourceIds: [],
+    });
   });
 
   it("removes compatibility runtime composition from the route", () => {

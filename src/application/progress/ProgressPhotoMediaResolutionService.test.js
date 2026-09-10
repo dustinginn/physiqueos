@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveProgressPhotoMedia } from "./ProgressPhotoMediaResolutionService.js";
+import {
+  createProgressPhotoMediaLookup,
+  resolveProgressPhotoMedia,
+} from "./ProgressPhotoMediaResolutionService.js";
 import { createPhotoSessionReadModels } from "../../domain/services/CanonicalPhotoSessionReadService.js";
 
 const media = (overrides = {}) => ({
@@ -12,6 +15,27 @@ const media = (overrides = {}) => ({
 });
 
 describe("provider Progress Photo media resolution", () => {
+  it("builds a bounded lookup from referenced photo identities only", () => {
+    expect(createProgressPhotoMediaLookup({
+      canonicalEvidenceObjects: [{ payload: {
+        evidence_type: "photo_session",
+        photos: [{
+          id: "source-photo",
+          sourceIds: ["source-photo"],
+          sourceHashes: ["hash-front"],
+          storage_path: "private/founder/photos/front.jpg",
+        }],
+      } }],
+      progressPhotos: [],
+    })).toEqual({
+      objectIds: [],
+      normalizedPaths: ["photos/front.jpg"],
+      basenames: ["front.jpg"],
+      sourceHashes: ["hash-front"],
+      sourceIds: ["source-photo"],
+    });
+  });
+
   it("maps legacy paths to opaque provider media identities", () => {
     const result = resolveProgressPhotoMedia({
       canonicalEvidenceObjects: [{

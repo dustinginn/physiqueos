@@ -82,6 +82,12 @@ import {
   isEvidenceReviewCanonicalSaveComplete,
 } from "../../../../domain/services/EvidenceReviewBackgroundContinuation";
 import { getProductionEvidenceReviewReadService } from "../../../../application/composition/productionApplicationComposition";
+import {
+  createCanonicalPhotoSessionRecord,
+  getStablePhotoSessionId,
+} from "../../../../domain/services/CanonicalPhotoSessionIdentityService";
+import { resolveCanonicalEvidenceLocalDate } from
+  "../../../../domain/services/CanonicalEvidenceDateService";
 
 function uniqueStrings(values = []) {
   return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
@@ -693,6 +699,8 @@ function createHandlers({ evidencePackage, reviewId, user,
         ? canonicalBeforeCommit
         : scopedResult.canonicalEvidenceObjects ?? scopedResult.changedObjects ?? [];
       if (committedPackage.evidence_objects.some((item) => item.evidence_type === "photo_session")) {
+        canonical = await FounderRepositories.canonicalEvidence
+          .listCanonicalEvidenceObjects(user.id);
         const expanded = expandCanonicalPhotoSessions(canonical, committedPackage, user.id);
         const projectionChanges = selectChangedPhotoProjectionObjects(
           canonical,
@@ -724,7 +732,7 @@ function createHandlers({ evidencePackage, reviewId, user,
         ...scopedResult.report,
       };
     },
-    compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ evidencePackage, user }) }),
+    compatibility_writes: async () => ({ status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user }) }),
     scheduled_completion: async () => {
       canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
       const results = evaluateScheduledCompletion({ canonicalObjects: canonical, evidencePackage });
@@ -1099,7 +1107,7 @@ function publishPostConfirmationRefreshes(orchestrationResult) {
   }
 }
 
-async function commitCompatibilityRepositories({ evidencePackage, user }) {
+async function commitCompatibilityRepositories({ canonical = [], evidencePackage, user }) {
   const records = [];
   for (const object of evidencePackage.evidence_objects ?? []) {
     if (object.removed === true) continue;
@@ -1116,13 +1124,24 @@ async function commitCompatibilityRepositories({ evidencePackage, user }) {
       records.push(entry.id);
     }
     if (["dexa_scan", "dexa", "body_composition"].includes(object.evidence_type)) {
-      const canonicalId = getStableCanonicalId(object, user.id);
-      const scan = toDexaReadModel(object, { canonicalId, userId: user.id });
+      const date = String(object.measuredAt ?? object.observed_at).slice(0, 10);
+      const canonicalRecord = canonical.find((item) =>
+        ["dexa_scan", "dexa", "body_composition"].includes(item.evidence_type) &&
+        item.quality?.status !== "superseded" &&
+        String(item.lastObservedAt ?? item.payload?.measuredAt).slice(0, 10) === date
+      );
+      const canonicalId = canonicalRecord?.canonicalId ?? getStableCanonicalId(object, user.id);
+      const scan = toDexaReadModel(canonicalRecord?.payload ?? object, {
+        canonicalId,
+        dexaRevision: canonicalRecord?.dexaRevision ?? null,
+        goalPhaseAttribution: canonicalRecord?.goalPhaseAttribution ?? null,
+        userId: user.id,
+      });
       await (FounderRepositories.dexaScans.upsertDEXAScan?.(scan) ?? FounderRepositories.dexaScans.addDEXAScan(scan));
       records.push(scan.id);
     }
     if (object.evidence_type === "photo_session") {
-      const date = String(object.observed_at).slice(0, 10);
+      const date = resolveCanonicalEvidenceLocalDate(object);
       const existing = await FounderRepositories.progressPhotos.getPhotosByDate(user.id, date);
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
         const id = `progress_photo_${user.id}_${date}_${photo.view}_${photo.pose}`;
@@ -1139,7 +1158,14 @@ async function commitCompatibilityRepositories({ evidencePackage, user }) {
 function expandCanonicalPhotoSessions(canonicalObjects, evidencePackage, userId) {
   const byId = new Map(canonicalObjects.map((item) => [item.canonicalId, item]));
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => item.evidence_type === "photo_session" && !item.removed)) {
-    const date = String(object.observed_at).slice(0, 10);
+    const date = resolveCanonicalEvidenceLocalDate(object);
+    const sourceObject = canonicalObjects.find((item) =>
+      item.evidence_type === "photo_session" &&
+      ((item.provenance?.contributing_evidence_object_ids ?? []).includes(object.id) ||
+        (item.provenance?.evidence_package_ids ?? []).includes(evidencePackage.package_id))
+    ) ?? null;
+    const sessionId = sourceObject?.canonicalId ??
+      getStablePhotoSessionId({ userId, captureDate: date });
     const photos = (object.photos ?? []).map((photo, index) => ({ ...photo,
       canonicalPhotoId: photo.canonicalPhotoId ?? `canonical_photo_${userId}_${date}_${stablePhotoIdentity(photo.id ?? photo.source_hash ?? index)}`,
       stableViewId: photo.stableViewId ?? photo.id, captureDate: date, occurrenceTimestamp: object.captureMetadata?.capturedAt ?? date,
@@ -1148,11 +1174,19 @@ function expandCanonicalPhotoSessions(canonicalObjects, evidencePackage, userId)
       sourceIds: [photo.id], sourceHashes: [photo.source_hash].filter(Boolean),
       status: photo.active === false ? "inactive" : "active", sourceOrder: photo.sourceOrder ?? photo.order ?? index,
     }));
-    const session = createCanonicalPhotoSession({ ...object, confirmationIntent: evidencePackage.review_metadata?.confirmationIntent ?? null, provisional: false, captureDate: date, sessionId: `photo_session_${userId}_${date}`, userId, photos });
-    const sessionObject = { canonicalId: session.sessionId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "photo_session", firstObservedAt: date, lastObservedAt: date, payload: { ...session, evidence_type: "photo_session", observed_at: date }, provenance: object.provenance ?? {}, quality: { status: "active" }, userId };
-    byId.set(sessionObject.canonicalId, preserveCanonicalTimestamps(byId.get(sessionObject.canonicalId), sessionObject));
+    const session = createCanonicalPhotoSession({ ...object, confirmationIntent: evidencePackage.review_metadata?.confirmationIntent ?? null, provisional: false, captureDate: date, sessionId, userId, photos });
+    const sessionObject = createCanonicalPhotoSessionRecord({
+      canonicalId: sessionId,
+      existingObject: byId.get(sessionId) ?? sourceObject,
+      payload: { ...session, evidence_type: "photo_session", observed_at: date },
+      sourceObject,
+      userId,
+    });
+    byId.set(sessionObject.canonicalId, sessionObject);
     photos.forEach((photo) => {
-      const candidate = { canonicalId: photo.canonicalPhotoId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "progress_photo", firstObservedAt: date, lastObservedAt: date, payload: { ...photo, evidence_type: "progress_photo", observed_at: date }, provenance: { source_artifact_refs: photo.sourceIds, source_hashes: photo.sourceHashes }, quality: { status: photo.status }, userId };
+      const candidate = { canonicalId: photo.canonicalPhotoId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), evidence_type: "progress_photo", firstObservedAt: date, lastObservedAt: date,
+        ...(sessionObject.goalPhaseAttribution ? { goalId: sessionObject.goalId, phaseId: sessionObject.phaseId, goalPhaseAttribution: sessionObject.goalPhaseAttribution } : {}),
+        payload: { ...photo, evidence_type: "progress_photo", observed_at: date }, provenance: { source_artifact_refs: photo.sourceIds, source_hashes: photo.sourceHashes }, quality: { status: photo.status }, userId };
       byId.set(photo.canonicalPhotoId, preserveCanonicalTimestamps(byId.get(photo.canonicalPhotoId), candidate));
     });
   }
@@ -1172,20 +1206,29 @@ async function runDomainAnalysis({ canonical, evidencePackage, user, loadPhotoAn
   const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
     if (object.evidence_type === "photo_session") {
+      const evidenceDate = resolveCanonicalEvidenceLocalDate(object);
+      const attributedSession = canonical.find((item) =>
+        item.evidence_type === "photo_session" &&
+        ((item.provenance?.contributing_evidence_object_ids ?? [])
+          .includes(object.id) ||
+          (item.provenance?.evidence_package_ids ?? [])
+            .includes(evidencePackage.package_id))) ?? null;
+      const sessionId = attributedSession?.canonicalId ??
+        getStablePhotoSessionId({ userId: user.id, captureDate: evidenceDate });
       const photoEventContext = await resolvePhotoEventContext({
         repositories: FounderRepositories,
         userId: user.id,
-        evidenceDate: object.observed_at,
+        evidenceDate,
+        evidenceAttribution: attributedSession,
       });
       const photoGoalContext = createPhotoInterpreterGoalContext(photoEventContext, completionIntent);
-      const sessionId = `photo_session_${user.id}_${String(object.observed_at).slice(0, 10)}`;
       const perView = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
-        const canonicalPhotoId = photo.canonicalPhotoId ?? `canonical_photo_${user.id}_${String(object.observed_at).slice(0, 10)}_${stablePhotoIdentity(photo.id ?? photo.source_hash)}`;
-        const prior = findPriorCanonicalPhoto(canonical, photo, object.observed_at);
+        const canonicalPhotoId = photo.canonicalPhotoId ?? `canonical_photo_${user.id}_${evidenceDate}_${stablePhotoIdentity(photo.id ?? photo.source_hash)}`;
+        const prior = findPriorCanonicalPhoto(canonical, photo, evidenceDate);
         const currentInput = await photoInterpreterInput(photo, object, loadPhotoAnalysisMedia);
         const priorInput = prior ? await canonicalPhotoInterpreterInput(prior, loadPhotoAnalysisMedia) : null;
-        const interpretationResult = await interpretPhotoSetWithVision({ captureDate: object.observed_at, goalContext: photoGoalContext, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
+        const interpretationResult = await interpretPhotoSetWithVision({ captureDate: evidenceDate, goalContext: photoGoalContext, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
         if (interpretationResult.provider !== "openai") throw new Error(`Photo Interpreter provider did not complete canonical analysis for ${canonicalPhotoId}: ${interpretationResult.warning ?? "provider unavailable"}`);
         const interpretation = interpretationResult.interpretation;
         const structuredObservations = interpretation.structured_observations ?? normalizePhotoInterpretationToStructuredObservations(interpretation);
@@ -1281,8 +1324,10 @@ function isCompletePhotoSession(object) {
 }
 
 function getStableCanonicalId(object, userId) {
-  const date = String(object?.observed_at ?? "").slice(0, 10);
-  return object?.evidence_type === "photo_session" ? `photo_session_${userId}_${date}` : object?.id ?? `dexa_${userId}_${date}`;
+  const date = resolveCanonicalEvidenceLocalDate(object);
+  return object?.evidence_type === "photo_session"
+    ? getStablePhotoSessionId({ userId, captureDate: date })
+    : object?.id ?? `dexa_${userId}_${date}`;
 }
 
 async function refreshGoalEvaluations({ evidencePackage, user, confirmationReads }) {

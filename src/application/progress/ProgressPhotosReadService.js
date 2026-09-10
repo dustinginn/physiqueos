@@ -4,7 +4,10 @@ import {
   attachPhotoBriefingPublication,
   getPhotoSessionWindow,
 } from "../../domain/services/PhotosEvidenceContextService.js";
-import { resolveProgressPhotoMedia } from "./ProgressPhotoMediaResolutionService.js";
+import {
+  createProgressPhotoMediaLookup,
+  resolveProgressPhotoMedia,
+} from "./ProgressPhotoMediaResolutionService.js";
 
 const PHOTO_CONTEXT_IDS = new Set(["build-lean-mass", "visible-abs", "all"]);
 
@@ -13,15 +16,17 @@ export function createProgressPhotosReadService({ store } = {}) {
   return Object.freeze({
     getPhotosTimeline({ context, currentDate = new Date() } = {}) {
       return store.run("progress.photos", async () => {
-        const [user, goals, weights, photoInputs, analyses, artifacts, mediaObjects] = await Promise.all([
+        const [user, goals, weights, photoInputs, analyses, artifacts] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listWeightEntries(),
           store.getPhotoInputs(),
           store.listPhotoAnalyses(),
           store.listPhotoBriefings(),
-          store.listMediaObjects(),
         ]);
+        const mediaObjects = await store.listMediaObjects(
+          createProgressPhotoMediaLookup(photoInputs)
+        );
         const resolved = resolveProgressPhotoMedia({
           canonicalEvidenceObjects: photoInputs.canonicalEvidenceObjects,
           mediaObjects,

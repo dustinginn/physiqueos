@@ -8,6 +8,13 @@ import {
 } from "../../domain/models/RecoveryEvidenceModel";
 import { getNutritionDayLogicalKey } from "../../domain/services/CanonicalNutritionDayService";
 import { getActivityDayLogicalKey } from "../../domain/services/CanonicalActivityDayService";
+import {
+  getDexaLogicalScanKey,
+  isDexaEvidence,
+} from "../../domain/services/CanonicalDexaScanService";
+import {
+  getPhotoSessionLogicalKey,
+} from "../../domain/services/CanonicalPhotoSessionIdentityService";
 
 export const RECOVERY_EVIDENCE_WINDOW_LIMIT = 64;
 
@@ -161,6 +168,14 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
         canonicalEvidenceObjects,
         evidenceObjects
       );
+      assertNoSecondActiveDexaScan(
+        canonicalEvidenceObjects,
+        evidenceObjects
+      );
+      assertNoSecondActivePhotoSession(
+        canonicalEvidenceObjects,
+        evidenceObjects
+      );
       let changed = false;
       evidenceObjects.forEach((evidenceObject) => {
         const existingIndex = canonicalEvidenceObjects.findIndex(
@@ -181,6 +196,49 @@ export function createCanonicalEvidenceRepository(canonicalEvidenceObjects = [],
       if (changed) options.onChange?.();
 
       return evidenceObjects;
+  }
+}
+
+function assertNoSecondActivePhotoSession(existing = [], incoming = []) {
+  for (const record of incoming) {
+    if (record.evidence_type !== "photo_session" ||
+        record.quality?.status === "superseded" ||
+        record.quality?.supersededBy) continue;
+    const logicalSessionKey = getPhotoSessionLogicalKey(record);
+    const conflict = existing.find((candidate) =>
+      candidate.canonicalId !== record.canonicalId &&
+      (!record.userId || !candidate.userId || candidate.userId === record.userId) &&
+      candidate.evidence_type === "photo_session" &&
+      candidate.quality?.status !== "superseded" &&
+      !candidate.quality?.supersededBy &&
+      getPhotoSessionLogicalKey(candidate) === logicalSessionKey
+    );
+    if (conflict) {
+      throw new Error(
+        `Cannot persist a second active canonical Photo Session for ${logicalSessionKey}.`
+      );
+    }
+  }
+}
+
+function assertNoSecondActiveDexaScan(existing = [], incoming = []) {
+  for (const record of incoming) {
+    if (!isDexaEvidence(record) || record.quality?.status === "superseded" ||
+        record.quality?.supersededBy) continue;
+    const logicalScanKey = getDexaLogicalScanKey(record);
+    const conflict = existing.find((candidate) =>
+      candidate.canonicalId !== record.canonicalId &&
+      (!record.userId || !candidate.userId || candidate.userId === record.userId) &&
+      isDexaEvidence(candidate) &&
+      candidate.quality?.status !== "superseded" &&
+      !candidate.quality?.supersededBy &&
+      getDexaLogicalScanKey(candidate) === logicalScanKey
+    );
+    if (conflict) {
+      throw new Error(
+        `Cannot persist a second active canonical DEXA scan for ${logicalScanKey}.`
+      );
+    }
   }
 }
 

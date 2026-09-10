@@ -1,4 +1,50 @@
-import { createProviderMediaReferenceResolver } from "../media/ProviderMediaReferenceResolver.js";
+import { parsePrivateMediaReference } from "../../contracts/v1/mediaIdentifiers.js";
+import {
+  createProviderMediaReferenceResolver,
+  normalizeLegacyMediaPath,
+} from "../media/ProviderMediaReferenceResolver.js";
+
+export function createProgressPhotoMediaLookup({
+  canonicalEvidenceObjects = [],
+  progressPhotos = [],
+} = {}) {
+  const photos = [
+    ...canonicalEvidenceObjects.flatMap((record) => {
+      const payload = record?.payload ?? {};
+      if (payload.evidence_type === "photo_session") return payload.photos ?? [];
+      return payload.evidence_type === "progress_photo" ? [payload] : [];
+    }),
+    ...progressPhotos,
+  ];
+  const objectIds = new Set();
+  const normalizedPaths = new Set();
+  const basenames = new Set();
+  const sourceHashes = new Set();
+  const sourceIds = new Set();
+  for (const photo of photos) {
+    const reference = photo.storage_path ?? photo.imagePath ?? photo.sourcePath ?? null;
+    const objectId = parsePrivateMediaReference(reference);
+    if (objectId) objectIds.add(objectId);
+    const normalized = normalizeLegacyMediaPath(reference);
+    if (normalized) {
+      normalizedPaths.add(normalized);
+      basenames.add(normalized.split("/").at(-1));
+    }
+    for (const hash of [...(photo.sourceHashes ?? []), photo.sourceHash, photo.source_hash]) {
+      if (hash) sourceHashes.add(String(hash).toLowerCase());
+    }
+    for (const id of [...(photo.sourceIds ?? []), photo.id]) {
+      if (id) sourceIds.add(String(id));
+    }
+  }
+  return Object.freeze({
+    objectIds: Object.freeze([...objectIds].sort()),
+    normalizedPaths: Object.freeze([...normalizedPaths].sort()),
+    basenames: Object.freeze([...basenames].sort()),
+    sourceHashes: Object.freeze([...sourceHashes].sort()),
+    sourceIds: Object.freeze([...sourceIds].sort()),
+  });
+}
 
 export function resolveProgressPhotoMedia({
   canonicalEvidenceObjects = [],

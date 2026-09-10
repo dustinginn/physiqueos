@@ -31,4 +31,14 @@ describe("photo confirmation foundation", () => {
     const canonicalObjects = [{ canonicalId: "session_1", evidence_type: "photo_session", lastObservedAt: "2026-07-12", payload: session, quality: { status: "active" } }];
     expect(evaluateScheduledCompletion({ canonicalObjects, evidencePackage })[0].satisfied).toBe(true);
   });
+
+  it("fails closed when a canonical session contains two active photos for one pose", () => {
+    expect(() => createCanonicalPhotoSession({
+      sessionId: "session_duplicate",
+      photos: [
+        { ...photos[0], canonicalPhotoId: "canonical_front_one", status: "active" },
+        { ...photos[0], id: "front-retry", canonicalPhotoId: "canonical_front_two", status: "active" },
+      ],
+    })).toThrowError(expect.objectContaining({ code: "PHOTO_SESSION_DUPLICATE_ACTIVE_POSE" }));
+  });
 });

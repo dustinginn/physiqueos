@@ -17,7 +17,13 @@ describe("PostgreSQL Progress Photos read store", () => {
       store.getPhotoInputs(),
       store.listPhotoAnalyses(),
       store.listPhotoBriefings(),
-      store.listMediaObjects(),
+      store.listMediaObjects({
+        objectIds: ["media-id"],
+        normalizedPaths: ["photos/front.jpg"],
+        basenames: ["front.jpg"],
+        sourceHashes: ["hash"],
+        sourceIds: ["photo-id"],
+      }),
     ]));
     expect(query).toHaveBeenCalledTimes(7);
     expect(query.mock.calls.every(([, values]) => values[0] === "owner-one")).toBe(true);
@@ -29,6 +35,8 @@ describe("PostgreSQL Progress Photos read store", () => {
     }));
     const sql = query.mock.calls.map(([text]) => String(text)).join("\n");
     expect(sql).toContain("canonical_media_objects");
+    expect(sql).toContain("content_type LIKE 'image/%'");
+    expect(sql).toContain("evidence_record_id=ANY");
     expect(sql).toContain("'photo_session','progress_photo'");
     expect(sql).not.toContain("loadCanonicalRuntime");
   });

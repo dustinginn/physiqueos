@@ -151,6 +151,51 @@ describe("DEXA Event canonical context", () => {
     expect(result).toMatchObject({ status: "neutral", semanticGoalType: "unknown", activeGoal: null, activePhase: null, operatingState: null, bodyFatGuardrail: null });
   });
 
+  it("prefers the scan's frozen Goal attribution over today's active Goal", async () => {
+    const historicalGoal = {
+      ...completedGoal,
+      type: "fat_loss",
+      phases: [{
+        id: "visible-abs-phase",
+        goalId: completedGoal.id,
+        name: "Final Cut",
+        purpose: "Finish",
+        order: 0,
+        status: "completed",
+        startDate: "2026-06-01",
+        startedAt: "2026-06-01",
+        completedAt: "2026-07-21",
+        timingMode: "completion_criteria",
+        transitionPolicy: "manual_review",
+      }],
+    };
+    const attributed = {
+      ...july,
+      goalId: historicalGoal.id,
+      phaseId: "visible-abs-phase",
+      goalPhaseAttribution: {
+        goalId: historicalGoal.id,
+        phaseId: "visible-abs-phase",
+        source: "persisted_artifact",
+      },
+    };
+    const result = await resolveDEXAEventContext({
+      repositories: {
+        goals: { getActiveGoal: async () => goal, listGoals: async () => [goal, historicalGoal] },
+        protocols: { listActiveProtocols: async () => [] },
+        executionItems: { listExecutionItems: async () => [] },
+        weights: { listWeightEntries: async () => [] },
+      },
+      userId,
+      scan: attributed,
+      scans: [attributed],
+    });
+    expect(result).toMatchObject({
+      activeGoal: { id: historicalGoal.id },
+      activePhase: { id: "visible-abs-phase" },
+    });
+  });
+
   it("resolves only canonical body-fat ranges and classifies deterministic boundaries", () => {
     const range = resolveBodyFatGuardrail(goal);
     expect(classifyBodyFatGuardrail(8, range).status).toBe("near_boundary");

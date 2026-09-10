@@ -7,11 +7,20 @@ import {
 const INACTIVE = new Set(["duplicate", "superseded", "inactive", "hidden"]);
 
 export function selectPoseAwareComparisons({ currentView, sessions = [], currentSessionId, goalId = null } = {}) {
+  const currentCaptureDate = String(currentView?.captureDate ??
+    sessions.find((session) => session.id === currentSessionId)?.captureDate ?? "");
   const candidates = sessions
     .filter((session) => session.id !== currentSessionId)
     .flatMap((session) => (session.views ?? []).map((view) => ({ ...view, photoSessionId: session.id, captureDate: view.captureDate ?? session.captureDate })))
-    .filter((view) => isQualifiedView(view) && arePhotoPoseIdentitiesCompatible(currentView.poseIdentity ?? currentView.pose ?? currentView, view.poseIdentity ?? view.pose ?? view))
-    .sort((left, right) => String(left.captureDate).localeCompare(String(right.captureDate)));
+    .filter((view) =>
+      isQualifiedView(view) &&
+      (!currentCaptureDate || String(view.captureDate) < currentCaptureDate) &&
+      arePhotoPoseIdentitiesCompatible(currentView.poseIdentity ?? currentView.pose ?? currentView, view.poseIdentity ?? view.pose ?? view))
+    .sort((left, right) =>
+      String(left.captureDate).localeCompare(String(right.captureDate)) ||
+      String(left.photoSessionId).localeCompare(String(right.photoSessionId)) ||
+      String(left.canonicalViewId ?? left.id).localeCompare(
+        String(right.canonicalViewId ?? right.id)));
   const earliest = candidates[0] ?? null;
   const prior = candidates.at(-1) ?? null;
   const identity = normalizePhotoViewIdentity(currentView.poseIdentity ?? currentView.pose ?? currentView);

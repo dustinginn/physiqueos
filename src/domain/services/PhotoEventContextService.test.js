@@ -28,6 +28,25 @@ describe("PhotoEventContextService",()=>{
     expect(prompt).toMatch(/do not assume a cut/i);
   });
 
+  it("uses persisted Photo Session Goal/Phase attribution instead of today's active Goal", async () => {
+    const historicalGoal={...completedGoal,phases:[{id:"visible-phase",goalId:completedGoal.id,name:"Final Cut",purpose:"Finish",order:0,status:"completed",startDate:"2026-06-01",startedAt:"2026-06-01",completedAt:"2026-07-21",timingMode:"completion_criteria",transitionPolicy:"manual_review"}]};
+    const repositories={
+      goals:{getActiveGoal:vi.fn(async()=>activeGoal),listGoals:vi.fn(async()=>[activeGoal,historicalGoal])},
+      executionItems:{listExecutionItems:vi.fn(async()=>[])},
+      dexaScans:{listDEXAScans:vi.fn(async()=>[])},
+    };
+    const context=await resolvePhotoEventContext({
+      repositories,
+      userId:"user",
+      evidenceDate:"2026-07-18",
+      evidenceAttribution:{goalId:historicalGoal.id,phaseId:"visible-phase"},
+    });
+    expect(context).toMatchObject({
+      activeGoal:{id:historicalGoal.id},
+      activePhase:{id:"visible-phase"},
+    });
+  });
+
   it("preserves completion-specific interpreter instructions",()=>{
     expect(createPhotoInterpreterGoalContext({}, {confirmationPurpose:"visible_abs_completion"})).toMatch(/Visible Abs completion evaluation/);
   });

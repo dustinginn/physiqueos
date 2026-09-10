@@ -28,10 +28,17 @@ export async function resolveDEXAEventContext({
       ?? repositories.weightEntries?.listWeightEntries?.(userId)
       ?? [],
   ]);
-  let activeGoal = candidateGoal?.status === "active" ? candidateGoal : null;
+  const persistedGoalId = scan?.goalId ??
+    scan?.goalPhaseAttribution?.goalId ?? scan?.relatedGoalIds?.[0] ?? null;
+  let activeGoal = goals.find((goal) => goal.id === persistedGoalId) ??
+    (candidateGoal?.status === "active" ? candidateGoal : null);
   const phaseContext = activeGoal ? resolveCommittedPhaseContext(activeGoal, { asOf: evidenceDate }) : null;
   activeGoal = phaseContext?.goal ?? activeGoal;
-  const activePhase = phaseContext?.activePhase ?? null;
+  const persistedPhaseId = scan?.phaseId ??
+    scan?.goalPhaseAttribution?.phaseId ?? null;
+  const activePhase = (activeGoal?.phases ?? []).find((phase) =>
+    (phase.phaseId ?? phase.id) === persistedPhaseId) ??
+    phaseContext?.activePhase ?? null;
   const completedPriorGoal = selectCompletedPriorGoal(goals, activeGoal);
   const eligibleScans = scans
     .filter((item) => item.userId === userId && dateKey(item.measuredAt ?? item.date) <= evidenceDate)

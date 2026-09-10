@@ -143,6 +143,10 @@ function validateCommand(command) {
   if (command.artifact?.trigger?.evidenceId !== command.photoSessionId) {
     return "Canonical PhotoSession identity differs from the Event trigger.";
   }
+  if (command.artifact?.briefing?.photoEventNarrative?.evidenceBinding
+    ?.photoSessionId !== command.photoSessionId) {
+    return "Photo Event evidence binding differs from the Event trigger.";
+  }
   return null;
 }
 function validateCandidate(candidate, command, prepared, context) {
@@ -168,7 +172,26 @@ function confidenceId(artifact) {
 function sameEvent(left, right) {
   return left.id === right.id &&
     left.trigger?.evidenceId === right.trigger?.evidenceId &&
-    confidenceId(left) === confidenceId(right);
+    confidenceId(left) === confidenceId(right) &&
+    stablePhotoBinding(left) === stablePhotoBinding(right);
+}
+function stablePhotoBinding(artifact) {
+  const narrative = artifact.briefing?.photoEventNarrative ?? {};
+  const binding = narrative.evidenceBinding ?? {
+    photoSessionId: narrative.photoSessionId ?? artifact.trigger?.evidenceId,
+    photos: (narrative.activeViews ?? []).map((view) => ({
+      photoId: view.id,
+      poseId: view.poseId,
+      mediaReference: view.imageHref ?? null,
+      priorPhotoId: view.priorViewId ?? null,
+      priorMediaReference: view.previousImageHref ?? null,
+    })),
+  };
+  return JSON.stringify({
+    ...binding,
+    photos: [...(binding.photos ?? [])].sort((left, right) =>
+      `${left.poseId}|${left.photoId}`.localeCompare(`${right.poseId}|${right.photoId}`)),
+  });
 }
 function capture(filePath, readText) {
   const raw = readText(filePath);

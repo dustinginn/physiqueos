@@ -86,6 +86,23 @@ describe("PI Photo Event publication", () => {
     expect(read(fixture).dailyBriefings).toHaveLength(1);
     expect(read(fixture).goalConfidenceHistory).toHaveLength(1);
   });
+
+  it("rejects a create retry whose bound photo identity changed", async () => {
+    const fixture = setup();
+    let baseline = fixture.service.captureBaseline();
+    await fixture.service.publish(command(fixture, baseline));
+    baseline = fixture.service.captureBaseline();
+    const changed = command(fixture, baseline, {
+      confidenceMode: "matched-only",
+      confidencePublicationCommand: null,
+    });
+    changed.artifact.briefing.photoEventNarrative.evidenceBinding.photos[0]
+      .photoId = "different-photo";
+    await expect(fixture.service.publish(changed)).resolves.toMatchObject({
+      status: "photo_event_conflict",
+      committed: false,
+    });
+  });
 });
 
 function setup(unitOfWorkOptions = {}) {
@@ -125,10 +142,17 @@ function command(fixture, baseline, overrides = {}) {
     id: "event_briefing_progress_photo_session_future",
     userId: "user", artifactType: "event", cadence: "event",
     trigger: { evidenceType: "photo_session", evidenceId: "session_future" },
-    briefing: { photoEventNarrative: { goalConfidence: {
-      assessmentId: fixture.assessment.id,
-      score: fixture.assessment.score.current,
-    } } },
+    briefing: { photoEventNarrative: {
+      evidenceBinding: {
+        photoSessionId: "session_future",
+        sessionRevision: 1,
+        photos: [{ photoId: "photo-front", poseId: "front-relaxed" }],
+      },
+      goalConfidence: {
+        assessmentId: fixture.assessment.id,
+        score: fixture.assessment.score.current,
+      },
+    } },
   };
   return {
     schemaVersion: "pi_photo_event_publication_v1",

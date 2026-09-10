@@ -56,7 +56,7 @@ describe("private evidence route provider media boundary", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/jpeg");
-    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect((await response.arrayBuffer()).byteLength).toBe(3);
     expect(mocks.openRead).toHaveBeenCalledWith(expect.objectContaining({ objectId, lifetimeSeconds: 60 }));
   });

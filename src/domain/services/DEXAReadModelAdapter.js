@@ -1,7 +1,13 @@
 import { createDEXAScan } from "../models/dexaScan";
 import { assertValidDexaScan, isValidDexaScan } from "./DEXAContract";
 
-export function toDexaReadModel(object, { canonicalId = null, now = new Date().toISOString(), userId } = {}) {
+export function toDexaReadModel(object, {
+  canonicalId = null,
+  dexaRevision = null,
+  goalPhaseAttribution = null,
+  now = new Date().toISOString(),
+  userId,
+} = {}) {
   assertValidDexaScan(object, { production: true });
   const sourceFileId =
     object.sourceFileId ??
@@ -16,6 +22,13 @@ export function toDexaReadModel(object, { canonicalId = null, now = new Date().t
     sourceFileId,
     rawReportPath: object.rawReportPath ?? sourceFileId,
     canonicalId,
+    ...(dexaRevision ? { dexaRevision: structuredClone(dexaRevision) } : {}),
+    ...(goalPhaseAttribution ? {
+      goalId: goalPhaseAttribution.goalId,
+      phaseId: goalPhaseAttribution.phaseId,
+      goalPhaseAttribution: structuredClone(goalPhaseAttribution),
+      relatedGoalIds: [goalPhaseAttribution.goalId].filter(Boolean),
+    } : {}),
     canonicalLifecycleStatus: "current",
     createdAt: object.createdAt ?? now,
     updatedAt: now,
@@ -32,7 +45,11 @@ export function selectValidDexaScans(scans = []) {
     .slice()
     .sort((left, right) =>
       String(left.measuredAt).localeCompare(String(right.measuredAt)) ||
-      String(left.updatedAt ?? left.id).localeCompare(String(right.updatedAt ?? right.id))
+      Number(left.dexaRevision?.revision ?? 0) -
+        Number(right.dexaRevision?.revision ?? 0) ||
+      String(left.updatedAt ?? left.createdAt ?? "").localeCompare(
+        String(right.updatedAt ?? right.createdAt ?? "")) ||
+      String(left.id).localeCompare(String(right.id))
     );
   return [...new Map(sorted.map((scan) => [scan.measuredAt, scan])).values()];
 }

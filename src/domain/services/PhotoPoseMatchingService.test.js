@@ -29,4 +29,17 @@ describe("pose-aware photo matching", () => {
     const result=selectPoseAwareComparisons({currentView:view("now","2026-07-18",identity),currentSessionId:"now",sessions:[session("old","2026-07-01",[view("hidden","2026-07-01",identity,{status:"hidden"})])]});
     expect(result.priorMatchFound).toBe(false);
   });
+
+  it("never selects a future session as a prior same-pose comparison", () => {
+    const identity={orientation:"front",contractionState:"relaxed",poseVariant:"standard"};
+    const result=selectPoseAwareComparisons({
+      currentView:view("now","2026-07-18",identity),
+      currentSessionId:"now",
+      sessions:[
+        session("past","2026-07-11",[view("past-view","2026-07-11",identity)]),
+        session("future","2026-08-01",[view("future-view","2026-08-01",identity)]),
+      ],
+    });
+    expect(result).toMatchObject({ priorViewId: "past-view", priorPhotoSessionId: "past" });
+  });
 });
