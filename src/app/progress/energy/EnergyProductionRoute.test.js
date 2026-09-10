@@ -9,8 +9,16 @@ const preview = fs.readFileSync(
 
 describe("production Energy route", () => {
   it("uses the canonical Energy service and screen", () => {
+    // The production route composes the same accepted report the Native
+    // production contract also builds on (createProviderEnergyEvidenceReport,
+    // see NativeProductionContractService.js's "energy" case). The preview
+    // route fetches its own repositories through the higher-level
+    // getEnergyEvidenceReport wrapper around that same composition -- the two
+    // routes intentionally call different entry points into one shared
+    // service, so only the entry point each route actually uses is asserted.
+    expect(production).toContain("createProviderEnergyEvidenceReport");
+    expect(preview).toContain("getEnergyEvidenceReport");
     for (const source of [production, preview]) {
-      expect(source).toContain("getEnergyEvidenceReport");
       expect(source).toContain("EnergyEvidenceScreen");
     }
     expect(production).toContain('export const dynamic = "force-dynamic"');

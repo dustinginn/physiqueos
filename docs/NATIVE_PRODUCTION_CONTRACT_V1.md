@@ -45,7 +45,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Exercise detail/history | `training-exercise` | `TrainingNavigationReadService.getExercise` | canonical exercise ID | Ready |
 | Nutrition | `nutrition` | `ProgressEvidenceReadService.getNutrition` | Goal context | Ready |
 | Activity | `activity` | `ProgressEvidenceReadService.getActivity` | Goal context | Ready |
-| Energy | `energy` | `ProgressEvidenceReadService.getEnergy` | Goal context | Ready; server-derived |
+| Energy | `energy` | `ProgressEvidenceReadService.getEnergy` composed through `EnergyEvidenceService.createProviderEnergyEvidenceReport` | Goal context | Ready; server-derived |
 | DEXA latest/history/detail data | `dexa` | `ProgressEvidenceReadService.getDEXA` | Goal context | Ready |
 | Progress Photos latest/history/comparison | `photos` | `ProgressPhotosReadService.getPhotosTimeline` | Goal context | Ready |
 | Briefing history | `briefing-history` | `BriefingNavigationReadService.listNativeHistory` | summary rows only; `limit` 1–50, default 20; opaque artifact cursor | Ready |
@@ -57,7 +57,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Evidence Review detail | `evidence-review` | `EvidenceReviewReadService.getReview` | review ID | Ready |
 | Evidence timeline | `timeline` | `EvidenceTimelineReadService.getPage` | limit 1–200 | Ready |
 
-Goal-context reads accept `all`, `build-lean-mass`, or `visible-abs`. The server applies Package 3 chronology and preserves stored historical attribution. Training uses canonical exercise IDs; photo comparisons use canonical session/photo/media/pose identities; DEXA and Event readers preserve Package 5 binding; Briefings preserve Package 6 artifact-bound Confidence.
+Goal-context reads accept `all`, `build-lean-mass`, or `visible-abs`. The server applies Package 3 chronology and preserves stored historical attribution. Training uses canonical exercise IDs; photo comparisons use canonical session/photo/media/pose identities; DEXA and Event readers preserve Package 5 binding; Briefings preserve Package 6 artifact-bound Confidence. The `energy` resource returns the finished, server-composed Energy report -- `timeline`, `summary` (average intake/expenditure/balance, complete/evidence day counts), `days` (per-day `calorieIntake`, `activeCalories`, `rmr`, `rmrScanId`, `rmrScanDate`, `estimatedExpenditure`, `expenditureKind`, `energyBalance`, `completeness`, `sources`), `weeks`, `recentFourWeeks`, `latestEvidenceDate`, `dataSources`, and `audit` -- never the raw Activity/Nutrition/DEXA source collections; clients must not reconcile Energy from those collections themselves.
 
 ## Write matrix
 

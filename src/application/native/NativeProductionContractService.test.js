@@ -30,7 +30,20 @@ function fixture(overrides = {}) {
       getLanding: call({ report: {} }), getReporting: call({ report: {} }), getLibrary: call({ report: {} }),
       getDay: call({ date: "2026-09-09" }), getSession: call({ id: "session-1" }), getExercise: call({ id: "curl" }),
     },
-    progress: { getNutrition: call({ report: {} }), getActivity: call({ report: {} }), getEnergy: call({ timeline: {} }), getDEXA: call({ report: {} }) },
+    progress: {
+      getNutrition: call({ report: {} }),
+      getActivity: call({ report: {} }),
+      // Realistic unreconciled shape, matching ProgressEvidenceReadService.getEnergy's
+      // real return value -- exercises the canonical Energy composition step rather
+      // than a stub the composition service would reject.
+      getEnergy: call({
+        activityDays: [],
+        dexaScans: [],
+        nutritionDays: [],
+        timeline: { contextId: "all", selectedLabel: "All Energy", options: [] },
+      }),
+      getDEXA: call({ report: {} }),
+    },
     photos: { getPhotosTimeline: call({ report: {} }) },
     briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getArtifact: call({ artifact: { id: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
@@ -82,6 +95,36 @@ describe("Native production contract boundary", () => {
     const result = await current.service.read({ request: request(), resource, input });
     expect(result.resource).toBe(resource);
     expect(current.readers[group][method]).toHaveBeenCalledTimes(1);
+  });
+
+  it("composes the canonical Energy report instead of exposing raw source collections", async () => {
+    const current = fixture();
+    current.readers.progress.getEnergy.mockResolvedValue({
+      activityDays: [{ id: "activity-1", date: "2026-07-23", activeCalories: 897, totalCalories: 2987 }],
+      dexaScans: [{ id: "dexa-1", measuredAt: "2026-07-18", restingMetabolicRate: { value: 1794 } }],
+      nutritionDays: [{ id: "nutrition-1", date: "2026-07-23", totals: { calories: 2321 }, meals: [{ totals: { calories: 1 } }] }],
+      timeline: { contextId: "all", selectedLabel: "All Energy", options: [] },
+    });
+    const result = await current.service.read({ request: request(), resource: "energy" });
+
+    // The finished report, not the raw provider collections, is the contract.
+    expect(result.data).not.toHaveProperty("activityDays");
+    expect(result.data).not.toHaveProperty("nutritionDays");
+    expect(result.data).not.toHaveProperty("dexaScans");
+    expect(result.data.summary).toMatchObject({ averageIntake: 2321, averageExpenditure: 2691, averageBalance: -370 });
+    expect(result.data.days).toEqual([
+      expect.objectContaining({
+        date: "2026-07-23",
+        calorieIntake: 2321,
+        activeCalories: 897,
+        rmr: 1794,
+        rmrScanId: "dexa-1",
+        estimatedExpenditure: 2691,
+        energyBalance: -370,
+        completeness: "complete",
+      }),
+    ]);
+    expect(Array.isArray(result.data.weeks)).toBe(true);
   });
 
   it("keeps every manifest resource routable, including current Confidence", async () => {

@@ -3,6 +3,7 @@ import { projectClientSafeValue } from "../read-models/readModel.js";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { nativeProductionContractManifest, NativeProductionResource } from "./nativeProductionContractManifest.js";
 import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
+import { createProviderEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
@@ -67,7 +68,20 @@ export function createNativeProductionContractService({
         case "training-exercise": data = await readers.training.getExercise({ context, currentDate, exerciseSlug: required(input.exerciseId, "exerciseId") }); break;
         case "nutrition": data = await readers.progress.getNutrition({ context, currentDate }); break;
         case "activity": data = await readers.progress.getActivity({ context, currentDate }); break;
-        case "energy": data = await readers.progress.getEnergy({ context, currentDate }); break;
+        case "energy": {
+          // The raw progress read returns unreconciled source collections
+          // (Activity/Nutrition days, DEXA scans). Native must not derive
+          // Energy itself, so this runs the same accepted composition the
+          // web /progress/energy route already uses (src/app/progress/energy/page.js)
+          // before the finished report ever reaches the envelope.
+          const energyEvidence = await readers.progress.getEnergy({ context, currentDate });
+          data = createProviderEnergyEvidenceReport({
+            ...energyEvidence,
+            contextId: energyEvidence.timeline.contextId,
+            timeline: energyEvidence.timeline,
+          });
+          break;
+        }
         case "dexa": data = await readers.progress.getDEXA({ context, currentDate }); break;
         case "photos": data = await readers.photos.getPhotosTimeline({ context, currentDate }); break;
         case "briefing-history": data = await readers.briefings.listNativeHistory({
