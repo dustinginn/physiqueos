@@ -13,6 +13,8 @@ import {
 } from "./CanonicalConfidenceAssessmentModel";
 import { createPhaseReviewArtifactPackage } from
   "../services/PhaseReviewArtifactService";
+import { createPIExecutionIdentity } from
+  "../services/IntelligenceLifecycleIdentityService";
 
 export const BRIEFING_FORECAST_FINALIZER_VERSION =
   "briefing_forecast_finalizer_v2";
@@ -109,6 +111,7 @@ export function createBriefingForecastFinalizer({
         idempotencyKey: normalized.idempotencyKey,
         sourceLineage: {
           ...normalized.sourceLineage,
+          intelligenceRunId: normalized.intelligenceRunId,
           confidenceExplanationDrivers: confidenceExplanationDrivers({
             forecastAssessment,
             narrativeAssessment,
@@ -238,6 +241,17 @@ function normalizeRequest(request, now) {
       ? structuredClone(request.phaseReviewContext) : null,
     expectedRevision: request.expectedRevision,
     expectedSemanticDigest: request.expectedSemanticDigest,
+    intelligenceRunId: createPIExecutionIdentity({
+      ownerUserId: request.userId,
+      publisherType: request.publisherType,
+      goalId: goalContract.goal.goalId,
+      phaseId: request.phaseId ?? goalContract.timeline?.currentPhase?.phaseId ?? null,
+      occurrenceId: request.occurrenceId,
+      artifactId: request.artifactId,
+      evidenceWindowId: request.evidenceWindow?.id,
+      evidenceCutoff: publicationCutoff,
+      idempotencyKey: request.idempotencyKey,
+    }),
   };
 }
 
@@ -280,6 +294,7 @@ function bindArtifact(composed, request, assessment, phaseReview = null,
     publisherType: request.publisherType,
     originatingBriefingId: request.occurrenceId,
     publicationCutoff: request.publicationCutoff,
+    intelligenceRunId: request.intelligenceRunId,
   };
   if (phaseReview?.presentation) {
     artifact.briefing ??= {};
@@ -313,6 +328,7 @@ function boundedDiagnostics(value) {
     projectionId: value.projection.id,
     assessmentId: value.assessment.id,
     publisherType: value.authorization.publisherType,
+    intelligenceRunId: value.assessment.sourceLineage?.intelligenceRunId ?? null,
     movement: value.projection.movement,
     percentage: value.projection.currentPercentage,
   });

@@ -52,13 +52,14 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
   // ConfidencePublisherRegistry's USER_FACING_CONFIDENCE_PUBLISHER_TYPES). A phase-initialization
   // (Starting Forecast) record is internal Forecast context, never a candidate here.
   function getLatestUserFacingConfidence({ goalId } = {}) {
-    const candidates = (sourceStore.goalConfidenceHistory ?? [])
-      .filter((record) => record.goalId === goalId && publishesUserFacingConfidence(record.publisherType))
-      .map((record) => ({ record, assessment: normalizeAssessment(record.assessment, record) }))
-      .filter(({ assessment }) => assessment)
-      .sort((left, right) => publicationTimeOf(right.record, right.assessment) -
-        publicationTimeOf(left.record, left.assessment));
-    const winner = candidates[0];
+    const selection = selectAuthoritativeAssessment({
+      records: sourceStore.goalConfidenceHistory ?? [],
+      goalId,
+      userFacingOnly: true,
+    });
+    if (selection.ambiguous) return unavailable(
+      "canonical_publication_chronology_ambiguous", goalId, null);
+    const winner = selection.selected;
     if (!winner) return unavailable("canonical_series_unavailable", goalId, null);
     return Object.freeze({
       status: winner.assessment.schemaVersion === "canonical_confidence_assessment_v2"
@@ -93,14 +94,14 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
     getAssessmentAtOrBefore({ goalId, phaseId = null, cutoff } = {}) {
       const at = Date.parse(cutoff);
       if (!Number.isFinite(at)) return null;
-      const selected = listHistory(goalId, phaseId)
-        .map((record) => ({ record, assessment: normalizeAssessment(
-          record.assessment, record) }))
-        .filter(({ assessment }) => assessment &&
-          Date.parse(assessment.sourceCutoff) <= at &&
-          Date.parse(assessment.publicationTimestamp ?? assessment.sourceCutoff) <= at)
-        .sort((left, right) => Date.parse(right.assessment.sourceCutoff) -
-          Date.parse(left.assessment.sourceCutoff))[0] ?? null;
+      const selection = selectAuthoritativeAssessment({
+        records: listHistory(goalId, phaseId),
+        goalId,
+        phaseId,
+        cutoff: at,
+      });
+      if (selection.ambiguous) return null;
+      const selected = selection.selected;
       if (!selected) return null;
       return Object.freeze({
         ...selected,
@@ -110,6 +111,25 @@ export function createCanonicalConfidenceReadService({ store = {}, repository = 
           "canonical_confidence_assessment_v2"
           ? "canonical_confidence_v2_history_at_or_before"
           : "canonical_pi_history_at_or_before",
+      });
+    },
+    getAssessmentForEvidenceCutoff({ goalId, phaseId = null, cutoff } = {}) {
+      const at = Date.parse(cutoff);
+      if (!Number.isFinite(at)) return null;
+      const selection = selectAuthoritativeAssessment({
+        records: listHistory(goalId, phaseId),
+        goalId,
+        phaseId,
+        cutoff: at,
+        allowPublicationAfterCutoff: true,
+        orderByEvidenceCutoff: true,
+      });
+      if (selection.ambiguous || !selection.selected) return null;
+      return Object.freeze({
+        ...selection.selected,
+        historyRecordId: selection.selected.record.id,
+        selectedAtOrBefore: new Date(at).toISOString(),
+        source: "canonical_confidence_evidence_cutoff",
       });
     },
   });
@@ -136,5 +156,82 @@ function unavailable(reason, goalId, phaseId) {
 function publicationTimeOf(record, assessment) {
   const value = record?.persistedAt ?? assessment?.publicationTimestamp ?? assessment?.sourceCutoff;
   const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : -Infinity;
+}
+
+function selectAuthoritativeAssessment({
+  records,
+  goalId,
+  phaseId = null,
+  cutoff = null,
+  userFacingOnly = false,
+  allowPublicationAfterCutoff = false,
+  orderByEvidenceCutoff = false,
+}) {
+  let candidates = records
+    .filter((record) => record.goalId === goalId &&
+      (phaseId == null || record.phaseId === phaseId))
+    .map((record) => ({
+      record,
+      assessment: normalizeAssessment(record.assessment, record),
+    }))
+    .filter(({ record, assessment }) => assessment &&
+      (!userFacingOnly || publishesUserFacingConfidence(
+        record.publisherType ?? assessment.publisherType
+      )));
+  if (cutoff != null) {
+    candidates = candidates.filter(({ record, assessment }) =>
+      sourceCutoffTime(assessment) <= cutoff &&
+      (allowPublicationAfterCutoff ||
+        publicationTimeOf(record, assessment) <= cutoff)
+    );
+  }
+  const superseded = new Set(candidates.map(({ assessment }) =>
+    assessment.replacementLineage?.replacesAssessmentId
+  ).filter(Boolean));
+  candidates = candidates.filter(({ assessment }) => !superseded.has(assessment.id));
+  candidates.sort(orderByEvidenceCutoff
+    ? compareEvidenceChronology
+    : comparePublicationChronology);
+  if (hasAmbiguousPublication(candidates[0], candidates[1])) {
+    return { selected: null, ambiguous: true };
+  }
+  return { selected: candidates[0] ?? null, ambiguous: false };
+}
+
+function compareEvidenceChronology(left, right) {
+  return sourceCutoffTime(right.assessment) - sourceCutoffTime(left.assessment) ||
+    publicationTimeOf(right.record, right.assessment) -
+      publicationTimeOf(left.record, left.assessment) ||
+    persistedTime(right.record) - persistedTime(left.record) ||
+    String(right.assessment.id).localeCompare(String(left.assessment.id));
+}
+
+function comparePublicationChronology(left, right) {
+  return publicationTimeOf(right.record, right.assessment) -
+      publicationTimeOf(left.record, left.assessment) ||
+    sourceCutoffTime(right.assessment) - sourceCutoffTime(left.assessment) ||
+    persistedTime(right.record) - persistedTime(left.record) ||
+    String(right.assessment.id).localeCompare(String(left.assessment.id));
+}
+
+function hasAmbiguousPublication(left, right) {
+  if (!left || !right) return false;
+  return publicationTimeOf(left.record, left.assessment) ===
+      publicationTimeOf(right.record, right.assessment) &&
+    sourceCutoffTime(left.assessment) === sourceCutoffTime(right.assessment) &&
+    left.assessment.publisherType === right.assessment.publisherType &&
+    left.assessment.briefingArtifactId === right.assessment.briefingArtifactId &&
+    left.assessment.evidenceWindowId === right.assessment.evidenceWindowId &&
+    left.assessment.id !== right.assessment.id;
+}
+
+function sourceCutoffTime(assessment) {
+  const parsed = Date.parse(assessment?.sourceCutoff ?? assessment?.evidenceCutoff);
+  return Number.isFinite(parsed) ? parsed : -Infinity;
+}
+
+function persistedTime(record) {
+  const parsed = Date.parse(record?.persistedAt);
   return Number.isFinite(parsed) ? parsed : -Infinity;
 }

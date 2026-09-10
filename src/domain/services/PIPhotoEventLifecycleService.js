@@ -10,6 +10,8 @@ import { createBriefingGoalConfidenceBlockFromV2 } from
   "./BriefingGoalConfidencePresentationService";
 import { ConfidencePublisherRegistry } from
   "../confidence/ConfidencePublisherRegistry";
+import { resolveIntelligenceEvidenceCutoff } from
+  "./IntelligenceLifecycleIdentityService";
 
 export function createPIPhotoEventLifecycleService({ publicationService,
   now = () => new Date() } = {}) {
@@ -37,7 +39,11 @@ export function createPIPhotoEventLifecycleService({ publicationService,
         .getCurrent({ goalId: goal.id, phaseId: phase.id });
       if (!current.assessment) return typed("canonical_predecessor_required",
         "Photo Confidence requires a canonical predecessor.");
-      const cutoff = iso(session.capturedAt ?? session.captureDate ?? session.date);
+      const cutoff = resolveIntelligenceEvidenceCutoff({
+        value: session.capturedAt ?? session.captureDate ?? session.date,
+        timeZone: context?.timeZone ?? artifact?.timeZone ??
+          "America/Los_Angeles",
+      });
       if (confidenceMode === "matched-only" ||
           Date.parse(cutoff) < Date.parse(current.assessment.sourceCutoff)) {
         const historical = historicalAssessmentAtOrBefore({
@@ -119,13 +125,8 @@ export function createPIPhotoEventLifecycleService({ publicationService,
 }
 
 function historicalAssessmentAtOrBefore({ store, goalId, phaseId, cutoff }) {
-  const at = Date.parse(cutoff);
-  return (store.goalConfidenceHistory ?? [])
-    .filter((record) => record.goalId === goalId && record.phaseId === phaseId &&
-      record.assessment?.schemaVersion === "canonical_confidence_assessment_v2" &&
-      Date.parse(record.assessment.sourceCutoff) <= at)
-    .sort((left, right) => Date.parse(right.assessment.sourceCutoff) -
-      Date.parse(left.assessment.sourceCutoff))[0] ?? null;
+  return createCanonicalConfidenceReadService({ store })
+    .getAssessmentForEvidenceCutoff({ goalId, phaseId, cutoff });
 }
 
 function bindHistoricalConfidence({ artifact, assessment, cutoff, now }) {
@@ -148,13 +149,6 @@ function bindHistoricalConfidence({ artifact, assessment, cutoff, now }) {
     matchedAssessmentPublisherType: assessment.publisherType,
   };
   return candidate;
-}
-function iso(value) {
-  const raw = String(value ?? "");
-  const parsed = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? `${raw}T23:59:59.999Z` : raw);
-  if (!Number.isFinite(parsed)) throw new Error("Photo cutoff is invalid.");
-  return new Date(parsed).toISOString();
 }
 function typed(status, message) { return { status, committed: false,
   error: message ? { code: status, message } : null }; }

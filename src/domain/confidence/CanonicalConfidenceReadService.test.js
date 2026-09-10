@@ -36,6 +36,43 @@ describe("mixed V1 and V2 canonical Confidence history", () => {
       compatibility: { incomplete: true } });
     expect(store).toEqual(before);
   });
+
+  it("excludes a replaced assessment from historical and latest authority", async () => {
+    const prior = previousV1();
+    const finalizer = createBriefingForecastFinalizer();
+    const obsolete = (await finalizer.finalize(request(prior)))
+      .confidenceAssessment;
+    const corrected = (await finalizer.finalize({
+      ...request(prior),
+      finalizedAt: "2026-08-02T12:00:00.000Z",
+      idempotencyKey: "weekly-one-correction",
+      replacesArtifactId: "weekly-one",
+      replacesAssessmentId: obsolete.id,
+    })).confidenceAssessment;
+    const store = {
+      goalConfidenceHistory: [
+        { id: "obsolete", assessmentId: obsolete.id, goalId: obsolete.goalId,
+          phaseId: obsolete.phaseId, publisherType: obsolete.publisherType,
+          persistedAt: "2026-08-04T12:00:00.000Z", assessment: obsolete },
+        { id: "corrected", assessmentId: corrected.id, goalId: corrected.goalId,
+          phaseId: corrected.phaseId, publisherType: corrected.publisherType,
+          persistedAt: corrected.publicationTimestamp, assessment: corrected },
+      ],
+    };
+    const read = createCanonicalConfidenceReadService({ store });
+    expect(read.getLatestUserFacingConfidence({ goalId: corrected.goalId })
+      .assessment.id).toBe(corrected.id);
+    expect(read.getAssessmentAtOrBefore({
+      goalId: corrected.goalId,
+      phaseId: corrected.phaseId,
+      cutoff: "2026-08-05T00:00:00.000Z",
+    }).assessment.id).toBe(corrected.id);
+    expect(read.getAssessmentForEvidenceCutoff({
+      goalId: corrected.goalId,
+      phaseId: corrected.phaseId,
+      cutoff: "2026-07-31T23:59:59.999Z",
+    }).assessment.id).toBe(corrected.id);
+  });
 });
 
 function request(previous) {

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { createBriefingCadenceExecutionIdentity } from
+  "../../domain/services/IntelligenceLifecycleIdentityService";
 
 export const BRIEFING_CADENCE_OPERATION_TYPE = "briefing.cadence.occurrence";
 export const BRIEFING_CADENCE_EXECUTION_STATE_VERSION =
@@ -137,7 +139,11 @@ export function occurrenceOperationId({
   cadenceKey,
   expectedArtifactId,
 }) {
-  return `briefing-cadence:${ownerUserId}:${cadenceKey}:${expectedArtifactId}`;
+  return createBriefingCadenceExecutionIdentity({
+    ownerUserId,
+    cadenceKey,
+    expectedArtifactId,
+  });
 }
 
 function nextRetryState(prior, record, observedAt) {
