@@ -21,7 +21,6 @@ const EXACT_PROTECTED_NAMES = new Set([
 
 export function assertProviderBuildLocation({
   sourceRoot = process.cwd(),
-  canonicalRoot = process.env.PHYSIQUEOS_CANONICAL_WINDOWS_ROOT,
   isolatedRoot = process.env.PHYSIQUEOS_PROVIDER_ISOLATED_BUILD_ROOT,
   distDir = process.env.PHYSIQUEOS_BUILD_DIST_DIR,
   sourceCommit = process.env.PHYSIQUEOS_GIT_SHA,
@@ -29,26 +28,14 @@ export function assertProviderBuildLocation({
 } = {}) {
   const source = realPath(sourceRoot);
 
-  // This marker makes the historical command fail with the requested error even
-  // when the caller omits every new isolation variable.
-  if (isCanonicalWindowsRoot(source)) {
-    fail(PROVIDER_BUILD_ERROR.CANONICAL_ROOT_FORBIDDEN,
-      `Provider full-runtime builds are forbidden from the canonical Windows root: ${source}`);
-  }
-
-  if (!canonicalRoot || !isolatedRoot || !distDir) {
+  if (!isolatedRoot || !distDir) {
     fail(PROVIDER_BUILD_ERROR.ISOLATION_REQUIRED,
-      "Provider full-runtime builds require canonical root, isolated root, and isolated distDir identities.");
+      "Provider full-runtime builds require isolated root and isolated distDir identities.");
   }
-  const canonical = realPath(canonicalRoot);
   const isolated = realPath(isolatedRoot);
   if (source !== isolated) {
     fail(PROVIDER_BUILD_ERROR.ISOLATION_REQUIRED,
       `Build cwd '${source}' does not equal the declared isolated root '${isolated}'.`);
-  }
-  if (source === canonical) {
-    fail(PROVIDER_BUILD_ERROR.CANONICAL_ROOT_FORBIDDEN,
-      `Provider full-runtime builds are forbidden from the canonical Windows root: ${canonical}`);
   }
   if (!/^[0-9a-f]{40}$/i.test(String(sourceCommit ?? ""))) {
     fail(PROVIDER_BUILD_ERROR.SOURCE_IDENTITY_INVALID, "An exact 40-character provider source commit is required.");
@@ -58,21 +45,12 @@ export function assertProviderBuildLocation({
   }
 
   const destination = realPath(path.resolve(source, distDir));
-  for (const protectedPath of protectedWindowsPaths(canonical)) {
-    const resolvedProtected = realPath(protectedPath);
-    if (destination === resolvedProtected || isWithin(resolvedProtected, destination)) {
-      const code = path.basename(protectedPath).toLowerCase() === ".next"
-        ? PROVIDER_BUILD_ERROR.DESTINATION_FORBIDDEN
-        : PROVIDER_BUILD_ERROR.RECOVERY_PATH_FORBIDDEN;
-      fail(code, `Provider build destination resolves into protected Windows state: ${protectedPath}`);
-    }
-  }
   if (!isWithin(source, destination) || destination === source) {
     fail(PROVIDER_BUILD_ERROR.DESTINATION_FORBIDDEN,
       `Provider build destination must remain inside the isolated root: ${destination}`);
   }
-  assertNoDestinationReparse(source, path.resolve(source, distDir), canonical);
-  return Object.freeze({ sourceRoot: source, canonicalRoot: canonical, isolatedRoot: isolated, destination });
+  assertNoDestinationReparse(source, path.resolve(source, distDir));
+  return Object.freeze({ sourceRoot: source, isolatedRoot: isolated, destination });
 }
 
 export function isCanonicalWindowsRoot(root) {
@@ -188,7 +166,7 @@ function normalizeRuntime(runtime) {
   });
 }
 
-function assertNoDestinationReparse(sourceRoot, destination, canonicalRoot) {
+function assertNoDestinationReparse(sourceRoot, destination) {
   const relative = path.relative(sourceRoot, destination);
   let current = sourceRoot;
   for (const segment of relative.split(path.sep).filter(Boolean)) {
@@ -197,10 +175,7 @@ function assertNoDestinationReparse(sourceRoot, destination, canonicalRoot) {
     const stat = fs.lstatSync(current);
     if (!stat.isSymbolicLink()) continue;
     const target = realPath(current);
-    if (!isWithin(sourceRoot, target) || protectedWindowsPaths(canonicalRoot).some((entry) => {
-      const protectedPath = realPath(entry);
-      return target === protectedPath || isWithin(protectedPath, target);
-    })) {
+    if (!isWithin(sourceRoot, target)) {
       fail(PROVIDER_BUILD_ERROR.REPARSE_PATH_FORBIDDEN,
         `Provider build destination traverses a reparse/symbolic path: ${current} -> ${target}`);
     }

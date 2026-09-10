@@ -1,91 +1,116 @@
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { collectProviderWorkerArtifact } from "./collectProviderWorkerArtifact.mjs";
 import { scanProviderArtifact } from "./scanProviderArtifact.mjs";
+import { assertProviderBuildLocation } from "./providerBuildSafety.mjs";
 import {
-  assertProviderBuildLocation,
-  assertWindowsIdentityUnchanged,
-  captureWindowsBuildIdentity,
-  snapshotDirectory,
-} from "./providerBuildSafety.mjs";
+  createProviderBuildIdentity,
+  inventoryArtifactRoot,
+  PROVIDER_BUILD_IDENTITY_FILE,
+  validateProviderArtifactManifest,
+  writeProviderArtifactManifest,
+  writeProviderBuildIdentity,
+} from "./providerArtifactManifest.mjs";
 
 export async function runIsolatedProviderBuild({
-  canonicalRoot,
   isolatedRoot,
   sourceCommit,
   providerBuildId,
   distDir,
   artifactDir,
   buildRunner = runNextBuild,
-  runtimeReader = readWindowsRuntimeStatus,
   artifactScanner = scanProviderArtifact,
 } = {}) {
   const guard = assertProviderBuildLocation({
-    sourceRoot: isolatedRoot, canonicalRoot, isolatedRoot, distDir, sourceCommit, providerBuildId,
+    sourceRoot: isolatedRoot, isolatedRoot, distDir, sourceCommit, providerBuildId,
   });
-  verifyGitIdentity(guard.sourceRoot, sourceCommit);
+  const sourceIdentity = verifyGitIdentity(guard.sourceRoot, sourceCommit);
+  assertNoPrivateBuildInputs(guard.sourceRoot);
   const artifactRoot = path.resolve(guard.sourceRoot, required(artifactDir, "artifactDir"));
   assertIsolatedOutput(guard.sourceRoot, artifactRoot, guard.destination);
   if (fs.existsSync(guard.destination) || fs.existsSync(artifactRoot)) {
     throw coded("PROVIDER_BUILD_DESTINATION_EXISTS", "Provider build and artifact destinations must be fresh.");
   }
 
-  const beforeBuild = captureWindowsBuildIdentity(guard.canonicalRoot);
-  const beforeRuntime = await runtimeReader(guard.canonicalRoot);
-  assertRuntimeCanonical(beforeRuntime, guard.canonicalRoot);
-  let result;
-  let operationError;
-  try {
-    await buildRunner({ ...guard, sourceCommit, providerBuildId, distDir });
-    const buildIdPath = path.join(guard.destination, "BUILD_ID");
-    if (!fs.existsSync(buildIdPath)) throw coded("PROVIDER_BUILD_OUTPUT_INVALID", "Next build identity is missing.");
-    fs.writeFileSync(path.join(guard.destination, "SOURCE_COMMIT"), sourceCommit, { encoding: "ascii", flag: "wx" });
+  await buildRunner({ ...guard, sourceCommit, providerBuildId, distDir });
+  const buildIdPath = path.join(guard.destination, "BUILD_ID");
+  if (!fs.existsSync(buildIdPath)) throw coded("PROVIDER_BUILD_OUTPUT_INVALID", "Next build identity is missing.");
+  const nextBuildId = fs.readFileSync(buildIdPath, "utf8").trim();
+  const identity = createProviderBuildIdentity({
+    sourceCommit,
+    sourceTree: sourceIdentity.sourceTree,
+    providerBuildId,
+    nextBuildId,
+  });
+  fs.writeFileSync(path.join(guard.destination, "SOURCE_COMMIT"), identity.sourceCommit,
+    { encoding: "ascii", flag: "wx" });
+  fs.writeFileSync(path.join(guard.destination, "PROVIDER_BUILD_ID"), identity.providerBuildId,
+    { encoding: "utf8", flag: "wx" });
+  const buildIdentityPath = writeProviderBuildIdentity({
+    destination: path.join(guard.destination, PROVIDER_BUILD_IDENTITY_FILE),
+    identity,
+  });
 
-    const webRoot = path.join(artifactRoot, "web");
-    const workerRoot = path.join(artifactRoot, "worker");
-    assembleWebArtifact({ sourceRoot: guard.sourceRoot, distRoot: guard.destination, distDir, webRoot });
-    const worker = await collectProviderWorkerArtifact({ sourceRoot: guard.sourceRoot, outputRoot: workerRoot });
-    const scan = await artifactScanner({ roots: [webRoot, workerRoot] });
-    const web = inventoryRoots([webRoot]);
-    const workerInventory = { ...worker, sha256: hashRoots([workerRoot]) };
-    result = Object.freeze({
-      sourceCommit,
-      providerBuildId,
-      isolatedRoot: guard.sourceRoot,
-      distDir,
-      nextBuildId: fs.readFileSync(buildIdPath, "utf8").trim(),
-      web: { ...web, routeCount: countRoutes(guard.destination), staticAssetCount: countFiles(path.join(guard.destination, "static")) },
-      worker: workerInventory,
-      privacyScan: scan,
-      artifactRoot,
-    });
-  } catch (error) {
-    operationError = error;
-  }
-
-  const afterBuild = captureWindowsBuildIdentity(guard.canonicalRoot);
-  const afterRuntime = await runtimeReader(guard.canonicalRoot);
-  try {
-    assertRuntimeCanonical(afterRuntime, guard.canonicalRoot);
-    assertWindowsIdentityUnchanged(beforeBuild, afterBuild, beforeRuntime, afterRuntime);
-  } catch (identityError) {
-    identityError.cause = operationError;
-    throw identityError;
-  }
-  if (operationError) throw operationError;
-  return Object.freeze({ ...result, windowsIdentity: { before: beforeBuild, after: afterBuild, runtime: beforeRuntime } });
+  const webRoot = path.join(artifactRoot, "web");
+  const workerRoot = path.join(artifactRoot, "worker");
+  assembleWebArtifact({
+    sourceRoot: guard.sourceRoot,
+    distRoot: guard.destination,
+    distDir,
+    webRoot,
+    buildIdentityPath,
+  });
+  await collectProviderWorkerArtifact({ sourceRoot: guard.sourceRoot, outputRoot: workerRoot });
+  fs.copyFileSync(buildIdentityPath,
+    path.join(workerRoot, PROVIDER_BUILD_IDENTITY_FILE), fs.constants.COPYFILE_EXCL);
+  const web = inventoryArtifactRoot(webRoot);
+  const worker = inventoryArtifactRoot(workerRoot);
+  const { manifest, manifestPath } = writeProviderArtifactManifest({
+    artifactRoot,
+    identity,
+    webRoot,
+    workerRoot,
+    web,
+    worker,
+  });
+  const scan = await artifactScanner({ roots: [artifactRoot] });
+  const validation = validateProviderArtifactManifest({
+    artifactRoot,
+    expectedIdentity: identity,
+  });
+  return Object.freeze({
+    sourceCommit: identity.sourceCommit,
+    sourceTree: identity.sourceTree,
+    providerBuildId,
+    isolatedRoot: guard.sourceRoot,
+    distDir,
+    nextBuildId,
+    web: { ...web, routeCount: countRoutes(guard.destination),
+      staticAssetCount: countFiles(path.join(guard.destination, "static")) },
+    worker,
+    privacyScan: scan,
+    sourceIdentity: Object.freeze({ status: "PASS", ...sourceIdentity }),
+    artifactManifest: Object.freeze({
+      path: manifestPath,
+      sha256: manifest.manifestSha256,
+      validationStatus: validation.status,
+    }),
+    artifactRoot,
+  });
 }
 
-function assembleWebArtifact({ sourceRoot, distRoot, distDir, webRoot }) {
+function assembleWebArtifact({ sourceRoot, distRoot, distDir, webRoot,
+  buildIdentityPath }) {
   copyTree(path.join(distRoot, "standalone"), webRoot, providerWebFilter);
   const publicRoot = path.join(sourceRoot, "public");
   if (fs.existsSync(publicRoot)) {
     copyTree(publicRoot, path.join(webRoot, "public"), (relative) => relative !== "mockup-home.png");
   }
   copyTree(path.join(distRoot, "static"), path.join(webRoot, path.basename(distDir), "static"));
+  fs.copyFileSync(buildIdentityPath,
+    path.join(webRoot, PROVIDER_BUILD_IDENTITY_FILE), fs.constants.COPYFILE_EXCL);
 }
 
 function providerWebFilter(relative) {
@@ -115,7 +140,7 @@ function copyTree(source, destination, filter = () => true, relativeRoot = "") {
   }
 }
 
-function runNextBuild({ sourceRoot, canonicalRoot, isolatedRoot, sourceCommit, providerBuildId, distDir }) {
+function runNextBuild({ sourceRoot, isolatedRoot, sourceCommit, providerBuildId, distDir }) {
   const next = resolveNextCli(sourceRoot);
   const result = spawnSync(process.execPath, [next, "build", "--webpack"], {
     cwd: sourceRoot,
@@ -124,7 +149,12 @@ function runNextBuild({ sourceRoot, canonicalRoot, isolatedRoot, sourceCommit, p
       NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1536",
       NEXT_PHASE: "phase-production-build",
       PHYSIQUEOS_PROVIDER_FULL_RUNTIME: "1",
-      PHYSIQUEOS_CANONICAL_WINDOWS_ROOT: canonicalRoot,
+      // Exact commits created before the portable gate still load the former
+      // location guard from their own next.config. This isolated sentinel
+      // satisfies that legacy path-separation input without reading or
+      // requiring any Windows runtime state. New commits ignore it.
+      PHYSIQUEOS_CANONICAL_WINDOWS_ROOT:
+        path.join(sourceRoot, ".provider-portable-legacy-sentinel"),
       PHYSIQUEOS_PROVIDER_ISOLATED_BUILD_ROOT: isolatedRoot,
       PHYSIQUEOS_BUILD_DIST_DIR: distDir,
       PHYSIQUEOS_GIT_SHA: sourceCommit,
@@ -136,43 +166,55 @@ function runNextBuild({ sourceRoot, canonicalRoot, isolatedRoot, sourceCommit, p
   if (result.status !== 0) throw coded("PROVIDER_BUILD_FAILED", `Next build failed with exit code ${result.status}.`);
 }
 
-function readWindowsRuntimeStatus(canonicalRoot) {
-  const script = path.join(canonicalRoot, "scripts", "statusPhysiqueOS.ps1");
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script], {
-    cwd: canonicalRoot, encoding: "utf8", windowsHide: true, timeout: 60_000,
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw coded("PROVIDER_WINDOWS_STATUS_UNAVAILABLE", result.stderr || "Windows status failed.");
-  const status = JSON.parse(result.stdout);
-  return Object.freeze({
-    pid: status.listener?.pid,
-    startedAt: status.process?.startedAt,
-    taskLastRunTime: status.task?.lastRunTime,
-    taskWorkingDirectory: status.task?.workingDirectory,
-    ownership: status.ownership?.ownershipDecision,
-    overallState: status.overallState,
-  });
-}
-
-function assertRuntimeCanonical(runtime, canonicalRoot) {
-  if (runtime?.overallState !== "healthy" || runtime?.ownership !== "canonical"
-      || path.resolve(runtime?.taskWorkingDirectory ?? "") !== path.resolve(canonicalRoot)
-      || !Number.isInteger(Number(runtime?.pid)) || !runtime?.startedAt) {
-    throw coded("PROVIDER_WINDOWS_STATUS_UNSAFE", "Windows production identity is not healthy, canonical, and complete.");
-  }
-}
-
 function verifyGitIdentity(sourceRoot, expectedCommit) {
   const head = git(sourceRoot, ["rev-parse", "HEAD"]);
   if (head !== expectedCommit) throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID", `Isolated HEAD ${head} does not match ${expectedCommit}.`);
-  const status = git(sourceRoot, ["status", "--porcelain", "--untracked-files=no"]);
-  if (status) throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID", "Isolated source contains tracked changes.");
+  const commitType = git(sourceRoot, ["cat-file", "-t", expectedCommit]);
+  if (commitType !== "commit") throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID",
+    "Requested provider source identity is not a Git commit.");
+  const branch = gitOptional(sourceRoot, ["symbolic-ref", "-q", "HEAD"]);
+  if (branch) throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID",
+    "Provider source must be a detached exact-commit checkout.");
+  const status = git(sourceRoot, ["status", "--porcelain", "--untracked-files=all"]);
+  if (status) throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID",
+    "Isolated source contains tracked or non-ignored untracked changes.");
+  return Object.freeze({
+    sourceCommit: head,
+    sourceTree: git(sourceRoot, ["rev-parse", `${expectedCommit}^{tree}`]),
+    detached: true,
+    clean: true,
+  });
 }
 
 function git(cwd, args) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
   if (result.status !== 0) throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID", result.stderr || "Git identity check failed.");
   return result.stdout.trim();
+}
+
+function gitOptional(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
+  if (result.status === 0) return result.stdout.trim();
+  if (result.status === 1) return "";
+  throw coded("PROVIDER_BUILD_SOURCE_IDENTITY_INVALID",
+    result.stderr || "Git identity check failed.");
+}
+
+function assertNoPrivateBuildInputs(sourceRoot) {
+  const forbidden = [".env", ".env.local", ".env.production",
+    ".env.production.local"];
+  const found = forbidden.filter((entry) => fs.existsSync(path.join(sourceRoot, entry)));
+  const privateRoot = path.join(sourceRoot, "private");
+  if (fs.existsSync(privateRoot)) {
+    const tracked = new Set(git(sourceRoot, ["ls-files", "--", "private"])
+      .split(/\r?\n/).filter(Boolean).map((entry) => entry.replaceAll("\\", "/")));
+    for (const file of listFiles(privateRoot)) {
+      const relative = path.relative(sourceRoot, file).split(path.sep).join("/");
+      if (!tracked.has(relative)) found.push(relative);
+    }
+  }
+  if (found.length > 0) throw coded("PROVIDER_BUILD_PRIVATE_INPUT_REJECTED",
+    `Isolated source contains private/environment build input: ${found.join(", ")}`);
 }
 
 function resolveNextCli(sourceRoot) {
@@ -196,29 +238,6 @@ function assertIsolatedOutput(sourceRoot, artifactRoot, distRoot) {
   if (artifactRoot === distRoot || artifactRoot.startsWith(`${distRoot}${path.sep}`) || distRoot.startsWith(`${artifactRoot}${path.sep}`)) {
     throw coded("PROVIDER_BUILD_DESTINATION_FORBIDDEN", "Build and artifact destinations must be disjoint.");
   }
-}
-
-function inventoryRoots(roots) {
-  let fileCount = 0;
-  let totalBytes = 0;
-  for (const root of roots) {
-    const snapshot = snapshotDirectory(root);
-    fileCount += snapshot.fileCount;
-    totalBytes += snapshot.totalBytes;
-  }
-  return { fileCount, totalBytes, sha256: hashRoots(roots) };
-}
-
-function hashRoots(roots) {
-  const hash = createHash("sha256");
-  for (const root of roots) {
-    const base = path.basename(root);
-    for (const file of listFiles(root)) {
-      hash.update(`${base}/${path.relative(root, file).split(path.sep).join("/")}\0`);
-      hash.update(fs.readFileSync(file));
-    }
-  }
-  return hash.digest("hex").toUpperCase();
 }
 
 function listFiles(root) {
@@ -269,7 +288,6 @@ function parseArgs(argv) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const result = await runIsolatedProviderBuild({
-    canonicalRoot: required(args["canonical-root"], "--canonical-root"),
     isolatedRoot: required(args["isolated-root"], "--isolated-root"),
     sourceCommit: required(args["source-commit"], "--source-commit"),
     providerBuildId: required(args["provider-build-id"], "--provider-build-id"),

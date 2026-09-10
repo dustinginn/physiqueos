@@ -32,6 +32,8 @@ describe("provider artifact privacy scanner", () => {
     ["tmp/playwright-founder-runtime.json", "{}"],
     [".tmp/database.credential.clixml", "encrypted"],
     ["private/founder/photo.jpg", "private-image"],
+    ["standalone/src/data/founderSeed/user.js", "export default {};"],
+    ["worker/src/data/seed/goals.js", "export default [];"],
     ["screenshots/founder.png", "private-image"],
     ["runtime-store.json", "{}"],
     ["migration-control.json", "{}"],

@@ -20,6 +20,10 @@ const FORBIDDEN_ARCHIVE_NAMES = [
   /recovery.*\.(?:zip|7z|tar|tgz|gz|enc)$/i,
   /\.(?:dump|backup)$/i,
 ];
+const FORBIDDEN_SOURCE_PATHS = [
+  /(?:^|\/)src\/data\/(?:founderSeed|seed)(?:\/|$)/i,
+  /(?:^|\/)private\/founder(?:\/|$)/i,
+];
 const SECRET_PATTERNS = [
   { name: "credential-bearing-database-uri", pattern: /postgres(?:ql)?:\/\/[^\s:/]+:[^\s@/]+@/i },
   { name: "digitalocean-api-token", pattern: /\bdop_v1_[A-Za-z0-9_-]{20,}\b/ },
@@ -56,6 +60,9 @@ export async function scanProviderArtifact({
       if (FORBIDDEN_ROOT_DIRECTORIES.has(rootSegment)) violation(violations, relativePath, "forbidden-root-directory");
       if (FORBIDDEN_FILE_NAMES.some((pattern) => pattern.test(fileName))) violation(violations, relativePath, "forbidden-private-filename");
       if (FORBIDDEN_ARCHIVE_NAMES.some((pattern) => pattern.test(fileName))) violation(violations, relativePath, "forbidden-recovery-artifact");
+      if (FORBIDDEN_SOURCE_PATHS.some((pattern) => pattern.test(relativePath))) {
+        violation(violations, relativePath, "forbidden-private-source-path");
+      }
 
       const digest = createHash("sha256").update(file).digest("hex");
       if (normalizedForbiddenHashes.has(digest)) violation(violations, relativePath, "forbidden-production-file-hash");
