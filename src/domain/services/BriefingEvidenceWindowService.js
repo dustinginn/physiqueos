@@ -1,6 +1,8 @@
 import { getLocalDateKey } from "../utils/localDate";
+import { localDateTimeToUtc } from
+  "./IntelligenceLifecycleIdentityService";
 
-export const ROUTINE_BRIEFING_CADENCE_VERSION = "routine_briefing_cadence_v2";
+export const ROUTINE_BRIEFING_CADENCE_VERSION = "routine_briefing_cadence_v3";
 
 export function createPreviousDayEvidenceWindow({ now = new Date(), timeZone = "America/Los_Angeles" } = {}) {
   const today = getDateKeyInTimeZone(now, timeZone);
@@ -8,7 +10,7 @@ export function createPreviousDayEvidenceWindow({ now = new Date(), timeZone = "
   target.setUTCDate(target.getUTCDate() - 1);
   const date = target.toISOString().slice(0, 10);
 
-  return { id: `daily:${date}:${timeZone}`, cadence: "daily", briefingDate: today, date, start: `${date}T00:00:00`, end: `${date}T23:59:59.999`, relativeLabel: "yesterday", sameDayEvidenceExcluded: true, timeZone, closed: true };
+  return { id: `daily:${date}:${timeZone}`, cadence: "daily", briefingDate: today, date, start: `${date}T00:00:00`, end: `${date}T23:59:59.999`, cutoff: endOfLocalDay(date, timeZone), relativeLabel: "yesterday", sameDayEvidenceExcluded: true, timeZone, closed: true };
 }
 
 export function selectScheduledBriefingCadence({ now = new Date(), timeZone = "America/Los_Angeles", monthlyEnabled = false, coachingUpdates = null } = {}) {
@@ -39,6 +41,7 @@ export function createWeeklyEvidenceWindow({ now = new Date(), timeZone = "Ameri
     endDate,
     start: `${startDate}T00:00:00`,
     end: `${endDate}T23:59:59.999`,
+    cutoff: endOfLocalDay(endDate, timeZone),
     relativeLabel: "this completed week",
     sameDayEvidenceExcluded: true,
     timeZone,
@@ -54,7 +57,7 @@ export function createMidweekEvidenceWindow({ now = new Date(), timeZone = "Amer
   const resolvedBriefingDate = shiftDateKey(briefingDate, offset);
   const startDate = shiftDateKey(resolvedBriefingDate, -3);
   const endDate = shiftDateKey(resolvedBriefingDate, -1);
-  return { id: `midweek:${startDate}:${endDate}:${timeZone}`, cadence: "midweek", briefingDate: resolvedBriefingDate, date: endDate, startDate, endDate, start: `${startDate}T00:00:00`, end: `${endDate}T23:59:59.999`, relativeLabel: "Sunday through Tuesday", sameDayEvidenceExcluded: true, timeZone, closed: true };
+  return { id: `midweek:${startDate}:${endDate}:${timeZone}`, cadence: "midweek", briefingDate: resolvedBriefingDate, date: endDate, startDate, endDate, start: `${startDate}T00:00:00`, end: `${endDate}T23:59:59.999`, cutoff: endOfLocalDay(endDate, timeZone), relativeLabel: "Sunday through Tuesday", sameDayEvidenceExcluded: true, timeZone, closed: true };
 }
 
 export function createMonthlyEvidenceWindow({
@@ -207,47 +210,10 @@ function lastDateOfMonth(monthKey) {
   return firstOfFollowing.toISOString().slice(0, 10);
 }
 
-function localDateTimeToUtc({ date, time, timeZone }) {
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute, secondWithMilliseconds = "0"] = time.split(":");
-  const [second, milliseconds = "0"] = secondWithMilliseconds.split(".");
-  const desired = Date.UTC(
-    year,
-    month - 1,
-    day,
-    Number(hour),
-    Number(minute),
-    Number(second),
-    Number(milliseconds.padEnd(3, "0").slice(0, 3))
-  );
-  let guess = desired;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const parts = Object.fromEntries(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }).formatToParts(new Date(guess))
-        .filter((part) => part.type !== "literal")
-        .map((part) => [part.type, part.value])
-    );
-    const represented = Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-      Number(parts.hour === "24" ? "0" : parts.hour),
-      Number(parts.minute),
-      Number(parts.second),
-      Number(milliseconds.padEnd(3, "0").slice(0, 3))
-    );
-    const adjustment = desired - represented;
-    guess += adjustment;
-    if (adjustment === 0) break;
-  }
-  return new Date(guess);
+function endOfLocalDay(date, timeZone) {
+  return localDateTimeToUtc({
+    date,
+    time: "23:59:59.999",
+    timeZone,
+  }).toISOString();
 }

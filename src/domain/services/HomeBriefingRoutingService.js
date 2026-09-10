@@ -17,7 +17,12 @@ export function resolveHomeBriefingSelection({
   coachingUpdates = null,
 } = {}) {
   const localDate = getLocalDateKey(now, timeZone);
-  const scheduledCadence = selectScheduledBriefingCadence({ now, timeZone, coachingUpdates });
+  const scheduledCadence = selectScheduledBriefingCadence({
+    now,
+    timeZone,
+    coachingUpdates,
+    monthlyEnabled: true,
+  });
   const activeEvent = isEventActiveForHome({ artifact: eventArtifact, localDate, timeZone });
   if (activeEvent) {
     const isPhoto = ["progress_photo", "photo_session"].includes(eventArtifact.trigger?.evidenceType);
@@ -46,6 +51,9 @@ export function resolveHomeBriefingSelection({
       localDate,
       "monthly_delivery_day"
     );
+  }
+  if (scheduledCadence === "monthly") {
+    return emptySelection(localDate, "scheduled_monthly_unavailable");
   }
   const validMidweek = isCadenceArtifactReady(midweekArtifact, "midweek") &&
     isMidweekInPromotionWindow(midweekArtifact, { localDate, now, scheduledCadence, timeZone, coachingUpdates })

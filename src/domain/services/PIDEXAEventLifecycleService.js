@@ -7,6 +7,8 @@ import {
 } from "../confidence/ProductionConfidenceContextAdapter";
 import { createBriefingGoalConfidenceBlockFromV2 } from
   "./BriefingGoalConfidencePresentationService";
+import { resolveIntelligenceEvidenceCutoff } from
+  "./IntelligenceLifecycleIdentityService";
 
 export function createPIDEXAEventLifecycleService({ publicationService,
   now = () => new Date() } = {}) {
@@ -27,7 +29,11 @@ export function createPIDEXAEventLifecycleService({ publicationService,
         .getCurrent({ goalId: goal.id, phaseId: phase.id });
       if (!current.assessment) return typed("canonical_predecessor_required",
         "DEXA Confidence requires a canonical predecessor.");
-      const cutoff = iso(scan.measuredAt ?? scan.date);
+      const cutoff = resolveIntelligenceEvidenceCutoff({
+        value: scan.measuredAt ?? scan.date,
+        timeZone: context?.timeZone ?? artifact?.timeZone ??
+          "America/Los_Angeles",
+      });
       const goalContract = adaptProductionGoalToCanonicalContract(goal, {
         activePhase: phase, canonicalStore: baseline.store, asOf: cutoff,
       });
@@ -86,13 +92,6 @@ export function createPIDEXAEventLifecycleService({ publicationService,
       return result.commitResult ?? typed(result.status, "DEXA finalization did not commit.");
     },
   });
-}
-function iso(value) {
-  const raw = String(value ?? "");
-  const parsed = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? `${raw}T23:59:59.999Z` : raw);
-  if (!Number.isFinite(parsed)) throw new Error("DEXA cutoff is invalid.");
-  return new Date(parsed).toISOString();
 }
 function typed(status, message) { return { status, committed: false,
   error: message ? { code: status, message } : null }; }

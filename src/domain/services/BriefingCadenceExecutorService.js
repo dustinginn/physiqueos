@@ -3,7 +3,7 @@ import {
   resolveBriefingCadenceRegistry,
 } from "./BriefingCadenceRegistryService";
 
-export const BRIEFING_CADENCE_EXECUTOR_VERSION = "briefing_cadence_executor_v1";
+export const BRIEFING_CADENCE_EXECUTOR_VERSION = "briefing_cadence_executor_v2";
 
 const TERMINAL_FAILURES = new Set([
   "artifact_identity_mismatch",
@@ -89,7 +89,8 @@ async function evaluateEntry({
   const started = Date.now();
   const base = {
     schemaVersion: BRIEFING_CADENCE_EXECUTOR_VERSION,
-    executionId: `${runId}:${entry.cadence}`,
+    executionId: entry.executionId,
+    attemptId: `${runId}:${entry.cadence}`,
     runId,
     cadenceKey: entry.cadence,
     userId: entry.userId,

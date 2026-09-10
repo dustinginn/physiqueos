@@ -23,6 +23,7 @@ describe("shared production briefing forecast finalizer", () => {
       publisherType: "goal_initialization",
       currentPercentage: result.numericConfidenceProjection.currentPercentage,
       sourceLineage: {
+        intelligenceRunId: expect.stringMatching(/^pi-execution\|/),
         confidenceExplanationDrivers: {
           schemaVersion: "confidence_explanation_drivers_v1",
           materiallyChanged: {
@@ -33,6 +34,8 @@ describe("shared production briefing forecast finalizer", () => {
     });
     expect(result.briefingArtifact.confidencePublication.assessmentId)
       .toBe(result.confidenceAssessment.id);
+    expect(result.briefingArtifact.confidencePublication.intelligenceRunId)
+      .toBe(result.confidenceAssessment.sourceLineage.intelligenceRunId);
     const drivers = result.confidenceAssessment.sourceLineage
       .confidenceExplanationDrivers;
     expect([...drivers.strengthenedBy, ...drivers.limitedBy]

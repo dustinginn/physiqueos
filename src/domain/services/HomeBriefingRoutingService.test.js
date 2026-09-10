@@ -266,6 +266,16 @@ describe("artifact-backed Home briefing routing", () => {
     });
   });
 
+  it("does not fall back to a colliding recurring cadence while Monthly is pending", () => {
+    expect(select("2026-08-01", {
+      weeklyArtifact: weekly,
+      midweekArtifact: midweek,
+    })).toMatchObject({
+      briefingType: "none",
+      artifact: null,
+    });
+  });
+
   it("returns to routine cadence selection after Monthly delivery day", () => {
     expect(select("2026-08-02", {
       monthlyArtifact: monthly,

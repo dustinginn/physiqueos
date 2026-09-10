@@ -64,6 +64,7 @@ describe("PI cadence Confidence lifecycle", () => {
       signals: [expect.objectContaining({ capability: "training_progression" })],
     });
     expect(assessment.movement).toBe("no_meaningful_change");
+    expect(assessment.sourceCutoff).toBe("2026-08-05T06:59:59.999Z");
     expect(assessment.narrativeExplanation.text).toMatch(/still preliminary/i);
   });
 

@@ -7,8 +7,12 @@ import { createCoachingUpdatesReadService } from "./CoachingUpdatesReadService";
 import { getMidweekArtifactId } from "./MidweekBriefingService";
 import { getMonthlyArtifactId } from "./MonthlyBriefingService";
 import { artifactIdForWeeklyWindow } from "./WeeklyClosedWindowContract";
+import {
+  applyRecurringBriefingPrecedence,
+  createBriefingCadenceExecutionIdentity,
+} from "./IntelligenceLifecycleIdentityService";
 
-export const BRIEFING_CADENCE_REGISTRY_VERSION = "briefing_cadence_registry_v1";
+export const BRIEFING_CADENCE_REGISTRY_VERSION = "briefing_cadence_registry_v2";
 export const BRIEFING_CADENCE_CATCH_UP_POLICY = Object.freeze({
   horizon: "local_cadence_day",
   missingArtifactGraceMinutes: 15,
@@ -43,7 +47,7 @@ export async function resolveBriefingCadenceRegistry({
   const timeZone = schedule.timeZone ?? user?.timeZone ?? DEFAULT_TIME_ZONE;
   const local = localParts(now, timeZone);
 
-  return [
+  const entries = [
     createEntry({
       cadence: "midweek",
       surface: schedule.midweek ?? DEFAULT_SCHEDULE.midweek,
@@ -91,13 +95,22 @@ export async function resolveBriefingCadenceRegistry({
       }),
       includeExpectedWindowWhenIneligible: true,
     }),
-  ].map((entry) => Object.freeze({
+  ].map((entry) => ({
     ...entry,
     registryVersion: BRIEFING_CADENCE_REGISTRY_VERSION,
     catchUpHorizon: BRIEFING_CADENCE_CATCH_UP_POLICY.horizon,
     notificationEnabled: false,
     artifactIdempotent: true,
+    executionId: entry.expectedArtifactId && entry.userId
+      ? createBriefingCadenceExecutionIdentity({
+          ownerUserId: entry.userId,
+          cadenceKey: entry.cadence,
+          expectedArtifactId: entry.expectedArtifactId,
+        })
+      : null,
   }));
+  return applyRecurringBriefingPrecedence(entries)
+    .map((entry) => Object.freeze(entry));
 }
 
 function createEntry({

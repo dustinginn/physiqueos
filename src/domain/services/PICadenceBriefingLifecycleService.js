@@ -10,6 +10,8 @@ import { createCadenceEvidenceDurabilityContext } from
   "../confidence/CadenceEvidenceDurabilityContextService";
 import { createBriefingGoalConfidenceBlockFromV2 } from
   "./BriefingGoalConfidencePresentationService";
+import { resolveIntelligenceEvidenceCutoff } from
+  "./IntelligenceLifecycleIdentityService";
 
 export function createPICadenceBriefingLifecycleService({
   publicationService,
@@ -33,8 +35,11 @@ export function createPICadenceBriefingLifecycleService({
         .getCurrent({ goalId: activeGoal.id, phaseId: activePhase.id });
       if (!current.assessment) return typed("canonical_predecessor_required",
         "Cadence Confidence requires a canonical predecessor.");
-      const cutoff = artifact.evidenceCutoff ??
-        `${artifact.evidenceWindow.endDate}T23:59:59.999Z`;
+      const cutoff = resolveIntelligenceEvidenceCutoff({
+        value: artifact.evidenceCutoff ?? artifact.evidenceWindow.cutoff ??
+          artifact.evidenceWindow.endDate,
+        timeZone: artifact.evidenceWindow.timeZone ?? "America/Los_Angeles",
+      });
       const goalContract = adaptProductionGoalToCanonicalContract(activeGoal, {
         activePhase, canonicalStore: baseline.store, asOf: cutoff,
       });

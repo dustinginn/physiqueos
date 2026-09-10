@@ -4,6 +4,7 @@ import { resolveBriefingCadenceRegistry } from "./BriefingCadenceRegistryService
 
 const WEDNESDAY = new Date("2026-07-29T19:00:00.000Z");
 const SUNDAY = new Date("2026-08-02T19:00:00.000Z");
+const MONTHLY_WEDNESDAY = new Date("2026-04-01T19:00:00.000Z");
 
 describe("production briefing cadence registry", () => {
   it("resolves the canonical Wednesday Midweek window and artifact identity", async () => {
@@ -28,6 +29,7 @@ describe("production briefing cadence registry", () => {
         startDate: "2026-07-26",
         endDate: "2026-07-28",
         end: "2026-07-28T23:59:59.999",
+        cutoff: "2026-07-29T06:59:59.999Z",
         sameDayEvidenceExcluded: true,
       },
     });
@@ -75,9 +77,45 @@ describe("production briefing cadence registry", () => {
     expect(calls.midweek.generateForCurrentWindow).not.toHaveBeenCalled();
     expect(calls.weekly.generateForCurrentWindow).not.toHaveBeenCalled();
   });
+
+  it("centralizes Monthly precedence over a colliding Midweek occurrence", async () => {
+    const entries = await resolveBriefingCadenceRegistry({
+      repositories: repositories(),
+      generators: generators(),
+      now: MONTHLY_WEDNESDAY,
+    });
+    expect(entries.find((entry) => entry.cadence === "monthly"))
+      .toMatchObject({ eligible: true });
+    expect(entries.find((entry) => entry.cadence === "midweek"))
+      .toMatchObject({
+        eligible: false,
+        eligibilityReason: "superseded_by_monthly",
+        supersededByCadence: "monthly",
+      });
+  });
 });
 
 describe("production briefing cadence executor", () => {
+  it("publishes only Monthly when the scheduler collides with Midweek", async () => {
+    const calls = generators({
+      monthly: vi.fn(async () => ({
+        state: "completed",
+        artifact: { id: "monthly" },
+      })),
+    });
+    const result = await executor({
+      repositories: repositories(),
+      generators: calls,
+    }).execute({ asOf: MONTHLY_WEDNESDAY });
+    expect(calls.monthly.generateForCurrentWindow).toHaveBeenCalledOnce();
+    expect(calls.midweek.generateForCurrentWindow).not.toHaveBeenCalled();
+    expect(result.outcomes.find((item) => item.cadenceKey === "midweek"))
+      .toMatchObject({
+        resultStatus: "ineligible",
+        skipReason: "superseded_by_monthly",
+      });
+  });
+
   it("generates one missing artifact and records operational lifecycle separately", async () => {
     const records = [];
     const calls = generators();
@@ -89,6 +127,9 @@ describe("production briefing cadence executor", () => {
     expect(calls.midweek.generateForCurrentWindow).toHaveBeenCalledOnce();
     expect(result.outcomes.find((item) => item.cadenceKey === "midweek"))
       .toMatchObject({
+        executionId: "briefing-cadence:user_founder_001:midweek:" +
+          "midweek_briefing_user_founder_001_20260726_20260728",
+        attemptId: "run-0:midweek",
         resultStatus: "generation_completed",
         artifactOutcome: "created",
         expectedArtifactId:
@@ -301,7 +342,7 @@ function repositories({ artifacts = [], schedule = null, weights = [] } = {}) {
   };
 }
 
-function generators({ midweek, weekly } = {}) {
+function generators({ midweek, weekly, monthly } = {}) {
   return {
     midweek: {
       generateForCurrentWindow: midweek ?? vi.fn(async () => completedResult()),
@@ -310,6 +351,12 @@ function generators({ midweek, weekly } = {}) {
       generateForCurrentWindow: weekly ?? vi.fn(async () => ({
         state: "completed",
         artifact: { id: "weekly" },
+      })),
+    },
+    monthly: {
+      generateForCurrentWindow: monthly ?? vi.fn(async () => ({
+        state: "completed",
+        artifact: { id: "monthly" },
       })),
     },
   };
