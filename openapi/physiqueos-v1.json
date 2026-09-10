@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PhysiqueOS Application API",
-    "version": "1.0.0-foundation.3",
-    "description": "Inactive Phase 3 shared application boundary. Versioned read-model, command, typed-destination, date, and authorized-media contracts are implemented over the still-canonical Founder JSON/file runtime. The only new HTTP surface is protected capability discovery; production authentication deliberately remains inactive and no Founder domain data is exposed."
+    "version": "1.0.0-native.1",
+    "description": "Versioned PhysiqueOS application and Native production boundary. Founder-device bearer sessions authorize owner-scoped canonical read models, idempotent commands, and opaque private media without exposing persistence or storage implementation details."
   },
   "servers": [{ "url": "/api/v1" }],
   "paths": {
@@ -68,6 +68,49 @@
           "401": { "$ref": "#/components/responses/Problem" },
           "503": { "$ref": "#/components/responses/Problem" }
         }
+      }
+    },
+    "/native/profile": {
+      "get": {
+        "operationId": "getNativeProfile",
+        "summary": "Return the authenticated Native profile and authority capabilities",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Owner-scoped profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NativeResourceEnvelope" } } } }, "401": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/contracts": {
+      "get": {
+        "operationId": "getNativeContracts",
+        "summary": "Return the authoritative Native production contract manifest",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Native contract manifest" }, "401": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/read/{resource}": {
+      "get": {
+        "operationId": "readNativeResource",
+        "summary": "Read one allowlisted bounded canonical Native resource",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "resource", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": { "200": { "description": "Canonical Native resource", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NativeResourceEnvelope" } } } }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/commands": {
+      "post": {
+        "operationId": "executeNativeCommand",
+        "summary": "Execute one allowlisted idempotent canonical Native command",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": { "200": { "description": "Canonical command receipt" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "412": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/native/media/{mediaId}": {
+      "get": {
+        "operationId": "readNativePrivateMedia",
+        "summary": "Stream owner-scoped private media by opaque canonical ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "mediaId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Private image or PDF" }, "404": { "$ref": "#/components/responses/Problem" } }
       }
     }
   },
@@ -218,7 +261,7 @@
         "additionalProperties": false,
         "required": ["commandType", "payloadVersion", "requiredPayloadFields", "expectedVersionRequired"],
         "properties": {
-          "commandType": { "type": "string", "enum": ["weight.submit.v1", "check-in.submit.v1", "evidence-intake.create.v1", "evidence-review.edit.v1", "evidence-review.confirm.v1", "evidence-review.dispose.v1", "priority.complete.v1", "previous-day.reconcile.v1", "protocol.edit.v1", "goal.edit.v1", "goal.transition.v1", "training-session.create.v1", "training-session.correct.v1", "training-logger.complete.v1", "nutrition-evidence.confirm.v1", "photo-evidence.confirm.v1", "dexa-evidence.confirm.v1"] },
+          "commandType": { "type": "string", "enum": ["weight.submit.v1", "check-in.submit.v1", "evidence-intake.create.v1", "evidence-review.edit.v1", "evidence-review.confirm.v1", "evidence-review.dispose.v1", "priority.complete.v1", "previous-day.reconcile.v1", "protocol.edit.v1", "goal.edit.v1", "goal.transition.v1", "training-session.create.v1", "training-session.correct.v1", "training-logger.complete.v1", "nutrition-evidence.confirm.v1", "photo-evidence.confirm.v1", "dexa-evidence.confirm.v1", "nutrition-day.upsert.v1", "activity-day.sync.v1"] },
           "payloadVersion": { "const": "1" },
           "requiredPayloadFields": { "type": "array", "items": { "type": "string" } },
           "expectedVersionRequired": { "type": "boolean" }
@@ -237,6 +280,18 @@
           "data": {},
           "intentionalDifferences": { "type": "array", "items": { "type": "string" } },
           "etag": { "type": "string" }
+        }
+      },
+      "NativeResourceEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contractVersion", "resource", "authority", "generatedAt", "data"],
+        "properties": {
+          "contractVersion": { "const": "1" },
+          "resource": { "type": "string" },
+          "authority": { "const": "founder-production" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "data": {}
         }
       },
       "AuthorizedMediaReadDescriptor": {

@@ -10,7 +10,7 @@ const specification = JSON.parse(fs.readFileSync(new URL("../../../openapi/physi
 
 describe("Phase 3 OpenAPI/runtime consistency", () => {
   it("matches destination, command, and read-model registries exactly", () => {
-    expect(specification.info.version).toBe("1.0.0-foundation.3");
+    expect(specification.info.version).toBe("1.0.0-native.1");
     expect(specification.paths["/capabilities"].get.security).toEqual([{ bearerAuth: [] }]);
     expect(new Set(specification.components.schemas.Destination.properties.id.enum)).toEqual(new Set(Object.values(DestinationId)));
     expect(new Set(specification.components.schemas.ApplicationCommandContract.properties.commandType.enum)).toEqual(new Set(listPhase3CommandContracts().map((item) => item.commandType)));

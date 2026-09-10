@@ -21,6 +21,8 @@ export const Phase3Command = Object.freeze({
   CONFIRM_NUTRITION: "nutrition-evidence.confirm.v1",
   CONFIRM_PHOTO: "photo-evidence.confirm.v1",
   CONFIRM_DEXA: "dexa-evidence.confirm.v1",
+  UPSERT_NUTRITION_DAY: "nutrition-day.upsert.v1",
+  SYNC_ACTIVITY_DAY: "activity-day.sync.v1",
 });
 
 const DEFINITIONS = Object.freeze({
@@ -41,6 +43,8 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.CONFIRM_NUTRITION]: define("confirmNutritionEvidence", ["reviewId"], true),
   [Phase3Command.CONFIRM_PHOTO]: define("confirmPhotoEvidence", ["reviewId"], true),
   [Phase3Command.CONFIRM_DEXA]: define("confirmDexaEvidence", ["reviewId"], true),
+  [Phase3Command.UPSERT_NUTRITION_DAY]: define("upsertNutritionDay", ["localDate", "dailyTotals"], false),
+  [Phase3Command.SYNC_ACTIVITY_DAY]: define("syncActivityDay", ["localDate", "dailyActivity", "sourceIdentity"], false),
 });
 
 export function createPhase3CommandService({ transactionRunner, ports, writeFence = null } = {}) {
@@ -106,6 +110,8 @@ function validatePayload(commandType, payload) {
     throw validation("value", "Weight must be a positive number.");
   }
   if (payload.items != null && !Array.isArray(payload.items)) throw validation("items", "items must be an array.");
+  if (payload.dailyTotals != null && (!payload.dailyTotals || typeof payload.dailyTotals !== "object" || Array.isArray(payload.dailyTotals))) throw validation("dailyTotals", "dailyTotals must be an object.");
+  if (payload.dailyActivity != null && (!payload.dailyActivity || typeof payload.dailyActivity !== "object" || Array.isArray(payload.dailyActivity))) throw validation("dailyActivity", "dailyActivity must be an object.");
   if (payload.observedAt != null && Number.isNaN(Date.parse(payload.observedAt))) throw validation("observedAt", "observedAt must be an ISO date-time.");
   for (const field of ["submissionId", "reviewId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);

@@ -1,8 +1,11 @@
+import { reconcileConfirmedEvidencePackage } from "../../domain/services/CanonicalEvidenceService.js";
+
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
   "confirmEvidenceReview", "disposeEvidenceReview", "completePriority", "reconcilePreviousDay",
   "editProtocol", "editGoal", "transitionGoal", "createTrainingSession", "correctTrainingSession",
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
+  "upsertNutritionDay", "syncActivityDay",
 ]);
 
 export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
@@ -52,7 +55,98 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     confirmNutritionEvidence: review("confirmed_nutrition"),
     confirmPhotoEvidence: review("confirmed_photo"),
     confirmDexaEvidence: review("confirmed_dexa"),
+    upsertNutritionDay: (context) => upsertCanonicalDay(context, {
+      evidenceType: "nutrition",
+      payload: {
+        id: `native-nutrition-${context.payload.localDate}`,
+        evidence_type: "nutrition",
+        observed_at: context.payload.localDate,
+        daily_totals: context.payload.dailyTotals,
+        meals: context.payload.meals ?? [],
+        metadata: {
+          date: context.payload.localDate,
+          time_zone: context.metadata.clientTimeZone ?? context.payload.timeZone ?? "America/Los_Angeles",
+          daily_totals_scope: "full_day_summary",
+        },
+        reconciliation: {
+          nutrition: {
+            disposition: "replace",
+            replacementScope: "full_day",
+            expectedPriorSemanticFingerprint: context.payload.expectedSemanticFingerprint ?? null,
+          },
+        },
+        source: context.payload.source ?? { application: "PhysiqueOS", modality: "manual" },
+      },
+    }),
+    syncActivityDay: (context) => upsertCanonicalDay(context, {
+      evidenceType: "activity_day",
+      payload: {
+        id: String(context.payload.sourceIdentity),
+        evidence_type: "activity_day",
+        observed_at: context.payload.localDate,
+        daily_activity: context.payload.dailyActivity,
+        metadata: {
+          date: context.payload.localDate,
+          time_zone: context.metadata.clientTimeZone ?? context.payload.timeZone ?? "America/Los_Angeles",
+          sync_checkpoint: context.payload.checkpoint ?? null,
+        },
+        reconciliation: {
+          activity: {
+            expectedPriorSemanticFingerprint: context.payload.expectedSemanticFingerprint ?? null,
+          },
+        },
+        source: context.payload.source ?? { application: "Apple Health", integration: "HealthKit", modality: "direct" },
+      },
+    }),
   });
+
+  async function upsertCanonicalDay(context, { evidenceType, payload }) {
+    const [existingCanonicalObjects, goals] = await Promise.all([
+      records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "goals" }),
+    ]);
+    const packageId = `${evidenceType}|native|${context.metadata.idempotencyKey}`;
+    const evidencePackage = {
+      id: packageId,
+      package_id: packageId,
+      userId: context.ownerUserId,
+      source: { type: "native", deviceId: context.principal.deviceId },
+      evidence_objects: [payload],
+    };
+    const reconciliation = reconcileConfirmedEvidencePackage({
+      evidencePackage,
+      existingCanonicalObjects,
+      goals,
+      userId: context.ownerUserId,
+      mutationReason: `native_${evidenceType}_write`,
+    });
+    const existingById = new Map(existingCanonicalObjects.map((record) => [record.canonicalId, record]));
+    const stored = [];
+    for (const record of reconciliation.changedObjects) {
+      const previous = existingById.get(record.canonicalId);
+      stored.push(await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: "canonicalEvidenceObjects",
+        recordId: record.canonicalId,
+        payload: record,
+        expectedVersion: previous?.version ?? null,
+        sourceIdentity: String(context.payload.sourceIdentity ?? packageId),
+      }));
+    }
+    const current = stored.find((record) => record.evidence_type === evidenceType) ??
+      reconciliation.changedObjects.find((record) => record.evidence_type === evidenceType) ??
+      existingCanonicalObjects.find((record) => record.evidence_type === evidenceType && String(record.lastObservedAt).slice(0, 10) === context.payload.localDate) ?? null;
+    return {
+      status: "committed",
+      result: {
+        status: reconciliation.semanticChangedObjects.length > 0 ? "changed" : "unchanged",
+        canonicalId: current?.canonicalId ?? null,
+        revision: current?.nutritionRevision?.revision ?? current?.activityRevision?.revision ?? current?.version ?? null,
+        semanticFingerprint: current?.nutritionRevision?.semanticFingerprint ?? current?.activityRevision?.semanticFingerprint ?? null,
+      },
+      outbox: [],
+    };
+  }
 
   function completeOccurrence(collection, idField, historyField, dateField = "occurrenceDate") {
     return async (context) => {

@@ -22,6 +22,8 @@ const payloads = {
   [Phase3Command.CONFIRM_NUTRITION]: { reviewId: "review-nutrition" },
   [Phase3Command.CONFIRM_PHOTO]: { reviewId: "review-photo" },
   [Phase3Command.CONFIRM_DEXA]: { reviewId: "review-dexa" },
+  [Phase3Command.UPSERT_NUTRITION_DAY]: { localDate: "2026-08-11", dailyTotals: { calories: 2400, protein_g: 180 } },
+  [Phase3Command.SYNC_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "healthkit-day-2026-08-11" },
 };
 
 describe("Phase 3 task command parity boundary", () => {
@@ -98,6 +100,7 @@ function commandPort(commandType) {
     [Phase3Command.EDIT_GOAL]: "editGoal", [Phase3Command.TRANSITION_GOAL]: "transitionGoal", [Phase3Command.CREATE_TRAINING_SESSION]: "createTrainingSession",
     [Phase3Command.CORRECT_TRAINING_SESSION]: "correctTrainingSession", [Phase3Command.COMPLETE_TRAINING_LOGGER]: "completeTrainingLogger", [Phase3Command.CONFIRM_NUTRITION]: "confirmNutritionEvidence",
     [Phase3Command.CONFIRM_PHOTO]: "confirmPhotoEvidence", [Phase3Command.CONFIRM_DEXA]: "confirmDexaEvidence",
+    [Phase3Command.UPSERT_NUTRITION_DAY]: "upsertNutritionDay", [Phase3Command.SYNC_ACTIVITY_DAY]: "syncActivityDay",
   })[commandType];
 }
 
