@@ -7,6 +7,7 @@ const ACCESS_LIFETIME_MS = 10 * 60 * 1000;
 const REFRESH_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
 const REFRESH_ABSOLUTE_MS = 90 * 24 * 60 * 60 * 1000;
 const PAIRING_LIFETIME_MS = 10 * 60 * 1000;
+export const FOUNDER_PRODUCTION_AUTHORITY = "founder-production";
 
 export function createFounderAuthService({ transactionRunner, credentialPepper, clock = () => new Date(), createId = () => createUuidV7(), createSecret = () => generateHighEntropyCredential() }) {
   if (!transactionRunner?.run) throw new Error("An authentication transaction runner is required.");
@@ -40,6 +41,65 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
         credentialHash: hash(credential), hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH, expiresAt,
       });
       return Object.freeze({ pairingCredential: credential, expiresAt: expiresAt.toISOString() });
+    });
+  }
+
+  async function issuePairingCredentialFromFounderWeb({ userId, authority, correlationId = null }) {
+    if (authority !== FOUNDER_PRODUCTION_AUTHORITY || !String(userId ?? "").trim()) {
+      throw authorityUnavailable();
+    }
+    return transactionRunner.run(async (transaction) => {
+      const owner = await transaction.identity.findUser(userId);
+      if (!owner) throw authorityUnavailable();
+
+      const now = clock();
+      const expiresAt = new Date(now.getTime() + PAIRING_LIFETIME_MS);
+      const issuerId = createId();
+      const pairingCredentialId = createId();
+      const pairingCredential = createSecret();
+
+      // The existing schema requires every pairing credential to have either a
+      // live-session issuer or a recovery-style one-time issuer. Founder web
+      // sessions are intentionally stateless, so create an internal issuer
+      // grant and consume it immediately in this same transaction. Its secret
+      // is never returned or logged and cannot become recovery authority.
+      const internalIssuerSecret = createSecret();
+      await transaction.identity.createRecoveryCredential({
+        id: issuerId,
+        userId,
+        credentialHash: hash(internalIssuerSecret),
+        hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH,
+        expiresAt: now,
+      });
+      await transaction.identity.consumeRecoveryCredential({ id: issuerId, at: now });
+      await transaction.identity.createPairingCredentialWithRecoveryIssuer({
+        id: pairingCredentialId,
+        userId,
+        issuedBySessionId: null,
+        issuedByRecoveryCredentialId: issuerId,
+        credentialHash: hash(pairingCredential),
+        hashAlgorithm: HIGH_ENTROPY_CREDENTIAL_HASH,
+        expiresAt,
+      });
+      await transaction.identity.recordSecurityEvent({
+        id: createId(),
+        userId,
+        eventType: "native_pairing_credential_issued",
+        outcome: "accepted",
+        correlationId,
+        details: {
+          authority: FOUNDER_PRODUCTION_AUTHORITY,
+          channel: "founder_web_session",
+          pairingCredentialId,
+          expiresAt: expiresAt.toISOString(),
+        },
+      });
+      return Object.freeze({
+        pairingCredential,
+        authority: FOUNDER_PRODUCTION_AUTHORITY,
+        issuedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      });
     });
   }
 
@@ -81,7 +141,20 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
       if (!pairing) throw invalidCredential("PAIRING_CREDENTIAL_INVALID");
       const deviceId = createId();
       await transaction.identity.createDevice({ id: deviceId, userId: pairing.user_id, platform, displayName });
-      return issueSessionWithinTransaction(transaction, { userId: pairing.user_id, deviceId, authenticatedAt: now });
+      const session = await issueSessionWithinTransaction(transaction, { userId: pairing.user_id, deviceId, authenticatedAt: now });
+      await transaction.identity.recordSecurityEvent({
+        id: createId(),
+        userId: pairing.user_id,
+        deviceId,
+        sessionId: session.sessionId,
+        eventType: "native_pairing_credential_consumed",
+        outcome: "accepted",
+        details: {
+          pairingCredentialId: pairing.id,
+          platform,
+        },
+      });
+      return session;
     });
   }
 
@@ -198,7 +271,7 @@ export function createFounderAuthService({ transactionRunner, credentialPepper, 
     try { return hash(secret); } catch { throw invalidCredential("CREDENTIAL_MALFORMED"); }
   }
 
-  return Object.freeze({ enrollFounder, issuePairingCredential, issuePairingCredentialWithRecovery, registerDeviceWithPairing, createSession, authenticateAccessToken, rotateRefreshCredential, revokeSession, revokeDevice, useRecoveryCredential, recoverFounder });
+  return Object.freeze({ enrollFounder, issuePairingCredential, issuePairingCredentialFromFounderWeb, issuePairingCredentialWithRecovery, registerDeviceWithPairing, createSession, authenticateAccessToken, rotateRefreshCredential, revokeSession, revokeDevice, useRecoveryCredential, recoverFounder });
 }
 
 function validateAccessRecord(row, now) {
@@ -220,3 +293,4 @@ function validateRecoveryRecord(row, now) {
 function minDate(left, right) { return left <= right ? left : right; }
 function invalidCredential(code) { return new ApplicationProblem({ status: 401, code, title: "The supplied authentication credential is unavailable." }); }
 function invalidAuthRequest() { return new ApplicationProblem({ status: 400, code: "AUTH_REQUEST_INVALID", title: "The authentication request is invalid." }); }
+function authorityUnavailable() { return new ApplicationProblem({ status: 403, code: "FOUNDER_PRODUCTION_AUTHORITY_UNAVAILABLE", title: "Founder production pairing is unavailable for this session." }); }

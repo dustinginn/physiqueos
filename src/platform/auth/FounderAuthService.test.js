@@ -39,7 +39,7 @@ describe("inactive Founder authentication lifecycle", () => {
   });
 
   it("registers an iOS device from a single-use pairing credential and issues a rotating session", async () => {
-    const identity = baseIdentity({ consumePairingCredential: vi.fn().mockResolvedValue({ user_id: "user" }) });
+    const identity = baseIdentity({ consumePairingCredential: vi.fn().mockResolvedValue({ id: "pairing", user_id: "user" }) });
     const result = await serviceFor(identity).registerDeviceWithPairing({
       pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder's iPhone",
     });
@@ -48,9 +48,65 @@ describe("inactive Founder authentication lifecycle", () => {
     expect(identity.createSession).toHaveBeenCalledOnce();
     expect(identity.createAccessCredential).toHaveBeenCalledOnce();
     expect(identity.createRefreshCredential).toHaveBeenCalledOnce();
+    expect(identity.recordSecurityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", eventType: "native_pairing_credential_consumed", outcome: "accepted",
+      details: { pairingCredentialId: "pairing", platform: "ios" },
+    }));
     expect(result).toMatchObject({ sessionId: expect.any(String), accessToken: expect.any(String), refreshCredential: expect.any(String) });
     expect(result.accessToken).toHaveLength(43);
     expect(result.refreshCredential).toHaveLength(43);
+  });
+
+  it("issues a ten-minute production pairing credential from an authenticated Founder web authority", async () => {
+    const identity = baseIdentity({ findUser: vi.fn().mockResolvedValue({ id: "user" }) });
+    const result = await serviceFor(identity).issuePairingCredentialFromFounderWeb({
+      userId: "user", authority: "founder-production", correlationId: "request-1",
+    });
+
+    expect(result).toMatchObject({
+      authority: "founder-production",
+      issuedAt: "2026-08-11T12:00:00.000Z",
+      expiresAt: "2026-08-11T12:10:00.000Z",
+      pairingCredential: expect.any(String),
+    });
+    expect(result.pairingCredential).toHaveLength(43);
+    expect(identity.createRecoveryCredential).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", expiresAt: NOW, credentialHash: expect.any(String),
+    }));
+    expect(identity.consumeRecoveryCredential).toHaveBeenCalledWith(expect.objectContaining({ at: NOW }));
+    expect(identity.createPairingCredentialWithRecoveryIssuer).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user", issuedBySessionId: null, expiresAt: new Date("2026-08-11T12:10:00.000Z"),
+    }));
+    const storedPairing = identity.createPairingCredentialWithRecoveryIssuer.mock.calls[0][0];
+    expect(storedPairing.credentialHash).not.toContain(result.pairingCredential);
+    expect(identity.recordSecurityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user",
+      eventType: "native_pairing_credential_issued",
+      outcome: "accepted",
+      correlationId: "request-1",
+      details: expect.objectContaining({ authority: "founder-production", channel: "founder_web_session" }),
+    }));
+    expect(JSON.stringify(identity.recordSecurityEvent.mock.calls)).not.toContain(result.pairingCredential);
+  });
+
+  it.each([
+    ["wrong authority", { userId: "user", authority: "native-integration-sandbox" }],
+    ["missing owner", { userId: "", authority: "founder-production" }],
+  ])("rejects %s before storing a web-issued pairing credential", async (_name, input) => {
+    const identity = baseIdentity({ findUser: vi.fn().mockResolvedValue({ id: "user" }) });
+    await expect(serviceFor(identity).issuePairingCredentialFromFounderWeb(input)).rejects.toMatchObject({
+      status: 403, code: "FOUNDER_PRODUCTION_AUTHORITY_UNAVAILABLE",
+    });
+    expect(identity.createRecoveryCredential).not.toHaveBeenCalled();
+    expect(identity.createPairingCredentialWithRecoveryIssuer).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the configured production owner does not exist", async () => {
+    const identity = baseIdentity({ findUser: vi.fn().mockResolvedValue(null) });
+    await expect(serviceFor(identity).issuePairingCredentialFromFounderWeb({
+      userId: "other-user", authority: "founder-production",
+    })).rejects.toMatchObject({ status: 403, code: "FOUNDER_PRODUCTION_AUTHORITY_UNAVAILABLE" });
+    expect(identity.createPairingCredentialWithRecoveryIssuer).not.toHaveBeenCalled();
   });
 
   it("issues one ten-minute pairing credential from the correct live recovery authority without creating a session", async () => {
@@ -117,7 +173,7 @@ describe("inactive Founder authentication lifecycle", () => {
   it("rejects pairing-credential reuse and never consults or consumes recovery material", async () => {
     const identity = baseIdentity({
       consumePairingCredential: vi.fn()
-        .mockResolvedValueOnce({ user_id: "sandbox-user" })
+        .mockResolvedValueOnce({ id: "pairing", user_id: "sandbox-user" })
         .mockResolvedValueOnce(null),
     });
     const service = serviceFor(identity);
@@ -128,6 +184,38 @@ describe("inactive Founder authentication lifecycle", () => {
     expect(identity.createDevice).toHaveBeenCalledOnce();
     expect(identity.findRecoveryCredentialForUse).not.toHaveBeenCalled();
     expect(identity.consumeRecoveryCredential).not.toHaveBeenCalled();
+  });
+
+  it("allows exactly one device/session when the same pairing credential is consumed concurrently", async () => {
+    let available = true;
+    const identity = baseIdentity({
+      consumePairingCredential: vi.fn(async () => {
+        if (!available) return null;
+        available = false;
+        return { id: "pairing", user_id: "user" };
+      }),
+    });
+    const service = serviceFor(identity);
+    const attempts = await Promise.allSettled([
+      service.registerDeviceWithPairing({ pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone" }),
+      service.registerDeviceWithPairing({ pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone" }),
+    ]);
+    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === "rejected")[0].reason).toMatchObject({
+      status: 401, code: "PAIRING_CREDENTIAL_INVALID",
+    });
+    expect(identity.createDevice).toHaveBeenCalledOnce();
+    expect(identity.createSession).toHaveBeenCalledOnce();
+    expect(identity.recordSecurityEvent).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when a pairing credential is expired or otherwise unavailable", async () => {
+    const identity = baseIdentity({ consumePairingCredential: vi.fn().mockResolvedValue(null) });
+    await expect(serviceFor(identity).registerDeviceWithPairing({
+      pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder iPhone",
+    })).rejects.toMatchObject({ status: 401, code: "PAIRING_CREDENTIAL_INVALID" });
+    expect(identity.createDevice).not.toHaveBeenCalled();
+    expect(identity.createSession).not.toHaveBeenCalled();
   });
 
   it("rotates an unused refresh credential and replaces it atomically", async () => {
@@ -208,13 +296,13 @@ function serviceFor(identity) {
 
 function baseIdentity(overrides = {}) {
   return {
-    lockFounderEnrollment: vi.fn().mockResolvedValue(true), createUserProfile: vi.fn(), createRecoveryCredential: vi.fn(),
+    lockFounderEnrollment: vi.fn().mockResolvedValue(true), createUserProfile: vi.fn(), createRecoveryCredential: vi.fn(), findUser: vi.fn().mockResolvedValue({ id: "user" }),
     createPairingCredential: vi.fn(), createPairingCredentialWithRecoveryIssuer: vi.fn(),
     consumePairingCredential: vi.fn(), createDevice: vi.fn(), createSession: vi.fn(),
     createAccessCredential: vi.fn(), createRefreshCredential: vi.fn(), findAccessCredentialForAuthentication: vi.fn(),
     updateDeviceSeen: vi.fn(), lockRefreshCredential: vi.fn(), replaceRefreshCredential: vi.fn(), revokeRefreshFamily: vi.fn(),
     revokeSession: vi.fn(), revokeDevice: vi.fn(), findRecoveryCredentialForUse: vi.fn(), consumeRecoveryCredential: vi.fn(),
     findPairingCredentialByRecoveryCredentialId: vi.fn().mockResolvedValue(null),
-    revokeAllSessions: vi.fn(), ...overrides,
+    recordSecurityEvent: vi.fn(), revokeAllSessions: vi.fn(), ...overrides,
   };
 }

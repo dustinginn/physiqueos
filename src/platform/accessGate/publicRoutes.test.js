@@ -50,6 +50,7 @@ describe("publicRoutes.isPublicPath", () => {
     expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}auth/pair`)).toBe(true);
     expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}auth/refresh`)).toBe(true);
     expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}weight/summary`)).toBe(true);
+    expect(isPublicPath(`${NATIVE_FOUNDER_API_ROUTE_PATH_PREFIX}auth/pairing-credentials`)).toBe(true);
   });
 
   it("does NOT broaden the Native bearer exemption to a sibling path", () => {

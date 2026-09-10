@@ -8,9 +8,10 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import IconBadge from "../components/ui/IconBadge";
+import NativePairingCard from "../components/profile/NativePairingCard";
 import { formatActiveGoalCount } from "../domain/services/YouProfileService";
 
-export default function YouScreen({ profile }) {
+export default function YouScreen({ nativePairingAvailable = false, profile }) {
   return (
     <main className="app-surface min-h-screen">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-28">
@@ -46,6 +47,7 @@ export default function YouScreen({ profile }) {
             icon={PlugZap}
             title="Integrations"
           />
+          {nativePairingAvailable ? <NativePairingCard /> : null}
         </div>
       </div>
     </main>

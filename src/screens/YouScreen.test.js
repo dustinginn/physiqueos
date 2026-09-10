@@ -38,6 +38,7 @@ describe("You production presentation", () => {
     expect(screen).toContain('{ label: "Integrations"');
     expect(screen).toContain('href={`${profile.goals.href}?from=you`}');
     expect(screen).toContain("href={profile.operatingPlan.href}");
+    expect(screen).toContain("nativePairingAvailable ? <NativePairingCard /> : null");
     expect(screen).not.toContain("href={profile.protocols.href}");
   });
 });

@@ -4,7 +4,10 @@ This document is the server-owned handoff for production Native integration. Swi
 
 ## Authority and authentication
 
-- Production Native uses `/api/v1/native/auth/pair`, `/refresh`, and `/session` with the existing opaque Founder-device bearer credentials.
+- An authenticated Founder web session creates a one-time production pairing credential with `POST /api/v1/native/auth/pairing-credentials`. The request must come from the configured application origin. The server chooses the canonical production owner; the request cannot name or override an owner.
+- The pairing credential is an opaque 256-bit secret, stored only as an HMAC-SHA-256 hash, expires after 10 minutes, and is consumed atomically by `POST /api/v1/native/auth/pair`. Concurrent reuse creates exactly one device/session; every later attempt fails closed.
+- Pairing issuance and consumption are recorded in `security_events` without credential material. The pairing row records owner, issued time, expiry, and consumed time; the consumption event binds the credential identity to the resulting device and session.
+- Production Native then uses `/api/v1/native/auth/refresh` and `/session` with the existing opaque Founder-device bearer credentials. Browser cookies are neither accepted nor required after pairing.
 - The authenticated principal must resolve to the configured canonical production owner. Cross-owner access fails as `RESOURCE_NOT_FOUND`.
 - Native Sandbox uses separate routes, database, owner, credential pepper, outbox namespace, and media namespace. A Sandbox bearer cannot authorize a production Native resource.
 - `/api/v1/native/profile` returns a client-safe profile, `founder-production` authority, `sandbox: false`, and capability flags. It does not expose PostgreSQL, Spaces, runtime-authority, or application deployment identities.
