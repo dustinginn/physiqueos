@@ -20,9 +20,10 @@ function fixture(overrides = {}) {
       getOperatingPlan: call({ goalId: "goal-build", phaseId: "phase-2" }),
       getMorningCheckIn: call({ today: "2026-09-09" }),
       getTrainingLogger: call({ initialDate: "2026-09-09" }),
+      getLog: call({ reviews: [] }),
     },
-    activeGoal: { getPreview: call({ goal: { id: "goal-build" }, confidence: { score: 62, movement: "no_meaningful_change" } }) },
-    completedGoal: { getVisibleAbs: call({ goal: { id: "goal-visible-abs" } }) },
+    activeGoal: { getPreview: call({ goalId: "goal-build", phaseId: "phase-2", confidence: { score: 62, band: "Moderate", movement: "held" } }) },
+    completedGoal: { getVisibleAbs: call({ goalId: "goal-visible-abs", status: "completed" }) },
     priorities: { getPriorityDetail: call({ id: "priority-1" }) },
     weight: { getCurrentWeight: call({ canonicalId: "weight_2026_09_09", revision: 1 }) },
     training: {
@@ -31,7 +32,7 @@ function fixture(overrides = {}) {
     },
     progress: { getNutrition: call({ report: {} }), getActivity: call({ report: {} }), getEnergy: call({ timeline: {} }), getDEXA: call({ report: {} }) },
     photos: { getPhotosTimeline: call({ report: {} }) },
-    briefings: { listHistory: call({ items: [] }), getArtifact: call({ artifact: { id: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
+    briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getArtifact: call({ artifact: { id: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
     evidenceReview: { getReview: call({ review: { id: "review-1" } }) },
     timeline: { getPage: call({ items: [], hasMore: false }) },
@@ -74,13 +75,54 @@ describe("Native production contract boundary", () => {
     ["energy", { context: "all" }, "progress", "getEnergy"],
     ["dexa", { context: "all" }, "progress", "getDEXA"],
     ["photos", { context: "all" }, "photos", "getPhotosTimeline"],
-    ["briefing-history", {}, "briefings", "listHistory"],
+    ["briefing-history", {}, "briefings", "listNativeHistory"],
     ["timeline", { limit: "25" }, "timeline", "getPage"],
   ])("maps %s to its canonical bounded read service", async (resource, input, group, method) => {
     const current = fixture();
     const result = await current.service.read({ request: request(), resource, input });
     expect(result.resource).toBe(resource);
     expect(current.readers[group][method]).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps every manifest resource routable, including current Confidence", async () => {
+    const current = fixture();
+    const inputs = {
+      priority: { priorityId: "priority-1" },
+      "training-day": { date: "2026-09-09" },
+      "training-session": { sessionId: "session-1" },
+      "training-exercise": { exerciseId: "curl" },
+      briefing: { artifactId: "briefing-1" },
+      "dexa-event": { scanId: "scan-1" },
+      "photo-event": { sessionId: "photo-session-1" },
+      "evidence-review": { reviewId: "review-1" },
+    };
+    const results = new Map();
+    for (const declaration of nativeProductionContractManifest.reads) {
+      const result = declaration.resource === "profile"
+        ? await current.service.profile({ request: request() })
+        : await current.service.read({ request: request(), resource: declaration.resource, input: inputs[declaration.resource] ?? {} });
+      results.set(declaration.resource, result);
+    }
+    const confidence = results.get("confidence");
+    expect(confidence.data).toEqual({ score: 62, band: "Moderate", movement: "held" });
+    expect(results.size).toBe(nativeProductionContractManifest.reads.length);
+    expect(current.readers.activeGoal.getPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("projects exact private media identities into the Native delivery contract", async () => {
+    const current = fixture();
+    const mediaId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
+    current.readers.completedGoal.getVisibleAbs.mockResolvedValue({ photos: { completion: { href: `/api/private-evidence/media/${mediaId}` } } });
+    const completed = await current.service.read({ request: request(), resource: "completed-goal" });
+    expect(completed.data.photos.completion).toEqual({ media: { mediaId, deliveryPath: `/api/v1/native/media/${mediaId}` } });
+  });
+
+  it("bounds Briefing History independently from rich artifact detail", async () => {
+    const current = fixture();
+    await current.service.read({ request: request(), resource: "briefing-history", input: { limit: "12", cursor: "briefing-prior" } });
+    expect(current.readers.briefings.listNativeHistory).toHaveBeenCalledWith({ limit: 12, cursor: "briefing-prior" });
+    await expect(current.service.read({ request: request(), resource: "briefing-history", input: { limit: "51" } }))
+      .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
   });
 
   it("requires canonical identities for detail reads and bounds history limits", async () => {

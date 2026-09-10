@@ -29,6 +29,8 @@ export function composeCompletedGoalPreview({ goals = [], dexaScans = [], progre
   const nextGoal = currentGoal?.id !== VISIBLE_ABS_GOAL_ID ? currentGoal : null;
 
   return {
+    goalId: goal?.id ?? VISIBLE_ABS_GOAL_ID,
+    status: goal?.status ?? "completed",
     preview: { readOnly: true, canonicalGoalId: VISIBLE_ABS_GOAL_ID, supportingGoalIds: ["goal_preserve_lean_mass", "goal_maintain_8_9_body_fat"] },
     hero: {
       title: normalizeGoalTitle(goal?.title),

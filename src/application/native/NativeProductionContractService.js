@@ -2,6 +2,7 @@ import { requireScope } from "../auth/principal.js";
 import { projectClientSafeValue } from "../read-models/readModel.js";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { nativeProductionContractManifest, NativeProductionResource } from "./nativeProductionContractManifest.js";
+import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
 
 const RESOURCES = new Set(Object.values(NativeProductionResource));
 const CONTEXTS = new Set(["all", "build-lean-mass", "visible-abs"]);
@@ -69,7 +70,10 @@ export function createNativeProductionContractService({
         case "energy": data = await readers.progress.getEnergy({ context, currentDate }); break;
         case "dexa": data = await readers.progress.getDEXA({ context, currentDate }); break;
         case "photos": data = await readers.photos.getPhotosTimeline({ context, currentDate }); break;
-        case "briefing-history": data = await readers.briefings.listHistory(); break;
+        case "briefing-history": data = await readers.briefings.listNativeHistory({
+          limit: boundedBriefingLimit(input.limit),
+          cursor: optional(input.cursor),
+        }); break;
         case "briefing": data = await readers.briefings.getArtifact({ artifactId: required(input.artifactId, "artifactId"), version: input.version || null }); break;
         case "dexa-event": data = await readers.briefings.getDexaArtifact({ scanId: required(input.scanId, "scanId") }); break;
         case "photo-event": data = await readers.photoEvents.getPhotoEvent({ sessionId: required(input.sessionId, "sessionId") }); break;
@@ -102,7 +106,7 @@ export function createNativeProductionContractService({
       resource,
       authority: "founder-production",
       generatedAt: now().toISOString(),
-      data: projectClientSafeValue(data),
+      data: projectClientSafeValue(projectNativeMediaReferences(data)),
     });
   }
 }
@@ -127,6 +131,12 @@ function boundedLimit(value) {
   if (!Number.isInteger(number) || number < 1 || number > 200) throw validation("limit", "limit must be an integer from 1 through 200.");
   return number;
 }
+function boundedBriefingLimit(value) {
+  const number = Number(value ?? 20);
+  if (!Number.isInteger(number) || number < 1 || number > 50) throw validation("limit", "limit must be an integer from 1 through 50.");
+  return number;
+}
+function optional(value) { const candidate = String(value ?? "").trim(); return candidate || null; }
 function pathParts(value) { return String(value ?? "").split("/").map((item) => item.trim()).filter(Boolean).slice(0, 4); }
 function validation(field, detail) {
   return new ApplicationProblem({ status: 400, code: "CONTRACT_VALIDATION_FAILED", title: "The Native request contract is invalid.", fieldErrors: [{ field, code: "invalid", detail }] });

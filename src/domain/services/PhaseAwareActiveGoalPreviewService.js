@@ -97,9 +97,12 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
   if(trainingProgress?.checkpoint.turningPoint)turningPoints.push(trainingProgress.checkpoint.turningPoint);
   turningPoints.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.title.localeCompare(b.title));
   return {
+    goalId: goal.id,
+    phaseId: active.phaseId,
+    confidence: nativeConfidencePresentation(overallGoalConfidence),
     hero: { title: trajectory.overallGoal.goalName, status: "Active Goal", destination: `${trajectory.overallGoal.targetDescription} by ${formatLongDate(trajectory.overallGoal.overallTargetDate)}`, confidence: `${overallGoalConfidence.value}% Confidence`, confidenceBand: overallGoalConfidence.label, confidenceDetail: overallGoalConfidence.explanation, confidenceExplanation: confidenceExplanationDetailFromModel(overallGoalConfidence.goalExplanationModel), confidenceSource: overallGoalConfidence.source, confidenceMovement: overallGoalConfidence.movement, confidenceDelta: overallGoalConfidence.delta, confidenceAssessmentId: overallGoalConfidence.assessmentId, editHref: `/goals/${goal.id}/edit` },
     journey: trajectory.phases.map((phase) => phaseCard(phase)),
-    currentPhase: { title: active.phaseName, purpose: active.purpose,
+    currentPhase: { id: active.phaseId, goalId: goal.id, title: active.phaseName, purpose: active.purpose,
       progress: active.progress.presentationLabel, review: phaseNarrative.review,
       evidence: phaseNarrative.evidence, readiness: phaseNarrative.readiness,
       color: active.presentationTone },
@@ -122,6 +125,24 @@ export function composePhaseAwareActiveGoalPreview({ user, goal, dexaScans = [],
     strategy,
     actions: { strategyHref: "/profile/operating-plan", protocolsHref: "/profile/operating-plan" },
   };
+}
+
+function nativeConfidencePresentation(value) {
+  return Object.freeze({
+    status: value.status,
+    score: value.score,
+    band: value.label,
+    movement: value.movement,
+    priorScore: value.priorScore,
+    delta: value.delta,
+    assessmentId: value.assessmentId,
+    goalId: value.goalId,
+    phaseId: value.phaseId,
+    evidenceCutoff: value.evidenceCutoff,
+    publicationTimestamp: value.publicationTimestamp,
+    summary: value.presentationExplanation ?? value.primaryReason,
+    explanation: confidenceExplanationDetailFromModel(value.goalExplanationModel),
+  });
 }
 
 function phaseCard(phase) {

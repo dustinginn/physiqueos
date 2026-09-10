@@ -20,7 +20,7 @@ This document is the server-owned handoff for production Native integration. Swi
 - Daily evidence corrections use the current semantic fingerprint, because that fingerprint is the canonical revision precondition for Nutrition and Activity.
 - Calendar evidence dates are explicit `YYYY-MM-DD` intended local dates. ISO timestamps and IANA timezones remain separate fields. Clients must not derive an intended day by slicing UTC.
 - History is bounded by service-specific date windows or limits. Timeline is additionally capped at 200 items per request.
-- Media is requested by opaque canonical media ID at `/api/v1/native/media/{mediaId}`. The route re-authenticates the bearer principal, owner-scopes catalog lookup, validates image/PDF content type, and returns `private, no-store`. Object keys and public Spaces URLs are never contract fields.
+- Media is requested by opaque canonical media ID at `/api/v1/native/media/{mediaId}`. DEXA, Progress Photos, completed-Goal, and Event read projections expose a single delivery descriptor (`mediaId`, `deliveryPath`) wherever canonical media is available, so clients never need a catalog side-channel. The route re-authenticates the bearer principal, owner-scopes catalog lookup, validates image/PDF content type, and returns `private, no-store`. Object keys and public Spaces URLs are never contract fields.
 
 ## Read surface matrix
 
@@ -31,7 +31,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Profile/current authority | `/api/v1/native/profile` | core profile + auth boundary | none | Ready |
 | Home | `home` | `CoreNavigationReadService.getHome` | none | Ready |
 | Goals landing | `goals` | `CoreNavigationReadService.getGoals` | none | Ready |
-| Active Goal / Phases / Confidence | `active-goal` | `ActiveGoalReadService.getPreview` | `currentDate` optional | Ready |
+| Active Goal / Phases / Confidence | `active-goal` | `ActiveGoalReadService.getPreview` | `currentDate` optional; includes canonical `goalId` and `phaseId` | Ready |
 | Completed Visible Abs Goal | `completed-goal` | `CompletedGoalReadService.getVisibleAbs` | none | Ready |
 | Operating Plan | `operating-plan` | `CoreNavigationReadService.getOperatingPlan` | none | Ready |
 | Priority detail | `priority` | `PriorityNavigationReadService.getPriorityDetail` | `priorityId` | Ready |
@@ -48,7 +48,7 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Energy | `energy` | `ProgressEvidenceReadService.getEnergy` | Goal context | Ready; server-derived |
 | DEXA latest/history/detail data | `dexa` | `ProgressEvidenceReadService.getDEXA` | Goal context | Ready |
 | Progress Photos latest/history/comparison | `photos` | `ProgressPhotosReadService.getPhotosTimeline` | Goal context | Ready |
-| Briefing history | `briefing-history` | `BriefingNavigationReadService.listHistory` | none | Ready |
+| Briefing history | `briefing-history` | `BriefingNavigationReadService.listNativeHistory` | summary rows only; `limit` 1–50, default 20; opaque artifact cursor | Ready |
 | Weekly/Midweek/Monthly detail | `briefing` | `BriefingNavigationReadService.getArtifact` | artifact ID, optional version | Ready |
 | DEXA Event | `dexa-event` | `BriefingNavigationReadService.getDexaArtifact` | scan ID | Ready |
 | Photo Event | `photo-event` | `PhotoEventBriefingReadService.getPhotoEvent` | session ID | Ready |

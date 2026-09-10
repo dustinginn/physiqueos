@@ -92,6 +92,7 @@ import { createProviderCanonicalUploadService } from "../media/ProviderCanonical
 import { createFoundationPostgresTransactionRunner } from "../../platform/database/foundationPostgresComposition.js";
 import { createFounderAuthService } from "../../platform/auth/FounderAuthService.js";
 import { createFounderWeightSummaryReadService } from "../weight/FounderWeightSummaryReadService.js";
+import { createPostgresFounderWeightReadStore } from "../../platform/database/PostgresFounderWeightReadStore.js";
 import { createPostgresFounderPhotoAcceptanceStore } from "../../platform/database/PostgresFounderPhotoAcceptanceStore.js";
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { createPostgresEvidenceTimelineReadStore } from "../../platform/database/PostgresEvidenceTimelineReadStore.js";
@@ -135,6 +136,17 @@ export function getProductionFounderAuthService(env = process.env) {
 }
 
 export function getProductionFounderWeightSummaryReadService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1" && env.NEXT_PHASE !== "phase-production-build") {
+    const runtime = getOrCreateProviderRuntime(env);
+    const store = createPostgresFounderWeightReadStore({
+      pool: runtime.pool,
+      ownerUserId: runtime.ownerUserId,
+      onComplete: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
+        ? (event) => console.info("provider.founder_weight_read.complete", event)
+        : null,
+    });
+    return createFounderWeightSummaryReadService({ readLatestWeight: () => store.getLatest() });
+  }
   return createFounderWeightSummaryReadService({
     readLatestWeight: (userId) => runProductionApplicationReadScope(async () => {
       const composition = await getProductionApplicationComposition(env);

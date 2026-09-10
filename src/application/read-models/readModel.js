@@ -6,6 +6,7 @@ const FORBIDDEN_KEYS = new Set([
   "absolutePath", "filePath", "filesystemPath", "localPath", "objectKey",
   "providerCredentials", "repository", "repositories", "runtimeStore",
   "secretAccessKey", "source_file", "source_path",
+  "storagePath", "storage_path", "bucket", "bucketName",
 ]);
 
 export function createApplicationReadModel({

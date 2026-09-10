@@ -54,7 +54,7 @@ const reads = Object.freeze([
   read("energy", "/api/v1/native/read/energy", "progressEvidence.getEnergy"),
   read("dexa", "/api/v1/native/read/dexa", "progressEvidence.getDEXA"),
   read("photos", "/api/v1/native/read/photos", "progressPhotos.getPhotosTimeline"),
-  read("briefing-history", "/api/v1/native/read/briefing-history", "briefingNavigation.listHistory"),
+  read("briefing-history", "/api/v1/native/read/briefing-history", "briefingNavigation.listNativeHistory", { pagination: "limit:1-50; default:20; cursor:opaque artifact identity" }),
   read("briefing", "/api/v1/native/read/briefing", "briefingNavigation.getArtifact"),
   read("dexa-event", "/api/v1/native/read/dexa-event", "briefingNavigation.getDexaArtifact"),
   read("photo-event", "/api/v1/native/read/photo-event", "photoEventBriefing.getPhotoEvent"),

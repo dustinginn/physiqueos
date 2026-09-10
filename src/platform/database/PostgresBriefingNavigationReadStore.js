@@ -56,6 +56,40 @@ export function createPostgresBriefingNavigationReadStore({ pool, ownerUserId, o
   };
 
   return Object.freeze({
+    listNativeHistory: tracked("briefing.native-history", async ({ input, query }) => {
+      const limit = boundedNativeHistoryLimit(input.limit);
+      const result = await query(
+        `SELECT record_id,version,
+                COALESCE(payload->>'id',record_id) AS artifact_id,
+                payload->>'artifactType' AS artifact_type,
+                payload->>'cadence' AS cadence,
+                payload->>'title' AS title,
+                COALESCE(payload->>'deliveryDate',payload->>'generatedAt',payload->>'createdAt',observed_at::text) AS publication_date,
+                payload->>'evidenceCutoff' AS evidence_cutoff,
+                payload->'evidenceWindow' AS evidence_window,
+                payload->'goalContext' AS goal_context,
+                payload->'confidencePublication' AS confidence_publication,
+                payload->'lifecycle' AS lifecycle
+           FROM physiqueos.canonical_briefing_records AS artifact
+          WHERE owner_user_id=$1 AND collection_name='dailyBriefings'
+            AND ($2::text IS NULL OR (COALESCE(observed_at,'epoch'::timestamptz),record_id) < (
+              SELECT COALESCE(observed_at,'epoch'::timestamptz),record_id FROM physiqueos.canonical_briefing_records
+               WHERE owner_user_id=$1 AND collection_name='dailyBriefings' AND record_id=$2
+            ))
+          ORDER BY observed_at DESC NULLS LAST,record_id DESC
+          LIMIT $3`,
+        [ownerUserId, input.cursor ?? null, limit + 1],
+      );
+      const rows = result.rows.slice(0, limit);
+      return Object.freeze({
+        items: Object.freeze(rows.map(nativeBriefingSummary)),
+        page: Object.freeze({
+          limit,
+          hasMore: result.rows.length > limit,
+          nextCursor: result.rows.length > limit ? rows.at(-1)?.record_id ?? null : null,
+        }),
+      });
+    }),
     listHistory: tracked("briefing.history", async ({ query }) => {
       const records = createPhase4CanonicalRecordStore({ query });
       const [artifacts, workItems] = await Promise.all([
@@ -158,4 +192,49 @@ function confidenceAssessmentId(artifact) {
     artifact?.briefing?.monthlyPresentation?.hero?.confidence?.assessmentId ??
     artifact?.briefing?.dexaEventNarrative?.goalConfidence?.assessmentId ??
     artifact?.briefing?.photoEventNarrative?.goalConfidence?.assessmentId ?? null;
+}
+
+function nativeBriefingSummary(row) {
+  const artifactType = row.artifact_type ?? (row.cadence ? "scheduled" : null);
+  const cadence = row.cadence ?? null;
+  return Object.freeze({
+    artifactId: row.artifact_id,
+    artifactType,
+    cadence,
+    label: row.title ?? briefingLabel({ artifactType, cadence }),
+    publicationDate: row.publication_date ?? null,
+    evidenceCutoff: row.evidence_cutoff ?? null,
+    evidenceWindow: boundedEvidenceWindow(row.evidence_window),
+    goalContext: row.goal_context ?? null,
+    confidence: row.confidence_publication ? Object.freeze({
+      assessmentId: row.confidence_publication.assessmentId ?? null,
+      publisherType: row.confidence_publication.publisherType ?? null,
+      publicationCutoff: row.confidence_publication.publicationCutoff ?? null,
+    }) : null,
+    status: row.lifecycle?.status ?? row.lifecycle?.generationStatus ?? null,
+    detail: Object.freeze({ resource: "briefing", artifactId: row.artifact_id }),
+    version: Number(row.version),
+  });
+}
+
+function boundedEvidenceWindow(value) {
+  if (!value || typeof value !== "object") return null;
+  return Object.freeze(Object.fromEntries([
+    "id", "startDate", "endDate", "briefingMonth", "deliveryDate", "timeZone", "cutoff",
+  ].filter((key) => value[key] != null).map((key) => [key, value[key]])));
+}
+
+function briefingLabel({ artifactType, cadence }) {
+  if (cadence === "weekly") return "Weekly Briefing";
+  if (cadence === "midweek") return "Midweek Briefing";
+  if (cadence === "monthly") return "Monthly Briefing";
+  if (["dexa_event", "dexa-event"].includes(artifactType)) return "DEXA Event";
+  if (["photo_event", "photo-event"].includes(artifactType)) return "Photo Event";
+  return "Briefing";
+}
+
+function boundedNativeHistoryLimit(value) {
+  const limit = Number(value ?? 20);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new TypeError("Native Briefing History limit must be from 1 through 50.");
+  return limit;
 }

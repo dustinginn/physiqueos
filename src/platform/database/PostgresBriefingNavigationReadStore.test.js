@@ -2,6 +2,32 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresBriefingNavigationReadStore } from "./PostgresBriefingNavigationReadStore.js";
 
 describe("PostgresBriefingNavigationReadStore", () => {
+  it("projects a bounded Native history page without loading full Briefing artifacts", async () => {
+    const query = vi.fn(async () => ({ rows: [{
+      record_id: "monthly-august", artifact_id: "monthly-august", artifact_type: "scheduled", cadence: "monthly",
+      publication_date: "2026-09-01", evidence_cutoff: "2026-09-01T06:59:59.999Z",
+      evidence_window: { id: "august", startDate: "2026-08-01", endDate: "2026-08-31", hugeInternalField: "omit" },
+      goal_context: { goalId: "goal-build", phaseId: "phase-2" },
+      confidence_publication: { assessmentId: "confidence-62", publisherType: "monthly", intelligenceRunId: "omit" },
+      lifecycle: { status: "completed" }, version: 4,
+    }] }));
+    const result = await createPostgresBriefingNavigationReadStore({
+      pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 }, ownerUserId: "owner",
+    }).listNativeHistory({ limit: 20 });
+    expect(result).toEqual({
+      items: [{ artifactId: "monthly-august", artifactType: "scheduled", cadence: "monthly", label: "Monthly Briefing",
+        publicationDate: "2026-09-01", evidenceCutoff: "2026-09-01T06:59:59.999Z",
+        evidenceWindow: { id: "august", startDate: "2026-08-01", endDate: "2026-08-31" },
+        goalContext: { goalId: "goal-build", phaseId: "phase-2" },
+        confidence: { assessmentId: "confidence-62", publisherType: "monthly", publicationCutoff: null },
+        status: "completed", detail: { resource: "briefing", artifactId: "monthly-august" }, version: 4 }],
+      page: { limit: 20, hasMore: false, nextCursor: null },
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).not.toMatch(/SELECT\s+payload[,\s]/i);
+    expect(query.mock.calls[0][1]).toEqual(["owner", null, 21]);
+  });
+
   it("loads history with two bounded collection reads", async () => {
     const complete = vi.fn();
     const query = vi.fn(async () => ({ rows: [] }));
