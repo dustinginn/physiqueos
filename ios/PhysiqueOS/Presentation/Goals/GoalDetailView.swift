@@ -30,11 +30,14 @@ struct GoalDetailView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil {
-                viewModel = GoalDetailViewModel(store: environment.goalsSandboxStore, goalId: goalId)
-            }
-            viewModel?.load()
+        .task(id: environment.nativeAuthority) {
+            viewModel = GoalDetailViewModel(
+                api: environment.goalsAPI,
+                store: environment.goalsSandboxStore,
+                usesSandboxStore: environment.nativeAuthority == .sandbox,
+                goalId: goalId
+            )
+            await viewModel?.load()
         }
     }
 
@@ -51,7 +54,11 @@ struct GoalDetailView: View {
             GoalUnavailableView(message: message)
         case .loaded(let detail):
             if let active = detail.active {
-                ActiveGoalDetailContent(goal: active, onNavigate: onNavigate)
+                ActiveGoalDetailContent(
+                    goal: active,
+                    allowsWrites: environment.nativeAuthority.permitsProductWrites,
+                    onNavigate: onNavigate
+                )
             } else if let completed = detail.completed {
                 CompletedGoalDetailContent(goal: completed, onNavigate: onNavigate)
             } else if let supporting = detail.supporting {
@@ -65,6 +72,7 @@ struct GoalDetailView: View {
 
 private struct ActiveGoalDetailContent: View {
     let goal: ActiveGoalReadModel
+    let allowsWrites: Bool
     let onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -97,21 +105,23 @@ private struct ActiveGoalDetailContent: View {
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                     Spacer(minLength: 4)
-                    Button { onNavigate(.goalEdit(goalId: goal.id)) } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                            .frame(width: 40, height: 40)
-                            .background(PhysiqueOSTheme.accent.opacity(0.14))
-                            .clipShape(Circle())
+                    if allowsWrites {
+                        Button { onNavigate(.goalEdit(goalId: goal.id)) } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                .frame(width: 40, height: 40)
+                                .background(PhysiqueOSTheme.accent.opacity(0.14))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Edit Goal")
                     }
-                    .accessibilityLabel("Edit Goal")
                 }
                 Divider().overlay(PhysiqueOSTheme.divider)
                 HStack(spacing: 8) {
                     Image(systemName: "gauge.with.dots.needle.33percent")
                         .foregroundStyle(PhysiqueOSTheme.accent)
-                    Text("\(goal.confidence.value)% · \(goal.confidence.band)")
+                    Text(goal.confidence.value.map { "\($0)% · \(goal.confidence.band)" } ?? goal.confidence.band)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     Spacer(minLength: 8)
@@ -164,7 +174,7 @@ private struct ActiveGoalDetailContent: View {
                 )
                 GoalContextBody(label: "Evidence in View", text: phase.evidence)
                 GoalContextBody(label: "What's Next", text: phase.progress.detail)
-                if goal.orderedPhases.contains(where: { $0.order == phase.order + 1 }) {
+                if allowsWrites, goal.orderedPhases.contains(where: { $0.order == phase.order + 1 }) {
                     GoalNavigationButton(title: "Review Phase Transition") {
                         onNavigate(.goalPhaseTransition(goalId: goal.id, phaseId: phase.id))
                     }

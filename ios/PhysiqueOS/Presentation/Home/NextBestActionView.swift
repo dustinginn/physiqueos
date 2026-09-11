@@ -5,9 +5,11 @@ private let iconMap: [HomeActionIcon: String] = [
     .analysis: "chart.bar.fill",
     .camera: "camera.fill",
     .check: "checkmark.circle.fill",
+    .moon: "moon.fill",
     .scale: "scalemass.fill",
     .syringe: "syringe.fill",
     .target: "list.clipboard.fill",
+    .utensils: "fork.knife",
 ]
 
 /// Mirrors `NextBestAction.jsx`/`ActionButton.jsx`: the single full-width

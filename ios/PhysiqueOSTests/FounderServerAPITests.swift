@@ -27,6 +27,32 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(store.load(), .sandbox)
     }
 
+    func testAuthoritySwitchSelectsOnlyMatchingDailyDriverProviders() {
+        let suite = "PhysiqueOS.DailyDriverProviderSelection.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let selection = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: selection)
+
+        XCTAssertTrue(environment.homeAPI is FixtureHomeAPI)
+        XCTAssertTrue(environment.goalsAPI is FixtureGoalsAPI)
+        XCTAssertTrue(environment.trainingAPI is FixtureTrainingAPI)
+        XCTAssertNil(environment.operatingPlanAPI)
+
+        environment.selectNativeAuthority(.founderProduction)
+
+        XCTAssertTrue(environment.homeAPI is ProductionHomeAPI)
+        XCTAssertTrue(environment.goalsAPI is ProductionGoalsAPI)
+        XCTAssertTrue(environment.trainingAPI is ProductionTrainingAPI)
+        XCTAssertTrue(environment.nutritionAPI is ProductionNutritionAPI)
+        XCTAssertTrue(environment.activityAPI is ProductionActivityAPI)
+        XCTAssertTrue(environment.energyAPI is ProductionEnergyAPI)
+        XCTAssertTrue(environment.priorityAPI is ProductionPriorityAPI)
+        XCTAssertTrue(environment.trainingLoggerAPI is ProductionTrainingLoggerAPI)
+        XCTAssertNotNil(environment.operatingPlanAPI)
+        XCTAssertEqual(selection.load(), .founderProduction)
+    }
+
     func testKeychainItemsAreAuthorityNamespacedWithoutWeakeningProtectionConfiguration() {
         let sandbox = KeychainFounderCredentialStore(namespace: .sandbox)
         let production = KeychainFounderCredentialStore(namespace: .founderProduction)
@@ -251,6 +277,252 @@ final class FounderServerAPITests: XCTestCase {
             }
             XCTAssertNoThrow(try NativeProductWriteGuard.authorize(domain, in: .sandbox))
         }
+    }
+
+    @MainActor
+    func testProductionHomeUsesServerProjectionWithoutSandboxOverwriteAndRefetches() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionHomeJSON(priorityID: "priority-server-old", goalID: "goal-server", confidence: 71)),
+            .json(200, productionHomeJSON(priorityID: "priority-server-new", goalID: "goal-server", confidence: 74)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let viewModel = HomeViewModel(
+            api: ProductionHomeAPI(api: native),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await viewModel.load()
+        guard case .loaded(let first) = viewModel.state else { return XCTFail("Expected production Home") }
+        XCTAssertEqual(first.hero.confidence, 71)
+        XCTAssertEqual(first.hero.mode, .active)
+        XCTAssertEqual(first.hero.daysRemaining, "4 weeks remaining")
+        XCTAssertEqual(first.goals.first?.id, "goal-server")
+        XCTAssertEqual(first.goals.first?.current, "148.3")
+        XCTAssertEqual(first.goals.first?.target, "10")
+        XCTAssertEqual(first.goals.first?.presentation, .primary(progress: 8))
+        XCTAssertEqual(first.todaysFocus.map(\.id), ["priority-server-old"])
+        XCTAssertFalse(first.todaysFocus[0].completable)
+        XCTAssertNil(first.todaysFocus[0].completionContext)
+
+        await viewModel.load()
+        guard case .loaded(let refreshed) = viewModel.state else { return XCTFail("Expected refreshed production Home") }
+        XCTAssertEqual(refreshed.hero.confidence, 74)
+        XCTAssertEqual(refreshed.todaysFocus.map(\.id), ["priority-server-new"])
+        let homePaths = await transport.requests.map { $0.url?.path }
+        XCTAssertEqual(Array(homePaths.suffix(2)), [
+            "/api/v1/native/read/home", "/api/v1/native/read/home",
+        ])
+    }
+
+    func testProductionGoalsHandlesEmptyActiveStateAndPreservesCanonicalGoalPhaseIDs() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionEnvelope(resource: "goals", data: #"{"activeGoals":[],"completedGoals":[],"transitionEntry":null,"relationshipContext":{}}"#)),
+            .json(200, productionGoalsJSON),
+            .json(200, productionGoalsJSON),
+            .json(200, productionActiveGoalJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let api = ProductionGoalsAPI(api: native)
+
+        let empty = try await api.fetchGoalsHub()
+        XCTAssertNil(empty.activeGoal)
+        XCTAssertTrue(empty.completedGoals.isEmpty)
+
+        let hub = try await api.fetchGoalsHub()
+        let active = try XCTUnwrap(hub.activeGoal)
+        let fetchedDetail = try await api.fetchGoalDetail(goalId: active.id)
+        let detail = try XCTUnwrap(fetchedDetail?.active)
+        XCTAssertEqual(active.id, "goal-canonical")
+        XCTAssertEqual(active.currentPhaseName, "Foundation")
+        XCTAssertEqual(detail.id, active.id)
+        XCTAssertEqual(detail.activePhaseId, "phase-canonical")
+        XCTAssertEqual(detail.activePhase?.id, "phase-canonical")
+    }
+
+    func testProductionCompletedGoalUsesCanonicalReadWithoutWiringPrivatePhotosOrBriefings() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionCompletedGoalsHubJSON),
+            .json(200, productionCompletedGoalJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let detail = try await ProductionGoalsAPI(api: native).fetchGoalDetail(goalId: "goal-visible-abs")
+        let completed = try XCTUnwrap(detail?.completed)
+        XCTAssertEqual(completed.id, "goal-visible-abs")
+        XCTAssertEqual(completed.achievement, "7.7% Body Fat")
+        XCTAssertEqual(completed.highlights.map(\.title), ["The finish line aligned"])
+        XCTAssertTrue(completed.photos.isEmpty)
+        XCTAssertNil(completed.finalComposition.briefingDestination)
+        XCTAssertEqual(completed.unlocked?.destination, .goalDetail(goalId: "goal-canonical"))
+        let paths = await transport.requests.map { $0.url?.path }
+        XCTAssertEqual(Array(paths.suffix(2)), ["/api/v1/native/read/goals", "/api/v1/native/read/completed-goal"])
+    }
+
+    func testProductionOperatingPlanAndPriorityUseCanonicalReadsAndRemainReadOnly() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionOperatingPlanJSON),
+            .json(200, productionPriorityJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let plan = try await ProductionOperatingPlanAPI(api: native).fetchOperatingPlan()
+        XCTAssertEqual(plan.sections.first?.title, "Energy Strategy")
+        XCTAssertNil(plan.sections.first?.items.first?.destination)
+        XCTAssertFalse(plan.sections.first?.supplementsAction == true)
+
+        let fetchedPriority = try await ProductionPriorityAPI(api: native).fetchPriority(priorityId: "priority-canonical")
+        let priority = try XCTUnwrap(fetchedPriority)
+        XCTAssertEqual(priority.id, "priority-canonical")
+        XCTAssertEqual(priority.executionItemId, "execution-canonical")
+        XCTAssertEqual(priority.date, "2026-09-10")
+        XCTAssertFalse(priority.completable)
+        XCTAssertNil(priority.completionContext)
+        let requests = await transport.requests
+        XCTAssertEqual(requests[1].url?.path, "/api/v1/native/read/operating-plan")
+        XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/priority")
+        XCTAssertEqual(URLComponents(url: requests[2].url!, resolvingAgainstBaseURL: false)?.queryItems,
+                       [URLQueryItem(name: "priorityId", value: "priority-canonical")])
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.priorityCompletion, in: .founderProduction))
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.operatingPlan, in: .founderProduction))
+    }
+
+    func testProductionTrainingLibraryAndLoggerShareCanonicalUniverseAndUnknownIdentityFailsClosed() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionTrainingLibraryJSON(exerciseID: "canonical-incline-press", muscleGroup: "Chest")),
+            .json(200, productionTrainingLoggerJSON(exerciseID: "canonical-incline-press", muscleGroup: "Chest")),
+            .json(200, productionTrainingLibraryJSON(exerciseID: "canonical-unknown", muscleGroup: "Unmapped Muscle")),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetchedLibrary = try await ProductionTrainingAPI(api: native).fetchTrainingArea(areaId: "chest", scope: .all)
+        let library = try XCTUnwrap(fetchedLibrary)
+        let logger = try await ProductionTrainingLoggerAPI(api: native).fetchConfiguration()
+        XCTAssertEqual(library.exercises.map(\.canonicalExerciseId), ["canonical-incline-press"])
+        XCTAssertEqual(logger.exercises.map(\.canonicalExerciseId), ["canonical-incline-press"])
+        XCTAssertEqual(library.exercises.map(\.canonicalExerciseId), logger.exercises.map(\.canonicalExerciseId))
+
+        await XCTAssertThrowsErrorAsync(try await ProductionTrainingAPI(api: native).fetchTrainingArea(areaId: "chest", scope: .all)) { error in
+            XCTAssertEqual(error as? ProductionDailyDriverError,
+                           .unknownCanonicalExerciseArea(exerciseID: "canonical-unknown", muscleGroupID: "Unmapped Muscle"))
+        }
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction))
+    }
+
+    func testProductionTrainingExerciseUsesCanonicalCatalogAndServerPerformanceRecords() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionTrainingLibraryJSON(exerciseID: "canonical-incline-press", muscleGroup: "Chest")),
+            .json(200, productionTrainingExerciseJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let fetched = try await ProductionTrainingAPI(api: native).fetchTrainingExercise(
+            exerciseId: "canonical-incline-press",
+            scope: .all
+        )
+        let exercise = try XCTUnwrap(fetched)
+        XCTAssertEqual(exercise.id, "canonical-incline-press")
+        XCTAssertEqual(exercise.title, "Incline Press")
+        XCTAssertNil(exercise.benchmark)
+        XCTAssertNil(exercise.lastSession)
+        XCTAssertTrue(exercise.history.isEmpty)
+        XCTAssertEqual(exercise.performanceRecords?.canonicalExerciseId, "canonical-incline-press")
+        XCTAssertEqual(exercise.performanceRecords?.records.first?.sourceEventId, "event-canonical")
+
+        let requests = await transport.requests
+        XCTAssertEqual(Array(requests.suffix(2)).map { $0.url?.path }, [
+            "/api/v1/native/read/training-library",
+            "/api/v1/native/read/training-exercise",
+        ])
+        XCTAssertEqual(
+            URLComponents(url: requests.last!.url!, resolvingAgainstBaseURL: false)?.queryItems,
+            [
+                URLQueryItem(name: "context", value: "all"),
+                URLQueryItem(name: "exerciseId", value: "canonical-incline-press"),
+            ]
+        )
+    }
+
+    func testProductionGoalContextRejectsUnknownCanonicalIdentityInsteadOfAliasing() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(
+            try await ProductionEnergyAPI(api: native).fetchEnergyReport(
+                scope: EvidenceScopeSelection.goal(goalId: "goal-unrecognized")
+            )
+        ) { error in
+            XCTAssertEqual(error as? ProductionDailyDriverError, .unsupportedGoalContext(id: "goal-unrecognized"))
+        }
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1, "An unknown Goal must fail before any resource read is sent.")
+    }
+
+    func testProductionNutritionAndActivityDecodeCanonicalDaysAndSelectExactContextRoutes() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionNutritionJSON),
+            .json(200, productionActivityJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let nutrition = try await ProductionNutritionAPI(api: native).fetchNutritionLanding(scope: .all)
+        XCTAssertEqual(nutrition.latestNutritionDay?.id, "nutrition-day-canonical")
+        XCTAssertEqual(nutrition.latestNutritionDay?.totals.calories, 2_300)
+        XCTAssertNil(nutrition.latestNutritionDay?.totals.fiberG)
+
+        let activity = try await ProductionActivityAPI(api: native).fetchActivityLanding(scope: .all)
+        XCTAssertEqual(activity.latestActivityDay?.id, "activity-day-canonical")
+        XCTAssertEqual(activity.latestActivityDay?.activeCalories, 650)
+        XCTAssertNil(activity.latestActivityDay?.totalCalories)
+
+        let requests = await transport.requests
+        for request in requests.suffix(2) {
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "context", value: "all")])
+        }
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.nutrition, in: .founderProduction))
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.activityAndHealthKit, in: .founderProduction))
+    }
+
+    func testProductionEnergyUsesFinishedServerReportPreservingMissingZeroPartialAndWeeklyValues() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, productionEnergyJSON),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let report = try await ProductionEnergyAPI(api: native).fetchEnergyReport(scope: .all)
+        XCTAssertEqual(report.summary.averageBalance, -125)
+        XCTAssertEqual(report.dailyHistory.map(\.id), ["2026-09-10", "2026-09-09"])
+        XCTAssertNil(report.dailyHistory[0].calorieIntake)
+        XCTAssertEqual(report.dailyHistory[1].calorieIntake, 0)
+        XCTAssertEqual(report.dailyHistory[0].completeness, "activity-only")
+        XCTAssertEqual(report.weeklyHistory.first?.averageBalance, -125)
+        XCTAssertTrue(report.weeklyHistory.first?.partial == true)
+        XCTAssertEqual(report.recentFourWeeks, report.weeklyHistory)
+        XCTAssertEqual(report.weeklyTrend.map(\.id), ["week-server"])
+        let energyPath = await transport.requests.last?.url?.path
+        XCTAssertEqual(energyPath, "/api/v1/native/read/energy")
     }
 
     func testProductionMediaAcceptsAuthenticatedImageAndPDF() async throws {
@@ -874,6 +1146,56 @@ private let testOrigin = URL(string: "https://example.invalid")!
 private let weightJSON = #"{"schemaVersion":"1","currentWeight":{"id":"weight-1","value":168.4,"unit":"lb","measurementDate":"2026-08-31"}}"#
 private let manualWeightResultJSON = #"{"schemaVersion":"1","id":"weight-manual-1","status":"confirmed","measurementDate":"2026-08-31","value":168.4,"unit":"lb"}"#
 private let photoManifestJSON = #"{"schemaVersion":"native-founder-photo-media-v1","authority":{"kind":"sandbox-founder-photo-acceptance","sandboxAuthorityId":"sandbox-1"},"sessions":[{"photoSessionId":"session-1","captureDate":"2026-07-18","photos":[{"viewIdentity":"session-1-front-relaxed","photoSessionId":"session-1","photoId":"photo-1","mediaId":"media_1","poseId":"front-relaxed","captureDate":"2026-07-18","contentType":"image/jpeg","pixelWidth":1200,"pixelHeight":1600,"delivery":{"kind":"authenticated_proxy","path":"/api/v1/native/sandbox/photo-acceptance/media/media_1"}}]}]}"#
+
+private func productionEnvelope(resource: String, data: String) -> String {
+    #"{"contractVersion":"1","resource":"\#(resource)","authority":"founder-production","generatedAt":"2026-09-10T15:00:00.000Z","data":\#(data)}"#
+}
+
+private func productionHomeJSON(priorityID: String, goalID: String, confidence: Int) -> String {
+    productionEnvelope(resource: "home", data: """
+    {
+      "header":{"greeting":"Good morning","name":"Founder"},
+      "hero":{"mode":"phase_trajectory","goalLabel":"Current Goal","headline":"Server headline","supportLine":"Server support","confidence":\(confidence),"confidenceDetail":null,"primaryTimeline":"4 weeks remaining","plannedReviewDate":"2026-10-08"},
+      "nextBestAction":{"title":"Server action","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}}},
+      "briefingCards":[],
+      "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8}}}}],
+      "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null}}]
+    }
+    """)
+}
+
+private let productionGoalsJSON = productionEnvelope(resource: "goals", data: #"{"activeGoals":[{"id":"goal-canonical","title":"Build Lean Mass","status":"active","statusLabel":"On Track","confidence":{"value":74,"band":"Moderate","source":"server","explanation":"Server explanation"},"phase":{"id":"phase-canonical","name":"Foundation","status":"active","startedAt":"2026-09-01","plannedReviewAt":"2026-10-01"}}],"completedGoals":[],"transitionEntry":null,"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
+
+private let productionCompletedGoalsHubJSON = productionEnvelope(resource: "goals", data: #"{"activeGoals":[],"completedGoals":[{"id":"goal-visible-abs","title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"}],"transitionEntry":null,"relationshipContext":{}}"#)
+
+private let productionCompletedGoalJSON = productionEnvelope(resource: "completed-goal", data: #"{"goalId":"goal-visible-abs","status":"completed","preview":{"readOnly":true,"canonicalGoalId":"goal-visible-abs","supportingGoalIds":[]},"hero":{"title":"Visible Abs at Rest","status":"Completed","dates":"May 20 → Jul 18","achievement":"7.7% Body Fat"},"recap":"Server recap","highlights":[{"date":"2026-07-18","title":"The finish line aligned","body":"Server evidence converged."}],"photos":{"beginning":null,"completion":null,"historyHref":"/progress/photos"},"finalComposition":{"scanId":"scan-canonical","date":"2026-07-18","bodyFat":"7.7%","leanMass":"147.5 lb","fatMass":"12.3 lb","weight":"159.8 lb","narrative":"Server conclusion","briefingHref":"/briefings/dexa/scan-canonical"},"achievedBy":["Server outcome"],"unlocked":{"title":"Build Lean Mass","destination":{"id":"goal.detail","parameters":{"goalId":"goal-canonical"}},"body":"Next canonical goal."}}"#)
+
+private let productionActiveGoalJSON = productionEnvelope(resource: "active-goal", data: #"{"goalId":"goal-canonical","phaseId":"phase-canonical","confidence":{"score":74,"band":"Moderate","summary":"Server confidence"},"hero":{"title":"Build Lean Mass","status":"Active Goal","destination":"Add 10 lb lean mass by December 2026"},"journey":[{"name":"Foundation","number":1,"status":"Active","dates":"Started Sep 1 · Evidence-led review","progress":"In progress","support":"Server support","percentage":32}],"currentPhase":{"id":"phase-canonical","goalId":"goal-canonical","title":"Foundation","purpose":"Build deliberately","progress":"In progress","review":"Evidence-led","evidence":"Server evidence","readiness":"Server readiness"},"readiness":[],"guardrail":{"title":"Maintain 8–9% body fat","scope":"Every phase","body":"DEXA is authoritative","observation":null},"evidence":{"goalBaseline":null,"phaseStart":null,"support":"Server support"},"turningPoints":[],"strategy":[{"label":"Energy","active":true}]}"#)
+
+private let productionOperatingPlanJSON = productionEnvelope(resource: "operating-plan", data: #"{"sections":[{"iconKey":"energy","tone":"primary","title":"Energy Strategy","subtitle":"Active","items":[{"id":"energy-canonical","title":"Phase Execution","detail":"2300 kcal/day intake","status":"Active","destination":{"id":"operating-plan","parameters":{}}}]}],"sourceVersions":{"energy":"4"},"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
+
+private let productionPriorityJSON = productionEnvelope(resource: "priority", data: #"{"id":"priority-canonical","title":"Morning weigh-in","subtitle":"Today","status":"Available","sections":[{"title":"Context","items":[{"label":"Goal","detail":"Build Lean Mass"}]}],"completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null},"executionContract":{"priorityId":"priority-canonical","occurrenceDate":"2026-09-10","occurrenceKey":"priority-canonical:2026-09-10","workflow":"priority_detail","destination":{"id":"priority.detail","parameters":{"priorityId":"priority-canonical"}}},"executionProjection":{"executionId":"execution-canonical"}}"#)
+
+private func productionTrainingLibraryJSON(exerciseID: String, muscleGroup: String) -> String {
+    productionEnvelope(resource: "training-library", data: """
+    {"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"canonicalExercises":[{"canonicalExerciseId":"\(exerciseID)","label":"Incline Press","primaryMuscleGroupId":"\(muscleGroup)","primaryMuscleGroups":["\(muscleGroup)"],"regionLabel":"Upper Body","equipment":"Dumbbells","defaultMeasurement":"reps_load","defaultLoadType":"external"}]}}
+    """)
+}
+
+private func productionTrainingLoggerJSON(exerciseID: String, muscleGroup: String) -> String {
+    productionEnvelope(resource: "training-logger", data: """
+    {"initialDate":"2026-09-10","initialCanonicalExercises":[{"id":"\(exerciseID)","name":"Incline Press","equipment":"Dumbbells","bodyRegion":"Upper Body","primaryMuscleGroups":["\(muscleGroup)"],"defaultMeasurement":"reps_load","defaultLoadType":"external"}],"initialHistorySessions":[],"initialPerformedExerciseIds":["\(exerciseID)"]}
+    """)
+}
+
+private let productionTrainingExerciseJSON = productionEnvelope(resource: "training-exercise", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"entries":[]},"exerciseRecords":{"id":"records-canonical","heading":"Performance Records","canonicalExerciseId":"canonical-incline-press","canonicalExerciseName":"Incline Press","records":[{"id":"record-canonical","canonicalExerciseId":"canonical-incline-press","canonicalExerciseName":"Incline Press","title":"Volume PR","value":"4,200 lb","previousBaseline":null,"improvement":null,"detail":null,"workoutDate":"2026-09-09","executionVariant":null,"relationshipContext":null,"achievedValue":4200,"achievementType":"session_volume_pr","sourceEventId":"event-canonical"}],"visibleCount":1,"totalCount":1,"hiddenCount":0,"countLabel":null}}"#)
+
+private let productionNutritionJSON = productionEnvelope(resource: "nutrition", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Nutrition","selected":true}]},"report":{"title":"Nutrition","subtitle":"Nutrition evidence","tone":"success","latestNutrition":{"id":"nutrition-day-canonical","date":"2026-09-10","value":"2300 calories","detail":"180g protein · 220g carbs · 70g fat · 1 meal","sourceEvidence":["web"],"totals":{"calories":2300,"proteinG":180,"carbsG":220,"fatG":70,"fiberG":null},"meals":[{"id":"meal-canonical","slot":"breakfast","name":"Breakfast","completeness":"complete","totals":{"calories":2300,"proteinG":180,"carbsG":220,"fatG":70,"fiberG":null},"foods":[],"additionalFoodsDetected":false}]},"nutritionDays":[{"id":"nutrition-day-canonical","date":"2026-09-10","value":"2300 calories","detail":"180g protein · 220g carbs · 70g fat · 1 meal","sourceEvidence":["web"],"totals":{"calories":2300,"proteinG":180,"carbsG":220,"fatG":70,"fiberG":null},"meals":[]}],"nutritionLibrary":[],"nutritionReportingLinks":[],"dataSources":[{"name":"Manual","status":"Connected"}]}}"#)
+
+private let productionActivityJSON = productionEnvelope(resource: "activity", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Activity","selected":true}]},"report":{"title":"Activity","subtitle":"Whole-day movement","tone":"success","latestActivityDay":{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."},"activityAreas":[],"linkedTrainingContext":[],"activityHistory":[{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."}],"dataSources":[{"name":"Web","status":"Connected"}]}}"#)
+
+private let productionEnergyJSON = productionEnvelope(resource: "energy", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Energy","selected":true}]},"summary":{"averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDays":1,"evidenceDays":2},"days":[{"date":"2026-09-10","nutritionDayId":null,"activityDayId":"activity-1","calorieIntake":null,"activeCalories":500,"rmr":1700,"estimatedExpenditure":2200,"energyBalance":null,"completeness":"activity-only","sources":{"nutrition":[],"activity":["Activity"]}},{"date":"2026-09-09","nutritionDayId":"nutrition-1","activityDayId":"activity-2","calorieIntake":0,"activeCalories":600,"rmr":1700,"estimatedExpenditure":2300,"energyBalance":-2300,"completeness":"complete","sources":{"nutrition":["Web"],"activity":["Activity"]}}],"weeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"recentFourWeeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"latestEvidenceDate":"2026-09-10","dataSources":[{"name":"Nutrition","status":"Connected"}],"audit":{"nutritionDays":1,"activityDays":2,"overlappingDates":1}}"#)
+
 private let productionProfileJSON = #"{"contractVersion":"1","resource":"profile","authority":"founder-production","generatedAt":"2026-09-10T15:00:00.000Z","data":{"profile":{"user":{"id":"user-founder","displayName":"Founder","firstName":"Dustin","lastName":null,"timezone":"America/Los_Angeles"},"operatingStatus":{"goals":1},"evidenceSources":[]},"authority":{"type":"founder-production","sandbox":false},"capabilities":{"read":true,"write":true,"media":true}}}"#
 private let productionContractsJSON = #"{"contractVersion":"1","apiVersion":"v1","authority":"founder-production","authentication":"founder-device-bearer","bootstrap":{"issuerEndpoint":"/api/v1/native/auth/pairing-credentials","issuerAuthentication":"founder-web-session","pairEndpoint":"/api/v1/native/auth/pair","credentialLifetimeSeconds":600,"credentialUse":"single-use","authority":"founder-production"},"sandboxAuthority":"physically-isolated-separate-contract","errorFormat":"application/problem+json; problemVersion=1","dateSemantics":"intended local dates are YYYY-MM-DD","media":{"endpoint":"/api/v1/native/media/{mediaId}","identity":"opaque canonical media ID","authorization":"bearer, owner-scoped","cache":"private, no-store"},"reads":[{"resource":"weight","endpoint":"/api/v1/native/read/weight","service":"weightSummary.getCurrentWeight","auth":"founder-device-bearer","authority":"founder-production","goalPhase":"server-resolved","media":"opaque references only","pagination":"bounded"}],"writes":[{"commandType":"weight.submit.v1","endpoint":"/api/v1/native/commands","auth":"founder-device-bearer","authority":"founder-production","idempotency":"Idempotency-Key","revision":"If-Match"}]}"#
 

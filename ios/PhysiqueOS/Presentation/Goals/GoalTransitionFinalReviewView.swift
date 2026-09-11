@@ -72,7 +72,7 @@ struct GoalTransitionSuccessView: View {
         VStack(spacing: 18) {
             Image(systemName: "checkmark.seal.fill").font(.system(size: 48)).foregroundStyle(PhysiqueOSTheme.chartSuccess)
             Text("Goal transition committed").physiqueOSFont(PhysiqueOSTypography.screenTitle).foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text("\(environment.goalsSandboxStore.hub.activeGoal.title) is active")
+            Text("\(environment.goalsSandboxStore.hub.activeGoal!.title) is active")
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20).foregroundStyle(PhysiqueOSTheme.accent)
             Text("The accepted transition was saved as one atomic change.")
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -82,7 +82,7 @@ struct GoalTransitionSuccessView: View {
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             PrimaryActionButton(title: "Go to your new goal") {
-                onNavigate(.goalDetail(goalId: environment.goalsSandboxStore.hub.activeGoal.id))
+                onNavigate(.goalDetail(goalId: environment.goalsSandboxStore.hub.activeGoal!.id))
             }
         }
         .padding(24)

@@ -7,13 +7,13 @@ import Foundation
 /// A future live `GoalsAPI` will decode the same server-owned presentation
 /// facts that the fixture supplies today.
 struct GoalsHubReadModel: Codable, Equatable {
-    var activeGoal: GoalSummaryReadModel
+    var activeGoal: GoalSummaryReadModel?
     var completedGoals: [GoalSummaryReadModel]
     var addGoalAvailable: Bool
     var addGoalMessage: String
 
     var orderedGoals: [GoalSummaryReadModel] {
-        [activeGoal] + completedGoals
+        (activeGoal.map { [$0] } ?? []) + completedGoals
     }
 }
 
@@ -112,7 +112,7 @@ struct ActiveGoalReadModel: Codable, Equatable, Identifiable {
 }
 
 struct GoalConfidenceReadModel: Codable, Equatable {
-    var value: Int
+    var value: Int?
     var band: String
     var explanation: String
     var source: String
@@ -302,4 +302,3 @@ struct CompletedGoalUnlockReadModel: Codable, Equatable {
     var body: String
     var destination: AppDestination
 }
-

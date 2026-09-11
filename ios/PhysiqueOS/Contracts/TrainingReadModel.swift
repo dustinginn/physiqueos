@@ -652,7 +652,7 @@ struct TrainingPerformanceRelationshipPartner: Codable, Equatable {
 /// One row in the Performance Records card — `toItem`'s output shape,
 /// ported field-for-field (`orderingKey` omitted: verified dead code on
 /// the web, `compareRecords` never reads it).
-struct TrainingPerformanceRecord: Identifiable, Equatable {
+struct TrainingPerformanceRecord: Identifiable, Codable, Equatable {
     var id: String
     var canonicalExerciseId: String
     var canonicalExerciseName: String
@@ -675,7 +675,7 @@ struct TrainingPerformanceRecord: Identifiable, Equatable {
 /// `createTrainingLibraryExerciseRecordsReadModel`'s return shape —
 /// always `nil` (not an empty-records object) when there is nothing to
 /// show, matching the web's `null`-vs-object distinction exactly.
-struct TrainingPerformanceRecordsReadModel: Equatable {
+struct TrainingPerformanceRecordsReadModel: Codable, Equatable {
     var id: String
     var heading: String
     var canonicalExerciseId: String

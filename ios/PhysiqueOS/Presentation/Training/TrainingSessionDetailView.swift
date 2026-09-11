@@ -46,8 +46,8 @@ struct TrainingSessionDetailView: View {
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
             }
         }
-        .task {
-            if viewModel == nil { viewModel = TrainingSessionDetailViewModel(api: environment.trainingAPI, sessionId: sessionId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingSessionDetailViewModel(api: environment.trainingAPI, sessionId: sessionId)
             await viewModel?.load()
         }
     }

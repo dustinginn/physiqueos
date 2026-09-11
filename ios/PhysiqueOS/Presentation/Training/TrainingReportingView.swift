@@ -23,10 +23,8 @@ struct TrainingReportingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil {
-                viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
-            }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
             await viewModel?.load()
         }
         .sheet(item: $selectedStatusGroup) { group in

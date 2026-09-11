@@ -43,6 +43,7 @@ import SwiftUI
 struct ActivityHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ActivityHistoryViewModel?
     @State private var isHistorySheetPresented = false
 
@@ -76,10 +77,12 @@ struct ActivityHistoryView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil { viewModel = ActivityHistoryViewModel(api: environment.activityAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
             await viewModel?.load()
         }
+        .refreshable { await viewModel?.load() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 
     @ViewBuilder

@@ -20,6 +20,7 @@ import SwiftUI
 struct TrainingHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: TrainingHistoryViewModel?
 
     @State private var isLatestDayExpanded = false
@@ -62,6 +63,13 @@ struct TrainingHistoryView: View {
         .task {
             if viewModel == nil { viewModel = TrainingHistoryViewModel(api: environment.trainingAPI) }
             await viewModel?.load()
+        }
+        .onChange(of: environment.nativeAuthority) { _, _ in
+            viewModel = TrainingHistoryViewModel(api: environment.trainingAPI)
+            Task { await viewModel?.load() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel?.load() } }
         }
     }
 

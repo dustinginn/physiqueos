@@ -45,10 +45,16 @@ struct PriorityDetailView: View {
                 }
             }
         }
-        .onAppear {
-            if viewModel == nil { viewModel = PriorityDetailViewModel(store: environment.loggingSandboxStore, priorityId: priorityId) }
-            viewModel?.load()
+        .task(id: environment.nativeAuthority) {
+            viewModel = PriorityDetailViewModel(
+                api: environment.priorityAPI,
+                store: environment.loggingSandboxStore,
+                authority: environment.nativeAuthority,
+                priorityId: priorityId
+            )
+            await viewModel?.load()
         }
+        .refreshable { await viewModel?.load() }
     }
 
     @ViewBuilder

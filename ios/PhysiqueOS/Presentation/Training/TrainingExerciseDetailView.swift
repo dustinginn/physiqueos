@@ -46,8 +46,8 @@ struct TrainingExerciseDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = TrainingExerciseDetailViewModel(api: environment.trainingAPI, exerciseId: exerciseId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingExerciseDetailViewModel(api: environment.trainingAPI, exerciseId: exerciseId)
             await viewModel?.load()
         }
     }

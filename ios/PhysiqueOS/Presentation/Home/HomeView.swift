@@ -9,6 +9,7 @@ import SwiftUI
 /// today's focus.
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: HomeViewModel?
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
@@ -23,9 +24,20 @@ struct HomeView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .toolbar(.hidden, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = HomeViewModel(api: environment.homeAPI, priorityStore: environment.loggingSandboxStore, goalsSandboxStore: environment.goalsSandboxStore, briefingStore: environment.briefingSandboxStore) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = HomeViewModel(
+                api: environment.homeAPI,
+                priorityStore: environment.loggingSandboxStore,
+                goalsSandboxStore: environment.goalsSandboxStore,
+                briefingStore: environment.briefingSandboxStore,
+                appliesSandboxProjections: environment.nativeAuthority == .sandbox
+            )
             await viewModel?.load()
+        }
+        .refreshable { await viewModel?.load() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel?.load() }
         }
         .sheet(item: Binding(
             get: { confidenceDetailPresentation.map(ConfidenceDetailPresentation.init) },
@@ -71,6 +83,7 @@ struct HomeView: View {
 
                 if home.hasTodaysFocus {
                     TodaysFocusCardView(items: home.todaysFocus, completingIDs: completingPriorityIDs, onTap: onNavigate) { occurrence in
+                        guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         completingPriorityIDs.insert(occurrence.id)
                         Task { @MainActor in
                             environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)

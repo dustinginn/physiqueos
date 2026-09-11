@@ -76,7 +76,7 @@ struct ConfidenceDetail: Codable, Equatable {
 }
 
 enum HomeActionIcon: String, Codable {
-    case activity, analysis, camera, check, scale, syringe, target
+    case activity, analysis, camera, check, moon, scale, syringe, target, utensils
 }
 
 struct HomeNextBestAction: Codable, Equatable {

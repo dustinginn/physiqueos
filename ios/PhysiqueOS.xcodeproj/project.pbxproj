@@ -72,198 +72,199 @@
 		00000000000000000000107E /* EvidenceLocalInterpretation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107D /* EvidenceLocalInterpretation.swift */; };
 		000000000000000000001080 /* FounderCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000107F /* FounderCredentialStore.swift */; };
 		000000000000000000001082 /* FounderServerAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001081 /* FounderServerAPI.swift */; };
-		000000000000000000001084 /* FounderPhotoMediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001083 /* FounderPhotoMediaStore.swift */; };
-		000000000000000000001086 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001085 /* PhysiqueOSTheme.swift */; };
-		000000000000000000001088 /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001087 /* IconBadge.swift */; };
-		00000000000000000000108A /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001089 /* CardContainer.swift */; };
-		00000000000000000000108C /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108B /* SectionHeading.swift */; };
-		00000000000000000000108E /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108D /* StatusChip.swift */; };
-		000000000000000000001090 /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108F /* ConfidenceRing.swift */; };
-		000000000000000000001092 /* ProgressPhotoTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001091 /* ProgressPhotoTile.swift */; };
-		000000000000000000001094 /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001093 /* AnimatedProgressBar.swift */; };
-		000000000000000000001096 /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001095 /* MetricRow.swift */; };
-		000000000000000000001098 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001097 /* Typography.swift */; };
-		00000000000000000000109A /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001099 /* PlusJakartaSans.swift */; };
-		00000000000000000000109C /* PrimaryActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109B /* PrimaryActionButton.swift */; };
-		00000000000000000000109E /* ScrollScreenLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109D /* ScrollScreenLayout.swift */; };
-		0000000000000000000010A0 /* DateField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109F /* DateField.swift */; };
-		0000000000000000000010A2 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A1 /* TabPlaceholderView.swift */; };
-		0000000000000000000010A4 /* EvidenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A3 /* EvidenceAttachment.swift */; };
-		0000000000000000000010A6 /* EvidenceSourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A5 /* EvidenceSourcePicker.swift */; };
-		0000000000000000000010A8 /* EvidenceStreamPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A7 /* EvidenceStreamPresentation.swift */; };
-		0000000000000000000010AA /* InteractivePopGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A9 /* InteractivePopGesture.swift */; };
-		0000000000000000000010AC /* NumericEditField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AB /* NumericEditField.swift */; };
-		0000000000000000000010AE /* EvidenceScopeAttributionChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AD /* EvidenceScopeAttributionChip.swift */; };
-		0000000000000000000010B0 /* ChartInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AF /* ChartInteraction.swift */; };
-		0000000000000000000010B2 /* BriefingPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B1 /* BriefingPresentation.swift */; };
-		0000000000000000000010B4 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B3 /* RootTabView.swift */; };
-		0000000000000000000010B6 /* DestinationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B5 /* DestinationPlaceholderView.swift */; };
-		0000000000000000000010B8 /* AppDestinationRouterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B7 /* AppDestinationRouterView.swift */; };
-		0000000000000000000010BA /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B9 /* HomeView.swift */; };
-		0000000000000000000010BC /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BB /* HomeViewModel.swift */; };
-		0000000000000000000010BE /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BD /* HomeHeaderView.swift */; };
-		0000000000000000000010C0 /* HomeHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BF /* HomeHeroCardView.swift */; };
-		0000000000000000000010C2 /* ConfidenceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C1 /* ConfidenceDetailSheet.swift */; };
-		0000000000000000000010C4 /* NextBestActionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C3 /* NextBestActionView.swift */; };
-		0000000000000000000010C6 /* BriefingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C5 /* BriefingCardView.swift */; };
-		0000000000000000000010C8 /* GoalRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C7 /* GoalRowView.swift */; };
-		0000000000000000000010CA /* FocusTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C9 /* FocusTileView.swift */; };
-		0000000000000000000010CC /* TodaysFocusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CB /* TodaysFocusCardView.swift */; };
-		0000000000000000000010CE /* PriorityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CD /* PriorityDetailView.swift */; };
-		0000000000000000000010D0 /* PriorityDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CF /* PriorityDetailViewModel.swift */; };
-		0000000000000000000010D2 /* BriefingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D1 /* BriefingHistoryView.swift */; };
-		0000000000000000000010D4 /* BriefingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D3 /* BriefingDetailView.swift */; };
-		0000000000000000000010D6 /* WeeklyBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D5 /* WeeklyBriefingSections.swift */; };
-		0000000000000000000010D8 /* MidweekBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D7 /* MidweekBriefingSections.swift */; };
-		0000000000000000000010DA /* MonthlyBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D9 /* MonthlyBriefingSections.swift */; };
-		0000000000000000000010DC /* DEXABriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DB /* DEXABriefingSections.swift */; };
-		0000000000000000000010DE /* PhotoBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DD /* PhotoBriefingSections.swift */; };
-		0000000000000000000010E0 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DF /* LogView.swift */; };
-		0000000000000000000010E2 /* LogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E1 /* LogViewModel.swift */; };
-		0000000000000000000010E4 /* LogHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E3 /* LogHeaderView.swift */; };
-		0000000000000000000010E6 /* LoggedTodayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E5 /* LoggedTodayCardView.swift */; };
-		0000000000000000000010E8 /* TrainingLoggerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E7 /* TrainingLoggerCardView.swift */; };
-		0000000000000000000010EA /* PendingEvidenceReviewsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E9 /* PendingEvidenceReviewsCardView.swift */; };
-		0000000000000000000010EC /* UploadCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010EB /* UploadCardView.swift */; };
-		0000000000000000000010EE /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010ED /* GoalsView.swift */; };
-		0000000000000000000010F0 /* GoalsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010EF /* GoalsViewModel.swift */; };
-		0000000000000000000010F2 /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F1 /* GoalDetailView.swift */; };
-		0000000000000000000010F4 /* CompletedGoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F3 /* CompletedGoalDetailView.swift */; };
-		0000000000000000000010F6 /* GoalPhaseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F5 /* GoalPhaseDetailView.swift */; };
-		0000000000000000000010F8 /* GoalStrategyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F7 /* GoalStrategyView.swift */; };
-		0000000000000000000010FA /* GoalEditWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F9 /* GoalEditWizardView.swift */; };
-		0000000000000000000010FC /* GoalTransitionWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FB /* GoalTransitionWizardView.swift */; };
-		0000000000000000000010FE /* GoalProtocolTransitionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FD /* GoalProtocolTransitionView.swift */; };
-		000000000000000000001100 /* GoalProtocolCategoryEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FF /* GoalProtocolCategoryEditorView.swift */; };
-		000000000000000000001102 /* GoalTransitionFinalReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001101 /* GoalTransitionFinalReviewView.swift */; };
-		000000000000000000001104 /* PhaseTransitionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001103 /* PhaseTransitionView.swift */; };
-		000000000000000000001106 /* OperatingPlanComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001105 /* OperatingPlanComponents.swift */; };
-		000000000000000000001108 /* OperatingPlanLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001107 /* OperatingPlanLandingView.swift */; };
-		00000000000000000000110A /* OperatingPlanStrategyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001109 /* OperatingPlanStrategyDetailView.swift */; };
-		00000000000000000000110C /* OperatingPlanStrategyEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110B /* OperatingPlanStrategyEditorView.swift */; };
-		00000000000000000000110E /* OperatingPlanProtocolDomainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110D /* OperatingPlanProtocolDomainView.swift */; };
-		000000000000000000001110 /* OperatingPlanPeptideExecutionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110F /* OperatingPlanPeptideExecutionView.swift */; };
-		000000000000000000001112 /* OperatingPlanRecoverySupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001111 /* OperatingPlanRecoverySupportView.swift */; };
-		000000000000000000001114 /* OperatingPlanSupportScheduleEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001113 /* OperatingPlanSupportScheduleEditor.swift */; };
-		000000000000000000001116 /* OperatingPlanSupplementSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001115 /* OperatingPlanSupplementSupportView.swift */; };
-		000000000000000000001118 /* OperatingPlanSupplementEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001117 /* OperatingPlanSupplementEditorView.swift */; };
-		00000000000000000000111A /* OperatingPlanTrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001119 /* OperatingPlanTrackingView.swift */; };
-		00000000000000000000111C /* OperatingPlanDexaAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111B /* OperatingPlanDexaAppointmentView.swift */; };
-		00000000000000000000111E /* ProtocolBuilderShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111D /* ProtocolBuilderShell.swift */; };
-		000000000000000000001120 /* OperatingPlanTrainingProtocolBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111F /* OperatingPlanTrainingProtocolBuilderView.swift */; };
-		000000000000000000001122 /* YouPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001121 /* YouPlaceholderView.swift */; };
-		000000000000000000001124 /* FounderServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001123 /* FounderServerConnectionView.swift */; };
-		000000000000000000001126 /* EvidenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001125 /* EvidenceView.swift */; };
-		000000000000000000001128 /* EvidenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001127 /* EvidenceViewModel.swift */; };
-		00000000000000000000112A /* EvidenceHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001129 /* EvidenceHeaderView.swift */; };
-		00000000000000000000112C /* EvidenceStreamRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112B /* EvidenceStreamRowView.swift */; };
-		00000000000000000000112E /* ActivityHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112D /* ActivityHistoryView.swift */; };
-		000000000000000000001130 /* ActivityHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112F /* ActivityHistoryViewModel.swift */; };
-		000000000000000000001132 /* ActivityDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001131 /* ActivityDayView.swift */; };
-		000000000000000000001134 /* ActivityDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001133 /* ActivityDayViewModel.swift */; };
-		000000000000000000001136 /* NutritionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001135 /* NutritionHistoryView.swift */; };
-		000000000000000000001138 /* NutritionHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001137 /* NutritionHistoryViewModel.swift */; };
-		00000000000000000000113A /* NutritionDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001139 /* NutritionDayView.swift */; };
-		00000000000000000000113C /* NutritionDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113B /* NutritionDayViewModel.swift */; };
-		00000000000000000000113E /* NutritionReportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113D /* NutritionReportingView.swift */; };
-		000000000000000000001140 /* NutritionReportingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113F /* NutritionReportingViewModel.swift */; };
-		000000000000000000001142 /* NutritionReportingChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001141 /* NutritionReportingChartViews.swift */; };
-		000000000000000000001144 /* NutritionReportingRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001143 /* NutritionReportingRowViews.swift */; };
-		000000000000000000001146 /* WeightHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001145 /* WeightHistoryView.swift */; };
-		000000000000000000001148 /* WeightHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001147 /* WeightHistoryViewModel.swift */; };
-		00000000000000000000114A /* DEXAHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001149 /* DEXAHistoryView.swift */; };
-		00000000000000000000114C /* DEXAHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114B /* DEXAHistoryViewModel.swift */; };
-		00000000000000000000114E /* DEXAChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114D /* DEXAChartViews.swift */; };
-		000000000000000000001150 /* PhotosHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114F /* PhotosHistoryView.swift */; };
-		000000000000000000001152 /* PhotosHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001151 /* PhotosHistoryViewModel.swift */; };
-		000000000000000000001154 /* PhotoSetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001153 /* PhotoSetDetailView.swift */; };
-		000000000000000000001156 /* PhotoSetDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001155 /* PhotoSetDetailViewModel.swift */; };
-		000000000000000000001158 /* EnergyHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001157 /* EnergyHistoryView.swift */; };
-		00000000000000000000115A /* EnergyHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001159 /* EnergyHistoryViewModel.swift */; };
-		00000000000000000000115C /* EnergyChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115B /* EnergyChartViews.swift */; };
-		00000000000000000000115E /* TrainingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115D /* TrainingHistoryView.swift */; };
-		000000000000000000001160 /* TrainingHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115F /* TrainingHistoryViewModel.swift */; };
-		000000000000000000001162 /* TrainingDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001161 /* TrainingDayView.swift */; };
-		000000000000000000001164 /* TrainingDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001163 /* TrainingDayViewModel.swift */; };
-		000000000000000000001166 /* TrainingSessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001165 /* TrainingSessionDetailView.swift */; };
-		000000000000000000001168 /* TrainingSessionDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001167 /* TrainingSessionDetailViewModel.swift */; };
-		00000000000000000000116A /* TrainingAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001169 /* TrainingAreaView.swift */; };
-		00000000000000000000116C /* TrainingAreaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116B /* TrainingAreaViewModel.swift */; };
-		00000000000000000000116E /* TrainingLibraryHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116D /* TrainingLibraryHeaderView.swift */; };
-		000000000000000000001170 /* TrainingExerciseDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116F /* TrainingExerciseDetailViewModel.swift */; };
-		000000000000000000001172 /* TrainingExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001171 /* TrainingExerciseDetailView.swift */; };
-		000000000000000000001174 /* TrainingLibraryRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001173 /* TrainingLibraryRootView.swift */; };
-		000000000000000000001176 /* TrainingLibraryRootViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001175 /* TrainingLibraryRootViewModel.swift */; };
-		000000000000000000001178 /* TrainingReportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001177 /* TrainingReportingView.swift */; };
-		00000000000000000000117A /* TrainingReportingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001179 /* TrainingReportingViewModel.swift */; };
-		00000000000000000000117C /* TrainingLoggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117B /* TrainingLoggerView.swift */; };
-		00000000000000000000117E /* TrainingLoggerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117D /* TrainingLoggerViewModel.swift */; };
-		000000000000000000001180 /* ManualWeighInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117F /* ManualWeighInView.swift */; };
-		000000000000000000001182 /* EvidenceIntakeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001181 /* EvidenceIntakeView.swift */; };
-		000000000000000000001184 /* LocalEvidenceReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001183 /* LocalEvidenceReviewView.swift */; };
-		000000000000000000001186 /* HomeFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001185 /* HomeFixture.json */; };
-		000000000000000000001188 /* PriorityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001187 /* PriorityFixture.json */; };
-		00000000000000000000118A /* GoalsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001189 /* GoalsFixture.json */; };
-		00000000000000000000118C /* OperatingPlanFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118B /* OperatingPlanFixture.json */; };
-		00000000000000000000118E /* LogFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118D /* LogFixture.json */; };
-		000000000000000000001190 /* EvidenceFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118F /* EvidenceFixture.json */; };
-		000000000000000000001192 /* EvidenceChronologyFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001191 /* EvidenceChronologyFixture.json */; };
-		000000000000000000001194 /* TrainingFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001193 /* TrainingFixture.json */; };
-		000000000000000000001196 /* ActivityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001195 /* ActivityFixture.json */; };
-		000000000000000000001198 /* NutritionFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001197 /* NutritionFixture.json */; };
-		00000000000000000000119A /* WeightFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001199 /* WeightFixture.json */; };
-		00000000000000000000119C /* DEXAFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119B /* DEXAFixture.json */; };
-		00000000000000000000119E /* PhotosFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119D /* PhotosFixture.json */; };
-		0000000000000000000011A0 /* EnergyFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119F /* EnergyFixture.json */; };
-		0000000000000000000011A2 /* TrainingLoggerFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A1 /* TrainingLoggerFixture.json */; };
-		0000000000000000000011A4 /* BriefingsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A3 /* BriefingsFixture.json */; };
-		0000000000000000000011A6 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A5 /* PlusJakartaSans[wght].ttf */; };
-		0000000000000000000011A8 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A7 /* OFL.txt */; };
-		00000000000000000000121D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000121C /* Assets.xcassets */; };
-		0000000000000000000011AB /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011AA /* AppTabTests.swift */; };
-		0000000000000000000011AD /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011AC /* HomeReadModelTests.swift */; };
-		0000000000000000000011AF /* PriorityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011AE /* PriorityReadModelTests.swift */; };
-		0000000000000000000011B1 /* GoalsReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B0 /* GoalsReadModelTests.swift */; };
-		0000000000000000000011B3 /* GoalsSandboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B2 /* GoalsSandboxStoreTests.swift */; };
-		0000000000000000000011B5 /* BriefingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B4 /* BriefingReadModelTests.swift */; };
-		0000000000000000000011B7 /* DEXABriefingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B6 /* DEXABriefingTests.swift */; };
-		0000000000000000000011B9 /* PhotoBriefingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B8 /* PhotoBriefingTests.swift */; };
-		0000000000000000000011BB /* OperatingPlanReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BA /* OperatingPlanReadModelTests.swift */; };
-		0000000000000000000011BD /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BC /* LogReadModelTests.swift */; };
-		0000000000000000000011BF /* SharedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BE /* SharedUITests.swift */; };
-		0000000000000000000011C1 /* EvidenceReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C0 /* EvidenceReadModelTests.swift */; };
-		0000000000000000000011C3 /* EvidenceHubUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C2 /* EvidenceHubUsageTests.swift */; };
-		0000000000000000000011C5 /* TrainingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C4 /* TrainingReadModelTests.swift */; };
-		0000000000000000000011C7 /* TrainingLibraryCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C6 /* TrainingLibraryCatalogTests.swift */; };
-		0000000000000000000011C9 /* ActivityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C8 /* ActivityReadModelTests.swift */; };
-		0000000000000000000011CB /* NutritionReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CA /* NutritionReadModelTests.swift */; };
-		0000000000000000000011CD /* NutritionReportingCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CC /* NutritionReportingCalculatorTests.swift */; };
-		0000000000000000000011CF /* WeightReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CE /* WeightReadModelTests.swift */; };
-		0000000000000000000011D1 /* DEXAReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D0 /* DEXAReadModelTests.swift */; };
-		0000000000000000000011D3 /* PhotosReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D2 /* PhotosReadModelTests.swift */; };
-		0000000000000000000011D5 /* EnergyReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D4 /* EnergyReadModelTests.swift */; };
-		0000000000000000000011D7 /* ChartInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D6 /* ChartInteractionTests.swift */; };
-		0000000000000000000011D9 /* EvidenceChronologyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D8 /* EvidenceChronologyTests.swift */; };
-		0000000000000000000011DB /* TrainingLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DA /* TrainingLoggerTests.swift */; };
-		0000000000000000000011DD /* LoggingSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DC /* LoggingSandboxTests.swift */; };
-		0000000000000000000011DF /* MorningCheckInModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DE /* MorningCheckInModelTests.swift */; };
-		0000000000000000000011E1 /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E0 /* FounderServerAPITests.swift */; };
-		000000000000000000001210 /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120F /* TrainingAcceptanceUITests.swift */; };
+		000000000000000000001084 /* ProductionDailyDriverAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001083 /* ProductionDailyDriverAPI.swift */; };
+		000000000000000000001086 /* FounderPhotoMediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001085 /* FounderPhotoMediaStore.swift */; };
+		000000000000000000001088 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001087 /* PhysiqueOSTheme.swift */; };
+		00000000000000000000108A /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001089 /* IconBadge.swift */; };
+		00000000000000000000108C /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108B /* CardContainer.swift */; };
+		00000000000000000000108E /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108D /* SectionHeading.swift */; };
+		000000000000000000001090 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108F /* StatusChip.swift */; };
+		000000000000000000001092 /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001091 /* ConfidenceRing.swift */; };
+		000000000000000000001094 /* ProgressPhotoTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001093 /* ProgressPhotoTile.swift */; };
+		000000000000000000001096 /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001095 /* AnimatedProgressBar.swift */; };
+		000000000000000000001098 /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001097 /* MetricRow.swift */; };
+		00000000000000000000109A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001099 /* Typography.swift */; };
+		00000000000000000000109C /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109B /* PlusJakartaSans.swift */; };
+		00000000000000000000109E /* PrimaryActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109D /* PrimaryActionButton.swift */; };
+		0000000000000000000010A0 /* ScrollScreenLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109F /* ScrollScreenLayout.swift */; };
+		0000000000000000000010A2 /* DateField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A1 /* DateField.swift */; };
+		0000000000000000000010A4 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A3 /* TabPlaceholderView.swift */; };
+		0000000000000000000010A6 /* EvidenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A5 /* EvidenceAttachment.swift */; };
+		0000000000000000000010A8 /* EvidenceSourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A7 /* EvidenceSourcePicker.swift */; };
+		0000000000000000000010AA /* EvidenceStreamPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A9 /* EvidenceStreamPresentation.swift */; };
+		0000000000000000000010AC /* InteractivePopGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AB /* InteractivePopGesture.swift */; };
+		0000000000000000000010AE /* NumericEditField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AD /* NumericEditField.swift */; };
+		0000000000000000000010B0 /* EvidenceScopeAttributionChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AF /* EvidenceScopeAttributionChip.swift */; };
+		0000000000000000000010B2 /* ChartInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B1 /* ChartInteraction.swift */; };
+		0000000000000000000010B4 /* BriefingPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B3 /* BriefingPresentation.swift */; };
+		0000000000000000000010B6 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B5 /* RootTabView.swift */; };
+		0000000000000000000010B8 /* DestinationPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B7 /* DestinationPlaceholderView.swift */; };
+		0000000000000000000010BA /* AppDestinationRouterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B9 /* AppDestinationRouterView.swift */; };
+		0000000000000000000010BC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BB /* HomeView.swift */; };
+		0000000000000000000010BE /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BD /* HomeViewModel.swift */; };
+		0000000000000000000010C0 /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010BF /* HomeHeaderView.swift */; };
+		0000000000000000000010C2 /* HomeHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C1 /* HomeHeroCardView.swift */; };
+		0000000000000000000010C4 /* ConfidenceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C3 /* ConfidenceDetailSheet.swift */; };
+		0000000000000000000010C6 /* NextBestActionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C5 /* NextBestActionView.swift */; };
+		0000000000000000000010C8 /* BriefingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C7 /* BriefingCardView.swift */; };
+		0000000000000000000010CA /* GoalRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010C9 /* GoalRowView.swift */; };
+		0000000000000000000010CC /* FocusTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CB /* FocusTileView.swift */; };
+		0000000000000000000010CE /* TodaysFocusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CD /* TodaysFocusCardView.swift */; };
+		0000000000000000000010D0 /* PriorityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010CF /* PriorityDetailView.swift */; };
+		0000000000000000000010D2 /* PriorityDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D1 /* PriorityDetailViewModel.swift */; };
+		0000000000000000000010D4 /* BriefingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D3 /* BriefingHistoryView.swift */; };
+		0000000000000000000010D6 /* BriefingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D5 /* BriefingDetailView.swift */; };
+		0000000000000000000010D8 /* WeeklyBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D7 /* WeeklyBriefingSections.swift */; };
+		0000000000000000000010DA /* MidweekBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010D9 /* MidweekBriefingSections.swift */; };
+		0000000000000000000010DC /* MonthlyBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DB /* MonthlyBriefingSections.swift */; };
+		0000000000000000000010DE /* DEXABriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DD /* DEXABriefingSections.swift */; };
+		0000000000000000000010E0 /* PhotoBriefingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010DF /* PhotoBriefingSections.swift */; };
+		0000000000000000000010E2 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E1 /* LogView.swift */; };
+		0000000000000000000010E4 /* LogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E3 /* LogViewModel.swift */; };
+		0000000000000000000010E6 /* LogHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E5 /* LogHeaderView.swift */; };
+		0000000000000000000010E8 /* LoggedTodayCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E7 /* LoggedTodayCardView.swift */; };
+		0000000000000000000010EA /* TrainingLoggerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010E9 /* TrainingLoggerCardView.swift */; };
+		0000000000000000000010EC /* PendingEvidenceReviewsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010EB /* PendingEvidenceReviewsCardView.swift */; };
+		0000000000000000000010EE /* UploadCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010ED /* UploadCardView.swift */; };
+		0000000000000000000010F0 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010EF /* GoalsView.swift */; };
+		0000000000000000000010F2 /* GoalsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F1 /* GoalsViewModel.swift */; };
+		0000000000000000000010F4 /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F3 /* GoalDetailView.swift */; };
+		0000000000000000000010F6 /* CompletedGoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F5 /* CompletedGoalDetailView.swift */; };
+		0000000000000000000010F8 /* GoalPhaseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F7 /* GoalPhaseDetailView.swift */; };
+		0000000000000000000010FA /* GoalStrategyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F9 /* GoalStrategyView.swift */; };
+		0000000000000000000010FC /* GoalEditWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FB /* GoalEditWizardView.swift */; };
+		0000000000000000000010FE /* GoalTransitionWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FD /* GoalTransitionWizardView.swift */; };
+		000000000000000000001100 /* GoalProtocolTransitionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010FF /* GoalProtocolTransitionView.swift */; };
+		000000000000000000001102 /* GoalProtocolCategoryEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001101 /* GoalProtocolCategoryEditorView.swift */; };
+		000000000000000000001104 /* GoalTransitionFinalReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001103 /* GoalTransitionFinalReviewView.swift */; };
+		000000000000000000001106 /* PhaseTransitionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001105 /* PhaseTransitionView.swift */; };
+		000000000000000000001108 /* OperatingPlanComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001107 /* OperatingPlanComponents.swift */; };
+		00000000000000000000110A /* OperatingPlanLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001109 /* OperatingPlanLandingView.swift */; };
+		00000000000000000000110C /* OperatingPlanStrategyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110B /* OperatingPlanStrategyDetailView.swift */; };
+		00000000000000000000110E /* OperatingPlanStrategyEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110D /* OperatingPlanStrategyEditorView.swift */; };
+		000000000000000000001110 /* OperatingPlanProtocolDomainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000110F /* OperatingPlanProtocolDomainView.swift */; };
+		000000000000000000001112 /* OperatingPlanPeptideExecutionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001111 /* OperatingPlanPeptideExecutionView.swift */; };
+		000000000000000000001114 /* OperatingPlanRecoverySupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001113 /* OperatingPlanRecoverySupportView.swift */; };
+		000000000000000000001116 /* OperatingPlanSupportScheduleEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001115 /* OperatingPlanSupportScheduleEditor.swift */; };
+		000000000000000000001118 /* OperatingPlanSupplementSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001117 /* OperatingPlanSupplementSupportView.swift */; };
+		00000000000000000000111A /* OperatingPlanSupplementEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001119 /* OperatingPlanSupplementEditorView.swift */; };
+		00000000000000000000111C /* OperatingPlanTrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111B /* OperatingPlanTrackingView.swift */; };
+		00000000000000000000111E /* OperatingPlanDexaAppointmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111D /* OperatingPlanDexaAppointmentView.swift */; };
+		000000000000000000001120 /* ProtocolBuilderShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111F /* ProtocolBuilderShell.swift */; };
+		000000000000000000001122 /* OperatingPlanTrainingProtocolBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001121 /* OperatingPlanTrainingProtocolBuilderView.swift */; };
+		000000000000000000001124 /* YouPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001123 /* YouPlaceholderView.swift */; };
+		000000000000000000001126 /* FounderServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001125 /* FounderServerConnectionView.swift */; };
+		000000000000000000001128 /* EvidenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001127 /* EvidenceView.swift */; };
+		00000000000000000000112A /* EvidenceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001129 /* EvidenceViewModel.swift */; };
+		00000000000000000000112C /* EvidenceHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112B /* EvidenceHeaderView.swift */; };
+		00000000000000000000112E /* EvidenceStreamRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112D /* EvidenceStreamRowView.swift */; };
+		000000000000000000001130 /* ActivityHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000112F /* ActivityHistoryView.swift */; };
+		000000000000000000001132 /* ActivityHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001131 /* ActivityHistoryViewModel.swift */; };
+		000000000000000000001134 /* ActivityDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001133 /* ActivityDayView.swift */; };
+		000000000000000000001136 /* ActivityDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001135 /* ActivityDayViewModel.swift */; };
+		000000000000000000001138 /* NutritionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001137 /* NutritionHistoryView.swift */; };
+		00000000000000000000113A /* NutritionHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001139 /* NutritionHistoryViewModel.swift */; };
+		00000000000000000000113C /* NutritionDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113B /* NutritionDayView.swift */; };
+		00000000000000000000113E /* NutritionDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113D /* NutritionDayViewModel.swift */; };
+		000000000000000000001140 /* NutritionReportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000113F /* NutritionReportingView.swift */; };
+		000000000000000000001142 /* NutritionReportingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001141 /* NutritionReportingViewModel.swift */; };
+		000000000000000000001144 /* NutritionReportingChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001143 /* NutritionReportingChartViews.swift */; };
+		000000000000000000001146 /* NutritionReportingRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001145 /* NutritionReportingRowViews.swift */; };
+		000000000000000000001148 /* WeightHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001147 /* WeightHistoryView.swift */; };
+		00000000000000000000114A /* WeightHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001149 /* WeightHistoryViewModel.swift */; };
+		00000000000000000000114C /* DEXAHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114B /* DEXAHistoryView.swift */; };
+		00000000000000000000114E /* DEXAHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114D /* DEXAHistoryViewModel.swift */; };
+		000000000000000000001150 /* DEXAChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000114F /* DEXAChartViews.swift */; };
+		000000000000000000001152 /* PhotosHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001151 /* PhotosHistoryView.swift */; };
+		000000000000000000001154 /* PhotosHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001153 /* PhotosHistoryViewModel.swift */; };
+		000000000000000000001156 /* PhotoSetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001155 /* PhotoSetDetailView.swift */; };
+		000000000000000000001158 /* PhotoSetDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001157 /* PhotoSetDetailViewModel.swift */; };
+		00000000000000000000115A /* EnergyHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001159 /* EnergyHistoryView.swift */; };
+		00000000000000000000115C /* EnergyHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115B /* EnergyHistoryViewModel.swift */; };
+		00000000000000000000115E /* EnergyChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115D /* EnergyChartViews.swift */; };
+		000000000000000000001160 /* TrainingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000115F /* TrainingHistoryView.swift */; };
+		000000000000000000001162 /* TrainingHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001161 /* TrainingHistoryViewModel.swift */; };
+		000000000000000000001164 /* TrainingDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001163 /* TrainingDayView.swift */; };
+		000000000000000000001166 /* TrainingDayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001165 /* TrainingDayViewModel.swift */; };
+		000000000000000000001168 /* TrainingSessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001167 /* TrainingSessionDetailView.swift */; };
+		00000000000000000000116A /* TrainingSessionDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001169 /* TrainingSessionDetailViewModel.swift */; };
+		00000000000000000000116C /* TrainingAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116B /* TrainingAreaView.swift */; };
+		00000000000000000000116E /* TrainingAreaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116D /* TrainingAreaViewModel.swift */; };
+		000000000000000000001170 /* TrainingLibraryHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000116F /* TrainingLibraryHeaderView.swift */; };
+		000000000000000000001172 /* TrainingExerciseDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001171 /* TrainingExerciseDetailViewModel.swift */; };
+		000000000000000000001174 /* TrainingExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001173 /* TrainingExerciseDetailView.swift */; };
+		000000000000000000001176 /* TrainingLibraryRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001175 /* TrainingLibraryRootView.swift */; };
+		000000000000000000001178 /* TrainingLibraryRootViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001177 /* TrainingLibraryRootViewModel.swift */; };
+		00000000000000000000117A /* TrainingReportingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001179 /* TrainingReportingView.swift */; };
+		00000000000000000000117C /* TrainingReportingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117B /* TrainingReportingViewModel.swift */; };
+		00000000000000000000117E /* TrainingLoggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117D /* TrainingLoggerView.swift */; };
+		000000000000000000001180 /* TrainingLoggerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000117F /* TrainingLoggerViewModel.swift */; };
+		000000000000000000001182 /* ManualWeighInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001181 /* ManualWeighInView.swift */; };
+		000000000000000000001184 /* EvidenceIntakeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001183 /* EvidenceIntakeView.swift */; };
+		000000000000000000001186 /* LocalEvidenceReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001185 /* LocalEvidenceReviewView.swift */; };
+		000000000000000000001188 /* HomeFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001187 /* HomeFixture.json */; };
+		00000000000000000000118A /* PriorityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001189 /* PriorityFixture.json */; };
+		00000000000000000000118C /* GoalsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118B /* GoalsFixture.json */; };
+		00000000000000000000118E /* OperatingPlanFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118D /* OperatingPlanFixture.json */; };
+		000000000000000000001190 /* LogFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000118F /* LogFixture.json */; };
+		000000000000000000001192 /* EvidenceFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001191 /* EvidenceFixture.json */; };
+		000000000000000000001194 /* EvidenceChronologyFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001193 /* EvidenceChronologyFixture.json */; };
+		000000000000000000001196 /* TrainingFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001195 /* TrainingFixture.json */; };
+		000000000000000000001198 /* ActivityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001197 /* ActivityFixture.json */; };
+		00000000000000000000119A /* NutritionFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001199 /* NutritionFixture.json */; };
+		00000000000000000000119C /* WeightFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119B /* WeightFixture.json */; };
+		00000000000000000000119E /* DEXAFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119D /* DEXAFixture.json */; };
+		0000000000000000000011A0 /* PhotosFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000119F /* PhotosFixture.json */; };
+		0000000000000000000011A2 /* EnergyFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A1 /* EnergyFixture.json */; };
+		0000000000000000000011A4 /* TrainingLoggerFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A3 /* TrainingLoggerFixture.json */; };
+		0000000000000000000011A6 /* BriefingsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A5 /* BriefingsFixture.json */; };
+		0000000000000000000011A8 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A7 /* PlusJakartaSans[wght].ttf */; };
+		0000000000000000000011AA /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011A9 /* OFL.txt */; };
+		00000000000000000000121F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000121E /* Assets.xcassets */; };
+		0000000000000000000011AD /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011AC /* AppTabTests.swift */; };
+		0000000000000000000011AF /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011AE /* HomeReadModelTests.swift */; };
+		0000000000000000000011B1 /* PriorityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B0 /* PriorityReadModelTests.swift */; };
+		0000000000000000000011B3 /* GoalsReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B2 /* GoalsReadModelTests.swift */; };
+		0000000000000000000011B5 /* GoalsSandboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B4 /* GoalsSandboxStoreTests.swift */; };
+		0000000000000000000011B7 /* BriefingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B6 /* BriefingReadModelTests.swift */; };
+		0000000000000000000011B9 /* DEXABriefingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011B8 /* DEXABriefingTests.swift */; };
+		0000000000000000000011BB /* PhotoBriefingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BA /* PhotoBriefingTests.swift */; };
+		0000000000000000000011BD /* OperatingPlanReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BC /* OperatingPlanReadModelTests.swift */; };
+		0000000000000000000011BF /* LogReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011BE /* LogReadModelTests.swift */; };
+		0000000000000000000011C1 /* SharedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C0 /* SharedUITests.swift */; };
+		0000000000000000000011C3 /* EvidenceReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C2 /* EvidenceReadModelTests.swift */; };
+		0000000000000000000011C5 /* EvidenceHubUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C4 /* EvidenceHubUsageTests.swift */; };
+		0000000000000000000011C7 /* TrainingReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C6 /* TrainingReadModelTests.swift */; };
+		0000000000000000000011C9 /* TrainingLibraryCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011C8 /* TrainingLibraryCatalogTests.swift */; };
+		0000000000000000000011CB /* ActivityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CA /* ActivityReadModelTests.swift */; };
+		0000000000000000000011CD /* NutritionReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CC /* NutritionReadModelTests.swift */; };
+		0000000000000000000011CF /* NutritionReportingCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011CE /* NutritionReportingCalculatorTests.swift */; };
+		0000000000000000000011D1 /* WeightReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D0 /* WeightReadModelTests.swift */; };
+		0000000000000000000011D3 /* DEXAReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D2 /* DEXAReadModelTests.swift */; };
+		0000000000000000000011D5 /* PhotosReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D4 /* PhotosReadModelTests.swift */; };
+		0000000000000000000011D7 /* EnergyReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D6 /* EnergyReadModelTests.swift */; };
+		0000000000000000000011D9 /* ChartInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011D8 /* ChartInteractionTests.swift */; };
+		0000000000000000000011DB /* EvidenceChronologyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DA /* EvidenceChronologyTests.swift */; };
+		0000000000000000000011DD /* TrainingLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DC /* TrainingLoggerTests.swift */; };
+		0000000000000000000011DF /* LoggingSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011DE /* LoggingSandboxTests.swift */; };
+		0000000000000000000011E1 /* MorningCheckInModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E0 /* MorningCheckInModelTests.swift */; };
+		0000000000000000000011E3 /* FounderServerAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E2 /* FounderServerAPITests.swift */; };
+		000000000000000000001212 /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001211 /* TrainingAcceptanceUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		00000000000000000000120E /* PBXContainerItemProxy */ = {
+		000000000000000000001210 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 0000000000000000000011FB /* Project object */;
+			containerPortal = 0000000000000000000011FD /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 0000000000000000000011FF;
+			remoteGlobalIDString = 000000000000000000001201;
 			remoteInfo = PhysiqueOS;
 		};
-		00000000000000000000121B /* PBXContainerItemProxy */ = {
+		00000000000000000000121D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 0000000000000000000011FB /* Project object */;
+			containerPortal = 0000000000000000000011FD /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 0000000000000000000011FF;
+			remoteGlobalIDString = 000000000000000000001201;
 			remoteInfo = PhysiqueOS;
 		};
 /* End PBXContainerItemProxy section */
@@ -334,205 +335,206 @@
 		00000000000000000000107D /* EvidenceLocalInterpretation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceLocalInterpretation.swift"; sourceTree = "<group>"; };
 		00000000000000000000107F /* FounderCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderCredentialStore.swift"; sourceTree = "<group>"; };
 		000000000000000000001081 /* FounderServerAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPI.swift"; sourceTree = "<group>"; };
-		000000000000000000001083 /* FounderPhotoMediaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderPhotoMediaStore.swift"; sourceTree = "<group>"; };
-		000000000000000000001085 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
-		000000000000000000001087 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
-		000000000000000000001089 /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
-		00000000000000000000108B /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
-		00000000000000000000108D /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
-		00000000000000000000108F /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
-		000000000000000000001091 /* ProgressPhotoTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoTile.swift"; sourceTree = "<group>"; };
-		000000000000000000001093 /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
-		000000000000000000001095 /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
-		000000000000000000001097 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography.swift"; sourceTree = "<group>"; };
-		000000000000000000001099 /* PlusJakartaSans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlusJakartaSans.swift"; sourceTree = "<group>"; };
-		00000000000000000000109B /* PrimaryActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimaryActionButton.swift"; sourceTree = "<group>"; };
-		00000000000000000000109D /* ScrollScreenLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScrollScreenLayout.swift"; sourceTree = "<group>"; };
-		00000000000000000000109F /* DateField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DateField.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A1 /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A3 /* EvidenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachment.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A5 /* EvidenceSourcePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceSourcePicker.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A7 /* EvidenceStreamPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamPresentation.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A9 /* InteractivePopGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InteractivePopGesture.swift"; sourceTree = "<group>"; };
-		0000000000000000000010AB /* NumericEditField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NumericEditField.swift"; sourceTree = "<group>"; };
-		0000000000000000000010AD /* EvidenceScopeAttributionChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceScopeAttributionChip.swift"; sourceTree = "<group>"; };
-		0000000000000000000010AF /* ChartInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChartInteraction.swift"; sourceTree = "<group>"; };
-		0000000000000000000010B1 /* BriefingPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingPresentation.swift"; sourceTree = "<group>"; };
-		0000000000000000000010B3 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootTabView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010B5 /* DestinationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DestinationPlaceholderView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010B7 /* AppDestinationRouterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDestinationRouterView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010B9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010BB /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeViewModel.swift"; sourceTree = "<group>"; };
-		0000000000000000000010BD /* HomeHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeaderView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010BF /* HomeHeroCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeroCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010C1 /* ConfidenceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceDetailSheet.swift"; sourceTree = "<group>"; };
-		0000000000000000000010C3 /* NextBestActionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NextBestActionView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010C5 /* BriefingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010C7 /* GoalRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalRowView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010C9 /* FocusTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FocusTileView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010CB /* TodaysFocusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TodaysFocusCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010CD /* PriorityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityDetailView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010CF /* PriorityDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityDetailViewModel.swift"; sourceTree = "<group>"; };
-		0000000000000000000010D1 /* BriefingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingHistoryView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010D3 /* BriefingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingDetailView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010D5 /* WeeklyBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyBriefingSections.swift"; sourceTree = "<group>"; };
-		0000000000000000000010D7 /* MidweekBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MidweekBriefingSections.swift"; sourceTree = "<group>"; };
-		0000000000000000000010D9 /* MonthlyBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonthlyBriefingSections.swift"; sourceTree = "<group>"; };
-		0000000000000000000010DB /* DEXABriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXABriefingSections.swift"; sourceTree = "<group>"; };
-		0000000000000000000010DD /* PhotoBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoBriefingSections.swift"; sourceTree = "<group>"; };
-		0000000000000000000010DF /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010E1 /* LogViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogViewModel.swift"; sourceTree = "<group>"; };
-		0000000000000000000010E3 /* LogHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogHeaderView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010E5 /* LoggedTodayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggedTodayCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010E7 /* TrainingLoggerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010E9 /* PendingEvidenceReviewsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PendingEvidenceReviewsCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010EB /* UploadCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UploadCardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010ED /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010EF /* GoalsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsViewModel.swift"; sourceTree = "<group>"; };
-		0000000000000000000010F1 /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalDetailView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010F3 /* CompletedGoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompletedGoalDetailView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010F5 /* GoalPhaseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalPhaseDetailView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010F7 /* GoalStrategyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalStrategyView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010F9 /* GoalEditWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalEditWizardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010FB /* GoalTransitionWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalTransitionWizardView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010FD /* GoalProtocolTransitionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalProtocolTransitionView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010FF /* GoalProtocolCategoryEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalProtocolCategoryEditorView.swift"; sourceTree = "<group>"; };
-		000000000000000000001101 /* GoalTransitionFinalReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalTransitionFinalReviewView.swift"; sourceTree = "<group>"; };
-		000000000000000000001103 /* PhaseTransitionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhaseTransitionView.swift"; sourceTree = "<group>"; };
-		000000000000000000001105 /* OperatingPlanComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanComponents.swift"; sourceTree = "<group>"; };
-		000000000000000000001107 /* OperatingPlanLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanLandingView.swift"; sourceTree = "<group>"; };
-		000000000000000000001109 /* OperatingPlanStrategyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanStrategyDetailView.swift"; sourceTree = "<group>"; };
-		00000000000000000000110B /* OperatingPlanStrategyEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanStrategyEditorView.swift"; sourceTree = "<group>"; };
-		00000000000000000000110D /* OperatingPlanProtocolDomainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanProtocolDomainView.swift"; sourceTree = "<group>"; };
-		00000000000000000000110F /* OperatingPlanPeptideExecutionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanPeptideExecutionView.swift"; sourceTree = "<group>"; };
-		000000000000000000001111 /* OperatingPlanRecoverySupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanRecoverySupportView.swift"; sourceTree = "<group>"; };
-		000000000000000000001113 /* OperatingPlanSupportScheduleEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupportScheduleEditor.swift"; sourceTree = "<group>"; };
-		000000000000000000001115 /* OperatingPlanSupplementSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupplementSupportView.swift"; sourceTree = "<group>"; };
-		000000000000000000001117 /* OperatingPlanSupplementEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupplementEditorView.swift"; sourceTree = "<group>"; };
-		000000000000000000001119 /* OperatingPlanTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanTrackingView.swift"; sourceTree = "<group>"; };
-		00000000000000000000111B /* OperatingPlanDexaAppointmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanDexaAppointmentView.swift"; sourceTree = "<group>"; };
-		00000000000000000000111D /* ProtocolBuilderShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProtocolBuilderShell.swift"; sourceTree = "<group>"; };
-		00000000000000000000111F /* OperatingPlanTrainingProtocolBuilderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanTrainingProtocolBuilderView.swift"; sourceTree = "<group>"; };
-		000000000000000000001121 /* YouPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "YouPlaceholderView.swift"; sourceTree = "<group>"; };
-		000000000000000000001123 /* FounderServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerConnectionView.swift"; sourceTree = "<group>"; };
-		000000000000000000001125 /* EvidenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceView.swift"; sourceTree = "<group>"; };
-		000000000000000000001127 /* EvidenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001129 /* EvidenceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHeaderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000112B /* EvidenceStreamRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamRowView.swift"; sourceTree = "<group>"; };
-		00000000000000000000112D /* ActivityHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityHistoryView.swift"; sourceTree = "<group>"; };
-		00000000000000000000112F /* ActivityHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityHistoryViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001131 /* ActivityDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityDayView.swift"; sourceTree = "<group>"; };
-		000000000000000000001133 /* ActivityDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityDayViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001135 /* NutritionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionHistoryView.swift"; sourceTree = "<group>"; };
-		000000000000000000001137 /* NutritionHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionHistoryViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001139 /* NutritionDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionDayView.swift"; sourceTree = "<group>"; };
-		00000000000000000000113B /* NutritionDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionDayViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000113D /* NutritionReportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingView.swift"; sourceTree = "<group>"; };
-		00000000000000000000113F /* NutritionReportingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001141 /* NutritionReportingChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingChartViews.swift"; sourceTree = "<group>"; };
-		000000000000000000001143 /* NutritionReportingRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingRowViews.swift"; sourceTree = "<group>"; };
-		000000000000000000001145 /* WeightHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightHistoryView.swift"; sourceTree = "<group>"; };
-		000000000000000000001147 /* WeightHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightHistoryViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001149 /* DEXAHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHistoryView.swift"; sourceTree = "<group>"; };
-		00000000000000000000114B /* DEXAHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHistoryViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000114D /* DEXAChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAChartViews.swift"; sourceTree = "<group>"; };
-		00000000000000000000114F /* PhotosHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosHistoryView.swift"; sourceTree = "<group>"; };
-		000000000000000000001151 /* PhotosHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosHistoryViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001153 /* PhotoSetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoSetDetailView.swift"; sourceTree = "<group>"; };
-		000000000000000000001155 /* PhotoSetDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoSetDetailViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001157 /* EnergyHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyHistoryView.swift"; sourceTree = "<group>"; };
-		000000000000000000001159 /* EnergyHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyHistoryViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000115B /* EnergyChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyChartViews.swift"; sourceTree = "<group>"; };
-		00000000000000000000115D /* TrainingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingHistoryView.swift"; sourceTree = "<group>"; };
-		00000000000000000000115F /* TrainingHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingHistoryViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001161 /* TrainingDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingDayView.swift"; sourceTree = "<group>"; };
-		000000000000000000001163 /* TrainingDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingDayViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001165 /* TrainingSessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionDetailView.swift"; sourceTree = "<group>"; };
-		000000000000000000001167 /* TrainingSessionDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionDetailViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001169 /* TrainingAreaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAreaView.swift"; sourceTree = "<group>"; };
-		00000000000000000000116B /* TrainingAreaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAreaViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000116D /* TrainingLibraryHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryHeaderView.swift"; sourceTree = "<group>"; };
-		00000000000000000000116F /* TrainingExerciseDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001171 /* TrainingExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailView.swift"; sourceTree = "<group>"; };
-		000000000000000000001173 /* TrainingLibraryRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryRootView.swift"; sourceTree = "<group>"; };
-		000000000000000000001175 /* TrainingLibraryRootViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryRootViewModel.swift"; sourceTree = "<group>"; };
-		000000000000000000001177 /* TrainingReportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReportingView.swift"; sourceTree = "<group>"; };
-		000000000000000000001179 /* TrainingReportingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReportingViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000117B /* TrainingLoggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerView.swift"; sourceTree = "<group>"; };
-		00000000000000000000117D /* TrainingLoggerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerViewModel.swift"; sourceTree = "<group>"; };
-		00000000000000000000117F /* ManualWeighInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ManualWeighInView.swift"; sourceTree = "<group>"; };
-		000000000000000000001181 /* EvidenceIntakeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceIntakeView.swift"; sourceTree = "<group>"; };
-		000000000000000000001183 /* LocalEvidenceReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalEvidenceReviewView.swift"; sourceTree = "<group>"; };
-		000000000000000000001185 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001187 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001189 /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000118B /* OperatingPlanFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "OperatingPlanFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000118D /* LogFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "LogFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000118F /* EvidenceFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001191 /* EvidenceChronologyFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceChronologyFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001193 /* TrainingFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001195 /* ActivityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ActivityFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001197 /* NutritionFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "NutritionFixture.json"; sourceTree = "<group>"; };
-		000000000000000000001199 /* WeightFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "WeightFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000119B /* DEXAFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "DEXAFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000119D /* PhotosFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PhotosFixture.json"; sourceTree = "<group>"; };
-		00000000000000000000119F /* EnergyFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EnergyFixture.json"; sourceTree = "<group>"; };
-		0000000000000000000011A1 /* TrainingLoggerFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingLoggerFixture.json"; sourceTree = "<group>"; };
-		0000000000000000000011A3 /* BriefingsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "BriefingsFixture.json"; sourceTree = "<group>"; };
-		0000000000000000000011A5 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
-		0000000000000000000011A7 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
-		00000000000000000000121C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
-		0000000000000000000011A9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
-		0000000000000000000011AA /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011AC /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011AE /* PriorityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011B0 /* GoalsReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011B2 /* GoalsSandboxStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsSandboxStoreTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011B4 /* BriefingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011B6 /* DEXABriefingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXABriefingTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011B8 /* PhotoBriefingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoBriefingTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011BA /* OperatingPlanReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011BC /* LogReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011BE /* SharedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SharedUITests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011C0 /* EvidenceReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011C2 /* EvidenceHubUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsageTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011C4 /* TrainingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011C6 /* TrainingLibraryCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryCatalogTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011C8 /* ActivityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011CA /* NutritionReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011CC /* NutritionReportingCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingCalculatorTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011CE /* WeightReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011D0 /* DEXAReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011D2 /* PhotosReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011D4 /* EnergyReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyReadModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011D6 /* ChartInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChartInteractionTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011D8 /* EvidenceChronologyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceChronologyTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011DA /* TrainingLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011DC /* LoggingSandboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggingSandboxTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011DE /* MorningCheckInModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MorningCheckInModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011E0 /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
-		00000000000000000000120F /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
-		0000000000000000000011F9 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		0000000000000000000011FA /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001211 /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001083 /* ProductionDailyDriverAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProductionDailyDriverAPI.swift"; sourceTree = "<group>"; };
+		000000000000000000001085 /* FounderPhotoMediaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderPhotoMediaStore.swift"; sourceTree = "<group>"; };
+		000000000000000000001087 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
+		000000000000000000001089 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
+		00000000000000000000108B /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
+		00000000000000000000108D /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
+		00000000000000000000108F /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
+		000000000000000000001091 /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
+		000000000000000000001093 /* ProgressPhotoTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoTile.swift"; sourceTree = "<group>"; };
+		000000000000000000001095 /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
+		000000000000000000001097 /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
+		000000000000000000001099 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography.swift"; sourceTree = "<group>"; };
+		00000000000000000000109B /* PlusJakartaSans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlusJakartaSans.swift"; sourceTree = "<group>"; };
+		00000000000000000000109D /* PrimaryActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimaryActionButton.swift"; sourceTree = "<group>"; };
+		00000000000000000000109F /* ScrollScreenLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScrollScreenLayout.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A1 /* DateField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DateField.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A3 /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A5 /* EvidenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachment.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A7 /* EvidenceSourcePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceSourcePicker.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A9 /* EvidenceStreamPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamPresentation.swift"; sourceTree = "<group>"; };
+		0000000000000000000010AB /* InteractivePopGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InteractivePopGesture.swift"; sourceTree = "<group>"; };
+		0000000000000000000010AD /* NumericEditField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NumericEditField.swift"; sourceTree = "<group>"; };
+		0000000000000000000010AF /* EvidenceScopeAttributionChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceScopeAttributionChip.swift"; sourceTree = "<group>"; };
+		0000000000000000000010B1 /* ChartInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChartInteraction.swift"; sourceTree = "<group>"; };
+		0000000000000000000010B3 /* BriefingPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingPresentation.swift"; sourceTree = "<group>"; };
+		0000000000000000000010B5 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootTabView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010B7 /* DestinationPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DestinationPlaceholderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010B9 /* AppDestinationRouterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDestinationRouterView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010BB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010BD /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000010BF /* HomeHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeaderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010C1 /* HomeHeroCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeroCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010C3 /* ConfidenceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceDetailSheet.swift"; sourceTree = "<group>"; };
+		0000000000000000000010C5 /* NextBestActionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NextBestActionView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010C7 /* BriefingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010C9 /* GoalRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalRowView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010CB /* FocusTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FocusTileView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010CD /* TodaysFocusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TodaysFocusCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010CF /* PriorityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityDetailView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D1 /* PriorityDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityDetailViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D3 /* BriefingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingHistoryView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D5 /* BriefingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingDetailView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D7 /* WeeklyBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyBriefingSections.swift"; sourceTree = "<group>"; };
+		0000000000000000000010D9 /* MidweekBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MidweekBriefingSections.swift"; sourceTree = "<group>"; };
+		0000000000000000000010DB /* MonthlyBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonthlyBriefingSections.swift"; sourceTree = "<group>"; };
+		0000000000000000000010DD /* DEXABriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXABriefingSections.swift"; sourceTree = "<group>"; };
+		0000000000000000000010DF /* PhotoBriefingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoBriefingSections.swift"; sourceTree = "<group>"; };
+		0000000000000000000010E1 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010E3 /* LogViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000010E5 /* LogHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogHeaderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010E7 /* LoggedTodayCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggedTodayCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010E9 /* TrainingLoggerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010EB /* PendingEvidenceReviewsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PendingEvidenceReviewsCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010ED /* UploadCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UploadCardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010EF /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010F1 /* GoalsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000010F3 /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalDetailView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010F5 /* CompletedGoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompletedGoalDetailView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010F7 /* GoalPhaseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalPhaseDetailView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010F9 /* GoalStrategyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalStrategyView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010FB /* GoalEditWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalEditWizardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010FD /* GoalTransitionWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalTransitionWizardView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010FF /* GoalProtocolTransitionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalProtocolTransitionView.swift"; sourceTree = "<group>"; };
+		000000000000000000001101 /* GoalProtocolCategoryEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalProtocolCategoryEditorView.swift"; sourceTree = "<group>"; };
+		000000000000000000001103 /* GoalTransitionFinalReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalTransitionFinalReviewView.swift"; sourceTree = "<group>"; };
+		000000000000000000001105 /* PhaseTransitionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhaseTransitionView.swift"; sourceTree = "<group>"; };
+		000000000000000000001107 /* OperatingPlanComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanComponents.swift"; sourceTree = "<group>"; };
+		000000000000000000001109 /* OperatingPlanLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanLandingView.swift"; sourceTree = "<group>"; };
+		00000000000000000000110B /* OperatingPlanStrategyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanStrategyDetailView.swift"; sourceTree = "<group>"; };
+		00000000000000000000110D /* OperatingPlanStrategyEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanStrategyEditorView.swift"; sourceTree = "<group>"; };
+		00000000000000000000110F /* OperatingPlanProtocolDomainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanProtocolDomainView.swift"; sourceTree = "<group>"; };
+		000000000000000000001111 /* OperatingPlanPeptideExecutionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanPeptideExecutionView.swift"; sourceTree = "<group>"; };
+		000000000000000000001113 /* OperatingPlanRecoverySupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanRecoverySupportView.swift"; sourceTree = "<group>"; };
+		000000000000000000001115 /* OperatingPlanSupportScheduleEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupportScheduleEditor.swift"; sourceTree = "<group>"; };
+		000000000000000000001117 /* OperatingPlanSupplementSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupplementSupportView.swift"; sourceTree = "<group>"; };
+		000000000000000000001119 /* OperatingPlanSupplementEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanSupplementEditorView.swift"; sourceTree = "<group>"; };
+		00000000000000000000111B /* OperatingPlanTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanTrackingView.swift"; sourceTree = "<group>"; };
+		00000000000000000000111D /* OperatingPlanDexaAppointmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanDexaAppointmentView.swift"; sourceTree = "<group>"; };
+		00000000000000000000111F /* ProtocolBuilderShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProtocolBuilderShell.swift"; sourceTree = "<group>"; };
+		000000000000000000001121 /* OperatingPlanTrainingProtocolBuilderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanTrainingProtocolBuilderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001123 /* YouPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "YouPlaceholderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001125 /* FounderServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerConnectionView.swift"; sourceTree = "<group>"; };
+		000000000000000000001127 /* EvidenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceView.swift"; sourceTree = "<group>"; };
+		000000000000000000001129 /* EvidenceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000112B /* EvidenceHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHeaderView.swift"; sourceTree = "<group>"; };
+		00000000000000000000112D /* EvidenceStreamRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamRowView.swift"; sourceTree = "<group>"; };
+		00000000000000000000112F /* ActivityHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityHistoryView.swift"; sourceTree = "<group>"; };
+		000000000000000000001131 /* ActivityHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityHistoryViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001133 /* ActivityDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityDayView.swift"; sourceTree = "<group>"; };
+		000000000000000000001135 /* ActivityDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityDayViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001137 /* NutritionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionHistoryView.swift"; sourceTree = "<group>"; };
+		000000000000000000001139 /* NutritionHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionHistoryViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000113B /* NutritionDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionDayView.swift"; sourceTree = "<group>"; };
+		00000000000000000000113D /* NutritionDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionDayViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000113F /* NutritionReportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingView.swift"; sourceTree = "<group>"; };
+		000000000000000000001141 /* NutritionReportingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001143 /* NutritionReportingChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingChartViews.swift"; sourceTree = "<group>"; };
+		000000000000000000001145 /* NutritionReportingRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingRowViews.swift"; sourceTree = "<group>"; };
+		000000000000000000001147 /* WeightHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightHistoryView.swift"; sourceTree = "<group>"; };
+		000000000000000000001149 /* WeightHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightHistoryViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000114B /* DEXAHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHistoryView.swift"; sourceTree = "<group>"; };
+		00000000000000000000114D /* DEXAHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHistoryViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000114F /* DEXAChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAChartViews.swift"; sourceTree = "<group>"; };
+		000000000000000000001151 /* PhotosHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosHistoryView.swift"; sourceTree = "<group>"; };
+		000000000000000000001153 /* PhotosHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosHistoryViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001155 /* PhotoSetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoSetDetailView.swift"; sourceTree = "<group>"; };
+		000000000000000000001157 /* PhotoSetDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoSetDetailViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001159 /* EnergyHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyHistoryView.swift"; sourceTree = "<group>"; };
+		00000000000000000000115B /* EnergyHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyHistoryViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000115D /* EnergyChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyChartViews.swift"; sourceTree = "<group>"; };
+		00000000000000000000115F /* TrainingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingHistoryView.swift"; sourceTree = "<group>"; };
+		000000000000000000001161 /* TrainingHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingHistoryViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001163 /* TrainingDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingDayView.swift"; sourceTree = "<group>"; };
+		000000000000000000001165 /* TrainingDayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingDayViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001167 /* TrainingSessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionDetailView.swift"; sourceTree = "<group>"; };
+		000000000000000000001169 /* TrainingSessionDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionDetailViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000116B /* TrainingAreaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAreaView.swift"; sourceTree = "<group>"; };
+		00000000000000000000116D /* TrainingAreaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAreaViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000116F /* TrainingLibraryHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryHeaderView.swift"; sourceTree = "<group>"; };
+		000000000000000000001171 /* TrainingExerciseDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001173 /* TrainingExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingExerciseDetailView.swift"; sourceTree = "<group>"; };
+		000000000000000000001175 /* TrainingLibraryRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryRootView.swift"; sourceTree = "<group>"; };
+		000000000000000000001177 /* TrainingLibraryRootViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryRootViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001179 /* TrainingReportingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReportingView.swift"; sourceTree = "<group>"; };
+		00000000000000000000117B /* TrainingReportingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReportingViewModel.swift"; sourceTree = "<group>"; };
+		00000000000000000000117D /* TrainingLoggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerView.swift"; sourceTree = "<group>"; };
+		00000000000000000000117F /* TrainingLoggerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerViewModel.swift"; sourceTree = "<group>"; };
+		000000000000000000001181 /* ManualWeighInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ManualWeighInView.swift"; sourceTree = "<group>"; };
+		000000000000000000001183 /* EvidenceIntakeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceIntakeView.swift"; sourceTree = "<group>"; };
+		000000000000000000001185 /* LocalEvidenceReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalEvidenceReviewView.swift"; sourceTree = "<group>"; };
+		000000000000000000001187 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001189 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000118B /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000118D /* OperatingPlanFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "OperatingPlanFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000118F /* LogFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "LogFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001191 /* EvidenceFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001193 /* EvidenceChronologyFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EvidenceChronologyFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001195 /* TrainingFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001197 /* ActivityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ActivityFixture.json"; sourceTree = "<group>"; };
+		000000000000000000001199 /* NutritionFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "NutritionFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000119B /* WeightFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "WeightFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000119D /* DEXAFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "DEXAFixture.json"; sourceTree = "<group>"; };
+		00000000000000000000119F /* PhotosFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PhotosFixture.json"; sourceTree = "<group>"; };
+		0000000000000000000011A1 /* EnergyFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "EnergyFixture.json"; sourceTree = "<group>"; };
+		0000000000000000000011A3 /* TrainingLoggerFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "TrainingLoggerFixture.json"; sourceTree = "<group>"; };
+		0000000000000000000011A5 /* BriefingsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "BriefingsFixture.json"; sourceTree = "<group>"; };
+		0000000000000000000011A7 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
+		0000000000000000000011A9 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
+		00000000000000000000121E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		0000000000000000000011AB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		0000000000000000000011AC /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011AE /* HomeReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011B0 /* PriorityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011B2 /* GoalsReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011B4 /* GoalsSandboxStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsSandboxStoreTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011B6 /* BriefingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011B8 /* DEXABriefingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXABriefingTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011BA /* PhotoBriefingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoBriefingTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011BC /* OperatingPlanReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OperatingPlanReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011BE /* LogReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011C0 /* SharedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SharedUITests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011C2 /* EvidenceReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011C4 /* EvidenceHubUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceHubUsageTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011C6 /* TrainingReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011C8 /* TrainingLibraryCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLibraryCatalogTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011CA /* ActivityReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011CC /* NutritionReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011CE /* NutritionReportingCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NutritionReportingCalculatorTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011D0 /* WeightReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeightReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011D2 /* DEXAReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011D4 /* PhotosReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotosReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011D6 /* EnergyReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EnergyReadModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011D8 /* ChartInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChartInteractionTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011DA /* EvidenceChronologyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceChronologyTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011DC /* TrainingLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoggerTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011DE /* LoggingSandboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoggingSandboxTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011E0 /* MorningCheckInModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MorningCheckInModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011E2 /* FounderServerAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderServerAPITests.swift"; sourceTree = "<group>"; };
+		000000000000000000001211 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
+		0000000000000000000011FB /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0000000000000000000011FC /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001213 /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		000000000000000000001204 /* Frameworks */ = {
+		000000000000000000001206 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000120B /* Frameworks */ = {
+		00000000000000000000120D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001218 /* Frameworks */ = {
+		00000000000000000000121A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -542,21 +544,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0000000000000000000011E4 /* PhysiqueOS */ = {
+		0000000000000000000011E6 /* PhysiqueOS */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011E6 /* App */,
-				0000000000000000000011E7 /* Contracts */,
-				0000000000000000000011E8 /* Networking */,
-				0000000000000000000011EB /* SharedUI */,
-				0000000000000000000011E9 /* Presentation */,
-				0000000000000000000011EA /* Resources */,
-				0000000000000000000011EC /* Supporting */,
+				0000000000000000000011E8 /* App */,
+				0000000000000000000011E9 /* Contracts */,
+				0000000000000000000011EA /* Networking */,
+				0000000000000000000011ED /* SharedUI */,
+				0000000000000000000011EB /* Presentation */,
+				0000000000000000000011EC /* Resources */,
+				0000000000000000000011EE /* Supporting */,
 			);
 			path = PhysiqueOS;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E6 /* App */ = {
+		0000000000000000000011E8 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001001 /* PhysiqueOSApp.swift */,
@@ -565,7 +567,7 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E7 /* Contracts */ = {
+		0000000000000000000011E9 /* Contracts */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001005 /* AppTab.swift */,
@@ -610,7 +612,7 @@
 			path = Contracts;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E8 /* Networking */ = {
+		0000000000000000000011EA /* Networking */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001051 /* HomeAPI.swift */,
@@ -638,356 +640,357 @@
 				00000000000000000000107D /* EvidenceLocalInterpretation.swift */,
 				00000000000000000000107F /* FounderCredentialStore.swift */,
 				000000000000000000001081 /* FounderServerAPI.swift */,
-				000000000000000000001083 /* FounderPhotoMediaStore.swift */,
+				000000000000000000001083 /* ProductionDailyDriverAPI.swift */,
+				000000000000000000001085 /* FounderPhotoMediaStore.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E9 /* Presentation */ = {
+		0000000000000000000011EB /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011ED /* Briefings */,
-				0000000000000000000011EE /* Evidence */,
-				0000000000000000000011EF /* Goals */,
-				0000000000000000000011F0 /* Home */,
-				0000000000000000000011F1 /* Log */,
-				0000000000000000000011F2 /* Logging */,
-				0000000000000000000011F3 /* OperatingPlan */,
-				0000000000000000000011F4 /* Root */,
-				0000000000000000000011F5 /* Training */,
-				0000000000000000000011F6 /* TrainingLogger */,
-				0000000000000000000011F7 /* You */,
+				0000000000000000000011EF /* Briefings */,
+				0000000000000000000011F0 /* Evidence */,
+				0000000000000000000011F1 /* Goals */,
+				0000000000000000000011F2 /* Home */,
+				0000000000000000000011F3 /* Log */,
+				0000000000000000000011F4 /* Logging */,
+				0000000000000000000011F5 /* OperatingPlan */,
+				0000000000000000000011F6 /* Root */,
+				0000000000000000000011F7 /* Training */,
+				0000000000000000000011F8 /* TrainingLogger */,
+				0000000000000000000011F9 /* You */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011EA /* Resources */ = {
+		0000000000000000000011EC /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011F8 /* Fonts */,
-				000000000000000000001185 /* HomeFixture.json */,
-				000000000000000000001187 /* PriorityFixture.json */,
-				000000000000000000001189 /* GoalsFixture.json */,
-				00000000000000000000118B /* OperatingPlanFixture.json */,
-				00000000000000000000118D /* LogFixture.json */,
-				00000000000000000000118F /* EvidenceFixture.json */,
-				000000000000000000001191 /* EvidenceChronologyFixture.json */,
-				000000000000000000001193 /* TrainingFixture.json */,
-				000000000000000000001195 /* ActivityFixture.json */,
-				000000000000000000001197 /* NutritionFixture.json */,
-				000000000000000000001199 /* WeightFixture.json */,
-				00000000000000000000119B /* DEXAFixture.json */,
-				00000000000000000000119D /* PhotosFixture.json */,
-				00000000000000000000119F /* EnergyFixture.json */,
-				0000000000000000000011A1 /* TrainingLoggerFixture.json */,
-				0000000000000000000011A3 /* BriefingsFixture.json */,
-				00000000000000000000121C /* Assets.xcassets */,
+				0000000000000000000011FA /* Fonts */,
+				000000000000000000001187 /* HomeFixture.json */,
+				000000000000000000001189 /* PriorityFixture.json */,
+				00000000000000000000118B /* GoalsFixture.json */,
+				00000000000000000000118D /* OperatingPlanFixture.json */,
+				00000000000000000000118F /* LogFixture.json */,
+				000000000000000000001191 /* EvidenceFixture.json */,
+				000000000000000000001193 /* EvidenceChronologyFixture.json */,
+				000000000000000000001195 /* TrainingFixture.json */,
+				000000000000000000001197 /* ActivityFixture.json */,
+				000000000000000000001199 /* NutritionFixture.json */,
+				00000000000000000000119B /* WeightFixture.json */,
+				00000000000000000000119D /* DEXAFixture.json */,
+				00000000000000000000119F /* PhotosFixture.json */,
+				0000000000000000000011A1 /* EnergyFixture.json */,
+				0000000000000000000011A3 /* TrainingLoggerFixture.json */,
+				0000000000000000000011A5 /* BriefingsFixture.json */,
+				00000000000000000000121E /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011EB /* SharedUI */ = {
+		0000000000000000000011ED /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001085 /* PhysiqueOSTheme.swift */,
-				000000000000000000001087 /* IconBadge.swift */,
-				000000000000000000001089 /* CardContainer.swift */,
-				00000000000000000000108B /* SectionHeading.swift */,
-				00000000000000000000108D /* StatusChip.swift */,
-				00000000000000000000108F /* ConfidenceRing.swift */,
-				000000000000000000001091 /* ProgressPhotoTile.swift */,
-				000000000000000000001093 /* AnimatedProgressBar.swift */,
-				000000000000000000001095 /* MetricRow.swift */,
-				000000000000000000001097 /* Typography.swift */,
-				000000000000000000001099 /* PlusJakartaSans.swift */,
-				00000000000000000000109B /* PrimaryActionButton.swift */,
-				00000000000000000000109D /* ScrollScreenLayout.swift */,
-				00000000000000000000109F /* DateField.swift */,
-				0000000000000000000010A1 /* TabPlaceholderView.swift */,
-				0000000000000000000010A3 /* EvidenceAttachment.swift */,
-				0000000000000000000010A5 /* EvidenceSourcePicker.swift */,
-				0000000000000000000010A7 /* EvidenceStreamPresentation.swift */,
-				0000000000000000000010A9 /* InteractivePopGesture.swift */,
-				0000000000000000000010AB /* NumericEditField.swift */,
-				0000000000000000000010AD /* EvidenceScopeAttributionChip.swift */,
-				0000000000000000000010AF /* ChartInteraction.swift */,
-				0000000000000000000010B1 /* BriefingPresentation.swift */,
+				000000000000000000001087 /* PhysiqueOSTheme.swift */,
+				000000000000000000001089 /* IconBadge.swift */,
+				00000000000000000000108B /* CardContainer.swift */,
+				00000000000000000000108D /* SectionHeading.swift */,
+				00000000000000000000108F /* StatusChip.swift */,
+				000000000000000000001091 /* ConfidenceRing.swift */,
+				000000000000000000001093 /* ProgressPhotoTile.swift */,
+				000000000000000000001095 /* AnimatedProgressBar.swift */,
+				000000000000000000001097 /* MetricRow.swift */,
+				000000000000000000001099 /* Typography.swift */,
+				00000000000000000000109B /* PlusJakartaSans.swift */,
+				00000000000000000000109D /* PrimaryActionButton.swift */,
+				00000000000000000000109F /* ScrollScreenLayout.swift */,
+				0000000000000000000010A1 /* DateField.swift */,
+				0000000000000000000010A3 /* TabPlaceholderView.swift */,
+				0000000000000000000010A5 /* EvidenceAttachment.swift */,
+				0000000000000000000010A7 /* EvidenceSourcePicker.swift */,
+				0000000000000000000010A9 /* EvidenceStreamPresentation.swift */,
+				0000000000000000000010AB /* InteractivePopGesture.swift */,
+				0000000000000000000010AD /* NumericEditField.swift */,
+				0000000000000000000010AF /* EvidenceScopeAttributionChip.swift */,
+				0000000000000000000010B1 /* ChartInteraction.swift */,
+				0000000000000000000010B3 /* BriefingPresentation.swift */,
 			);
 			path = SharedUI;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011EC /* Supporting */ = {
+		0000000000000000000011EE /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011A9 /* Info.plist */,
+				0000000000000000000011AB /* Info.plist */,
 			);
 			path = Supporting;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011ED /* Briefings */ = {
+		0000000000000000000011EF /* Briefings */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000010D1 /* BriefingHistoryView.swift */,
-				0000000000000000000010D3 /* BriefingDetailView.swift */,
-				0000000000000000000010D5 /* WeeklyBriefingSections.swift */,
-				0000000000000000000010D7 /* MidweekBriefingSections.swift */,
-				0000000000000000000010D9 /* MonthlyBriefingSections.swift */,
-				0000000000000000000010DB /* DEXABriefingSections.swift */,
-				0000000000000000000010DD /* PhotoBriefingSections.swift */,
+				0000000000000000000010D3 /* BriefingHistoryView.swift */,
+				0000000000000000000010D5 /* BriefingDetailView.swift */,
+				0000000000000000000010D7 /* WeeklyBriefingSections.swift */,
+				0000000000000000000010D9 /* MidweekBriefingSections.swift */,
+				0000000000000000000010DB /* MonthlyBriefingSections.swift */,
+				0000000000000000000010DD /* DEXABriefingSections.swift */,
+				0000000000000000000010DF /* PhotoBriefingSections.swift */,
 			);
 			path = Briefings;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011EE /* Evidence */ = {
+		0000000000000000000011F0 /* Evidence */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001125 /* EvidenceView.swift */,
-				000000000000000000001127 /* EvidenceViewModel.swift */,
-				000000000000000000001129 /* EvidenceHeaderView.swift */,
-				00000000000000000000112B /* EvidenceStreamRowView.swift */,
-				00000000000000000000112D /* ActivityHistoryView.swift */,
-				00000000000000000000112F /* ActivityHistoryViewModel.swift */,
-				000000000000000000001131 /* ActivityDayView.swift */,
-				000000000000000000001133 /* ActivityDayViewModel.swift */,
-				000000000000000000001135 /* NutritionHistoryView.swift */,
-				000000000000000000001137 /* NutritionHistoryViewModel.swift */,
-				000000000000000000001139 /* NutritionDayView.swift */,
-				00000000000000000000113B /* NutritionDayViewModel.swift */,
-				00000000000000000000113D /* NutritionReportingView.swift */,
-				00000000000000000000113F /* NutritionReportingViewModel.swift */,
-				000000000000000000001141 /* NutritionReportingChartViews.swift */,
-				000000000000000000001143 /* NutritionReportingRowViews.swift */,
-				000000000000000000001145 /* WeightHistoryView.swift */,
-				000000000000000000001147 /* WeightHistoryViewModel.swift */,
-				000000000000000000001149 /* DEXAHistoryView.swift */,
-				00000000000000000000114B /* DEXAHistoryViewModel.swift */,
-				00000000000000000000114D /* DEXAChartViews.swift */,
-				00000000000000000000114F /* PhotosHistoryView.swift */,
-				000000000000000000001151 /* PhotosHistoryViewModel.swift */,
-				000000000000000000001153 /* PhotoSetDetailView.swift */,
-				000000000000000000001155 /* PhotoSetDetailViewModel.swift */,
-				000000000000000000001157 /* EnergyHistoryView.swift */,
-				000000000000000000001159 /* EnergyHistoryViewModel.swift */,
-				00000000000000000000115B /* EnergyChartViews.swift */,
+				000000000000000000001127 /* EvidenceView.swift */,
+				000000000000000000001129 /* EvidenceViewModel.swift */,
+				00000000000000000000112B /* EvidenceHeaderView.swift */,
+				00000000000000000000112D /* EvidenceStreamRowView.swift */,
+				00000000000000000000112F /* ActivityHistoryView.swift */,
+				000000000000000000001131 /* ActivityHistoryViewModel.swift */,
+				000000000000000000001133 /* ActivityDayView.swift */,
+				000000000000000000001135 /* ActivityDayViewModel.swift */,
+				000000000000000000001137 /* NutritionHistoryView.swift */,
+				000000000000000000001139 /* NutritionHistoryViewModel.swift */,
+				00000000000000000000113B /* NutritionDayView.swift */,
+				00000000000000000000113D /* NutritionDayViewModel.swift */,
+				00000000000000000000113F /* NutritionReportingView.swift */,
+				000000000000000000001141 /* NutritionReportingViewModel.swift */,
+				000000000000000000001143 /* NutritionReportingChartViews.swift */,
+				000000000000000000001145 /* NutritionReportingRowViews.swift */,
+				000000000000000000001147 /* WeightHistoryView.swift */,
+				000000000000000000001149 /* WeightHistoryViewModel.swift */,
+				00000000000000000000114B /* DEXAHistoryView.swift */,
+				00000000000000000000114D /* DEXAHistoryViewModel.swift */,
+				00000000000000000000114F /* DEXAChartViews.swift */,
+				000000000000000000001151 /* PhotosHistoryView.swift */,
+				000000000000000000001153 /* PhotosHistoryViewModel.swift */,
+				000000000000000000001155 /* PhotoSetDetailView.swift */,
+				000000000000000000001157 /* PhotoSetDetailViewModel.swift */,
+				000000000000000000001159 /* EnergyHistoryView.swift */,
+				00000000000000000000115B /* EnergyHistoryViewModel.swift */,
+				00000000000000000000115D /* EnergyChartViews.swift */,
 			);
 			path = Evidence;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011EF /* Goals */ = {
+		0000000000000000000011F1 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000010ED /* GoalsView.swift */,
-				0000000000000000000010EF /* GoalsViewModel.swift */,
-				0000000000000000000010F1 /* GoalDetailView.swift */,
-				0000000000000000000010F3 /* CompletedGoalDetailView.swift */,
-				0000000000000000000010F5 /* GoalPhaseDetailView.swift */,
-				0000000000000000000010F7 /* GoalStrategyView.swift */,
-				0000000000000000000010F9 /* GoalEditWizardView.swift */,
-				0000000000000000000010FB /* GoalTransitionWizardView.swift */,
-				0000000000000000000010FD /* GoalProtocolTransitionView.swift */,
-				0000000000000000000010FF /* GoalProtocolCategoryEditorView.swift */,
-				000000000000000000001101 /* GoalTransitionFinalReviewView.swift */,
-				000000000000000000001103 /* PhaseTransitionView.swift */,
+				0000000000000000000010EF /* GoalsView.swift */,
+				0000000000000000000010F1 /* GoalsViewModel.swift */,
+				0000000000000000000010F3 /* GoalDetailView.swift */,
+				0000000000000000000010F5 /* CompletedGoalDetailView.swift */,
+				0000000000000000000010F7 /* GoalPhaseDetailView.swift */,
+				0000000000000000000010F9 /* GoalStrategyView.swift */,
+				0000000000000000000010FB /* GoalEditWizardView.swift */,
+				0000000000000000000010FD /* GoalTransitionWizardView.swift */,
+				0000000000000000000010FF /* GoalProtocolTransitionView.swift */,
+				000000000000000000001101 /* GoalProtocolCategoryEditorView.swift */,
+				000000000000000000001103 /* GoalTransitionFinalReviewView.swift */,
+				000000000000000000001105 /* PhaseTransitionView.swift */,
 			);
 			path = Goals;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F0 /* Home */ = {
+		0000000000000000000011F2 /* Home */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000010B9 /* HomeView.swift */,
-				0000000000000000000010BB /* HomeViewModel.swift */,
-				0000000000000000000010BD /* HomeHeaderView.swift */,
-				0000000000000000000010BF /* HomeHeroCardView.swift */,
-				0000000000000000000010C1 /* ConfidenceDetailSheet.swift */,
-				0000000000000000000010C3 /* NextBestActionView.swift */,
-				0000000000000000000010C5 /* BriefingCardView.swift */,
-				0000000000000000000010C7 /* GoalRowView.swift */,
-				0000000000000000000010C9 /* FocusTileView.swift */,
-				0000000000000000000010CB /* TodaysFocusCardView.swift */,
-				0000000000000000000010CD /* PriorityDetailView.swift */,
-				0000000000000000000010CF /* PriorityDetailViewModel.swift */,
+				0000000000000000000010BB /* HomeView.swift */,
+				0000000000000000000010BD /* HomeViewModel.swift */,
+				0000000000000000000010BF /* HomeHeaderView.swift */,
+				0000000000000000000010C1 /* HomeHeroCardView.swift */,
+				0000000000000000000010C3 /* ConfidenceDetailSheet.swift */,
+				0000000000000000000010C5 /* NextBestActionView.swift */,
+				0000000000000000000010C7 /* BriefingCardView.swift */,
+				0000000000000000000010C9 /* GoalRowView.swift */,
+				0000000000000000000010CB /* FocusTileView.swift */,
+				0000000000000000000010CD /* TodaysFocusCardView.swift */,
+				0000000000000000000010CF /* PriorityDetailView.swift */,
+				0000000000000000000010D1 /* PriorityDetailViewModel.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F1 /* Log */ = {
+		0000000000000000000011F3 /* Log */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000010DF /* LogView.swift */,
-				0000000000000000000010E1 /* LogViewModel.swift */,
-				0000000000000000000010E3 /* LogHeaderView.swift */,
-				0000000000000000000010E5 /* LoggedTodayCardView.swift */,
-				0000000000000000000010E7 /* TrainingLoggerCardView.swift */,
-				0000000000000000000010E9 /* PendingEvidenceReviewsCardView.swift */,
-				0000000000000000000010EB /* UploadCardView.swift */,
+				0000000000000000000010E1 /* LogView.swift */,
+				0000000000000000000010E3 /* LogViewModel.swift */,
+				0000000000000000000010E5 /* LogHeaderView.swift */,
+				0000000000000000000010E7 /* LoggedTodayCardView.swift */,
+				0000000000000000000010E9 /* TrainingLoggerCardView.swift */,
+				0000000000000000000010EB /* PendingEvidenceReviewsCardView.swift */,
+				0000000000000000000010ED /* UploadCardView.swift */,
 			);
 			path = Log;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F2 /* Logging */ = {
+		0000000000000000000011F4 /* Logging */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000117F /* ManualWeighInView.swift */,
-				000000000000000000001181 /* EvidenceIntakeView.swift */,
-				000000000000000000001183 /* LocalEvidenceReviewView.swift */,
+				000000000000000000001181 /* ManualWeighInView.swift */,
+				000000000000000000001183 /* EvidenceIntakeView.swift */,
+				000000000000000000001185 /* LocalEvidenceReviewView.swift */,
 			);
 			path = Logging;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F3 /* OperatingPlan */ = {
+		0000000000000000000011F5 /* OperatingPlan */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001105 /* OperatingPlanComponents.swift */,
-				000000000000000000001107 /* OperatingPlanLandingView.swift */,
-				000000000000000000001109 /* OperatingPlanStrategyDetailView.swift */,
-				00000000000000000000110B /* OperatingPlanStrategyEditorView.swift */,
-				00000000000000000000110D /* OperatingPlanProtocolDomainView.swift */,
-				00000000000000000000110F /* OperatingPlanPeptideExecutionView.swift */,
-				000000000000000000001111 /* OperatingPlanRecoverySupportView.swift */,
-				000000000000000000001113 /* OperatingPlanSupportScheduleEditor.swift */,
-				000000000000000000001115 /* OperatingPlanSupplementSupportView.swift */,
-				000000000000000000001117 /* OperatingPlanSupplementEditorView.swift */,
-				000000000000000000001119 /* OperatingPlanTrackingView.swift */,
-				00000000000000000000111B /* OperatingPlanDexaAppointmentView.swift */,
-				00000000000000000000111D /* ProtocolBuilderShell.swift */,
-				00000000000000000000111F /* OperatingPlanTrainingProtocolBuilderView.swift */,
+				000000000000000000001107 /* OperatingPlanComponents.swift */,
+				000000000000000000001109 /* OperatingPlanLandingView.swift */,
+				00000000000000000000110B /* OperatingPlanStrategyDetailView.swift */,
+				00000000000000000000110D /* OperatingPlanStrategyEditorView.swift */,
+				00000000000000000000110F /* OperatingPlanProtocolDomainView.swift */,
+				000000000000000000001111 /* OperatingPlanPeptideExecutionView.swift */,
+				000000000000000000001113 /* OperatingPlanRecoverySupportView.swift */,
+				000000000000000000001115 /* OperatingPlanSupportScheduleEditor.swift */,
+				000000000000000000001117 /* OperatingPlanSupplementSupportView.swift */,
+				000000000000000000001119 /* OperatingPlanSupplementEditorView.swift */,
+				00000000000000000000111B /* OperatingPlanTrackingView.swift */,
+				00000000000000000000111D /* OperatingPlanDexaAppointmentView.swift */,
+				00000000000000000000111F /* ProtocolBuilderShell.swift */,
+				000000000000000000001121 /* OperatingPlanTrainingProtocolBuilderView.swift */,
 			);
 			path = OperatingPlan;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F4 /* Root */ = {
+		0000000000000000000011F6 /* Root */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000010B3 /* RootTabView.swift */,
-				0000000000000000000010B5 /* DestinationPlaceholderView.swift */,
-				0000000000000000000010B7 /* AppDestinationRouterView.swift */,
+				0000000000000000000010B5 /* RootTabView.swift */,
+				0000000000000000000010B7 /* DestinationPlaceholderView.swift */,
+				0000000000000000000010B9 /* AppDestinationRouterView.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F5 /* Training */ = {
+		0000000000000000000011F7 /* Training */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000115D /* TrainingHistoryView.swift */,
-				00000000000000000000115F /* TrainingHistoryViewModel.swift */,
-				000000000000000000001161 /* TrainingDayView.swift */,
-				000000000000000000001163 /* TrainingDayViewModel.swift */,
-				000000000000000000001165 /* TrainingSessionDetailView.swift */,
-				000000000000000000001167 /* TrainingSessionDetailViewModel.swift */,
-				000000000000000000001169 /* TrainingAreaView.swift */,
-				00000000000000000000116B /* TrainingAreaViewModel.swift */,
-				00000000000000000000116D /* TrainingLibraryHeaderView.swift */,
-				00000000000000000000116F /* TrainingExerciseDetailViewModel.swift */,
-				000000000000000000001171 /* TrainingExerciseDetailView.swift */,
-				000000000000000000001173 /* TrainingLibraryRootView.swift */,
-				000000000000000000001175 /* TrainingLibraryRootViewModel.swift */,
-				000000000000000000001177 /* TrainingReportingView.swift */,
-				000000000000000000001179 /* TrainingReportingViewModel.swift */,
+				00000000000000000000115F /* TrainingHistoryView.swift */,
+				000000000000000000001161 /* TrainingHistoryViewModel.swift */,
+				000000000000000000001163 /* TrainingDayView.swift */,
+				000000000000000000001165 /* TrainingDayViewModel.swift */,
+				000000000000000000001167 /* TrainingSessionDetailView.swift */,
+				000000000000000000001169 /* TrainingSessionDetailViewModel.swift */,
+				00000000000000000000116B /* TrainingAreaView.swift */,
+				00000000000000000000116D /* TrainingAreaViewModel.swift */,
+				00000000000000000000116F /* TrainingLibraryHeaderView.swift */,
+				000000000000000000001171 /* TrainingExerciseDetailViewModel.swift */,
+				000000000000000000001173 /* TrainingExerciseDetailView.swift */,
+				000000000000000000001175 /* TrainingLibraryRootView.swift */,
+				000000000000000000001177 /* TrainingLibraryRootViewModel.swift */,
+				000000000000000000001179 /* TrainingReportingView.swift */,
+				00000000000000000000117B /* TrainingReportingViewModel.swift */,
 			);
 			path = Training;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F6 /* TrainingLogger */ = {
+		0000000000000000000011F8 /* TrainingLogger */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000117B /* TrainingLoggerView.swift */,
-				00000000000000000000117D /* TrainingLoggerViewModel.swift */,
+				00000000000000000000117D /* TrainingLoggerView.swift */,
+				00000000000000000000117F /* TrainingLoggerViewModel.swift */,
 			);
 			path = TrainingLogger;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F7 /* You */ = {
+		0000000000000000000011F9 /* You */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001121 /* YouPlaceholderView.swift */,
-				000000000000000000001123 /* FounderServerConnectionView.swift */,
+				000000000000000000001123 /* YouPlaceholderView.swift */,
+				000000000000000000001125 /* FounderServerConnectionView.swift */,
 			);
 			path = You;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011F8 /* Fonts */ = {
+		0000000000000000000011FA /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011A5 /* PlusJakartaSans[wght].ttf */,
-				0000000000000000000011A7 /* OFL.txt */,
+				0000000000000000000011A7 /* PlusJakartaSans[wght].ttf */,
+				0000000000000000000011A9 /* OFL.txt */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E5 /* PhysiqueOSTests */ = {
+		0000000000000000000011E7 /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011AA /* AppTabTests.swift */,
-				0000000000000000000011AC /* HomeReadModelTests.swift */,
-				0000000000000000000011AE /* PriorityReadModelTests.swift */,
-				0000000000000000000011B0 /* GoalsReadModelTests.swift */,
-				0000000000000000000011B2 /* GoalsSandboxStoreTests.swift */,
-				0000000000000000000011B4 /* BriefingReadModelTests.swift */,
-				0000000000000000000011B6 /* DEXABriefingTests.swift */,
-				0000000000000000000011B8 /* PhotoBriefingTests.swift */,
-				0000000000000000000011BA /* OperatingPlanReadModelTests.swift */,
-				0000000000000000000011BC /* LogReadModelTests.swift */,
-				0000000000000000000011BE /* SharedUITests.swift */,
-				0000000000000000000011C0 /* EvidenceReadModelTests.swift */,
-				0000000000000000000011C2 /* EvidenceHubUsageTests.swift */,
-				0000000000000000000011C4 /* TrainingReadModelTests.swift */,
-				0000000000000000000011C6 /* TrainingLibraryCatalogTests.swift */,
-				0000000000000000000011C8 /* ActivityReadModelTests.swift */,
-				0000000000000000000011CA /* NutritionReadModelTests.swift */,
-				0000000000000000000011CC /* NutritionReportingCalculatorTests.swift */,
-				0000000000000000000011CE /* WeightReadModelTests.swift */,
-				0000000000000000000011D0 /* DEXAReadModelTests.swift */,
-				0000000000000000000011D2 /* PhotosReadModelTests.swift */,
-				0000000000000000000011D4 /* EnergyReadModelTests.swift */,
-				0000000000000000000011D6 /* ChartInteractionTests.swift */,
-				0000000000000000000011D8 /* EvidenceChronologyTests.swift */,
-				0000000000000000000011DA /* TrainingLoggerTests.swift */,
-				0000000000000000000011DC /* LoggingSandboxTests.swift */,
-				0000000000000000000011DE /* MorningCheckInModelTests.swift */,
-				0000000000000000000011E0 /* FounderServerAPITests.swift */,
+				0000000000000000000011AC /* AppTabTests.swift */,
+				0000000000000000000011AE /* HomeReadModelTests.swift */,
+				0000000000000000000011B0 /* PriorityReadModelTests.swift */,
+				0000000000000000000011B2 /* GoalsReadModelTests.swift */,
+				0000000000000000000011B4 /* GoalsSandboxStoreTests.swift */,
+				0000000000000000000011B6 /* BriefingReadModelTests.swift */,
+				0000000000000000000011B8 /* DEXABriefingTests.swift */,
+				0000000000000000000011BA /* PhotoBriefingTests.swift */,
+				0000000000000000000011BC /* OperatingPlanReadModelTests.swift */,
+				0000000000000000000011BE /* LogReadModelTests.swift */,
+				0000000000000000000011C0 /* SharedUITests.swift */,
+				0000000000000000000011C2 /* EvidenceReadModelTests.swift */,
+				0000000000000000000011C4 /* EvidenceHubUsageTests.swift */,
+				0000000000000000000011C6 /* TrainingReadModelTests.swift */,
+				0000000000000000000011C8 /* TrainingLibraryCatalogTests.swift */,
+				0000000000000000000011CA /* ActivityReadModelTests.swift */,
+				0000000000000000000011CC /* NutritionReadModelTests.swift */,
+				0000000000000000000011CE /* NutritionReportingCalculatorTests.swift */,
+				0000000000000000000011D0 /* WeightReadModelTests.swift */,
+				0000000000000000000011D2 /* DEXAReadModelTests.swift */,
+				0000000000000000000011D4 /* PhotosReadModelTests.swift */,
+				0000000000000000000011D6 /* EnergyReadModelTests.swift */,
+				0000000000000000000011D8 /* ChartInteractionTests.swift */,
+				0000000000000000000011DA /* EvidenceChronologyTests.swift */,
+				0000000000000000000011DC /* TrainingLoggerTests.swift */,
+				0000000000000000000011DE /* LoggingSandboxTests.swift */,
+				0000000000000000000011E0 /* MorningCheckInModelTests.swift */,
+				0000000000000000000011E2 /* FounderServerAPITests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
 		};
-		000000000000000000001212 /* PhysiqueOSUITests */ = {
+		000000000000000000001214 /* PhysiqueOSUITests */ = {
 			isa = PBXGroup;
 			children = (
-				00000000000000000000120F /* TrainingAcceptanceUITests.swift */,
+				000000000000000000001211 /* TrainingAcceptanceUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E3 /* Products */ = {
+		0000000000000000000011E5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011F9 /* PhysiqueOS.app */,
-				0000000000000000000011FA /* PhysiqueOSTests.xctest */,
-				000000000000000000001211 /* PhysiqueOSUITests.xctest */,
+				0000000000000000000011FB /* PhysiqueOS.app */,
+				0000000000000000000011FC /* PhysiqueOSTests.xctest */,
+				000000000000000000001213 /* PhysiqueOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		0000000000000000000011E2 /* Main */ = {
+		0000000000000000000011E4 /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				0000000000000000000011E4 /* PhysiqueOS */,
-				0000000000000000000011E5 /* PhysiqueOSTests */,
-				000000000000000000001212 /* PhysiqueOSUITests */,
-				0000000000000000000011E3 /* Products */,
+				0000000000000000000011E6 /* PhysiqueOS */,
+				0000000000000000000011E7 /* PhysiqueOSTests */,
+				000000000000000000001214 /* PhysiqueOSUITests */,
+				0000000000000000000011E5 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		0000000000000000000011FF /* PhysiqueOS */ = {
+		000000000000000000001201 /* PhysiqueOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001200 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
+			buildConfigurationList = 000000000000000000001202 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */;
 			buildPhases = (
-				000000000000000000001203 /* Sources */,
-				000000000000000000001204 /* Frameworks */,
-				000000000000000000001205 /* Resources */,
+				000000000000000000001205 /* Sources */,
+				000000000000000000001206 /* Frameworks */,
+				000000000000000000001207 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -995,69 +998,69 @@
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
-			productReference = 0000000000000000000011F9 /* PhysiqueOS.app */;
+			productReference = 0000000000000000000011FB /* PhysiqueOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001206 /* PhysiqueOSTests */ = {
+		000000000000000000001208 /* PhysiqueOSTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001207 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
+			buildConfigurationList = 000000000000000000001209 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */;
 			buildPhases = (
-				00000000000000000000120A /* Sources */,
-				00000000000000000000120B /* Frameworks */,
-				00000000000000000000120C /* Resources */,
+				00000000000000000000120C /* Sources */,
+				00000000000000000000120D /* Frameworks */,
+				00000000000000000000120E /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				00000000000000000000120D /* PBXTargetDependency */,
+				00000000000000000000120F /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSTests;
 			productName = PhysiqueOSTests;
-			productReference = 0000000000000000000011FA /* PhysiqueOSTests.xctest */;
+			productReference = 0000000000000000000011FC /* PhysiqueOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		000000000000000000001213 /* PhysiqueOSUITests */ = {
+		000000000000000000001215 /* PhysiqueOSUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001214 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
+			buildConfigurationList = 000000000000000000001216 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */;
 			buildPhases = (
-				000000000000000000001217 /* Sources */,
-				000000000000000000001218 /* Frameworks */,
-				000000000000000000001219 /* Resources */,
+				000000000000000000001219 /* Sources */,
+				00000000000000000000121A /* Frameworks */,
+				00000000000000000000121B /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				00000000000000000000121A /* PBXTargetDependency */,
+				00000000000000000000121C /* PBXTargetDependency */,
 			);
 			name = PhysiqueOSUITests;
 			productName = PhysiqueOSUITests;
-			productReference = 000000000000000000001211 /* PhysiqueOSUITests.xctest */;
+			productReference = 000000000000000000001213 /* PhysiqueOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		0000000000000000000011FB /* Project object */ = {
+		0000000000000000000011FD /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
-					0000000000000000000011FF = {
+					000000000000000000001201 = {
 						CreatedOnToolsVersion = 26.0;
 					};
-					000000000000000000001206 = {
+					000000000000000000001208 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 0000000000000000000011FF;
+						TestTargetID = 000000000000000000001201;
 					};
-					000000000000000000001213 = {
+					000000000000000000001215 = {
 						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 0000000000000000000011FF;
+						TestTargetID = 000000000000000000001201;
 					};
 				};
 			};
-			buildConfigurationList = 0000000000000000000011FC /* Build configuration list for PBXProject "PhysiqueOS" */;
+			buildConfigurationList = 0000000000000000000011FE /* Build configuration list for PBXProject "PhysiqueOS" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -1065,53 +1068,53 @@
 				en,
 				Base,
 			);
-			mainGroup = 0000000000000000000011E2;
-			productRefGroup = 0000000000000000000011E3 /* Products */;
+			mainGroup = 0000000000000000000011E4;
+			productRefGroup = 0000000000000000000011E5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				0000000000000000000011FF /* PhysiqueOS */,
-				000000000000000000001206 /* PhysiqueOSTests */,
-				000000000000000000001213 /* PhysiqueOSUITests */,
+				000000000000000000001201 /* PhysiqueOS */,
+				000000000000000000001208 /* PhysiqueOSTests */,
+				000000000000000000001215 /* PhysiqueOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		000000000000000000001205 /* Resources */ = {
+		000000000000000000001207 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001186 /* HomeFixture.json in Resources */,
-				000000000000000000001188 /* PriorityFixture.json in Resources */,
-				00000000000000000000118A /* GoalsFixture.json in Resources */,
-				00000000000000000000118C /* OperatingPlanFixture.json in Resources */,
-				00000000000000000000118E /* LogFixture.json in Resources */,
-				000000000000000000001190 /* EvidenceFixture.json in Resources */,
-				000000000000000000001192 /* EvidenceChronologyFixture.json in Resources */,
-				000000000000000000001194 /* TrainingFixture.json in Resources */,
-				000000000000000000001196 /* ActivityFixture.json in Resources */,
-				000000000000000000001198 /* NutritionFixture.json in Resources */,
-				00000000000000000000119A /* WeightFixture.json in Resources */,
-				00000000000000000000119C /* DEXAFixture.json in Resources */,
-				00000000000000000000119E /* PhotosFixture.json in Resources */,
-				0000000000000000000011A0 /* EnergyFixture.json in Resources */,
-				0000000000000000000011A2 /* TrainingLoggerFixture.json in Resources */,
-				0000000000000000000011A4 /* BriefingsFixture.json in Resources */,
-				0000000000000000000011A6 /* PlusJakartaSans[wght].ttf in Resources */,
-				0000000000000000000011A8 /* OFL.txt in Resources */,
-				00000000000000000000121D /* Assets.xcassets in Resources */,
+				000000000000000000001188 /* HomeFixture.json in Resources */,
+				00000000000000000000118A /* PriorityFixture.json in Resources */,
+				00000000000000000000118C /* GoalsFixture.json in Resources */,
+				00000000000000000000118E /* OperatingPlanFixture.json in Resources */,
+				000000000000000000001190 /* LogFixture.json in Resources */,
+				000000000000000000001192 /* EvidenceFixture.json in Resources */,
+				000000000000000000001194 /* EvidenceChronologyFixture.json in Resources */,
+				000000000000000000001196 /* TrainingFixture.json in Resources */,
+				000000000000000000001198 /* ActivityFixture.json in Resources */,
+				00000000000000000000119A /* NutritionFixture.json in Resources */,
+				00000000000000000000119C /* WeightFixture.json in Resources */,
+				00000000000000000000119E /* DEXAFixture.json in Resources */,
+				0000000000000000000011A0 /* PhotosFixture.json in Resources */,
+				0000000000000000000011A2 /* EnergyFixture.json in Resources */,
+				0000000000000000000011A4 /* TrainingLoggerFixture.json in Resources */,
+				0000000000000000000011A6 /* BriefingsFixture.json in Resources */,
+				0000000000000000000011A8 /* PlusJakartaSans[wght].ttf in Resources */,
+				0000000000000000000011AA /* OFL.txt in Resources */,
+				00000000000000000000121F /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000120C /* Resources */ = {
+		00000000000000000000120E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001219 /* Resources */ = {
+		00000000000000000000121B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1121,7 +1124,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		000000000000000000001203 /* Sources */ = {
+		000000000000000000001205 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1190,198 +1193,199 @@
 				00000000000000000000107E /* EvidenceLocalInterpretation.swift in Sources */,
 				000000000000000000001080 /* FounderCredentialStore.swift in Sources */,
 				000000000000000000001082 /* FounderServerAPI.swift in Sources */,
-				000000000000000000001084 /* FounderPhotoMediaStore.swift in Sources */,
-				000000000000000000001086 /* PhysiqueOSTheme.swift in Sources */,
-				000000000000000000001088 /* IconBadge.swift in Sources */,
-				00000000000000000000108A /* CardContainer.swift in Sources */,
-				00000000000000000000108C /* SectionHeading.swift in Sources */,
-				00000000000000000000108E /* StatusChip.swift in Sources */,
-				000000000000000000001090 /* ConfidenceRing.swift in Sources */,
-				000000000000000000001092 /* ProgressPhotoTile.swift in Sources */,
-				000000000000000000001094 /* AnimatedProgressBar.swift in Sources */,
-				000000000000000000001096 /* MetricRow.swift in Sources */,
-				000000000000000000001098 /* Typography.swift in Sources */,
-				00000000000000000000109A /* PlusJakartaSans.swift in Sources */,
-				00000000000000000000109C /* PrimaryActionButton.swift in Sources */,
-				00000000000000000000109E /* ScrollScreenLayout.swift in Sources */,
-				0000000000000000000010A0 /* DateField.swift in Sources */,
-				0000000000000000000010A2 /* TabPlaceholderView.swift in Sources */,
-				0000000000000000000010A4 /* EvidenceAttachment.swift in Sources */,
-				0000000000000000000010A6 /* EvidenceSourcePicker.swift in Sources */,
-				0000000000000000000010A8 /* EvidenceStreamPresentation.swift in Sources */,
-				0000000000000000000010AA /* InteractivePopGesture.swift in Sources */,
-				0000000000000000000010AC /* NumericEditField.swift in Sources */,
-				0000000000000000000010AE /* EvidenceScopeAttributionChip.swift in Sources */,
-				0000000000000000000010B0 /* ChartInteraction.swift in Sources */,
-				0000000000000000000010B2 /* BriefingPresentation.swift in Sources */,
-				0000000000000000000010B4 /* RootTabView.swift in Sources */,
-				0000000000000000000010B6 /* DestinationPlaceholderView.swift in Sources */,
-				0000000000000000000010B8 /* AppDestinationRouterView.swift in Sources */,
-				0000000000000000000010BA /* HomeView.swift in Sources */,
-				0000000000000000000010BC /* HomeViewModel.swift in Sources */,
-				0000000000000000000010BE /* HomeHeaderView.swift in Sources */,
-				0000000000000000000010C0 /* HomeHeroCardView.swift in Sources */,
-				0000000000000000000010C2 /* ConfidenceDetailSheet.swift in Sources */,
-				0000000000000000000010C4 /* NextBestActionView.swift in Sources */,
-				0000000000000000000010C6 /* BriefingCardView.swift in Sources */,
-				0000000000000000000010C8 /* GoalRowView.swift in Sources */,
-				0000000000000000000010CA /* FocusTileView.swift in Sources */,
-				0000000000000000000010CC /* TodaysFocusCardView.swift in Sources */,
-				0000000000000000000010CE /* PriorityDetailView.swift in Sources */,
-				0000000000000000000010D0 /* PriorityDetailViewModel.swift in Sources */,
-				0000000000000000000010D2 /* BriefingHistoryView.swift in Sources */,
-				0000000000000000000010D4 /* BriefingDetailView.swift in Sources */,
-				0000000000000000000010D6 /* WeeklyBriefingSections.swift in Sources */,
-				0000000000000000000010D8 /* MidweekBriefingSections.swift in Sources */,
-				0000000000000000000010DA /* MonthlyBriefingSections.swift in Sources */,
-				0000000000000000000010DC /* DEXABriefingSections.swift in Sources */,
-				0000000000000000000010DE /* PhotoBriefingSections.swift in Sources */,
-				0000000000000000000010E0 /* LogView.swift in Sources */,
-				0000000000000000000010E2 /* LogViewModel.swift in Sources */,
-				0000000000000000000010E4 /* LogHeaderView.swift in Sources */,
-				0000000000000000000010E6 /* LoggedTodayCardView.swift in Sources */,
-				0000000000000000000010E8 /* TrainingLoggerCardView.swift in Sources */,
-				0000000000000000000010EA /* PendingEvidenceReviewsCardView.swift in Sources */,
-				0000000000000000000010EC /* UploadCardView.swift in Sources */,
-				0000000000000000000010EE /* GoalsView.swift in Sources */,
-				0000000000000000000010F0 /* GoalsViewModel.swift in Sources */,
-				0000000000000000000010F2 /* GoalDetailView.swift in Sources */,
-				0000000000000000000010F4 /* CompletedGoalDetailView.swift in Sources */,
-				0000000000000000000010F6 /* GoalPhaseDetailView.swift in Sources */,
-				0000000000000000000010F8 /* GoalStrategyView.swift in Sources */,
-				0000000000000000000010FA /* GoalEditWizardView.swift in Sources */,
-				0000000000000000000010FC /* GoalTransitionWizardView.swift in Sources */,
-				0000000000000000000010FE /* GoalProtocolTransitionView.swift in Sources */,
-				000000000000000000001100 /* GoalProtocolCategoryEditorView.swift in Sources */,
-				000000000000000000001102 /* GoalTransitionFinalReviewView.swift in Sources */,
-				000000000000000000001104 /* PhaseTransitionView.swift in Sources */,
-				000000000000000000001106 /* OperatingPlanComponents.swift in Sources */,
-				000000000000000000001108 /* OperatingPlanLandingView.swift in Sources */,
-				00000000000000000000110A /* OperatingPlanStrategyDetailView.swift in Sources */,
-				00000000000000000000110C /* OperatingPlanStrategyEditorView.swift in Sources */,
-				00000000000000000000110E /* OperatingPlanProtocolDomainView.swift in Sources */,
-				000000000000000000001110 /* OperatingPlanPeptideExecutionView.swift in Sources */,
-				000000000000000000001112 /* OperatingPlanRecoverySupportView.swift in Sources */,
-				000000000000000000001114 /* OperatingPlanSupportScheduleEditor.swift in Sources */,
-				000000000000000000001116 /* OperatingPlanSupplementSupportView.swift in Sources */,
-				000000000000000000001118 /* OperatingPlanSupplementEditorView.swift in Sources */,
-				00000000000000000000111A /* OperatingPlanTrackingView.swift in Sources */,
-				00000000000000000000111C /* OperatingPlanDexaAppointmentView.swift in Sources */,
-				00000000000000000000111E /* ProtocolBuilderShell.swift in Sources */,
-				000000000000000000001120 /* OperatingPlanTrainingProtocolBuilderView.swift in Sources */,
-				000000000000000000001122 /* YouPlaceholderView.swift in Sources */,
-				000000000000000000001124 /* FounderServerConnectionView.swift in Sources */,
-				000000000000000000001126 /* EvidenceView.swift in Sources */,
-				000000000000000000001128 /* EvidenceViewModel.swift in Sources */,
-				00000000000000000000112A /* EvidenceHeaderView.swift in Sources */,
-				00000000000000000000112C /* EvidenceStreamRowView.swift in Sources */,
-				00000000000000000000112E /* ActivityHistoryView.swift in Sources */,
-				000000000000000000001130 /* ActivityHistoryViewModel.swift in Sources */,
-				000000000000000000001132 /* ActivityDayView.swift in Sources */,
-				000000000000000000001134 /* ActivityDayViewModel.swift in Sources */,
-				000000000000000000001136 /* NutritionHistoryView.swift in Sources */,
-				000000000000000000001138 /* NutritionHistoryViewModel.swift in Sources */,
-				00000000000000000000113A /* NutritionDayView.swift in Sources */,
-				00000000000000000000113C /* NutritionDayViewModel.swift in Sources */,
-				00000000000000000000113E /* NutritionReportingView.swift in Sources */,
-				000000000000000000001140 /* NutritionReportingViewModel.swift in Sources */,
-				000000000000000000001142 /* NutritionReportingChartViews.swift in Sources */,
-				000000000000000000001144 /* NutritionReportingRowViews.swift in Sources */,
-				000000000000000000001146 /* WeightHistoryView.swift in Sources */,
-				000000000000000000001148 /* WeightHistoryViewModel.swift in Sources */,
-				00000000000000000000114A /* DEXAHistoryView.swift in Sources */,
-				00000000000000000000114C /* DEXAHistoryViewModel.swift in Sources */,
-				00000000000000000000114E /* DEXAChartViews.swift in Sources */,
-				000000000000000000001150 /* PhotosHistoryView.swift in Sources */,
-				000000000000000000001152 /* PhotosHistoryViewModel.swift in Sources */,
-				000000000000000000001154 /* PhotoSetDetailView.swift in Sources */,
-				000000000000000000001156 /* PhotoSetDetailViewModel.swift in Sources */,
-				000000000000000000001158 /* EnergyHistoryView.swift in Sources */,
-				00000000000000000000115A /* EnergyHistoryViewModel.swift in Sources */,
-				00000000000000000000115C /* EnergyChartViews.swift in Sources */,
-				00000000000000000000115E /* TrainingHistoryView.swift in Sources */,
-				000000000000000000001160 /* TrainingHistoryViewModel.swift in Sources */,
-				000000000000000000001162 /* TrainingDayView.swift in Sources */,
-				000000000000000000001164 /* TrainingDayViewModel.swift in Sources */,
-				000000000000000000001166 /* TrainingSessionDetailView.swift in Sources */,
-				000000000000000000001168 /* TrainingSessionDetailViewModel.swift in Sources */,
-				00000000000000000000116A /* TrainingAreaView.swift in Sources */,
-				00000000000000000000116C /* TrainingAreaViewModel.swift in Sources */,
-				00000000000000000000116E /* TrainingLibraryHeaderView.swift in Sources */,
-				000000000000000000001170 /* TrainingExerciseDetailViewModel.swift in Sources */,
-				000000000000000000001172 /* TrainingExerciseDetailView.swift in Sources */,
-				000000000000000000001174 /* TrainingLibraryRootView.swift in Sources */,
-				000000000000000000001176 /* TrainingLibraryRootViewModel.swift in Sources */,
-				000000000000000000001178 /* TrainingReportingView.swift in Sources */,
-				00000000000000000000117A /* TrainingReportingViewModel.swift in Sources */,
-				00000000000000000000117C /* TrainingLoggerView.swift in Sources */,
-				00000000000000000000117E /* TrainingLoggerViewModel.swift in Sources */,
-				000000000000000000001180 /* ManualWeighInView.swift in Sources */,
-				000000000000000000001182 /* EvidenceIntakeView.swift in Sources */,
-				000000000000000000001184 /* LocalEvidenceReviewView.swift in Sources */,
+				000000000000000000001084 /* ProductionDailyDriverAPI.swift in Sources */,
+				000000000000000000001086 /* FounderPhotoMediaStore.swift in Sources */,
+				000000000000000000001088 /* PhysiqueOSTheme.swift in Sources */,
+				00000000000000000000108A /* IconBadge.swift in Sources */,
+				00000000000000000000108C /* CardContainer.swift in Sources */,
+				00000000000000000000108E /* SectionHeading.swift in Sources */,
+				000000000000000000001090 /* StatusChip.swift in Sources */,
+				000000000000000000001092 /* ConfidenceRing.swift in Sources */,
+				000000000000000000001094 /* ProgressPhotoTile.swift in Sources */,
+				000000000000000000001096 /* AnimatedProgressBar.swift in Sources */,
+				000000000000000000001098 /* MetricRow.swift in Sources */,
+				00000000000000000000109A /* Typography.swift in Sources */,
+				00000000000000000000109C /* PlusJakartaSans.swift in Sources */,
+				00000000000000000000109E /* PrimaryActionButton.swift in Sources */,
+				0000000000000000000010A0 /* ScrollScreenLayout.swift in Sources */,
+				0000000000000000000010A2 /* DateField.swift in Sources */,
+				0000000000000000000010A4 /* TabPlaceholderView.swift in Sources */,
+				0000000000000000000010A6 /* EvidenceAttachment.swift in Sources */,
+				0000000000000000000010A8 /* EvidenceSourcePicker.swift in Sources */,
+				0000000000000000000010AA /* EvidenceStreamPresentation.swift in Sources */,
+				0000000000000000000010AC /* InteractivePopGesture.swift in Sources */,
+				0000000000000000000010AE /* NumericEditField.swift in Sources */,
+				0000000000000000000010B0 /* EvidenceScopeAttributionChip.swift in Sources */,
+				0000000000000000000010B2 /* ChartInteraction.swift in Sources */,
+				0000000000000000000010B4 /* BriefingPresentation.swift in Sources */,
+				0000000000000000000010B6 /* RootTabView.swift in Sources */,
+				0000000000000000000010B8 /* DestinationPlaceholderView.swift in Sources */,
+				0000000000000000000010BA /* AppDestinationRouterView.swift in Sources */,
+				0000000000000000000010BC /* HomeView.swift in Sources */,
+				0000000000000000000010BE /* HomeViewModel.swift in Sources */,
+				0000000000000000000010C0 /* HomeHeaderView.swift in Sources */,
+				0000000000000000000010C2 /* HomeHeroCardView.swift in Sources */,
+				0000000000000000000010C4 /* ConfidenceDetailSheet.swift in Sources */,
+				0000000000000000000010C6 /* NextBestActionView.swift in Sources */,
+				0000000000000000000010C8 /* BriefingCardView.swift in Sources */,
+				0000000000000000000010CA /* GoalRowView.swift in Sources */,
+				0000000000000000000010CC /* FocusTileView.swift in Sources */,
+				0000000000000000000010CE /* TodaysFocusCardView.swift in Sources */,
+				0000000000000000000010D0 /* PriorityDetailView.swift in Sources */,
+				0000000000000000000010D2 /* PriorityDetailViewModel.swift in Sources */,
+				0000000000000000000010D4 /* BriefingHistoryView.swift in Sources */,
+				0000000000000000000010D6 /* BriefingDetailView.swift in Sources */,
+				0000000000000000000010D8 /* WeeklyBriefingSections.swift in Sources */,
+				0000000000000000000010DA /* MidweekBriefingSections.swift in Sources */,
+				0000000000000000000010DC /* MonthlyBriefingSections.swift in Sources */,
+				0000000000000000000010DE /* DEXABriefingSections.swift in Sources */,
+				0000000000000000000010E0 /* PhotoBriefingSections.swift in Sources */,
+				0000000000000000000010E2 /* LogView.swift in Sources */,
+				0000000000000000000010E4 /* LogViewModel.swift in Sources */,
+				0000000000000000000010E6 /* LogHeaderView.swift in Sources */,
+				0000000000000000000010E8 /* LoggedTodayCardView.swift in Sources */,
+				0000000000000000000010EA /* TrainingLoggerCardView.swift in Sources */,
+				0000000000000000000010EC /* PendingEvidenceReviewsCardView.swift in Sources */,
+				0000000000000000000010EE /* UploadCardView.swift in Sources */,
+				0000000000000000000010F0 /* GoalsView.swift in Sources */,
+				0000000000000000000010F2 /* GoalsViewModel.swift in Sources */,
+				0000000000000000000010F4 /* GoalDetailView.swift in Sources */,
+				0000000000000000000010F6 /* CompletedGoalDetailView.swift in Sources */,
+				0000000000000000000010F8 /* GoalPhaseDetailView.swift in Sources */,
+				0000000000000000000010FA /* GoalStrategyView.swift in Sources */,
+				0000000000000000000010FC /* GoalEditWizardView.swift in Sources */,
+				0000000000000000000010FE /* GoalTransitionWizardView.swift in Sources */,
+				000000000000000000001100 /* GoalProtocolTransitionView.swift in Sources */,
+				000000000000000000001102 /* GoalProtocolCategoryEditorView.swift in Sources */,
+				000000000000000000001104 /* GoalTransitionFinalReviewView.swift in Sources */,
+				000000000000000000001106 /* PhaseTransitionView.swift in Sources */,
+				000000000000000000001108 /* OperatingPlanComponents.swift in Sources */,
+				00000000000000000000110A /* OperatingPlanLandingView.swift in Sources */,
+				00000000000000000000110C /* OperatingPlanStrategyDetailView.swift in Sources */,
+				00000000000000000000110E /* OperatingPlanStrategyEditorView.swift in Sources */,
+				000000000000000000001110 /* OperatingPlanProtocolDomainView.swift in Sources */,
+				000000000000000000001112 /* OperatingPlanPeptideExecutionView.swift in Sources */,
+				000000000000000000001114 /* OperatingPlanRecoverySupportView.swift in Sources */,
+				000000000000000000001116 /* OperatingPlanSupportScheduleEditor.swift in Sources */,
+				000000000000000000001118 /* OperatingPlanSupplementSupportView.swift in Sources */,
+				00000000000000000000111A /* OperatingPlanSupplementEditorView.swift in Sources */,
+				00000000000000000000111C /* OperatingPlanTrackingView.swift in Sources */,
+				00000000000000000000111E /* OperatingPlanDexaAppointmentView.swift in Sources */,
+				000000000000000000001120 /* ProtocolBuilderShell.swift in Sources */,
+				000000000000000000001122 /* OperatingPlanTrainingProtocolBuilderView.swift in Sources */,
+				000000000000000000001124 /* YouPlaceholderView.swift in Sources */,
+				000000000000000000001126 /* FounderServerConnectionView.swift in Sources */,
+				000000000000000000001128 /* EvidenceView.swift in Sources */,
+				00000000000000000000112A /* EvidenceViewModel.swift in Sources */,
+				00000000000000000000112C /* EvidenceHeaderView.swift in Sources */,
+				00000000000000000000112E /* EvidenceStreamRowView.swift in Sources */,
+				000000000000000000001130 /* ActivityHistoryView.swift in Sources */,
+				000000000000000000001132 /* ActivityHistoryViewModel.swift in Sources */,
+				000000000000000000001134 /* ActivityDayView.swift in Sources */,
+				000000000000000000001136 /* ActivityDayViewModel.swift in Sources */,
+				000000000000000000001138 /* NutritionHistoryView.swift in Sources */,
+				00000000000000000000113A /* NutritionHistoryViewModel.swift in Sources */,
+				00000000000000000000113C /* NutritionDayView.swift in Sources */,
+				00000000000000000000113E /* NutritionDayViewModel.swift in Sources */,
+				000000000000000000001140 /* NutritionReportingView.swift in Sources */,
+				000000000000000000001142 /* NutritionReportingViewModel.swift in Sources */,
+				000000000000000000001144 /* NutritionReportingChartViews.swift in Sources */,
+				000000000000000000001146 /* NutritionReportingRowViews.swift in Sources */,
+				000000000000000000001148 /* WeightHistoryView.swift in Sources */,
+				00000000000000000000114A /* WeightHistoryViewModel.swift in Sources */,
+				00000000000000000000114C /* DEXAHistoryView.swift in Sources */,
+				00000000000000000000114E /* DEXAHistoryViewModel.swift in Sources */,
+				000000000000000000001150 /* DEXAChartViews.swift in Sources */,
+				000000000000000000001152 /* PhotosHistoryView.swift in Sources */,
+				000000000000000000001154 /* PhotosHistoryViewModel.swift in Sources */,
+				000000000000000000001156 /* PhotoSetDetailView.swift in Sources */,
+				000000000000000000001158 /* PhotoSetDetailViewModel.swift in Sources */,
+				00000000000000000000115A /* EnergyHistoryView.swift in Sources */,
+				00000000000000000000115C /* EnergyHistoryViewModel.swift in Sources */,
+				00000000000000000000115E /* EnergyChartViews.swift in Sources */,
+				000000000000000000001160 /* TrainingHistoryView.swift in Sources */,
+				000000000000000000001162 /* TrainingHistoryViewModel.swift in Sources */,
+				000000000000000000001164 /* TrainingDayView.swift in Sources */,
+				000000000000000000001166 /* TrainingDayViewModel.swift in Sources */,
+				000000000000000000001168 /* TrainingSessionDetailView.swift in Sources */,
+				00000000000000000000116A /* TrainingSessionDetailViewModel.swift in Sources */,
+				00000000000000000000116C /* TrainingAreaView.swift in Sources */,
+				00000000000000000000116E /* TrainingAreaViewModel.swift in Sources */,
+				000000000000000000001170 /* TrainingLibraryHeaderView.swift in Sources */,
+				000000000000000000001172 /* TrainingExerciseDetailViewModel.swift in Sources */,
+				000000000000000000001174 /* TrainingExerciseDetailView.swift in Sources */,
+				000000000000000000001176 /* TrainingLibraryRootView.swift in Sources */,
+				000000000000000000001178 /* TrainingLibraryRootViewModel.swift in Sources */,
+				00000000000000000000117A /* TrainingReportingView.swift in Sources */,
+				00000000000000000000117C /* TrainingReportingViewModel.swift in Sources */,
+				00000000000000000000117E /* TrainingLoggerView.swift in Sources */,
+				000000000000000000001180 /* TrainingLoggerViewModel.swift in Sources */,
+				000000000000000000001182 /* ManualWeighInView.swift in Sources */,
+				000000000000000000001184 /* EvidenceIntakeView.swift in Sources */,
+				000000000000000000001186 /* LocalEvidenceReviewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000120A /* Sources */ = {
+		00000000000000000000120C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0000000000000000000011AB /* AppTabTests.swift in Sources */,
-				0000000000000000000011AD /* HomeReadModelTests.swift in Sources */,
-				0000000000000000000011AF /* PriorityReadModelTests.swift in Sources */,
-				0000000000000000000011B1 /* GoalsReadModelTests.swift in Sources */,
-				0000000000000000000011B3 /* GoalsSandboxStoreTests.swift in Sources */,
-				0000000000000000000011B5 /* BriefingReadModelTests.swift in Sources */,
-				0000000000000000000011B7 /* DEXABriefingTests.swift in Sources */,
-				0000000000000000000011B9 /* PhotoBriefingTests.swift in Sources */,
-				0000000000000000000011BB /* OperatingPlanReadModelTests.swift in Sources */,
-				0000000000000000000011BD /* LogReadModelTests.swift in Sources */,
-				0000000000000000000011BF /* SharedUITests.swift in Sources */,
-				0000000000000000000011C1 /* EvidenceReadModelTests.swift in Sources */,
-				0000000000000000000011C3 /* EvidenceHubUsageTests.swift in Sources */,
-				0000000000000000000011C5 /* TrainingReadModelTests.swift in Sources */,
-				0000000000000000000011C7 /* TrainingLibraryCatalogTests.swift in Sources */,
-				0000000000000000000011C9 /* ActivityReadModelTests.swift in Sources */,
-				0000000000000000000011CB /* NutritionReadModelTests.swift in Sources */,
-				0000000000000000000011CD /* NutritionReportingCalculatorTests.swift in Sources */,
-				0000000000000000000011CF /* WeightReadModelTests.swift in Sources */,
-				0000000000000000000011D1 /* DEXAReadModelTests.swift in Sources */,
-				0000000000000000000011D3 /* PhotosReadModelTests.swift in Sources */,
-				0000000000000000000011D5 /* EnergyReadModelTests.swift in Sources */,
-				0000000000000000000011D7 /* ChartInteractionTests.swift in Sources */,
-				0000000000000000000011D9 /* EvidenceChronologyTests.swift in Sources */,
-				0000000000000000000011DB /* TrainingLoggerTests.swift in Sources */,
-				0000000000000000000011DD /* LoggingSandboxTests.swift in Sources */,
-				0000000000000000000011DF /* MorningCheckInModelTests.swift in Sources */,
-				0000000000000000000011E1 /* FounderServerAPITests.swift in Sources */,
+				0000000000000000000011AD /* AppTabTests.swift in Sources */,
+				0000000000000000000011AF /* HomeReadModelTests.swift in Sources */,
+				0000000000000000000011B1 /* PriorityReadModelTests.swift in Sources */,
+				0000000000000000000011B3 /* GoalsReadModelTests.swift in Sources */,
+				0000000000000000000011B5 /* GoalsSandboxStoreTests.swift in Sources */,
+				0000000000000000000011B7 /* BriefingReadModelTests.swift in Sources */,
+				0000000000000000000011B9 /* DEXABriefingTests.swift in Sources */,
+				0000000000000000000011BB /* PhotoBriefingTests.swift in Sources */,
+				0000000000000000000011BD /* OperatingPlanReadModelTests.swift in Sources */,
+				0000000000000000000011BF /* LogReadModelTests.swift in Sources */,
+				0000000000000000000011C1 /* SharedUITests.swift in Sources */,
+				0000000000000000000011C3 /* EvidenceReadModelTests.swift in Sources */,
+				0000000000000000000011C5 /* EvidenceHubUsageTests.swift in Sources */,
+				0000000000000000000011C7 /* TrainingReadModelTests.swift in Sources */,
+				0000000000000000000011C9 /* TrainingLibraryCatalogTests.swift in Sources */,
+				0000000000000000000011CB /* ActivityReadModelTests.swift in Sources */,
+				0000000000000000000011CD /* NutritionReadModelTests.swift in Sources */,
+				0000000000000000000011CF /* NutritionReportingCalculatorTests.swift in Sources */,
+				0000000000000000000011D1 /* WeightReadModelTests.swift in Sources */,
+				0000000000000000000011D3 /* DEXAReadModelTests.swift in Sources */,
+				0000000000000000000011D5 /* PhotosReadModelTests.swift in Sources */,
+				0000000000000000000011D7 /* EnergyReadModelTests.swift in Sources */,
+				0000000000000000000011D9 /* ChartInteractionTests.swift in Sources */,
+				0000000000000000000011DB /* EvidenceChronologyTests.swift in Sources */,
+				0000000000000000000011DD /* TrainingLoggerTests.swift in Sources */,
+				0000000000000000000011DF /* LoggingSandboxTests.swift in Sources */,
+				0000000000000000000011E1 /* MorningCheckInModelTests.swift in Sources */,
+				0000000000000000000011E3 /* FounderServerAPITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001217 /* Sources */ = {
+		000000000000000000001219 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001210 /* TrainingAcceptanceUITests.swift in Sources */,
+				000000000000000000001212 /* TrainingAcceptanceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		00000000000000000000120D /* PBXTargetDependency */ = {
+		00000000000000000000120F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 0000000000000000000011FF /* PhysiqueOS */;
-			targetProxy = 00000000000000000000120E /* PBXContainerItemProxy */;
+			target = 000000000000000000001201 /* PhysiqueOS */;
+			targetProxy = 000000000000000000001210 /* PBXContainerItemProxy */;
 		};
-		00000000000000000000121A /* PBXTargetDependency */ = {
+		00000000000000000000121C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 0000000000000000000011FF /* PhysiqueOS */;
-			targetProxy = 00000000000000000000121B /* PBXContainerItemProxy */;
+			target = 000000000000000000001201 /* PhysiqueOS */;
+			targetProxy = 00000000000000000000121D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		0000000000000000000011FD /* Debug */ = {
+		0000000000000000000011FF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1442,7 +1446,7 @@
 			};
 			name = Debug;
 		};
-		0000000000000000000011FE /* Release */ = {
+		000000000000000000001200 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1497,7 +1501,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001201 /* Debug */ = {
+		000000000000000000001203 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1524,7 +1528,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001202 /* Release */ = {
+		000000000000000000001204 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1551,7 +1555,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001208 /* Debug */ = {
+		00000000000000000000120A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1568,7 +1572,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001209 /* Release */ = {
+		00000000000000000000120B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1585,7 +1589,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001215 /* Debug */ = {
+		000000000000000000001217 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1601,7 +1605,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000000001216 /* Release */ = {
+		000000000000000000001218 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1620,43 +1624,43 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		0000000000000000000011FC /* Build configuration list for PBXProject "PhysiqueOS" */ = {
+		0000000000000000000011FE /* Build configuration list for PBXProject "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0000000000000000000011FD /* Debug */,
-				0000000000000000000011FE /* Release */,
+				0000000000000000000011FF /* Debug */,
+				000000000000000000001200 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001200 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
+		000000000000000000001202 /* Build configuration list for PBXNativeTarget "PhysiqueOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001201 /* Debug */,
-				000000000000000000001202 /* Release */,
+				000000000000000000001203 /* Debug */,
+				000000000000000000001204 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001207 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
+		000000000000000000001209 /* Build configuration list for PBXNativeTarget "PhysiqueOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001208 /* Debug */,
-				000000000000000000001209 /* Release */,
+				00000000000000000000120A /* Debug */,
+				00000000000000000000120B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001214 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
+		000000000000000000001216 /* Build configuration list for PBXNativeTarget "PhysiqueOSUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000000001215 /* Debug */,
-				000000000000000000001216 /* Release */,
+				000000000000000000001217 /* Debug */,
+				000000000000000000001218 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 0000000000000000000011FB /* Project object */;
+	rootObject = 0000000000000000000011FD /* Project object */;
 }

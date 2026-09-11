@@ -29,10 +29,8 @@ struct GoalStrategyView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil {
-                viewModel = GoalStrategyViewModel(api: environment.goalsAPI, goalId: goalId, focus: focus)
-            }
+        .task(id: environment.nativeAuthority) {
+            viewModel = GoalStrategyViewModel(api: environment.goalsAPI, goalId: goalId, focus: focus)
             await viewModel?.load()
         }
     }

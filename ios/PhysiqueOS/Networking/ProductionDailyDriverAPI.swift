@@ -1,0 +1,1004 @@
+import Foundation
+
+enum ProductionDailyDriverError: Error, Equatable {
+    case unknownCanonicalExerciseArea(exerciseID: String, muscleGroupID: String?)
+    case inconsistentCanonicalIdentity(expected: String, actual: String?)
+    case unsupportedGoalContext(id: String)
+    case unsupportedHomeGoalPresentation(id: String)
+}
+
+private struct ProductionTimeline: Decodable, @unchecked Sendable {
+    var contextId: String
+    var goalId: String?
+    var startDate: String?
+    var endDate: String?
+    var dateRangeLabel: String
+    var options: [TrainingScopeOption]
+
+    func scope(allLabel: String) -> TrainingScopeContext {
+        TrainingScopeContext(
+            options: options.map { option in
+                TrainingScopeOption(
+                    id: option.id == "all" ? "all" : "goal:\(option.id)",
+                    label: option.id == "all" ? allLabel : option.label,
+                    selected: option.selected
+                )
+            },
+            dateRangeLabel: dateRangeLabel
+        )
+    }
+}
+
+private enum ProductionContext {
+    static func value(for scope: EvidenceScopeSelection) throws -> String {
+        switch scope {
+        case .all:
+            return "all"
+        case .goal(let goalId), .phase(let goalId, _):
+            switch goalId {
+            case EvidenceCanonicalGoalID.visibleAbs, "visible-abs":
+                return "visible-abs"
+            case EvidenceCanonicalGoalID.buildLeanMass, "build-lean-mass":
+                return "build-lean-mass"
+            default:
+                throw ProductionDailyDriverError.unsupportedGoalContext(id: goalId)
+            }
+        }
+    }
+}
+
+// MARK: - Home and server-owned Priority occurrence projection
+
+struct ProductionHomeAPI: HomeAPI {
+    let api: ProductionNativeAPI
+
+    func fetchHome() async throws -> HomeReadModel {
+        let envelope = try await api.readResource("home", as: Payload.self)
+        return HomeReadModel(
+            header: envelope.data.header,
+            hero: envelope.data.hero.readModel,
+            nextBestAction: envelope.data.nextBestAction,
+            briefingCards: envelope.data.briefingCards,
+            goals: try envelope.data.goals.map { try $0.readModel() },
+            todaysFocus: envelope.data.todaysFocus.map { $0.readOnlyOccurrence }
+        )
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var header: HomeHeader
+        var hero: Hero
+        var nextBestAction: HomeNextBestAction
+        var briefingCards: [HomeBriefingCard]
+        var goals: [Goal]
+        var todaysFocus: [Priority]
+    }
+
+    private struct Hero: Decodable {
+        var mode: String
+        var goalLabel: String
+        var headline: String
+        var supportLine: String
+        var confidence: Int?
+        var confidenceDetail: ConfidenceDetail?
+        var projectedFinish: String?
+        var daysRemaining: String?
+        var primaryTimeline: String?
+        var plannedReviewDate: String?
+        var actionLabel: String?
+        var actionDestination: AppDestination?
+
+        var readModel: HomeHero {
+            HomeHero(
+                mode: mode == "terminal" ? .terminal : .active,
+                goalLabel: goalLabel,
+                headline: headline,
+                supportLine: supportLine,
+                confidence: confidence,
+                confidenceDetail: confidenceDetail,
+                projectedFinish: projectedFinish ?? plannedReviewDate,
+                daysRemaining: daysRemaining ?? primaryTimeline,
+                actionLabel: actionLabel,
+                actionDestination: actionDestination
+            )
+        }
+    }
+
+    private struct Goal: Decodable {
+        var id: String
+        var title: String
+        var current: String?
+        var target: String?
+        var unit: String?
+        var icon: HomeGoalIcon
+        var color: HomeColorToken
+        var presentationMode: String?
+        var progress: Int?
+        var status: String?
+        var detail: String?
+        var destination: AppDestination?
+        var presentation: Presentation?
+
+        func readModel() throws -> HomeGoal {
+            if presentation?.mode == "phase_trajectory_goal" {
+                let serverProgress = presentation?.trajectory?.goalProgress ?? presentation?.trajectory?.activePhase?.progress
+                return HomeGoal(
+                    id: id,
+                    title: title,
+                    current: Self.number(serverProgress?.latestValue ?? serverProgress?.baselineValue),
+                    target: Self.number(serverProgress?.targetAmount),
+                    unit: serverProgress?.unit ?? "",
+                    icon: icon,
+                    color: color,
+                    presentation: .primary(progress: serverProgress?.clampedProgressPercentage ?? 0),
+                    destination: destination
+                )
+            }
+            switch presentationMode ?? presentation?.mode {
+            case "primary", "primary_goal":
+                return HomeGoal(
+                    id: id, title: title, current: current ?? "—", target: target ?? "—", unit: unit ?? "",
+                    icon: icon, color: color, presentation: .primary(progress: progress ?? 0), destination: destination
+                )
+            case "supporting", "supporting_objective":
+                return HomeGoal(
+                    id: id, title: title, current: current ?? "", target: target ?? "", unit: unit ?? "",
+                    icon: icon, color: color,
+                    presentation: .supporting(status: status ?? "", detail: detail ?? ""), destination: destination
+                )
+            default:
+                throw ProductionDailyDriverError.unsupportedHomeGoalPresentation(id: id)
+            }
+        }
+
+        private static func number(_ value: Double?) -> String {
+            guard let value else { return "—" }
+            return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+        }
+    }
+
+    private struct Presentation: Decodable { var mode: String; var trajectory: Trajectory? }
+    private struct Trajectory: Decodable { var goalProgress: ServerProgress?; var activePhase: ActivePhase? }
+    private struct ActivePhase: Decodable { var progress: ServerProgress? }
+    private struct ServerProgress: Decodable {
+        var baselineValue: Double?
+        var latestValue: Double?
+        var targetAmount: Double?
+        var unit: String?
+        var clampedProgressPercentage: Int?
+    }
+
+    private struct Priority: Decodable, @unchecked Sendable {
+        var id: String
+        var completionId: String?
+        var executionId: String?
+        var occurrenceDate: String?
+        var label: String
+        var subtitle: String?
+        var metadata: String?
+        var changeLabel: String?
+        var icon: HomeFocusIcon
+        var color: HomeColorToken
+        var state: String?
+        var completed: Bool
+        var actionLabel: String?
+        var completionContext: PriorityCompletionContext?
+
+        var readOnlyOccurrence: PriorityOccurrence {
+            PriorityOccurrence(
+                id: id,
+                executionItemId: executionId ?? completionId ?? id,
+                date: occurrenceDate ?? completionContext?.occurrenceDate ?? String(ISO8601DateFormatter().string(from: Date()).prefix(10)),
+                title: label,
+                subtitle: subtitle,
+                metadata: metadata,
+                changeLabel: changeLabel,
+                icon: icon,
+                color: color,
+                urgency: PriorityUrgency(rawValue: state ?? "") ?? .available,
+                completed: completed,
+                completable: false,
+                actionLabel: actionLabel,
+                completionContext: nil,
+                continueActionDestination: nil,
+                attributedScope: nil
+            )
+        }
+    }
+}
+
+// MARK: - Goals / current canonical Phase
+
+struct ProductionGoalsAPI: GoalsAPI {
+    let api: ProductionNativeAPI
+
+    func fetchGoalsHub() async throws -> GoalsHubReadModel {
+        let data = try await api.readResource("goals", as: HubPayload.self).data
+        return GoalsHubReadModel(
+            activeGoal: data.activeGoals.first.map(Self.summary),
+            completedGoals: data.completedGoals.map {
+                GoalSummaryReadModel(
+                    id: $0.id, title: $0.title, lifecycle: .completed,
+                    statusLabel: $0.status, dateRange: $0.dates,
+                    achievement: $0.achievement, confidence: nil, currentPhaseName: nil
+                )
+            },
+            addGoalAvailable: false,
+            addGoalMessage: "Founder Production is read-only."
+        )
+    }
+
+    func fetchGoalDetail(goalId: String) async throws -> GoalDetailReadModel? {
+        let hub = try await fetchGoalsHub()
+        if hub.activeGoal?.id == goalId {
+            let payload = try await api.readResource("active-goal", as: ActivePayload.self).data
+            guard payload.goalId == goalId else {
+                throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: goalId, actual: payload.goalId)
+            }
+            return GoalDetailReadModel(active: payload.model, completed: nil, supporting: nil)
+        }
+        if hub.completedGoals.contains(where: { $0.id == goalId }) {
+            let payload = try await api.readResource("completed-goal", as: CompletedPayload.self).data
+            guard payload.goalId == goalId else {
+                throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: goalId, actual: payload.goalId)
+            }
+            return GoalDetailReadModel(active: nil, completed: payload.model, supporting: nil)
+        }
+        return nil
+    }
+
+    func fetchGoalPhase(goalId: String, phaseId: String) async throws -> GoalPhaseDetailReadModel? {
+        guard let active = try await fetchGoalDetail(goalId: goalId)?.active,
+              active.activePhaseId == phaseId,
+              let phase = active.activePhase else { return nil }
+        return GoalPhaseDetailReadModel(
+            goalId: goalId, goalTitle: active.title, phase: phase,
+            goalProgress: active.goalProgress, confidence: active.confidence,
+            guardrail: active.guardrail
+        )
+    }
+
+    func fetchGoalStrategy(goalId: String, focus: GoalPlanFocus) async throws -> GoalStrategyReadModel? {
+        guard let active = try await fetchGoalDetail(goalId: goalId)?.active else { return nil }
+        return GoalStrategyReadModel(
+            goalId: active.id, goalTitle: active.title, objective: active.objective,
+            focus: focus, items: active.strategy, guardrail: active.guardrail
+        )
+    }
+
+    private static func summary(_ value: ActiveSummary) -> GoalSummaryReadModel {
+        let range = [value.phase?.startedAt, value.phase?.plannedReviewAt].compactMap { $0 }.joined(separator: " – ")
+        return GoalSummaryReadModel(
+            id: value.id, title: value.title, lifecycle: .active,
+            statusLabel: value.statusLabel ?? value.status ?? "Active",
+            dateRange: range,
+            achievement: nil,
+            confidence: value.confidence.map {
+                GoalConfidenceReadModel(
+                    value: $0.value, band: $0.band ?? "Unavailable",
+                    explanation: $0.explanation ?? "", source: $0.source ?? "Server"
+                )
+            },
+            currentPhaseName: value.phase?.name
+        )
+    }
+
+    private struct HubPayload: Decodable, @unchecked Sendable {
+        var activeGoals: [ActiveSummary]
+        var completedGoals: [CompletedSummary]
+    }
+
+    private struct ActiveSummary: Decodable {
+        var id: String
+        var title: String
+        var status: String?
+        var statusLabel: String?
+        var confidence: HubConfidence?
+        var phase: HubPhase?
+    }
+
+    private struct HubConfidence: Decodable {
+        var value: Int?
+        var band: String?
+        var source: String?
+        var explanation: String?
+    }
+
+    private struct HubPhase: Decodable {
+        var id: String
+        var name: String
+        var status: String
+        var startedAt: String?
+        var plannedReviewAt: String?
+    }
+
+    private struct CompletedSummary: Decodable {
+        var id: String
+        var title: String
+        var status: String
+        var dates: String
+        var achievement: String?
+    }
+
+    private struct CompletedPayload: Decodable, @unchecked Sendable {
+        var goalId: String
+        var hero: CompletedHero
+        var recap: String
+        var highlights: [CompletedHighlight]
+        var photos: CompletedPhotos
+        var finalComposition: CompletedComposition
+        var achievedBy: [String]
+        var unlocked: CompletedUnlock?
+
+        var model: CompletedGoalReadModel {
+            CompletedGoalReadModel(
+                id: goalId, title: hero.title, status: hero.status,
+                dateRange: hero.dates, achievement: hero.achievement, recap: recap,
+                highlights: highlights.enumerated().map { index, item in
+                    CompletedGoalHighlightReadModel(
+                        id: "\(goalId)-highlight-\(index)", date: item.date ?? "—",
+                        title: item.title, body: item.body
+                    )
+                },
+                photos: photos.rows(goalId: goalId),
+                photoHistoryDestination: .progressStream(streamId: "photos"),
+                finalComposition: CompletedGoalCompositionReadModel(
+                    date: finalComposition.date ?? "—", bodyFat: finalComposition.bodyFat,
+                    leanMass: finalComposition.leanMass, fatMass: finalComposition.fatMass,
+                    weight: finalComposition.weight, narrative: finalComposition.narrative,
+                    briefingDestination: nil
+                ),
+                achievedBy: achievedBy,
+                unlocked: unlocked.flatMap { value in
+                    value.destination.map {
+                        CompletedGoalUnlockReadModel(title: value.title, body: value.body, destination: $0)
+                    }
+                }
+            )
+        }
+    }
+    private struct CompletedHero: Decodable { var title: String; var status: String; var dates: String; var achievement: String }
+    private struct CompletedHighlight: Decodable { var date: String?; var title: String; var body: String }
+    private struct CompletedPhotos: Decodable {
+        var beginning: CompletedPhoto?
+        var completion: CompletedPhoto?
+        func rows(goalId: String) -> [CompletedGoalPhotoReadModel] {
+            [
+                beginning.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-beginning", label: "Beginning", date: $0.date, systemImage: "person.crop.rectangle") },
+                completion.map { CompletedGoalPhotoReadModel(id: $0.evidenceId ?? "\(goalId)-completion", label: "Completion", date: $0.date, systemImage: "person.crop.rectangle.fill") },
+            ].compactMap { $0 }
+        }
+    }
+    private struct CompletedPhoto: Decodable { var date: String; var evidenceId: String? }
+    private struct CompletedComposition: Decodable {
+        var date: String?; var bodyFat: String; var leanMass: String; var fatMass: String; var weight: String; var narrative: String
+    }
+    private struct CompletedUnlock: Decodable { var title: String; var body: String; var destination: AppDestination? }
+
+    private struct ActivePayload: Decodable, @unchecked Sendable {
+        var goalId: String
+        var phaseId: String
+        var confidence: Confidence
+        var hero: Hero
+        var journey: [Journey]
+        var currentPhase: CurrentPhase
+        var readiness: [String]
+        var guardrail: Guardrail
+        var evidence: Evidence
+        var turningPoints: [GoalTurningPointReadModel]
+        var strategy: [Strategy]
+
+        var model: ActiveGoalReadModel {
+            let currentJourney = journey.first { $0.status.lowercased() == "active" }
+            let progress = GoalProgressReadModel(
+                percentage: currentJourney?.percentage ?? 0,
+                label: currentPhase.progress,
+                detail: currentPhase.readiness
+            )
+            let phase = GoalPhaseReadModel(
+                id: currentPhase.id,
+                order: max(0, (currentJourney?.number ?? 1) - 1),
+                name: currentPhase.title,
+                status: .active,
+                dates: currentJourney?.dates ?? currentPhase.review,
+                purpose: currentPhase.purpose,
+                progress: progress,
+                evidence: currentPhase.evidence,
+                strategy: [], successCriteria: [], guardrails: [guardrail.title]
+            )
+            let anchor = evidence.goalBaseline ?? evidence.phaseStart
+            let goalGuardrail = GoalGuardrailReadModel(
+                title: guardrail.title,
+                state: guardrail.observation?.label ?? "Server monitored",
+                scope: guardrail.scope,
+                body: guardrail.body
+            )
+            return ActiveGoalReadModel(
+                id: goalId,
+                title: hero.title,
+                status: hero.status,
+                objective: hero.destination,
+                dateRange: hero.destination,
+                confidence: GoalConfidenceReadModel(
+                    value: confidence.score, band: confidence.band ?? "Unavailable",
+                    explanation: confidence.summary ?? "", source: "Server"
+                ),
+                goalProgress: progress,
+                phases: [phase],
+                activePhaseId: phaseId,
+                readiness: readiness,
+                guardrail: goalGuardrail,
+                evidence: GoalEvidenceAnchorReadModel(
+                    date: anchor?.date ?? "—", bodyFat: anchor?.bodyFat ?? "—",
+                    leanMass: anchor?.leanMass ?? "—", fatMass: anchor?.fatMass ?? "—",
+                    weight: anchor?.weight ?? "—", support: evidence.support ?? currentPhase.evidence
+                ),
+                trainingProgress: GoalTrainingProgressReadModel(
+                    reviewDate: currentPhase.review, state: "Server-derived",
+                    interpretation: currentPhase.evidence, comparisons: [], muscleGroups: []
+                ),
+                turningPoints: turningPoints,
+                strategy: strategy.map {
+                    GoalStrategyItemReadModel(id: $0.label, label: $0.label, active: $0.active)
+                },
+                plan: GoalPlanReadModel(
+                    name: hero.title, purpose: currentPhase.purpose, primaryOutcome: hero.destination,
+                    target: GoalTargetReadModel(
+                        type: .numericChange, metric: "server-owned", direction: "server-owned",
+                        amount: nil, targetValue: nil, unit: "", description: hero.destination, targetDate: nil
+                    ),
+                    timeline: GoalTimelineReadModel(startDate: "", targetDate: nil),
+                    successCriteria: [], guardrails: []
+                )
+            )
+        }
+    }
+
+    private struct Confidence: Decodable { var score: Int?; var band: String?; var summary: String? }
+    private struct Hero: Decodable { var title: String; var status: String; var destination: String }
+    private struct Journey: Decodable { var name: String; var number: Int; var status: String; var dates: String; var progress: String; var support: String; var percentage: Int }
+    private struct CurrentPhase: Decodable { var id: String; var goalId: String; var title: String; var purpose: String; var progress: String; var review: String; var evidence: String; var readiness: String }
+    private struct Guardrail: Decodable { var title: String; var scope: String; var body: String; var observation: Observation? }
+    private struct Observation: Decodable { var label: String }
+    private struct Evidence: Decodable { var goalBaseline: Anchor?; var phaseStart: Anchor?; var support: String? }
+    private struct Anchor: Decodable { var date: String; var bodyFat: String; var leanMass: String; var fatMass: String; var weight: String }
+    private struct Strategy: Decodable { var label: String; var active: Bool }
+}
+
+// MARK: - Operating Plan
+
+protocol OperatingPlanAPI: Sendable {
+    func fetchOperatingPlan() async throws -> OperatingPlanReadModel
+}
+
+struct ProductionOperatingPlanAPI: OperatingPlanAPI {
+    let api: ProductionNativeAPI
+
+    func fetchOperatingPlan() async throws -> OperatingPlanReadModel {
+        let payload = try await api.readResource("operating-plan", as: Payload.self).data
+        return OperatingPlanReadModel(sections: payload.sections.map { section in
+            OperatingPlanSectionReadModel(
+                id: "\(section.iconKey)-\(section.title)",
+                iconKey: section.iconKey,
+                tone: section.tone,
+                title: section.title,
+                subtitle: section.subtitle,
+                items: section.items.map {
+                    OperatingPlanSectionItemReadModel(
+                        id: $0.id, title: $0.title, detail: $0.detail,
+                        destination: nil, status: $0.status
+                    )
+                },
+                supplementsAction: false
+            )
+        })
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable { var sections: [Section] }
+    private struct Section: Decodable { var iconKey: String; var tone: OperatingPlanSectionTone; var title: String; var subtitle: String; var items: [Item] }
+    private struct Item: Decodable { var id: String; var title: String; var detail: String; var status: String? }
+}
+
+// MARK: - Priority detail
+
+struct ProductionPriorityAPI: PriorityAPI {
+    let api: ProductionNativeAPI
+
+    func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
+
+    func fetchPriority(priorityId: String) async throws -> PriorityOccurrence? {
+        let value = try await api.readResource("priority", query: ["priorityId": priorityId], as: Payload.self).data
+        guard value.id == priorityId else {
+            throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: priorityId, actual: value.id)
+        }
+        let date = value.completionContext?.occurrenceDate ?? value.executionContract?.occurrenceDate ?? String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        return PriorityOccurrence(
+            id: value.id, executionItemId: value.executionProjection?.executionId ?? value.id,
+            date: date, title: value.title, subtitle: value.subtitle,
+            metadata: value.sections.first?.items.first?.detail,
+            changeLabel: nil, icon: .target, color: .primary,
+            urgency: value.status == "Completed" ? .available : .available,
+            completed: value.status == "Completed", completable: false,
+            actionLabel: nil, completionContext: nil,
+            continueActionDestination: nil, attributedScope: nil
+        )
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var id: String; var title: String; var subtitle: String?; var status: String
+        var completionContext: PriorityCompletionContext?
+        var executionContract: ExecutionContract?
+        var executionProjection: ExecutionProjection?
+        var sections: [Section]
+    }
+    private struct ExecutionContract: Decodable { var occurrenceDate: String? }
+    private struct ExecutionProjection: Decodable { var executionId: String? }
+    private struct Section: Decodable { var title: String; var items: [Item] }
+    private struct Item: Decodable { var label: String; var detail: String? }
+}
+
+// MARK: - Training and canonical exercise registry agreement
+
+struct ProductionTrainingAPI: TrainingAPI {
+    let api: ProductionNativeAPI
+
+    func fetchTrainingLanding(scope: EvidenceScopeSelection) async throws -> TrainingLandingReadModel {
+        let context = try ProductionContext.value(for: scope)
+        async let landingRead = api.readResource("training-landing", query: ["context": context], as: LandingPayload.self)
+        async let libraryRead = api.readResource("training-library", query: ["context": context], as: LibraryPayload.self)
+        let (landingEnvelope, libraryEnvelope) = try await (landingRead, libraryRead)
+        let payload = landingEnvelope.data
+        let catalog = try CanonicalTrainingCatalog(exercises: libraryEnvelope.data.report.canonicalExercises)
+        return TrainingLandingReadModel(
+            title: payload.report.title,
+            subtitle: payload.report.subtitle,
+            tone: payload.report.tone,
+            scope: payload.timeline.scope(allLabel: "All Training"),
+            latestTrainingDay: payload.report.latestTrainingDay.map {
+                TrainingLandingDay(
+                    date: $0.date, label: $0.label, daySummary: $0.summary,
+                    destination: $0.destination, sessions: $0.sessions
+                )
+            },
+            trainingAreas: catalog.areaSummaries,
+            reportingLinks: payload.report.reportingLinks,
+            trainingDays: payload.report.trainingDays.map {
+                TrainingDaySummary(date: $0.date, label: $0.label, summary: $0.summary, destination: $0.destination)
+            },
+            currentProtocol: TrainingProtocolSummary(
+                sourceOfTruth: payload.report.currentProtocol.sourceOfTruth,
+                dailyActivityTarget: payload.report.currentProtocol.dailyActivityTarget,
+                trainingObjective: payload.report.currentProtocol.resistanceTraining,
+                goal: payload.report.currentProtocol.goal
+            ),
+            relatedGoals: payload.report.relatedGoals,
+            sourceEvidence: payload.report.sourceEvidence
+        )
+    }
+
+    func fetchTrainingDay(date: String) async throws -> TrainingDayReadModel? {
+        try await api.readResource("training-day", query: ["date": date], as: TrainingDayReadModel.self).data
+    }
+
+    func fetchTrainingSession(sessionId: String) async throws -> TrainingSessionDetailReadModel? {
+        let value = try await api.readResource("training-session", query: ["sessionId": sessionId], as: TrainingSessionDetailReadModel.self).data
+        guard value.id == sessionId else {
+            throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: sessionId, actual: value.id)
+        }
+        return value
+    }
+
+    func fetchTrainingArea(areaId: String, scope: EvidenceScopeSelection) async throws -> TrainingAreaReadModel? {
+        let payload = try await api.readResource(
+            "training-library",
+            query: ["context": try ProductionContext.value(for: scope), "path": areaId],
+            as: LibraryPayload.self
+        ).data
+        let catalog = try CanonicalTrainingCatalog(exercises: payload.report.canonicalExercises)
+        guard let area = catalog.areas.first(where: { $0.id == areaId }) else { return nil }
+        return TrainingAreaReadModel(
+            id: area.id,
+            title: area.label,
+            breadcrumbs: [
+                TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
+                TrainingBreadcrumb(label: "Training Library", destination: .progressStream(streamId: "training/library")),
+            ],
+            scope: payload.timeline.scope(allLabel: "All Training"),
+            exercises: area.exercises.map {
+                TrainingAreaExerciseRow(
+                    id: $0.canonicalExerciseId, label: $0.label, detail: nil,
+                    destination: .trainingExercise(exerciseId: $0.canonicalExerciseId),
+                    canonicalExerciseId: $0.canonicalExerciseId
+                )
+            }
+        )
+    }
+
+    func fetchTrainingExercise(exerciseId: String, scope: EvidenceScopeSelection) async throws -> TrainingExerciseDetailReadModel? {
+        let context = try ProductionContext.value(for: scope)
+        let libraryEnvelope = try await api.readResource(
+            "training-library", query: ["context": context], as: LibraryPayload.self
+        )
+        let catalog = try CanonicalTrainingCatalog(exercises: libraryEnvelope.data.report.canonicalExercises)
+        guard let canonicalExercise = catalog.exercise(id: exerciseId) else {
+            throw ProductionDailyDriverError.inconsistentCanonicalIdentity(expected: exerciseId, actual: "unavailable")
+        }
+        let payload = try await api.readResource(
+            "training-exercise",
+            query: ["context": context, "exerciseId": exerciseId],
+            as: ExercisePayload.self
+        ).data
+        let occurrences = payload.report.entries.flatMap { session in
+            session.exercises.filter { $0.canonicalExerciseId == exerciseId }.map { exercise in
+                TrainingExerciseHistoryOccurrence(
+                    sessionId: session.id,
+                    sessionDate: session.date,
+                    exercise: exercise,
+                    relationship: Self.relationship(for: exercise, in: session)
+                )
+            }
+        }
+        return TrainingExerciseDetailReadModel(
+            id: exerciseId,
+            title: canonicalExercise.label,
+            breadcrumbs: [
+                TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
+                TrainingBreadcrumb(label: "Training Library", destination: .progressStream(streamId: "training/library")),
+            ],
+            scope: payload.timeline.scope(allLabel: "All Training"),
+            benchmark: TrainingExerciseHistoryCalculator.benchmark(for: occurrences),
+            performanceRecords: payload.exerciseRecords,
+            lastSession: occurrences.first,
+            history: Array(occurrences.prefix(10))
+        )
+    }
+
+    func fetchTrainingReporting(reportId: String, scope: EvidenceScopeSelection) async throws -> TrainingReportingReadModel? {
+        // The daily-driver patch consumes the server reporting resource for
+        // route/capability parity, while the accepted deep reporting
+        // presentation remains deferred until its report-specific adapter.
+        _ = try await api.readResource(
+            "training-reporting",
+            query: ["context": try ProductionContext.value(for: scope)],
+            as: DiscardedReport.self
+        )
+        return nil
+    }
+
+    private static func relationship(
+        for exercise: TrainingExerciseOccurrence,
+        in session: TrainingSessionDetailReadModel
+    ) -> TrainingExerciseRelationshipContext? {
+        guard let group = session.exerciseRelationshipGroups.first(where: { $0.memberExerciseIds.contains(exercise.id) }) else { return nil }
+        let partners = session.exercises.filter { group.memberExerciseIds.contains($0.id) && $0.id != exercise.id }
+        return TrainingExerciseRelationshipContext(
+            relationshipType: group.relationshipType,
+            partnerNames: partners.map(\.name),
+            partnerCanonicalExerciseIds: partners.compactMap(\.canonicalExerciseId)
+        )
+    }
+
+    private struct LandingPayload: Decodable, @unchecked Sendable { var timeline: ProductionTimeline; var report: LandingReport }
+    private struct LandingReport: Decodable {
+        var title: String; var subtitle: String?; var tone: HomeColorToken
+        var latestTrainingDay: Day?
+        var reportingLinks: [TrainingReportingLink]
+        var trainingDays: [Day]
+        var currentProtocol: ProtocolSummary
+        var relatedGoals: [TrainingRelatedGoal]
+        var sourceEvidence: [TrainingSourceEvidenceItem]
+    }
+    private struct Day: Decodable {
+        var date: String; var label: String; var summary: String?
+        var destination: AppDestination; var sessions: [TrainingSessionPreview] = []
+        private enum CodingKeys: String, CodingKey { case date, label, summary, destination, sessions }
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            date = try container.decode(String.self, forKey: .date)
+            label = try container.decode(String.self, forKey: .label)
+            summary = try container.decodeIfPresent(String.self, forKey: .summary)
+            destination = try container.decode(AppDestination.self, forKey: .destination)
+            sessions = try container.decodeIfPresent([TrainingSessionPreview].self, forKey: .sessions) ?? []
+        }
+    }
+    private struct ProtocolSummary: Decodable { var sourceOfTruth: String; var dailyActivityTarget: String; var resistanceTraining: String; var goal: String }
+    private struct LibraryPayload: Decodable, @unchecked Sendable { var timeline: ProductionTimeline; var report: LibraryReport }
+    private struct LibraryReport: Decodable { var canonicalExercises: [ProductionCanonicalExercise] }
+    private struct ExercisePayload: Decodable, @unchecked Sendable {
+        var timeline: ProductionTimeline
+        var report: ExerciseReport
+        var exerciseRecords: TrainingPerformanceRecordsReadModel?
+    }
+    private struct ExerciseReport: Decodable { var entries: [TrainingSessionDetailReadModel] }
+    private struct DiscardedReport: Decodable, @unchecked Sendable { var timeline: ProductionTimeline }
+}
+
+struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
+    let api: ProductionNativeAPI
+
+    func fetchConfiguration() async throws -> TrainingLoggerConfiguration {
+        let payload = try await api.readResource("training-logger", as: Payload.self).data
+        let projected = payload.initialCanonicalExercises.map(ProductionCanonicalExercise.init)
+        let catalog = try CanonicalTrainingCatalog(exercises: projected)
+        let history = payload.initialHistorySessions
+        return TrainingLoggerConfiguration(
+            areas: catalog.areas.map { TrainingLoggerArea(id: $0.id, label: $0.label) },
+            variants: [],
+            exercises: catalog.areas.flatMap { area in
+                area.exercises.map { exercise in
+                    TrainingLoggerCatalogExercise(
+                        canonicalExerciseId: exercise.canonicalExerciseId,
+                        name: exercise.label,
+                        areaId: area.id,
+                        equipment: exercise.equipment,
+                        measurement: exercise.measurement,
+                        previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
+                        history: Self.history(for: exercise.canonicalExerciseId, in: history),
+                        progressionRecommendation: nil
+                    )
+                }
+            }
+        )
+    }
+
+    private static func history(
+        for exerciseID: String,
+        in sessions: [TrainingSessionDetailReadModel]
+    ) -> [TrainingLoggerHistoryRecord] {
+        sessions.flatMap { session in
+            session.exercises.filter { $0.canonicalExerciseId == exerciseID }.map { exercise in
+                TrainingLoggerHistoryRecord(
+                    sessionId: session.id,
+                    workoutDate: String(session.date.prefix(10)),
+                    executionVariant: exercise.executionVariant,
+                    relationship: nil,
+                    sets: exercise.sets
+                )
+            }
+        }
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var initialCanonicalExercises: [RawExercise]
+        var initialHistorySessions: [TrainingSessionDetailReadModel]
+        var initialPerformedExerciseIds: [String]
+    }
+    fileprivate struct RawExercise: Decodable {
+        var id: String; var name: String; var equipment: String?
+        var bodyRegion: String?; var primaryMuscleGroups: [String]
+        var defaultMeasurement: String?; var defaultLoadType: String?
+    }
+}
+
+private struct ProductionCanonicalExercise: Decodable {
+    var canonicalExerciseId: String
+    var label: String
+    var primaryMuscleGroupId: String?
+    var primaryMuscleGroups: [String]
+    var regionLabel: String?
+    var equipment: String?
+    var defaultMeasurement: String?
+    var defaultLoadType: String?
+
+    init(_ raw: ProductionTrainingLoggerAPI.RawExercise) {
+        canonicalExerciseId = raw.id
+        label = raw.name
+        primaryMuscleGroupId = nil
+        primaryMuscleGroups = raw.primaryMuscleGroups
+        regionLabel = raw.bodyRegion
+        equipment = raw.equipment
+        defaultMeasurement = raw.defaultMeasurement
+        defaultLoadType = raw.defaultLoadType
+    }
+}
+
+private struct CanonicalTrainingCatalog {
+    struct Exercise { var canonicalExerciseId: String; var label: String; var equipment: String?; var measurement: TrainingLoggerMeasurement }
+    struct Area { var id: String; var label: String; var exercises: [Exercise] }
+    let areas: [Area]
+
+    init(exercises: [ProductionCanonicalExercise]) throws {
+        let definitions = [
+            ("chest", "Chest"), ("back", "Back"), ("shoulders", "Shoulders"),
+            ("biceps", "Biceps"), ("triceps", "Triceps"), ("core", "Core"),
+            ("quads", "Quads"), ("hamstrings", "Hamstrings"),
+            ("glutes", "Glutes"), ("calves", "Calves"),
+        ]
+        var grouped = Dictionary(uniqueKeysWithValues: definitions.map { ($0.0, [Exercise]()) })
+        for exercise in exercises {
+            guard let areaID = Self.areaID(for: exercise) else {
+                throw ProductionDailyDriverError.unknownCanonicalExerciseArea(
+                    exerciseID: exercise.canonicalExerciseId,
+                    muscleGroupID: exercise.primaryMuscleGroupId ?? exercise.primaryMuscleGroups.first
+                )
+            }
+            grouped[areaID, default: []].append(Exercise(
+                canonicalExerciseId: exercise.canonicalExerciseId,
+                label: exercise.label,
+                equipment: exercise.equipment,
+                measurement: exercise.defaultMeasurement == "duration" ? .duration
+                    : exercise.defaultLoadType == "bodyweight" ? .bodyweightReps : .repsLoad
+            ))
+        }
+        areas = definitions.map { id, label in
+            Area(id: id, label: label, exercises: (grouped[id] ?? []).sorted { $0.label < $1.label })
+        }
+    }
+
+    var areaSummaries: [TrainingAreaSummary] {
+        areas.map {
+            TrainingAreaSummary(
+                id: $0.id, label: $0.label, exerciseCount: $0.exercises.count,
+                destination: .trainingExercise(exerciseId: $0.id)
+            )
+        }
+    }
+
+    func exercise(id: String) -> Exercise? {
+        areas.lazy.flatMap(\.exercises).first { $0.canonicalExerciseId == id }
+    }
+
+    private static func areaID(for exercise: ProductionCanonicalExercise) -> String? {
+        let candidates = [exercise.primaryMuscleGroupId] + exercise.primaryMuscleGroups.map(Optional.some) + [exercise.regionLabel]
+        for candidate in candidates.compactMap({ $0 }).map(slug) {
+            switch candidate {
+            case "chest", "upper-chest": return "chest"
+            case "back", "lats", "mid-back", "upper-back", "lower-back": return "back"
+            case "shoulders", "front-delts", "side-delts", "rear-delts": return "shoulders"
+            case "biceps", "forearms", "arms": return "biceps"
+            case "triceps": return "triceps"
+            case "core", "abs", "obliques", "deep-core", "hip-flexors": return "core"
+            case "quads", "lower-body": return "quads"
+            case "hamstrings": return "hamstrings"
+            case "glutes", "adductors", "hip-abductors": return "glutes"
+            case "calves": return "calves"
+            default: continue
+            }
+        }
+        return nil
+    }
+
+    private static func slug(_ value: String) -> String {
+        value.lowercased().replacingOccurrences(of: "_", with: "-").replacingOccurrences(of: " ", with: "-")
+    }
+}
+
+// MARK: - Nutrition and Activity
+
+struct ProductionNutritionAPI: NutritionAPI {
+    let api: ProductionNativeAPI
+
+    func fetchNutritionLanding(scope: EvidenceScopeSelection) async throws -> NutritionLandingReadModel {
+        let payload = try await read(scope: scope)
+        return payload.landing(allLabel: "All Nutrition")
+    }
+
+    func fetchNutritionDay(dayId: String) async throws -> NutritionDayRecord? {
+        try await read(scope: .all).report.nutritionDays.first { $0.id == dayId }
+    }
+
+    func fetchNutritionReporting(
+        reportId: String, scope: EvidenceScopeSelection, range: EvidenceChartRange,
+        macro: NutritionMacroKey, mealMacroMixSlot: NutritionMealSlotFilter,
+        mealTrendSlot: NutritionMealSlotFilter, mealTrendMetric: NutritionMealTrendMetric
+    ) async throws -> NutritionReportingReadModel? {
+        guard ["calories", "macros", "meals"].contains(reportId) else { return nil }
+        let payload = try await read(scope: scope)
+        let days = NutritionReportingCalculator.rangeFiltered(days: payload.report.nutritionDays, range: range)
+        let context = payload.timeline.scope(allLabel: "All Nutrition")
+        switch reportId {
+        case "calories": return NutritionReportingReadModel(id: reportId, eyebrow: "Nutrition Reporting", title: "Calories", subtitle: "Daily intake, weekly averages, and calorie history over time.", scope: context, dataSources: payload.report.dataSources, calories: NutritionReportingCalculator.caloriesReport(days: days), macros: nil, meals: nil)
+        case "macros": return NutritionReportingReadModel(id: reportId, eyebrow: "Nutrition Reporting", title: "Macros", subtitle: "Macro distribution, daily averages, and weekly trends over time.", scope: context, dataSources: payload.report.dataSources, calories: nil, macros: NutritionReportingCalculator.macrosReport(days: days, selectedMacro: macro), meals: nil)
+        default: return NutritionReportingReadModel(id: reportId, eyebrow: "Nutrition Reporting", title: "Meals", subtitle: "Meal structure across the selected period.", scope: context, dataSources: payload.report.dataSources, calories: nil, macros: nil, meals: NutritionReportingCalculator.mealsReport(days: days, macroMixSlot: mealMacroMixSlot, trendSlot: mealTrendSlot, trendMetric: mealTrendMetric))
+        }
+    }
+
+    private func read(scope: EvidenceScopeSelection) async throws -> Payload {
+        try await api.readResource("nutrition", query: ["context": try ProductionContext.value(for: scope)], as: Payload.self).data
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var timeline: ProductionTimeline
+        var report: Report
+        func landing(allLabel: String) -> NutritionLandingReadModel {
+            let reportLinks = report.nutritionReportingLinks.map { link -> NutritionInfoLink in
+                var link = link
+                if ["calories", "macros", "meals"].contains(link.id) {
+                    link.destination = .progressStream(streamId: "nutrition/reporting/\(link.id)")
+                }
+                return link
+            }
+            return NutritionLandingReadModel(
+                title: report.title, subtitle: report.subtitle, tone: report.tone,
+                scope: timeline.scope(allLabel: allLabel),
+                latestNutritionDay: report.nutritionDays.first,
+                reportingLinks: reportLinks, nutritionAreas: report.nutritionLibrary,
+                nutritionHistory: report.nutritionDays, dataSources: report.dataSources
+            )
+        }
+    }
+    private struct Report: Decodable {
+        var title: String; var subtitle: String?; var tone: HomeColorToken
+        var nutritionDays: [NutritionDayRecord]
+        var nutritionLibrary: [NutritionInfoLink]
+        var nutritionReportingLinks: [NutritionInfoLink]
+        var dataSources: [NutritionDataSource]
+    }
+}
+
+struct ProductionActivityAPI: ActivityAPI {
+    let api: ProductionNativeAPI
+
+    func fetchActivityLanding(scope: EvidenceScopeSelection) async throws -> ActivityLandingReadModel {
+        let payload = try await read(scope: scope)
+        return ActivityLandingReadModel(
+            title: payload.report.title, subtitle: payload.report.subtitle,
+            tone: payload.report.tone, scope: payload.timeline.scope(allLabel: "All Activity"),
+            latestActivityDay: payload.report.latestActivityDay,
+            activityAreas: payload.report.activityAreas,
+            linkedTrainingContext: payload.report.linkedTrainingContext,
+            activityHistory: payload.report.activityHistory,
+            dataSources: payload.report.dataSources
+        )
+    }
+
+    func fetchActivityDay(date: String) async throws -> ActivityDayRecord? {
+        try await read(scope: .all).report.activityHistory.first { $0.date == date }
+    }
+
+    private func read(scope: EvidenceScopeSelection) async throws -> Payload {
+        try await api.readResource("activity", query: ["context": try ProductionContext.value(for: scope)], as: Payload.self).data
+    }
+    private struct Payload: Decodable, @unchecked Sendable { var timeline: ProductionTimeline; var report: Report }
+    private struct Report: Decodable {
+        var title: String; var subtitle: String; var tone: HomeColorToken
+        var latestActivityDay: ActivityDayRecord?; var activityAreas: [ActivityAreaSummary]
+        var linkedTrainingContext: [ActivityTrainingContextEntry]
+        var activityHistory: [ActivityDayRecord]; var dataSources: [ActivityDataSource]
+    }
+}
+
+// MARK: - Finished server-derived Energy report
+
+struct ProductionEnergyAPI: EnergyAPI {
+    let api: ProductionNativeAPI
+
+    func fetchEnergyReport(scope: EvidenceScopeSelection) async throws -> EnergyReportReadModel {
+        let report = try await api.readResource(
+            "energy", query: ["context": try ProductionContext.value(for: scope)], as: Payload.self
+        ).data
+        let days = report.days.map(\.readModel)
+        return EnergyReportReadModel(
+            title: "Energy", heading: "Energy Balance", subtitle: "Intake and expenditure over time.",
+            scope: report.timeline.scope(allLabel: "All Energy"), summary: report.summary,
+            weeklyTrend: report.weeks.reversed(), recentFourWeeks: report.recentFourWeeks,
+            weeklyHistory: report.weeks, dailyHistory: days, dataSources: report.dataSources
+        )
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var timeline: ProductionTimeline
+        var summary: EnergySummary
+        var days: [ServerEnergyDay]
+        var weeks: [EnergyWeekRecord]
+        var recentFourWeeks: [EnergyWeekRecord]
+        var latestEvidenceDate: String?
+        var dataSources: [EnergyDataSource]
+    }
+
+    private struct ServerEnergyDay: Decodable {
+        var date: String
+        var calorieIntake: Double?
+        var activeCalories: Double?
+        var estimatedExpenditure: Double?
+        var energyBalance: Double?
+        var completeness: String
+
+        var readModel: EnergyDayRecord {
+            EnergyDayRecord(
+                id: date, date: date, calorieIntake: calorieIntake,
+                activeCalories: activeCalories, estimatedExpenditure: estimatedExpenditure,
+                energyBalance: energyBalance, completeness: completeness
+            )
+        }
+    }
+}

@@ -86,7 +86,7 @@ final class GoalsSandboxStoreTests: XCTestCase {
         let active = try XCTUnwrap(store.goalDetail(goalId: "goal_fixture_build_lean_mass")?.active)
         XCTAssertEqual(active.title, "Build Serious Lean Mass")
         XCTAssertEqual(active.plan.timeline.targetDate, "2026-12-15")
-        XCTAssertEqual(store.hub.activeGoal.title, "Build Serious Lean Mass", "The Goals hub summary must reflect the edit too.")
+        XCTAssertEqual(store.hub.activeGoal?.title, "Build Serious Lean Mass", "The Goals hub summary must reflect the edit too.")
     }
 
     func testSavingAnInvalidGoalPlanIsRejectedAndLeavesStateUnchanged() throws {
@@ -96,7 +96,7 @@ final class GoalsSandboxStoreTests: XCTestCase {
         let result = store.saveGoalPlan(plan)
         guard case .failure(let error) = result else { return XCTFail("Expected validation to reject") }
         XCTAssertEqual(error.message, "Enter an amount for your target.")
-        XCTAssertEqual(store.hub.activeGoal.title, "Build Lean Mass", "A rejected save must not mutate state.")
+        XCTAssertEqual(store.hub.activeGoal?.title, "Build Lean Mass", "A rejected save must not mutate state.")
     }
 
     // MARK: - Goal Edit: phase editing respects the operational-change guard
@@ -147,7 +147,7 @@ final class GoalsSandboxStoreTests: XCTestCase {
     func testTransitionBecomesEligibleInTheSeededBeforeState() {
         let store = makeEligibleStore()
         XCTAssertTrue(store.isTransitionEligible)
-        XCTAssertEqual(store.hub.activeGoal.title, "Visible Abs")
+        XCTAssertEqual(store.hub.activeGoal?.title, "Visible Abs")
         XCTAssertTrue(store.hub.completedGoals.isEmpty)
     }
 
@@ -227,12 +227,12 @@ final class GoalsSandboxStoreTests: XCTestCase {
 
     func testActivatingTheTransitionAtomicallyCompletesOldGoalAndCreatesNewGoal() throws {
         let (store, token) = readyStoreForActivation()
-        let sourceId = store.hub.activeGoal.id
+        let sourceId = store.hub.activeGoal!.id
         guard case .success(let result) = store.activateGoalTransition(reviewToken: token) else { return XCTFail("Expected activation to succeed") }
 
         XCTAssertEqual(result.completedGoalId, sourceId)
         XCTAssertNotEqual(result.newGoalId, sourceId, "The new goal must be a genuinely distinct identity, matching the real activation coordinator.")
-        XCTAssertEqual(store.hub.activeGoal.id, result.newGoalId)
+        XCTAssertEqual(store.hub.activeGoal?.id, result.newGoalId)
         XCTAssertTrue(store.hub.completedGoals.contains { $0.id == sourceId }, "The old goal must never go missing once completed.")
     }
 
@@ -245,7 +245,7 @@ final class GoalsSandboxStoreTests: XCTestCase {
 
     func testCompletedGoalPreservesItsOriginalEvidenceAnchorAfterTransition() throws {
         let (store, token) = readyStoreForActivation()
-        let originalEvidenceDate = store.hub.activeGoal.dateRange
+        let originalEvidenceDate = store.hub.activeGoal!.dateRange
         guard case .success(let result) = store.activateGoalTransition(reviewToken: token) else { return XCTFail("Expected activation to succeed") }
         let completed = try XCTUnwrap(store.goalDetail(goalId: result.completedGoalId)?.completed)
         XCTAssertEqual(completed.dateRange, originalEvidenceDate, "The completed goal's own historical fields must stay exactly as recorded.")
@@ -267,11 +267,11 @@ final class GoalsSandboxStoreTests: XCTestCase {
 
     func testActivationLeavesNoPartialStateWhenReadinessIsMissing() {
         let store = makeEligibleStore()
-        let bogusToken = GoalTransitionReviewToken(transitionId: "x", issuedAt: Date(), sourceGoalId: store.hub.activeGoal.id, targetGoalTitle: "y")
-        let sourceId = store.hub.activeGoal.id
+        let bogusToken = GoalTransitionReviewToken(transitionId: "x", issuedAt: Date(), sourceGoalId: store.hub.activeGoal!.id, targetGoalTitle: "y")
+        let sourceId = store.hub.activeGoal!.id
         let result = store.activateGoalTransition(reviewToken: bogusToken)
         guard case .failure = result else { return XCTFail("Expected activation to be rejected without full readiness") }
-        XCTAssertEqual(store.hub.activeGoal.id, sourceId, "Nothing about the source goal changes if activation is rejected.")
+        XCTAssertEqual(store.hub.activeGoal?.id, sourceId, "Nothing about the source goal changes if activation is rejected.")
         XCTAssertTrue(store.hub.completedGoals.isEmpty)
     }
 
@@ -436,9 +436,9 @@ final class GoalsSandboxStoreTests: XCTestCase {
 
         // Mirrors HomeViewModel.projectPrimaryGoal's private logic via the
         // same public contract it reads (GoalSummaryReadModel/destination).
-        fixtureRows[primaryIndex].id = goalsStore.hub.activeGoal.id
-        fixtureRows[primaryIndex].title = goalsStore.hub.activeGoal.title
-        fixtureRows[primaryIndex].destination = goalsStore.hub.activeGoal.destination
+        fixtureRows[primaryIndex].id = goalsStore.hub.activeGoal!.id
+        fixtureRows[primaryIndex].title = goalsStore.hub.activeGoal!.title
+        fixtureRows[primaryIndex].destination = goalsStore.hub.activeGoal!.destination
 
         XCTAssertEqual(fixtureRows[primaryIndex].id, activation.newGoalId)
         XCTAssertEqual(fixtureRows[primaryIndex].destination, .goalDetail(goalId: activation.newGoalId))
@@ -446,7 +446,7 @@ final class GoalsSandboxStoreTests: XCTestCase {
 
     func testCompletedGoalRemainsIndividuallyNavigableAfterTransition() throws {
         let (store, token) = readyStoreForActivation()
-        let sourceId = store.hub.activeGoal.id
+        let sourceId = store.hub.activeGoal!.id
         guard case .success = store.activateGoalTransition(reviewToken: token) else { return XCTFail("Expected activation to succeed") }
         let completedDetail = store.goalDetail(goalId: sourceId)
         XCTAssertNotNil(completedDetail?.completed, "The now-completed source goal must still resolve to a real detail page.")

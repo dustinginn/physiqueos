@@ -30,8 +30,8 @@ struct ActivityDayView: View {
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
             await viewModel?.load()
         }
     }

@@ -32,20 +32,32 @@ final class HomeViewModel {
     /// collection (`latestForHome`), never a second Home-only Briefing
     /// fixture (see `BriefingSandboxStore.swift`'s doc comment).
     private let briefingStore: BriefingSandboxStore
+    private let appliesSandboxProjections: Bool
 
-    init(api: HomeAPI, priorityStore: LoggingSandboxStore, goalsSandboxStore: GoalsSandboxStore, briefingStore: BriefingSandboxStore) {
+    init(
+        api: HomeAPI,
+        priorityStore: LoggingSandboxStore,
+        goalsSandboxStore: GoalsSandboxStore,
+        briefingStore: BriefingSandboxStore,
+        appliesSandboxProjections: Bool = true
+    ) {
         self.api = api
         self.priorityStore = priorityStore
         self.goalsSandboxStore = goalsSandboxStore
         self.briefingStore = briefingStore
+        self.appliesSandboxProjections = appliesSandboxProjections
     }
 
     func load(now: Date = Date()) async {
         do {
             var home = try await api.fetchHome()
-            home.todaysFocus = Self.visiblePriorities(priorityStore.todaysPriorities(now: now))
-            home.goals = Self.projectGoals(home.goals, from: goalsSandboxStore.hub.activeGoal)
-            home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
+            if appliesSandboxProjections {
+                home.todaysFocus = Self.visiblePriorities(priorityStore.todaysPriorities(now: now))
+                if let activeGoal = goalsSandboxStore.hub.activeGoal {
+                    home.goals = Self.projectGoals(home.goals, from: activeGoal)
+                }
+                home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
+            }
             state = .loaded(home)
         } catch {
             state = .failed("Home could not be loaded.")

@@ -6,8 +6,8 @@ final class GoalsReadModelTests: XCTestCase {
 
     func testGoalsLandingContainsActiveThenCompletedGoal() async throws {
         let hub = try await api.fetchGoalsHub()
-        XCTAssertEqual(hub.activeGoal.title, "Build Lean Mass")
-        XCTAssertEqual(hub.activeGoal.lifecycle, .active)
+        XCTAssertEqual(hub.activeGoal?.title, "Build Lean Mass")
+        XCTAssertEqual(hub.activeGoal?.lifecycle, .active)
         XCTAssertEqual(hub.completedGoals.map(\.title), ["Visible Abs"])
         XCTAssertEqual(hub.orderedGoals.map(\.lifecycle), [.active, .completed])
     }
@@ -116,7 +116,7 @@ final class GoalsReadModelTests: XCTestCase {
 
     func testFixtureUsesSyntheticIdentityAndNaturalProductCopy() async throws {
         let hub = try await api.fetchGoalsHub()
-        XCTAssertTrue(hub.activeGoal.id.contains("fixture"))
+        XCTAssertTrue(hub.activeGoal!.id.contains("fixture"))
         let renderedCopy = (try await activeGoalCopy()).joined(separator: " ")
         for forbidden in ["server-owned", "canonical model", "production write", "device-only"] {
             XCTAssertFalse(renderedCopy.localizedCaseInsensitiveContains(forbidden))
@@ -128,7 +128,7 @@ final class GoalsReadModelTests: XCTestCase {
 
     private func activeGoal() async throws -> ActiveGoalReadModel {
         let hub = try await api.fetchGoalsHub()
-        let detail = try await api.fetchGoalDetail(goalId: hub.activeGoal.id)
+        let detail = try await api.fetchGoalDetail(goalId: hub.activeGoal!.id)
         return try XCTUnwrap(detail?.active)
     }
 

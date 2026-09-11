@@ -48,8 +48,8 @@ struct TrainingAreaView: View {
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId)
             await viewModel?.load()
         }
     }

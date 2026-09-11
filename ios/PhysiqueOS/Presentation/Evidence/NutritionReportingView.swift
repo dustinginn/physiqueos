@@ -59,8 +59,8 @@ struct NutritionReportingView: View {
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
             await viewModel?.load()
         }
     }

@@ -23,8 +23,8 @@ struct NutritionDayView: View {
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
             await viewModel?.load()
         }
     }

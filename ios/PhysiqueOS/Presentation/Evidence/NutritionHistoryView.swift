@@ -31,6 +31,7 @@ import SwiftUI
 struct NutritionHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: NutritionHistoryViewModel?
     @State private var isHistorySheetPresented = false
 
@@ -64,10 +65,12 @@ struct NutritionHistoryView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil { viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI)
             await viewModel?.load()
         }
+        .refreshable { await viewModel?.load() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 
     @ViewBuilder

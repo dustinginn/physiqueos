@@ -15,14 +15,23 @@ final class GoalsViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    private let api: GoalsAPI
     private let store: GoalsSandboxStore
+    private let usesSandboxStore: Bool
 
-    init(store: GoalsSandboxStore) {
+    init(api: GoalsAPI, store: GoalsSandboxStore, usesSandboxStore: Bool) {
+        self.api = api
         self.store = store
+        self.usesSandboxStore = usesSandboxStore
     }
 
-    func load() {
-        state = .loaded(store.hub)
+    func load() async {
+        if usesSandboxStore {
+            state = .loaded(store.hub)
+            return
+        }
+        do { state = .loaded(try await api.fetchGoalsHub()) }
+        catch { state = .failed("Goals could not be loaded.") }
     }
 }
 
@@ -37,20 +46,24 @@ final class GoalDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    private let api: GoalsAPI
     private let store: GoalsSandboxStore
+    private let usesSandboxStore: Bool
     private let goalId: String
 
-    init(store: GoalsSandboxStore, goalId: String) {
+    init(api: GoalsAPI, store: GoalsSandboxStore, usesSandboxStore: Bool, goalId: String) {
+        self.api = api
         self.store = store
+        self.usesSandboxStore = usesSandboxStore
         self.goalId = goalId
     }
 
-    func load() {
-        guard let detail = store.goalDetail(goalId: goalId) else {
-            state = .unavailable
-            return
-        }
-        state = .loaded(detail)
+    func load() async {
+        do {
+            let detail = usesSandboxStore ? store.goalDetail(goalId: goalId) : try await api.fetchGoalDetail(goalId: goalId)
+            guard let detail else { state = .unavailable; return }
+            state = .loaded(detail)
+        } catch { state = .failed("This goal could not be loaded.") }
     }
 }
 
@@ -65,26 +78,38 @@ final class GoalPhaseDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    private let api: GoalsAPI
     private let store: GoalsSandboxStore
+    private let usesSandboxStore: Bool
     private let goalId: String
     private let phaseId: String
 
-    init(store: GoalsSandboxStore, goalId: String, phaseId: String) {
+    init(api: GoalsAPI, store: GoalsSandboxStore, usesSandboxStore: Bool, goalId: String, phaseId: String) {
+        self.api = api
         self.store = store
+        self.usesSandboxStore = usesSandboxStore
         self.goalId = goalId
         self.phaseId = phaseId
     }
 
-    func load() {
-        guard let active = store.goalDetail(goalId: goalId)?.active,
-              let phase = active.phases.first(where: { $0.id == phaseId }) else {
-            state = .unavailable
-            return
-        }
-        state = .loaded(GoalPhaseDetailReadModel(
-            goalId: active.id, goalTitle: active.title, phase: phase,
-            goalProgress: active.goalProgress, confidence: active.confidence, guardrail: active.guardrail
-        ))
+    func load() async {
+        do {
+            if usesSandboxStore {
+                guard let active = store.goalDetail(goalId: goalId)?.active,
+                      let phase = active.phases.first(where: { $0.id == phaseId }) else {
+                    state = .unavailable; return
+                }
+                state = .loaded(GoalPhaseDetailReadModel(
+                    goalId: active.id, goalTitle: active.title, phase: phase,
+                    goalProgress: active.goalProgress, confidence: active.confidence, guardrail: active.guardrail
+                ))
+            } else {
+                guard let phase = try await api.fetchGoalPhase(goalId: goalId, phaseId: phaseId) else {
+                    state = .unavailable; return
+                }
+                state = .loaded(phase)
+            }
+        } catch { state = .failed("This phase could not be loaded.") }
     }
 }
 

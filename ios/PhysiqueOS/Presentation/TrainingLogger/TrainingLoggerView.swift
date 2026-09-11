@@ -53,13 +53,12 @@ struct TrainingLoggerView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil {
-                viewModel = TrainingLoggerViewModel(
-                    api: environment.trainingLoggerAPI,
-                    draftStore: environment.trainingLoggerDraftStore
-                )
-            }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingLoggerViewModel(
+                api: environment.trainingLoggerAPI,
+                draftStore: environment.trainingLoggerDraftStore,
+                authority: environment.nativeAuthority
+            )
             await viewModel?.load()
         }
         .onDisappear { viewModel?.persist() }
@@ -207,6 +206,14 @@ struct TrainingLoggerView: View {
         VStack(alignment: .leading, spacing: 16) {
             loggerHeader(eyebrow: "Training Logger", title: "Log the work. Keep the context.", subtitle: "Start now or capture a past workout with the same exercise and set details.")
 
+            if !viewModel.canWrite {
+                CardContainer {
+                    Label("Founder Production is read-only. Training history and the canonical exercise library remain available.", systemImage: "lock.fill")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            }
+
             if viewModel.savedDraft != nil {
                 CardContainer {
                     VStack(alignment: .leading, spacing: 12) {
@@ -227,6 +234,8 @@ struct TrainingLoggerView: View {
             actionCard(icon: "play.fill", title: "Start Workout", detail: "Begin a live session using today’s date.") {
                 viewModel.start(mode: .live)
             }
+            .allowsHitTesting(viewModel.canWrite)
+            .opacity(viewModel.canWrite ? 1 : 0.55)
             .accessibilityIdentifier("trainingLogger.start")
 
             CardContainer {
@@ -248,6 +257,7 @@ struct TrainingLoggerView: View {
                     PrimaryActionButton(title: "Continue with past workout") {
                         viewModel.start(mode: .past, date: pastWorkoutDate)
                     }
+                    .disabled(!viewModel.canWrite)
                     .accessibilityIdentifier("trainingLogger.past")
                 }
             }

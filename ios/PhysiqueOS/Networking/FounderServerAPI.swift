@@ -327,7 +327,11 @@ actor ProductionNativeAPI {
     private let baseURL: URL
     private let credentialStore: FounderRefreshCredentialStore
     private let transport: FounderHTTPTransport
-    private let decoder = JSONDecoder()
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }()
     private let encoder = JSONEncoder()
     private var accessToken: String?
     private var refreshTask: Task<String, Error>?
@@ -413,6 +417,7 @@ actor ProductionNativeAPI {
 
     func readResource<Payload: Decodable & Sendable>(
         _ resource: String,
+        query: [String: String] = [:],
         as type: Payload.Type
     ) async throws -> ProductionResponseEnvelope<Payload> {
         guard resource.range(of: #"^[a-z][a-z0-9-]*$"#, options: .regularExpression) != nil else {
@@ -420,7 +425,8 @@ actor ProductionNativeAPI {
         }
         let envelope: ProductionResponseEnvelope<Payload> = try await authenticatedJSON(
             path: "\(configuration.routeFamily)/read/\(resource)",
-            method: "GET"
+            method: "GET",
+            query: query
         )
         try validate(envelope, expectedResource: resource)
         return envelope
@@ -503,8 +509,12 @@ actor ProductionNativeAPI {
         accessToken = session.accessToken
     }
 
-    private func authenticatedJSON<Response: Decodable>(path: String, method: String) async throws -> Response {
-        let (data, _) = try await authenticatedResponse(path: path, method: method, accept: "application/json")
+    private func authenticatedJSON<Response: Decodable>(
+        path: String,
+        method: String,
+        query: [String: String] = [:]
+    ) async throws -> Response {
+        let (data, _) = try await authenticatedResponse(path: path, method: method, query: query, accept: "application/json")
         do { return try decoder.decode(Response.self, from: data) }
         catch { throw ProductionNativeError.invalidResponse }
     }
@@ -512,13 +522,14 @@ actor ProductionNativeAPI {
     private func authenticatedResponse(
         path: String,
         method: String,
+        query: [String: String] = [:],
         accept: String
     ) async throws -> (Data, HTTPURLResponse) {
         let token = try await validAccessToken()
-        var result = try await perform(path: path, method: method, body: nil, bearer: token, accept: accept)
+        var result = try await perform(path: path, method: method, query: query, body: nil, bearer: token, accept: accept)
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
-            result = try await perform(path: path, method: method, body: nil, bearer: refreshedToken, accept: accept)
+            result = try await perform(path: path, method: method, query: query, body: nil, bearer: refreshedToken, accept: accept)
         }
         try validateHTTP(result.1, data: result.0)
         return result
@@ -548,11 +559,20 @@ actor ProductionNativeAPI {
     private func perform(
         path: String,
         method: String,
+        query: [String: String] = [:],
         body: Data?,
         bearer: String?,
         accept: String
     ) async throws -> (Data, HTTPURLResponse) {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        let endpoint = baseURL.appending(path: path)
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw ProductionNativeError.invalidResponse
+        }
+        if !query.isEmpty {
+            components.queryItems = query.keys.sorted().map { URLQueryItem(name: $0, value: query[$0]) }
+        }
+        guard let url = components.url else { throw ProductionNativeError.invalidResponse }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
         request.cachePolicy = .reloadIgnoringLocalCacheData

@@ -14,6 +14,7 @@ import SwiftUI
 /// page, but not this one).
 struct TrainingLibraryRootView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: TrainingLibraryRootViewModel?
 
     var body: some View {
@@ -27,10 +28,12 @@ struct TrainingLibraryRootView: View {
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
             await viewModel?.load()
         }
+        .refreshable { await viewModel?.load() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await viewModel?.load() } } }
     }
 
     @ViewBuilder

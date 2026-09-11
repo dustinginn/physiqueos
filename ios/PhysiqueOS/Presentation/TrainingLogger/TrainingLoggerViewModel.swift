@@ -11,6 +11,7 @@ final class TrainingLoggerViewModel {
 
     private let api: TrainingLoggerAPI
     private let draftStore: TrainingLoggerDraftStore
+    let authority: NativeAPIEnvironment
 
     var loadState: LoadState = .loading
     var configuration: TrainingLoggerConfiguration?
@@ -20,16 +21,21 @@ final class TrainingLoggerViewModel {
     var isBrowsingAllExercises = false
     var validationMessage: String?
 
-    init(api: TrainingLoggerAPI, draftStore: TrainingLoggerDraftStore) {
+    init(
+        api: TrainingLoggerAPI,
+        draftStore: TrainingLoggerDraftStore,
+        authority: NativeAPIEnvironment = .sandbox
+    ) {
         self.api = api
         self.draftStore = draftStore
+        self.authority = authority
     }
 
     func load() async {
         guard configuration == nil else { return }
         do {
             configuration = try await api.fetchConfiguration()
-            savedDraft = draftStore.load()
+            savedDraft = canWrite ? draftStore.load() : nil
             loadState = .loaded
         } catch {
             loadState = .failed(error.localizedDescription)
@@ -37,6 +43,7 @@ final class TrainingLoggerViewModel {
     }
 
     func start(mode: TrainingLoggerMode, date: Date = Date()) {
+        guard canWrite else { return }
         let workoutDate = mode == .live ? Self.dateKey(Date()) : Self.dateKey(date)
         draft = .fresh(mode: mode, workoutDate: workoutDate)
         validationMessage = nil
@@ -44,6 +51,7 @@ final class TrainingLoggerViewModel {
     }
 
     func resume() {
+        guard canWrite else { return }
         draft = savedDraft
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
@@ -53,12 +61,14 @@ final class TrainingLoggerViewModel {
     }
 
     func discardSavedDraft() {
+        guard canWrite else { return }
         draftStore.discard()
         savedDraft = nil
         draft = nil
     }
 
     func cancelWorkout() {
+        guard canWrite else { return }
         draftStore.discard()
         savedDraft = nil
         draft = nil
@@ -66,6 +76,7 @@ final class TrainingLoggerViewModel {
     }
 
     func update(_ mutation: (inout TrainingLoggerDraft) -> Void) {
+        guard canWrite else { return }
         guard var draft else { return }
         mutation(&draft)
         self.draft = draft
@@ -114,6 +125,7 @@ final class TrainingLoggerViewModel {
     }
 
     func completeLocalCapture() {
+        guard canWrite else { return }
         guard var draft else { return }
         draft.step = .complete
         self.draft = draft
@@ -122,6 +134,7 @@ final class TrainingLoggerViewModel {
     }
 
     func persist() {
+        guard canWrite else { return }
         guard let draft, draft.step != .complete else { return }
         draftStore.save(draft)
         savedDraft = draft
@@ -164,6 +177,10 @@ final class TrainingLoggerViewModel {
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+
+    var canWrite: Bool {
+        (try? NativeProductWriteGuard.authorize(.workoutLogger, in: authority)) != nil
     }
 }
 

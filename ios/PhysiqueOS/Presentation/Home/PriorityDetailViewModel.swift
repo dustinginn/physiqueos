@@ -12,16 +12,24 @@ final class PriorityDetailViewModel {
     }
 
     private(set) var state: LoadState = .loading
+    private let api: PriorityAPI
     private let store: LoggingSandboxStore
+    private let authority: NativeAPIEnvironment
     private let priorityId: String
 
-    init(store: LoggingSandboxStore, priorityId: String) {
+    init(api: PriorityAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String) {
+        self.api = api
         self.store = store
+        self.authority = authority
         self.priorityId = priorityId
     }
 
-    func load() {
-        state = .loaded(store.priorityOccurrence(id: priorityId))
+    func load() async {
+        if authority == .sandbox {
+            state = .loaded(store.priorityOccurrence(id: priorityId))
+            return
+        }
+        state = .loaded(try? await api.fetchPriority(priorityId: priorityId))
     }
 
     /// `completePriority` (`src/app/priorities/[priorityId]/actions.js`) —
@@ -29,8 +37,9 @@ final class PriorityDetailViewModel {
     /// (dose/protocol), a plain completion otherwise, matching the real
     /// server's own branch exactly.
     func complete() {
+        guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: authority)) != nil else { return }
         guard case .loaded(.some(let occurrence)) = state else { return }
         store.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
-        load()
+        state = .loaded(store.priorityOccurrence(id: priorityId))
     }
 }

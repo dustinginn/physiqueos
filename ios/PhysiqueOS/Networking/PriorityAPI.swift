@@ -8,6 +8,11 @@ import Foundation
 /// `PriorityOccurrenceCalculator.project`, never a second parallel list.
 protocol PriorityAPI: Sendable {
     func fetchExecutionItems() async throws -> [ExecutionItemFixture]
+    func fetchPriority(priorityId: String) async throws -> PriorityOccurrence?
+}
+
+extension PriorityAPI {
+    func fetchPriority(priorityId: String) async throws -> PriorityOccurrence? { nil }
 }
 
 struct FixturePriorityAPI: PriorityAPI {

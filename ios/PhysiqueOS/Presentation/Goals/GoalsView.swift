@@ -6,6 +6,7 @@ import SwiftUI
 /// longer renders them as separate cards.
 struct GoalsView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: GoalsViewModel?
     let onNavigate: (AppDestination) -> Void
 
@@ -17,9 +18,18 @@ struct GoalsView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
-        .task {
-            if viewModel == nil { viewModel = GoalsViewModel(store: environment.goalsSandboxStore) }
-            viewModel?.load()
+        .task(id: environment.nativeAuthority) {
+            viewModel = GoalsViewModel(
+                api: environment.goalsAPI,
+                store: environment.goalsSandboxStore,
+                usesSandboxStore: environment.nativeAuthority == .sandbox
+            )
+            await viewModel?.load()
+        }
+        .refreshable { await viewModel?.load() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel?.load() }
         }
     }
 
@@ -38,8 +48,10 @@ struct GoalsView: View {
         case .loaded(let hub):
             VStack(alignment: .leading, spacing: 18) {
                 header
-                goalSection(title: "Primary Goal") {
-                    activeGoalCard(hub.activeGoal)
+                if let activeGoal = hub.activeGoal {
+                    goalSection(title: "Primary Goal") {
+                        activeGoalCard(activeGoal)
+                    }
                 }
                 if !hub.completedGoals.isEmpty {
                     goalSection(title: "Completed Goals") {
@@ -89,7 +101,9 @@ struct GoalsView: View {
                         HStack(spacing: 5) {
                             Text(goal.statusLabel)
                             Text("•").accessibilityHidden(true)
-                            Text(goal.confidence.map { "\($0.value)% confidence" } ?? "Confidence unavailable")
+                            Text(goal.confidence.flatMap { confidence in
+                                confidence.value.map { "\($0)% confidence" }
+                            } ?? "Confidence unavailable")
                         }
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)

@@ -8,13 +8,48 @@ import SwiftUI
 /// items and, for Supplements, the "Add Supplement" header action.
 struct OperatingPlanLandingView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var state: LoadState = .loading
     let onNavigate: (AppDestination) -> Void
 
-    private var model: OperatingPlanReadModel { environment.operatingPlanStore.landing }
+    private enum LoadState {
+        case loading
+        case loaded(OperatingPlanReadModel)
+        case failed
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            Group {
+                switch state {
+                case .loading:
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 300)
+                case .failed:
+                    Text("Operating Plan could not be loaded.")
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 300)
+                case .loaded(let model):
+                    content(model)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+        }
+        .physiqueOSScrollBottomClearance()
+        .background(PhysiqueOSTheme.background)
+        .navigationTitle("Operating Plan")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await load() }
+        }
+        .onChange(of: environment.nativeAuthority) { _, _ in Task { await load() } }
+    }
+
+    private func content(_ model: OperatingPlanReadModel) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
                 OperatingPlanScreenHeader(
                     eyebrow: "OPERATING PLAN",
                     title: "Your Operating Plan",
@@ -22,7 +57,7 @@ struct OperatingPlanLandingView: View {
                 )
                 ForEach(model.sections) { section in
                     OperatingPlanSection(section.title, trailing: {
-                        if section.supplementsAction {
+                        if section.supplementsAction, environment.nativeAuthority.permitsProductWrites {
                             Button("Add Supplement") { onNavigate(.operatingPlanSupplementNew) }
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.accent)
@@ -55,13 +90,17 @@ struct OperatingPlanLandingView: View {
                         }
                     }
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationTitle("Operating Plan")
-        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @MainActor
+    private func load() async {
+        state = .loading
+        guard let api = environment.operatingPlanAPI else {
+            state = .loaded(environment.operatingPlanStore.landing)
+            return
+        }
+        do { state = .loaded(try await api.fetchOperatingPlan()) }
+        catch { state = .failed }
     }
 }

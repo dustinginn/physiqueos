@@ -29,11 +29,15 @@ struct GoalPhaseDetailView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil {
-                viewModel = GoalPhaseDetailViewModel(store: environment.goalsSandboxStore, goalId: goalId, phaseId: phaseId)
-            }
-            viewModel?.load()
+        .task(id: environment.nativeAuthority) {
+            viewModel = GoalPhaseDetailViewModel(
+                api: environment.goalsAPI,
+                store: environment.goalsSandboxStore,
+                usesSandboxStore: environment.nativeAuthority == .sandbox,
+                goalId: goalId,
+                phaseId: phaseId
+            )
+            await viewModel?.load()
         }
     }
 
@@ -91,7 +95,10 @@ struct GoalPhaseDetailView: View {
                         GoalProgressBlock(progress: detail.goalProgress, color: PhysiqueOSTheme.accent, label: "Goal progress")
                         Divider().overlay(PhysiqueOSTheme.divider)
                         HStack {
-                            GoalMetric(label: "Confidence", value: "\(detail.confidence.value)% · \(detail.confidence.band)")
+                            GoalMetric(
+                                label: "Confidence",
+                                value: detail.confidence.value.map { "\($0)% · \(detail.confidence.band)" } ?? detail.confidence.band
+                            )
                             GoalMetric(label: "Guardrail", value: detail.guardrail.state)
                         }
                     }

@@ -103,13 +103,13 @@ final class UserDefaultsNativeAuthoritySelectionStore: NativeAuthoritySelectionS
 final class AppEnvironment {
     private(set) var nativeAuthority: NativeAPIEnvironment
     private let authoritySelectionStore: NativeAuthoritySelectionStore
-    let homeAPI: HomeAPI
-    let goalsAPI: GoalsAPI
+    private let sandboxHomeAPI: HomeAPI
+    private let sandboxGoalsAPI: GoalsAPI
     let logAPI: LogAPI
     let evidenceAPI: EvidenceAPI
-    let trainingAPI: TrainingAPI
-    let activityAPI: ActivityAPI
-    let nutritionAPI: NutritionAPI
+    private let sandboxTrainingAPI: TrainingAPI
+    private let sandboxActivityAPI: ActivityAPI
+    private let sandboxNutritionAPI: NutritionAPI
     /// Fixture/read-model-backed Weight Evidence product surface — never
     /// mixed with `founderServerAPI`'s isolated live Sandbox Weight write
     /// proof (see `WeightEvidenceAPI.swift`'s doc comment).
@@ -117,7 +117,7 @@ final class AppEnvironment {
     private let productionWeightEvidenceAPI: ProductionWeightEvidenceAPI
     let dexaAPI: DEXAAPI
     let photosAPI: PhotosAPI
-    let energyAPI: EnergyAPI
+    private let sandboxEnergyAPI: EnergyAPI
     /// The read seam for the canonical Operating Plan execution-item
     /// catalog. `loggingSandboxStore` loads the same catalog synchronously
     /// at init (`PriorityCatalogLoader`, mirroring
@@ -126,8 +126,8 @@ final class AppEnvironment {
     /// can run — this property exists so a future live implementation has
     /// the same seam every other vertical already does, not because
     /// today's fixture-only screens call it directly.
-    let priorityAPI: PriorityAPI
-    let trainingLoggerAPI: TrainingLoggerAPI
+    private let sandboxPriorityAPI: PriorityAPI
+    private let sandboxTrainingLoggerAPI: TrainingLoggerAPI
     let trainingLoggerDraftStore: TrainingLoggerDraftStore
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
@@ -148,6 +148,42 @@ final class AppEnvironment {
         case .sandbox: sandboxWeightEvidenceAPI
         case .founderProduction: productionWeightEvidenceAPI
         }
+    }
+
+    var homeAPI: HomeAPI {
+        nativeAuthority == .founderProduction ? ProductionHomeAPI(api: productionNativeAPI) : sandboxHomeAPI
+    }
+
+    var goalsAPI: GoalsAPI {
+        nativeAuthority == .founderProduction ? ProductionGoalsAPI(api: productionNativeAPI) : sandboxGoalsAPI
+    }
+
+    var trainingAPI: TrainingAPI {
+        nativeAuthority == .founderProduction ? ProductionTrainingAPI(api: productionNativeAPI) : sandboxTrainingAPI
+    }
+
+    var activityAPI: ActivityAPI {
+        nativeAuthority == .founderProduction ? ProductionActivityAPI(api: productionNativeAPI) : sandboxActivityAPI
+    }
+
+    var nutritionAPI: NutritionAPI {
+        nativeAuthority == .founderProduction ? ProductionNutritionAPI(api: productionNativeAPI) : sandboxNutritionAPI
+    }
+
+    var energyAPI: EnergyAPI {
+        nativeAuthority == .founderProduction ? ProductionEnergyAPI(api: productionNativeAPI) : sandboxEnergyAPI
+    }
+
+    var priorityAPI: PriorityAPI {
+        nativeAuthority == .founderProduction ? ProductionPriorityAPI(api: productionNativeAPI) : sandboxPriorityAPI
+    }
+
+    var trainingLoggerAPI: TrainingLoggerAPI {
+        nativeAuthority == .founderProduction ? ProductionTrainingLoggerAPI(api: productionNativeAPI) : sandboxTrainingLoggerAPI
+    }
+
+    var operatingPlanAPI: OperatingPlanAPI? {
+        nativeAuthority == .founderProduction ? ProductionOperatingPlanAPI(api: productionNativeAPI) : nil
     }
 
     init(
@@ -177,20 +213,20 @@ final class AppEnvironment {
     ) {
         self.authoritySelectionStore = authoritySelectionStore
         self.nativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
-        self.homeAPI = homeAPI
-        self.goalsAPI = goalsAPI
+        self.sandboxHomeAPI = homeAPI
+        self.sandboxGoalsAPI = goalsAPI
         self.logAPI = logAPI
         self.evidenceAPI = evidenceAPI
-        self.trainingAPI = trainingAPI
-        self.activityAPI = activityAPI
-        self.nutritionAPI = nutritionAPI
+        self.sandboxTrainingAPI = trainingAPI
+        self.sandboxActivityAPI = activityAPI
+        self.sandboxNutritionAPI = nutritionAPI
         self.sandboxWeightEvidenceAPI = weightEvidenceAPI
         self.productionWeightEvidenceAPI = ProductionWeightEvidenceAPI(api: productionNativeAPI)
         self.dexaAPI = dexaAPI
         self.photosAPI = photosAPI
-        self.energyAPI = energyAPI
-        self.priorityAPI = priorityAPI
-        self.trainingLoggerAPI = trainingLoggerAPI
+        self.sandboxEnergyAPI = energyAPI
+        self.sandboxPriorityAPI = priorityAPI
+        self.sandboxTrainingLoggerAPI = trainingLoggerAPI
         self.trainingLoggerDraftStore = trainingLoggerDraftStore
         self.loggingSandboxStore = loggingSandboxStore
         self.operatingPlanStore = operatingPlanStore
