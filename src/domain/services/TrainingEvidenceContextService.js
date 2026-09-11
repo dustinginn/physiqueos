@@ -4,6 +4,7 @@ import { EVIDENCE_CONTEXT_WINDOWS } from "./EvidenceContextWindows";
 import { createProgressReportingService } from "./ProgressReportingService";
 import { runRepositoryReadScope } from "../../application/read-models/RepositoryReadScope";
 import { selectCanonicalActiveGoal } from "./CanonicalGoalRelationshipService.js";
+import { resolveCanonicalGoalPhaseChronology } from "./CanonicalGoalPhaseChronologyService.js";
 
 export async function getTrainingEvidenceContext({
   context,
@@ -43,18 +44,23 @@ export function createTrainingEvidenceContext({
   if (selected !== "all" && (!validDate(startDate) || !validDate(endDate))) {
     throw new Error(`The ${labels[selected]} lifecycle window is unavailable.`);
   }
+  const phase = goal
+    ? resolveCanonicalGoalPhaseChronology(goal, { asOf: endDate ?? currentDate }).effectivePhase
+    : null;
   return Object.freeze({
     contextId: selected,
     selectedLabel: labels[selected],
     goalId: goal?.id ?? null,
     goalRevision: goal?.updatedAt ?? null,
+    phaseId: phase?.id ?? null,
+    phaseRevision: phase?.updatedAt ?? phase?.revision ?? null,
     startDate,
     endDate,
     goalScoped: selected !== "all",
     type:
       selected === "all"
         ? "all_history"
-        : goal.status === "completed"
+        : goal?.status === "completed"
           ? "completed_goal"
           : "active_goal",
     dateRangeLabel:

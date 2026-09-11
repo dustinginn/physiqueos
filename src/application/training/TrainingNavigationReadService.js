@@ -14,6 +14,7 @@ import { resolveTrainingExerciseIdentity } from "../../domain/models/trainingExe
 import {
   readCurrentCanonicalTrainingExerciseRegistry,
 } from "./CanonicalExerciseRegistryReadService.js";
+import { createTrainingReportingPresentation } from "../../domain/services/TrainingReportingPresentationService.js";
 
 export function createTrainingNavigationReadService({
   store,
@@ -55,18 +56,20 @@ export function createTrainingNavigationReadService({
           evidencePackages,
           goals,
         });
+        const report = timeline.goalScoped
+          ? Object.freeze({
+              ...scopedReport,
+              trainingBreakdowns: mergeTrainingBreakdowns({
+                globalBreakdowns: globalReport.trainingBreakdowns,
+                scopedBreakdowns: scopedReport.trainingBreakdowns,
+              }),
+              trainingLibrary: globalReport.trainingLibrary,
+            })
+          : globalReport;
         return Object.freeze({
           timeline,
-          report: timeline.goalScoped
-            ? Object.freeze({
-                ...scopedReport,
-                trainingBreakdowns: mergeTrainingBreakdowns({
-                  globalBreakdowns: globalReport.trainingBreakdowns,
-                  scopedBreakdowns: scopedReport.trainingBreakdowns,
-                }),
-                trainingLibrary: globalReport.trainingLibrary,
-              })
-            : globalReport,
+          report,
+          presentation: createTrainingReportingPresentation(report),
         });
       });
     },

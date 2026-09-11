@@ -181,7 +181,13 @@ describe("provider-native Training navigation", () => {
         store: createRepositoryTrainingNavigationReadStore({ repositories: narrowRepositories }),
       }).getReporting({ context });
       const legacy = await getTrainingTimelineReport({ context, repositories: legacyRepositories });
-      expect(narrow).toEqual(legacy);
+      expect(narrow.timeline).toEqual(legacy.timeline);
+      expect(narrow.report).toEqual(legacy.report);
+      expect(narrow.presentation).toMatchObject({
+        schemaVersion: "1",
+        resistance: { title: "Resistance Training" },
+        history: { title: "Training History" },
+      });
       expect(narrow.report.resistancePerformance).toBeDefined();
       const route = fs.readFileSync("src/app/progress/training/reporting/[reportId]/page.js", "utf8");
       expect(route).toContain("getProductionTrainingNavigationReadService().getReporting");

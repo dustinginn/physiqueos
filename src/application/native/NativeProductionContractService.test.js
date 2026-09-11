@@ -27,10 +27,24 @@ function fixture(overrides = {}) {
     priorities: { getPriorityDetail: call({ id: "priority-1" }) },
     weight: { getCurrentWeight: call({ canonicalId: "weight_2026_09_09", revision: 1 }) },
     training: {
-      getLanding: call({ report: {} }), getReporting: call({ report: {} }), getLibrary: call({ report: {} }),
+      getLanding: call({ report: {} }),
+      getReporting: call({
+        timeline: { contextId: "all", type: "all_history" },
+        report: { resistancePerformance: { raw: true } },
+        presentation: { schemaVersion: "1", resistance: { title: "Resistance Training" } },
+      }),
+      getLibrary: call({ report: {} }),
       getDay: call({ date: "2026-09-09" }), getSession: call({ id: "session-1" }), getExercise: call({ id: "curl" }),
     },
     progress: {
+      getWeight: call({
+        timeline: { contextId: "all", type: "all_history" },
+        report: {
+          current: { id: "weight_2026_09_09", date: "2026-09-09", value: 170, unit: "lb", revision: 2 },
+          recentWeighIns: [], rollingAverages: {}, weeklyAverages: [], extrema: {},
+          chart: { markers: [] }, history: [],
+        },
+      }),
       getNutrition: call({ report: {} }),
       getActivity: call({ report: {} }),
       // Realistic unreconciled shape, matching ProgressEvidenceReadService.getEnergy's
@@ -44,8 +58,8 @@ function fixture(overrides = {}) {
       }),
       getDEXA: call({ report: {} }),
     },
-    photos: { getPhotosTimeline: call({ report: {} }) },
-    briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getArtifact: call({ artifact: { id: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
+    photos: { getNativePhotosTimeline: call({ sessions: [], page: { limit: 12, count: 0, hasMore: false } }) },
+    briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getNativeArtifact: call({ artifact: { artifactId: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
     evidenceReview: { getReview: call({ review: { id: "review-1" } }) },
     timeline: { getPage: call({ items: [], hasMore: false }) },
@@ -87,7 +101,7 @@ describe("Native production contract boundary", () => {
     ["activity", { context: "all" }, "progress", "getActivity"],
     ["energy", { context: "all" }, "progress", "getEnergy"],
     ["dexa", { context: "all" }, "progress", "getDEXA"],
-    ["photos", { context: "all" }, "photos", "getPhotosTimeline"],
+    ["photos", { context: "all" }, "photos", "getNativePhotosTimeline"],
     ["briefing-history", {}, "briefings", "listNativeHistory"],
     ["timeline", { limit: "25" }, "timeline", "getPage"],
   ])("maps %s to its canonical bounded read service", async (resource, input, group, method) => {
@@ -125,6 +139,54 @@ describe("Native production contract boundary", () => {
       }),
     ]);
     expect(Array.isArray(result.data.weeks)).toBe(true);
+  });
+
+  it("uses the revision-safe canonical Weight report and bounds newest-first history", async () => {
+    const current = fixture();
+    current.readers.progress.getWeight.mockResolvedValue({
+      timeline: { contextId: "build-lean-mass", type: "active_goal", goalId: "goal-build", phaseId: "phase-2" },
+      report: {
+        current: { id: "weight-3", date: "2026-09-09", value: 170, unit: "lb", revision: 3 },
+        recentWeighIns: [], rollingAverages: { threeDay: { value: 170 }, sevenDay: { value: 171 } },
+        weeklyAverages: [], extrema: { goalRelevant: ["highest"] }, chart: { markers: [] },
+        history: [{ id: "weight-3" }, { id: "weight-2" }, { id: "weight-1" }],
+      },
+    });
+    const result = await current.service.read({ request: request(), resource: "weight", input: { context: "build-lean-mass", limit: "2" } });
+    expect(current.readers.progress.getWeight).toHaveBeenCalledWith({ context: "build-lean-mass", currentDate: expect.any(Date) });
+    expect(result.data).toMatchObject({
+      current: { id: "weight-3", revision: 3 },
+      context: { goalId: "goal-build", phaseId: "phase-2" },
+      rollingAverages: { threeDay: { value: 170 }, sevenDay: { value: 171 } },
+      page: { limit: 2, count: 2, hasMore: true },
+    });
+    expect(result.data.history.map((item) => item.id)).toEqual(["weight-3", "weight-2"]);
+  });
+
+  it("returns only finished Training Reporting semantics", async () => {
+    const result = await fixture().service.read({ request: request(), resource: "training-reporting" });
+    expect(result.data.reporting).toMatchObject({ resistance: { title: "Resistance Training" } });
+    expect(result.data).not.toHaveProperty("report");
+    expect(JSON.stringify(result.data)).not.toContain("resistancePerformance");
+  });
+
+  it("projects Photo media references without storage internals", async () => {
+    const current = fixture();
+    const mediaId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
+    current.readers.photos.getNativePhotosTimeline.mockResolvedValue({
+      sessions: [{ sessionId: "session-1", revision: 2, photos: [{
+        photoId: "photo-1", poseId: "front-relaxed", comparisonStatus: "comparable",
+        mediaReference: `/api/private-evidence/media/${mediaId}`,
+        prior: { photoId: "photo-0", mediaReference: `/api/private-evidence/media/${mediaId}` },
+      }] }],
+      page: { limit: 12, count: 1, hasMore: false },
+    });
+    const result = await current.service.read({ request: request(), resource: "photos" });
+    expect(result.data.sessions[0].photos[0]).toMatchObject({
+      photoId: "photo-1", poseId: "front-relaxed",
+      media: { mediaId }, prior: { photoId: "photo-0", media: { mediaId } },
+    });
+    expect(JSON.stringify(result.data)).not.toMatch(/private-evidence|storage|spaces|objectKey/i);
   });
 
   it("keeps every manifest resource routable, including current Confidence", async () => {
@@ -173,6 +235,10 @@ describe("Native production contract boundary", () => {
     await expect(current.service.read({ request: request(), resource: "training-session", input: {} }))
       .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
     await expect(current.service.read({ request: request(), resource: "timeline", input: { limit: "201" } }))
+      .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
+    await expect(current.service.read({ request: request(), resource: "weight", input: { limit: "366" } }))
+      .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
+    await expect(current.service.read({ request: request(), resource: "photos", input: { limit: "51" } }))
       .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
   });
 

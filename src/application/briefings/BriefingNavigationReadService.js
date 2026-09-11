@@ -1,7 +1,17 @@
 import { resolveBriefingReviewArtifact } from "../../domain/services/BriefingReviewArtifactResolver.js";
+import { prepareWeeklyBriefingReviewPresentation } from "../../domain/services/WeeklyBriefingReviewPresentationService.js";
+import { prepareMidweekBriefingReviewPresentation } from "../../domain/services/MidweekBriefingPresentationService.js";
+import { createWeeklyBriefingScreenPresentation } from "../../domain/services/WeeklyBriefingScreenPresentationService.js";
+import { resolveWeeklyBriefingPhaseBoundary } from "../../domain/services/WeeklyBriefingPhaseBoundaryReadService.js";
+import { projectConfidenceExplanationForSurface } from "../../domain/presentation/confidenceExplanationPresentation.js";
 
 export function createBriefingNavigationReadService({ store } = {}) {
   if (!store?.getAnalysis || !store?.getArtifact || !store?.listHistory) throw new Error("Briefing navigation requires a read store.");
+  async function loadArtifact({ artifactId, version = null } = {}) {
+    const context = await store.getArtifact({ artifactId });
+    const artifact = resolveBriefingReviewArtifact(context.artifact ? [context.artifact] : [], { artifactId, version });
+    return Object.freeze({ ...context, artifact });
+  }
   return Object.freeze({
     listHistory() {
       return store.listHistory();
@@ -22,10 +32,53 @@ export function createBriefingNavigationReadService({ store } = {}) {
         }),
       });
     },
-    async getArtifact({ artifactId, version = null } = {}) {
-      const context = await store.getArtifact({ artifactId });
-      const artifact = resolveBriefingReviewArtifact(context.artifact ? [context.artifact] : [], { artifactId, version });
-      return Object.freeze({ ...context, artifact });
+    getArtifact: loadArtifact,
+    async getNativeArtifact(input = {}) {
+      const context = await loadArtifact(input);
+      const artifact = context.artifact;
+      if (!artifact) return null;
+      if (artifact.briefing?.weeklyNarrative) {
+        const sourceNarrative = artifact.briefing.weeklyNarrative;
+        const goalId = sourceNarrative.context?.activeGoal?.id ??
+          sourceNarrative.context?.activeGoalSummary?.id ?? null;
+        const goal = context.goals?.find((item) => item.id === goalId) ?? null;
+        const phaseBoundary = resolveWeeklyBriefingPhaseBoundary({ artifact, goal });
+        const narrative = await prepareWeeklyBriefingReviewPresentation({
+          artifact,
+          timeZone: context.user?.timeZone,
+          phaseBoundary,
+        });
+        const finished = {
+          ...narrative,
+          goalConfidence: projectConfidenceExplanationForSurface(
+            narrative.goalConfidence,
+            { assessment: context.confidenceAssessment, surface: "weekly" }
+          ),
+        };
+        return nativeBriefingDetail({
+          artifact,
+          cadence: "weekly",
+          attribution: weeklyAttribution(artifact, finished),
+          presentation: createWeeklyBriefingScreenPresentation(finished),
+        });
+      }
+      if (artifact.cadence === "midweek" && artifact.briefing) {
+        const briefing = prepareMidweekBriefingReviewPresentation({ artifact });
+        const finished = {
+          ...briefing,
+          goalConfidence: projectConfidenceExplanationForSurface(
+            briefing.goalConfidence,
+            { assessment: context.confidenceAssessment, surface: "midweek" }
+          ),
+        };
+        return nativeBriefingDetail({
+          artifact,
+          cadence: "midweek",
+          attribution: midweekAttribution(artifact, finished),
+          presentation: finished,
+        });
+      }
+      return context;
     },
     getDexaArtifact({ scanId } = {}) {
       return store.getDexaArtifact({ scanId });
@@ -37,6 +90,52 @@ export function createBriefingNavigationReadService({ store } = {}) {
       return store.getConfidenceAssessment?.({ assessmentId }) ?? null;
     },
   });
+}
+
+function nativeBriefingDetail({ artifact, cadence, attribution, presentation }) {
+  return Object.freeze({
+    schemaVersion: "1",
+    artifact: Object.freeze({
+      artifactId: artifact.id,
+      artifactType: artifact.artifactType ?? "scheduled",
+      cadence,
+      version: Number(artifact.version ?? 1),
+      evidenceCutoff: artifact.evidenceCutoff ?? null,
+      evidenceWindow: boundedEvidenceWindow(artifact.evidenceWindow),
+      publicationDate: artifact.deliveryDate ?? artifact.generatedAt ?? artifact.createdAt ?? null,
+    }),
+    goalPhaseAttribution: attribution,
+    historical: Object.freeze({ frozen: true, artifactBound: true }),
+    presentation,
+  });
+}
+
+function weeklyAttribution(artifact, narrative) {
+  return boundedAttribution(artifact.goalContext ?? {
+    goalId: narrative.context?.activeGoal?.id ?? narrative.context?.activeGoalSummary?.id,
+    phaseId: narrative.context?.activePhase?.id,
+  });
+}
+
+function midweekAttribution(artifact, briefing) {
+  return boundedAttribution(artifact.goalContext ?? {
+    goalId: briefing.activeGoal?.id,
+    phaseId: briefing.activePhase?.id,
+  });
+}
+
+function boundedAttribution(value) {
+  if (!value || typeof value !== "object") return null;
+  return Object.freeze(Object.fromEntries([
+    "goalId", "phaseId", "goalRevision", "phaseRevision", "source", "attributedAt",
+  ].filter((key) => value[key] != null).map((key) => [key, value[key]])));
+}
+
+function boundedEvidenceWindow(value) {
+  if (!value || typeof value !== "object") return null;
+  return Object.freeze(Object.fromEntries([
+    "id", "startDate", "endDate", "briefingMonth", "deliveryDate", "timeZone", "cutoff",
+  ].filter((key) => value[key] != null).map((key) => [key, value[key]])));
 }
 
 function repositoryNativeSummary(artifact) {

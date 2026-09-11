@@ -36,9 +36,9 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Operating Plan | `operating-plan` | `CoreNavigationReadService.getOperatingPlan` | none | Ready |
 | Priority detail | `priority` | `PriorityNavigationReadService.getPriorityDetail` | `priorityId` | Ready |
 | Morning Check-In context | `morning-check-in` | `CoreNavigationReadService.getMorningCheckIn` | none | Ready |
-| Weight summary | `weight` | `FounderWeightSummaryReadService.getCurrentWeight` | none | Ready |
+| Weight reporting/history | `weight` | `ProgressEvidenceReadService.getWeight` + bounded Native projection | Goal context; history `limit` 1–365, default 90 | Ready; server-derived |
 | Training Logger support | `training-logger` | `CoreNavigationReadService.getTrainingLogger` | none | Ready |
-| Training landing/reporting | `training-landing`, `training-reporting` | `TrainingNavigationReadService` | Goal context | Ready |
+| Training landing/reporting | `training-landing`, `training-reporting` | `TrainingNavigationReadService`; reporting uses `TrainingReportingPresentationService` | Goal context | Ready; reporting presentation is server-derived |
 | Training Library | `training-library` | `TrainingNavigationReadService.getLibrary` | Goal context, category path | Ready |
 | Training Day | `training-day` | `TrainingNavigationReadService.getDay` | date, timezone | Ready |
 | Training Session | `training-session` | `TrainingNavigationReadService.getSession` | canonical session ID | Ready |
@@ -47,9 +47,9 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Activity | `activity` | `ProgressEvidenceReadService.getActivity` | Goal context | Ready |
 | Energy | `energy` | `ProgressEvidenceReadService.getEnergy` composed through `EnergyEvidenceService.createProviderEnergyEvidenceReport` | Goal context | Ready; server-derived |
 | DEXA latest/history/detail data | `dexa` | `ProgressEvidenceReadService.getDEXA` | Goal context | Ready |
-| Progress Photos latest/history/comparison | `photos` | `ProgressPhotosReadService.getPhotosTimeline` | Goal context | Ready |
+| Progress Photos latest/history/comparison | `photos` | `ProgressPhotosReadService.getNativePhotosTimeline` | Goal context; session `limit` 1–50, default 12 | Ready; canonical bounded projection |
 | Briefing history | `briefing-history` | `BriefingNavigationReadService.listNativeHistory` | summary rows only; `limit` 1–50, default 20; opaque artifact cursor | Ready |
-| Weekly/Midweek/Monthly detail | `briefing` | `BriefingNavigationReadService.getArtifact` | artifact ID, optional version | Ready |
+| Weekly/Midweek/Monthly detail | `briefing` | `BriefingNavigationReadService.getNativeArtifact` | artifact ID, optional version | Ready; Weekly/Midweek use finished web presentation composition |
 | DEXA Event | `dexa-event` | `BriefingNavigationReadService.getDexaArtifact` | scan ID | Ready |
 | Photo Event | `photo-event` | `PhotoEventBriefingReadService.getPhotoEvent` | session ID | Ready |
 | Current Confidence detail | `confidence` | active Goal canonical Confidence projection | current date optional | Ready |
@@ -58,6 +58,10 @@ All reads below use `GET /api/v1/native/read/{resource}` unless a different rout
 | Evidence timeline | `timeline` | `EvidenceTimelineReadService.getPage` | limit 1–200 | Ready |
 
 Goal-context reads accept `all`, `build-lean-mass`, or `visible-abs`. The server applies Package 3 chronology and preserves stored historical attribution. Training uses canonical exercise IDs; photo comparisons use canonical session/photo/media/pose identities; DEXA and Event readers preserve Package 5 binding; Briefings preserve Package 6 artifact-bound Confidence. The `energy` resource returns the finished, server-composed Energy report -- `timeline`, `summary` (average intake/expenditure/balance, complete/evidence day counts), `days` (per-day `calorieIntake`, `activeCalories`, `rmr`, `rmrScanId`, `rmrScanDate`, `estimatedExpenditure`, `expenditureKind`, `energyBalance`, `completeness`, `sources`), `weeks`, `recentFourWeeks`, `latestEvidenceDate`, `dataSources`, and `audit` -- never the raw Activity/Nutrition/DEXA source collections; clients must not reconcile Energy from those collections themselves.
+
+The `weight` resource returns one revision-safe canonical current selection, seven recent weigh-ins, canonical rolling 3-day and 7-day averages (using at most one canonical weigh-in per intended day), newest-first weekly averages, Goal-appropriate extrema with dates, bounded newest-first history, Goal/Phase context, and DEXA markers. Same-day corrections are resolved by the canonical server reader before projection; Native never chooses among revisions. The `photos` resource returns bounded newest-first sessions containing only session identity/revision, intended capture date, frozen Goal/Phase attribution, completion/comparison status, canonical photo and pose identities, and current/prior opaque media delivery descriptors. It never returns storage paths, keys, URLs, fingerprints, or provider provenance.
+
+Weekly and Midweek `briefing` detail is a frozen, artifact-bound finished presentation. Weekly uses the same artifact adapter, editorial selector, screen presentation composer, phase-boundary interpretation, and historical Confidence explanation binding as web. Midweek uses the same editorial and Confidence presentation path as web. Native does not select narrative copy or reinterpret current data into a historical artifact. `training-reporting` returns the server-composed reporting projection (status groups, highlights, PRs, attention items, category rollups, and bounded day/session history) with canonical exercise/session identities; raw performance observations are not part of the Native response.
 
 ## Write matrix
 
@@ -85,6 +89,8 @@ HealthKit sends a recomputed canonical day for additions, source corrections, an
 - The API never returns generic collection mutation capability.
 - Current Confidence and historical Confidence remain server-owned and distinct.
 - Weekly, Midweek, Monthly, DEXA Event, and Photo Event artifacts are returned as persisted artifacts; Native does not regenerate them.
+- Weekly and Midweek persisted artifacts are passed through their artifact-only server presentation composers before delivery; no live evidence is read to revise historical meaning.
+- Native Weight, Photos, Briefing detail, Energy, and Training Reporting are finished server projections. Native renders these contracts and does not derive chronology, comparisons, rolling averages, extrema, narrative selection, Confidence, or reporting group semantics.
 - Nutrition/Activity corrections flow through Package 4 canonical reconciliation. Energy remains a read projection from Nutrition, Activity, and applicable DEXA RMR.
 - No API route calls OpenAI or PI at render time.
 

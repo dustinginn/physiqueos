@@ -51,6 +51,17 @@ function queryFixture() {
     row(weightEntry("weight_other_day", "2026-08-30", 169.5, "2026-08-31T15:00:00.000Z")),
   ];
   return vi.fn(async (sql, values = []) => {
+    if (sql.includes("canonical_evidence_records") && sql.includes("LIMIT 1")) {
+      return { rows: [{
+        payload: {
+          canonicalId: "photo_session_2026-08-31",
+          evidence_type: "photo_session",
+          lastObservedAt: "2026-08-31",
+          payload: { sessionId: "photo_session_2026-08-31", evidence_type: "photo_session", observed_at: "2026-08-31" },
+        },
+        version: 1,
+      }], rowCount: 1 };
+    }
     if (sql.includes("canonical_checkin_records") &&
         (values[1] === "weightEntries" || sql.includes("collection_name='weightEntries'"))) {
       return { rows, rowCount: rows.length };

@@ -152,10 +152,9 @@ function buildPlaceholderReportFromContext({ context, options = {}, streamId }) 
   if (streamId === "photos" && options.photoSessionWindow) {
     scopedContext = {
       ...context,
-      photoSessions: reconcilePhotoSessionComparisons(
-        context.photoSessions.filter((session) =>
-          isInsideDateWindow(session.captureDate, options.photoSessionWindow)
-        )
+      photoSessions: scopePhotoSessionsToWindow(
+        context.photoSessions,
+        options.photoSessionWindow
       ),
     };
   }
@@ -581,6 +580,8 @@ function buildWeightReport(
     id: entry.id,
     date: entry.measuredAt,
     value: entry.weight.value,
+    unit: entry.weight.unit,
+    revision: revisionOrNull(entry),
     label: formatWeight(entry.weight),
     detail:
       entry.context?.isDefault === false
@@ -588,6 +589,10 @@ function buildWeightReport(
         : "Morning weight",
   }));
   const weeklyAverages = getWeeklyAverages(values);
+  const history = values.slice().reverse();
+  const current = history[0] ?? null;
+  const highest = weightPoint(getWeightExtreme(weights, "highest"));
+  const lowest = weightPoint(getWeightExtreme(weights, "lowest"));
   const summary = buildWeightSummary({
     allWeights: weights,
     contextId: summaryContextId,
@@ -610,9 +615,63 @@ function buildWeightReport(
         label: "DEXA",
       })),
     },
+    current,
+    recentWeighIns: history.slice(0, 7),
+    rollingAverages: {
+      threeDay: rollingWeightAverage(values, 3),
+      sevenDay: rollingWeightAverage(values, 7),
+    },
+    extrema: {
+      goalRelevant: summaryContextId === "build-lean-mass"
+        ? ["highest"]
+        : summaryContextId === "visible-abs"
+          ? ["lowest"]
+          : ["highest", "lowest"],
+      highest,
+      lowest,
+    },
     weeklyAverages,
-    history: values.slice().reverse(),
+    history,
   };
+}
+
+function rollingWeightAverage(points, requestedDays) {
+  const endDate = points.at(-1)?.date ?? null;
+  const startBoundary = endDate ? shiftIsoDate(endDate, -(requestedDays - 1)) : null;
+  const selected = startBoundary
+    ? points.filter((point) => point.date >= startBoundary && point.date <= endDate)
+    : [];
+  return {
+    requestedDays,
+    observationCount: selected.length,
+    startDate: selected[0]?.date ?? null,
+    endDate: selected.at(-1)?.date ?? null,
+    value: selected.length
+      ? Number(average(selected.map((point) => point.value)).toFixed(1))
+      : null,
+    unit: selected.at(-1)?.unit ?? null,
+  };
+}
+
+function weightPoint(entry) {
+  return entry ? {
+    id: entry.id,
+    date: entry.measuredAt,
+    value: entry.weight.value,
+    unit: entry.weight.unit,
+    revision: revisionOrNull(entry),
+  } : null;
+}
+
+function revisionOrNull(entry) {
+  const revision = entry?.version ?? entry?.revision;
+  return revision == null ? null : Number(revision);
+}
+
+function shiftIsoDate(value, days) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export function createProviderWeightEvidenceReport({
@@ -917,10 +976,11 @@ export function createProviderPhotosEvidenceReport({
   goals = [],
   photoSessionWindow = null,
   progressPhotos = [],
+  photoSessions: suppliedPhotoSessions = null,
   user = null,
   weights = [],
 } = {}) {
-  const photoSessions = createPhotoSessionReadModels({
+  const photoSessions = suppliedPhotoSessions ?? createPhotoSessionReadModels({
     analyses,
     canonicalObjects: canonicalEvidenceObjects,
     legacyPhotos: progressPhotos,
@@ -948,6 +1008,15 @@ export function createProviderPhotosEvidenceReport({
     options: { photoSessionWindow },
     streamId: "photos",
   });
+}
+
+export function scopePhotoSessionsToWindow(photoSessions = [], photoSessionWindow = null) {
+  if (!photoSessionWindow) return photoSessions;
+  return reconcilePhotoSessionComparisons(
+    photoSessions.filter((session) =>
+      isInsideDateWindow(session.captureDate, photoSessionWindow)
+    )
+  );
 }
 
 export function getPlaceholderEntries(streamId, context) {
