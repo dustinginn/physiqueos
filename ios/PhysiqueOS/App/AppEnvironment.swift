@@ -43,19 +43,80 @@ enum NativeAPIEnvironment: String, CaseIterable, Identifiable, Sendable, Hashabl
         }
     }
 
+    /// Superseded by `NativeProductWriteGuard`'s per-domain enablement (Daily
+    /// Driver Write Build) — Sandbox always permits every domain; Founder
+    /// Production permits only `NativeProductWriteDomain.enabledUnderFounderProduction`.
+    /// Kept only as the Sandbox-side shortcut `authorize` still uses.
     var permitsProductWrites: Bool { self == .sandbox }
 }
 
+/// `.activityEvidence` covers only the existing screenshot/manual evidence
+/// workflow (`CREATE_EVIDENCE_INTAKE`/confirm) — HealthKit sync is a
+/// separate, not-yet-implemented capability with no Swift representation
+/// today and will get its own domain case when that work begins; it must
+/// never be folded into this one. `.dexa` and `.progressPhotos` were split
+/// out of a single prior `dexaAndPhotos` case (never referenced by any real
+/// call site) so DEXA's screenshot/PDF evidence workflow can be enabled
+/// independently of Progress Photo writes, which remain out of scope this
+/// pass — there is no Photo capture/upload UI in Native yet, so this split
+/// is precautionary against a future Photos write feature silently
+/// inheriting DEXA's enablement.
 enum NativeProductWriteDomain: String, CaseIterable, Sendable, Hashable {
     case morningCheckInAndWeight
     case priorityCompletion
     case workoutLogger
     case nutrition
-    case activityAndHealthKit
+    case activityEvidence
     case evidenceReview
     case goalAndPhaseTransitions
     case operatingPlan
-    case dexaAndPhotos
+    case dexa
+    case progressPhotos
+
+    /// The bounded set of domains accepted for the Daily Driver Write
+    /// Build. Every other domain (HealthKit sync has no case yet; Evidence
+    /// Review's generic accept/reject queue; Goal/Phase transitions;
+    /// Operating Plan edits; Progress Photo writes) remains denied under
+    /// Founder Production regardless of authority — this is a scope
+    /// decision from the task spec, not a placeholder for "not implemented
+    /// yet." Nutrition/Activity/DEXA's own screenshot-evidence confirm
+    /// commands are gated by their own domain case (`.nutrition`,
+    /// `.activityEvidence`, `.dexa`), not by `.evidenceReview` — that case
+    /// stays reserved for a future general Evidence Review accept/reject
+    /// UI, which this build does not add.
+    ///
+    /// EVERY domain in this task's requested scope was found blocked by a
+    /// genuine, confirmed server-side gap during the Daily Driver Write
+    /// Build investigation — none are enabled. Per this task's own "STOP
+    /// on that domain and report the smallest server correction required"
+    /// rule, this is left empty rather than shipping any write path known
+    /// to silently fail, corrupt read/write identity, or bypass the real
+    /// canonical-commit pipeline. See the task's final report for the
+    /// full per-domain findings and the specific server fix each needs:
+    /// - `.morningCheckInAndWeight`: `submitWeight` writes a different
+    ///   weight-entry id scheme than the web's own weigh-in, with no
+    ///   correction path.
+    /// - `.priorityCompletion`: `completePriority` writes to the wrong
+    ///   canonical collection (`executionItems` instead of `reminders`,
+    ///   which is all the read side ever consults) — 500s or silently
+    ///   no-ops, never shows as completed.
+    /// - `.workoutLogger`: `createTrainingSession`/`correctTrainingSession`/
+    ///   `completeTrainingLogger` write to `trainingPerformanceEvents`, a
+    ///   collection completely disconnected from every Training read view.
+    /// - `.nutrition` / `.activityEvidence`: the screenshot/manual evidence
+    ///   intake pipeline (`CREATE_EVIDENCE_INTAKE` → interpretation →
+    ///   confirm) is a disconnected stub with no media upload endpoint and
+    ///   no interpretation trigger; `CONFIRM_NUTRITION`/`CONFIRM_PHOTO`/
+    ///   `CONFIRM_DEXA`/`CONFIRM_EVIDENCE_REVIEW` are all the same one-line
+    ///   status-flip stub that never performs the real canonical commit.
+    ///   The direct `UPSERT_NUTRITION_DAY`/`SYNC_ACTIVITY_DAY` commands ARE
+    ///   real for a first-time day, but corrections 500 (a required
+    ///   `expectedSemanticFingerprint` isn't exposed on any read model),
+    ///   and neither matches the task's required "existing Native logging
+    ///   workflow."
+    /// - `.dexa`: no direct-write command exists at all; `CONFIRM_DEXA` is
+    ///   the same inert stub — not ready for tomorrow's scan.
+    static let enabledUnderFounderProduction: Set<NativeProductWriteDomain> = []
 }
 
 enum NativeWriteGuardError: Error, Equatable {
@@ -64,8 +125,13 @@ enum NativeWriteGuardError: Error, Equatable {
 
 enum NativeProductWriteGuard {
     static func authorize(_ domain: NativeProductWriteDomain, in environment: NativeAPIEnvironment) throws {
-        guard environment.permitsProductWrites else {
-            throw NativeWriteGuardError.productionReadOnly(domain)
+        switch environment {
+        case .sandbox:
+            return
+        case .founderProduction:
+            guard NativeProductWriteDomain.enabledUnderFounderProduction.contains(domain) else {
+                throw NativeWriteGuardError.productionReadOnly(domain)
+            }
         }
     }
 }

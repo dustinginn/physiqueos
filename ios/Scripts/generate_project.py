@@ -97,6 +97,8 @@ app_files = [
     ("Networking", "EvidenceLocalInterpretation.swift"),
     ("Networking", "FounderCredentialStore.swift"),
     ("Networking", "FounderServerAPI.swift"),
+    ("Networking", "ProductionCommandAPI.swift"),
+    ("Networking", "UUIDv7.swift"),
     ("Networking", "ProductionDailyDriverAPI.swift"),
     ("Networking", "FounderPhotoMediaStore.swift"),
     ("Networking", "FounderProductionPhotoMediaStore.swift"),

@@ -309,7 +309,22 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.last?.httpMethod, "DELETE")
     }
 
-    func testFounderProductionWriteGuardDeniesEveryKnownDomainAndSandboxRemainsIsolated() throws {
+    /// Daily Driver Write Build: the guard moved from a blanket authority
+    /// check to per-domain enablement — a real, contained mechanism ready
+    /// for whichever domains a future patch enables. But this task's own
+    /// server investigation found EVERY requested domain blocked by a
+    /// genuine, confirmed server-side gap (see `enabledUnderFounderProduction`'s
+    /// doc comment and this task's final report for specifics: Weight's
+    /// divergent id scheme, Priority's wrong canonical collection, Workout
+    /// Logger's disconnected-from-every-read-view collection, the
+    /// evidence-intake pipeline's missing media upload/interpretation
+    /// trigger and inert confirm stubs, DEXA's complete absence of a real
+    /// write path) — so the enabled set stays empty and Founder Production
+    /// remains fully read-only, same as before this task. This regression
+    /// test proves Sandbox stays unconditionally permitted while Founder
+    /// Production denies every domain.
+    func testFounderProductionWriteGuardEnablesOnlyTheAcceptedDailyDriverDomainsAndSandboxRemainsIsolated() throws {
+        XCTAssertTrue(NativeProductWriteDomain.enabledUnderFounderProduction.isEmpty)
         for domain in NativeProductWriteDomain.allCases {
             XCTAssertThrowsError(try NativeProductWriteGuard.authorize(domain, in: .founderProduction)) { error in
                 XCTAssertEqual(error as? NativeWriteGuardError, .productionReadOnly(domain))
@@ -738,7 +753,7 @@ final class FounderServerAPITests: XCTestCase {
                            [URLQueryItem(name: "context", value: "all")])
         }
         XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.nutrition, in: .founderProduction))
-        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.activityAndHealthKit, in: .founderProduction))
+        XCTAssertThrowsError(try NativeProductWriteGuard.authorize(.activityEvidence, in: .founderProduction))
     }
 
     func testProductionEnergyUsesFinishedServerReportPreservingMissingZeroPartialAndWeeklyValues() async throws {

@@ -562,7 +562,8 @@ actor ProductionNativeAPI {
         query: [String: String] = [:],
         body: Data?,
         bearer: String?,
-        accept: String
+        accept: String,
+        headers: [String: String] = [:]
     ) async throws -> (Data, HTTPURLResponse) {
         let endpoint = baseURL.appending(path: path)
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
@@ -580,8 +581,64 @@ actor ProductionNativeAPI {
         request.setValue(accept, forHTTPHeaderField: "Accept")
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
         do { return try await transport.data(for: request) }
         catch { throw ProductionNativeError.networkFailure }
+    }
+
+    /// Founder Production's one command dispatch endpoint
+    /// (`POST /api/v1/native/commands`, `Phase3CommandService.js`) —
+    /// every enabled write domain funnels through this single method.
+    /// `idempotencyKey` MUST be the same value across a retry of the same
+    /// logical write attempt (the caller owns generating/persisting it —
+    /// see `ProductionIdempotentSubmission`) so the server's own command
+    /// receipt replay returns the original outcome instead of creating a
+    /// second mutation. `expectedVersion` becomes the `If-Match` header
+    /// (server strips a leading `W/` and surrounding quotes) for
+    /// correction-style commands that require optimistic concurrency;
+    /// omit it for create-only commands that don't need it.
+    func submitCommand<Payload: Encodable, Result: Decodable>(
+        _ commandType: String,
+        idempotencyKey: String,
+        expectedVersion: String? = nil,
+        payload: Payload
+    ) async throws -> ProductionCommandOutcome<Result> {
+        let metadata = ProductionCommandRequestMetadata(
+            commandId: UUIDv7.generateString(),
+            idempotencyKey: idempotencyKey,
+            expectedVersion: expectedVersion
+        )
+        let envelope = ProductionCommandRequestEnvelope(commandType: commandType, metadata: metadata, payload: payload)
+        let encoded: Data
+        do { encoded = try encoder.encode(envelope) }
+        catch { throw ProductionNativeError.invalidResponse }
+
+        var headers = ["Idempotency-Key": idempotencyKey]
+        if let expectedVersion { headers["If-Match"] = "\"\(expectedVersion)\"" }
+
+        let token = try await validAccessToken()
+        var result = try await perform(
+            path: "\(configuration.routeFamily)/commands",
+            method: "POST",
+            body: encoded,
+            bearer: token,
+            accept: "application/json",
+            headers: headers
+        )
+        if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
+            let refreshedToken = try await refreshAccessToken()
+            result = try await perform(
+                path: "\(configuration.routeFamily)/commands",
+                method: "POST",
+                body: encoded,
+                bearer: refreshedToken,
+                accept: "application/json",
+                headers: headers
+            )
+        }
+        try validateHTTP(result.1, data: result.0)
+        do { return try decoder.decode(ProductionCommandOutcome<Result>.self, from: result.0) }
+        catch { throw ProductionNativeError.invalidResponse }
     }
 
     private func validateHTTP(_ response: HTTPURLResponse, data: Data) throws {
