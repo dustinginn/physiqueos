@@ -103,25 +103,8 @@ struct TrainingSessionDetailView: View {
                 Text(session.detail)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                let sources = TrainingSourceEvidencePresentation.filtered(session.sourceEvidence)
-                if !sources.isEmpty {
-                    Text(Self.formatSourceLine(sources))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
             }
         }
-    }
-
-    /// Mirrors `getSessionContent`'s
-    /// `Source: {session.sourceEvidence.join(" + ")}`
-    /// (`TrainingKnowledgeScreen.jsx:782-786`) exactly — a prior revision
-    /// used `", "`, which every other Training source line in this app
-    /// (`TrainingHistoryView`'s `TrainingRecordPreviewRow`,
-    /// `DataSourcesFooterView`) already gets right with `" + "`.
-    /// `internal` (not `private`) so this is directly testable.
-    static func formatSourceLine(_ sources: [String]) -> String {
-        "Source: \(sources.joined(separator: " + "))"
     }
 
     /// Real web semantics (`EvidenceCorrectionService`,

@@ -35,6 +35,12 @@ struct GoalRowView: View {
                         .physiqueOSFont(PhysiqueOSTypography.goalRange)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+                if let phaseLabel {
+                    Text(phaseLabel)
+                        .physiqueOSFont(PhysiqueOSTypography.goalRange)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 8)
@@ -58,10 +64,15 @@ struct GoalRowView: View {
         return false
     }
 
+    private var phaseLabel: String? {
+        if case .primary(_, let phaseLabel) = goal.presentation { return phaseLabel }
+        return nil
+    }
+
     @ViewBuilder
     private var trailing: some View {
         switch goal.presentation {
-        case .primary(let progress):
+        case .primary(let progress, _):
             HStack(spacing: 10) {
                 AnimatedProgressBar(value: progress, color: goal.color.foreground, accessibilityLabel: "\(goal.title) progress")
                     .frame(width: 64)

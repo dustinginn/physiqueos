@@ -75,24 +75,24 @@
 		000000000000000000001084 /* ProductionDailyDriverAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001083 /* ProductionDailyDriverAPI.swift */; };
 		000000000000000000001086 /* FounderPhotoMediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001085 /* FounderPhotoMediaStore.swift */; };
 		000000000000000000001088 /* PhysiqueOSTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001087 /* PhysiqueOSTheme.swift */; };
-		00000000000000000000108A /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001089 /* IconBadge.swift */; };
-		00000000000000000000108C /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108B /* CardContainer.swift */; };
-		00000000000000000000108E /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108D /* SectionHeading.swift */; };
-		000000000000000000001090 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108F /* StatusChip.swift */; };
-		000000000000000000001092 /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001091 /* ConfidenceRing.swift */; };
-		000000000000000000001094 /* ProgressPhotoTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001093 /* ProgressPhotoTile.swift */; };
-		000000000000000000001096 /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001095 /* AnimatedProgressBar.swift */; };
-		000000000000000000001098 /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001097 /* MetricRow.swift */; };
-		00000000000000000000109A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001099 /* Typography.swift */; };
-		00000000000000000000109C /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109B /* PlusJakartaSans.swift */; };
-		00000000000000000000109E /* PrimaryActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109D /* PrimaryActionButton.swift */; };
-		0000000000000000000010A0 /* ScrollScreenLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109F /* ScrollScreenLayout.swift */; };
-		0000000000000000000010A2 /* DateField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A1 /* DateField.swift */; };
-		0000000000000000000010A4 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A3 /* TabPlaceholderView.swift */; };
-		0000000000000000000010A6 /* EvidenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A5 /* EvidenceAttachment.swift */; };
-		0000000000000000000010A8 /* EvidenceSourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A7 /* EvidenceSourcePicker.swift */; };
-		0000000000000000000010AA /* EvidenceStreamPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A9 /* EvidenceStreamPresentation.swift */; };
-		0000000000000000000010AC /* TrainingSourceEvidencePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AB /* TrainingSourceEvidencePresentation.swift */; };
+		00000000000000000000108A /* HomeGreeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001089 /* HomeGreeting.swift */; };
+		00000000000000000000108C /* IconBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108B /* IconBadge.swift */; };
+		00000000000000000000108E /* CardContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108D /* CardContainer.swift */; };
+		000000000000000000001090 /* SectionHeading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000108F /* SectionHeading.swift */; };
+		000000000000000000001092 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001091 /* StatusChip.swift */; };
+		000000000000000000001094 /* ConfidenceRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001093 /* ConfidenceRing.swift */; };
+		000000000000000000001096 /* ProgressPhotoTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001095 /* ProgressPhotoTile.swift */; };
+		000000000000000000001098 /* AnimatedProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001097 /* AnimatedProgressBar.swift */; };
+		00000000000000000000109A /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001099 /* MetricRow.swift */; };
+		00000000000000000000109C /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109B /* Typography.swift */; };
+		00000000000000000000109E /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109D /* PlusJakartaSans.swift */; };
+		0000000000000000000010A0 /* PrimaryActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000109F /* PrimaryActionButton.swift */; };
+		0000000000000000000010A2 /* ScrollScreenLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A1 /* ScrollScreenLayout.swift */; };
+		0000000000000000000010A4 /* DateField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A3 /* DateField.swift */; };
+		0000000000000000000010A6 /* TabPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A5 /* TabPlaceholderView.swift */; };
+		0000000000000000000010A8 /* EvidenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A7 /* EvidenceAttachment.swift */; };
+		0000000000000000000010AA /* EvidenceSourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010A9 /* EvidenceSourcePicker.swift */; };
+		0000000000000000000010AC /* EvidenceStreamPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AB /* EvidenceStreamPresentation.swift */; };
 		0000000000000000000010AE /* InteractivePopGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AD /* InteractivePopGesture.swift */; };
 		0000000000000000000010B0 /* NumericEditField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010AF /* NumericEditField.swift */; };
 		0000000000000000000010B2 /* EvidenceScopeAttributionChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010B1 /* EvidenceScopeAttributionChip.swift */; };
@@ -339,24 +339,24 @@
 		000000000000000000001083 /* ProductionDailyDriverAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProductionDailyDriverAPI.swift"; sourceTree = "<group>"; };
 		000000000000000000001085 /* FounderPhotoMediaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FounderPhotoMediaStore.swift"; sourceTree = "<group>"; };
 		000000000000000000001087 /* PhysiqueOSTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSTheme.swift"; sourceTree = "<group>"; };
-		000000000000000000001089 /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
-		00000000000000000000108B /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
-		00000000000000000000108D /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
-		00000000000000000000108F /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
-		000000000000000000001091 /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
-		000000000000000000001093 /* ProgressPhotoTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoTile.swift"; sourceTree = "<group>"; };
-		000000000000000000001095 /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
-		000000000000000000001097 /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
-		000000000000000000001099 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography.swift"; sourceTree = "<group>"; };
-		00000000000000000000109B /* PlusJakartaSans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlusJakartaSans.swift"; sourceTree = "<group>"; };
-		00000000000000000000109D /* PrimaryActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimaryActionButton.swift"; sourceTree = "<group>"; };
-		00000000000000000000109F /* ScrollScreenLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScrollScreenLayout.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A1 /* DateField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DateField.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A3 /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A5 /* EvidenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachment.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A7 /* EvidenceSourcePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceSourcePicker.swift"; sourceTree = "<group>"; };
-		0000000000000000000010A9 /* EvidenceStreamPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamPresentation.swift"; sourceTree = "<group>"; };
-		0000000000000000000010AB /* TrainingSourceEvidencePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSourceEvidencePresentation.swift"; sourceTree = "<group>"; };
+		000000000000000000001089 /* HomeGreeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeGreeting.swift"; sourceTree = "<group>"; };
+		00000000000000000000108B /* IconBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IconBadge.swift"; sourceTree = "<group>"; };
+		00000000000000000000108D /* CardContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CardContainer.swift"; sourceTree = "<group>"; };
+		00000000000000000000108F /* SectionHeading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SectionHeading.swift"; sourceTree = "<group>"; };
+		000000000000000000001091 /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusChip.swift"; sourceTree = "<group>"; };
+		000000000000000000001093 /* ConfidenceRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceRing.swift"; sourceTree = "<group>"; };
+		000000000000000000001095 /* ProgressPhotoTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoTile.swift"; sourceTree = "<group>"; };
+		000000000000000000001097 /* AnimatedProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AnimatedProgressBar.swift"; sourceTree = "<group>"; };
+		000000000000000000001099 /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetricRow.swift"; sourceTree = "<group>"; };
+		00000000000000000000109B /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Typography.swift"; sourceTree = "<group>"; };
+		00000000000000000000109D /* PlusJakartaSans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlusJakartaSans.swift"; sourceTree = "<group>"; };
+		00000000000000000000109F /* PrimaryActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimaryActionButton.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A1 /* ScrollScreenLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScrollScreenLayout.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A3 /* DateField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DateField.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A5 /* TabPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabPlaceholderView.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A7 /* EvidenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceAttachment.swift"; sourceTree = "<group>"; };
+		0000000000000000000010A9 /* EvidenceSourcePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceSourcePicker.swift"; sourceTree = "<group>"; };
+		0000000000000000000010AB /* EvidenceStreamPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceStreamPresentation.swift"; sourceTree = "<group>"; };
 		0000000000000000000010AD /* InteractivePopGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InteractivePopGesture.swift"; sourceTree = "<group>"; };
 		0000000000000000000010AF /* NumericEditField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NumericEditField.swift"; sourceTree = "<group>"; };
 		0000000000000000000010B1 /* EvidenceScopeAttributionChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceScopeAttributionChip.swift"; sourceTree = "<group>"; };
@@ -695,24 +695,24 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000001087 /* PhysiqueOSTheme.swift */,
-				000000000000000000001089 /* IconBadge.swift */,
-				00000000000000000000108B /* CardContainer.swift */,
-				00000000000000000000108D /* SectionHeading.swift */,
-				00000000000000000000108F /* StatusChip.swift */,
-				000000000000000000001091 /* ConfidenceRing.swift */,
-				000000000000000000001093 /* ProgressPhotoTile.swift */,
-				000000000000000000001095 /* AnimatedProgressBar.swift */,
-				000000000000000000001097 /* MetricRow.swift */,
-				000000000000000000001099 /* Typography.swift */,
-				00000000000000000000109B /* PlusJakartaSans.swift */,
-				00000000000000000000109D /* PrimaryActionButton.swift */,
-				00000000000000000000109F /* ScrollScreenLayout.swift */,
-				0000000000000000000010A1 /* DateField.swift */,
-				0000000000000000000010A3 /* TabPlaceholderView.swift */,
-				0000000000000000000010A5 /* EvidenceAttachment.swift */,
-				0000000000000000000010A7 /* EvidenceSourcePicker.swift */,
-				0000000000000000000010A9 /* EvidenceStreamPresentation.swift */,
-				0000000000000000000010AB /* TrainingSourceEvidencePresentation.swift */,
+				000000000000000000001089 /* HomeGreeting.swift */,
+				00000000000000000000108B /* IconBadge.swift */,
+				00000000000000000000108D /* CardContainer.swift */,
+				00000000000000000000108F /* SectionHeading.swift */,
+				000000000000000000001091 /* StatusChip.swift */,
+				000000000000000000001093 /* ConfidenceRing.swift */,
+				000000000000000000001095 /* ProgressPhotoTile.swift */,
+				000000000000000000001097 /* AnimatedProgressBar.swift */,
+				000000000000000000001099 /* MetricRow.swift */,
+				00000000000000000000109B /* Typography.swift */,
+				00000000000000000000109D /* PlusJakartaSans.swift */,
+				00000000000000000000109F /* PrimaryActionButton.swift */,
+				0000000000000000000010A1 /* ScrollScreenLayout.swift */,
+				0000000000000000000010A3 /* DateField.swift */,
+				0000000000000000000010A5 /* TabPlaceholderView.swift */,
+				0000000000000000000010A7 /* EvidenceAttachment.swift */,
+				0000000000000000000010A9 /* EvidenceSourcePicker.swift */,
+				0000000000000000000010AB /* EvidenceStreamPresentation.swift */,
 				0000000000000000000010AD /* InteractivePopGesture.swift */,
 				0000000000000000000010AF /* NumericEditField.swift */,
 				0000000000000000000010B1 /* EvidenceScopeAttributionChip.swift */,
@@ -1199,24 +1199,24 @@
 				000000000000000000001084 /* ProductionDailyDriverAPI.swift in Sources */,
 				000000000000000000001086 /* FounderPhotoMediaStore.swift in Sources */,
 				000000000000000000001088 /* PhysiqueOSTheme.swift in Sources */,
-				00000000000000000000108A /* IconBadge.swift in Sources */,
-				00000000000000000000108C /* CardContainer.swift in Sources */,
-				00000000000000000000108E /* SectionHeading.swift in Sources */,
-				000000000000000000001090 /* StatusChip.swift in Sources */,
-				000000000000000000001092 /* ConfidenceRing.swift in Sources */,
-				000000000000000000001094 /* ProgressPhotoTile.swift in Sources */,
-				000000000000000000001096 /* AnimatedProgressBar.swift in Sources */,
-				000000000000000000001098 /* MetricRow.swift in Sources */,
-				00000000000000000000109A /* Typography.swift in Sources */,
-				00000000000000000000109C /* PlusJakartaSans.swift in Sources */,
-				00000000000000000000109E /* PrimaryActionButton.swift in Sources */,
-				0000000000000000000010A0 /* ScrollScreenLayout.swift in Sources */,
-				0000000000000000000010A2 /* DateField.swift in Sources */,
-				0000000000000000000010A4 /* TabPlaceholderView.swift in Sources */,
-				0000000000000000000010A6 /* EvidenceAttachment.swift in Sources */,
-				0000000000000000000010A8 /* EvidenceSourcePicker.swift in Sources */,
-				0000000000000000000010AA /* EvidenceStreamPresentation.swift in Sources */,
-				0000000000000000000010AC /* TrainingSourceEvidencePresentation.swift in Sources */,
+				00000000000000000000108A /* HomeGreeting.swift in Sources */,
+				00000000000000000000108C /* IconBadge.swift in Sources */,
+				00000000000000000000108E /* CardContainer.swift in Sources */,
+				000000000000000000001090 /* SectionHeading.swift in Sources */,
+				000000000000000000001092 /* StatusChip.swift in Sources */,
+				000000000000000000001094 /* ConfidenceRing.swift in Sources */,
+				000000000000000000001096 /* ProgressPhotoTile.swift in Sources */,
+				000000000000000000001098 /* AnimatedProgressBar.swift in Sources */,
+				00000000000000000000109A /* MetricRow.swift in Sources */,
+				00000000000000000000109C /* Typography.swift in Sources */,
+				00000000000000000000109E /* PlusJakartaSans.swift in Sources */,
+				0000000000000000000010A0 /* PrimaryActionButton.swift in Sources */,
+				0000000000000000000010A2 /* ScrollScreenLayout.swift in Sources */,
+				0000000000000000000010A4 /* DateField.swift in Sources */,
+				0000000000000000000010A6 /* TabPlaceholderView.swift in Sources */,
+				0000000000000000000010A8 /* EvidenceAttachment.swift in Sources */,
+				0000000000000000000010AA /* EvidenceSourcePicker.swift in Sources */,
+				0000000000000000000010AC /* EvidenceStreamPresentation.swift in Sources */,
 				0000000000000000000010AE /* InteractivePopGesture.swift in Sources */,
 				0000000000000000000010B0 /* NumericEditField.swift in Sources */,
 				0000000000000000000010B2 /* EvidenceScopeAttributionChip.swift in Sources */,

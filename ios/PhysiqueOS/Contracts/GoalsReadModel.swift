@@ -116,6 +116,10 @@ struct GoalConfidenceReadModel: Codable, Equatable {
     var band: String
     var explanation: String
     var source: String
+    var movement: String? = nil
+    var priorScore: Int? = nil
+    var delta: Int? = nil
+    var detail: ConfidenceDetail? = nil
 }
 
 struct GoalProgressReadModel: Codable, Equatable {

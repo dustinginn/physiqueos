@@ -121,6 +121,10 @@ struct ProductionHomeAPI: HomeAPI {
         func readModel() throws -> HomeGoal {
             if presentation?.mode == "phase_trajectory_goal" {
                 let serverProgress = presentation?.trajectory?.goalProgress ?? presentation?.trajectory?.activePhase?.progress
+                let activePhase = presentation?.trajectory?.activePhase
+                let phaseLabel = activePhase?.order.map { order in
+                    activePhase?.phaseName.map { "Phase \(order) · \($0)" } ?? "Phase \(order)"
+                } ?? activePhase?.phaseName
                 return HomeGoal(
                     id: id,
                     title: title,
@@ -129,7 +133,7 @@ struct ProductionHomeAPI: HomeAPI {
                     unit: serverProgress?.unit ?? "",
                     icon: icon,
                     color: color,
-                    presentation: .primary(progress: serverProgress?.clampedProgressPercentage ?? 0),
+                    presentation: .primary(progress: serverProgress?.clampedProgressPercentage ?? 0, phaseLabel: phaseLabel),
                     destination: destination
                 )
             }
@@ -158,7 +162,7 @@ struct ProductionHomeAPI: HomeAPI {
 
     private struct Presentation: Decodable { var mode: String; var trajectory: Trajectory? }
     private struct Trajectory: Decodable { var goalProgress: ServerProgress?; var activePhase: ActivePhase? }
-    private struct ActivePhase: Decodable { var progress: ServerProgress? }
+    private struct ActivePhase: Decodable { var progress: ServerProgress?; var order: Int?; var phaseName: String? }
     private struct ServerProgress: Decodable {
         var baselineValue: Double?
         var latestValue: Double?
@@ -445,7 +449,19 @@ struct ProductionGoalsAPI: GoalsAPI {
                 dateRange: hero.destination,
                 confidence: GoalConfidenceReadModel(
                     value: confidence.score, band: confidence.band ?? "Unavailable",
-                    explanation: confidence.summary ?? "", source: "Server"
+                    explanation: confidence.summary ?? "", source: "Server",
+                    movement: confidence.movement, priorScore: confidence.priorScore, delta: confidence.delta,
+                    detail: confidence.explanation.map {
+                        ConfidenceDetail(
+                            qualitativeLevel: $0.qualitativeLevel,
+                            supportingFactors: $0.supportingFactors,
+                            limitingFactors: $0.limitingFactors,
+                            clarifyingFactors: $0.clarifyingFactors,
+                            uncertaintyStatement: $0.uncertaintyStatement,
+                            movementFactors: $0.movementFactors,
+                            summary: $0.summary
+                        )
+                    }
                 ),
                 goalProgress: progress,
                 phases: phases,
@@ -490,7 +506,25 @@ struct ProductionGoalsAPI: GoalsAPI {
         }
     }
 
-    private struct Confidence: Decodable { var score: Int?; var band: String?; var summary: String? }
+    private struct Confidence: Decodable {
+        var score: Int?
+        var band: String?
+        var summary: String?
+        var movement: String?
+        var priorScore: Int?
+        var delta: Int?
+        var explanation: Explanation?
+
+        struct Explanation: Decodable {
+            var qualitativeLevel: String
+            var summary: String
+            var supportingFactors: [String]
+            var limitingFactors: [String]
+            var movementFactors: [String]
+            var clarifyingFactors: [String]
+            var uncertaintyStatement: String
+        }
+    }
     private struct Hero: Decodable { var title: String; var status: String; var destination: String }
     /// `support` is `null` for a completed journey entry (see
     /// `Package7Server`'s `active-goal` response for the Establish
@@ -1164,6 +1198,173 @@ struct ProductionEnergyAPI: EnergyAPI {
     }
 }
 
+// MARK: - DEXA
+
+/// The server already scopes/selects `dexaScans` server-side before
+/// computing this report (`buildDEXAReport`), so — unlike
+/// `FixtureDEXAAPI`/`DEXAEvidenceCalculator`, which must select which
+/// scans are "in scope" and which is "latest" from a raw fixture list —
+/// Production only decodes and reformats already-final server output. It
+/// must never re-run scan selection itself (DEXA selection/revisions are
+/// server-canonical).
+struct ProductionDEXAAPI: DEXAAPI {
+    let api: ProductionNativeAPI
+
+    func fetchDEXAReport(scope: EvidenceScopeSelection) async throws -> DEXAReportReadModel {
+        let context = try ProductionContext.value(for: scope)
+        let envelope = try await api.readResource("dexa", query: ["context": context], as: Payload.self)
+        return Self.report(from: envelope.data, allLabel: "All DEXA")
+    }
+
+    private static func report(from payload: Payload, allLabel: String) -> DEXAReportReadModel {
+        let report = payload.report
+        return DEXAReportReadModel(
+            title: report.title,
+            subtitle: report.subtitle,
+            scope: payload.timeline.scope(allLabel: allLabel),
+            latestScan: report.latestScan.map {
+                DEXALatestScan(date: $0.date, sourceLabel: "BodySpec PDF Import")
+            },
+            summary: report.summary.map { DEXASummaryItem(label: $0.label, value: $0.value) },
+            delta: report.delta.map {
+                DEXADelta(bodyFatPercentagePoints: $0.bodyFat, fatMassPounds: $0.fatMass, leanMassPounds: $0.leanMass)
+            },
+            bodyFatTrend: DEXAMetricSeries(
+                title: "Body Fat %", unit: "%",
+                points: report.chart.points.map { DEXATrendPoint(id: $0.id, date: $0.date, value: $0.value) }
+            ),
+            coreTrends: ["totalMass", "fatMass", "leanMass", "rmr"].compactMap { id in
+                Self.series(id: id, in: report.charts, title: Self.coreTrendTitle(for: id), unit: Self.coreTrendUnit(for: id))
+            },
+            supplementalDetails: report.latestDetails.map { $0.readModel },
+            supplementalTrends: ["vatMass", "androidGynoidRatio"].compactMap { id in
+                Self.series(id: id, in: report.charts, title: Self.coreTrendTitle(for: id), unit: Self.coreTrendUnit(for: id))
+            },
+            regionalLeanTrends: Self.regionalTrends(in: report.regionalMassCharts, suffix: "-leanMass"),
+            regionalFatTrends: Self.regionalTrends(in: report.regionalMassCharts, suffix: "-fatMass"),
+            history: report.history.map(\.readModel),
+            dataSources: report.dataSources
+        )
+    }
+
+    /// Server chart `id`/`label`/`suffix` are cosmetically inconsistent
+    /// with what this app's own Sandbox-established UI already calls each
+    /// series (server: "Weight"/" kcal"; Native: "Total Mass"/"kcal/day")
+    /// — matched by stable `id`, not by trusting the server's own label
+    /// text, so on-screen copy stays consistent with the UI users already
+    /// know regardless of authority.
+    private static func series(id: String, in charts: [NamedChart], title: String, unit: String) -> DEXAMetricSeries? {
+        guard let chart = charts.first(where: { $0.id == id }) else { return nil }
+        return DEXAMetricSeries(
+            title: title, unit: unit,
+            points: chart.points.map { DEXATrendPoint(id: $0.id, date: $0.date, value: $0.value) }
+        )
+    }
+
+    private static func regionalTrends(in charts: [NamedChart], suffix: String) -> [DEXAMetricSeries] {
+        let order = ["arms", "legs", "trunk", "android", "gynoid"]
+        return order.compactMap { region in
+            guard let chart = charts.first(where: { $0.id == "\(region)\(suffix)" }) else { return nil }
+            return DEXAMetricSeries(
+                title: region.prefix(1).uppercased() + region.dropFirst(), unit: "lb",
+                points: chart.points.map { DEXATrendPoint(id: $0.id, date: $0.date, value: $0.value) }
+            )
+        }
+    }
+
+    private static func coreTrendTitle(for id: String) -> String {
+        switch id {
+        case "totalMass": "Total Mass"
+        case "fatMass": "Fat Mass"
+        case "leanMass": "Lean Mass"
+        case "vatMass": "VAT Mass"
+        case "rmr": "RMR"
+        case "androidGynoidRatio": "A/G Ratio"
+        default: id
+        }
+    }
+
+    private static func coreTrendUnit(for id: String) -> String {
+        switch id {
+        case "rmr": "kcal/day"
+        case "androidGynoidRatio": ""
+        default: "lb"
+        }
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var timeline: ProductionTimeline
+        var report: Report
+    }
+
+    private struct Report: Decodable {
+        var title: String
+        var subtitle: String
+        var latestScan: LatestScan?
+        var summary: [SummaryItem]
+        var delta: Delta?
+        var chart: Chart
+        var charts: [NamedChart]
+        var regionalMassCharts: [NamedChart]
+        var latestDetails: [DetailTuple]
+        var history: [HistoryRow]
+        var dataSources: [DEXADataSource]
+    }
+
+    private struct LatestScan: Decodable { var date: String }
+    private struct SummaryItem: Decodable { var label: String; var value: String }
+    private struct Delta: Decodable { var bodyFat: String; var fatMass: String; var leanMass: String }
+    private struct Chart: Decodable { var points: [ChartPoint] }
+    private struct ChartPoint: Decodable { var id: String; var date: String; var value: Double? }
+    private struct NamedChart: Decodable { var id: String; var points: [ChartPoint] }
+
+    /// `latestDetails` is a heterogeneous JSON tuple array on the wire
+    /// (`["VAT Mass", 12.3, " lb", 2]`, the trailing precision sometimes
+    /// omitted) — not a keyed object — so it needs an `unkeyedContainer`
+    /// decode rather than ordinary `Decodable` synthesis. Formatting rule
+    /// mirrors the real product's own `MetricRows` component exactly:
+    /// `Number.isFinite(value) ? value.toFixed(precision ?? 1)+unit : "Unavailable"`.
+    private struct DetailTuple: Decodable {
+        var label: String
+        var value: Double?
+        var unit: String
+        var precision: Int
+
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            label = try container.decode(String.self)
+            value = try container.decodeNil() ? nil : try container.decode(Double.self)
+            unit = try container.decode(String.self)
+            precision = container.isAtEnd ? 1 : try container.decode(Int.self)
+        }
+
+        var readModel: DEXADetailRow {
+            let formatted = value.map { String(format: "%.\(precision)f%@", $0, unit) } ?? "Unavailable"
+            return DEXADetailRow(label: label, value: formatted)
+        }
+    }
+
+    private struct HistoryRow: Decodable {
+        var id: String
+        var date: String
+        var bodyFatPercentage: Double?
+        var fatMass: Double?
+        var leanMass: Double?
+        var rmr: Double?
+
+        var readModel: DEXAScanHistoryRow {
+            DEXAScanHistoryRow(
+                id: id, date: date,
+                bodyFatPercentage: bodyFatPercentage.map { String(format: "%.1f%%", $0) } ?? "Pending",
+                fatMass: fatMass.map { String(format: "%.1f lb", $0) } ?? "Pending",
+                leanMass: leanMass.map { String(format: "%.1f lb", $0) } ?? "Pending",
+                restingMetabolicRate: rmr.map { "\(Int($0.rounded())) kcal/day" } ?? "Pending",
+                sourceLabel: "BodySpec PDF Import"
+            )
+        }
+    }
+}
+
 // MARK: - Evidence Hub summary projection
 
 /// Composes the Evidence Hub's per-stream summary rows from the same
@@ -1191,13 +1392,14 @@ struct ProductionEvidenceAPI: EvidenceAPI {
         let nutrition = try await ProductionNutritionAPI(api: api).fetchNutritionLanding(scope: .all)
         let activity = try await ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
         let energy = try await ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
+        let dexa = try await ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
 
         let streams: [EvidenceStreamSummary] = [
             trainingStream(training),
             nutritionStream(nutrition),
             weightStream(weight),
             notYetAvailableStream(id: "photos", title: "Progress Photos", tone: .primary),
-            notYetAvailableStream(id: "dexa", title: "DEXA", tone: .success),
+            dexaStream(dexa),
             activityStream(activity),
             energyStream(energy),
             comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
@@ -1245,6 +1447,19 @@ struct ProductionEvidenceAPI: EvidenceAPI {
             status: latest != nil ? .available : .placeholder,
             tone: .evidence,
             destination: .progressStream(streamId: "weight")
+        )
+    }
+
+    private func dexaStream(_ report: DEXAReportReadModel) -> EvidenceStreamSummary {
+        let latest = report.latestScan
+        return EvidenceStreamSummary(
+            id: "dexa", title: "DEXA",
+            metric: report.summary.first(where: { $0.label == "Body Fat" })?.value ?? "No scan recorded",
+            trend: latest != nil ? "Last scan \(latest!.date)" : "No scan recorded",
+            lastUpdated: latest?.date,
+            status: latest != nil ? .available : .placeholder,
+            tone: .success,
+            destination: .progressStream(streamId: "dexa")
         )
     }
 

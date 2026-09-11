@@ -75,6 +75,8 @@ private struct ActiveGoalDetailContent: View {
     let allowsWrites: Bool
     let onNavigate: (AppDestination) -> Void
 
+    @State private var isShowingConfidenceDetail = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             hero
@@ -86,6 +88,11 @@ private struct ActiveGoalDetailContent: View {
             trainingProgress
             turningPoints
             currentStrategy
+        }
+        .sheet(isPresented: $isShowingConfidenceDetail) {
+            if let detail = goal.confidence.detail {
+                ConfidenceDetailSheet(confidence: goal.confidence.value ?? 0, detail: detail)
+            }
         }
     }
 
@@ -124,11 +131,21 @@ private struct ActiveGoalDetailContent: View {
                     Text(goal.confidence.value.map { "\($0)% · \(goal.confidence.band)" } ?? goal.confidence.band)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    if goal.confidence.detail != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    }
                     Spacer(minLength: 8)
                     Text(goal.dateRange)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if goal.confidence.detail != nil { isShowingConfidenceDetail = true }
+                }
+                .accessibilityAddTraits(goal.confidence.detail != nil ? .isButton : [])
             }
         }
         .padding(.bottom, 12)

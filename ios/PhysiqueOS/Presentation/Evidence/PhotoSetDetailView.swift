@@ -32,8 +32,8 @@ struct PhotoSetDetailView: View {
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .task {
-            if viewModel == nil { viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)
             await viewModel?.load()
             await environment.founderPhotoMediaStore.loadManifestIfNeeded()
         }

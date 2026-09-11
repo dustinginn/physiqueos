@@ -25,6 +25,13 @@ struct ConfidenceDetailSheet: View {
                     .physiqueOSFont(PhysiqueOSTypography.sheetSectionHeading)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
 
+                if !detail.summary.isEmpty {
+                    Text(detail.summary)
+                        .physiqueOSFont(PhysiqueOSTypography.sheetBody)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+
+                factorGroup(systemImage: "arrow.left.arrow.right.circle.fill", title: "What changed", items: detail.movementFactors)
                 factorGroup(systemImage: "checkmark.circle.fill", title: "What supports confidence", items: detail.supportingFactors)
                 factorGroup(systemImage: "questionmark.circle.fill", title: "What limits confidence", items: detail.limitingFactors)
                 factorGroup(systemImage: "chart.line.uptrend.xyaxis", title: "What will make confidence clearer", items: detail.clarifyingFactors)

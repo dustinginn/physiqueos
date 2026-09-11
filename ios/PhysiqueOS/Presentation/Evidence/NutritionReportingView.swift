@@ -91,7 +91,6 @@ struct NutritionReportingView: View {
                 if let calories = report.calories { caloriesContent(calories) }
                 if let macros = report.macros { macrosContent(macros) }
                 if let meals = report.meals { mealsContent(meals) }
-                NutritionReportDataSourcesFooterView(items: report.dataSources)
             }
         }
     }

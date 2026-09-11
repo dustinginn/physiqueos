@@ -298,17 +298,17 @@ struct DEXABriefingSections: View {
                 Text(content.interpretation.opening)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                labeledParagraph(content.interpretation.primaryLabel, content.interpretation.primaryText)
-                labeledParagraph("Lean Tissue", content.interpretation.leanMassText)
-                labeledParagraph("Where Change Occurred", content.interpretation.regionalText)
+                labeledParagraph(content.fatLossInterpretationLabel, content.interpretation.fatLoss)
+                labeledParagraph("Lean Tissue", content.interpretation.leanMass)
+                labeledParagraph("Where Change Occurred", content.interpretation.regional)
                 if let phaseMeaning = content.interpretation.phaseMeaning {
                     labeledParagraph("Phase & Strategy", phaseMeaning)
                 }
                 if let stoodOut = content.interpretation.stoodOut {
                     labeledParagraph("What Stood Out", stoodOut)
                 }
-                labeledParagraph("Supporting Context", content.interpretation.supportingEvidenceText)
-                labeledParagraph("Uncertainty", content.interpretation.uncertaintyText)
+                labeledParagraph("Supporting Context", content.interpretation.supportingEvidence)
+                labeledParagraph("Uncertainty", content.interpretation.uncertainty)
             }
         }
     }

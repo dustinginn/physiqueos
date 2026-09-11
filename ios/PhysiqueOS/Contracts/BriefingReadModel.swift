@@ -520,22 +520,29 @@ struct DEXAProgressSection: Codable, Equatable {
     var timeline: DEXACutTimeline
 }
 
+/// Mirrors `DEXAEventNarrativeService.js`'s real wire field names exactly
+/// (`opening/fatLoss/leanMass/regional/supportingEvidence/uncertainty`) — a
+/// prior revision invented differently-named fields
+/// (`primaryLabel`/`primaryText`/`leanMassText`/etc.) that never matched
+/// what the server actually sends, verified directly against
+/// `DEXAEventBriefingScreen.jsx`'s own render (`<Interpret label=... />`
+/// calls). `goalProgress`/`guardrailStatus` are real wire fields but the
+/// real screen never renders them (both are redundant restatements of
+/// `fatLoss`) — decoded for field-for-field fidelity only, not displayed.
 struct DEXAInterpretationSection: Codable, Equatable {
     var opening: String
-    /// Label varies by narrative branch on the real product (e.g. a
-    /// fat-loss guardrail framing vs. a lean-mass-gain framing) — carried
-    /// as opaque server-authored text/label rather than a fixed enum.
-    var primaryLabel: String
-    var primaryText: String
-    var leanMassText: String
-    var regionalText: String
+    var fatLoss: String
+    var leanMass: String
+    var regional: String
     /// Present only when the real narrative actually composed a
     /// phase-and-strategy paragraph.
     var phaseMeaning: String?
     /// Present only when something genuinely stood out this scan.
     var stoodOut: String?
-    var supportingEvidenceText: String
-    var uncertaintyText: String
+    var supportingEvidence: String
+    var uncertainty: String
+    var goalProgress: String?
+    var guardrailStatus: String?
 }
 
 struct DEXACoachInsightSection: Codable, Equatable {
@@ -585,8 +592,16 @@ struct DEXABriefingContent: Codable, Equatable {
     var coachInsight: DEXACoachInsightSection
     var phaseReview: DEXAPhaseReviewSummary?
     var goalCompletionHandoff: DEXAGoalCompletionHandoff?
+    /// Drives the "Fat loss" vs. "Body-fat guardrail" label on the
+    /// Interpretation card's second row — mirrors
+    /// `DEXAEventBriefingScreen.jsx`'s own
+    /// `semanticGoalType==="fat_loss" ? "Fat loss" : "Body-fat guardrail"`.
+    var semanticGoalType: String?
 
     var isBaselineScan: Bool { priorScanId == nil }
+    var fatLossInterpretationLabel: String {
+        semanticGoalType == "fat_loss" ? "Fat loss" : "Body-fat guardrail"
+    }
 }
 
 // MARK: - Photo Event content (verified section list: Hero → Snapshot

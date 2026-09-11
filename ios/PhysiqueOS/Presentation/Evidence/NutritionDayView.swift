@@ -78,11 +78,6 @@ struct NutritionDayView: View {
                 Text(day.detail)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if !day.sourceEvidence.isEmpty {
-                    Text("Source: \(day.sourceEvidence.joined(separator: " + "))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
             }
         }
     }

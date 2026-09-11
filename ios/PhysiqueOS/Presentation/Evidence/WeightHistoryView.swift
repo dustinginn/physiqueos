@@ -92,7 +92,6 @@ struct WeightHistoryView: View {
                 trendCard(report.chart)
                 weeklyAveragesCard(report.weeklyAverages)
                 historyCard(report.history)
-                DataSourcesFooterView(items: report.dataSources)
             }
         }
     }
@@ -479,35 +478,6 @@ private struct EvidenceDisclosureRow<Summary: View, Expanded: View>: View {
 
             expanded
                 .padding(.top, 12)
-        }
-    }
-}
-
-/// `TrainingSourceMetadataFooter`'s sibling for Weight's own
-/// `getDataSources("weight")` shape — same per-vertical convention as
-/// Nutrition's/Activity's own private copies.
-private struct DataSourcesFooterView: View {
-    let items: [WeightDataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
         }
     }
 }

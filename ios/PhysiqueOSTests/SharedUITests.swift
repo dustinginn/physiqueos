@@ -201,31 +201,45 @@ final class SharedUITests: XCTestCase {
         XCTAssertEqual(EvidenceSourceOption.allCases, [.photos, .files])
     }
 
-    // MARK: - Training source evidence never exposes a raw internal identifier
+    // MARK: - Home greeting reflects the device's own clock, not the server's
 
-    /// A Training Logger draft-session id is an internal identifier, not
-    /// provenance a Founder should ever read — the server's own label
-    /// formatter falls back to it verbatim when it doesn't recognize the
-    /// artifact pattern (see `TrainingSourceEvidencePresentation`'s doc
-    /// comment), so Native must filter it out at the presentation boundary.
-    func testTrainingSourceEvidenceFiltersRawDraftIdentifiersButKeepsCleanLabels() {
-        let sources = [
-            "Training Logger Draft Training Logger Dc4e0ad0-2a13-4e28-A2ed-B37497d7b80a",
-            "Screenshot",
-        ]
-        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), ["Screenshot"])
+    /// The server's `home.header.greeting` is computed from the server
+    /// process's own clock (effectively UTC), not the Founder's device —
+    /// a 10 PM Pacific viewing was shown "Good morning," because that
+    /// instant is early morning UTC. Native must compute this from the
+    /// device's own calendar/timezone instead of trusting that field.
+    func testHomeGreetingUsesDeviceLocalHourAcrossAllThreeDayparts() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        func date(hour: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: hour))!
+        }
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 5), calendar: calendar), "Good morning,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 11), calendar: calendar), "Good morning,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 12), calendar: calendar), "Good afternoon,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 16), calendar: calendar), "Good afternoon,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 17), calendar: calendar), "Good evening,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 22), calendar: calendar), "Good evening,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 0), calendar: calendar), "Good evening,")
+        XCTAssertEqual(HomeGreeting.text(for: date(hour: 4), calendar: calendar), "Good evening,")
     }
 
-    /// When every source label is an unpresentable raw identifier, the
-    /// filtered list must be empty — never fall back to showing the raw
-    /// value because there's nothing "nicer" available.
-    func testTrainingSourceEvidenceOmitsTheSourceLineEntirelyWhenNoSafeLabelExists() {
-        let sources = ["Training Logger Draft Training Logger Dc4e0ad0-2a13-4e28-A2ed-B37497d7b80a"]
-        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), [])
-    }
+    /// The exact reported bug: 10 PM Pacific must never resolve to
+    /// "Good morning," regardless of which timezone the calling process
+    /// happens to be running in — this pins the greeting to the supplied
+    /// calendar's timezone, not the host's default.
+    func testHomeGreetingAtTenPMPacificIsEveningRegardlessOfHostTimezone() {
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let tenPMPacific = pacific.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: 22))!
+        XCTAssertEqual(HomeGreeting.text(for: tenPMPacific, calendar: pacific), "Good evening,")
 
-    func testTrainingSourceEvidenceLeavesOrdinaryLabelsUntouched() {
-        let sources = ["Screenshot", "Typed evidence", "Correction"]
-        XCTAssertEqual(TrainingSourceEvidencePresentation.filtered(sources), sources)
+        // The same instant, read through a UTC calendar, is early morning —
+        // exactly the mismatch that produced the original bug when the
+        // computation ran in the server's (UTC) clock instead of the
+        // viewer's own.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(HomeGreeting.text(for: tenPMPacific, calendar: utc), "Good morning,")
     }
 }

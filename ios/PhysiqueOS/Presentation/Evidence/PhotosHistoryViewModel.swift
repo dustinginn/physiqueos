@@ -20,6 +20,8 @@ final class PhotosHistoryViewModel {
     func load() async {
         do {
             state = .loaded(try await api.fetchPhotosLanding(scope: scope))
+        } catch is NotYetAvailablePhotosAPI.NotYetAvailable {
+            state = .failed("Progress Photos reads are not yet available in Founder Production.")
         } catch {
             state = .failed("Progress Photos could not be loaded.")
         }

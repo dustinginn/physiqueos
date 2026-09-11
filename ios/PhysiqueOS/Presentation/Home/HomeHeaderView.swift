@@ -9,7 +9,7 @@ struct HomeHeaderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(header.greeting)
+            Text(HomeGreeting.text())
                 .physiqueOSFont(PhysiqueOSTypography.greeting)
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
             (

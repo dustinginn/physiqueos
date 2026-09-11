@@ -115,8 +115,8 @@ final class AppEnvironment {
     /// proof (see `WeightEvidenceAPI.swift`'s doc comment).
     private let sandboxWeightEvidenceAPI: WeightEvidenceAPI
     private let productionWeightEvidenceAPI: ProductionWeightEvidenceAPI
-    let dexaAPI: DEXAAPI
-    let photosAPI: PhotosAPI
+    private let sandboxDEXAAPI: DEXAAPI
+    private let sandboxPhotosAPI: PhotosAPI
     private let sandboxEnergyAPI: EnergyAPI
     /// The read seam for the canonical Operating Plan execution-item
     /// catalog. `loggingSandboxStore` loads the same catalog synchronously
@@ -202,6 +202,23 @@ final class AppEnvironment {
         nativeAuthority == .founderProduction ? ProductionOperatingPlanAPI(api: productionNativeAPI) : nil
     }
 
+    var dexaAPI: DEXAAPI {
+        nativeAuthority == .founderProduction ? ProductionDEXAAPI(api: productionNativeAPI) : sandboxDEXAAPI
+    }
+
+    /// Progress Photos has a genuine, narrow server-side gap under Founder
+    /// Production (the `photos` native resource strips `poseId`/
+    /// `comparisonStatus` before it reaches the wire, even though both
+    /// already exist on the server's own in-memory session objects — see
+    /// this task's final report). A prior revision left this a stored,
+    /// never-authority-aware constant, so tapping into Photos under
+    /// Founder Production silently rendered the bundled Sandbox fixture as
+    /// if it were live — the same fixture-leak defect class already fixed
+    /// for Evidence Hub/Log/Goal chronology.
+    var photosAPI: PhotosAPI {
+        nativeAuthority == .founderProduction ? NotYetAvailablePhotosAPI() : sandboxPhotosAPI
+    }
+
     init(
         nativeAuthority: NativeAPIEnvironment? = nil,
         authoritySelectionStore: NativeAuthoritySelectionStore = UserDefaultsNativeAuthoritySelectionStore(),
@@ -238,8 +255,8 @@ final class AppEnvironment {
         self.sandboxNutritionAPI = nutritionAPI
         self.sandboxWeightEvidenceAPI = weightEvidenceAPI
         self.productionWeightEvidenceAPI = ProductionWeightEvidenceAPI(api: productionNativeAPI)
-        self.dexaAPI = dexaAPI
-        self.photosAPI = photosAPI
+        self.sandboxDEXAAPI = dexaAPI
+        self.sandboxPhotosAPI = photosAPI
         self.sandboxEnergyAPI = energyAPI
         self.sandboxPriorityAPI = priorityAPI
         self.sandboxTrainingLoggerAPI = trainingLoggerAPI

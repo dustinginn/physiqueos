@@ -79,7 +79,7 @@ final class DEXABriefingTests: XCTestCase {
             hero: DEXABriefingHero(title: "First scan on file.", body: "A baseline for everything that follows.", results: [], milestones: []),
             snapshot: DEXABriefingSnapshot(scanDate: "2026-05-24", daysBetweenScans: 0, weightLb: "185.5 lb", bodyFatPercent: "14.8%", fatMassLb: "27.4 lb", leanMassLb: "154.8 lb", restingMetabolicRateKcal: nil),
             progress: DEXAProgressSection(headline: [], regionalFat: [], regionalLean: [], supplemental: [], timeline: DEXACutTimeline(timelineLabel: "Available Body-Composition History", isSimulated: false, baselineDate: "2026-05-24", currentDate: "2026-05-24", elapsedDays: 0, scans: [], metrics: [], summary: "A single scan on file — nothing to compare yet.")),
-            interpretation: DEXAInterpretationSection(opening: "A starting point.", primaryLabel: "Baseline", primaryText: "No comparison available yet.", leanMassText: "Baseline only.", regionalText: "Baseline only.", phaseMeaning: nil, stoodOut: nil, supportingEvidenceText: "One scan on file.", uncertaintyText: "Nothing to compare against yet."),
+            interpretation: DEXAInterpretationSection(opening: "A starting point.", fatLoss: "No comparison available yet.", leanMass: "Baseline only.", regional: "Baseline only.", phaseMeaning: nil, stoodOut: nil, supportingEvidence: "One scan on file.", uncertainty: "Nothing to compare against yet."),
             coachInsight: DEXACoachInsightSection(biggestWin: "A real baseline is now on file.", protect: "Nothing to protect yet.", watch: "The next scan.", next: "Keep logging."),
             phaseReview: nil, goalCompletionHandoff: nil
         )

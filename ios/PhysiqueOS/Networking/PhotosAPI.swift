@@ -22,6 +22,29 @@ enum PhotosScopeDefault {
     static let selection: EvidenceScopeSelection = .goal(goalId: EvidenceCanonicalGoalID.buildLeanMass)
 }
 
+/// The `photos` native resource strips `poseId`/`comparisonStatus` from
+/// every reachable per-view field before it reaches the wire — both exist
+/// on the server's own in-memory session objects, but are discarded by
+/// `toGalleryEvidenceRecord`/`getPhotoReportExtras`
+/// (`ProgressReportingService.js:1022-1063`) — so `PhotoSetRecord.views`
+/// cannot be built correctly from what Founder Production actually sends
+/// today (see this task's final report). Until that's fixed server-side,
+/// this conformance throws rather than silently falling back to
+/// `FixturePhotosAPI`'s bundled Sandbox data, which would misrepresent
+/// stale fixture photos as Founder Production truth — the same class of
+/// defect already corrected for Evidence Hub/Log/Goal chronology.
+struct NotYetAvailablePhotosAPI: PhotosAPI {
+    struct NotYetAvailable: Error {}
+
+    func fetchPhotosLanding(scope: EvidenceScopeSelection) async throws -> PhotosLandingReadModel {
+        throw NotYetAvailable()
+    }
+
+    func fetchPhotoSet(setId: String) async throws -> PhotoSetRecord? {
+        throw NotYetAvailable()
+    }
+}
+
 /// Fixture-backed conformance: decodes one bundled JSON file of raw,
 /// chronologically-ascending photo sets, then derives the entire scoped
 /// report (with comparisons attached) through `PhotosEvidenceCalculator`.

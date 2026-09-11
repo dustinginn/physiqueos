@@ -95,7 +95,6 @@ struct NutritionHistoryView: View {
                 infoLinksCard(title: "Reporting", links: landing.reportingLinks)
                 infoLinksCard(title: "Nutrition Areas", links: landing.nutritionAreas)
                 recentHistoryCard(landing.nutritionHistory)
-                DataSourcesFooterView(items: landing.dataSources)
             }
         }
     }
@@ -285,11 +284,6 @@ private struct NutritionHistoryRow: View {
                 Text(day.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if !day.sourceEvidence.isEmpty {
-                    Text("Source: \(day.sourceEvidence.joined(separator: " + "))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
@@ -366,34 +360,3 @@ struct NutritionMacroGridView: View {
 }
 
 /// `TrainingSourceMetadataFooter`'s sibling for Nutrition's own
-/// `getDataSources("nutrition")` shape — mirrors `ActivityHistoryView`'s
-/// own private `DataSourcesFooterView` exactly (same `{name, status}`
-/// shape) but kept as its own type rather than shared, matching this
-/// codebase's established per-vertical convention (see
-/// `ActivityHistoryView.swift`'s own doc comment on why Activity's isn't
-/// shared with Training's either).
-private struct DataSourcesFooterView: View {
-    let items: [NutritionDataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
-    }
-}

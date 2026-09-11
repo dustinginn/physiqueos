@@ -97,7 +97,6 @@ struct TrainingHistoryView: View {
                 recentHistoryCard(landing)
                 currentProtocolCard(landing.currentProtocol)
                 RelatedGoalsView(goals: landing.relatedGoals)
-                DataSourcesFooterView(items: landing.sourceEvidence)
             }
         }
     }
@@ -516,12 +515,6 @@ private struct TrainingRecordPreviewRow: View {
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
             }
-            let sources = TrainingSourceEvidencePresentation.filtered(sourceEvidence)
-            if !sources.isEmpty {
-                Text("Source: \(sources.joined(separator: " + "))")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -777,34 +770,6 @@ private struct RelatedGoalsView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-/// `TrainingSourceMetadataFooter` — a plain border-top "Data Sources"
-/// footer of label/sources pairs, only rendered when non-empty.
-private struct DataSourcesFooterView: View {
-    let items: [TrainingSourceEvidenceItem]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.label)
-                        Spacer(minLength: 8)
-                        Text(item.sources.joined(separator: " + "))
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
             }
         }

@@ -73,6 +73,39 @@ struct ConfidenceDetail: Codable, Equatable {
     var limitingFactors: [String]
     var clarifyingFactors: [String]
     var uncertaintyStatement: String
+    var movementFactors: [String] = []
+    var summary: String = ""
+
+    init(
+        qualitativeLevel: String, supportingFactors: [String], limitingFactors: [String],
+        clarifyingFactors: [String], uncertaintyStatement: String,
+        movementFactors: [String] = [], summary: String = ""
+    ) {
+        self.qualitativeLevel = qualitativeLevel
+        self.supportingFactors = supportingFactors
+        self.limitingFactors = limitingFactors
+        self.clarifyingFactors = clarifyingFactors
+        self.uncertaintyStatement = uncertaintyStatement
+        self.movementFactors = movementFactors
+        self.summary = summary
+    }
+
+    // A prior revision relied on Swift's synthesized `Decodable`, which
+    // does NOT treat a non-Optional property's default value as "use this
+    // when the key is missing" — it still requires the key present, so
+    // adding `movementFactors`/`summary` broke every older fixture that
+    // predates those fields. This custom decoder is what actually makes
+    // them backward-compatible optional additions.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        qualitativeLevel = try container.decode(String.self, forKey: .qualitativeLevel)
+        supportingFactors = try container.decode([String].self, forKey: .supportingFactors)
+        limitingFactors = try container.decode([String].self, forKey: .limitingFactors)
+        clarifyingFactors = try container.decode([String].self, forKey: .clarifyingFactors)
+        uncertaintyStatement = try container.decode(String.self, forKey: .uncertaintyStatement)
+        movementFactors = try container.decodeIfPresent([String].self, forKey: .movementFactors) ?? []
+        summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
+    }
 }
 
 enum HomeActionIcon: String, Codable {
@@ -107,7 +140,13 @@ enum HomeGoalIcon: String, Codable {
 /// `phase_trajectory` goal presentations exist on the web but are deferred
 /// — see the Native V1 doc update for this slice.
 enum HomeGoalPresentation: Equatable {
-    case primary(progress: Int)
+    /// `phaseLabel` — e.g. "Phase 2 · Lean Mass Build" — mirrors the same
+    /// canonical phase order/name Goals Detail shows in "Your Journey",
+    /// derived from the server's `trajectory.activePhase.order`/`.phaseName`.
+    /// `nil` for a goal with no explicit phase chronology (matching the
+    /// server's own `hasExplicitPhases` gate) — never a Native-invented
+    /// ordinal.
+    case primary(progress: Int, phaseLabel: String? = nil)
     case supporting(status: String, detail: String)
 }
 
@@ -126,7 +165,7 @@ struct HomeGoal: Codable, Equatable, Identifiable {
 extension HomeGoal {
     private enum CodingKeys: String, CodingKey {
         case id, title, current, target, unit, icon, color, destination
-        case presentationMode, progress, status, detail
+        case presentationMode, progress, status, detail, phaseLabel
     }
 
     init(from decoder: Decoder) throws {
@@ -142,7 +181,10 @@ extension HomeGoal {
         let mode = try container.decode(String.self, forKey: .presentationMode)
         switch mode {
         case "primary":
-            presentation = .primary(progress: try container.decode(Int.self, forKey: .progress))
+            presentation = .primary(
+                progress: try container.decode(Int.self, forKey: .progress),
+                phaseLabel: try container.decodeIfPresent(String.self, forKey: .phaseLabel)
+            )
         case "supporting":
             presentation = .supporting(
                 status: try container.decode(String.self, forKey: .status),
@@ -167,9 +209,10 @@ extension HomeGoal {
         try container.encode(color, forKey: .color)
         try container.encodeIfPresent(destination, forKey: .destination)
         switch presentation {
-        case .primary(let progress):
+        case .primary(let progress, let phaseLabel):
             try container.encode("primary", forKey: .presentationMode)
             try container.encode(progress, forKey: .progress)
+            try container.encodeIfPresent(phaseLabel, forKey: .phaseLabel)
         case .supporting(let status, let detail):
             try container.encode("supporting", forKey: .presentationMode)
             try container.encode(status, forKey: .status)

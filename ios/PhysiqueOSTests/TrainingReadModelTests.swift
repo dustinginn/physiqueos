@@ -560,17 +560,6 @@ final class TrainingReadModelTests: XCTestCase {
 
     // MARK: - Workout Detail fidelity (Stage 3)
 
-    /// A prior revision joined source labels with `", "` — the real web
-    /// (`getSessionContent`, `TrainingKnowledgeScreen.jsx:782-786`) and
-    /// every other Training source line in this app already use `" + "`.
-    func testSourceLineJoinsMultipleSourcesWithPlusNotComma() {
-        XCTAssertEqual(TrainingSessionDetailView.formatSourceLine(["Typed evidence"]), "Source: Typed evidence")
-        XCTAssertEqual(
-            TrainingSessionDetailView.formatSourceLine(["Screenshot", "Typed evidence"]),
-            "Source: Screenshot + Typed evidence"
-        )
-    }
-
     /// `formatDurationSet` (`TrainingKnowledgeScreen.jsx:1746-1753`): under
     /// 60s is `"Ns"`; 60s and over is `"M:SS"` — a prior revision rendered
     /// the latter as `"1m 15s"`, which the fixture's original single 30s

@@ -48,8 +48,8 @@ struct PhotosHistoryView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil { viewModel = PhotosHistoryViewModel(api: environment.photosAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = PhotosHistoryViewModel(api: environment.photosAPI)
             await viewModel?.load()
             await environment.founderPhotoMediaStore.loadManifestIfNeeded()
         }
@@ -92,7 +92,6 @@ struct PhotosHistoryView: View {
                     }
                 }
                 historyCard(displayed.history)
-                PhotosDataSourcesFooterView(items: displayed.dataSources)
             }
         }
     }
@@ -323,32 +322,6 @@ private struct PhotosDisclosureRow<Summary: View, Expanded: View>: View {
 
             expanded
                 .padding(.top, 12)
-        }
-    }
-}
-
-private struct PhotosDataSourcesFooterView: View {
-    let items: [PhotoDataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
         }
     }
 }

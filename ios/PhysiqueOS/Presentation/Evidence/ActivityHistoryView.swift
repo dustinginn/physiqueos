@@ -107,7 +107,6 @@ struct ActivityHistoryView: View {
                 activityAreasCard(landing.activityAreas)
                 linkedTrainingContextCard(landing.linkedTrainingContext)
                 recentHistoryCard(landing.activityHistory)
-                DataSourcesFooterView(items: landing.dataSources)
             }
         }
     }
@@ -383,49 +382,12 @@ private struct ActivityTrainingContextRow: View {
                     }
                 }
             }
-            if !entry.sourceEvidence.isEmpty {
-                Text("Source: \(entry.sourceEvidence.joined(separator: " + "))")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(PhysiqueOSTheme.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// `TrainingSourceMetadataFooter`'s sibling for Activity's own
-/// `getDataSources("activity")` shape — plain `{name, status}` text pairs,
-/// no color-coding (verified directly against `EvidenceReportContext.jsx`'s
-/// `DataSourcesCard`). Not shared with Training's own private
-/// `DataSourcesFooterView` in `TrainingHistoryView.swift`: that type reads
-/// `{label, sources}`, a different shape for a different section.
-private struct DataSourcesFooterView: View {
-    let items: [ActivityDataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
     }
 }
 

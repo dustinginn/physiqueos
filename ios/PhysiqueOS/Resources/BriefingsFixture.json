@@ -1388,15 +1388,15 @@
       },
       "interpretation": {
         "opening": "This is the second scan since the lean mass phase began, and the surplus is producing measurable tissue gain rather than just scale weight.",
-        "primaryLabel": "Body Composition",
-        "primaryText": "Fat mass grew slightly faster than modeled over these two weeks — not a guardrail breach, but worth watching if it continues at this rate.",
-        "leanMassText": "Lean tissue gained 1.5 lb, consistent with the training progression logged over the same window.",
-        "regionalText": "Most of the fat gain concentrated in the trunk; lean gain was distributed fairly evenly across arms, legs, and trunk.",
+        "fatLoss": "Fat mass grew slightly faster than modeled over these two weeks — not a guardrail breach, but worth watching if it continues at this rate.",
+        "leanMass": "Lean tissue gained 1.5 lb, consistent with the training progression logged over the same window.",
+        "regional": "Most of the fat gain concentrated in the trunk; lean gain was distributed fairly evenly across arms, legs, and trunk.",
         "phaseMeaning": "The lean mass phase calls for exactly this kind of controlled gain — the question going forward is whether the fat-to-lean ratio holds as the surplus continues.",
         "stoodOut": null,
-        "supportingEvidenceText": "Fourteen days of consistent nutrition and training logging back this comparison.",
-        "uncertaintyText": "One more scan is needed to know whether the trunk fat gain is a real trend or normal scan-to-scan noise."
+        "supportingEvidence": "Fourteen days of consistent nutrition and training logging back this comparison.",
+        "uncertainty": "One more scan is needed to know whether the trunk fat gain is a real trend or normal scan-to-scan noise."
       },
+      "semanticGoalType": "lean_mass_gain",
       "coachInsight": {
         "biggestWin": "Lean tissue is climbing for the second scan in a row.",
         "protect": "Keep the current surplus size — don't cut calories over one slightly-faster-than-modeled fat gain.",
@@ -1706,15 +1706,15 @@
       },
       "interpretation": {
         "opening": "This scan closes the loop on your visible abs goal: the numeric target and eight weeks of visual tracking now agree.",
-        "primaryLabel": "Fat Loss",
-        "primaryText": "Body fat fell 3.3 points in four weeks, the fastest single-scan drop of the entire cut, with the deficit held through the final stretch rather than eased up.",
-        "leanMassText": "Lean mass gained 0.4 lb despite the deficit — a strong preservation result for an eight-week cut.",
-        "regionalText": "Trunk fat dropped the most of any region (-3.6 lb), consistent with the visual definition the goal was built around.",
+        "fatLoss": "Body fat fell 3.3 points in four weeks, the fastest single-scan drop of the entire cut, with the deficit held through the final stretch rather than eased up.",
+        "leanMass": "Lean mass gained 0.4 lb despite the deficit — a strong preservation result for an eight-week cut.",
+        "regional": "Trunk fat dropped the most of any region (-3.6 lb), consistent with the visual definition the goal was built around.",
         "phaseMeaning": null,
         "stoodOut": "Lean mass didn't just hold — it went up slightly, unusual for the final weeks of a cut.",
-        "supportingEvidenceText": "Twenty-eight days of consistent weigh-ins and training logs support this comparison.",
-        "uncertaintyText": "None — this scan is the closing measurement for the goal, not a projection."
+        "supportingEvidence": "Twenty-eight days of consistent weigh-ins and training logs support this comparison.",
+        "uncertainty": "None — this scan is the closing measurement for the goal, not a projection."
       },
+      "semanticGoalType": "fat_loss",
       "coachInsight": {
         "biggestWin": "Your visible abs goal is complete, with lean mass preserved through the entire cut.",
         "protect": "Don't rush straight into a new deficit — confirm the goal transition before changing intake again.",

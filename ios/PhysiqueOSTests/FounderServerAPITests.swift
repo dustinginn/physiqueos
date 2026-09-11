@@ -304,7 +304,11 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(first.goals.first?.id, "goal-server")
         XCTAssertEqual(first.goals.first?.current, "148.3")
         XCTAssertEqual(first.goals.first?.target, "10")
-        XCTAssertEqual(first.goals.first?.presentation, .primary(progress: 8))
+        // Home Phase Parity: the same canonical `order`/`phaseName` Goals
+        // Detail uses ("Phase 2 · Lean Mass Build") must surface here too,
+        // not just a bare percentage — this is the exact gap that made
+        // Home look like a single, unnumbered phase.
+        XCTAssertEqual(first.goals.first?.presentation, .primary(progress: 8, phaseLabel: "Phase 2 · Lean Mass Build"))
         XCTAssertEqual(first.todaysFocus.map(\.id), ["priority-server-old"])
         XCTAssertFalse(first.todaysFocus[0].completable)
         XCTAssertNil(first.todaysFocus[0].completionContext)
@@ -346,6 +350,20 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(detail.id, active.id)
         XCTAssertEqual(detail.activePhaseId, "phase-canonical")
         XCTAssertEqual(detail.activePhase?.id, "phase-canonical")
+
+        // Confidence must carry movement/priorScore/delta and the full
+        // explanation detail (supports/limits/what-changed/what's-next) —
+        // a prior revision discarded everything but score/band/summary,
+        // silently dropping data the server already computes and sends.
+        XCTAssertEqual(detail.confidence.movement, "increased")
+        XCTAssertEqual(detail.confidence.priorScore, 68)
+        XCTAssertEqual(detail.confidence.delta, 6)
+        let confidenceDetail = try XCTUnwrap(detail.confidence.detail)
+        XCTAssertEqual(confidenceDetail.movementFactors, ["Confidence increased because training consistency improved."])
+        XCTAssertEqual(confidenceDetail.supportingFactors, ["Training has been consistently strong for the last few weeks."])
+        XCTAssertEqual(confidenceDetail.limitingFactors, ["Calories still need more consistency before we can tell whether this intake is right."])
+        XCTAssertEqual(confidenceDetail.clarifyingFactors, ["Another body-composition check will confirm the trend."])
+        XCTAssertEqual(confidenceDetail.summary, "Training and adherence have both been strong recently.")
 
         // `turningPoints[]` never carries an `id` on the wire — confirms a
         // stable id is still derived rather than the decode failing.
@@ -726,6 +744,7 @@ final class FounderServerAPITests: XCTestCase {
                 "nutrition": productionNutritionJSON,
                 "activity": productionActivityJSON,
                 "energy": productionEnergyJSON,
+                "dexa": productionDexaJSON,
             ]
         )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -752,13 +771,64 @@ final class FounderServerAPITests: XCTestCase {
         // Production actually has.
         XCTAssertEqual(streamsByID["photos"]?.status, .placeholder)
         XCTAssertEqual(streamsByID["photos"]?.metric, "Not yet available in Founder Production")
-        XCTAssertEqual(streamsByID["dexa"]?.status, .placeholder)
-        XCTAssertEqual(streamsByID["dexa"]?.metric, "Not yet available in Founder Production")
+
+        // DEXA is wired to real production reads (Patch 3) — must show the
+        // real latest scan, never the placeholder.
+        XCTAssertEqual(streamsByID["dexa"]?.status, .available)
+        XCTAssertEqual(streamsByID["dexa"]?.metric, "14.2%")
+        XCTAssertEqual(streamsByID["dexa"]?.lastUpdated, "2026-09-01")
 
         // Never-built surfaces keep the same "Coming soon" placeholder
         // Sandbox already shows — no regression there either.
         XCTAssertEqual(streamsByID["recovery"]?.metric, "Coming soon")
         XCTAssertEqual(streamsByID["health-metrics"]?.metric, "Coming soon")
+    }
+
+    /// The server already selects/scopes scans before this report is
+    /// built, so Production must decode its output directly rather than
+    /// re-running scan selection — and must reconcile several genuine
+    /// wire-vs-Native naming/shape differences: `delta.{bodyFat,fatMass,
+    /// leanMass}` (not `bodyFatPercentagePoints`/etc.), `charts[]` matched
+    /// by stable `id` with Native's own titles/units applied (not the
+    /// server's cosmetically different `label`/`suffix`), `regionalMassCharts[]`
+    /// split by `-leanMass`/`-fatMass` id suffix, and `latestDetails` as a
+    /// heterogeneous JSON tuple array (3 or 4 elements, precision optional).
+    func testProductionDEXAReportDecodesRealServerShapeNotFixtureScanSelection() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["dexa": productionDexaJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let report = try await ProductionDEXAAPI(api: native).fetchDEXAReport(scope: .all)
+
+        XCTAssertEqual(report.latestScan?.date, "2026-09-01")
+        let delta = try XCTUnwrap(report.delta)
+        XCTAssertEqual(delta.bodyFatPercentagePoints, "-0.6")
+        XCTAssertEqual(delta.fatMassPounds, "-1.1")
+        XCTAssertEqual(delta.leanMassPounds, "+0.8")
+
+        let totalMassTrend = try XCTUnwrap(report.coreTrends.first { $0.title == "Total Mass" })
+        XCTAssertEqual(totalMassTrend.unit, "lb")
+        let rmrTrend = try XCTUnwrap(report.coreTrends.first { $0.title == "RMR" })
+        XCTAssertEqual(rmrTrend.unit, "kcal/day")
+
+        let trunkFat = try XCTUnwrap(report.regionalFatTrends.first { $0.title == "Trunk" })
+        XCTAssertEqual(trunkFat.points.map(\.value), [11.4, 10.8])
+
+        // 3-element tuple ("Android Fat", no precision → defaults to 1),
+        // 4-element tuple ("VAT Mass", precision 2), and a null value
+        // ("T-score" → "Unavailable", never a crash or a fabricated 0).
+        let detailsByLabel = Dictionary(uniqueKeysWithValues: report.supplementalDetails.map { ($0.label, $0.value) })
+        XCTAssertEqual(detailsByLabel["VAT Mass"], "1.80 lb")
+        XCTAssertEqual(detailsByLabel["Android Fat"], "18.4%")
+        XCTAssertEqual(detailsByLabel["T-score"], "Unavailable")
+
+        // History arrives newest-first from the server already — Production
+        // must pass it straight through, never re-sort or reverse.
+        XCTAssertEqual(report.history.map(\.date), ["2026-09-01", "2026-08-01"])
+        XCTAssertEqual(report.history.first?.restingMetabolicRate, "1780 kcal/day")
     }
 
     /// The defect this guards against was architectural, not a data bug:
@@ -788,6 +858,76 @@ final class FounderServerAPITests: XCTestCase {
 
         environment.selectNativeAuthority(.sandbox)
         XCTAssertTrue((environment.evidenceAPI as? ProbeEvidenceAPI) === probe)
+    }
+
+    /// `dexaAPI` was a stored constant (never authority-aware) before
+    /// Patch 3 — same architectural defect class as `evidenceAPI`/`logAPI`.
+    @MainActor
+    func testAppEnvironmentDEXAAPISwitchesWithAuthorityAndSandboxKeepsTheInjectedFixture() {
+        final class ProbeDEXAAPI: DEXAAPI {
+            func fetchDEXAReport(scope: EvidenceScopeSelection) async throws -> DEXAReportReadModel {
+                DEXAReportReadModel(
+                    title: "probe", subtitle: "probe", scope: TrainingScopeContext(options: [], dateRangeLabel: ""),
+                    latestScan: nil, summary: [], delta: nil,
+                    bodyFatTrend: DEXAMetricSeries(title: "probe", unit: "", points: []),
+                    coreTrends: [], supplementalDetails: [], supplementalTrends: [],
+                    regionalLeanTrends: [], regionalFatTrends: [], history: [], dataSources: []
+                )
+            }
+        }
+        let suite = "PhysiqueOS.DEXAAPIAuthoritySwitch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+
+        let probe = ProbeDEXAAPI()
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: store, dexaAPI: probe)
+        XCTAssertTrue((environment.dexaAPI as? ProbeDEXAAPI) === probe)
+
+        environment.selectNativeAuthority(.founderProduction)
+        XCTAssertTrue(environment.dexaAPI is ProductionDEXAAPI)
+        XCTAssertNil(environment.dexaAPI as? ProbeDEXAAPI)
+
+        environment.selectNativeAuthority(.sandbox)
+        XCTAssertTrue((environment.dexaAPI as? ProbeDEXAAPI) === probe)
+    }
+
+    /// `photosAPI` was a stored constant — never authority-aware — so
+    /// tapping into Progress Photos under Founder Production silently
+    /// rendered the bundled Sandbox fixture (photo sets, poses, dates) as
+    /// if it were live data. Discovered via Simulator acceptance, not
+    /// static review. Progress Photos has a genuine, narrow server-side
+    /// gap (`poseId`/`comparisonStatus` missing from the wire), so the fix
+    /// is an honest "not yet available" failure, never fixture fallback.
+    @MainActor
+    func testAppEnvironmentPhotosAPISwitchesWithAuthorityAndFounderProductionNeverLeaksSandboxFixture() {
+        let suite = "PhysiqueOS.PhotosAPIAuthoritySwitch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority")
+
+        let fixture = FixturePhotosAPI()
+        let environment = AppEnvironment(nativeAuthority: .sandbox, authoritySelectionStore: store, photosAPI: fixture)
+        XCTAssertTrue((environment.photosAPI as? FixturePhotosAPI) != nil)
+
+        environment.selectNativeAuthority(.founderProduction)
+        XCTAssertTrue(environment.photosAPI is NotYetAvailablePhotosAPI)
+        XCTAssertNil(environment.photosAPI as? FixturePhotosAPI)
+
+        environment.selectNativeAuthority(.sandbox)
+        XCTAssertTrue(environment.photosAPI is FixturePhotosAPI)
+    }
+
+    func testNotYetAvailablePhotosAPIThrowsRatherThanReturningFixtureData() async {
+        let api = NotYetAvailablePhotosAPI()
+        do {
+            _ = try await api.fetchPhotosLanding()
+            XCTFail("Expected NotYetAvailable to be thrown")
+        } catch is NotYetAvailablePhotosAPI.NotYetAvailable {
+            // expected
+        } catch {
+            XCTFail("Expected NotYetAvailable, got \(error)")
+        }
     }
 
     func testProductionMediaAcceptsAuthenticatedImageAndPDF() async throws {
@@ -1423,7 +1563,7 @@ private func productionHomeJSON(priorityID: String, goalID: String, confidence: 
       "hero":{"mode":"phase_trajectory","goalLabel":"Current Goal","headline":"Server headline","supportLine":"Server support","confidence":\(confidence),"confidenceDetail":null,"primaryTimeline":"4 weeks remaining","plannedReviewDate":"2026-10-08"},
       "nextBestAction":{"title":"Server action","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}}},
       "briefingCards":[],
-      "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8}}}}],
+      "goals":[{"id":"\(goalID)","title":"Server Goal","icon":"dumbbell","color":"success","destination":{"id":"goal.detail","parameters":{"goalId":"\(goalID)"}},"presentation":{"mode":"phase_trajectory_goal","trajectory":{"goalProgress":{"baselineValue":147.5,"latestValue":148.3,"targetAmount":10,"unit":"lb","clampedProgressPercentage":8},"activePhase":{"order":2,"phaseName":"Lean Mass Build"}}}}],
       "todaysFocus":[{"id":"\(priorityID)","completionId":"completion-canonical","executionId":"execution-canonical","occurrenceDate":"2026-09-10","label":"Server Priority","subtitle":"Server-owned occurrence","metadata":"Production","changeLabel":null,"icon":"target","color":"primary","state":"available","completed":false,"actionLabel":"Complete","completionContext":{"occurrenceDate":"2026-09-10","dose":null,"protocolId":null}}]
     }
     """)
@@ -1440,7 +1580,7 @@ private let productionCompletedGoalJSON = productionEnvelope(resource: "complete
 /// fixture must include that null case, not just an active entry with a
 /// populated `support`, or it can't catch a regression to
 /// `Journey.support: String` non-optional.
-private let productionActiveGoalJSON = productionEnvelope(resource: "active-goal", data: #"{"goalId":"goal-canonical","phaseId":"phase-canonical","confidence":{"score":74,"band":"Moderate","summary":"Server confidence"},"hero":{"title":"Build Lean Mass","status":"Active Goal","destination":"Add 10 lb lean mass by December 2026"},"journey":[{"name":"Establish Maintenance","number":1,"status":"Completed","dates":"Started Jul 19 · Completed","progress":"Completed","support":null,"percentage":100},{"name":"Foundation","number":2,"status":"Active","dates":"Started Sep 1 · Evidence-led review","progress":"In progress","support":"Server support","percentage":32}],"currentPhase":{"id":"phase-canonical","goalId":"goal-canonical","title":"Foundation","purpose":"Build deliberately","progress":"In progress","review":"Evidence-led","evidence":"Server evidence","readiness":"Server readiness"},"readiness":[],"guardrail":{"title":"Maintain 8–9% body fat","scope":"Every phase","body":"DEXA is authoritative","observation":null},"evidence":{"goalBaseline":null,"phaseStart":null,"support":"Server support"},"turningPoints":[{"title":"Goal journey activated","body":"The journey began.","date":"2026-07-19"}],"strategy":[{"label":"Energy","active":true}]}"#)
+private let productionActiveGoalJSON = productionEnvelope(resource: "active-goal", data: #"{"goalId":"goal-canonical","phaseId":"phase-canonical","confidence":{"score":74,"band":"Moderate","summary":"Server confidence","movement":"increased","priorScore":68,"delta":6,"explanation":{"qualitativeLevel":"Moderate","summary":"Training and adherence have both been strong recently.","supportingFactors":["Training has been consistently strong for the last few weeks."],"limitingFactors":["Calories still need more consistency before we can tell whether this intake is right."],"movementFactors":["Confidence increased because training consistency improved."],"clarifyingFactors":["Another body-composition check will confirm the trend."],"uncertaintyStatement":""}},"hero":{"title":"Build Lean Mass","status":"Active Goal","destination":"Add 10 lb lean mass by December 2026"},"journey":[{"name":"Establish Maintenance","number":1,"status":"Completed","dates":"Started Jul 19 · Completed","progress":"Completed","support":null,"percentage":100},{"name":"Foundation","number":2,"status":"Active","dates":"Started Sep 1 · Evidence-led review","progress":"In progress","support":"Server support","percentage":32}],"currentPhase":{"id":"phase-canonical","goalId":"goal-canonical","title":"Foundation","purpose":"Build deliberately","progress":"In progress","review":"Evidence-led","evidence":"Server evidence","readiness":"Server readiness"},"readiness":[],"guardrail":{"title":"Maintain 8–9% body fat","scope":"Every phase","body":"DEXA is authoritative","observation":null},"evidence":{"goalBaseline":null,"phaseStart":null,"support":"Server support"},"turningPoints":[{"title":"Goal journey activated","body":"The journey began.","date":"2026-07-19"}],"strategy":[{"label":"Energy","active":true}]}"#)
 
 private let productionOperatingPlanJSON = productionEnvelope(resource: "operating-plan", data: #"{"sections":[{"iconKey":"energy","tone":"primary","title":"Energy Strategy","subtitle":"Active","items":[{"id":"energy-canonical","title":"Phase Execution","detail":"2300 kcal/day intake","status":"Active","destination":{"id":"operating-plan","parameters":{}}}]}],"sourceVersions":{"energy":"4"},"relationshipContext":{"activeGoalId":"goal-canonical","activePhaseId":"phase-canonical"}}"#)
 
@@ -1484,6 +1624,8 @@ private let productionNutritionJSON = productionEnvelope(resource: "nutrition", 
 private let productionActivityJSON = productionEnvelope(resource: "activity", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Activity","selected":true}]},"report":{"title":"Activity","subtitle":"Whole-day movement","tone":"success","latestActivityDay":{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."},"activityAreas":[],"linkedTrainingContext":[{"id":"training-canonical","label":"Traditional Strength Training","value":"356 active cal","detail":"1h 12m · 4 exercises"}],"activityHistory":[{"id":"activity-day-canonical","label":"Daily Activity","value":"650 active cal / 45 min","detail":"1 workout linked","date":"2026-09-10","isToday":true,"activeCalories":650,"totalCalories":null,"exerciseMinutes":45,"standHours":12,"moveGoal":600,"exerciseGoal":30,"standGoal":12,"ringCompletion":null,"workoutActiveCalories":400,"nonWorkoutActiveCalories":250,"linkedTrainingSessionCount":1,"protocolStatus":"50 active calories above target."}],"dataSources":[{"name":"Web","status":"Connected"}]}}"#)
 
 private let productionEnergyJSON = productionEnvelope(resource: "energy", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Energy","selected":true}]},"summary":{"averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDays":1,"evidenceDays":2},"days":[{"date":"2026-09-10","nutritionDayId":null,"activityDayId":"activity-1","calorieIntake":null,"activeCalories":500,"rmr":1700,"estimatedExpenditure":2200,"energyBalance":null,"completeness":"activity-only","sources":{"nutrition":[],"activity":["Activity"]}},{"date":"2026-09-09","nutritionDayId":"nutrition-1","activityDayId":"activity-2","calorieIntake":0,"activeCalories":600,"rmr":1700,"estimatedExpenditure":2300,"energyBalance":-2300,"completeness":"complete","sources":{"nutrition":["Web"],"activity":["Activity"]}}],"weeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"recentFourWeeks":[{"id":"week-server","weekStart":"2026-09-07","weekEnd":"2026-09-13","averageIntake":2300,"averageExpenditure":2425,"averageBalance":-125,"completeDayCount":1,"evidenceDayCount":2,"expectedDayCount":4,"partial":true}],"latestEvidenceDate":"2026-09-10","dataSources":[{"name":"Nutrition","status":"Connected"}],"audit":{"nutritionDays":1,"activityDays":2,"overlappingDates":1}}"#)
+
+private let productionDexaJSON = productionEnvelope(resource: "dexa", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All DEXA","selected":true}]},"report":{"title":"DEXA","subtitle":"BodySpec body-composition scan history.","latestScan":{"date":"2026-09-01","sourceFileId":"media://scan-2","sourceHref":"/api/private-evidence/media/scan-2"},"summary":[{"label":"Body Fat","value":"14.2%"},{"label":"Fat Mass","value":"26.8 lb"},{"label":"Lean Mass","value":"156.4 lb"},{"label":"Weight","value":"183.2 lb"},{"label":"RMR","value":"1780 kcal"}],"delta":{"bodyFat":"-0.6","fatMass":"-1.1","leanMass":"+0.8"},"chart":{"points":[{"id":"scan-1","date":"2026-08-01","value":14.8},{"id":"scan-2","date":"2026-09-01","value":14.2}]},"charts":[{"id":"totalMass","label":"Weight","suffix":" lb","points":[{"id":"scan-1","date":"2026-08-01","value":184.3},{"id":"scan-2","date":"2026-09-01","value":183.2}]},{"id":"rmr","label":"RMR","suffix":" kcal","points":[{"id":"scan-1","date":"2026-08-01","value":1775},{"id":"scan-2","date":"2026-09-01","value":1780}]}],"regionalMassCharts":[{"id":"trunk-fatMass","label":"Trunk Fat Mass","suffix":" lb","points":[{"id":"scan-1","date":"2026-08-01","value":11.4},{"id":"scan-2","date":"2026-09-01","value":10.8}]}],"latestDetails":[["VAT Mass",1.8," lb",2],["Android Fat",18.4,"%"],["A/G Ratio",0.92,"",2],["T-score",null,""]],"history":[{"id":"scan-2","date":"2026-09-01","bodyFatPercentage":14.2,"totalMass":183.2,"fatMass":26.8,"leanMass":156.4,"rmr":1780,"sourceFileId":"media://scan-2","sourceHref":"/api/private-evidence/media/scan-2"},{"id":"scan-1","date":"2026-08-01","bodyFatPercentage":14.8,"totalMass":184.3,"fatMass":27.9,"leanMass":155.6,"rmr":1775,"sourceFileId":"media://scan-1","sourceHref":"/api/private-evidence/media/scan-1"}],"dataSources":[{"name":"BodySpec PDF Import","status":"Connected"}]}}"#)
 
 private let productionTrainingLandingJSON = productionEnvelope(resource: "training-landing", data: #"{"timeline":{"contextId":"all","goalId":null,"startDate":null,"endDate":null,"dateRangeLabel":"All time","options":[{"id":"all","label":"All Training","selected":true}]},"report":{"title":"Training","subtitle":"Training evidence","tone":"success","latestTrainingDay":{"date":"2026-09-09","label":"Sep 9","summary":"Biceps · Triceps","destination":{"id":"progress.stream","parameters":{"streamId":"training"}},"sessions":[]},"reportingLinks":[],"trainingDays":[],"currentProtocol":{"sourceOfTruth":"Server","dailyActivityTarget":"1000 cal","resistanceTraining":"3x/week","goal":"Build Lean Mass"},"relatedGoals":[],"sourceEvidence":[]}}"#)
 

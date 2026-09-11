@@ -89,7 +89,6 @@ struct EnergyHistoryView: View {
                 recentWeeksCard(report.recentFourWeeks)
                 weeklyHistoryCard(report.weeklyHistory)
                 dailyHistoryCard(report.dailyHistory)
-                EnergyDataSourcesFooterView(items: report.dataSources)
             }
         }
     }
@@ -393,31 +392,5 @@ private struct EnergyDayHistoryRow: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct EnergyDataSourcesFooterView: View {
-    let items: [EnergyDataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
     }
 }

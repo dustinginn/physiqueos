@@ -71,8 +71,8 @@ struct DEXAHistoryView: View {
                 }
             }
         }
-        .task {
-            if viewModel == nil { viewModel = DEXAHistoryViewModel(api: environment.dexaAPI) }
+        .task(id: environment.nativeAuthority) {
+            viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
             await viewModel?.load()
         }
     }
@@ -103,7 +103,6 @@ struct DEXAHistoryView: View {
                 regionalCard(title: "Regional Tissue Lean Mass", series: report.regionalLeanTrends, namespace: "regionalLean", isExpanded: $isRegionalLeanExpanded)
                 regionalCard(title: "Regional Tissue Fat Mass", series: report.regionalFatTrends, namespace: "regionalFat", isExpanded: $isRegionalFatExpanded)
                 historyCard(report.history)
-                DEXADataSourcesFooterView(items: report.dataSources)
             }
         }
     }
@@ -446,32 +445,6 @@ private struct DEXADisclosureRow<Summary: View, Expanded: View>: View {
 
             expanded
                 .padding(.top, 12)
-        }
-    }
-}
-
-private struct DEXADataSourcesFooterView: View {
-    let items: [DEXADataSource]
-
-    var body: some View {
-        if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text("Data Sources")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .padding(.top, 6)
-                ForEach(items) { item in
-                    HStack {
-                        Text(item.name)
-                        Spacer(minLength: 8)
-                        Text(item.status)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
         }
     }
 }
